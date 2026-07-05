@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Faolan.Core;
 using Stat = Faolan.Core.Enums.CharacterStatId;
 
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer.FullCharSnapshot
 {
 	// The fresh-character STAT-block skeleton (the SnapshotTails PostAccessBlock), relocated out of
 	// BeachTailsTemplate.bin so the stat region can be authored without the .bin (#186). Decoded by

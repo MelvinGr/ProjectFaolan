@@ -5,7 +5,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Faolan.TestClient;
 
 // Faolan.TestClient — a console client that mirrors the retail client's protocol from login through WORLD ENTRY,

@@ -7,7 +7,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
 

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.World;
 
 // ReSharper disable once CheckNamespace

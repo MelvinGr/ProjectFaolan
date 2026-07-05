@@ -9,7 +9,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Xunit;
 
 namespace Faolan.Tests

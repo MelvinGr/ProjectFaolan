@@ -3,14 +3,13 @@ using System;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
-using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Dialogue;
-using Faolan.GameServer.Packets.Protobuf;
+using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -90,7 +89,7 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.ScryScriptIIR:
 				{
-					await HandleCommandPacket(client, packet);
+					await _createFlow.HandleCommandPacket(client, packet);
 					break;
 				}
 
@@ -229,7 +228,7 @@ namespace Faolan.GameServer
 						else
 						{
 							await SendReadyForPlayScreen(client);
-							await HandleNewCharacter(client, packet);
+							await CreateFlow.CreateFlowService.HandleNewCharacter(client, packet);
 						}
 					}
 					else

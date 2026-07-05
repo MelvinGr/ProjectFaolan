@@ -1,5 +1,5 @@
 using System.IO;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Xunit;
 using Xunit.Abstractions;
 

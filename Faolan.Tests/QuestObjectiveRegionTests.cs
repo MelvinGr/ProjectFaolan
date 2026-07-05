@@ -1,6 +1,6 @@
 using System.IO;
 using System.Text;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Xunit;
 
 namespace Faolan.Tests

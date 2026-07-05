@@ -6,7 +6,7 @@ using System.Text;
 using Faolan.Core;
 using Faolan.Core.Network.Packets;
 
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer.FullCharSnapshot
 {
 	public static class InventorySnapshotInspector
 	{

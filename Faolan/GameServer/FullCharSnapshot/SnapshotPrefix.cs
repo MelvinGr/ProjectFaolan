@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core.Network.Conan;
 
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer.FullCharSnapshot
 {
 	// Constructs the beach 0x737A6DF9 snapshot's 8-byte IIR prefix FROM SCRATCH, instead of carrying the captured
 	// prefix and rewriting its length field (on the live path that length is set by RetailLoginReplay.SetSnapshotBlobLength,

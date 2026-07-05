@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
+using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
@@ -281,7 +282,7 @@ namespace Faolan.Importer.Cli
 					s.ReadUInt32();
 					s.ReadUInt32();
 					s.ReadUInt32();
-					var rootMsg = Faolan.GameServer.Packets.FullCharSnapshot.InventorySnapshotInspector.ParseInventoryRoot(s);
+					var rootMsg = InventorySnapshotInspector.ParseInventoryRoot(s);
 					Console.WriteLine($"    inventory-root: OK ({rootMsg.Fields.Count} fields)");
 				}
 				catch (Exception ex)

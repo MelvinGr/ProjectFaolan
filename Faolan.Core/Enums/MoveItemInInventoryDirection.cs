@@ -1,4 +1,4 @@
-namespace Faolan.GameServer.Packets.Protobuf
+namespace Faolan.Core.Enums
 {
 	// The TypeId of an Interact 0x09 equip move identifies the drag's window pair; Mode is the client's
 	// monotonic per-session action counter, NOT a direction (armed+unarmed combat capture 2026-06-12).

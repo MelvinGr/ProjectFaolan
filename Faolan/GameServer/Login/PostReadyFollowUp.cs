@@ -68,11 +68,9 @@ namespace Faolan.GameServer
 		private static readonly byte[] NewCharacterReadyForPlayScreenReceiver = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10];
 
 		private static readonly byte[] NewCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
-		private static readonly byte[] Receiver2 = [0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08];
 		private static readonly byte[] Receiver3 = [0x0d, 0x48, 0x76, 0x37, 0x28, 0x10, 0x84, 0x80, 0x80, 0x08];
 		private static readonly byte[] RetailCreatePost205FSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
 
-		private static readonly byte[] Sender2 = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x14);
 		// Receiver for the create-editor (clientInstance=0x021662C8) conversation family.
 		// The create-editor 0x2000 receiver is built per session from the character's real instance id -
 		// see CreateEditorReceiver(client) in GameServerListener. The editor/world bursts are constructed at

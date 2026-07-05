@@ -11,10 +11,12 @@ using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
-	public partial class GameServerListener
+	// The character-creation editor's INBOUND handler: the client->server 0xA36D3B74 script callbacks
+	// (ChangeSex/ChangeRace/ChangeClass/.../TheNameIs/SetMorphValue/Finish + the beach cutscene lifecycle triggers).
+	// The outbound side (naming acks, morph acks, cutscene Scry steps) lives on the other CreateFlowService partials.
+	public partial class CreateFlowService
 	{
 		// Applies one editor SetMorphValue callback to the character's body. The value is a ZIGZAG-encoded
 		// signed slider value; CharacterMorphs decodes it and stores the signed value in the matching
@@ -31,7 +33,7 @@ namespace Faolan.GameServer
 			}
 
 			if (!CharacterMorphs.TryApply(EnsureBody(character), morph, value))
-				Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", morph, value);
+				_logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", morph, value);
 		}
 
 		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string name)
@@ -46,10 +48,10 @@ namespace Faolan.GameServer
 			// Check the name is free BEFORE saving (Characters.Name is UNIQUE) so a taken name is rejected cleanly as
 			// NicknameTaken rather than blowing up the SaveCharacter unit of work. A row owned by THIS character doesn't
 			// count (idempotent re-name to the same value is handled above).
-			var existing = await Database.GetCharacterByName(name);
+			var existing = await _database.GetCharacterByName(name);
 			if (existing != null && existing.Id != character.Id)
 			{
-				Logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);
+				_logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);
 				return NameCommitResult.Taken;
 			}
 
@@ -58,14 +60,14 @@ namespace Faolan.GameServer
 			// class/level - replacing the level-1 rogue baseline seeded at row allocation.
 			character.RegenerateMaxStats();
 			// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
-			await Database.SaveCharacter(character);
+			await _database.SaveCharacter(character);
 
 			// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
 			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
 			// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
 			// NOT re-seeded on world entry, so a completed/removed quest never reappears.
-			await Database.SetCharacterQuest(character.Id, WorldQuest.BeachStarterQuestId, QuestState.Active);
-			Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, WorldQuest.BeachStarterQuestId);
+			await _database.SetCharacterQuest(character.Id, WorldQuest.BeachStarterQuestId, QuestState.Active);
+			_logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, WorldQuest.BeachStarterQuestId);
 			return NameCommitResult.Committed;
 		}
 
@@ -93,7 +95,7 @@ namespace Faolan.GameServer
 		// The chosen name is captured into Session.PendingCharacterName rather than Character.Name, so the
 		// create-editor gating (which keys on Character.Name == null) is not disturbed mid-stream;
 		// promoting it to a persisted character is the separate enter-world step.
-		private async Task HandleCommandPacket(INetworkClient client, ConanPacket packet)
+		internal async Task HandleCommandPacket(INetworkClient client, ConanPacket packet)
 		{
 			var ack = packet.Body.ReadUInt32();
 			var clientInstance = packet.Body.ReadUInt32();
@@ -144,7 +146,7 @@ namespace Faolan.GameServer
 			}
 
 			var character = client.Session.Character;
-			Logger.LogInformation("Character-editor script callback: token={Token}, scryType={ScryType}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.",
+			_logger.LogInformation("Character-editor script callback: token={Token}, scryType={ScryType}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.",
 				token,
 				scryType,
 				numericValue,
@@ -157,7 +159,7 @@ namespace Faolan.GameServer
 			// PlayResult (AFTER the player commits to playing the cutscene), not before. Route it explicitly.
 			if (token == null && scryType == 8 && IsCreateWorldConnection(client))
 			{
-				await _createFlow.SendCreateCutsceneStep(client, "PlayResult", 0);
+				await SendCreateCutsceneStep(client, "PlayResult", 0);
 				return;
 			}
 
@@ -232,20 +234,20 @@ namespace Faolan.GameServer
 					if (commit == NameCommitResult.Committed && client.Session.Character?.Name == valueString)
 					{
 						// Confirm the name (NicknameOk + CharCreationFinished) so the client advances to enter-world.
-						await _createFlow.SendNicknameAccepted(client, valueString);
+						await SendNicknameAccepted(client, valueString);
 
 						// The character is now named; its NEXT GameServer connection (opened after the 0x2002
 						// enter-world handoff) is the create-world entry and must get the intro/cutscene. Mark it
 						// pending so the world Hello recognises that connection (and not later normal logins).
 						PendingCreateWorldEntry.TryAdd(client.Session.Character.Id, 0);
-						Logger.LogInformation("Create-editor: character {CharacterId:X8} named '{Name}'; marked pending create-world entry.", client.Session.Character.Id, valueString);
+						_logger.LogInformation("Create-editor: character {CharacterId:X8} named '{Name}'; marked pending create-world entry.", client.Session.Character.Id, valueString);
 					}
 					else
 					{
 						// Reject the name so the client re-prompts instead of silently stalling (no loading screen).
 						// NicknameTaken = already in use; NicknameInvalid = empty/unsaveable (retail callbacks, see
 						// SendNicknameRejected). Without this the create flow dead-ends on a duplicate name.
-						await _createFlow.SendNicknameRejected(client, valueString, commit == NameCommitResult.Taken);
+						await SendNicknameRejected(client, valueString, commit == NameCommitResult.Taken);
 					}
 
 					break;
@@ -257,7 +259,7 @@ namespace Faolan.GameServer
 					// morphs, so the set varies and may be empty if nothing was morphed). Debounce the
 					// post-morph trio off Finish + each morph so it fires once the stream goes quiet,
 					// regardless of which morphs were sent.
-					_createFlow.SchedulePostMorphBurst(client);
+					SchedulePostMorphBurst(client);
 					break;
 				}
 
@@ -273,10 +275,10 @@ namespace Faolan.GameServer
 					{
 						if (character != null)
 							ApplyMorph(character, valueString, numericValue);
-						await _createFlow.SendMorphValueAck(client, valueString);
+						await SendMorphValueAck(client, valueString);
 					}
 
-					_createFlow.SchedulePostMorphBurst(client);
+					SchedulePostMorphBurst(client);
 					break;
 				}
 
@@ -287,11 +289,11 @@ namespace Faolan.GameServer
 					// the editor interactive (the editor connection then drives itself; see the create flow).
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
 					{
-						await _createFlow.SendCreateCutsceneStep(client, token, numericValue);
+						await SendCreateCutsceneStep(client, token, numericValue);
 						break;
 					}
 
-					Logger.LogInformation("Character-editor: IntroDone - editor is interactive; the editor connection is now silent until enter-world.");
+					_logger.LogInformation("Character-editor: IntroDone - editor is interactive; the editor connection is now silent until enter-world.");
 					break;
 				}
 
@@ -303,13 +305,13 @@ namespace Faolan.GameServer
 				case "Move":
 				{
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
-						await _createFlow.SendCreateCutsceneStep(client, token, numericValue);
+						await SendCreateCutsceneStep(client, token, numericValue);
 					break;
 				}
 
 				default:
 				{
-					Logger.LogInformation("Character-editor: unhandled script callback token '{Token}' (numericValue={NumericValue}, value={Value}).", token, numericValue, valueString ?? "");
+					_logger.LogInformation("Character-editor: unhandled script callback token '{Token}' (numericValue={NumericValue}, value={Value}).", token, numericValue, valueString ?? "");
 					break;
 				}
 			}

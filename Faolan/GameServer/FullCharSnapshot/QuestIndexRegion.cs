@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core;
 
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer.FullCharSnapshot
 {
 	// The QUEST INDEX region of the 0x737A6DF9 tails - the bytes between the @609 objective region (see
 	// QuestObjectiveRegion) and the access-window table. Two parts (decoded from the template, validated by the

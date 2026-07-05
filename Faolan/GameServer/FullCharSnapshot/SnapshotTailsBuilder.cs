@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
-using Faolan.Core.Enums;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer.FullCharSnapshot
 {
 	// Builds the beach 0x737A6DF9 snapshot TAILS entirely FROM SCRATCH (BuildFromScratch) - no captured-tails
 	// template: the generated quest portion + the game-static PFAccessWindow_ catalog (AccessWindowCatalog typed

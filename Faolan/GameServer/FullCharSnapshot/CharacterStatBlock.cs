@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Faolan.Core;
 using Faolan.Core.Enums;
 
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer.FullCharSnapshot
 {
 	/// <summary>
 	///     Builds the count-prefixed stat-record block shared by the <c>0x737A6DF9</c> snapshot and the

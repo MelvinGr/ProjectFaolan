@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Network.Conan;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Xunit;
 using Xunit.Abstractions;
 

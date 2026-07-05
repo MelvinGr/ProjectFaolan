@@ -7,7 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.FullCharSnapshot;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

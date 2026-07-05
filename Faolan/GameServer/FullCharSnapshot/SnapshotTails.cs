@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Faolan.Core;
 
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer.FullCharSnapshot
 {
 	public sealed class SnapshotTails
 	{
