@@ -4,9 +4,9 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
-	public partial class GameServerListener
+	public partial class CreateFlowService
 	{
 		// Step 3 of the create->world handshake: the world-prep / scene burst the creator sends after
 		// CharCreationFinished, before the client will send 0x206E (enter world). Verbatim from

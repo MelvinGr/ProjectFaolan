@@ -157,7 +157,7 @@ namespace Faolan.GameServer
 			// PlayResult (AFTER the player commits to playing the cutscene), not before. Route it explicitly.
 			if (token == null && scryType == 8 && IsCreateWorldConnection(client))
 			{
-				await SendCreateCutsceneStep(client, "PlayResult", 0);
+				await _createFlow.SendCreateCutsceneStep(client, "PlayResult", 0);
 				return;
 			}
 
@@ -232,7 +232,7 @@ namespace Faolan.GameServer
 					if (commit == NameCommitResult.Committed && client.Session.Character?.Name == valueString)
 					{
 						// Confirm the name (NicknameOk + CharCreationFinished) so the client advances to enter-world.
-						await SendNicknameAccepted(client, valueString);
+						await _createFlow.SendNicknameAccepted(client, valueString);
 
 						// The character is now named; its NEXT GameServer connection (opened after the 0x2002
 						// enter-world handoff) is the create-world entry and must get the intro/cutscene. Mark it
@@ -245,7 +245,7 @@ namespace Faolan.GameServer
 						// Reject the name so the client re-prompts instead of silently stalling (no loading screen).
 						// NicknameTaken = already in use; NicknameInvalid = empty/unsaveable (retail callbacks, see
 						// SendNicknameRejected). Without this the create flow dead-ends on a duplicate name.
-						await SendNicknameRejected(client, valueString, commit == NameCommitResult.Taken);
+						await _createFlow.SendNicknameRejected(client, valueString, commit == NameCommitResult.Taken);
 					}
 
 					break;
@@ -257,7 +257,7 @@ namespace Faolan.GameServer
 					// morphs, so the set varies and may be empty if nothing was morphed). Debounce the
 					// post-morph trio off Finish + each morph so it fires once the stream goes quiet,
 					// regardless of which morphs were sent.
-					SchedulePostMorphBurst(client);
+					_createFlow.SchedulePostMorphBurst(client);
 					break;
 				}
 
@@ -273,10 +273,10 @@ namespace Faolan.GameServer
 					{
 						if (character != null)
 							ApplyMorph(character, valueString, numericValue);
-						await SendMorphValueAck(client, valueString);
+						await _createFlow.SendMorphValueAck(client, valueString);
 					}
 
-					SchedulePostMorphBurst(client);
+					_createFlow.SchedulePostMorphBurst(client);
 					break;
 				}
 
@@ -287,7 +287,7 @@ namespace Faolan.GameServer
 					// the editor interactive (the editor connection then drives itself; see the create flow).
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
 					{
-						await SendCreateCutsceneStep(client, token, numericValue);
+						await _createFlow.SendCreateCutsceneStep(client, token, numericValue);
 						break;
 					}
 
@@ -303,7 +303,7 @@ namespace Faolan.GameServer
 				case "Move":
 				{
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
-						await SendCreateCutsceneStep(client, token, numericValue);
+						await _createFlow.SendCreateCutsceneStep(client, token, numericValue);
 					break;
 				}
 

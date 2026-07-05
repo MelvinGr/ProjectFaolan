@@ -11,7 +11,7 @@ using Faolan.GameServer.World;
 // ScryScript (the destiny cutscene step builder)
 
 // ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
 	// #234 reconstruct STEP 2 (docs/handoff-2026-06-22-create-flow-reconstruct.md). The post-creation world entry
 	// is now the PROVEN burst-less world (live char) PLUS the destiny cutscene's Scry-script overlay - WITHOUT the
@@ -21,7 +21,7 @@ namespace Faolan.GameServer
 	// cutscene's ACTORS stay invisible until the #185 scene-spawn lift, but the flow PROGRESSES and the created char
 	// lands playable (instead of the verbatim path's wrong-char world -> disconnect -> hang). The Scry steps + their
 	// framing are lifted verbatim from RetailCreateWorldEntryBurst (the golden); only the world bulk is dropped.
-	public partial class GameServerListener
+	public partial class CreateFlowService
 	{
 		private const float KalanthesWalkPathLength = 8.567047119140625f; // from -> target distance (interp timing)
 		private static readonly Quaternion KalanthesIntroFacing = new Quaternion(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
@@ -105,7 +105,7 @@ namespace Faolan.GameServer
 		}
 
 		// The post-creation world entry: handshake + burst-less live-char world + cutscene start.
-		private async Task SendCreateWorldWithCutscene(INetworkClient client)
+		internal async Task SendCreateWorldWithCutscene(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
 
@@ -125,7 +125,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// (b) The live-char world (constructed; same path existing-char logins use).
-			await SendBurstlessWorldEntry(client, client.Session.Character.MapId);
+			await _sendBurstlessWorldEntry(client, client.Session.Character.MapId);
 
 			// (c) Start the destiny cutscene (Scry scripts only - the begin marker, the scene-load character_creation
 			// step, and the two opening script groups). The per-callback steps follow via SendCreateCutsceneStep.

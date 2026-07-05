@@ -556,7 +556,7 @@ namespace Faolan.GameServer
 								// post-creation intro (conversation 12493). It is NPC-agnostic, so it shows the same text
 								// for every NPC - the DB path above is what routes the correct dialogue per NPC.
 								if (client.Session.IsCreateWorldSession && npcHandle != 0)
-									await SendNpcIntroConversation(client, npcHandle);
+									await _createFlow.SendNpcIntroConversation(client, npcHandle);
 								// Beach login with no captured node for this (Mode, Field3): close the chat window so the
 								// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
 								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
@@ -873,7 +873,7 @@ namespace Faolan.GameServer
 				if (client.Session.CreateEditorTempInstanceCount >= 3)
 				{
 					Logger.LogInformation("Flushing create-editor post-0x205F burst after {Count}x instance echo.", client.Session.CreateEditorTempInstanceCount);
-					await SendRetailCreateEditorPost205FBurst(client);
+					await CreateFlow.CreateFlowService.SendRetailCreateEditorPost205FBurst(client);
 					client.Session.HasPendingPost205FFollowUp = false;
 					client.Session.HasFlushedCreateWorldEntryBurst = true;
 					client.Session.CreateEditorTempInstanceCount = 0;
@@ -892,7 +892,7 @@ namespace Faolan.GameServer
 				if (requestId.HasValue)
 				{
 					Logger.LogInformation("Flushing create-editor post-ready burst using observed request ids [{RequestIds}].", string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
-					await SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
+					await CreateFlow.CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
 					client.Session.HasPendingCreateEditorReadyFollowUp = false;
 					client.Session.CreateEditorTempInstanceCount = 0;
 					client.Session.CreateEditorReadyRequestIds.Clear();
@@ -916,7 +916,7 @@ namespace Faolan.GameServer
 					{
 						Logger.LogInformation("Create-editor deadlock breaker: client never sent ReadyForPlayScreen; proactively flushing the post-ready burst using observed request ids [{RequestIds}].",
 							string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
-						await SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
+						await CreateFlow.CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
 						client.Session.HasFlushedCreateEditorPostReady = true;
 						client.Session.CreateEditorReadyRequestIds.Clear();
 						return;
@@ -924,7 +924,7 @@ namespace Faolan.GameServer
 				}
 
 				Logger.LogInformation("Acknowledging standalone create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
-				await SendRetailCreateEditorPostReadyAck(client, requestId.Value);
+				await CreateFlow.CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId.Value);
 			}
 			else
 				Logger.LogInformation("Ignoring standalone create-editor instance-echo after the expected bursts already flushed.");

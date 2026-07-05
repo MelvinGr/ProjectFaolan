@@ -10,14 +10,15 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Spawn;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
 	public static class RetailCreateEditorInitialBurst
 	{
 		// The character-create editor playfield/map id (the scene props are WorldObjects rows on it).
 		private const uint EditorMapId = 4000;
 		// Verbatim replay of the retail create-editor INITIAL download from
-		// Captures/account-stricken998-character-create-no-worldenter.json (GameServer port 7030), 		// rows 30-65. This stage front-loads MapChange + SpawnObject/Spawn + AccessWindow + SetDayTime
+		// Captures/account-stricken998-character-create-no-worldenter.json (GameServer port 7030),
+		// rows 30-65. This stage front-loads MapChange + SpawnObject/Spawn + AccessWindow + SetDayTime
 		// + the first 9x 0xF98E10B3 before the client sends its first 0x205F.
 
 		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository database = null)

@@ -5,7 +5,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
 	// The NPC intro-conversation reply, reconstructed from
 	// Captures/Dikketest_rogue-barbarian_create_random-actions.json (world conn 37.18.193.22:7012).
@@ -20,14 +20,14 @@ namespace Faolan.GameServer
 	// receiver family tail (C8 C5 D9 10) and in each body's clientInstance field (02 16 62 C8). The player name
 	// embedded in the remoteformat XML is still the capture's ("Dikketest"); rebuilding it per-character is a
 	// follow-up.
-	public partial class GameServerListener
+	public partial class CreateFlowService
 	{
 		// Sends the intro NPC conversation in response to the player talking to the beach NPC (the Interact
 		// talk action). Sent once per world session - the dialogue-tree advancement (the later conversation
 		// nodes the player clicked through) is not yet modelled.
-		private async Task SendNpcIntroConversation(INetworkClient client, uint npcHandle)
+		internal async Task SendNpcIntroConversation(INetworkClient client, uint npcHandle)
 		{
-			Logger.LogInformation("Player talked to NPC handle 0x{NpcHandle:X}; sending the intro conversation reply.", npcHandle);
+			_logger.LogInformation("Player talked to NPC handle 0x{NpcHandle:X}; sending the intro conversation reply.", npcHandle);
 			var id = client.Session.Account.ClientInstance;
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)

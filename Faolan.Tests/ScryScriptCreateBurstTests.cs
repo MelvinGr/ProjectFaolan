@@ -1,7 +1,7 @@
 using System;
-using Faolan.GameServer;
 using Faolan.GameServer.World;
 using Xunit;
+using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
 
 namespace Faolan.Tests
 {
@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PreloadAssetsStep_BuildsTheCapturedRecord()
 		{
-			var body = ScryScript.BuildStep(Handle, GameServerListener.CreateWorldScriptToken, 7, resources: GameServerListener.CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303);
+			var body = ScryScript.BuildStep(Handle, CreateFlowService.CreateWorldScriptToken, 7, resources: CreateFlowService.CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303);
 			Assert.Equal(Expected(Rec1Suffix), Convert.ToHexStringLower(body));
 		}
 

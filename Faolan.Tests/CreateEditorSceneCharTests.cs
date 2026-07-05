@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using Faolan.GameServer;
+using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Spawn;
 using Faolan.Tests.Support;
 using Xunit;

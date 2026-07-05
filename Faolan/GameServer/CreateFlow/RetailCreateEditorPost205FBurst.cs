@@ -4,16 +4,16 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
-	public partial class GameServerListener
+	public partial class CreateFlowService
 	{
 		// Verbatim replay of the retail create-editor POST-0x205F burst from
 		// Captures/account-stricken998-character-create-no-worldenter.json (rows 100-166, excluding Pong row 146).
 		// Retail waits for the first 3x 0x021662C8 after the client's first 0x205F, then answers with this
 		// SpawnCheck/0xF98E10B3 burst plus the 0x0009FF92-0x0009FF96 acknowledgement packets.
 
-		private static async Task SendRetailCreateEditorPost205FBurst(INetworkClient client)
+		internal static async Task SendRetailCreateEditorPost205FBurst(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
 

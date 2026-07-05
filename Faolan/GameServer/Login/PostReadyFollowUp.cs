@@ -1,4 +1,3 @@
-using Faolan.Core.Enums;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -10,7 +9,6 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
-using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 

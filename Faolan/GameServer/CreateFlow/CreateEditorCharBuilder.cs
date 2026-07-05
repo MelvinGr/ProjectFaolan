@@ -4,7 +4,7 @@ using System.Numerics;
 using Faolan.GameServer.Spawn;
 
 // ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
 	// Reconstructs the character-create EDITOR scene-character records - the SimpleCharFullUpdateIIR (FA015807)
 	// spawns the initial burst streams for the editor pedestals (issue #189). They are ordinary entity spawns:

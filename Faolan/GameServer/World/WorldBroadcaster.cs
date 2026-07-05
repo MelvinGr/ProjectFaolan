@@ -16,7 +16,7 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
-using Faolan.GameServer.Dialogue;
+using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;

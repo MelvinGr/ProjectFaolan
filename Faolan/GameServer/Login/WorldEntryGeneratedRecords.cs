@@ -3,6 +3,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.CreateFlow;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

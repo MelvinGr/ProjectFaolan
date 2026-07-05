@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
 {

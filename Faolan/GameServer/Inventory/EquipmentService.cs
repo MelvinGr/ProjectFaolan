@@ -7,7 +7,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.GameServer.Packets.FullCharSnapshot;
-using Faolan.GameServer.Packets.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Inventory

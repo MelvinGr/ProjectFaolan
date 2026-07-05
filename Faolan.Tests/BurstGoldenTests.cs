@@ -3,9 +3,10 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Faolan.GameServer;
+using Faolan.GameServer.CreateFlow;
 using Faolan.Tests.Support;
 using Xunit;
+using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
 
 namespace Faolan.Tests
 {
@@ -35,9 +36,9 @@ namespace Faolan.Tests
 			return AssertBurstStable("CreateWorldEntryBurst",
 				async c =>
 				{
-					await GameServerListener.SendCreateWorldSceneBurst(c);
+					await CreateFlowService.SendCreateWorldSceneBurst(c);
 					for (var i = 0; i < 5; i++)
-						await GameServerListener.SendNextCreateWorldChunk(c);
+						await CreateFlowService.SendNextCreateWorldChunk(c);
 				},
 				CreateWorldCapturedInstance);
 		}
@@ -45,7 +46,7 @@ namespace Faolan.Tests
 		[Fact]
 		public Task CreationScriptBurst_IsByteStable()
 		{
-			return AssertBurstStable("CreationScriptBurst", GameServerListener.SendRetailCreateEditorCreationScriptBurst);
+			return AssertBurstStable("CreationScriptBurst", CreateFlowService.SendRetailCreateEditorCreationScriptBurst);
 		}
 
 		[Fact]
@@ -59,7 +60,7 @@ namespace Faolan.Tests
 		[Fact]
 		public Task WorldPrepBurst_IsByteStable()
 		{
-			return AssertBurstStable("WorldPrepBurst", GameServerListener.SendWorldPrepBurst);
+			return AssertBurstStable("WorldPrepBurst", CreateFlowService.SendWorldPrepBurst);
 		}
 
 		private static async Task AssertBurstStable(string name, Func<RecordingNetworkClient, Task> run, uint instance = TestInstance)

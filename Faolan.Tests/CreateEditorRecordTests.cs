@@ -1,5 +1,5 @@
 using System;
-using Faolan.GameServer;
+using Faolan.GameServer.CreateFlow;
 using Xunit;
 
 namespace Faolan.Tests

@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer;
+using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Spawn;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;

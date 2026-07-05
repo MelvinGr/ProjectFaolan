@@ -6,9 +6,9 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.World;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
-	public partial class GameServerListener
+	public partial class CreateFlowService
 	{
 		private static readonly byte[] RetailCreateEditorPostReadyAckSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x59);
 
@@ -19,7 +19,7 @@ namespace Faolan.GameServer
 				: 0x00000002u;
 		}
 
-		private static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
+		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
 		{
 			return new PacketStream()
 				.WriteHeader(RetailCreateEditorPostReadyAckSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameServerCarrierOpcodes.IirCarrier)
@@ -60,7 +60,7 @@ namespace Faolan.GameServer
 		// The leading 0x0009FF92-0x0009FF96 ack packets are generated dynamically from the request ids the
 		// client actually sends so the live flow can advance even when it stalls before all 5 retail requests.
 
-		private static async Task SendRetailCreateEditorPostReadyBurst(INetworkClient client, IReadOnlyList<uint> requestIds)
+		internal static async Task SendRetailCreateEditorPostReadyBurst(INetworkClient client, IReadOnlyList<uint> requestIds)
 		{
 			foreach (var requestId in requestIds)
 				await SendRetailCreateEditorPostReadyAck(client, requestId);

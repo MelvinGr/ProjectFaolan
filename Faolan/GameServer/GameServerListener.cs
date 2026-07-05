@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,8 +13,8 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
-using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Economy.Bank;
 using Faolan.GameServer.Economy.Shop;
@@ -109,6 +108,11 @@ namespace Faolan.GameServer
 		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
 		private readonly WorldSimulation _simulation;
 
+		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
+		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
+		// burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
+		private readonly CreateFlow.CreateFlowService _createFlow;
+
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
 		// surfaces instead of being swallowed.
@@ -123,6 +127,7 @@ namespace Faolan.GameServer
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
+			_createFlow = new CreateFlow.CreateFlowService(logger, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
@@ -147,168 +152,6 @@ namespace Faolan.GameServer
 			InitGmCommands();
 		}
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count)
-		{
-			return GrantItemToBackpack(client, itemTemplateId, count);
-		}
-
-		Task IEconomyOutbound.SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
-		{
-			return SendAddItem(client, containerType, itemPos, entry, feedback);
-		}
-
-		// --- IEconomyOutbound: the wallet + item-grant ops the economy/inventory services reach back to (forwarding
-		// to the private Outbound builders, which the listener also calls directly from loot/GM paths) ---------------
-		Task IEconomyOutbound.SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)
-		{
-			return SendMoneyUpdate(client, balanceTin, reason);
-		}
-
-		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
-		{
-			return _broadcaster.BroadcastEntityFade(entity);
-		}
-
-		Task IWorldOutbound.BroadcastNpcAggro(WorldEntity npc, WorldEntity target)
-		{
-			return _broadcaster.BroadcastNpcAggro(npc, target);
-		}
-
-		Task IWorldOutbound.BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
-		{
-			return _broadcaster.BroadcastNpcCombatMode(npc, inCombat);
-		}
-
-		Task IWorldOutbound.BroadcastNpcMove(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcMove(npc);
-		}
-
-		Task IWorldOutbound.BroadcastNpcPatrol(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcPatrol(npc);
-		}
-
-		// --- IWorldOutbound: the wire side of the simulation tick (broadcaster builds packets; listener owns vitals
-		// send + the world-entry replay) -----------------------------------------------------------------------------
-		Task IWorldOutbound.BroadcastNpcRespawn(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcRespawn(npc);
-		}
-
-		Task IWorldOutbound.BroadcastNpcStop(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcStop(npc);
-		}
-
-		Task IWorldOutbound.ConvertCorpseToLoot(WorldEntity npc)
-		{
-			return _broadcaster.ConvertCorpseToLoot(npc);
-		}
-
-		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
-		{
-			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
-		}
-
-		Task IWorldOutbound.ReenterWorld(INetworkClient client)
-		{
-			return SendWorldEntry(client);
-		}
-
-		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
-		// payload. Routes the private SendBuffRemoval used by .cancelbuff so the world-tick expiry and the GM cancel
-		// share one builder.
-		Task IWorldOutbound.SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
-		{
-			return SendBuffRemoval(client, applyTo, applyFrom, appliedSpellId);
-		}
-
-		Task IWorldOutbound.SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
-		{
-			return _combat.SendDamageNumber(client, targetHandle, attackerHandle, damage);
-		}
-
-		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
-		{
-			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathBcc(dyingHandle)))
-				.SendAsync(client);
-		}
-
-		Task IWorldOutbound.SendDeathEffect(INetworkClient client, uint dyingHandle)
-		{
-			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathEffect(dyingHandle)))
-				.SendAsync(client);
-		}
-
-		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition)
-		{
-			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathPose(dyingHandle, deathPosition)))
-				.SendAsync(client);
-		}
-
-		Task IWorldOutbound.SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
-		{
-			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint)))
-				.SendAsync(client);
-		}
-
-		Task IWorldOutbound.SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
-		{
-			return _combat.SendNpcAttackAnimation(client, npcHandle, damage, swingCounter);
-		}
-
-		Task IWorldOutbound.SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)
-		{
-			return _combat.SendNpcSpellCast(client, npcHandle, spell);
-		}
-
-		Task IWorldOutbound.SendResurrectionScreen(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
-		{
-			return SendValidResurrectionSpots(client, deathPosition, spots);
-		}
-
-		Task IWorldOutbound.SendRevive(INetworkClient client, uint handle, uint respawnPointId)
-		{
-			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
-			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildRevive(handle, respawnPointId)))
-				.SendAsync(client);
-		}
-
-		Task IWorldOutbound.SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ)
-		{
-			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the res point - retail sends it right
-			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
-			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(TeleportCodec.BuildReviveDestination(handle, mapId, handle, position, facingX, facingZ)))
-				.SendAsync(client);
-		}
-
-		Task IWorldOutbound.SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)
-		{
-			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen res point on the SAME map (no
-			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
-			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(TeleportCodec.BuildReviveTeleport(handle, mapId, handle, playfieldToken)))
-				.SendAsync(client);
-		}
-
-		Task IWorldOutbound.SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
-		{
-			return _combat.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
-		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)
 		{
@@ -484,7 +327,7 @@ namespace Faolan.GameServer
 							? RetailCreatePost205FSender
 							: null;
 						var authReceiver = isNewCharacter
-							? CreateEditorReceiver(client)
+							? CreateEditorFraming.Receiver(client)
 							: null;
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
@@ -528,7 +371,7 @@ namespace Faolan.GameServer
 						// live-char world + the destiny cutscene's Scry-script overlay instead (SendCreateWorldWithCutscene):
 						// the created char lands on the beach as ITSELF and the cutscene drives to IntroDone. Cutscene
 						// actors stay invisible until #185; SendCreateWorldSceneBurst stays as the golden reference.
-						await SendCreateWorldWithCutscene(client);
+						await _createFlow.SendCreateWorldWithCutscene(client);
 					}
 					else if (isNewCharacter) // New character -> show the creator
 					{
@@ -1085,14 +928,6 @@ namespace Faolan.GameServer
 			return _simulation.PlayerWorldEntity(client);
 		}
 
-		// The create-editor 0x2000 receiver: the player object (GameInterfaceType) addressed to this session's
-		// client instance. Built as a typed ProtoEndpoint so the type+instance can't drift (the old hardcoded
-		// receiver baked in 0x021662C8; see ConanEndpoints / ProtoEndpointGoldenTests).
-		private static byte[] CreateEditorReceiver(INetworkClient client)
-		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance);
-		}
-
 		// The post-creation WORLD connection: the second (world) connection opened after the 0x2002 enter-world
 		// handoff, flagged in the Hello handler. Distinguishes it from the editor connection and from a normal
 		// existing-character login so the intro/cutscene bursts only fire there.
@@ -1119,9 +954,25 @@ namespace Faolan.GameServer
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
 			var address = $"{realm.IpAddress}:{realm.Port}";
 
-			await new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.WorldHandoff).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
+			await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.WorldHandoff).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
+		}
+
+		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
+		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
+		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
+		{
+			var instance = client.Session.Account.ClientInstance;
+			// Source the destination playfield token from the destination map's burst so the announce matches the token
+			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
+			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
+			foreach (var body in new[]
+			{
+				TeleportCodec.BuildBegin(instance, destMapId),
+				TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
+			})
+				await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 	}
 }

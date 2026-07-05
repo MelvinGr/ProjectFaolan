@@ -10,7 +10,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Spawn;
-using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;

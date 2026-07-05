@@ -1,7 +1,6 @@
 using System.Text;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
-using Faolan.TextureUpscaler;
 
 // Faolan.TextureUpscaler (#295 Phase 2): batch-upscales AoC textures and INLINES the results into the RDB, so a
 // modded install renders higher-res art with no CDN dependency. Colour textures (DXT1/DXT5) go through
@@ -15,6 +14,8 @@ using Faolan.TextureUpscaler;
 //
 // SAFETY: writes le.idx + a new NN.rdbdata IN PLACE. It backs le.idx up to le.idx.faolan-bak first. Stop the game
 // before running. --dry-run does everything except the write.
+
+namespace Faolan.TextureUpscaler;
 
 internal class Program
 {

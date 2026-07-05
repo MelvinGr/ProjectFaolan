@@ -1,13 +1,12 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
 	// The post-customization handshake on the character-creator connection, reconstructed byte-for-byte
 	// from Captures/Dikketest_rogue-barbarian_create_random-actions.json (creator = gs013:7016).
@@ -19,19 +18,14 @@ namespace Faolan.GameServer
 	//      callback + 0x96B8DC59) that prompts the client to send TheNameIs,
 	//   3. TheNameIs is answered with NicknameOk + CharCreationFinished (handled elsewhere),
 	//   4. the client's 0x206E enter-world request is answered with a 0x2002 carrying the world address.
-	public partial class GameServerListener
+	public partial class CreateFlowService
 	{
-		// Server->client conversation family for the creator 0x2000 traffic. Sender is the game-server
-		// conversation id; receiver is built per session by CreateEditorReceiver(client) (the per-client
-		// family ending in the character-instance varint).
-		private static readonly byte[] CreateEditorMorphAckSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x0C);
-
 		// Sends the post-morph trio once the morph stream goes quiet. After Finish the editor streams its
 		// SetMorphValue callbacks, but ONLY for morphs that were changed - so the set (and which one is last)
 		// varies, and if the body is left default the "thigh"/body morphs never arrive. Instead of keying off
 		// a specific morph, we debounce: Finish and every morph bump MorphActivitySequence; ~350ms after the
 		// last activity (so any morphs have arrived and been acked) we send the trio exactly once.
-		private void SchedulePostMorphBurst(INetworkClient client)
+		internal void SchedulePostMorphBurst(INetworkClient client)
 		{
 			if (client.Session.PostMorphBurstSent)
 				return;
@@ -53,7 +47,7 @@ namespace Faolan.GameServer
 				}
 				catch (Exception e)
 				{
-					Logger.LogWarning(e, "Character-editor: failed to send the post-morph burst.");
+					_logger.LogWarning(e, "Character-editor: failed to send the post-morph burst.");
 				}
 			}));
 		}
@@ -65,7 +59,7 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.ScryScriptIIR);
@@ -94,7 +88,7 @@ namespace Faolan.GameServer
 		private Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(subOpcode);
@@ -109,14 +103,14 @@ namespace Faolan.GameServer
 		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
 		private Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
-			return new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
+			return new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
 		}
 
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
 		//   subOpcode(0xBADF5A4B) ack(0xC350) clientInstance uint16(0) [byteLen morphValue] float byte(0) counter
 		// The float is a server-side default that is not present in the client's message: textures
 		// (values starting with '*') use 1.0, body morphs use -0.03 (the only two values seen in retail).
-		private Task SendMorphValueAck(INetworkClient client, string morphValue)
+		internal Task SendMorphValueAck(INetworkClient client, string morphValue)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var counter = client.Session.MorphAckCounter == 0
@@ -130,7 +124,7 @@ namespace Faolan.GameServer
 				: 0xBCF5C28Fu;
 
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetMorphValueIIR);
@@ -148,12 +142,12 @@ namespace Faolan.GameServer
 		// Step 2: answer the client's TheNameIs callback so it knows the name was accepted and advances to
 		// enter-world. Sequence from dikketest (idx 359-363): 0xADCE0CDA (echoes the name) + an 0xA36D3B74
 		// "NicknameOk" callback (echoes the name) + 0xF508F4C1 (fixed) + an 0xA36D3B74 "CharCreationFinished".
-		private async Task SendNicknameAccepted(INetworkClient client, string name)
+		internal async Task SendNicknameAccepted(INetworkClient client, string name)
 		{
 			var instance = client.Session.Account.ClientInstance;
 
 			await new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetNameIIR);
@@ -189,7 +183,7 @@ namespace Faolan.GameServer
 		// use, echoes the name) or NicknameInvalid (empty/unsaveable, empty value). Verbatim grammar from
 		// Captures/Stricken_soldier-guardian_create_random-actions (frames 151 taken / 158 invalid / 193 ok). The client
 		// then simply re-sends TheNameIs with a new name - no other packets are needed.
-		private Task SendNicknameRejected(INetworkClient client, string name, bool taken)
+		internal Task SendNicknameRejected(INetworkClient client, string name, bool taken)
 		{
 			return taken
 				? SendA36DCallback(client, "NicknameTaken", name)

@@ -16,20 +16,6 @@ namespace Faolan.GameServer
 	// verified in the Strie capture. Body built byte-exact by FormatFeedbackCodec (FormatFeedbackCodecTests).
 	public partial class GameServerListener
 	{
-		// The captured GenericDisplayAreaName FIFO banner (necrol80 Has-inventory #1753) - a known-good top-of-screen
-		// notification. Replayed verbatim (key + localized string id unchanged) with only the live session instance
-		// substituted, so it is guaranteed byte-valid. Arbitrary literal text would need a literal-text FIFO template
-		// (or an RDB string id) - a follow-up.
-		private const string AreaNameBannerXml = "<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
-		                                         "key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
-		                                         "token=&#39;DisplayedText(3)|GenericDisplayAreaName|3474586&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>";
-
-		// Sends the proven GenericDisplayAreaName FIFO banner - the top-of-screen notification overlay.
-		private Task SendAreaNameBanner(INetworkClient client)
-		{
-			return SendFeedback(client, AreaNameBannerXml);
-		}
-
 		// Pushes a FormatFeedback message (raw remoteformat XML) to the client's on-screen feedback. typeFlags =
 		// FifoBannerTypeFlags for the top-of-screen FIFO banner. Addressed to the player's GameInterface instance.
 		private async Task SendFeedback(INetworkClient client, string xml, uint typeFlags = FormatFeedbackCodec.FifoBannerTypeFlags, uint footer = 1)

@@ -23,29 +23,6 @@ namespace Faolan.GameServer
 		private const uint AbilityGrantConstantA = 0xB290805C;
 		private const uint AbilityGrantConstantB = 0x29E627CA;
 
-		// The persistent self-buff every character carries in-world (the protective "shield" buff, #221). Re-applied on
-		// each login AND playfield change: it lives in FlushPendingPost205FFollowUp next to the ability/spell re-grants,
-		// and the teleport/changemap re-entry re-arms that flush, so zoning re-asserts it too. Class-agnostic - every
-		// character gets it. Applied via the proven ApplySpell (MagicBuff 0x6B87E316) self-buff path, so it also lands in
-		// ActiveBuffs (.buffs / CancelBuff / expiry).
-		//
-		// CAPTURE-PROVEN spell id + payload (#221): the starting self-buff is wire id 0x000B9000 - base 0x0B90 (2960),
-		// apply rank 0x00 ((base<<8)|rank). It is applied to EVERY freshly-created character on the beach in all 11
-		// create captures (Captures/*_create.tshark.json - Necro/Guardian/Assassin/Barbarian/BearShaman/Herald, etc.),
-		// so it is class-agnostic, exactly as this re-apply assumes. (Earlier this was an INTERIM guess - Scythe Shield
-		// 0x02387E00 - on the false premise the id was in no capture; it is in every create capture.)
-		private const uint ShieldBuffSpellId = 0x000B9000;
-
-		// The captured MagicBuff effect payload for 0x000B9000 (the 54 bytes after applyFrom in the create-capture
-		// ApplySpell, e.g. Stickienecro_mage-necromancer_create pkt#284). Only the trailing u32 (@50) is a per-cast
-		// counter/timestamp - kept as captured; the client doesn't validate it for a self-buff.
-		private static readonly byte[] ShieldBuffPayload =
-		[
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x08, 0xA8, 0x15, 0xAD
-		];
-
 		// Ensures the character's LOADOUT on EVERY world entry (#74/#71), not just at creation:
 		//  (1) ALWAYS makes the class's spells + abilities KNOWN to the client (the client keeps no persistent kit),
 		//      so the spellbook fills and every action-bar slot - default OR imported - resolves to an icon; also

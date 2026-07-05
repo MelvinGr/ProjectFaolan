@@ -15,31 +15,12 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy.Tradepost;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Scripting;
-using Faolan.GameServer.World;
-using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
 	partial class GameServerListener
 	{
-		private const uint MountShortcutSlot = 0x4E2C; // a free special-bar slot (the 0x4E20+ special bar EnsureCharacterLoadout uses)
-
-		// .grantmount [mountIdHex]  - put a catalog mount on the player's action bar so they can SUMMON it themselves
-		// (#27), the client-initiated flow. Persists a CharacterShortcut (mount shortcut type 0x69, decoded from the
-		// UpdateShortcut 0x206E the client sends after mounting) on the special bar so it survives relog and restores
-		// via ShortcutBarReply; then the player clicks it and the SummonMount handler casts + spawns the mount. Default
-		// 0x3E34F1 ("Fading Black Horse").
-		private const uint MountShortcutType = 0x69; // UpdateShortcut 0x206E type word for a mount bar entry (capture-decoded)
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
-
-		// A captured retail self-buff payload keyed by wire id, for VISUAL buff testing (#274). The icon only renders
-		// when the payload carries the buff's real effect descriptor (the generic synthesized blob has the wrong id at
-		// +24 so the client can't render it). Exhausted (0x000B9000) lifted byte-for-byte from the guardian combat
-		// capture (frame 2110); its +8 duration field is 0x2710 = 10s, so it also exercises the tick expiry + removal.
-		private static readonly Dictionary<uint, byte[]> CapturedBuffPayloads = new Dictionary<uint, byte[]>
-		{
-			[0x000B9000] = Convert.FromHexString("0000000000000000000027100001000000010000000000000b900000000100000000000000000000000000000001000000000705ff5b")
-		};
 
 		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist
 		// a CharacterInventory row in the first free bag slot, then re-send the rebuilt 0x737A6DF9 inventory
@@ -481,22 +462,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
 		}
 
-		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
-		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
-		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
-		{
-			var instance = client.Session.Account.ClientInstance;
-			// Source the destination playfield token from the destination map's burst so the announce matches the token
-			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
-			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
-			foreach (var body in new[]
-			{
-				TeleportCodec.BuildBegin(instance, destMapId),
-				TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
-			})
-				await new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
-		}
-
 		private Task SendGmHelpText(uint characterId)
 		{
 			return _agentServerDispatcher.SendSystemMessage(characterId, $"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}");
@@ -573,7 +538,7 @@ namespace Faolan.GameServer
 
 		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
 		// Level to 25). The stat's wire scale is applied automatically.
-		private Task SetStatCommand(INetworkClient client, string arguments)
+		private static Task SetStatCommand(INetworkClient client, string arguments)
 		{
 			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
 			var statId = (CharacterStatId)Convert.ToUInt32(parts[0], 16);
@@ -584,7 +549,7 @@ namespace Faolan.GameServer
 
 		// .setstatrange <startHex> <endHex> <value>  - DEBUG sweep: push every stat id in [start, end] set to `value`
 		// in one 0x96B8DC59 update, to bisect which stat a client behaviour keys off (e.g. the spell-usability level).
-		private Task SetStatRangeCommand(INetworkClient client, string arguments)
+		private static Task SetStatRangeCommand(INetworkClient client, string arguments)
 		{
 			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
 			var start = Convert.ToUInt32(parts[0], 16);

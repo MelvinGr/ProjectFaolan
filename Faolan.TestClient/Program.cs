@@ -295,11 +295,14 @@ static Options ParseArgs(string[] a)
 	return o;
 }
 
-sealed class Options
+namespace Faolan.TestClient
 {
-	public string Host = "127.0.0.1";
-	public int Port = 7010;
-	public string User = "faolan";
-	public string Pass = "";
-	public int CharIndex;
+	sealed class Options
+	{
+		public string Host = "127.0.0.1";
+		public int Port = 7010;
+		public string User = "faolan";
+		public string Pass = "";
+		public int CharIndex;
+	}
 }
