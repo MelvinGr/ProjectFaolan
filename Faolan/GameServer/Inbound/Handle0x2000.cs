@@ -534,10 +534,11 @@ namespace Faolan.GameServer
 								{
 									var vendorShop = await Database.GetShopByVendorName(vendorNpcName);
 									if (vendorShop != null)
-									{
 										await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
-										break;
-									}
+									else
+										await _agentServerDispatcher.SendSystemMessage(client.Session.Account!.ClientInstance, "Shop not yet imported");
+
+									break;
 								}
 
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
