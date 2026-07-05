@@ -51,9 +51,22 @@ Interact, not a pet action and not an emote).
 - `0x1F8` = **dismiss** → server replies with `ApplySpell` + `n3ToClientQuit 0x04B82B2D` despawn of the pet.
 - (attack/follow/stay/aggressive/passive are the neighbouring `0x1Fx` codes — capture those next.)
 
-So the whole loop is now decoded: **summon (BCC ability → FA015807 spawn) · command (QueuePetCommand 0x205b) ·
-dismiss (0x205b 0x1F8 → despawn)**. Implementing `QueuePetCommand` handling (dismiss/defend) + the BCC summon
-trigger is now unblocked — no new RE needed for the command side.
+**Owner-binding — `PetIIR_c` (0x1F4CB0F7)** (opcode already named; reader in docs/iir-readers-conversation-misc.md
+= `[u32 mode], mode∈{0,1}→[u32×2], mode==0→[u32×3]`). This is the packet that tells the client "this creature is
+YOUR pet". Sent right after the pet spawn: carrier `[sub][C350][ownerHandle=player][u8 env]` then the mode
+payload carrying the **pet handle** (+ extras for mode 0). Observed: mode-0 (len 41) on each summon
+(frames 470/679/919 for the 3 pets), mode-1 (len 29) on dismiss (frame 1167). So ownership is a SERVER signal,
+not client inference and not a spawn field.
+
+**FULLY DECODED loop** (nothing left to RE on the protocol):
+1. **Summon**: C→S BCC `0x642CD3D6` ability → channel → S→C `FA015807` pet spawn + `StatIIR` + `ApplySpell`
+   (pet self-buff) + `StatUpdate` + `MoveTask` + **`PetIIR` 0x1F4CB0F7 mode-0 owner-assign** `[player][pet]`.
+2. **Command**: C→S `QueuePetCommand` 0x205b `[C350][pet][cmd]` (0x1F6 defend, 0x1F8 dismiss, neighbours = the
+   rest of the stance/command set).
+3. **Dismiss**: 0x205b 0x1F8 → S→C `ApplySpell` + `PetIIR` mode-1 + `n3ToClientQuit 0x04B82B2D` despawn.
+
+The only non-protocol unknown is **which BCC summon-ability id maps to which pet template** (Deathless Acolyte
+Arcanist vs Magnus — a data mapping, harvestable from the BCC payload / RDB, not a wire decode).
 
 ## Follow-up (#307) to make it retail-accurate
 
