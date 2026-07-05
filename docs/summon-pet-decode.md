@@ -79,6 +79,25 @@ gets an `ApplySpell` (the pet's combat buff/aura) + a `MoveTask` (combat movemen
 spawn/own/command subsystem for ALL pets; combat pets stack the buff + combat-AI on top. Implementing `PetIIR`
 + `QueuePetCommand` once gives you both — social pets for free, combat pets by adding the buff + follow/attack AI.
 
+## Implementation (2026-07-05) — pets spawn from the creature TYPE (the right way, #244)
+
+Wired end-to-end. Melvin's steer: `NpcSpawns` are world PLACEMENTS — wrong for a summon-on-demand pet — so
+pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift):
+- `Npc.Data` + `Npc.Level`: the type-level captured stat core, so a creature can be built standalone.
+- `NpcSpawnBuilder.TryBuildFromType(Npc, handle, pos, rot)`: builds the `FA015807` from the type + a
+  caller transform — no `NpcSpawn` instance.
+- `WorldBroadcaster.SpawnPetForPlayer` + `IDatabaseRepository.GetNpcByName`: the spawn-from-type path.
+- `SummonPetForPlayer` (shared by `.pet` + the CastSpell hook) resolves the creature TYPE; only falls back
+  to the placement path for the `.pet` GM test.
+- `PetIirCodec` (0x1F4CB0F7) owner-assign/remove + inbound `QueuePetCommand` (0x205B) dismiss.
+- `CapturePetImporter` + `PetsModule` (`--only pets`): lifts each pet's captured `FA015807` onto its `Npc`
+  type. Seeded from the necro capture: **Arcanist** (tpl 11733) + **Magus** (tpl 11732) — the two combat
+  necro pets (lvl 80); **Pleasurable Company** (tpl 17756) — the social companion (lvl 5).
+
+**Naming gotcha:** "Deathless Acolyte" is the SPELL/UI name; the summoned pet CREATURES are named
+`Arcanist` / `Magus`. `PetSummonCatalog` maps summon-spell → creature name: `0x5E2F5`→Arcanist,
+`0x5E2F0`→Magus, `0x4105E9`→Pleasurable Company (all `CastSpell` 0x4, spell id in the cast trailer).
+
 ## Follow-up (#307) to make it retail-accurate
 
 The capture DOES contain the flow (frames 1197→1222, above), so the remaining work is:
