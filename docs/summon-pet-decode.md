@@ -32,6 +32,29 @@ A minion **works now** via a GM trigger, built on existing infra:
 `.pet <name>` spawns a creature (the SAME `FA015807` spawn retail uses for the pet) and makes it follow → a
 rendered, following minion. This is structurally the retail flow minus the class-summon trigger + owner binding.
 
+## FULL pet protocol — from the chat-annotated capture (2026-07-05)
+
+`NecroL80_..._casting-with-chat-notes.pcapng` — Melvin typed a local-say note before each action, so every packet
+is labelled. The two **Deathless Acolyte** casts (Arcanist, Magnus) are the real necro pets ("Pleasurable
+Company" is a generic companion; "sit on bench" was clicking a bench world-object to sit on it — a sittable
+Interact, not a pet action and not an emote).
+
+**Summon** (necro Deathless Acolyte): C→S **`BehaviorControlCenterIIR` 0x642CD3D6** (72 B) ability activation
+(the summon-ability channel; body carries the caster instance as varint `d4 cb 8b 40` + the ability fields
+`08 c0e80a … 52 09 08 d0860310 d4cb8b40 60 …`). Server channels (BCC anim updates + `0x2009` ack), then:
+**S→C `FA015807` pet spawn** (`0x00023EDC` Arcanist / `0x00023EDF` Magus, ~471 B) + `StatIIR` + `ApplySpell`
+(the pet's buff) + `StatUpdate` + `MoveTask`.
+
+**Command — `QueuePetCommand` (0x205b)** (opcode already named in `Opcodes.cs`):
+`[u32 type=0xC350][u32 petHandle][u32 command]`. Confirmed command codes (labelled by the notes):
+- `0x1F6` = **defend** ("net magus to defend")
+- `0x1F8` = **dismiss** → server replies with `ApplySpell` + `n3ToClientQuit 0x04B82B2D` despawn of the pet.
+- (attack/follow/stay/aggressive/passive are the neighbouring `0x1Fx` codes — capture those next.)
+
+So the whole loop is now decoded: **summon (BCC ability → FA015807 spawn) · command (QueuePetCommand 0x205b) ·
+dismiss (0x205b 0x1F8 → despawn)**. Implementing `QueuePetCommand` handling (dismiss/defend) + the BCC summon
+trigger is now unblocked — no new RE needed for the command side.
+
 ## Follow-up (#307) to make it retail-accurate
 
 The capture DOES contain the flow (frames 1197→1222, above), so the remaining work is:
