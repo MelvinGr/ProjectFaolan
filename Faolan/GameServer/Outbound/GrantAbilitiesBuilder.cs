@@ -170,9 +170,10 @@ namespace Faolan.GameServer
 			return [.. abilities];
 		}
 
-		// Re-emits the character's COMBO book (CharacterCombo) on login as ComboBookIIR grants - the combo counterpart to
-		// GrantCharacterAbilities. Combos are class/level content the client's book gains per level (LevelComboCatalog);
-		// a MAX-LEVEL imported character never dings, so without this its combo book would be empty. Not in the snapshot.
+		// Re-emits the character's COMBO book on login as ComboBookIIR grants - the combo counterpart to
+		// GrantCharacterAbilities. The book = persisted CharacterCombo rows UNION the class's combos up to its level
+		// from the class<->combo ACCESS map (ClassCombo); a MAX-LEVEL imported character never dings, so without this
+		// its combo book would be empty. Not in the snapshot.
 		private async Task GrantCharacterCombos(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -181,15 +182,16 @@ namespace Faolan.GameServer
 
 			var instance = client.Session.Account.ClientInstance;
 
-			// The combo book = the persisted CharacterCombo rows UNION the level-derived catalog. #299: a max-level
-			// IMPORTED character never dinged, so it has no CharacterCombo rows and its book was empty after relog;
-			// deriving from LevelComboCatalog.ForLevel(1..Level) re-emits the full book on every login (deduped).
+			// The combo book = the persisted CharacterCombo rows UNION the class's combos up to its level, from the
+			// class<->combo ACCESS map (ClassCombo). This replaces the class-INDEPENDENT LevelComboCatalog, which gave
+			// every class the same level-keyed set - so a Necromancer (a caster with no weapon combos) re-"learned"
+			// Sweep/Slam/Hell Strikes on every login. ClassCombo has NO rows for casters, and ships empty until
+			// populated from dumps, so today this grants only the persisted CharacterCombo rows (the safe default).
 			var comboIds = new HashSet<uint>();
 			foreach (var combo in await Database.GetCharacterCombos(character.Id))
 				comboIds.Add(combo.ComboId);
-			for (uint lvl = 1; lvl <= character.Level; lvl++)
-				foreach (var comboId in Combat.LevelComboCatalog.ForLevel(lvl))
-					comboIds.Add(comboId);
+			foreach (var combo in await Database.GetClassCombos(character.Level, character.Class))
+				comboIds.Add(combo.Id);
 
 			foreach (var comboId in comboIds)
 				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)

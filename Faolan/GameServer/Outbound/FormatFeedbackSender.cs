@@ -52,6 +52,7 @@ namespace Faolan.GameServer
 		private async Task SendLevelUpDings(INetworkClient client, uint fromLevel, uint toLevel, uint finalRemainingXp)
 		{
 			var instance = client.Session.Account.ClientInstance;
+			var @class = client.Session.Character?.Class ?? default;
 			for (var lvl = fromLevel + 1; lvl <= toLevel; lvl++)
 			{
 				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);
@@ -61,10 +62,11 @@ namespace Faolan.GameServer
 
 				await SendWorldIir(client, NewLevelIirCodec.Build(instance, lvl, deltas));
 
-				// The combos unlocked at this level (class-independent, level-keyed; retail sends them right after the
-				// NewLevelIIR - combat-levelup capture ordering).
-				foreach (var comboId in LevelComboCatalog.ForLevel(lvl))
-					await SendWorldIir(client, ComboBookIirCodec.Build(instance, comboId));
+				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
+				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the
+				// class-independent LevelComboCatalog (casters have no rows); empty until populated from dumps.
+				foreach (var combo in await Database.GetClassCombosUnlockedBetween(@class, lvl - 1, lvl))
+					await SendWorldIir(client, ComboBookIirCodec.Build(instance, combo.Id));
 			}
 		}
 

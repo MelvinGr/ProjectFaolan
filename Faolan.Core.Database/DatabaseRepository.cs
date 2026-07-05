@@ -100,6 +100,8 @@ namespace Faolan.Core.Database
 		Task<Spell[]> GetSpells();
 		Task<Ability[]> GetClassAbilities(uint level, Class @class);
 		Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<Combo[]> GetClassCombos(uint level, Class @class);
+		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
@@ -959,6 +961,33 @@ namespace Faolan.Core.Database
 				.Include(ca => ca.Ability)
 				.OrderBy(ca => ca.Level).ThenBy(ca => ca.AbilityId)
 				.Select(ca => ca.Ability)
+				.ToArrayAsync();
+		}
+
+		// The combos a character of `class` has access to up to `level`, from the class<->combo ACCESS map (ClassCombo)
+		// - the combo analogue of GetClassAbilities. Casters have no rows, so they get no combos (see ClassCombo). The
+		// table ships empty until populated from dumps, so this returns nothing today (the safe default).
+		public async Task<Combo[]> GetClassCombos(uint level, Class @class)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassCombos
+				.Where(cc => cc.Class == @class && cc.Level <= level)
+				.Include(cc => cc.Combo)
+				.OrderBy(cc => cc.Level).ThenBy(cc => cc.ComboId)
+				.Select(cc => cc.Combo)
+				.ToArrayAsync();
+		}
+
+		// The combos a character of `class` unlocks in the level band (fromExclusive, toInclusive] - the combo analogue
+		// of GetClassAbilitiesUnlockedBetween, used to grant the ding's newly-unlocked combos on level-up.
+		public async Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassCombos
+				.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive)
+				.Include(cc => cc.Combo)
+				.OrderBy(cc => cc.Level).ThenBy(cc => cc.ComboId)
+				.Select(cc => cc.Combo)
 				.ToArrayAsync();
 		}
 

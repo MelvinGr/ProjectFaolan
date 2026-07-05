@@ -1,11 +1,10 @@
 namespace Faolan.GameServer.Combat
 {
-	// The combos the client's combo book gains at a given level, sent as ComboBookIIR (0xA8BBEB7F) on a level-up ding
-	// (#209). These are LEVEL-keyed and class-INDEPENDENT: every class captured (Guardian, Conqueror, Assassin, Herald
-	// mage) receives the SAME set at a given level - so this is a flat level->combos map, not per-class. Harvested
-	// verbatim from the login/gameplay captures (Hoxxling, Stihetfv, Strie level-up bursts); coverage is only the
-	// levels present in captures (L2/L4/L5 so far). Levels with no entry grant no combos (a level-up sends none), which
-	// matches retail (L3 dinged with zero ComboBook in the Hoxxling capture).
+	// RETIRED from the live grant path - superseded by the class<->combo ACCESS map (ClassCombo). It was LEVEL-keyed
+	// and class-INDEPENDENT (every captured class got the SAME set at a level), which wrongly gave casters weapon
+	// combos (a Necromancer "learned" Sweep/Slam every login). GrantCharacterCombos / the level-up dings now read
+	// ClassCombo instead. Kept ONLY as the capture-derived level->combo-id reference (Hoxxling/Stihetfv/Strie level-up
+	// bursts; L2/L4/L5) for populating ClassCombo from dumps later - it is no longer referenced by any live code.
 	public static class LevelComboCatalog
 	{
 		private static readonly System.Collections.Generic.Dictionary<uint, uint[]> ByLevel = new()
