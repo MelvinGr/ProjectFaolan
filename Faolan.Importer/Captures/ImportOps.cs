@@ -8,6 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.GameServer.World;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -108,7 +109,14 @@ namespace Faolan.Importer.Captures
 				Take(best.All.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), best.Routes);
 			}
 
-			return (NpcSpawnExtractor.Merge(spawns), patrols);
+			// Pets are content of the creature TYPE (lifted onto Npc.Data by CapturePetImporter, spawned from the type
+			// at summon time - #307/#244), NEVER world placements. A captured session's SUMMONED pets otherwise leak in
+			// here as permanent NpcSpawns and stand around forever where the player summoned them (the necro pet cluster
+			// on Old Tarantia). Drop the PetSummonCatalog creatures from the placement set.
+			var petNames = PetSummonCatalog.All.Select(p => p.PetTemplate.ToLowerInvariant()).ToHashSet();
+			var placements = spawns.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant())).ToList();
+
+			return (NpcSpawnExtractor.Merge(placements), patrols);
 
 			void Take(List<NpcSpawnEntry> chosen, Dictionary<uint, PatrolPathEntry> routes)
 			{
