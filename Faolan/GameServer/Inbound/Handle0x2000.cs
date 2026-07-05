@@ -337,8 +337,10 @@ namespace Faolan.GameServer
 									}
 									await _combat.SendBehaviorEchoAck(client, dismountAck, 3);
 									await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
-									var dismountStats = new CharacterStatBlock();
-									dismountStats[CharacterStatId.Mount] = 0; // clear the mount stat (frame 1449)
+									var dismountStats = new CharacterStatBlock
+									{
+										[CharacterStatId.Mount] = 0 // clear the mount stat (frame 1449)
+									};
 									await SendStatUpdate(client, dismountStats, self);
 									if (playerEntity != null)
 										playerEntity.IsMounted = false;
@@ -346,32 +348,24 @@ namespace Faolan.GameServer
 								}
 
 								var mountCastPayload = (byte[])rawPayload.Clone();
-								_ = Task.Run(async () =>
+								Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
 								{
-									try
+									if (client.Session?.Account == null)
+										return;
+									if (mountCastPayload.Length > 17)
 									{
-										await Task.Delay(MountCatalog.SummonChannelMs); // horse runs up during the channel
-										if (client.Session?.Account == null)
-											return;
-										if (mountCastPayload.Length > 17)
-										{
-											mountCastPayload[16] = 0x00;
-											mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
-										}
-										await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
-										await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
-										var mountStats = new CharacterStatBlock(); // the mount StatUpd (frame 520)
-										mountStats[CharacterStatId.Mount] = mount.RideStat;
-										mountStats[CharacterStatId.MountSpeed] = 100;
-										await SendStatUpdate(client, mountStats, self);
-										if (playerEntity != null)
-											playerEntity.IsMounted = true;
+										mountCastPayload[16] = 0x00;
+										mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
 									}
-									catch (Exception ex)
-									{
-										Logger.LogWarning(ex, "Deferred mount seat failed.");
-									}
-								});
+									await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
+									await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
+									var mountStats = new CharacterStatBlock { [CharacterStatId.Mount] = mount.RideStat,
+										[CharacterStatId.MountSpeed] = 100
+									}; // the mount StatUpd (frame 520)
+									await SendStatUpdate(client, mountStats, self);
+									if (playerEntity != null)
+										playerEntity.IsMounted = true;
+								}, Logger);
 
 								break;
 							}
