@@ -268,7 +268,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 		private static void WriteObjList(FaolanStream w, List<uint[]> list)
 		{
-			w.WriteUInt32((uint)list.Count);
+			w.WriteUInt32(list.Count);
 			foreach (var rec in list)
 			foreach (var word in rec)
 				w.WriteUInt32(word);

@@ -1,4 +1,3 @@
-using Faolan.Core.Network.Protobuf;
 using System;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
@@ -8,6 +7,8 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Protobuf;
+using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.World;
@@ -228,7 +229,7 @@ namespace Faolan.GameServer
 						else
 						{
 							await SendReadyForPlayScreen(client);
-							await CreateFlow.CreateFlowService.HandleNewCharacter(client, packet);
+							await CreateFlowService.HandleNewCharacter(client, packet);
 						}
 					}
 					else
@@ -334,7 +335,13 @@ namespace Faolan.GameServer
 								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
 								var playerEntity = PlayerWorldEntity(client);
 								var dismounting = playerEntity?.IsMounted ?? false;
-								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting ? "dismount" : "mount", args);
+								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}",
+									from,
+									mount.CreatureName,
+									dismounting
+										? "dismount"
+										: "mount",
+									args);
 
 								var self = client.Session.Account.ClientInstance;
 								await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode); // cast begin: bar + animation
@@ -348,6 +355,7 @@ namespace Faolan.GameServer
 										dismountAck[16] = 0x00;
 										dismountAck[17] = 0x09;
 									}
+
 									await _combat.SendBehaviorEchoAck(client, dismountAck, 3);
 									await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
 									var dismountStats = new CharacterStatBlock
@@ -361,24 +369,30 @@ namespace Faolan.GameServer
 								}
 
 								var mountCastPayload = (byte[])rawPayload.Clone();
-								Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
-								{
-									if (client.Session?.Account == null)
-										return;
-									if (mountCastPayload.Length > 17)
+								Task.RunAfter(MountCatalog.SummonChannelMs,
+									async () => // horse runs up during the channel, then mount
 									{
-										mountCastPayload[16] = 0x00;
-										mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
-									}
-									await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
-									await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
-									var mountStats = new CharacterStatBlock { [CharacterStatId.Mount] = mount.RideStat,
-										[CharacterStatId.MountSpeed] = 100
-									}; // the mount StatUpd (frame 520)
-									await SendStatUpdate(client, mountStats, self);
-									if (playerEntity != null)
-										playerEntity.IsMounted = true;
-								}, Logger);
+										if (client.Session?.Account == null)
+											return;
+
+										if (mountCastPayload.Length > 17)
+										{
+											mountCastPayload[16] = 0x00;
+											mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
+										}
+
+										await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
+										await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
+										var mountStats = new CharacterStatBlock
+										{
+											[CharacterStatId.Mount] = mount.RideStat,
+											[CharacterStatId.MountSpeed] = 100
+										}; // the mount StatUpd (frame 520)
+										await SendStatUpdate(client, mountStats, self);
+										if (playerEntity != null)
+											playerEntity.IsMounted = true;
+									},
+									Logger);
 
 								break;
 							}
@@ -429,11 +443,15 @@ namespace Faolan.GameServer
 								if (castMs == 0)
 									await Resolve();
 								else
-									Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
-									{
-										if (client.Session?.Account != null)
-											await Resolve();
-									}, Logger);
+								{
+									Task.RunAfter(castMs,
+										async () => // resolve the effect after the cast time (#236)
+										{
+											if (client.Session?.Account != null)
+												await Resolve();
+										},
+										Logger);
+								}
 
 								break;
 
@@ -459,11 +477,15 @@ namespace Faolan.GameServer
 									// just the .pet GM command. Decoded from the necro-pet capture (docs/summon-pet-decode.md):
 									// cast (CastSpell) -> after the channel -> FA015807 pet spawn + PetIIR. PetSummonCatalog maps
 									// the summon spell id -> pet template + kind.
-									if (World.PetSummonCatalog.ForSpell(spellId) is { } petSummon)
+									if (PetSummonCatalog.ForSpell(spellId) is { } petSummon)
 									{
 										var pet = await SummonPetForPlayer(client, petSummon.PetTemplate, petSummon.Combat);
-										Logger.LogInformation("CastSpell 0x{Spell:X} pet-summon '{Template}' -> {Result}.", spellId, petSummon.PetTemplate,
-											pet != null ? $"0x{pet.Handle:X8}" : "no spawnable template (pet-creature import needed)");
+										Logger.LogInformation("CastSpell 0x{Spell:X} pet-summon '{Template}' -> {Result}.",
+											spellId,
+											petSummon.PetTemplate,
+											pet != null
+												? $"0x{pet.Handle:X8}"
+												: "no spawnable template (pet-creature import needed)");
 										return;
 									}
 
@@ -872,7 +894,7 @@ namespace Faolan.GameServer
 				if (client.Session.CreateEditorTempInstanceCount >= 3)
 				{
 					Logger.LogInformation("Flushing create-editor post-0x205F burst after {Count}x instance echo.", client.Session.CreateEditorTempInstanceCount);
-					await CreateFlow.CreateFlowService.SendRetailCreateEditorPost205FBurst(client);
+					await CreateFlowService.SendRetailCreateEditorPost205FBurst(client);
 					client.Session.HasPendingPost205FFollowUp = false;
 					client.Session.HasFlushedCreateWorldEntryBurst = true;
 					client.Session.CreateEditorTempInstanceCount = 0;
@@ -891,7 +913,7 @@ namespace Faolan.GameServer
 				if (requestId.HasValue)
 				{
 					Logger.LogInformation("Flushing create-editor post-ready burst using observed request ids [{RequestIds}].", string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
-					await CreateFlow.CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
+					await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
 					client.Session.HasPendingCreateEditorReadyFollowUp = false;
 					client.Session.CreateEditorTempInstanceCount = 0;
 					client.Session.CreateEditorReadyRequestIds.Clear();
@@ -915,7 +937,7 @@ namespace Faolan.GameServer
 					{
 						Logger.LogInformation("Create-editor deadlock breaker: client never sent ReadyForPlayScreen; proactively flushing the post-ready burst using observed request ids [{RequestIds}].",
 							string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
-						await CreateFlow.CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
+						await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
 						client.Session.HasFlushedCreateEditorPostReady = true;
 						client.Session.CreateEditorReadyRequestIds.Clear();
 						return;
@@ -923,7 +945,7 @@ namespace Faolan.GameServer
 				}
 
 				Logger.LogInformation("Acknowledging standalone create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
-				await CreateFlow.CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId.Value);
+				await CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId.Value);
 			}
 			else
 				Logger.LogInformation("Ignoring standalone create-editor instance-echo after the expected bursts already flushed.");
@@ -944,12 +966,15 @@ namespace Faolan.GameServer
 			if (command == PetCommand.Dismiss)
 			{
 				await new PacketStream()
-					.WriteHeader(World.WorldFraming.Sender, World.WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s.WriteArray(World.PetIirCodec.BuildRemove(owner, petHandle)))
+					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildRemove(owner, petHandle)))
 					.SendAsync(client);
 
 				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
-				Logger.LogInformation(removed != null ? "Pet 0x{Pet:X8} dismissed (despawned)." : "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", petHandle);
+				Logger.LogInformation(removed != null
+						? "Pet 0x{Pet:X8} dismissed (despawned)."
+						: "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.",
+					petHandle);
 			}
 		}
 	}

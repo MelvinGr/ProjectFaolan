@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+
 namespace Faolan.Core.Database.Tables
 {
 	// An ability/skill catalog entry (keyed by its RDB id). Data0..4 is the ability's stable identity quad from the

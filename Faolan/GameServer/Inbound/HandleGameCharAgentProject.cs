@@ -13,6 +13,34 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		private const int EnergyRegenPerTick = 600;
+		private const int EnergyTickMs = 1000;
+
+		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
+		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
+		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
+		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprint
+
+		private static readonly byte[] SprintBarSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x54);
+
+		// Inits the energy pool + starts the single persistent energy loop (idempotent). Called on sprint and on weave
+		// start, so energy is tracked + regenerates regardless of which happens first.
+		internal void EnsureEnergyLoop(INetworkClient client)
+		{
+			var session = client.Session;
+			if (session?.Character == null)
+				return;
+
+			if (session.EnergyMax == 0)
+			{
+				session.EnergyMax = SpellweaveCatalog.EnergyMaxForClass(session.Character.Class);
+				session.Energy = session.EnergyMax;
+			}
+
+			if (!session.EnergyLoopActive)
+				_ = RunEnergyMirror(client); // fire-and-forget; it logs its own exceptions
+		}
+
 		// Inbound RPCs on the GameCharAgentProject endpoint (0x5B9756FC). Routed here by class id from
 		// ReceivedPacket because its method ids (0x2000, ...) collide with ordinary GameServer opcodes.
 		//
@@ -85,40 +113,6 @@ namespace Faolan.GameServer
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
 		}
 
-		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
-		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
-		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
-		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprint
-		private const int EnergyRegenPerTick = 600;
-		private const int EnergyTickMs = 1000;
-
-		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
-		{
-			if (client.Session?.Character == null)
-				return;
-
-			client.Session.IsSprinting = sprinting;
-			EnsureEnergyLoop(client);
-		}
-
-		// Inits the energy pool + starts the single persistent energy loop (idempotent). Called on sprint and on weave
-		// start, so energy is tracked + regenerates regardless of which happens first.
-		internal void EnsureEnergyLoop(INetworkClient client)
-		{
-			var session = client.Session;
-			if (session?.Character == null)
-				return;
-
-			if (session.EnergyMax == 0)
-			{
-				session.EnergyMax = SpellweaveCatalog.EnergyMaxForClass(session.Character.Class);
-				session.Energy = session.EnergyMax;
-			}
-
-			if (!session.EnergyLoopActive)
-				_ = RunEnergyMirror(client); // fire-and-forget; it logs its own exceptions
-		}
-
 		// The single per-session energy loop: drains while sprinting, REGENS when idle, and steps aside while weaving
 		// (the weave owns the drain + the 0x200E stream). Persistent - it keeps ticking for the whole session so energy
 		// recovers after a weave/sprint - and exits only on disconnect. A PeriodicTimer loop, not a self-rescheduling
@@ -137,6 +131,7 @@ namespace Faolan.GameServer
 
 					if (session.IsSpellweaving)
 						continue; // the weave owns the energy this tick
+
 					if (session.IsSprinting)
 						session.Energy -= (uint)Math.Min(SprintEnergyDrainPerTick, (int)session.Energy);
 					// Exhausted is client-driven for sprint (it owns the visual); nothing to send here.
@@ -156,8 +151,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		private static readonly byte[] SprintBarSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x54);
-
 		// DispatchUpdateSprintbar (0x200E): the ENERGY / sprint bar update - the yellow bar. Body = [u32 energy][u8 01].
 		// This is what actually MOVES the yellow bar (the e9f24184 "Spellweaving Cost" gauge is separate accounting).
 		// Retail streams it while weaving to drain the energy bar (decode_spellweave, sender GameCharAgentProject/0x54
@@ -169,6 +162,15 @@ namespace Faolan.GameServer
 				.WriteUInt32(energy)
 				.WriteByte(0x01)
 				.SendAsync(client);
+		}
+
+		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
+		{
+			if (client.Session?.Character == null)
+				return;
+
+			client.Session.IsSprinting = sprinting;
+			EnsureEnergyLoop(client);
 		}
 	}
 }

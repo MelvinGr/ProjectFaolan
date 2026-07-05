@@ -389,6 +389,28 @@ namespace Faolan.Web.Services
 			return result;
 		}
 
+		// One clip's decoded keyframes (type 1010003, by rdbname), shaped for the viewer to build THREE.KeyframeTracks:
+		// per-bone position (vec3) + rotation (quat xyzw) with their key times (seconds). Null if unavailable/variant.
+		public object? GetAnimation(uint rdbname)
+		{
+			if (!RdbAvailable || AnimationCatalog.DecodeClip(Reader(), rdbname) is not { } clip)
+				return null;
+
+			return new
+			{
+				rdbname = clip.Rdbname,
+				duration = clip.Duration,
+				bones = clip.Bones.Select(b => new
+				{
+					bone = b.Bone,
+					posTimes = b.PosTimes,
+					pos = b.Pos,
+					rotTimes = b.RotTimes,
+					rot = b.Rot
+				})
+			};
+		}
+
 		// The appearance choices legal for a given SEX+RACE, read from the imported AppearanceChoice rows (built by
 		// the rdb-appearance importer from the client CHARACTERCREATOR table + resource names). Colours carry their hex
 		// (swatches); tattoos/heads carry a friendly Name, hair falls back to an ordinal label.
@@ -423,38 +445,6 @@ namespace Faolan.Web.Services
 						r.Color))
 					.ToList();
 			}
-		}
-
-		// The authentic ANIMSYS clips available for a skeleton (#292), for the viewer's animation dropdown. Defaults to
-		// the humanoid rig the viewer skins to; CDN-only clips resolve through the ContentMirror via Reader(). Returns
-		// (name, rdbname, duration) sorted by name.
-		public IReadOnlyList<AnimationCatalog.ClipInfo> ListAnimations(uint? skeletonId = null)
-		{
-			return RdbAvailable
-				? AnimationCatalog.ListClips(Reader(), skeletonId ?? RdbAssetExtractor.HumanoidSkeletonId)
-				: [];
-		}
-
-		// One clip's decoded keyframes (type 1010003, by rdbname), shaped for the viewer to build THREE.KeyframeTracks:
-		// per-bone position (vec3) + rotation (quat xyzw) with their key times (seconds). Null if unavailable/variant.
-		public object? GetAnimation(uint rdbname)
-		{
-			if (!RdbAvailable || AnimationCatalog.DecodeClip(Reader(), rdbname) is not { } clip)
-				return null;
-
-			return new
-			{
-				rdbname = clip.Rdbname,
-				duration = clip.Duration,
-				bones = clip.Bones.Select(b => new
-				{
-					bone = b.Bone,
-					posTimes = b.PosTimes,
-					pos = b.Pos,
-					rotTimes = b.RotTimes,
-					rot = b.Rot
-				})
-			};
 		}
 
 		// The character's CURRENT appearance selections, to seed the editor when a character is opened: the 7 body
@@ -546,6 +536,16 @@ namespace Faolan.Web.Services
 						? null
 						: RdbAssetExtractor.BuildItemModelGlb(Reader(), itemId, item.Data1, item.Data2, item.Data3, item.Data4);
 				});
+		}
+
+		// The authentic ANIMSYS clips available for a skeleton (#292), for the viewer's animation dropdown. Defaults to
+		// the humanoid rig the viewer skins to; CDN-only clips resolve through the ContentMirror via Reader(). Returns
+		// (name, rdbname, duration) sorted by name.
+		public IReadOnlyList<AnimationCatalog.ClipInfo> ListAnimations(uint? skeletonId = null)
+		{
+			return RdbAvailable
+				? AnimationCatalog.ListClips(Reader(), skeletonId ?? RdbAssetExtractor.HumanoidSkeletonId)
+				: [];
 		}
 
 		public (int Width, int Height)? MapBounds(uint mapId)
@@ -771,9 +771,7 @@ namespace Faolan.Web.Services
 				: [];
 
 			if (bodyRm != 0 && headMeshes.Count > 0)
-			{
 				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyRm, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ?? BuildCharacter(race, sex, hairRmId);
-			}
 
 			return BuildCharacter(race, sex, hairRmId);
 		}

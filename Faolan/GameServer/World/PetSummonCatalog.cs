@@ -10,36 +10,45 @@ namespace Faolan.GameServer.World
 	// NOT a world placement. The pet-creature types must be imported (Npc row + Data) for the summon to render.
 	public sealed record PetSummon(uint SummonSpellId, string PetTemplate, bool Combat)
 	{
-		public (uint F1, uint F2, uint F3) Kind => Combat ? PetIirCodec.CombatKind : PetIirCodec.SocialKind;
+		public (uint F1, uint F2, uint F3) Kind =>
+			Combat
+				? PetIirCodec.CombatKind
+				: PetIirCodec.SocialKind;
 	}
 
 	public static class PetSummonCatalog
 	{
+		// The distinct pet creature TYPES to seed (by template name) - used by the importer's pets module.
+		public static IEnumerable<PetSummon> All => BySpell.Values;
+
 		// Confirmed from the necro captures (spell id = the CastSpell trailer; pet template = the summoned FA015807
 		// creature's decoded name). The full necro pet roster is in NecroL80_..._mount-horse_all-necro-summons_dismiss-all
 		// (all 12 summoned + mass-dismissed). "Pleasurable Company" is the generic SOCIAL companion (non-combat, not
 		// targetable); everything else is a combat pet.
-		private static readonly Dictionary<uint, PetSummon> BySpell = new()
+		private static readonly Dictionary<uint, PetSummon> BySpell = new Dictionary<uint, PetSummon>
 		{
-			[0x004105E9] = new PetSummon(0x004105E9, "Pleasurable Company", Combat: false),
-			[0x0005E2F5] = new PetSummon(0x0005E2F5, "Arcanist", Combat: true),
-			[0x0005E2F0] = new PetSummon(0x0005E2F0, "Magus", Combat: true),
-			[0x0005E2F6] = new PetSummon(0x0005E2F6, "Reaper", Combat: true),
-			[0x0005E321] = new PetSummon(0x0005E321, "Archmagus", Combat: true),
-			[0x0005E322] = new PetSummon(0x0005E322, "Blood Arcanist", Combat: true),
-			[0x0004F813] = new PetSummon(0x0004F813, "Corruptor", Combat: true),
-			[0x0004F814] = new PetSummon(0x0004F814, "Blighted One", Combat: true),
-			[0x0004F815] = new PetSummon(0x0004F815, "Necrotic Bomb", Combat: true),
-			[0x0004F816] = new PetSummon(0x0004F816, "Harvester", Combat: true),
-			[0x0004F817] = new PetSummon(0x0004F817, "Life-stealer", Combat: true),
-			[0x00127EDD] = new PetSummon(0x00127EDD, "Mutilator", Combat: true),
+			[0x004105E9] = new PetSummon(0x004105E9, "Pleasurable Company", false),
+			[0x0005E2F5] = new PetSummon(0x0005E2F5, "Arcanist", true),
+			[0x0005E2F0] = new PetSummon(0x0005E2F0, "Magus", true),
+			[0x0005E2F6] = new PetSummon(0x0005E2F6, "Reaper", true),
+			[0x0005E321] = new PetSummon(0x0005E321, "Archmagus", true),
+			[0x0005E322] = new PetSummon(0x0005E322, "Blood Arcanist", true),
+			[0x0004F813] = new PetSummon(0x0004F813, "Corruptor", true),
+			[0x0004F814] = new PetSummon(0x0004F814, "Blighted One", true),
+			[0x0004F815] = new PetSummon(0x0004F815, "Necrotic Bomb", true),
+			[0x0004F816] = new PetSummon(0x0004F816, "Harvester", true),
+			[0x0004F817] = new PetSummon(0x0004F817, "Life-stealer", true),
+			[0x00127EDD] = new PetSummon(0x00127EDD, "Mutilator", true)
 		};
 
-		public static PetSummon ForSpell(uint spellId) => BySpell.GetValueOrDefault(spellId);
+		public static PetSummon ForSpell(uint spellId)
+		{
+			return BySpell.GetValueOrDefault(spellId);
+		}
 
-		public static bool IsPetSummon(uint spellId) => BySpell.ContainsKey(spellId);
-
-		// The distinct pet creature TYPES to seed (by template name) - used by the importer's pets module.
-		public static IEnumerable<PetSummon> All => BySpell.Values;
+		public static bool IsPetSummon(uint spellId)
+		{
+			return BySpell.ContainsKey(spellId);
+		}
 	}
 }

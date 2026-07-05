@@ -116,7 +116,9 @@ namespace Faolan.CSPlayerAgent
 				throw new ArgumentException($"renown block must be {Length} bytes, got {block.Length}");
 
 			var o = 0;
-			var b = new GuildRenownBlock { Flag = block[o++],
+			var b = new GuildRenownBlock
+			{
+				Flag = block[o++],
 				StatIds = ReadList(block, ref o),
 				BoolA = block[o++],
 				BoolB = block[o++],
@@ -205,7 +207,7 @@ namespace Faolan.CSPlayerAgent
 
 		private static void WriteList(FaolanStream s, uint[] items)
 		{
-			s.WriteUInt32((uint)(items.Length + 1) * ListMultiplier);
+			s.WriteUInt32((items.Length + 1) * ListMultiplier);
 			foreach (var v in items)
 				s.WriteUInt32(v);
 		}

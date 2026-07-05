@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Packets
 				? mail.Attachments
 				: null;
 			var count = attachments?.Count ?? 0;
-			s.WriteUInt32((uint)count);
+			s.WriteUInt32(count);
 
 			if (count > 0)
 			{
@@ -111,7 +111,9 @@ namespace Faolan.Core.Network.Packets
 		public static Mail Parse(byte[] body)
 		{
 			var s = new FaolanStream(body);
-			var mail = new Mail { MailId = s.ReadUInt64(),
+			var mail = new Mail
+			{
+				MailId = s.ReadUInt64(),
 				RecipientClass = s.ReadUInt32(),
 				RecipientName = Encoding.ASCII.GetString(s.ReadArrayUInt16Length()),
 				SenderClass = s.ReadUInt32(),

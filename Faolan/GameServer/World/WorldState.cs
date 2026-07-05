@@ -19,10 +19,6 @@ namespace Faolan.GameServer.World
 		// follower ~one step behind; its MoveTasks track the player ~6-7u apart). A follower never leashes/aggros.
 		public const float FollowStopRange = 4f;
 
-		// A pet holds a tighter distance to its FORMATION SLOT than a lone escort keeps to the player, so the fan-out
-		// slots stay distinct (a 4u stop would let two pets share one slot). #307.
-		public const float PetFollowSlotStop = 1.5f;
-
 		// #272 smooth movement: the client interpolates a MoveTask's from->to segment over the implied time, so the server
 		// must feed it retail-sized segments - retail's chase/follow stream is ~6-7u steps. The model still steps Position
 		// every tick (combat/interest fidelity), but a MoveTask is only broadcast once the entity has travelled this far
@@ -60,14 +56,12 @@ namespace Faolan.GameServer.World
 		// chase teleport. 7 matches the render speed so consecutive segments chain smoothly. (Also ~PatrolWalkSpeed 6.)
 		public const float NpcMoveSpeed = 7f;
 
+		// A pet holds a tighter distance to its FORMATION SLOT than a lone escort keeps to the player, so the fan-out
+		// slots stay distinct (a 4u stop would let two pets share one slot). #307.
+		public const float PetFollowSlotStop = 1.5f;
+
 		// The shared instance id every Shared map (and every pre-instancing call site) uses - one zone per map.
 		public const uint DefaultInstance = 0;
-
-		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
-		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
-		// shared copy every Shared map uses - so ZoneFor(mapId) / the historical single-zone-per-map paths all resolve
-		// to it and behave exactly as before instancing existed.
-		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new ConcurrentDictionary<(uint MapId, uint InstanceId), Zone>();
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
 		// increasing per-instance id stamped into despawns; see protocol_despawn_n3toclientquit). Every Zone gets a
@@ -81,6 +75,12 @@ namespace Faolan.GameServer.World
 		// token that disagrees across those packets makes the client hide it). Shared so the cross-map teleport
 		// dest-announce can carry the same value the destination's entry will stamp (WorldBroadcaster).
 		public const uint DefaultPlayfieldToken = 0x004FE428;
+
+		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
+		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
+		// shared copy every Shared map uses - so ZoneFor(mapId) / the historical single-zone-per-map paths all resolve
+		// to it and behave exactly as before instancing existed.
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new ConcurrentDictionary<(uint MapId, uint InstanceId), Zone>();
 
 		private uint _nextPlayfieldToken = 0x00A00000;
 
@@ -198,8 +198,12 @@ namespace Faolan.GameServer.World
 						// from the handle (stable, no per-tick jitter) and settles at a tighter stop so it holds its
 						// place. Escort/quest followers (Casilda, OwnerHandle == 0) keep the exact-follow path (#262).
 						var isPet = entity.OwnerHandle != 0;
-						var (ox, oz) = isPet ? FollowFormationOffset(entity.Handle) : (0f, 0f);
-						var stop = isPet ? PetFollowSlotStop : FollowStopRange;
+						var (ox, oz) = isPet
+							? FollowFormationOffset(entity.Handle)
+							: (0f, 0f);
+						var stop = isPet
+							? PetFollowSlotStop
+							: FollowStopRange;
 						var fdx = leader.Position.X + ox - entity.Position.X;
 						var fdz = leader.Position.Z + oz - entity.Position.Z;
 						var fdist = MathF.Sqrt(fdx * fdx + fdz * fdz);
@@ -418,6 +422,17 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// A deterministic per-pet formation slot offset (X, Z) on a small ring around the leader, so multiple pets
+		// following one player fan out instead of piling on the same spot (#307). Derived from the entity handle so
+		// it is STABLE across ticks (no per-tick jitter that would make the pet jitter in place): the handle picks an
+		// angle around the circle and one of a few radius rings (so more than a ring's worth of pets don't collide).
+		private static (float X, float Z) FollowFormationOffset(uint handle)
+		{
+			var angle = handle % 3600 * (MathF.PI / 1800f); // 0..2π in 0.1° steps, deterministic per handle
+			var radius = 3f + handle % 3; // 3 / 4 / 5u rings
+			return (radius * MathF.Cos(angle), radius * MathF.Sin(angle));
+		}
+
 		// The closest player within `range` of the NPC (its aggro target), or null if none.
 		private static WorldEntity NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
 		{
@@ -441,17 +456,6 @@ namespace Faolan.GameServer.World
 			}
 
 			return nearest;
-		}
-
-		// A deterministic per-pet formation slot offset (X, Z) on a small ring around the leader, so multiple pets
-		// following one player fan out instead of piling on the same spot (#307). Derived from the entity handle so
-		// it is STABLE across ticks (no per-tick jitter that would make the pet jitter in place): the handle picks an
-		// angle around the circle and one of a few radius rings (so more than a ring's worth of pets don't collide).
-		private static (float X, float Z) FollowFormationOffset(uint handle)
-		{
-			var angle = handle % 3600 * (MathF.PI / 1800f); // 0..2π in 0.1° steps, deterministic per handle
-			var radius = 3f + handle % 3;                    // 3 / 4 / 5u rings
-			return (radius * MathF.Cos(angle), radius * MathF.Sin(angle));
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),

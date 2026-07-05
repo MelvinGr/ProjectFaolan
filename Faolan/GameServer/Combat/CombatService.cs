@@ -3,9 +3,9 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Enums;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
@@ -33,11 +33,6 @@ namespace Faolan.GameServer.Combat
 		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
 		private readonly CombatState _combat = new CombatState();
-		private readonly IDatabaseRepository _database;
-		private readonly ILogger _logger;
-		private readonly QuestProgressionService _questProgression;
-
-		private readonly WorldSimulation _sim;
 
 		// The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
 		// it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
@@ -47,10 +42,16 @@ namespace Faolan.GameServer.Combat
 		// The listener's live spell-learn op (DispatchLearnSpell 0x200A), for the level-up spell unlocks (#209). Same
 		// narrow-seam pattern as _announceAbilityGrant. Null-safe for tests that construct the service without it.
 		private readonly Func<INetworkClient, uint, Task> _learnSpell;
+		private readonly IDatabaseRepository _database;
+		private readonly ILogger _logger;
+		private readonly QuestProgressionService _questProgression;
+
+		private readonly WorldSimulation _sim;
 
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
-		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAbilityGrant = null, Func<INetworkClient, uint, Task> learnSpell = null)
+		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAbilityGrant = null,
+			Func<INetworkClient, uint, Task> learnSpell = null)
 		{
 			_sim = sim;
 			_database = database;
@@ -215,7 +216,7 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(instance)
 					.WriteUInt16(next)
 					.WriteUInt32(0x0000000Fu)
-					.WriteUInt32((uint)echoedArgs.Length)
+					.WriteUInt32(echoedArgs.Length)
 					.WriteArray(echoedArgs)
 					.WriteUInt32(0)
 					.WriteUInt32(0)
@@ -465,7 +466,9 @@ namespace Faolan.GameServer.Combat
 			{
 				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);
 				var nextXp = LevelingResolver.CumulativeXpForLevel(lvl + 1);
-				var currentXp = lvl == character.Level ? thisXp + character.Experience : thisXp;
+				var currentXp = lvl == character.Level
+					? thisXp + character.Experience
+					: thisXp;
 				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
 				await SendWorldFeedback(killer, NewLevelIirCodec.Build(instance, lvl, deltas));
 
@@ -489,11 +492,7 @@ namespace Faolan.GameServer.Combat
 			vitals.Stamina = max.Stamina;
 			vitals.Mana = max.Mana;
 
-			var block = vitals
-				.ToVitalsBlock()
-				.Set(CharacterStatId.Level, character.Level)
-				.Set(CharacterStatId.Exp, character.Experience)
-				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+			var block = vitals.ToVitalsBlock().Set(CharacterStatId.Level, character.Level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 
 			// Level-gated ability unlocks (#209/#73): retail grants the abilities that unlock at the new level as
@@ -575,9 +574,9 @@ namespace Faolan.GameServer.Combat
 				.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
 				.WriteUInt32(0x0000C350u)
 				.WriteUInt32(instance)
-				.WriteUInt16((ushort)(seq + 1))
+				.WriteUInt16(seq + 1)
 				.WriteUInt32(behaviorId)
-				.WriteUInt32((uint)echoedArgs.Length)
+				.WriteUInt32(echoedArgs.Length)
 				.WriteArray(echoedArgs)
 				.WriteArray(tail);
 			if (padTail)
@@ -630,7 +629,7 @@ namespace Faolan.GameServer.Combat
 		private static byte[] EncodeBehaviorPhase(uint value)
 		{
 			var bytes = new List<byte> { 0x18 };
-			Varint.Write(bytes, value);
+			ProtoMessage.WriteVarint(bytes, value);
 			return bytes.ToArray();
 		}
 

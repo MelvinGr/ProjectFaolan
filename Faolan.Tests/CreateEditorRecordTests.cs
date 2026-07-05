@@ -55,6 +55,14 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void CharInPlayIir_MatchesCapturedBytes()
+		{
+			// The "character in play" signal: type=C350 handle=021662C8 flag=00 (the whole message is the handle).
+			var bytes = CreateEditorRecordBuilder.BuildCharInPlayIir(0x021662C8);
+			Assert.Equal("0000c350021662c800", Convert.ToHexString(bytes).ToLowerInvariant());
+		}
+
+		[Fact]
 		public void ComboBookIir_MatchesCapturedBytes()
 		{
 			// First ComboBook of the WorldPrep stream (handle 0x02000001, combo id 0x00416544).
@@ -67,14 +75,6 @@ namespace Faolan.Tests
 			// The editor's single EnergyIIR: type=C350 handle=021662C8 flag=01 value=0.
 			var bytes = CreateEditorRecordBuilder.BuildEnergyIir(0x0000C350, 0x021662C8, 0x01, 0);
 			Assert.Equal("0000c350021662c80100000000", Convert.ToHexString(bytes).ToLowerInvariant());
-		}
-
-		[Fact]
-		public void CharInPlayIir_MatchesCapturedBytes()
-		{
-			// The "character in play" signal: type=C350 handle=021662C8 flag=00 (the whole message is the handle).
-			var bytes = CreateEditorRecordBuilder.BuildCharInPlayIir(0x021662C8);
-			Assert.Equal("0000c350021662c800", Convert.ToHexString(bytes).ToLowerInvariant());
 		}
 
 		[Fact]

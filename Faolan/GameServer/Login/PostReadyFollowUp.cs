@@ -2,7 +2,9 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -70,6 +72,10 @@ namespace Faolan.GameServer
 		private static readonly byte[] NewCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
 		private static readonly byte[] Receiver3 = [0x0d, 0x48, 0x76, 0x37, 0x28, 0x10, 0x84, 0x80, 0x80, 0x08];
 		private static readonly byte[] RetailCreatePost205FSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
+
+		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
+		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
+		private static int _spellweaveEffectSeq;
 
 		// Receiver for the create-editor (clientInstance=0x021662C8) conversation family.
 		// The create-editor 0x2000 receiver is built per session from the character's real instance id -
@@ -187,10 +193,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
-		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
-		private static int _spellweaveEffectSeq;
-
 		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
 		// 54-byte MagicBuffIIR blob (SpellweaveCodec.BuildBuffData) instead of the shared 50-byte default - the client
 		// rejects the default shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's real
@@ -201,7 +203,7 @@ namespace Faolan.GameServer
 			var spellBase = spellId >> 8;
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			var nonce = 0x18000000u | ((uint)System.Threading.Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
+			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
 			await ApplySpell(client, applyTo, applyFrom, spellId, SpellweaveCodec.BuildBuffData(spellBase, durationCs, nonce));
 		}
 
@@ -8583,7 +8585,7 @@ namespace Faolan.GameServer
 				0xC1,
 				0x09
 			};
-			var inst = Varint.Encode(instance);
+			var inst = new FaolanStream().WriteVarint(instance).ToArray();
 			if (inst.Length != placeholder.Length)
 				return tail;
 

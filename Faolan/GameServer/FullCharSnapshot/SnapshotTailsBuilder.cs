@@ -42,24 +42,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
 		private static readonly QuestTextSlot[] HeaderSlots = [QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
 
-		// The single-quest quest portion (golden-test oracle for the multi-quest BuildQuestPortion: for one held quest
-		// the two are byte-identical - see BuildQuestPortionTests).
-		public static byte[] BuildSingleQuestPortion(QuestDefinition def, uint state, uint instance)
-		{
-			ArgumentNullException.ThrowIfNull(def);
-
-			var quests = new QuestcRegion { Records = { QuestcRecord.BuildSingle(def, state, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) } };
-			var objectives = QuestObjectiveRegion.Build(def, instance);
-			var goalSteps = (def.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
-			var index = QuestIndexRegion.Build([def.QuestId], goalSteps, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3, def.QuestId, def.IndexTrailerWord);
-
-			byte[] portion = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
-			if (portion.Length != QuestPortionLength)
-				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {QuestPortionLength}");
-
-			return portion;
-		}
-
 		public static byte[] BuildEmptyQuestPortion()
 		{
 			using var w = new FaolanStream();
@@ -163,16 +145,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return [.. quest, .. AccessWindowTable, .. statBytes];
 		}
 
-		// Sets a stat id's value at EVERY occurrence in the sheet (a few ids appear in both StatList#1 and StatList#2).
-		// Applied to the sheet BEFORE the block is built, so - unlike TailsPostAccessBlock.SetStat - it never scans the
-		// inline known-list records.
-		private static void SetSheet(List<(uint Id, uint Value)> sheet, uint statId, uint value)
-		{
-			for (var i = 0; i < sheet.Count; i++)
-				if (sheet[i].Id == statId)
-					sheet[i] = (statId, value);
-		}
-
 		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
@@ -205,7 +177,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			w.WriteUInt32(((uint)ordered.Count + 1) * QuestcRegion.Frame);
 			foreach (var q in ordered)
 				w.WriteUInt32(q.QuestId);
-			w.WriteUInt32((uint)ordered.Count);
+			w.WriteUInt32(ordered.Count);
 			w.WriteUInt32(QuestIndexRegion.Sentinel);
 			for (var i = 0; i < ordered.Count; i++)
 			{
@@ -215,11 +187,11 @@ namespace Faolan.GameServer.FullCharSnapshot
 				w.WriteUInt32(q.IndexTableField2);
 				w.WriteUInt32(q.IndexTableField3);
 				var steps = (q.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
-				w.WriteUInt32((uint)steps.Length);
+				w.WriteUInt32(steps.Length);
 				for (var s = 0; s < steps.Length; s++)
 				{
 					w.WriteUInt32(steps[s]);
-					w.WriteUInt32((uint)(s + 1));
+					w.WriteUInt32(s + 1);
 				}
 
 				w.WriteUInt32(q.QuestId);
@@ -239,6 +211,24 @@ namespace Faolan.GameServer.FullCharSnapshot
 			}
 		}
 
+		// The single-quest quest portion (golden-test oracle for the multi-quest BuildQuestPortion: for one held quest
+		// the two are byte-identical - see BuildQuestPortionTests).
+		public static byte[] BuildSingleQuestPortion(QuestDefinition def, uint state, uint instance)
+		{
+			ArgumentNullException.ThrowIfNull(def);
+
+			var quests = new QuestcRegion { Records = { QuestcRecord.BuildSingle(def, state, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) } };
+			var objectives = QuestObjectiveRegion.Build(def, instance);
+			var goalSteps = (def.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
+			var index = QuestIndexRegion.Build([def.QuestId], goalSteps, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3, def.QuestId, def.IndexTrailerWord);
+
+			byte[] portion = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
+			if (portion.Length != QuestPortionLength)
+				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {QuestPortionLength}");
+
+			return portion;
+		}
+
 		// A quest can ride the snapshot journal region (BuildQuestPortion) only if its Quest_c scalars are seeded
 		// (SnapshotState != 0) AND all 5 header text refs are present - else BuildSingle throws. Quests failing this
 		// fall to the live RestorePlayerQuests path instead, so the two never deliver the same quest twice (#255).
@@ -251,5 +241,16 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return HeaderSlots.All(slots.Contains);
 		}
 
+		// Sets a stat id's value at EVERY occurrence in the sheet (a few ids appear in both StatList#1 and StatList#2).
+		// Applied to the sheet BEFORE the block is built, so - unlike TailsPostAccessBlock.SetStat - it never scans the
+		// inline known-list records.
+		private static void SetSheet(List<(uint Id, uint Value)> sheet, uint statId, uint value)
+		{
+			for (var i = 0; i < sheet.Count; i++)
+			{
+				if (sheet[i].Id == statId)
+					sheet[i] = (statId, value);
+			}
+		}
 	}
 }

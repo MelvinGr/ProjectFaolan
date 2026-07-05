@@ -14,16 +14,16 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(Class), nameof(AbilityId))]
 	public class ClassAbility
 	{
-		[ConstrainToEnumValues]
-		public Class Class { get; set; }
-
-		// FK into the Abilities catalog (Ability.Id). The catalog row always exists (harvested from the 0x2052 grants).
-		public uint AbilityId { get; set; }
-
 		[ForeignKey(nameof(AbilityId))]
 		public virtual Ability Ability { get; set; }
 
 		// The character level this ability unlocks at FOR THIS CLASS (min level of that class's captured holders).
 		public byte Level { get; set; }
+
+		[ConstrainToEnumValues]
+		public Class Class { get; set; }
+
+		// FK into the Abilities catalog (Ability.Id). The catalog row always exists (harvested from the 0x2052 grants).
+		public uint AbilityId { get; set; }
 	}
 }

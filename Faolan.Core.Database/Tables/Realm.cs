@@ -12,10 +12,13 @@ namespace Faolan.Core.Database.Tables
 
 		[ConstrainToEnumValues]
 		public RealmCountry Country { get; set; }
+
 		[ConstrainToEnumValues]
 		public RealmLoadStatus LoadStatus { get; set; }
+
 		[ConstrainToEnumValues]
 		public RealmOnlineStatus OnlineStatus { get; set; }
+
 		[ConstrainToEnumValues]
 		public RealmType Type { get; set; }
 

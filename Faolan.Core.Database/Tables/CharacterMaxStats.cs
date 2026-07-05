@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {

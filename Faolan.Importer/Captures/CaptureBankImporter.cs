@@ -21,9 +21,9 @@ namespace Faolan.Importer.Captures
 	// wins (the bank can be re-sent after a move). Only DB characters are touched; the bank container is replaced.
 	public static class CaptureBankImporter
 	{
-		private const ushort IirCarrierOpcode = 0x2000;
-		private const uint BankIirSubOpcode = 0x0BA1C1CB;
 		private const int BlobOffset = 17; // subop(4) + 0xC350(4) + charInstance(4) + flag(1) + blobLen(4)
+		private const uint BankIirSubOpcode = 0x0BA1C1CB;
+		private const ushort IirCarrierOpcode = 0x2000;
 
 		public static async Task<(int Characters, int Items)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
 		{

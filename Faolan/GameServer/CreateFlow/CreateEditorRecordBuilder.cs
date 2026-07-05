@@ -213,7 +213,7 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteUInt32(type)
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0000)
-				.WriteByte((byte)(1 + nameBytes.Length))
+				.WriteByte(1 + nameBytes.Length)
 				.WriteByte(0x2A)
 				.WriteArray(nameBytes)
 				.WriteFloatBigEndian(weight)
@@ -236,7 +236,7 @@ namespace Faolan.GameServer.CreateFlow
 		// The editor/world-prep streams it to seed a character's stat block (max health/mana/... + a few flags).
 		public static byte[] BuildStatUpdateIir(uint handle, (uint StatId, uint Value)[] stats, uint type = CharacterWireType)
 		{
-			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte((byte)stats.Length);
+			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(stats.Length);
 			foreach (var (statId, value) in stats)
 				s.WriteUInt32(statId).WriteUInt32(value);
 			return s.ToArray();

@@ -29,15 +29,6 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(256)]
 		public string Name { get; set; }
 
-		// Per-TEMPLATE hash the client needs (alongside the Data quad) to fully realize/render the item from its RDB.
-		// On the wire it is ProtoAcgItem.Hash (and the FullChar snapshot tail's f8 field). It is NOT in the old C++
-		// `p_items`, so it can only be HARVESTED from a capture where the item sat in an inventory (a 0x737A6DF9
-		// snapshot or a 0x2020 add-item) - it is absent from sources that only describe the template abstractly (AH
-		// search-results carry Hash=0). An item is "fully buildable" (renders via the hash-gated world-entry
-		// snapshot) iff Hash != 0 AND it has a Data quad; the more forgiving live DispatchAddItem (0x2020) path
-		// renders an item by template even with Hash == 0 (used for AH-bought items we lack a hash for).
-		public uint Hash { get; set; }
-
 		// The item's stable identity QUAD (Data1..Data4) - the per-template 16-byte ProtoDecryptionKey repeated in
 		// the inventory snapshot tail and the add-item packet, and the TEA key for the item's encrypted RDB template.
 		// The client REJECTS an item whose quad isn't a template it knows (the add/remove stall). Sourced from the
@@ -49,6 +40,15 @@ namespace Faolan.Core.Database.Tables
 		public uint Data2 { get; set; }
 		public uint Data3 { get; set; }
 		public uint Data4 { get; set; }
+
+		// Per-TEMPLATE hash the client needs (alongside the Data quad) to fully realize/render the item from its RDB.
+		// On the wire it is ProtoAcgItem.Hash (and the FullChar snapshot tail's f8 field). It is NOT in the old C++
+		// `p_items`, so it can only be HARVESTED from a capture where the item sat in an inventory (a 0x737A6DF9
+		// snapshot or a 0x2020 add-item) - it is absent from sources that only describe the template abstractly (AH
+		// search-results carry Hash=0). An item is "fully buildable" (renders via the hash-gated world-entry
+		// snapshot) iff Hash != 0 AND it has a Data quad; the more forgiving live DispatchAddItem (0x2020) path
+		// renders an item by template even with Hash == 0 (used for AH-bought items we lack a hash for).
+		public uint Hash { get; set; }
 
 		// The auction-house SEARCH CATEGORY id the client queries by (e.g. 30000/30030, NOT the template id) - the
 		// FIRST u32 of the decrypted RDB item-template body (template[12..16]). Decoded from the client RDB

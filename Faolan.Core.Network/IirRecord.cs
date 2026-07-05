@@ -10,20 +10,20 @@ namespace Faolan.Core.Network
 	// decompose/verify the generated world-entry records.
 	public sealed class IirRecord
 	{
-		// RpcHeader + the 2-byte opcode marker, verbatim. Carries the source endpoint + (re-addressable) instance.
-		public byte[] Header { get; set; }
-
 		// The IIR component payload (everything after the lifted header fields), verbatim until dissected.
 		public byte[] Body { get; set; }
+
+		// RpcHeader + the 2-byte opcode marker, verbatim. Carries the source endpoint + (re-addressable) instance.
+		public byte[] Header { get; set; }
 
 		// Order within the stream (the replay/verify sends in this order).
 		public int Sequence { get; set; }
 
-		// The target entity handle this record addresses (0 for global records like MapChange / GameTime).
-		public uint Handle { get; set; }
-
 		// The field following the handle (usually 0; a stat id for StatIIR, a sub-count for FullChar, etc.).
 		public uint FieldA { get; set; }
+
+		// The target entity handle this record addresses (0 for global records like MapChange / GameTime).
+		public uint Handle { get; set; }
 
 		// The IIR message type (sub-opcode), e.g. 0xFA015807 SimpleCharFullUpdate, 0x66AEDD50 SimpleDynelFullUpdate.
 		public uint IirType { get; set; }

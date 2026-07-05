@@ -70,32 +70,32 @@ namespace Faolan.GameServer.Combat
 		{
 			// args protobuf: {f1=TypeId, f3=swingCounter, f5, f6=0, f10=SpellTarget{f1=0xC350, f2=player}, f11, f12}.
 			// NO f2/Mode - that field is present only on player-initiated actions and is the NPC-vs-player tell.
-			var spellTarget = new FaolanStream().WriteByte(0x08).WriteArray(Varint.Encode(SpellTargetTypeWord)).WriteByte(0x10).WriteArray(Varint.Encode(playerHandle)).ToArray();
+			var spellTarget = new FaolanStream().WriteByte(0x08).WriteVarint(SpellTargetTypeWord).WriteByte(0x10).WriteVarint(playerHandle).ToArray();
 			var args = new FaolanStream()
 				.WriteByte(0x08)
-				.WriteArray(Varint.Encode(typeId))
+				.WriteVarint(typeId)
 				.WriteByte(0x18)
-				.WriteArray(Varint.Encode(swingCounter))
+				.WriteVarint(swingCounter)
 				.WriteByte(0x28)
-				.WriteArray(Varint.Encode(f5))
+				.WriteVarint(f5)
 				.WriteByte(0x30)
-				.WriteArray(Varint.Encode(0))
+				.WriteVarint(0)
 				.WriteByte(0x52)
-				.WriteArray(Varint.Encode((ulong)spellTarget.Length))
+				.WriteVarint((ulong)spellTarget.Length)
 				.WriteArray(spellTarget)
 				.WriteByte(0x58)
-				.WriteArray(Varint.Encode(f11))
+				.WriteVarint(f11)
 				.WriteByte(0x60)
-				.WriteArray(Varint.Encode(f12))
+				.WriteVarint(f12)
 				.ToArray();
 
 			return new FaolanStream()
-				.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
+				.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
 				.WriteUInt32(SpellTargetTypeWord)
 				.WriteUInt32(npcHandle)
 				.WriteUInt16(NpcAttackAckSeq)
 				.WriteUInt32(NormalAttackBehaviorId)
-				.WriteUInt32((uint)args.Length)
+				.WriteUInt32(args.Length)
 				.WriteArray(args)
 				// result block (the single-entry 132-byte-frame layout)
 				.WriteUInt32(0)

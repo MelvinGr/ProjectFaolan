@@ -23,6 +23,7 @@ namespace Faolan.Core.Database.Tables
 		//   Escort     - escorting the NPC named TargetName to a destination (not yet wired; Gitea sub-ticket).
 		// Default Kill keeps the existing single-goal rows (seeded before this field) as kill goals.
 		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
+
 		[MaxLength(128)]
 		public string ObjectiveKey { get; set; }
 
@@ -34,8 +35,10 @@ namespace Faolan.Core.Database.Tables
 		// Null/empty = target not yet sourced.
 		[MaxLength(128)]
 		public string TargetName { get; set; }
+
 		[MaxLength(64)]
 		public string TrailingFlags { get; set; }
+
 		[MaxLength(128)]
 		public string TrailingKey { get; set; }
 

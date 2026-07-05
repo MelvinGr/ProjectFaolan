@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Faolan.GameServer.Combat
 {
 	// RETIRED from the live grant path - superseded by the class<->combo ACCESS map (ClassCombo). It was LEVEL-keyed
@@ -7,14 +9,19 @@ namespace Faolan.GameServer.Combat
 	// bursts; L2/L4/L5) for populating ClassCombo from dumps later - it is no longer referenced by any live code.
 	public static class LevelComboCatalog
 	{
-		private static readonly System.Collections.Generic.Dictionary<uint, uint[]> ByLevel = new()
+		private static readonly Dictionary<uint, uint[]> ByLevel = new Dictionary<uint, uint[]>
 		{
 			[2] = [0x0035F6BE, 0x000218C6, 0x0035F7E1, 0x0035F6B5],
 			[4] = [0x0035F91E, 0x0035F917, 0x0035F91D, 0x00021A95],
-			[5] = [0x0030DCBC],
+			[5] = [0x0030DCBC]
 		};
 
 		// The combos unlocked exactly AT `level` (empty if that level grants none / is uncaptured).
-		public static uint[] ForLevel(uint level) => ByLevel.TryGetValue(level, out var combos) ? combos : [];
+		public static uint[] ForLevel(uint level)
+		{
+			return ByLevel.TryGetValue(level, out var combos)
+				? combos
+				: [];
+		}
 	}
 }

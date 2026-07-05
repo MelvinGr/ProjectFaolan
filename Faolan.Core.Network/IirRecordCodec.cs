@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Binary;
 
-
 namespace Faolan.Core.Network
 {
 	// Decomposes a world-burst packet into a structured IirRecord and rebuilds the exact bytes back.

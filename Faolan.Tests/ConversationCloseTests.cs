@@ -23,11 +23,16 @@ namespace Faolan.Tests
 		[Fact]
 		public void EndConversation_ClearsAllConversationSessionState()
 		{
-			var client = new RecordingNetworkClient(0x0089ABCD) { Session = { ConversationAnswerPath = "0>1",
-				ConversationNpcName = "Casilda",
-				ConversationTypeId = 13,
-				ConversationNpcHandle = 0x000818D6
-			} };
+			var client = new RecordingNetworkClient(0x0089ABCD)
+			{
+				Session =
+				{
+					ConversationAnswerPath = "0>1",
+					ConversationNpcName = "Casilda",
+					ConversationTypeId = 13,
+					ConversationNpcHandle = 0x000818D6
+				}
+			};
 
 			ConversationService.EndConversation(client);
 

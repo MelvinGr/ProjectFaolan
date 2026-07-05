@@ -134,7 +134,7 @@ namespace Faolan.GameServer.World
 		internal static byte[] WithLength(byte[] body)
 		{
 			var s = new FaolanStream();
-			s.WriteUInt32((uint)body.Length);
+			s.WriteUInt32(body.Length);
 			s.WriteArray(body);
 			return s.ToArray();
 		}

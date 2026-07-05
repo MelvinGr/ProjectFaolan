@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+
 namespace Faolan.Core.Database.Tables
 {
 	// One Lua script from the client RDB LuaArchive (type 1010223) - the logic/branching behind conversations,

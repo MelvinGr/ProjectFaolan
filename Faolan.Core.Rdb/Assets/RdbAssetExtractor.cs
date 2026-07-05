@@ -874,6 +874,24 @@ namespace Faolan.Core.Rdb.Assets
 				: SkiaImage.CompositeDecals(rgba, w, h, placed, tint);
 		}
 
+		// Resolve the body's real tangent-space NORMAL map from the MIXD container (2nd header ref). MIXD ("MIXeD") is a
+		// container holding a BC5/ATI2 normal map + a trailing ATI1 detail map (+ an as-yet-unidentified seg1); the BC5
+		// normal is the proper per-texel surface detail (breasts/abs/fingers), far better than deriving one from the
+		// single-channel detail. Null when there's no MIXD ref or it can't be decoded.
+		private static byte[]? BuildBodyNormal(RdbReader rdb, ReadOnlySpan<byte> blob)
+		{
+			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+			{
+				if (RawBytes(rdb, type, id) is not { Length: >= 24 } raw || Encoding.ASCII.GetString(raw.AsSpan(20, 4)) != "MIXD")
+					continue;
+
+				if (FctxConverter.TryDecodeMixdNormal(raw, out var rgba, out var w, out var h))
+					return SkiaImage.EncodePng(rgba, w, h);
+			}
+
+			return null;
+		}
+
 		// Axis-aligned bounding-box centre of a set of sub-meshes.
 		private static (float x, float y, float z) Center(IReadOnlyList<RenderMeshReader.SubMesh> model)
 		{
@@ -1233,24 +1251,6 @@ namespace Faolan.Core.Rdb.Assets
 					Alpha = RenderMeshReader.AlphaMode.Opaque
 				})
 				.ToList();
-		}
-
-		// Resolve the body's real tangent-space NORMAL map from the MIXD container (2nd header ref). MIXD ("MIXeD") is a
-		// container holding a BC5/ATI2 normal map + a trailing ATI1 detail map (+ an as-yet-unidentified seg1); the BC5
-		// normal is the proper per-texel surface detail (breasts/abs/fingers), far better than deriving one from the
-		// single-channel detail. Null when there's no MIXD ref or it can't be decoded.
-		private static byte[]? BuildBodyNormal(RdbReader rdb, ReadOnlySpan<byte> blob)
-		{
-			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
-			{
-				if (RawBytes(rdb, type, id) is not { Length: >= 24 } raw || Encoding.ASCII.GetString(raw.AsSpan(20, 4)) != "MIXD")
-					continue;
-
-				if (FctxConverter.TryDecodeMixdNormal(raw, out var rgba, out var w, out var h))
-					return SkiaImage.EncodePng(rgba, w, h);
-			}
-
-			return null;
 		}
 
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each

@@ -127,7 +127,7 @@ namespace Faolan.GameServer.Economy.Bank
 		// against the captured bank (BankStorageTests).
 		public static byte[] BuildBankIirRecord(uint charInstance, byte[] containerBlob)
 		{
-			return new FaolanStream().WriteUInt32(BankIirSubOpcode).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteUInt32((uint)containerBlob.Length).WriteArray(containerBlob).ToArray();
+			return new FaolanStream().WriteUInt32(BankIirSubOpcode).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteUInt32(containerBlob.Length).WriteArray(containerBlob).ToArray();
 		}
 
 		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]

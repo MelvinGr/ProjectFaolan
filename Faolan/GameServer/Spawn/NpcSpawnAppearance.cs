@@ -52,7 +52,7 @@ namespace Faolan.GameServer.Spawn
 		// Builds the post-IIR bytes for a humanoid from its morph rows (the inverse of TryDecodeAppearance).
 		public static byte[] BuildPostIir(IReadOnlyList<NpcAppearanceMorph> morphs)
 		{
-			var stream = new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Record1).WriteUInt32((uint)morphs.Count);
+			var stream = new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Record1).WriteUInt32(morphs.Count);
 
 			foreach (var morph in morphs)
 				stream.WriteUInt32(morph.MorphId).WriteFloatBigEndian(morph.Value).WriteUInt32(0).WriteByte(0).WriteArrayByteLength(Encoding.ASCII.GetBytes(morph.Text ?? ""));

@@ -41,10 +41,20 @@ namespace Faolan.Core.Network.Spawn
 		// blocked, NOT RDB-key-blocked) and Gitea #298/#251/#74. Ascending ids (the wire/codec require it).
 		private static readonly Dictionary<Class, uint[]> FullSkillIdsByClass = new Dictionary<Class, uint[]>
 		{
-			[Class.Necromancer] = [4100, 7002, 8909, 13603, 18502, 85279, 86200, 86507, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313104, 321202, 321502, 323205, 323305, 323405, 323505, 326000, 326300, 326600, 327402, 327505, 328908, 329400, 330400, 330500, 331300, 1440500, 1445000],
-			[Class.Demonologist] = [4400, 7002, 8909, 13603, 18502, 104579, 104600, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313704, 321701, 322402, 323201, 323300, 323402, 323501, 326000, 326300, 326600, 327200, 327500, 328908, 329400, 330400, 330500, 331300, 1410900, 1411300, 1440000, 1440400, 1440500, 1440700, 1441902, 1445000],
-			[Class.Assassin] = [3400, 13603, 14101, 14801, 15000, 16707, 160022, 160300, 165600, 301200, 302100, 302900, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 309100, 318100, 323301, 328703, 328902, 329302, 330400, 331300],
-			[Class.HeraldOfXotli] = [4300, 7700, 13603, 14101, 18502, 114823, 114900, 117801, 119000, 300300, 301200, 302100, 302400, 302900, 304300, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 328703, 328902, 330400, 331300]
+			[Class.Necromancer] =
+			[
+				4100, 7002, 8909, 13603, 18502, 85279, 86200, 86507, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313104, 321202, 321502, 323205,
+				323305, 323405, 323505, 326000, 326300, 326600, 327402, 327505, 328908, 329400, 330400, 330500, 331300, 1440500, 1445000
+			],
+			[Class.Demonologist] =
+			[
+				4400, 7002, 8909, 13603, 18502, 104579, 104600, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313704, 321701, 322402, 323201, 323300,
+				323402, 323501, 326000, 326300, 326600, 327200, 327500, 328908, 329400, 330400, 330500, 331300, 1410900, 1411300, 1440000, 1440400, 1440500, 1440700, 1441902, 1445000
+			],
+			[Class.Assassin] =
+				[3400, 13603, 14101, 14801, 15000, 16707, 160022, 160300, 165600, 301200, 302100, 302900, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 309100, 318100, 323301, 328703, 328902, 329302, 330400, 331300],
+			[Class.HeraldOfXotli] =
+				[4300, 7700, 13603, 14101, 18502, 114823, 114900, 117801, 119000, 300300, 301200, 302100, 302400, 302900, 304300, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 328703, 328902, 330400, 331300]
 		};
 
 		// Dikketest's 6 weighted attributes (weight 1.0). The tags are per-character (likely the chosen
@@ -160,29 +170,12 @@ namespace Faolan.Core.Network.Spawn
 			// TryApplyFrom reconstructs them from Character.Class - see FreshPreFrame + docs/fa015807-spawn-reader.md.
 		}
 
-		// The normal-login pre-IIR frame (239 bytes) with the fresh-character island values: the near-constant
-		// skeleton (0x05 lead, the 0x7E2/0x3F1 constants, the 41 00 00 82 08 closer) + Dikketest's per-char
-		// values at the two known islands.
-		// The frame's archetype code at @70 (abs-135 high byte): Soldier=1, Priest=2, Rogue=3, Mage=4. This is a
-		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
-		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
-		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
-		// docs/fa015807-spawn-reader.md (FUN_01121c00) + docs/archive/player-spawn-generation-plan.md.
-		private static byte FrameArchetype(Class @class) => @class switch
-		{
-			Class.Conqueror or Class.DarkTemplar or Class.Guardian => 1,        // Soldier
-			Class.PriestOfMitra or Class.TempestOfSet or Class.BearShaman => 2, // Priest
-			Class.Barbarian or Class.Ranger or Class.Assassin => 3,            // Rogue
-			Class.HeraldOfXotli or Class.Demonologist or Class.Necromancer => 4, // Mage
-			_ => 3
-		};
-
 		public static byte[] FreshPreFrame(Class @class)
 		{
 			var f = new byte[239];
 			f[0] = 0x05;
 			f[70] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
-			f[71] = (byte)@class;           // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
+			f[71] = (byte)@class; // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
 			f[76] = 0x6F; // constant marker
 			f[81] = 0x41; // constant marker 0x4170
 			f[82] = 0x70;
@@ -291,6 +284,26 @@ namespace Faolan.Core.Network.Spawn
 			}
 
 			return true;
+		}
+
+		// The normal-login pre-IIR frame (239 bytes) with the fresh-character island values: the near-constant
+		// skeleton (0x05 lead, the 0x7E2/0x3F1 constants, the 41 00 00 82 08 closer) + Dikketest's per-char
+		// values at the two known islands.
+		// The frame's archetype code at @70 (abs-135 high byte): Soldier=1, Priest=2, Rogue=3, Mage=4. This is a
+		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
+		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
+		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
+		// docs/fa015807-spawn-reader.md (FUN_01121c00) + docs/archive/player-spawn-generation-plan.md.
+		private static byte FrameArchetype(Class @class)
+		{
+			return @class switch
+			{
+				Class.Conqueror or Class.DarkTemplar or Class.Guardian         => 1, // Soldier
+				Class.PriestOfMitra or Class.TempestOfSet or Class.BearShaman  => 2, // Priest
+				Class.Barbarian or Class.Ranger or Class.Assassin              => 3, // Rogue
+				Class.HeraldOfXotli or Class.Demonologist or Class.Necromancer => 4, // Mage
+				_                                                              => 3
+			};
 		}
 
 		// The closing [u16 tag][u32 value] entry-table record (the final entry-table entry). #250: stamping the WRONG

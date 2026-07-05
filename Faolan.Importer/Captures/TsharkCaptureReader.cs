@@ -73,8 +73,8 @@ namespace Faolan.Importer.Captures
 					// epoch - parse it as a DateTimeOffset and use its 100ns UtcTicks. Falls back to the per-file
 					// sequence when absent/unparseable. (Used by CaptureCharacterStateImporter to take a character's
 					// LATEST-in-time saved hotbar/wallet when it appears in several captures.)
-					var tick = p.TryGetProperty("TimeUtc", out var tEl) && tEl.ValueKind == JsonValueKind.String
-					           && DateTimeOffset.TryParse(tEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var timestamp)
+					var tick = p.TryGetProperty("TimeUtc", out var tEl) && tEl.ValueKind == JsonValueKind.String &&
+					           DateTimeOffset.TryParse(tEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var timestamp)
 						? timestamp.UtcTicks
 						: seq;
 

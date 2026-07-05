@@ -39,7 +39,7 @@ namespace Faolan.GameServer
 		// The 12-byte wire body; golden-tested against the captured first-coin-loot update (MoneyUpdateTests).
 		internal static void WriteMoneyUpdateBody(FaolanStream s, ulong balanceTin, MoneyUpdateReason reason)
 		{
-			s.WriteUInt64(balanceTin).WriteUInt32((uint)reason);
+			s.WriteUInt64(balanceTin).WriteUInt32(reason);
 		}
 	}
 }

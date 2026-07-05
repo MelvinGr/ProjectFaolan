@@ -16,8 +16,8 @@ namespace Faolan.GameServer.World
 	public static class PetIirCodec
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.PetIIR;
-		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 		private const byte Env = 0x00;
+		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 
 		// (f1,f2,f3) kind triples observed in the capture.
 		public static readonly (uint F1, uint F2, uint F3) CombatKind = (0, 2, 2);

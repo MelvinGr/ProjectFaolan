@@ -11,8 +11,7 @@ namespace Faolan.Core.Network.Packets
 	//   @29 = Magnitude, @45 = Rank (equal on most casts; differ on a few - the two effect-strength bytes)
 	//   @50 u32 = a per-cast Counter/timestamp the client does NOT validate (0 when we synthesise a cast)
 	// Codec is byte-exact: ToBytes(Parse(captured)) == captured for all 21 goldens (NpcSpellEffectCodecTests).
-	public readonly record struct NpcSpellEffect(
-		uint SpellId, ushort Duration, byte Magnitude, byte Rank, byte FlagA, byte FlagB, byte FlagC, uint Counter = 0)
+	public readonly record struct NpcSpellEffect(uint SpellId, ushort Duration, byte Magnitude, byte Rank, byte FlagA, byte FlagB, byte FlagC, uint Counter = 0)
 	{
 		public const int Length = 54;
 
@@ -35,15 +34,7 @@ namespace Faolan.Core.Network.Packets
 			if (b.Length != Length)
 				throw new ArgumentException($"NpcSpellEffect payload must be {Length} bytes, got {b.Length}.", nameof(b));
 
-			return new NpcSpellEffect(
-				SpellId: BinaryPrimitives.ReadUInt32BigEndian(b[23..]),
-				Duration: BinaryPrimitives.ReadUInt16BigEndian(b[10..]),
-				Magnitude: b[29],
-				Rank: b[45],
-				FlagA: b[13],
-				FlagB: b[17],
-				FlagC: b[33],
-				Counter: BinaryPrimitives.ReadUInt32BigEndian(b[50..]));
+			return new NpcSpellEffect(BinaryPrimitives.ReadUInt32BigEndian(b[23..]), BinaryPrimitives.ReadUInt16BigEndian(b[10..]), b[29], b[45], b[13], b[17], b[33], BinaryPrimitives.ReadUInt32BigEndian(b[50..]));
 		}
 	}
 }

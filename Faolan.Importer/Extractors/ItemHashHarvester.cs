@@ -24,8 +24,15 @@ namespace Faolan.Importer.Extractors
 	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/archive/spawn-dissection-plan.md Phase 5.
 	public static class ItemHashHarvester
 	{
-		private const uint InventorySubOpcode = 0x737A6DF9;
 		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // 0x0BA1C1CB - same framing
+
+		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
+		// numbers as ContainerKind (Bag=Normal 104 / Resource 112 / Quest 113), so those map straight. EXCEPT the
+		// equipped container (101): that is a LOCATION, not an item class - worn gear is ordinary Normal loot - so it
+		// folds into Normal, keeping the catalog to the three real item classes (the routing hint that keeps quest/
+		// resource items out of random loot).
+		private const uint EquippedContainerKind = 101;
+		private const uint InventorySubOpcode = 0x737A6DF9;
 
 		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
 		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the
@@ -91,33 +98,33 @@ namespace Faolan.Importer.Extractors
 			}
 
 			// Sixth source: the personal BANK (BankIIR 0x0BA1C1CB). Unlike the world-entry snapshot (a multi-container
-				// root), the bank packet carries a SINGLE container blob (kind 105) after [c350][instance][u8 env][u32 len];
-				// its field-4 entries are the stashed items in the same InventoryListEntry codec. This is the ONLY source
-				// that reaches items a character merely STASHED (crafting mats/food/spare gear - never worn, vended, looted).
-				try
-				{
-					ExtractFromBankIir(packetBytes, found);
-				}
-				catch
-				{
-					// not a parseable bank packet
-				}
+			// root), the bank packet carries a SINGLE container blob (kind 105) after [c350][instance][u8 env][u32 len];
+			// its field-4 entries are the stashed items in the same InventoryListEntry codec. This is the ONLY source
+			// that reaches items a character merely STASHED (crafting mats/food/spare gear - never worn, vended, looted).
+			try
+			{
+				ExtractFromBankIir(packetBytes, found);
+			}
+			catch
+			{
+				// not a parseable bank packet
+			}
 
-				// Seventh source: mail attachments (DispatchMailMessage 0x2002). The AH-buy delivery escrows the bought
-				// item as a mail attachment - a ProtoInventoryGameEntry in the same codec as everywhere else. Taken mail
-				// items also arrive via the live-add source, so this only adds ones seen in a mailbox but never claimed;
-				// still worth harvesting so a future mail capture's items land without a code change.
-				try
-				{
-					ExtractFromMail(packetBytes, found);
-				}
-				catch
-				{
-					// not a parseable mail packet
-				}
+			// Seventh source: mail attachments (DispatchMailMessage 0x2002). The AH-buy delivery escrows the bought
+			// item as a mail attachment - a ProtoInventoryGameEntry in the same codec as everywhere else. Taken mail
+			// items also arrive via the live-add source, so this only adds ones seen in a mailbox but never claimed;
+			// still worth harvesting so a future mail capture's items land without a code change.
+			try
+			{
+				ExtractFromMail(packetBytes, found);
+			}
+			catch
+			{
+				// not a parseable mail packet
+			}
 
-				foreach (var (template, item) in found)
-				{
+			foreach (var (template, item) in found)
+			{
 				if (into.TryGetValue(template, out var existing))
 				{
 					if (!existing.Equals(item))
@@ -128,13 +135,6 @@ namespace Faolan.Importer.Extractors
 				into[template] = item;
 			}
 		}
-
-		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
-		// numbers as ContainerKind (Bag=Normal 104 / Resource 112 / Quest 113), so those map straight. EXCEPT the
-		// equipped container (101): that is a LOCATION, not an item class - worn gear is ordinary Normal loot - so it
-		// folds into Normal, keeping the catalog to the three real item classes (the routing hint that keeps quest/
-		// resource items out of random loot).
-		private const uint EquippedContainerKind = 101;
 
 		private static ItemType ClassifyContainer(InventorySnapshotInspector.ContainerKind kind)
 		{
@@ -175,6 +175,41 @@ namespace Faolan.Importer.Extractors
 				types[acg.Template1] = type;
 		}
 
+		// Recovers (template -> CapturedItem) from a BankIIR (0x0BA1C1CB) - the personal bank, delivered on-demand
+		// (protocol_bank_storage). Body after the sub-opcode is [u32 c350][u32 instance][u8 env=01][u32 len][blob],
+		// where blob is a SINGLE ProtoInventoryGame container (kind 105 = ContainerKind.Bank) whose field-4 entries
+		// use the same InventoryListEntry codec as the snapshot. Bank entries carry a real hash, so banked-only
+		// items become buildable too. Identity only - the bank holds every kind in one container, so no type stamp.
+		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2000)
+				return;
+
+			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			if (body.ReadUInt32() != BankIirSubOpcode)
+				return;
+
+			body.ReadUInt32(); // c350
+			body.ReadUInt32(); // instance
+			body.ReadByte(); // env marker (0x01)
+			var blob = body.ReadArrayUInt32Length();
+
+			using var ms = new MemoryStream(blob, false);
+			var container = ProtoMessage.Parse(ms);
+			if (InventorySnapshotInspector.GetContainerKind(container) != (ulong)InventorySnapshotInspector.ContainerKind.Bank)
+				return;
+
+			foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
+			{
+				var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
+				var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
+				var hash = InventorySnapshotInspector.GetEntryArchetype(entry);
+				if (template.HasValue && quad.HasValue)
+					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
+			}
+		}
+
 		// Recovers (template -> CapturedItem) from a loot bag IIR carrier (0x2000 packet whose payload sub-opcode is
 		// 0xF096251E). The trailing ProtoLootBagIIR's inventory entries each carry a ProtoAcgItem (Key1 = the quad,
 		// Template1 = the id, Hash = the hash) - identical to the snapshot/spawn sources. Hash 0 is kept here
@@ -200,41 +235,6 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				into.TryAdd(acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
-			}
-		}
-
-		// Recovers (template -> CapturedItem) from a BankIIR (0x0BA1C1CB) - the personal bank, delivered on-demand
-		// (protocol_bank_storage). Body after the sub-opcode is [u32 c350][u32 instance][u8 env=01][u32 len][blob],
-		// where blob is a SINGLE ProtoInventoryGame container (kind 105 = ContainerKind.Bank) whose field-4 entries
-		// use the same InventoryListEntry codec as the snapshot. Bank entries carry a real hash, so banked-only
-		// items become buildable too. Identity only - the bank holds every kind in one container, so no type stamp.
-		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
-		{
-			var packet = new ConanPacket(packetBytes);
-			if (packet.Opcode != 0x2000)
-				return;
-
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
-			if (body.ReadUInt32() != BankIirSubOpcode)
-				return;
-
-			body.ReadUInt32(); // c350
-			body.ReadUInt32(); // instance
-			body.ReadByte();   // env marker (0x01)
-			var blob = body.ReadArrayUInt32Length();
-
-			using var ms = new MemoryStream(blob, false);
-			var container = ProtoMessage.Parse(ms);
-			if (InventorySnapshotInspector.GetContainerKind(container) != (ulong)InventorySnapshotInspector.ContainerKind.Bank)
-				return;
-
-			foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
-			{
-				var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
-				var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
-				var hash = InventorySnapshotInspector.GetEntryArchetype(entry);
-				if (template.HasValue && quad.HasValue)
-					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
 			}
 		}
 

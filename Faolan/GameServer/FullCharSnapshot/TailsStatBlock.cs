@@ -21,6 +21,16 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public const uint BlockType = 0x46F2;
 		public const uint Marker = 1009; // 0x3F1, twice
 
+		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
+		// 0xBF..0x40B (see WorldDespawn). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
+		// live zone's minted token (SnapshotTailsBuilder passes it in), never a captured one. Replaying a stale token
+		// HIDES the entire in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04) and mis-scopes
+		// despawns. SkeletonValueOf (the beach 0x4FE428) is the fresh/fallback value when no live token is given.
+		public const uint PlayfieldTokenStatId = (uint)Stat.PlayfieldToken;
+
+		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
+		public static int SheetSize => StatList1.Length + StatList2Half.Length;
+
 		// The block is TWO 0x3F1-framed StatList_t (StatPair_t = [statId, value]; docs/fullplayer-snapshot-reader.md
 		// regions 9-10). StatList#1 = the 17 DISPLAYED stats (its count word IS the BlockType field, (17+1)*0x3F1 =
 		// 0x46F2). StatList#2 = the full sheet: 74 UNIQUE pairs written TWICE (base + current copy = 148 pairs, the old
@@ -65,48 +75,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// records - is built inline by CreateBlock, so it is no longer spliced in after the fact).
 		private static readonly uint[] TrailerRest = [0x1, 0x1000000, 0x0, 0x0, 0x0, 0x0];
 
-		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
-		// 0xBF..0x40B (see WorldDespawn). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
-		// live zone's minted token (SnapshotTailsBuilder passes it in), never a captured one. Replaying a stale token
-		// HIDES the entire in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04) and mis-scopes
-		// despawns. SkeletonValueOf (the beach 0x4FE428) is the fresh/fallback value when no live token is given.
-		public const uint PlayfieldTokenStatId = (uint)Stat.PlayfieldToken;
-
-		// The fresh-skeleton baseline value for a stat id (0 if absent). Used to reset the volatile slots above.
-		public static uint SkeletonValueOf(uint statId)
-		{
-			foreach (var (id, value) in StatList1)
-				if ((uint)id == statId)
-					return value;
-			foreach (var (id, value) in StatList2Half)
-				if ((uint)id == statId)
-					return value;
-			return 0;
-		}
-
-		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
-		public static int SheetSize => StatList1.Length + StatList2Half.Length;
-
-		// The fresh-character baseline stat sheet (StatList#1's 17 displayed pairs + StatList#2's 74 sheet pairs, ONE
-		// copy), as a fresh mutable list - the caller patches the character-derived slots (level/...) on IT before
-		// building, so nothing has to SetStat the finished block (which would also scan the inline known-list).
-		public static List<(uint Id, uint Value)> FreshSheet()
-		{
-			var sheet = new List<(uint, uint)>(SheetSize);
-			foreach (var (id, value) in StatList1)
-				sheet.Add(((uint)id, value));
-			foreach (var (id, value) in StatList2Half)
-				sheet.Add(((uint)id, value));
-			return sheet;
-		}
-
-		public static TailsPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
-		{
-			// The fresh skeleton is just the baseline sheet run through the generic builder - byte-identical to the
-			// captured beach block (proven by BeachTailsFromScratchTests).
-			return CreateBlock(FreshSheet(), known);
-		}
-
 		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs - the
 		// displayed stats) followed by StatList#2 (the remaining pairs, ONE copy). StatList#2 is emitted TWICE on the
 		// wire (base + current), so the block is [17 displayed pairs][StatList#2 count][74 sheet pairs x2][known-spell
@@ -128,11 +96,11 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 			values.Add(((uint)sheetCount * 2 + 1) * StatPairList.Frame); // StatList#2 count = 0x24B45 for 74 pairs
 			for (var copy = 0; copy < 2; copy++)
-				for (var i = displayedCount; i < sheet.Count; i++)
-				{
-					values.Add(sheet[i].Id);
-					values.Add(sheet[i].Value);
-				}
+			for (var i = displayedCount; i < sheet.Count; i++)
+			{
+				values.Add(sheet[i].Id);
+				values.Add(sheet[i].Value);
+			}
 
 			var records = known?.Records ?? [];
 			values.Add(((uint)records.Count + 1) * StatPairList.Frame); // known-spell list count (0x3F1 when empty)
@@ -161,6 +129,13 @@ namespace Faolan.GameServer.FullCharSnapshot
 					RepeatCount = 2
 				}
 			};
+		}
+
+		public static TailsPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
+		{
+			// The fresh skeleton is just the baseline sheet run through the generic builder - byte-identical to the
+			// captured beach block (proven by BeachTailsFromScratchTests).
+			return CreateBlock(FreshSheet(), known);
 		}
 
 		// Scans a raw 0x737A6DF9 snapshot body for the stat block and returns its (statId, value) pairs in order:
@@ -193,6 +168,54 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return null;
 		}
 
+		// The fresh-character baseline stat sheet (StatList#1's 17 displayed pairs + StatList#2's 74 sheet pairs, ONE
+		// copy), as a fresh mutable list - the caller patches the character-derived slots (level/...) on IT before
+		// building, so nothing has to SetStat the finished block (which would also scan the inline known-list).
+		public static List<(uint Id, uint Value)> FreshSheet()
+		{
+			var sheet = new List<(uint, uint)>(SheetSize);
+			foreach (var (id, value) in StatList1)
+				sheet.Add(((uint)id, value));
+			foreach (var (id, value) in StatList2Half)
+				sheet.Add(((uint)id, value));
+			return sheet;
+		}
+
+		// (The known-spell list is no longer spliced in after the fact - CreateBlock builds it inline at the block tail,
+		// so the former FindKnownSpellCountIndex landmark search + InjectKnownSpells splice are gone.)
+
+		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
+		// (mirrors SnapshotTails.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
+		public static byte[] Serialize(TailsPostAccessBlock block)
+		{
+			var w = new FaolanStream();
+			w.WriteUInt32(block.Marker0);
+			w.WriteUInt32(block.Marker1);
+			w.WriteUInt32(block.BlockType);
+			foreach (var value in block.Values)
+				w.WriteUInt32(value);
+			w.WriteArray(block.Trailer);
+			return w.ToArray();
+		}
+
+		// The fresh-skeleton baseline value for a stat id (0 if absent). Used to reset the volatile slots above.
+		public static uint SkeletonValueOf(uint statId)
+		{
+			foreach (var (id, value) in StatList1)
+			{
+				if ((uint)id == statId)
+					return value;
+			}
+
+			foreach (var (id, value) in StatList2Half)
+			{
+				if ((uint)id == statId)
+					return value;
+			}
+
+			return 0;
+		}
+
 		private static bool TryReadStatList(ReadOnlySpan<byte> body, int off, out List<(uint Id, uint Value)> list, out int end)
 		{
 			list = null;
@@ -215,23 +238,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 			end = p;
 			return true;
-		}
-
-		// (The known-spell list is no longer spliced in after the fact - CreateBlock builds it inline at the block tail,
-		// so the former FindKnownSpellCountIndex landmark search + InjectKnownSpells splice are gone.)
-
-		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
-		// (mirrors SnapshotTails.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
-		public static byte[] Serialize(TailsPostAccessBlock block)
-		{
-			var w = new FaolanStream();
-			w.WriteUInt32(block.Marker0);
-			w.WriteUInt32(block.Marker1);
-			w.WriteUInt32(block.BlockType);
-			foreach (var value in block.Values)
-				w.WriteUInt32(value);
-			w.WriteArray(block.Trailer);
-			return w.ToArray();
 		}
 	}
 }

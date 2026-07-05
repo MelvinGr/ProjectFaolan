@@ -30,8 +30,10 @@ namespace Faolan.GameServer.Combat
 			var combos = await _database.GetClassCombos(level, @class);
 			var result = new List<PerformableCombo>();
 			foreach (var combo in combos)
+			{
 				if (ComboActionParser.TryParse(combo.Actions, out var sequence))
 					result.Add(new PerformableCombo(combo.Id, combo.Name, sequence, combo.GameActionId));
+			}
 
 			return result;
 		}

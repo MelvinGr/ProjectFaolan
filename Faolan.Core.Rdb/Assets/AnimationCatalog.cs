@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
@@ -21,60 +22,11 @@ namespace Faolan.Core.Rdb.Assets
 	public static class AnimationCatalog
 	{
 		private const uint AnimSysType = 1010511; // LMXB clip metadata
-		private const uint CurveType = 1010003;    // keyframe curves
-		private const uint MasterId = 1;           // the 3.6MB master catalog
+		private const uint CurveType = 1010003; // keyframe curves
+		private const uint MasterId = 1; // the 3.6MB master catalog
 
 		// Per-skeleton clip lists are stable for the process; the master parse is ~3.6MB so cache it.
-		private static readonly ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>> _clipsBySkeleton = new();
-
-		public sealed record ClipInfo(string Name, uint Rdbname, float Duration);
-
-		// One bone's animation: translation (vec3) + rotation (quaternion x,y,z,w) keyframes with their times (seconds).
-		public sealed record BoneTrack(string Bone, float[] PosTimes, float[] Pos, float[] RotTimes, float[] Rot);
-
-		public sealed record ClipData(uint Rdbname, float Duration, IReadOnlyList<BoneTrack> Bones);
-
-		// The named clips available for a skeleton, sorted by name. Empty when the master catalog or the skeleton
-		// entry is unavailable. Deduped by name (the master lists a few clip aliases that share an rdbname).
-		public static IReadOnlyList<ClipInfo> ListClips(RdbReader rdb, uint skeletonId)
-		{
-			return _clipsBySkeleton.GetOrAdd(skeletonId, sk =>
-			{
-				if (!rdb.TryGet(AnimSysType, MasterId, out var e) || !rdb.CanRead(e))
-					return [];
-
-				var lmxb = new Lmxb(rdb.ReadDecompressed(e));
-				var skText = sk.ToString();
-				foreach (var animsys in lmxb.Children(lmxb.Root()))
-				{
-					if (lmxb.Attrs(animsys).GetValueOrDefault("skeleton") != skText)
-						continue;
-
-					var clips = new List<ClipInfo>();
-					var seen = new HashSet<string>();
-					foreach (var group in lmxb.Children(animsys))
-					{
-						foreach (var node in lmxb.Children(group))
-						{
-							if (lmxb.Name(node) != "animation")
-								continue;
-
-							var a = lmxb.Attrs(node);
-							if (a.TryGetValue("name", out var name) && a.TryGetValue("rdbname", out var rdbText) &&
-							    uint.TryParse(rdbText, out var rid) && seen.Add(name))
-							{
-								float.TryParse(a.GetValueOrDefault("duration"), System.Globalization.CultureInfo.InvariantCulture, out var dur);
-								clips.Add(new ClipInfo(name, rid, dur));
-							}
-						}
-					}
-
-					return clips.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
-				}
-
-				return [];
-			});
-		}
+		private static readonly ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>> _clipsBySkeleton = new ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>>();
 
 		// Decode one clip's keyframe curves (type 1010003, by rdbname), or null if unavailable / a variant layout.
 		public static ClipData? DecodeClip(RdbReader rdb, uint rdbname)
@@ -98,8 +50,7 @@ namespace Faolan.Core.Rdb.Assets
 				var bone = Encoding.ASCII.GetString(d, pos + 4, nameLen);
 				pos += 4 + nameLen;
 
-				if (!TryChannel(d, ref pos, 3, out var posTimes, out var posVals) ||
-				    !TryChannel(d, ref pos, 4, out var rotTimes, out var rotVals))
+				if (!TryChannel(d, ref pos, 3, out var posTimes, out var posVals) || !TryChannel(d, ref pos, 4, out var rotTimes, out var rotVals))
 					return null; // variant channel layout (a few creature rigs) — bail rather than emit garbage
 
 				bones.Add(new BoneTrack(bone, posTimes, posVals, rotTimes, rotVals));
@@ -108,6 +59,48 @@ namespace Faolan.Core.Rdb.Assets
 			return bones.Count == 0
 				? null
 				: new ClipData(rdbname, duration, bones);
+		}
+
+		// The named clips available for a skeleton, sorted by name. Empty when the master catalog or the skeleton
+		// entry is unavailable. Deduped by name (the master lists a few clip aliases that share an rdbname).
+		public static IReadOnlyList<ClipInfo> ListClips(RdbReader rdb, uint skeletonId)
+		{
+			return _clipsBySkeleton.GetOrAdd(skeletonId,
+				sk =>
+				{
+					if (!rdb.TryGet(AnimSysType, MasterId, out var e) || !rdb.CanRead(e))
+						return [];
+
+					var lmxb = new Lmxb(rdb.ReadDecompressed(e));
+					var skText = sk.ToString();
+					foreach (var animsys in lmxb.Children(lmxb.Root()))
+					{
+						if (lmxb.Attrs(animsys).GetValueOrDefault("skeleton") != skText)
+							continue;
+
+						var clips = new List<ClipInfo>();
+						var seen = new HashSet<string>();
+						foreach (var group in lmxb.Children(animsys))
+						{
+							foreach (var node in lmxb.Children(group))
+							{
+								if (lmxb.Name(node) != "animation")
+									continue;
+
+								var a = lmxb.Attrs(node);
+								if (a.TryGetValue("name", out var name) && a.TryGetValue("rdbname", out var rdbText) && uint.TryParse(rdbText, out var rid) && seen.Add(name))
+								{
+									float.TryParse(a.GetValueOrDefault("duration"), CultureInfo.InvariantCulture, out var dur);
+									clips.Add(new ClipInfo(name, rid, dur));
+								}
+							}
+						}
+
+						return clips.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
+					}
+
+					return [];
+				});
 		}
 
 		// [u32 count][count f32 time][count x width f32 value] -> flat time[] + value[] (count*width). Bounds-checked:
@@ -136,6 +129,13 @@ namespace Faolan.Core.Rdb.Assets
 			return true;
 		}
 
+		public sealed record ClipInfo(string Name, uint Rdbname, float Duration);
+
+		// One bone's animation: translation (vec3) + rotation (quaternion x,y,z,w) keyframes with their times (seconds).
+		public sealed record BoneTrack(string Bone, float[] PosTimes, float[] Pos, float[] RotTimes, float[] Rot);
+
+		public sealed record ClipData(uint Rdbname, float Duration, IReadOnlyList<BoneTrack> Bones);
+
 		// Minimal LMXB clip-metadata tree reader (the 1010511 half of decode_lmxb.py).
 		private sealed class Lmxb
 		{
@@ -145,48 +145,6 @@ namespace Faolan.Core.Rdb.Assets
 			public Lmxb(byte[] d)
 			{
 				_d = d;
-			}
-
-			private uint U32(int o)
-			{
-				return BinaryPrimitives.ReadUInt32LittleEndian(_d.AsSpan(o, 4));
-			}
-
-			private ushort U16(int o)
-			{
-				return BinaryPrimitives.ReadUInt16LittleEndian(_d.AsSpan(o, 2));
-			}
-
-			private string Str(uint rel)
-			{
-				var o = Base + (int)rel;
-				var end = Array.IndexOf(_d, (byte)0, o);
-				return Encoding.ASCII.GetString(_d, o, (end < 0 ? _d.Length : end) - o);
-			}
-
-			public Node Root()
-			{
-				return NodeAt(Base);
-			}
-
-			public string Name(Node n)
-			{
-				return Str(n.NameOff);
-			}
-
-			private Node NodeAt(int off)
-			{
-				return new Node(U32(off), U32(off + 4), U32(off + 8), U16(off + 0xc), U16(off + 0xe));
-			}
-
-			public IEnumerable<Node> Children(Node n)
-			{
-				if (n.ChildOff == 0 || n.ChildCount == 0)
-					yield break;
-
-				var cb = Base + (int)n.ChildOff;
-				for (var i = 0; i < n.ChildCount; i++)
-					yield return NodeAt(cb + i * 0x10);
 			}
 
 			public Dictionary<string, string> Attrs(Node n)
@@ -204,6 +162,52 @@ namespace Faolan.Core.Rdb.Assets
 				}
 
 				return outp;
+			}
+
+			public IEnumerable<Node> Children(Node n)
+			{
+				if (n.ChildOff == 0 || n.ChildCount == 0)
+					yield break;
+
+				var cb = Base + (int)n.ChildOff;
+				for (var i = 0; i < n.ChildCount; i++)
+					yield return NodeAt(cb + i * 0x10);
+			}
+
+			public string Name(Node n)
+			{
+				return Str(n.NameOff);
+			}
+
+			public Node Root()
+			{
+				return NodeAt(Base);
+			}
+
+			private Node NodeAt(int off)
+			{
+				return new Node(U32(off), U32(off + 4), U32(off + 8), U16(off + 0xc), U16(off + 0xe));
+			}
+
+			private string Str(uint rel)
+			{
+				var o = Base + (int)rel;
+				var end = Array.IndexOf(_d, (byte)0, o);
+				return Encoding.ASCII.GetString(_d,
+					o,
+					(end < 0
+						? _d.Length
+						: end) - o);
+			}
+
+			private ushort U16(int o)
+			{
+				return BinaryPrimitives.ReadUInt16LittleEndian(_d.AsSpan(o, 2));
+			}
+
+			private uint U32(int o)
+			{
+				return BinaryPrimitives.ReadUInt32LittleEndian(_d.AsSpan(o, 4));
 			}
 
 			public readonly record struct Node(uint ChildOff, uint AttrPtr, uint NameOff, ushort ChildCount, ushort AttrCount);

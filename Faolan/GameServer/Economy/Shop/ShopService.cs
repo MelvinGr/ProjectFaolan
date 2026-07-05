@@ -11,6 +11,8 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.Combat;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy.Shop
@@ -186,19 +188,10 @@ namespace Faolan.GameServer.Economy.Shop
 		{
 			var instance = client.Session.Account.ClientInstance;
 			await SendWorldPacket(client, ShopOpenBuilder.BuildTradeSelectEcho(instance, npcHandle));
-			await SendWorldPacket(client, Combat.CombatService.BuildBehaviorEchoAckBody(rawPayload, instance, mode, padTail: false));
+			await SendWorldPacket(client, CombatService.BuildBehaviorEchoAckBody(rawPayload, instance, mode, padTail: false));
 			await SendShopData(client, shop, npcHandle);
 
 			_logger.LogInformation("Shop: vendor trade-open for \"{Vendor}\" (npc 0x{Handle:X8}) by {Character}.", shop.VendorName, npcHandle, client.Session.Character?.Name);
-		}
-
-		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
-		private static Task SendWorldPacket(INetworkClient client, byte[] body)
-		{
-			return new PacketStream()
-				.WriteHeader(World.WorldFraming.Sender, World.WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
-				.SendAsync(client);
 		}
 
 		// DL 0x2033 DispatchShopData: serve a vendor's window and remember it for this session so BuyItem can
@@ -262,6 +255,12 @@ namespace Faolan.GameServer.Economy.Shop
 			return value > 0
 				? Math.Max(1u, (value + 5) / 10)
 				: 0;
+		}
+
+		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
+		private static Task SendWorldPacket(INetworkClient client, byte[] body)
+		{
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).

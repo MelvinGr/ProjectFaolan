@@ -11,6 +11,15 @@ namespace Faolan.Tests
 	public class StatPairListTests
 	{
 		[Fact]
+		public void Set_OverridesEveryOccurrence()
+		{
+			var list = new StatPairList { Pairs = [(0x36, 1), (0x1B, 9800), (0x36, 1)] };
+			list.Set(0x36, 40);
+			Assert.Equal(40u, list.Get(0x36));
+			Assert.All(list.Pairs.FindAll(p => p.Id == 0x36), p => Assert.Equal(40u, p.Value));
+		}
+
+		[Fact]
 		public void StatBlock_ParsesAsTwoFramedStatPairLists_AndRoundTripsByteExact()
 		{
 			var original = TailsStatBlock.Serialize(TailsStatBlock.CreateFreshBlock());
@@ -43,15 +52,6 @@ namespace Faolan.Tests
 				w.WriteByte(r.ReadArray(1)[0]);
 
 			Assert.Equal(original, w.ToArray());
-		}
-
-		[Fact]
-		public void Set_OverridesEveryOccurrence()
-		{
-			var list = new StatPairList { Pairs = [(0x36, 1), (0x1B, 9800), (0x36, 1)] };
-			list.Set(0x36, 40);
-			Assert.Equal(40u, list.Get(0x36));
-			Assert.All(list.Pairs.FindAll(p => p.Id == 0x36), p => Assert.Equal(40u, p.Value));
 		}
 	}
 }

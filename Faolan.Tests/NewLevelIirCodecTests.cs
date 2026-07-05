@@ -14,15 +14,6 @@ namespace Faolan.Tests
 		private const string L1ToL2Ding = "000000296d3147430000c35001316d8a0000000002000000a80000006400000154000000010000000800000000";
 
 		[Fact]
-		public void Build_MatchesCapturedLevelUpEvent()
-		{
-			ReadOnlySpan<uint> deltas = [168, 100, 340, 1, 8, 0];
-			var body = NewLevelIirCodec.Build(0x01316d8a, 2, deltas);
-
-			Assert.Equal(L1ToL2Ding, Convert.ToHexStringLower(body));
-		}
-
-		[Fact]
 		public void Build_Convenience_CarriesLevelWithZeroDeltas()
 		{
 			var body = NewLevelIirCodec.Build(0x02000003, 20);
@@ -33,6 +24,15 @@ namespace Faolan.Tests
 			// newLevel field (offset 4 len + 4 sub + 4 marker + 4 instance + 1 env = 17)
 			var newLevel = (uint)((body[17] << 24) | (body[18] << 16) | (body[19] << 8) | body[20]);
 			Assert.Equal(20u, newLevel);
+		}
+
+		[Fact]
+		public void Build_MatchesCapturedLevelUpEvent()
+		{
+			ReadOnlySpan<uint> deltas = [168, 100, 340, 1, 8, 0];
+			var body = NewLevelIirCodec.Build(0x01316d8a, 2, deltas);
+
+			Assert.Equal(L1ToL2Ding, Convert.ToHexStringLower(body));
 		}
 	}
 }

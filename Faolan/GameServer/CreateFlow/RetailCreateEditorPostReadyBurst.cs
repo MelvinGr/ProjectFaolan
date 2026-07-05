@@ -50,7 +50,7 @@ namespace Faolan.GameServer.CreateFlow
 			var body = GameActionListCodec.BuildBody(id, dynel, 0u, actionTail);
 			return new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, agentSub), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteUInt32((uint)body.Length)
+				.WriteUInt32(body.Length)
 				.WriteArray(body)
 				.SendAsync(client);
 		}
@@ -72,7 +72,7 @@ namespace Faolan.GameServer.CreateFlow
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.CharInPlayIIR).WriteArray(CreateEditorRecordBuilder.BuildCharInPlayIir(id)))
+				.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000RespondsOpcodes.CharInPlayIIR).WriteArray(CreateEditorRecordBuilder.BuildCharInPlayIir(id)))
 				.SendAsync(client);
 			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailA);
 			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailB);

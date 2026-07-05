@@ -7,8 +7,8 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.World;
 using Faolan.GameServer.Spawn;
+using Faolan.GameServer.World;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
@@ -211,7 +211,6 @@ namespace Faolan.Importer.Captures
 			return kept.Count;
 		}
 
-
 		// Upsert by (map, spawn point); never wipe. Ensures Npc TYPE rows exist first (#244).
 		public static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
 		{
@@ -246,9 +245,7 @@ namespace Faolan.Importer.Captures
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
 			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n.ToLowerInvariant()).ToHashSet();
-			var typeByName = (await db.Npcs.Where(n => n.Name != null).ToListAsync())
-				.GroupBy(n => n.Name.ToLowerInvariant())
-				.ToDictionary(g => g.Key, g => g.First().Id);
+			var typeByName = (await db.Npcs.Where(n => n.Name != null).ToListAsync()).GroupBy(n => n.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First().Id);
 
 			var inserted = 0;
 			foreach (var e in spells)
@@ -260,7 +257,11 @@ namespace Faolan.Importer.Captures
 				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcId == npcId && s.SpellId == e.SpellId);
 				if (existing == null)
 				{
-					var s = new NpcSpell { NpcId = npcId, SpellId = e.SpellId };
+					var s = new NpcSpell
+					{
+						NpcId = npcId,
+						SpellId = e.SpellId
+					};
 					ApplyEffect(s, e.Payload);
 					db.NpcSpells.Add(s);
 					inserted++;
@@ -271,21 +272,6 @@ namespace Faolan.Importer.Captures
 
 			await db.SaveChangesAsync();
 			return inserted;
-		}
-
-		// Decodes the captured 54-byte ApplySpell effect payload into the NpcSpell columns (NpcSpellEffectCodec, #304).
-		private static void ApplyEffect(NpcSpell s, byte[] payload)
-		{
-			if (payload is not { Length: NpcSpellEffect.Length })
-				return;
-
-			var fx = NpcSpellEffect.Parse(payload);
-			s.Duration = fx.Duration;
-			s.Magnitude = fx.Magnitude;
-			s.Rank = fx.Rank;
-			s.FlagA = fx.FlagA;
-			s.FlagB = fx.FlagB;
-			s.FlagC = fx.FlagC;
 		}
 
 		// NPC patrol routes, deduped by (map, position). Replaces waypoints wholesale on re-import.
@@ -409,7 +395,6 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 		}
 
-
 		public static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
 		{
 			row.CapturedHandle = e.Handle;
@@ -471,6 +456,21 @@ namespace Faolan.Importer.Captures
 
 			SimpleDynelMessageCodec.TryLiftColumns(row);
 			return row;
+		}
+
+		// Decodes the captured 54-byte ApplySpell effect payload into the NpcSpell columns (NpcSpellEffectCodec, #304).
+		private static void ApplyEffect(NpcSpell s, byte[] payload)
+		{
+			if (payload is not { Length: NpcSpellEffect.Length })
+				return;
+
+			var fx = NpcSpellEffect.Parse(payload);
+			s.Duration = fx.Duration;
+			s.Magnitude = fx.Magnitude;
+			s.Rank = fx.Rank;
+			s.FlagA = fx.FlagA;
+			s.FlagB = fx.FlagB;
+			s.FlagC = fx.FlagC;
 		}
 
 		// Upsert (never wipe): refresh from a clean slate so stale handle-keyed (un-named) nodes don't linger.

@@ -20,7 +20,7 @@ namespace Faolan.Importer.Captures
 	{
 		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
 		{
-			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>();    // char -> questId -> wire state
+			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> wire state
 			var progressByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> goal count
 			foreach (var packet in rawPackets)
 				TryRead(packet, stateByChar, progressByChar);

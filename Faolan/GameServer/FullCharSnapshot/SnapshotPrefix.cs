@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {
@@ -27,7 +27,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		{
 			var prefix = new List<byte>(8);
 			prefix.AddRange(BaseVersion);
-			Varint.Write(prefix, RootLengthConstant + (ulong)rootLength);
+			ProtoMessage.WriteVarint(prefix, RootLengthConstant + (ulong)rootLength);
 			prefix.AddRange(Trailing);
 			return [.. prefix];
 		}

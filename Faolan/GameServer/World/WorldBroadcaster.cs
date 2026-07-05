@@ -7,9 +7,9 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Enums;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -543,7 +543,6 @@ namespace Faolan.GameServer.World
 				entity.SpawnBody = spawnPacket[bodyStart..];
 		}
 
-
 		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
 		// it from the model.
 		public async Task CloseLootBag(INetworkClient client, uint bagHandle)
@@ -845,7 +844,9 @@ namespace Faolan.GameServer.World
 		public async Task<uint> ResolveMapPlayfieldToken(uint mapId)
 		{
 			var token = (await _database.GetMap(mapId))?.PlayfieldToken ?? 0;
-			return token != 0 ? token : WorldState.DefaultPlayfieldToken;
+			return token != 0
+				? token
+				: WorldState.DefaultPlayfieldToken;
 		}
 
 		// On world entry: re-send the player's persisted active quests so their journal is restored.
@@ -1018,7 +1019,9 @@ namespace Faolan.GameServer.World
 				return null;
 			}
 
-			var maxHealth = npcType.Level > 0 ? CombatResolver.NpcMaxHealthForLevel(npcType.Level) : 1;
+			var maxHealth = npcType.Level > 0
+				? CombatResolver.NpcMaxHealthForLevel(npcType.Level)
+				: 1;
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals);
 			entity.Level = npcType.Level;
@@ -1306,7 +1309,7 @@ namespace Faolan.GameServer.World
 			var record = captive
 				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
 				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
-			var body = new FaolanStream().WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
+			var body = new FaolanStream().WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
 			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.",
 				captive
 					? "CAPTIVE"

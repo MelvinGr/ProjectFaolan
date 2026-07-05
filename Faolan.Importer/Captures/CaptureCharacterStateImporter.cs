@@ -22,9 +22,9 @@ namespace Faolan.Importer.Captures
 	// the DOWNLOAD's receiver. Only characters already in the DB are touched (CaptureCharacterImporter first).
 	public static class CaptureCharacterStateImporter
 	{
+		private const int ShortcutEntrySize = 24; // [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]
 		private const uint GameCharInterfaceType = 0x8B87F791;
 		private const uint ListFrame = 0x3F1; // (count + 1) * 0x3F1 list framing (matches ShortcutBarBuilder)
-		private const int ShortcutEntrySize = 24; // [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]
 
 		public static CaptureState Extract(IReadOnlyList<CapturedPacket> packets)
 		{

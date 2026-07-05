@@ -7,20 +7,21 @@ namespace Faolan.TestClient
 	// through the SAME ConanMessageFramer the server uses (length-prefixed, zlib-aware), yielding parsed ConanPackets.
 	public sealed class ProtocolConnection : IDisposable
 	{
-		private readonly TcpClient _tcp = new();
-		private readonly ConanMessageFramer _framer = new();
-		private readonly Queue<ConanPacket> _pending = new();
+		private readonly ConanMessageFramer _framer = new ConanMessageFramer();
+		private readonly Queue<ConanPacket> _pending = new Queue<ConanPacket>();
+		private readonly TcpClient _tcp = new TcpClient();
 		private NetworkStream _stream = null!;
+
+		public void Dispose()
+		{
+			_stream?.Dispose();
+			_tcp.Dispose();
+		}
 
 		public async Task ConnectAsync(string host, int port)
 		{
 			await _tcp.ConnectAsync(host, port);
 			_stream = _tcp.GetStream();
-		}
-
-		public Task SendAsync(byte[] packetBytes)
-		{
-			return _stream.WriteAsync(packetBytes).AsTask();
 		}
 
 		// Read the next complete packet, blocking until one frames (or the timeout / socket close).
@@ -59,10 +60,9 @@ namespace Faolan.TestClient
 			}
 		}
 
-		public void Dispose()
+		public Task SendAsync(byte[] packetBytes)
 		{
-			_stream?.Dispose();
-			_tcp.Dispose();
+			return _stream.WriteAsync(packetBytes).AsTask();
 		}
 	}
 }

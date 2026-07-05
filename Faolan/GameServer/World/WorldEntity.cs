@@ -71,6 +71,11 @@ namespace Faolan.GameServer.World
 		// the client won't render). Loot is cleared when the NPC respawns (TickRespawn).
 		public bool IsLootable => IsLoot || (IsDead && (LootItems.Count > 0 || CashTin > 0));
 
+		// True while this player is riding a mount (#27). Pressing the SummonMount action toggles it: mount when false
+		// (ride buff + mount StatUpd), dismount when true (end-twin + StatUpd 0xBA=0). Without this the toggle re-mounts
+		// and the client gets stuck at the end of the dismount channel.
+		public bool IsMounted { get; set; }
+
 		public bool IsPlayer { get; }
 
 		// #272: true while this entity is mid-move (chasing / returning home / following a player). Drives the segment
@@ -153,6 +158,8 @@ namespace Faolan.GameServer.World
 		// Item template ids carried by a loot bag, rolled when it drops; granted to the looter's backpack via
 		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
 		public List<uint> LootItems { get; } = [];
+		public Quaternion Rotation { get; set; }
+		public Quaternion SpawnRotation { get; set; }
 
 		// For a LOOT BAG dropped by a kill: the NAME of the NPC whose corpse it is (e.g. "Scavenger Tuut"). The bag is a
 		// decoupled entity (#246) whose own Name is the generic "Bag of loot", so the source is recorded separately - it
@@ -199,17 +206,12 @@ namespace Faolan.GameServer.World
 		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
 		public uint Level { get; set; }
 
+		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
+		public uint MapId { get; set; }
+
 		// If this entity is a PET, the handle of the owner (the summoner's client instance); 0 = not a pet (#307).
 		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.
 		public uint OwnerHandle { get; set; }
-
-		// True while this player is riding a mount (#27). Pressing the SummonMount action toggles it: mount when false
-		// (ride buff + mount StatUpd), dismount when true (end-twin + StatUpd 0xBA=0). Without this the toggle re-mounts
-		// and the client gets stuck at the end of the dismount channel.
-		public bool IsMounted { get; set; }
-
-		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
-		public uint MapId { get; set; }
 
 		// #272: the FROM point of the segment the broadcaster actually sends (MoveFrom -> Position), captured when a move
 		// effect is queued. Distinct from MoveOrigin (which re-anchors to Position at that moment to start the next
@@ -222,11 +224,9 @@ namespace Faolan.GameServer.World
 		// re-advances to Position. So the client interpolates ~6u segments instead of a 1.2u-per-tick snap (the jitter).
 		public Vector3 MoveOrigin { get; set; }
 		public Vector3 Position { get; set; }
-		public Quaternion Rotation { get; set; }
 
 		// Where the entity respawns (its original spawn point) - set for NPCs by ForNpc.
 		public Vector3 SpawnPosition { get; set; }
-		public Quaternion SpawnRotation { get; set; }
 
 		public WorldEntity(uint handle, uint mapId, bool isPlayer, string name, INetworkClient client)
 		{

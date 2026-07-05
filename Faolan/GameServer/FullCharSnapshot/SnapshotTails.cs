@@ -1096,12 +1096,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return Values[(int)index];
 		}
 
-		public void SetValue(CharacterValueIndex index, uint value)
-		{
-			Values[(int)index] = value;
-			Values[GetRepeatedCopyIndex(index)] = value;
-		}
-
 		// The block is a [statId, value] stat sheet: a stat's value is the slot immediately after each occurrence of
 		// its id (a stat appears in the leading displayed section, the repeated run, AND the run's +148 copy). Sets the
 		// value at EVERY occurrence so the sheet is internally consistent. Used to DERIVE character stats (Level 0x36,
@@ -1115,6 +1109,12 @@ namespace Faolan.GameServer.FullCharSnapshot
 				if (Values[i] == statId)
 					Values[i + 1] = value;
 			}
+		}
+
+		public void SetValue(CharacterValueIndex index, uint value)
+		{
+			Values[(int)index] = value;
+			Values[GetRepeatedCopyIndex(index)] = value;
 		}
 
 		private static int GetRepeatedCopyIndex(CharacterValueIndex index)

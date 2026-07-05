@@ -86,7 +86,9 @@ namespace Faolan.Importer.Rdb
 
 		private static uint ParseUint(XElement el, string attr)
 		{
-			return el.Attribute(attr) is { Value: var v } && uint.TryParse(v, out var n) ? n : 0u;
+			return el.Attribute(attr) is { Value: var v } && uint.TryParse(v, out var n)
+				? n
+				: 0u;
 		}
 	}
 }

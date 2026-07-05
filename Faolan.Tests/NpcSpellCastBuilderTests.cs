@@ -26,21 +26,6 @@ namespace Faolan.Tests
 			Assert.Equal(capturedCarrier, built);
 		}
 
-		// #26: the mount RIDE buff (the ApplySpell that seats the player after the horse spawns) built from the
-		// MountCatalog constants must reproduce the captured apply byte-for-byte - NecroL80 *_mount_move_dismount,
-		// frame 520 (self-applied to/from player handle 0x0802e5d4, spell 0x31EB1500 + the 54-byte payload).
-		[Fact]
-		public void Build_MountRideBuff_IsByteIdenticalToFrame520()
-		{
-			var capturedCarrier = Convert.FromHexString(
-				"6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" +
-				"00000000000000000083d600000100000001000000000031eb150000005000000000000000000000000000000050000000001560f9bb");
-
-			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
-
-			Assert.Equal(capturedCarrier, built);
-		}
-
 		[Fact]
 		public void Build_FromCapturedFields_IsByteIdentical()
 		{
@@ -54,6 +39,19 @@ namespace Faolan.Tests
 			var built = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
 
 			Assert.Equal(golden, built);
+		}
+
+		// #26: the mount RIDE buff (the ApplySpell that seats the player after the horse spawns) built from the
+		// MountCatalog constants must reproduce the captured apply byte-for-byte - NecroL80 *_mount_move_dismount,
+		// frame 520 (self-applied to/from player handle 0x0802e5d4, spell 0x31EB1500 + the 54-byte payload).
+		[Fact]
+		public void Build_MountRideBuff_IsByteIdenticalToFrame520()
+		{
+			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" + "00000000000000000083d600000100000001000000000031eb150000005000000000000000000000000000000050000000001560f9bb");
+
+			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
+
+			Assert.Equal(capturedCarrier, built);
 		}
 
 		[Fact]

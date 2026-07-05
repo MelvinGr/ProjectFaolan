@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
@@ -76,8 +77,8 @@ namespace Faolan.GameServer.World
 
 		private static void WriteBytesField(List<byte> w, int field, byte[] value)
 		{
-			Varint.Write(w, (ulong)((field << 3) | 2)); // wire type 2 (length-delimited)
-			Varint.Write(w, (ulong)value.Length);
+			ProtoMessage.WriteVarint(w, (ulong)((field << 3) | 2)); // wire type 2 (length-delimited)
+			ProtoMessage.WriteVarint(w, (ulong)value.Length);
 			w.AddRange(value);
 		}
 
@@ -98,8 +99,8 @@ namespace Faolan.GameServer.World
 
 		private static void WriteVarintField(List<byte> w, int field, ulong value)
 		{
-			Varint.Write(w, (ulong)(field << 3)); // wire type 0 (varint)
-			Varint.Write(w, value);
+			ProtoMessage.WriteVarint(w, (ulong)(field << 3)); // wire type 0 (varint)
+			ProtoMessage.WriteVarint(w, value);
 		}
 	}
 }

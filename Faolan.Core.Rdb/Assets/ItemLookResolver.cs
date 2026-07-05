@@ -71,9 +71,11 @@ namespace Faolan.Core.Rdb.Assets
 				var list = group.ToList();
 				var hasPair = list.Any(m => m.Gender == "Female") && list.Any(m => m.Gender == "Male");
 				if (hasPair)
+				{
 					picked.Add(list.FirstOrDefault(m => m.Gender == wantGender).MeshIndexId is var id and not 0
 						? id
 						: list[0].MeshIndexId);
+				}
 				else
 					picked.AddRange(list.Select(m => m.MeshIndexId));
 			}

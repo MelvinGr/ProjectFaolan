@@ -27,7 +27,7 @@ namespace Faolan.GameServer
 	{
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
-		private const uint BeachPlayfieldId = World.WorldState.DefaultPlayfieldToken;
+		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
 		private byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
@@ -188,7 +188,9 @@ namespace Faolan.GameServer
 			// the zone so they still agree by construction - only the source value changes. A wrong (beach) token in a
 			// mountable zone like Old Tarantia made the client read it as the no-mount Tortage beach.
 			var mapToken = map?.PlayfieldToken ?? 0;
-			var playfieldToken = mapToken != 0 ? mapToken : BeachPlayfieldId;
+			var playfieldToken = mapToken != 0
+				? mapToken
+				: BeachPlayfieldId;
 			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
 			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken);
 

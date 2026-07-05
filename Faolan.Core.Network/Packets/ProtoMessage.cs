@@ -3,7 +3,6 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Faolan.Core.Network.Conan;
 
 namespace Faolan.Core.Network.Packets
 {
@@ -14,6 +13,42 @@ namespace Faolan.Core.Network.Packets
 		public byte[] ToArray()
 		{
 			return Fields.SelectMany(x => x.ToArray()).ToArray();
+		}
+
+		// The canonical base-128 varint (protobuf LEB128) codec for the Conan wire, merged in from the retired
+		// Conan.Varint. FaolanStream.WriteVarint is the stream writer; these serve the byte[]/List<byte> builders
+		// (ProtoField below + the GameServer packet codecs - ScryScript, SnapshotPrefix, CombatService).
+		public static ulong ReadVarint(Stream stream)
+		{
+			ulong result = 0;
+			var shift = 0;
+			while (true)
+			{
+				var value = stream.ReadByte();
+				if (value < 0)
+					throw new InvalidDataException("Unexpected end of protobuf varint.");
+
+				var b = (byte)value;
+				result |= (ulong)(b & 0x7F) << shift;
+				if ((b & 0x80) == 0)
+					return result;
+
+				shift += 7;
+				if (shift > 63)
+					throw new InvalidDataException("Invalid protobuf varint (too long).");
+			}
+		}
+
+		// Appends `value` as a base-128 varint to `bytes`.
+		public static void WriteVarint(ICollection<byte> bytes, ulong value)
+		{
+			while (value >= 0x80)
+			{
+				bytes.Add((byte)((value & 0x7F) | 0x80));
+				value >>= 7;
+			}
+
+			bytes.Add((byte)value);
 		}
 
 		public static ProtoMessage Parse(MemoryStream stream, int? max = null)
@@ -114,13 +149,13 @@ namespace Faolan.Core.Network.Packets
 		{
 			var bytes = new List<byte>();
 
-			WriteVarint(bytes, (ulong)((FieldNumber << 3) | WireType));
+			ProtoMessage.WriteVarint(bytes, (ulong)((FieldNumber << 3) | WireType));
 
 			switch (WireType)
 			{
 				case 0:
 				{
-					WriteVarint(bytes, VarintValue);
+					ProtoMessage.WriteVarint(bytes, VarintValue);
 					break;
 				}
 
@@ -139,7 +174,7 @@ namespace Faolan.Core.Network.Packets
 						? MessageValue.ToArray()
 						: RawBytes ?? [];
 
-					WriteVarint(bytes, (ulong)payload.Length);
+					ProtoMessage.WriteVarint(bytes, (ulong)payload.Length);
 					bytes.AddRange(payload);
 
 					break;
@@ -163,7 +198,7 @@ namespace Faolan.Core.Network.Packets
 
 		public static ProtoField Read(MemoryStream stream)
 		{
-			var tag = ReadVarint(stream);
+			var tag = ProtoMessage.ReadVarint(stream);
 
 			var fieldNumber = (int)(tag >> 3);
 			var wireType = (int)(tag & 7);
@@ -177,7 +212,7 @@ namespace Faolan.Core.Network.Packets
 				{
 					FieldNumber = fieldNumber,
 					WireType = wireType,
-					VarintValue = ReadVarint(stream)
+					VarintValue = ProtoMessage.ReadVarint(stream)
 				},
 
 				1 => new ProtoField
@@ -219,7 +254,7 @@ namespace Faolan.Core.Network.Packets
 
 		private static ProtoField ReadLengthDelimited(MemoryStream stream, int fieldNumber)
 		{
-			var length = checked((int)ReadVarint(stream));
+			var length = checked((int)ProtoMessage.ReadVarint(stream));
 			var bytes = ReadBytes(stream, length);
 
 			ProtoMessage? nested = null;
@@ -241,16 +276,6 @@ namespace Faolan.Core.Network.Packets
 				RawBytes = bytes,
 				MessageValue = nested
 			};
-		}
-
-		private static ulong ReadVarint(MemoryStream stream)
-		{
-			return Varint.Read(stream);
-		}
-
-		private static void WriteVarint(List<byte> bytes, ulong value)
-		{
-			Varint.Write(bytes, value);
 		}
 	}
 }

@@ -24,10 +24,8 @@ namespace Faolan.Importer.Tsv
 	// (Class, SpellId) pairs already present, so it composes with the create-capture class-spells seed).
 	public static class WikiClassSpellImporter
 	{
-		private static readonly Regex RankSuffix = new(@"\s*\(Rank \d+\)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-		private static readonly Regex Disambiguator = new(@"\s*\((spell|ability|combo|buff|debuff)\)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-		private static string BaseKey(string name) => RankSuffix.Replace(Disambiguator.Replace(name, ""), "").Trim().ToLowerInvariant();
+		private static readonly Regex Disambiguator = new Regex(@"\s*\((spell|ability|combo|buff|debuff)\)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex RankSuffix = new Regex(@"\s*\(Rank \d+\)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		public static async Task<(int Rows, int Matched, int Inserted)> ImportAsync(IDatabaseContext db, string tsvPath, ILogger logger = null)
 		{
@@ -43,9 +41,11 @@ namespace Faolan.Importer.Tsv
 			{
 				if (line.Length == 0 || line[0] == '#')
 					continue;
+
 				var c = line.Split('\t');
 				if (c.Length < 3 || !uint.TryParse(c[0], out var classId))
 					continue;
+
 				wanted.Add((classId, BaseKey(c[2])));
 			}
 
@@ -53,30 +53,55 @@ namespace Faolan.Importer.Tsv
 			// RDB id-ranges: one is the real castable record with CastTime > 0, the other an instant/free variant with
 			// CastTime 0). Keep ONE id per full (rank-specific) NAME - the real cast (CastTime > 0), tie-break lowest id
 			// - so a class never learns the same spell twice or gets handed the wrong instant variant.
-			var reps = (await db.Spells.Where(s => s.Name != null && s.Name != "").Select(s => new { s.Id, s.Name, s.CastTime }).ToListAsync())
+			var reps = (await db
+					.Spells
+					.Where(s => s.Name != null && s.Name != "")
+					.Select(s => new
+					{
+						s.Id,
+						s.Name,
+						s.CastTime
+					})
+					.ToListAsync())
 				.GroupBy(s => s.Name)
 				.Select(g => g.OrderByDescending(x => x.CastTime > 0).ThenBy(x => x.Id).First());
 			var byBase = new Dictionary<string, List<uint>>();
 			foreach (var s in reps)
 			{
 				var key = BaseKey(s.Name);
-				(byBase.TryGetValue(key, out var ids) ? ids : byBase[key] = []).Add(s.Id);
+				(byBase.TryGetValue(key, out var ids)
+					? ids
+					: byBase[key] = []).Add(s.Id);
 			}
 
-			var existing = (await db.ClassSpells.Select(cs => new { cs.Class, cs.SpellId }).ToListAsync())
-				.Select(x => ((uint)x.Class, x.SpellId)).ToHashSet();
+			var existing = (await db
+					.ClassSpells
+					.Select(cs => new
+					{
+						cs.Class,
+						cs.SpellId
+					})
+					.ToListAsync())
+				.Select(x => ((uint)x.Class, x.SpellId))
+				.ToHashSet();
 
 			int matched = 0, inserted = 0;
 			foreach (var (cls, key) in wanted)
 			{
 				if (!byBase.TryGetValue(key, out var ids))
 					continue;
+
 				matched++;
 				foreach (var id in ids)
 				{
 					if (!existing.Add((cls, id)))
 						continue;
-					db.ClassSpells.Add(new ClassSpell { Class = (Class)cls, SpellId = id });
+
+					db.ClassSpells.Add(new ClassSpell
+					{
+						Class = (Class)cls,
+						SpellId = id
+					});
 					inserted++;
 				}
 			}
@@ -86,13 +111,19 @@ namespace Faolan.Importer.Tsv
 			// Final dedup: collapse any (Class, spell-NAME) that still has >1 catalog id (e.g. a create-capture starter
 			// whose captured id differs from the wiki rep, or a name spanning both RDB id-ranges) to the real castable
 			// record (CastTime > 0, tie lowest id) - so a class never learns the same spell twice / the instant variant.
-			var joined = await db.ClassSpells.Join(db.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new { cs, s.Name, s.CastTime }).ToListAsync();
-			var removed = joined
-				.GroupBy(x => (x.cs.Class, x.Name))
-				.Where(g => g.Count() > 1)
-				.SelectMany(g => g.OrderByDescending(x => x.CastTime > 0).ThenBy(x => x.cs.SpellId).Skip(1))
-				.Select(x => x.cs)
-				.ToList();
+			var joined = await db
+				.ClassSpells
+				.Join(db.Spells,
+				cs => cs.SpellId,
+				s => s.Id,
+				(cs, s) => new
+				{
+					cs,
+					s.Name,
+					s.CastTime
+				})
+				.ToListAsync();
+			var removed = joined.GroupBy(x => (x.cs.Class, x.Name)).Where(g => g.Count() > 1).SelectMany(g => g.OrderByDescending(x => x.CastTime > 0).ThenBy(x => x.cs.SpellId).Skip(1)).Select(x => x.cs).ToList();
 			if (removed.Count > 0)
 			{
 				db.ClassSpells.RemoveRange(removed);
@@ -121,17 +152,17 @@ namespace Faolan.Importer.Tsv
 			{
 				if (line.Length == 0 || line[0] == '#')
 					continue;
+
 				var c = line.Split('\t');
 				if (c.Length < 2 || !byte.TryParse(c[1], out var lvl) || lvl == 0)
 					continue;
+
 				rows++;
 				levelByBase[BaseKey(c[0])] = lvl;
 			}
 
 			// Only the base/rank-1 rows currently at Level 0 (Name == base, or "base (Rank 1)").
-			var candidates = await db.Spells
-				.Where(s => s.Level == 0 && s.Name != null && s.Name != "" && (!s.Name.Contains("(Rank ") || s.Name.Contains("(Rank 1)")))
-				.ToListAsync();
+			var candidates = await db.Spells.Where(s => s.Level == 0 && s.Name != null && s.Name != "" && (!s.Name.Contains("(Rank ") || s.Name.Contains("(Rank 1)"))).ToListAsync();
 			var updated = 0;
 			foreach (var s in candidates)
 			{
@@ -145,6 +176,11 @@ namespace Faolan.Importer.Tsv
 			await db.SaveChangesAsync();
 			logger?.LogInformation("WikiClassSpellImporter: {Rows} wiki level rows, {Updated} base spell levels set.", rows, updated);
 			return (rows, updated);
+		}
+
+		private static string BaseKey(string name)
+		{
+			return RankSuffix.Replace(Disambiguator.Replace(name, ""), "").Trim().ToLowerInvariant();
 		}
 	}
 }

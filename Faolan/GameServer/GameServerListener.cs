@@ -52,11 +52,15 @@ namespace Faolan.GameServer
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
 		private readonly CombatService _combat;
-		private readonly SpellweaveService _spellweave;
 
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
+
+		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
+		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
+		// burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
+		private readonly CreateFlowService _createFlow;
 
 		// Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
@@ -84,6 +88,7 @@ namespace Faolan.GameServer
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/Shop/ShopService.cs.
 		private readonly ShopService _shop;
+		private readonly SpellweaveService _spellweave;
 
 		// Auction-house buy->mail + mailbox ops + sell/list flow. Wallet/item-grant injected as seams. See Economy/Tradepost/TradepostService.cs.
 		private readonly TradepostService _tradepost;
@@ -97,11 +102,6 @@ namespace Faolan.GameServer
 		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
 		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
 		private readonly WorldSimulation _simulation;
-
-		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
-		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
-		// burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
-		private readonly CreateFlow.CreateFlowService _createFlow;
 
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
@@ -117,7 +117,7 @@ namespace Faolan.GameServer
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
-			_createFlow = new CreateFlow.CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
+			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
@@ -127,7 +127,7 @@ namespace Faolan.GameServer
 				(c, to, from, spellId) => ApplySpellweaveBuff(c, to, from, spellId), // trance + component buffs (correct 54-byte blob)
 				// reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body,
 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
-				(c, record) => SendWorldIir(c, new FaolanStream().WriteUInt32((uint)record.Length).WriteArray(record).ToArray()),
+				(c, record) => SendWorldIir(c, new FaolanStream().WriteUInt32(record.Length).WriteArray(record).ToArray()),
 				(c, to, from, spellId) => SendBuffRemoval(c, to, from, spellId), // trance-buff end-twins on cancel/fire
 				(c, energy) => SendSprintBar(c, energy), // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				c => EnsureEnergyLoop(c)); // start the persistent energy tracking/regen loop
@@ -141,7 +141,6 @@ namespace Faolan.GameServer
 
 			InitGmCommands();
 		}
-
 
 		public override Task StartAsync(CancellationToken cancellationToken)
 		{
@@ -922,11 +921,20 @@ namespace Faolan.GameServer
 			return _simulation.PlayerWorldEntity(client);
 		}
 
-		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
-		// the character's real id now, so the unnamed-character state alone identifies the editor flow.
-		private static bool IsRetailCreateEditorFlow(INetworkClient client)
+		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
+		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
+		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
 		{
-			return client.Session.Character?.Name == null;
+			var instance = client.Session.Account.ClientInstance;
+			// Source the destination playfield token from the destination map's burst so the announce matches the token
+			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
+			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
+			foreach (var body in new[]
+			{
+				TeleportCodec.BuildBegin(instance, destMapId),
+				TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
+			})
+				await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// Step 4: the enter-world handoff. The client learns the world server address ONLY from this 0x2002
@@ -945,20 +953,11 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}
 
-		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
-		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
-		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
+		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
+		// the character's real id now, so the unnamed-character state alone identifies the editor flow.
+		private static bool IsRetailCreateEditorFlow(INetworkClient client)
 		{
-			var instance = client.Session.Account.ClientInstance;
-			// Source the destination playfield token from the destination map's burst so the announce matches the token
-			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
-			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
-			foreach (var body in new[]
-			{
-				TeleportCodec.BuildBegin(instance, destMapId),
-				TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
-			})
-				await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return client.Session.Character?.Name == null;
 		}
 	}
 }

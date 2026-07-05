@@ -10,12 +10,6 @@ namespace Faolan.Core.Database.Tables
 	// what the Faolan.Web appearance editor reads for its race/sex-gated pickers (replacing a runtime XML parse).
 	public class AppearanceChoice : BaseEntity
 	{
-		[ConstrainToEnumValues]
-		public Race Race { get; set; }
-
-		[ConstrainToEnumValues]
-		public Sex Sex { get; set; }
-
 		public int Max { get; set; }
 
 		// Bounds for the morph/height rows (in CharacterBody signed-slider units for morphs); 0 for option rows.
@@ -23,6 +17,12 @@ namespace Faolan.Core.Database.Tables
 
 		// Editor send order within the category (drives the picker order).
 		public int Sequence { get; set; }
+
+		[ConstrainToEnumValues]
+		public Race Race { get; set; }
+
+		[ConstrainToEnumValues]
+		public Sex Sex { get; set; }
 
 		// hair | haircolor | eyecolor | skincolor | bodymarkings | facemarkings | head | morph | height
 		[MaxLength(64)]

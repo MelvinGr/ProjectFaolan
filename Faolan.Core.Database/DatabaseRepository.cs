@@ -12,7 +12,6 @@ namespace Faolan.Core.Database
 	public interface IDatabaseRepository
 	{
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
-		Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds);
 		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<bool> CheckLogin(string username, string password);
 		Task<Character> CreateCharacter(uint accountId, uint realmId);
@@ -27,6 +26,7 @@ namespace Faolan.Core.Database
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 		Task DeleteTradepostListing(ulong saleId);
 		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
+		Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds);
 
 		// Ad-hoc unit of work: runs `work` against a fresh short-lived context and disposes it. Use for one-off
 		// reads/writes that do not have a dedicated method. Entities returned are detached.
@@ -39,7 +39,9 @@ namespace Faolan.Core.Database
 		Task<Account> GetAccount(string userName);
 
 		Task<Character> GetCharacter(uint id);
+		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
 		Task<Character> GetCharacterByName(string name);
+		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
@@ -50,9 +52,12 @@ namespace Faolan.Core.Database
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
-		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
-		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
+		Task<Ability[]> GetClassAbilities(uint level, Class @class);
+		Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<Combo[]> GetClassCombos(uint level, Class @class);
+		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 
 		Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath);
 		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath);
@@ -76,8 +81,8 @@ namespace Faolan.Core.Database
 		Task<Map[]> GetMaps();
 
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
-		Task<NpcSpawn> GetNpcSpawnByName(string name);
 		Task<Npc> GetNpcByName(string name);
+		Task<NpcSpawn> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<PatrolPath[]> GetPatrolPaths(uint mapId);
@@ -98,14 +103,9 @@ namespace Faolan.Core.Database
 
 		Task<Spell> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
-		Task<Ability[]> GetClassAbilities(uint level, Class @class);
-		Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
-		Task<Combo[]> GetClassCombos(uint level, Class @class);
-		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
 
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
-		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
-		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
 		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot);
 
@@ -159,6 +159,24 @@ namespace Faolan.Core.Database
 		private const uint FirstCharacterId = 0x02000000;
 		private const uint MaxCharacterId = 0x0FFFFFFF;
 
+		// Interior lowercase words allowed inside a combo DISPLAY name (e.g. "Burn to Death", "Body and Spirit Wrack").
+		private static readonly HashSet<string> ComboNameConnectors = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+		{
+			"to",
+			"of",
+			"and",
+			"the",
+			"for",
+			"a",
+			"in",
+			"on",
+			"from",
+			"with",
+			"your",
+			"our",
+			"my"
+		};
+
 		private readonly IDbContextFactory<DatabaseContext> _contextFactory;
 
 		public DatabaseRepository(IDbContextFactory<DatabaseContext> contextFactory)
@@ -181,37 +199,6 @@ namespace Faolan.Core.Database
 			});
 			await ctx.SaveChangesAsync();
 			return true;
-		}
-
-		// Ensures the character's spawn scaffold (CharacterSkills) contains every id in `skillIds` (rank 0 for any
-		// added), idempotent. Used on level-up to grant the class feat scaffold so learned spells become castable
-		// (the client gates spell usability on feat presence). Returns the number of newly-added skill rows.
-		public async Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var existing = await ctx.CharacterSkills
-				.Where(s => s.CharacterId == characterId)
-				.Select(s => s.SkillId)
-				.ToListAsync();
-			var have = existing.ToHashSet();
-			var added = 0;
-			foreach (var id in skillIds)
-			{
-				if (!have.Add(id))
-					continue;
-
-				ctx.CharacterSkills.Add(new CharacterSkill
-				{
-					CharacterId = characterId,
-					SkillId = id,
-					Rank = 0
-				});
-				added++;
-			}
-
-			if (added > 0)
-				await ctx.SaveChangesAsync();
-			return added;
 		}
 
 		// Sets a tag on a character (idempotent - no duplicate row).
@@ -407,6 +394,34 @@ namespace Faolan.Core.Database
 			await ctx.SaveChangesAsync();
 		}
 
+		// Ensures the character's spawn scaffold (CharacterSkills) contains every id in `skillIds` (rank 0 for any
+		// added), idempotent. Used on level-up to grant the class feat scaffold so learned spells become castable
+		// (the client gates spell usability on feat presence). Returns the number of newly-added skill rows.
+		public async Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var existing = await ctx.CharacterSkills.Where(s => s.CharacterId == characterId).Select(s => s.SkillId).ToListAsync();
+			var have = existing.ToHashSet();
+			var added = 0;
+			foreach (var id in skillIds)
+			{
+				if (!have.Add(id))
+					continue;
+
+				ctx.CharacterSkills.Add(new CharacterSkill
+				{
+					CharacterId = characterId,
+					SkillId = id,
+					Rank = 0
+				});
+				added++;
+			}
+
+			if (added > 0)
+				await ctx.SaveChangesAsync();
+			return added;
+		}
+
 		// --- ad-hoc units of work ------------------------------------------------------------------------------
 
 		public async Task Execute(Func<IDatabaseContext, Task> work)
@@ -453,11 +468,27 @@ namespace Faolan.Core.Database
 			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.Id == id);
 		}
 
+		// The character's granted abilities (CharacterAbility) - the authoritative per-character ability set, re-granted
+		// on login by GrantCharacterAbilities. Empty for a freshly-created character (the class-starting set is used).
+		public async Task<CharacterAbility[]> GetCharacterAbilities(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterAbilities.Where(a => a.CharacterId == characterId).OrderBy(a => a.AbilityId).ToArrayAsync();
+		}
+
 		// Character names are unique (guild invites and GM commands address players by name).
 		public async Task<Character> GetCharacterByName(string name)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Characters.FirstOrDefaultAsync(c => c.Name == name);
+		}
+
+		// The character's combo book (CharacterCombo) - re-emitted on login by GrantCharacterCombos (a max-level
+		// imported character never dings, so this is how it keeps its combos).
+		public async Task<CharacterCombo[]> GetCharacterCombos(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterCombos.Where(c => c.CharacterId == characterId).OrderBy(c => c.ComboId).ToArrayAsync();
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------
@@ -530,14 +561,7 @@ namespace Faolan.Core.Database
 		public async Task<Character> GetCharacterScaffold(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.Characters
-				.Include(c => c.Attributes)
-				.Include(c => c.Skills)
-				.Include(c => c.ScaffoldPairs)
-				.Include(c => c.Body)
-				.Include(c => c.BodyResources)
-				.FirstOrDefaultAsync(c => c.Id == characterId);
+			return await ctx.Characters.Include(c => c.Attributes).Include(c => c.Skills).Include(c => c.ScaffoldPairs).Include(c => c.Body).Include(c => c.BodyResources).FirstOrDefaultAsync(c => c.Id == characterId);
 		}
 
 		// --- hotbar shortcuts (persistence only; the login restore path is undecoded - see CharacterShortcut) ---
@@ -563,26 +587,76 @@ namespace Faolan.Core.Database
 			return await ctx.CharacterStats.Where(s => s.CharacterId == characterId).OrderBy(s => s.Ordinal).ToArrayAsync();
 		}
 
-		// The character's granted abilities (CharacterAbility) - the authoritative per-character ability set, re-granted
-		// on login by GrantCharacterAbilities. Empty for a freshly-created character (the class-starting set is used).
-		public async Task<CharacterAbility[]> GetCharacterAbilities(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterAbilities.Where(a => a.CharacterId == characterId).OrderBy(a => a.AbilityId).ToArrayAsync();
-		}
-
-		// The character's combo book (CharacterCombo) - re-emitted on login by GrantCharacterCombos (a max-level
-		// imported character never dings, so this is how it keeps its combos).
-		public async Task<CharacterCombo[]> GetCharacterCombos(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterCombos.Where(c => c.CharacterId == characterId).OrderBy(c => c.ComboId).ToArrayAsync();
-		}
-
 		public async Task<uint[]> GetCharacterTags(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterTags.Where(t => t.CharacterId == characterId).Select(t => t.TagId).ToArrayAsync();
+		}
+
+		// The abilities a character of `class` has access to up to `level`, from the class<->ability ACCESS map
+		// (ClassAbility): true multi-class membership with a PER-CLASS unlock level, derived from the per-character
+		// grants (CaptureAbilityImporter.DeriveClassAbilitiesAsync) - the data-driven replacement for the old
+		// IsStartingAbility flag. Coverage is whatever the captures supplied (the classes we have captures for).
+		public async Task<Ability[]> GetClassAbilities(uint level, Class @class)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassAbilities.Where(ca => ca.Class == @class && ca.Level <= level).Include(ca => ca.Ability).Select(ca => ca.Ability).OrderBy(a => a.Slot).ToArrayAsync();
+		}
+
+		// The abilities a character of `class` unlocks in the level band (fromExclusive, toInclusive] - the ability
+		// analogue of GetClassSpellsUnlockedBetween, used to grant the ding's newly-unlocked abilities on level-up.
+		public async Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ClassAbilities
+				.Where(ca => ca.Class == @class && ca.Level > fromLevelExclusive && ca.Level <= toLevelInclusive)
+				.Include(ca => ca.Ability)
+				.OrderBy(ca => ca.Level)
+				.ThenBy(ca => ca.AbilityId)
+				.Select(ca => ca.Ability)
+				.ToArrayAsync();
+		}
+
+		// The combos a character of `class` has access to up to `level`, from the class<->combo ACCESS map (ClassCombo)
+		// - the combo analogue of GetClassAbilities. Casters have no rows, so they get no combos (see ClassCombo).
+		// RANK-SUPERSEDED like the spell bar (GetStartingBarSpells): one combo per family (the highest rank the
+		// character qualifies for), so a lvl-24 HoX gets Hell Strikes II, NOT both I and II - matching the retail
+		// 0x2076 combo book (Hakotep). Family grouping is ComboFamilyKey.
+		public async Task<Combo[]> GetClassCombos(uint level, Class @class)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var candidates = await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level <= level).Include(cc => cc.Combo).Select(cc => cc.Combo).ToListAsync();
+
+			return HighestRankPerFamily(candidates);
+		}
+
+		// The combos a character of `class` unlocks in the level band (fromExclusive, toInclusive] - the combo analogue
+		// of GetClassAbilitiesUnlockedBetween, used to grant the ding's newly-unlocked combos on level-up. Also
+		// rank-superseded within the band (a multi-level ding that crosses two ranks of a line grants only the higher).
+		public async Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var candidates = await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive).Include(cc => cc.Combo).Select(cc => cc.Combo).ToListAsync();
+
+			return HighestRankPerFamily(candidates);
+		}
+
+		// The class spells whose unlock level (Spells.Level) falls in (fromLevelExclusive, toLevelInclusive] - the
+		// spells NEWLY learned crossing from one level to another (the level-up delta). Grants these on a ding.
+		public async Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ClassSpells
+				.Where(cs => cs.Class == 0 || cs.Class == @class)
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
+				.Where(s => s.Level > fromLevelExclusive && s.Level <= toLevelInclusive)
+				.OrderBy(s => s.Level)
+				.ThenBy(s => s.Id)
+				.Select(s => s.Id)
+				.Distinct()
+				.ToArrayAsync();
 		}
 
 		// One screen in an NPC's dialogue tree, keyed by the stable (NpcName, TypeId, AnswerPath). The runtime serves
@@ -738,6 +812,16 @@ namespace Faolan.Core.Database
 			return await ctx.MorphTargets.Where(t => names.Contains(t.Name)).ToDictionaryAsync(t => t.Name);
 		}
 
+		// The creature TYPE by name (for spawn-from-TYPE - a summoned pet #307/#244) - distinct from GetNpcSpawnByName,
+		// which returns a world PLACEMENT. Includes the type's caster Spells; the lifted stat core is Npc.Data. Null if
+		// no such type or it has no lifted Data (can't be spawned standalone yet).
+		public async Task<Npc> GetNpcByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = name.ToLowerInvariant();
+			return await ctx.Npcs.Include(t => t.Spells).Where(t => t.Name != null && t.Name.ToLower() == lowered && t.Data != null).FirstOrDefaultAsync();
+		}
+
 		// The captured static world objects for a map (decor/containers/zones). The world-entry path builds each
 		// object's body from its row via WorldObjectBuilder, like the NPC spawns.
 		// A captured NPC spawn by name (case-insensitive), any map (used by .spawnnpc and to fetch a mount-entity
@@ -753,20 +837,6 @@ namespace Faolan.Core.Database
 				.Include(n => n.Morphs)
 				.Include(n => n.Equipment)
 				.Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered && n.Data != null) // #244: name lives on the type
-				.FirstOrDefaultAsync();
-		}
-
-		// The creature TYPE by name (for spawn-from-TYPE - a summoned pet #307/#244) - distinct from GetNpcSpawnByName,
-		// which returns a world PLACEMENT. Includes the type's caster Spells; the lifted stat core is Npc.Data. Null if
-		// no such type or it has no lifted Data (can't be spawned standalone yet).
-		public async Task<Npc> GetNpcByName(string name)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var lowered = name.ToLowerInvariant();
-			return await ctx
-				.Npcs
-				.Include(t => t.Spells)
-				.Where(t => t.Name != null && t.Name.ToLower() == lowered && t.Data != null)
 				.FirstOrDefaultAsync();
 		}
 
@@ -936,74 +1006,37 @@ namespace Faolan.Core.Database
 			return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
 		}
 
-		// The abilities a character of `class` has access to up to `level`, from the class<->ability ACCESS map
-		// (ClassAbility): true multi-class membership with a PER-CLASS unlock level, derived from the per-character
-		// grants (CaptureAbilityImporter.DeriveClassAbilitiesAsync) - the data-driven replacement for the old
-		// IsStartingAbility flag. Coverage is whatever the captures supplied (the classes we have captures for).
-		public async Task<Ability[]> GetClassAbilities(uint level, Class @class)
+		// The spells to place on the DEFAULT action bar: ONE per spell family (the highest rank the character can use),
+		// so the bar shows one icon per spell instead of every rank (Ice Strike R1/R2/R3... all share one icon, which
+		// makes the bar look like it "repeats"). The full ranked set is still LEARNED via GetStartingSpells; this is
+		// bar placement only. Families are ordered by when first acquired (their lowest unlock level) so the bar reads
+		// low -> high. Family key = the spell name with a trailing " (Rank N)" stripped.
+		public async Task<uint[]> GetStartingBarSpells(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassAbilities
-				.Where(ca => ca.Class == @class && ca.Level <= level)
-				.Include(ca => ca.Ability)
-				.Select(ca => ca.Ability)
-				.OrderBy(a => a.Slot)
-				.ToArrayAsync();
-		}
-
-		// The abilities a character of `class` unlocks in the level band (fromExclusive, toInclusive] - the ability
-		// analogue of GetClassSpellsUnlockedBetween, used to grant the ding's newly-unlocked abilities on level-up.
-		public async Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassAbilities
-				.Where(ca => ca.Class == @class && ca.Level > fromLevelExclusive && ca.Level <= toLevelInclusive)
-				.Include(ca => ca.Ability)
-				.OrderBy(ca => ca.Level).ThenBy(ca => ca.AbilityId)
-				.Select(ca => ca.Ability)
-				.ToArrayAsync();
-		}
-
-		// The combos a character of `class` has access to up to `level`, from the class<->combo ACCESS map (ClassCombo)
-		// - the combo analogue of GetClassAbilities. Casters have no rows, so they get no combos (see ClassCombo).
-		// RANK-SUPERSEDED like the spell bar (GetStartingBarSpells): one combo per family (the highest rank the
-		// character qualifies for), so a lvl-24 HoX gets Hell Strikes II, NOT both I and II - matching the retail
-		// 0x2076 combo book (Hakotep). Family grouping is ComboFamilyKey.
-		public async Task<Combo[]> GetClassCombos(uint level, Class @class)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var candidates = await ctx.ClassCombos
-				.Where(cc => cc.Class == @class && cc.Level <= level)
-				.Include(cc => cc.Combo)
-				.Select(cc => cc.Combo)
+			var candidates = await ctx
+				.ClassSpells
+				.Where(cs => cs.Class == 0 || cs.Class == @class)
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
+				.Where(s => s.Level <= level)
+				.Select(s => new
+				{
+					s.Id,
+					s.Name,
+					s.Level
+				})
 				.ToListAsync();
 
-			return HighestRankPerFamily(candidates);
-		}
-
-		// The combos a character of `class` unlocks in the level band (fromExclusive, toInclusive] - the combo analogue
-		// of GetClassAbilitiesUnlockedBetween, used to grant the ding's newly-unlocked combos on level-up. Also
-		// rank-superseded within the band (a multi-level ding that crosses two ranks of a line grants only the higher).
-		public async Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var candidates = await ctx.ClassCombos
-				.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive)
-				.Include(cc => cc.Combo)
-				.Select(cc => cc.Combo)
-				.ToListAsync();
-
-			return HighestRankPerFamily(candidates);
-		}
-
-		// Collapses a combo set to one entry per family - the highest rank (by Level, then Id) - ordered low->high by
-		// first-acquired level. The combo twin of the spell-bar family collapse in GetStartingBarSpells.
-		private static Combo[] HighestRankPerFamily(IEnumerable<Combo> combos)
-		{
-			return combos
-				.GroupBy(c => ComboFamilyKey(c.Name))
-				.Select(g => g.OrderByDescending(c => c.Level).ThenByDescending(c => c.Id).First())
-				.OrderBy(c => c.Level).ThenBy(c => c.Id)
+			return candidates
+				.GroupBy(s => StripRankSuffix(s.Name))
+				.Select(g => new
+				{
+					BestId = g.OrderByDescending(s => s.Level).ThenByDescending(s => s.Id).First().Id,
+					FirstLevel = g.Min(s => s.Level)
+				})
+				.OrderBy(x => x.FirstLevel)
+				.ThenBy(x => x.BestId)
+				.Select(x => x.BestId)
 				.ToArray();
 		}
 
@@ -1014,123 +1047,13 @@ namespace Faolan.Core.Database
 		public async Task<uint[]> GetStartingSpells(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassSpells
+			return await ctx
+				.ClassSpells
 				.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
 				.Where(s => s.Level <= level)
-				.OrderBy(s => s.Level).ThenBy(s => s.Id)
-				.Select(s => s.Id)
-				.Distinct()
-				.ToArrayAsync();
-		}
-
-		// The spells to place on the DEFAULT action bar: ONE per spell family (the highest rank the character can use),
-		// so the bar shows one icon per spell instead of every rank (Ice Strike R1/R2/R3... all share one icon, which
-		// makes the bar look like it "repeats"). The full ranked set is still LEARNED via GetStartingSpells; this is
-		// bar placement only. Families are ordered by when first acquired (their lowest unlock level) so the bar reads
-		// low -> high. Family key = the spell name with a trailing " (Rank N)" stripped.
-		public async Task<uint[]> GetStartingBarSpells(uint level, Class @class)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var candidates = await ctx.ClassSpells
-				.Where(cs => cs.Class == 0 || cs.Class == @class)
-				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
-				.Where(s => s.Level <= level)
-				.Select(s => new { s.Id, s.Name, s.Level })
-				.ToListAsync();
-
-			return candidates
-				.GroupBy(s => StripRankSuffix(s.Name))
-				.Select(g => new
-				{
-					BestId = g.OrderByDescending(s => s.Level).ThenByDescending(s => s.Id).First().Id,
-					FirstLevel = g.Min(s => s.Level)
-				})
-				.OrderBy(x => x.FirstLevel).ThenBy(x => x.BestId)
-				.Select(x => x.BestId)
-				.ToArray();
-		}
-
-		// The spell-family key: the name with a trailing " (Rank N)" removed (and trailing spaces trimmed - a few
-		// catalog names carry a double space before the rank, e.g. "Freeze  (Rank 2)").
-		private static string StripRankSuffix(string name)
-		{
-			if (string.IsNullOrEmpty(name))
-				return name ?? "";
-
-			var i = name.IndexOf(" (Rank ", StringComparison.Ordinal);
-			return (i >= 0
-				? name[..i]
-				: name).TrimEnd();
-		}
-
-		// Interior lowercase words allowed inside a combo DISPLAY name (e.g. "Burn to Death", "Body and Spirit Wrack").
-		private static readonly HashSet<string> ComboNameConnectors = new(StringComparer.OrdinalIgnoreCase)
-		{
-			"to", "of", "and", "the", "for", "a", "in", "on", "from", "with", "your", "our", "my"
-		};
-
-		// The combo-family key: groups the ranks of one combo LINE (Hell Strikes I/II/III...) so the grant can pick
-		// just the highest rank the character qualifies for - the combo analogue of StripRankSuffix for spells. Combo
-		// catalog names are ENGINE names ({Class}_{level}_{tags}_{Display Name}_{RankRoman}, e.g.
-		// Herald_05_multihit_Hell_Strikes_I), so the family is the trailing DISPLAY-name run (Capitalized words +
-		// interior connectors like "to"/"and"), normalised (lowercased, separators stripped) after dropping the class
-		// prefix and a trailing roman-numeral rank. This groups I..V of a line regardless of the differing level/tag
-		// prefix, and merges the "80b" / space-in-name / "khitai" variants that share a display name (validated in
-		// Python against the Herald catalog: a lvl-24 HoX collapses to the 5 the retail 0x2076 book shows).
-		private static string ComboFamilyKey(string name)
-		{
-			if (string.IsNullOrEmpty(name))
-				return name ?? "";
-
-			var tokens = name.Split('_', StringSplitOptions.RemoveEmptyEntries);
-			if (tokens.Length <= 1)
-				return name.ToLowerInvariant();
-
-			var end = tokens.Length;
-			if (IsRomanNumeral(tokens[end - 1])) // drop a trailing rank
-				end--;
-
-			// Walk back over the trailing display run (stop before the class prefix at index 0).
-			var start = end;
-			for (var i = end - 1; i >= 1; i--)
-			{
-				var t = tokens[i];
-				if (t.Length > 0 && (char.IsUpper(t[0]) || ComboNameConnectors.Contains(t)))
-					start = i;
-				else
-					break;
-			}
-
-			if (start >= end) // no display run found - fall back to the whole name
-				return name.ToLowerInvariant().Replace("_", "").Replace(" ", "");
-
-			return string.Concat(tokens[start..end]).ToLowerInvariant().Replace(" ", "");
-		}
-
-		// True for a combo rank token (I, II, III, IV, V, VI, VII, ...): uppercase roman numeral characters only.
-		private static bool IsRomanNumeral(string s)
-		{
-			if (string.IsNullOrEmpty(s) || s.Length > 5)
-				return false;
-
-			foreach (var c in s)
-				if (c is not ('I' or 'V' or 'X'))
-					return false;
-
-			return true;
-		}
-
-		// The class spells whose unlock level (Spells.Level) falls in (fromLevelExclusive, toLevelInclusive] - the
-		// spells NEWLY learned crossing from one level to another (the level-up delta). Grants these on a ding.
-		public async Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassSpells
-				.Where(cs => cs.Class == 0 || cs.Class == @class)
-				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
-				.Where(s => s.Level > fromLevelExclusive && s.Level <= toLevelInclusive)
-				.OrderBy(s => s.Level).ThenBy(s => s.Id)
+				.OrderBy(s => s.Level)
+				.ThenBy(s => s.Id)
 				.Select(s => s.Id)
 				.Distinct()
 				.ToArrayAsync();
@@ -1607,10 +1530,7 @@ namespace Faolan.Core.Database
 
 		private static CharacterEquipment AddNewEquipment(DatabaseContext ctx, uint characterId)
 		{
-			var equipment = new CharacterEquipment
-			{
-				CharacterId = characterId
-			};
+			var equipment = new CharacterEquipment { CharacterId = characterId };
 			ctx.CharacterEquipment.Add(equipment);
 			return equipment;
 		}
@@ -1620,6 +1540,44 @@ namespace Faolan.Core.Database
 		private static void ApplyCreationSpawn(Character character)
 		{
 			character.Position = Map.NewPlayerSpawnSpawnPoint.Position;
+		}
+
+		// The combo-family key: groups the ranks of one combo LINE (Hell Strikes I/II/III...) so the grant can pick
+		// just the highest rank the character qualifies for - the combo analogue of StripRankSuffix for spells. Combo
+		// catalog names are ENGINE names ({Class}_{level}_{tags}_{Display Name}_{RankRoman}, e.g.
+		// Herald_05_multihit_Hell_Strikes_I), so the family is the trailing DISPLAY-name run (Capitalized words +
+		// interior connectors like "to"/"and"), normalised (lowercased, separators stripped) after dropping the class
+		// prefix and a trailing roman-numeral rank. This groups I..V of a line regardless of the differing level/tag
+		// prefix, and merges the "80b" / space-in-name / "khitai" variants that share a display name (validated in
+		// Python against the Herald catalog: a lvl-24 HoX collapses to the 5 the retail 0x2076 book shows).
+		private static string ComboFamilyKey(string name)
+		{
+			if (string.IsNullOrEmpty(name))
+				return name ?? "";
+
+			var tokens = name.Split('_', StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length <= 1)
+				return name.ToLowerInvariant();
+
+			var end = tokens.Length;
+			if (IsRomanNumeral(tokens[end - 1])) // drop a trailing rank
+				end--;
+
+			// Walk back over the trailing display run (stop before the class prefix at index 0).
+			var start = end;
+			for (var i = end - 1; i >= 1; i--)
+			{
+				var t = tokens[i];
+				if (t.Length > 0 && (char.IsUpper(t[0]) || ComboNameConnectors.Contains(t)))
+					start = i;
+				else
+					break;
+			}
+
+			if (start >= end) // no display run found - fall back to the whole name
+				return name.ToLowerInvariant().Replace("_", "").Replace(" ", "");
+
+			return string.Concat(tokens[start..end]).ToLowerInvariant().Replace(" ", "");
 		}
 
 		// Inserts a Map row only if its id is absent (INSERT OR IGNORE keeps an existing seeded row, e.g.
@@ -1632,6 +1590,28 @@ namespace Faolan.Core.Database
 			// omitted them would be silently dropped (NOT NULL violation -> ignored), leaving no Map row and failing the
 			// character->Map foreign key. 0/0 = the Shared, uncapped default (this best-effort fallback beach row).
 			return ctx.Database.ExecuteSqlRawAsync("INSERT OR IGNORE INTO Maps (Id, Name, InstanceMode, PopulationCap) VALUES ({0}, {1}, 0, 0)", mapId, name);
+		}
+
+		// Collapses a combo set to one entry per family - the highest rank (by Level, then Id) - ordered low->high by
+		// first-acquired level. The combo twin of the spell-bar family collapse in GetStartingBarSpells.
+		private static Combo[] HighestRankPerFamily(IEnumerable<Combo> combos)
+		{
+			return combos.GroupBy(c => ComboFamilyKey(c.Name)).Select(g => g.OrderByDescending(c => c.Level).ThenByDescending(c => c.Id).First()).OrderBy(c => c.Level).ThenBy(c => c.Id).ToArray();
+		}
+
+		// True for a combo rank token (I, II, III, IV, V, VI, VII, ...): uppercase roman numeral characters only.
+		private static bool IsRomanNumeral(string s)
+		{
+			if (string.IsNullOrEmpty(s) || s.Length > 5)
+				return false;
+
+			foreach (var c in s)
+			{
+				if (c is not ('I' or 'V' or 'X'))
+					return false;
+			}
+
+			return true;
 		}
 
 		// Guild with the full member roster (the 0x203F full update needs every member's name/level/class).
@@ -1670,6 +1650,19 @@ namespace Faolan.Core.Database
 			return id == null
 				? null
 				: await ctx.Items.FindAsync(id.Value);
+		}
+
+		// The spell-family key: the name with a trailing " (Rank N)" removed (and trailing spaces trimmed - a few
+		// catalog names carry a double space before the rank, e.g. "Freeze  (Rank 2)").
+		private static string StripRankSuffix(string name)
+		{
+			if (string.IsNullOrEmpty(name))
+				return name ?? "";
+
+			var i = name.IndexOf(" (Rank ", StringComparison.Ordinal);
+			return (i >= 0
+				? name[..i]
+				: name).TrimEnd();
 		}
 	}
 }

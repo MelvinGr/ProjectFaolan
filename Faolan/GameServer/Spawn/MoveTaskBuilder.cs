@@ -43,7 +43,7 @@ namespace Faolan.GameServer.Spawn
 
 			var total = 16 + 2 + 12 + 10 + 1 + 12 * waypoints.Count + 17 + 12 + 2;
 			var stream = new FaolanStream()
-				.WriteUInt32((uint)(total - 4))
+				.WriteUInt32(total - 4)
 				.WriteUInt32(SubOpcode)
 				.WriteUInt32(Ack)
 				.WriteUInt32(handle)
@@ -51,7 +51,7 @@ namespace Faolan.GameServer.Spawn
 				.WriteVector3BigEndian(currentPosition)
 				// segment-list + move-block header (04 01 00 02 01 01 00 00 00 00)
 				.WriteArray(0x04, 0x01, 0x00, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00)
-				.WriteByte((byte)waypoints.Count);
+				.WriteByte(waypoints.Count);
 			foreach (var wp in waypoints)
 				stream.WriteVector3BigEndian(wp);
 

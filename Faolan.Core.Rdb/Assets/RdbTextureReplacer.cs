@@ -9,50 +9,6 @@ namespace Faolan.Core.Rdb.Assets
 	// container/encode/inline path is the point; swap the resampler for quality. DXT1 only for now (opaque diffuse).
 	public static class RdbTextureReplacer
 	{
-		// Build an upscaled FCTX replacement blob for the given texture entry, PRESERVING its format (DXT1 or DXT5),
-		// or null if it isn't a decodable DXT-colour FCTX (MIXD/normal maps return null). `scale` multiplies both
-		// dimensions (2 = double res). `upscale` replaces the resampler (default bilinear).
-		public static byte[]? BuildUpscaled(RdbReader rdb, uint type, uint id, int scale = 2, Func<byte[], int, int, int, int, byte[]>? upscale = null)
-		{
-			if (scale < 1 || !rdb.TryGet(type, id, out var e) || !rdb.CanRead(e))
-				return null;
-
-			var payload = rdb.ReadDecompressed(e);
-			if (!FctxConverter.IsFctx(payload) || payload.Length < 24)
-				return null;
-
-			var fourCc = Encoding.ASCII.GetString(payload, 20, 4);
-			var resample = upscale ?? Bilinear;
-
-			if (fourCc == "MIXD")
-			{
-				// Normal + detail sub-textures, both upscaled; seg1 is regenerated as zero-padding (BC5-path only).
-				if (!FctxConverter.TryDecodeMixdNormal(payload, out var nrm, out var w, out var h) ||
-				    !FctxConverter.TryDecodeTopMip(payload, out var det, out _, out _, includeSingleChannel: true))
-					return null;
-
-				var nw = w * scale;
-				var nh = h * scale;
-				var upN = resample(nrm, w, h, nw, nh);
-				var upDrgba = resample(det, w, h, nw, nh);
-				var upD = new byte[nw * nh];
-				for (var i = 0; i < nw * nh; i++)
-					upD[i] = upDrgba[i * 4]; // detail is single-channel (decoded to R)
-				return FctxEncoder.WrapIOz1(FctxEncoder.EncodeMixd(upN, upD, nw, nh));
-			}
-
-			if (fourCc != "DXT1" && fourCc != "DXT5")
-				return null; // DXT3/unknown - not re-encodable
-
-			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var cw, out var ch))
-				return null;
-
-			var cnw = cw * scale;
-			var cnh = ch * scale;
-			var up = resample(rgba, cw, ch, cnw, cnh);
-			return FctxEncoder.WrapIOz1(FctxEncoder.Encode(up, cnw, cnh, fourCc));
-		}
-
 		// Bilinear resample RGBA32 (row-major, top-down) from (sw,sh) to (dw,dh).
 		public static byte[] Bilinear(byte[] src, int sw, int sh, int dw, int dh)
 		{
@@ -86,6 +42,49 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			return dst;
+		}
+
+		// Build an upscaled FCTX replacement blob for the given texture entry, PRESERVING its format (DXT1 or DXT5),
+		// or null if it isn't a decodable DXT-colour FCTX (MIXD/normal maps return null). `scale` multiplies both
+		// dimensions (2 = double res). `upscale` replaces the resampler (default bilinear).
+		public static byte[]? BuildUpscaled(RdbReader rdb, uint type, uint id, int scale = 2, Func<byte[], int, int, int, int, byte[]>? upscale = null)
+		{
+			if (scale < 1 || !rdb.TryGet(type, id, out var e) || !rdb.CanRead(e))
+				return null;
+
+			var payload = rdb.ReadDecompressed(e);
+			if (!FctxConverter.IsFctx(payload) || payload.Length < 24)
+				return null;
+
+			var fourCc = Encoding.ASCII.GetString(payload, 20, 4);
+			var resample = upscale ?? Bilinear;
+
+			if (fourCc == "MIXD")
+			{
+				// Normal + detail sub-textures, both upscaled; seg1 is regenerated as zero-padding (BC5-path only).
+				if (!FctxConverter.TryDecodeMixdNormal(payload, out var nrm, out var w, out var h) || !FctxConverter.TryDecodeTopMip(payload, out var det, out _, out _, true))
+					return null;
+
+				var nw = w * scale;
+				var nh = h * scale;
+				var upN = resample(nrm, w, h, nw, nh);
+				var upDrgba = resample(det, w, h, nw, nh);
+				var upD = new byte[nw * nh];
+				for (var i = 0; i < nw * nh; i++)
+					upD[i] = upDrgba[i * 4]; // detail is single-channel (decoded to R)
+				return FctxEncoder.WrapIOz1(FctxEncoder.EncodeMixd(upN, upD, nw, nh));
+			}
+
+			if (fourCc != "DXT1" && fourCc != "DXT5")
+				return null; // DXT3/unknown - not re-encodable
+
+			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var cw, out var ch))
+				return null;
+
+			var cnw = cw * scale;
+			var cnh = ch * scale;
+			var up = resample(rgba, cw, ch, cnw, cnh);
+			return FctxEncoder.WrapIOz1(FctxEncoder.Encode(up, cnw, cnh, fourCc));
 		}
 	}
 }

@@ -23,8 +23,8 @@ namespace Faolan.Core.Network.Packets
 	//                      live path sends zeros here (a display summary refinement is a follow-up).
 	public static class NewLevelIirCodec
 	{
-		public const uint SubOpcode = 0x6D314743;
 		public const int DeltaCount = 6;
+		public const uint SubOpcode = 0x6D314743;
 		private const byte LeadFlag = 0x00;
 		private const uint IirMarker = EntityClass.Character;
 
@@ -34,16 +34,21 @@ namespace Faolan.Core.Network.Packets
 			var content = new FaolanStream();
 			content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(instance).WriteByte(LeadFlag).WriteUInt32(newLevel);
 			for (var i = 0; i < DeltaCount; i++)
-				content.WriteUInt32(i < deltas.Length ? deltas[i] : 0u);
+				content.WriteUInt32(i < deltas.Length
+					? deltas[i]
+					: 0u);
 
 			var body = content.ToArray();
 			var s = new FaolanStream();
-			s.WriteUInt32((uint)body.Length);
+			s.WriteUInt32(body.Length);
 			s.WriteArray(body);
 			return s.ToArray();
 		}
 
 		// Live path: the new level with an empty (all-zero) delta summary - enough to fire the banner + effect.
-		public static byte[] Build(uint instance, uint newLevel) => Build(instance, newLevel, ReadOnlySpan<uint>.Empty);
+		public static byte[] Build(uint instance, uint newLevel)
+		{
+			return Build(instance, newLevel, ReadOnlySpan<uint>.Empty);
+		}
 	}
 }

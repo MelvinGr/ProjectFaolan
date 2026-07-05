@@ -71,7 +71,12 @@ namespace Faolan.GameServer
 
 			if (existingShortcuts.Length > 0)
 			{
-				Logger.LogInformation("EnsureCharacterLoadout: granted {S} spells + {A} abilities to '{Name}' (class={Class}); kept its existing {N}-slot bar.", spells.Length, abilities.Length, character.Name, character.Class, existingShortcuts.Length);
+				Logger.LogInformation("EnsureCharacterLoadout: granted {S} spells + {A} abilities to '{Name}' (class={Class}); kept its existing {N}-slot bar.",
+					spells.Length,
+					abilities.Length,
+					character.Name,
+					character.Class,
+					existingShortcuts.Length);
 				return;
 			}
 
@@ -104,6 +109,26 @@ namespace Faolan.GameServer
 			Logger.LogInformation("EnsureCharacterLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).", character.Name, character.Class, abilities.Length, spells.Length);
 		}
 
+		// The abilities to grant a character on login: its authoritative per-character set (CharacterAbility, imported
+		// from the retail 0x2052 grants) resolved to Ability rows, or the class-starting kit for a freshly-created
+		// character with no persisted set. NOT derived from the bar (the bar is only shortcuts).
+		private async Task<Ability[]> GetLoadoutAbilities(Character character)
+		{
+			var granted = await Database.GetCharacterAbilities(character.Id);
+			if (granted.Length == 0)
+				return await Database.GetClassAbilities(character.Level, character.Class);
+
+			var abilities = new List<Ability>(granted.Length);
+			foreach (var ga in granted)
+			{
+				var ability = await Database.GetAbility(ga.AbilityId);
+				if (ability != null) // ids we do not have cataloged are skipped (that bar slot stays empty)
+					abilities.Add(ability);
+			}
+
+			return [.. abilities];
+		}
+
 		// Grants the character's starting abilities so the player has castable attacks in-world (enables the combat
 		// test, TODO #3). The set is the universal starting kit every captured character receives via 0x2052 on
 		// login - the `Abilities` table, imported from the retail grants by CaptureAbilityImporter (3 Normal Attack
@@ -125,26 +150,6 @@ namespace Faolan.GameServer
 				await SendAbilityGrant(client, ability, false);
 
 			Logger.LogInformation("GrantCharacterAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
-		}
-
-		// The abilities to grant a character on login: its authoritative per-character set (CharacterAbility, imported
-		// from the retail 0x2052 grants) resolved to Ability rows, or the class-starting kit for a freshly-created
-		// character with no persisted set. NOT derived from the bar (the bar is only shortcuts).
-		private async Task<Ability[]> GetLoadoutAbilities(Character character)
-		{
-			var granted = await Database.GetCharacterAbilities(character.Id);
-			if (granted.Length == 0)
-				return await Database.GetClassAbilities(character.Level, character.Class);
-
-			var abilities = new List<Ability>(granted.Length);
-			foreach (var ga in granted)
-			{
-				var ability = await Database.GetAbility(ga.AbilityId);
-				if (ability != null) // ids we do not have cataloged are skipped (that bar slot stays empty)
-					abilities.Add(ability);
-			}
-
-			return [.. abilities];
 		}
 
 		// Re-emits the character's COMBO book on login as ComboBookIIR grants - the combo counterpart to
@@ -171,8 +176,9 @@ namespace Faolan.GameServer
 				comboIds.Add(combo.Id);
 
 			foreach (var comboId in comboIds)
-				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-					.WriteArray(ComboBookIirCodec.Build(instance, comboId)).SendAsync(client);
+			{
+				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArray(ComboBookIirCodec.Build(instance, comboId)).SendAsync(client);
+			}
 
 			if (comboIds.Count > 0)
 				Logger.LogInformation("GrantCharacterCombos: emitted {Count} combos to '{Name}' (class={Class}, level {Level}).", comboIds.Count, character.Name, character.Class, character.Level);

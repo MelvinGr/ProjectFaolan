@@ -57,6 +57,32 @@ namespace Faolan.Core.Rdb.Assets
 			return Encode(result, tint);
 		}
 
+		// Decode a PNG (or any Skia-supported image) to an RGBA8888 buffer + dimensions. For reading an external
+		// upscaler's output back into the texture pipeline (#295).
+		public static (byte[] Rgba, int W, int H) DecodePng(byte[] png)
+		{
+			// Decode STRAIGHT to RGBA8888 UNPREMUL via the codec. SKBitmap.Decode defaults to premultiplied alpha,
+			// which folds alpha into RGB (darkens semi-transparent textures) - we want straight, non-premultiplied
+			// colour to feed back into DXT encoding.
+			using var data = SKData.CreateCopy(png);
+			using var codec = SKCodec.Create(data) ?? throw new ArgumentException("not a decodable image");
+			var info = new SKImageInfo(codec.Info.Width, codec.Info.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+			var rgba = new byte[info.Width * info.Height * 4];
+			var handle = GCHandle.Alloc(rgba, GCHandleType.Pinned);
+			try
+			{
+				var res = codec.GetPixels(info, handle.AddrOfPinnedObject());
+				if (res != SKCodecResult.Success && res != SKCodecResult.IncompleteInput)
+					throw new ArgumentException($"image decode failed: {res}");
+			}
+			finally
+			{
+				handle.Free();
+			}
+
+			return (rgba, info.Width, info.Height);
+		}
+
 		// Draw a decal (e.g. a tattoo) onto a copy of the base atlas at UV (u,v in 0..1), scaled and rotated, blended
 		// by alpha. scale is the decal's drawn size as a fraction of the atlas width (the TexScript "scale" / 255).
 		public static byte[] DrawDecal(byte[] baseRgba, int bw, int bh, byte[] decalRgba, int dw, int dh, float u, float v, float scaleFraction, float rotationDeg, float blend, RdbAssetExtractor.Tint? tint = null)
@@ -91,32 +117,6 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			using var bmp = FromRgba(rgba, w, h);
 			return Encode(bmp, tint);
-		}
-
-		// Decode a PNG (or any Skia-supported image) to an RGBA8888 buffer + dimensions. For reading an external
-		// upscaler's output back into the texture pipeline (#295).
-		public static (byte[] Rgba, int W, int H) DecodePng(byte[] png)
-		{
-			// Decode STRAIGHT to RGBA8888 UNPREMUL via the codec. SKBitmap.Decode defaults to premultiplied alpha,
-			// which folds alpha into RGB (darkens semi-transparent textures) - we want straight, non-premultiplied
-			// colour to feed back into DXT encoding.
-			using var data = SKData.CreateCopy(png);
-			using var codec = SKCodec.Create(data) ?? throw new ArgumentException("not a decodable image");
-			var info = new SKImageInfo(codec.Info.Width, codec.Info.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-			var rgba = new byte[info.Width * info.Height * 4];
-			var handle = System.Runtime.InteropServices.GCHandle.Alloc(rgba, System.Runtime.InteropServices.GCHandleType.Pinned);
-			try
-			{
-				var res = codec.GetPixels(info, handle.AddrOfPinnedObject());
-				if (res != SKCodecResult.Success && res != SKCodecResult.IncompleteInput)
-					throw new ArgumentException($"image decode failed: {res}");
-			}
-			finally
-			{
-				handle.Free();
-			}
-
-			return (rgba, info.Width, info.Height);
 		}
 
 		// Wrap an RGBA8888 (R,G,B,A) byte buffer in an SKBitmap (copies into Skia-owned pixels).

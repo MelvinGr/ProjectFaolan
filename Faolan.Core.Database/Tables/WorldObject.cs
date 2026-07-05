@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -18,6 +18,9 @@ namespace Faolan.Core.Database.Tables
 	// from Base3DEntity, shared with the player Character and the NPC spawns.
 	public class WorldObject : Base3DEntity
 	{
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
+
 		public bool IsClosed { get; set; } // proto field 12
 
 		// LEGACY verbatim captured packet. The world-entry render no longer replays it - it CONSTRUCTS the object
@@ -28,9 +31,6 @@ namespace Faolan.Core.Database.Tables
 		[Obsolete("Legacy verbatim packet; the render builds from the typed columns + KdTreeTail (#187). Kept only as the import source + runtime loot-bag/fallback.")]
 		public byte[] Data { get; set; }
 
-		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
-
 		// The bytes AFTER the identity message: the kd-tree / collision / bounds geometry (FUN_0080c620), per-object
 		// but session-INDEPENDENT (static decor geometry). Stored so the world-entry build constructs the whole
 		// object from the DB - identity (columns above) + this tail - instead of slicing it from the raw Data packet
@@ -40,8 +40,10 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(128)]
 		public string DisplayName { get; set; } // proto field 3
+
 		[MaxLength(128)]
 		public string Name { get; set; }
+
 		public uint CapturedHandle { get; set; }
 		public uint CarsGroup { get; set; } // proto field 5
 

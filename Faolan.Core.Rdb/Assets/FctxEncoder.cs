@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 
 namespace Faolan.Core.Rdb.Assets
@@ -12,12 +13,6 @@ namespace Faolan.Core.Rdb.Assets
 	// output of Encode is ready to be IOz1+zlib-wrapped and inlined via RdbWriter.
 	public static class FctxEncoder
 	{
-		// Encode RGBA32 (row-major, top-down) as a full-mip FCTX DXT1 blob.
-		public static byte[] EncodeDxt1(byte[] rgba, int width, int height)
-		{
-			return Encode(rgba, width, height, "DXT1");
-		}
-
 		// Encode RGBA32 as a full-mip FCTX blob in `fourCc` (DXT1 = opaque colour, DXT5 = colour + alpha). Mip
 		// levels: full res down to 1×1, each dimension = max(1, dim >> level), box-downsampled from the previous.
 		public static byte[] Encode(byte[] rgba, int width, int height, string fourCc)
@@ -55,11 +50,19 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			for (var n = mipCount - 1; n >= 0; n--)
+			{
 				ms.Write(fourCc == "DXT5"
 					? BcEncoder.EncodeBc3(levels[n], dims[n].W, dims[n].H)
 					: BcEncoder.EncodeBc1(levels[n], dims[n].W, dims[n].H));
+			}
 
 			return ms.ToArray();
+		}
+
+		// Encode RGBA32 (row-major, top-down) as a full-mip FCTX DXT1 blob.
+		public static byte[] EncodeDxt1(byte[] rgba, int width, int height)
+		{
+			return Encode(rgba, width, height, "DXT1");
 		}
 
 		// Encode a MIXD container (#295 / #293): the body normal/detail texture. Layout mirrors what the client
@@ -107,49 +110,42 @@ namespace Faolan.Core.Rdb.Assets
 			return ms.ToArray();
 		}
 
+		// IOz1+zlib-wrap FCTX bytes into the raw on-disk blob a local RDB entry stores (what RdbWriter inlines).
+		public static byte[] WrapIOz1(byte[] content)
+		{
+			using var ms = new MemoryStream();
+			ms.Write(Encoding.ASCII.GetBytes("IOz1"));
+			WriteU32(ms, (uint)content.Length);
+			using (var zlib = new ZLibStream(ms, CompressionLevel.Optimal, true))
+				zlib.Write(content, 0, content.Length);
+			return ms.ToArray();
+		}
+
 		private static int BlockCount(int w, int h)
 		{
 			return Math.Max(1, (w + 3) / 4) * Math.Max(1, (h + 3) / 4);
 		}
 
-		private static (int W, int H)[] MipDims(int w, int h, int mipCount)
+		// Simple 2×2 box downsample (clamped for odd dimensions). Good enough for mip generation; the top mip is
+		// what's usually sampled and is authored at full quality by the caller (the upscaled image).
+		private static byte[] BoxDownsample(byte[] src, int sw, int sh, int dw, int dh)
 		{
-			var dims = new (int, int)[mipCount];
-			for (var n = 0; n < mipCount; n++)
-				dims[n] = (Math.Max(1, w >> n), Math.Max(1, h >> n));
-			return dims;
-		}
-
-		private static byte[][] BuildMipsRgba(byte[] rgba, int w, int h, int mipCount)
-		{
-			var levels = new byte[mipCount][];
-			levels[0] = rgba;
-			var (pw, ph) = (w, h);
-			for (var n = 1; n < mipCount; n++)
+			var dst = new byte[dw * dh * 4];
+			for (var y = 0; y < dh; y++)
+			for (var x = 0; x < dw; x++)
 			{
-				var nw = Math.Max(1, w >> n);
-				var nh = Math.Max(1, h >> n);
-				levels[n] = BoxDownsample(levels[n - 1], pw, ph, nw, nh);
-				(pw, ph) = (nw, nh);
+				var x0 = Math.Min(x * 2, sw - 1);
+				var x1 = Math.Min(x * 2 + 1, sw - 1);
+				var y0 = Math.Min(y * 2, sh - 1);
+				var y1 = Math.Min(y * 2 + 1, sh - 1);
+				for (var c = 0; c < 4; c++)
+				{
+					var sum = src[(y0 * sw + x0) * 4 + c] + src[(y0 * sw + x1) * 4 + c] + src[(y1 * sw + x0) * 4 + c] + src[(y1 * sw + x1) * 4 + c];
+					dst[(y * dw + x) * 4 + c] = (byte)(sum / 4);
+				}
 			}
 
-			return levels;
-		}
-
-		private static byte[][] BuildMipsChannel(byte[] channel, int w, int h, int mipCount)
-		{
-			var levels = new byte[mipCount][];
-			levels[0] = channel;
-			var (pw, ph) = (w, h);
-			for (var n = 1; n < mipCount; n++)
-			{
-				var nw = Math.Max(1, w >> n);
-				var nh = Math.Max(1, h >> n);
-				levels[n] = BoxDownsampleChannel(levels[n - 1], pw, ph, nw, nh);
-				(pw, ph) = (nw, nh);
-			}
-
-			return levels;
+			return dst;
 		}
 
 		private static byte[] BoxDownsampleChannel(byte[] src, int sw, int sh, int dw, int dh)
@@ -168,59 +164,65 @@ namespace Faolan.Core.Rdb.Assets
 			return dst;
 		}
 
-		// IOz1+zlib-wrap FCTX bytes into the raw on-disk blob a local RDB entry stores (what RdbWriter inlines).
-		public static byte[] WrapIOz1(byte[] content)
+		private static byte[][] BuildMipsChannel(byte[] channel, int w, int h, int mipCount)
 		{
-			using var ms = new MemoryStream();
-			ms.Write(Encoding.ASCII.GetBytes("IOz1"));
-			WriteU32(ms, (uint)content.Length);
-			using (var zlib = new System.IO.Compression.ZLibStream(ms, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
-				zlib.Write(content, 0, content.Length);
-			return ms.ToArray();
+			var levels = new byte[mipCount][];
+			levels[0] = channel;
+			var (pw, ph) = (w, h);
+			for (var n = 1; n < mipCount; n++)
+			{
+				var nw = Math.Max(1, w >> n);
+				var nh = Math.Max(1, h >> n);
+				levels[n] = BoxDownsampleChannel(levels[n - 1], pw, ph, nw, nh);
+				(pw, ph) = (nw, nh);
+			}
+
+			return levels;
+		}
+
+		private static byte[][] BuildMipsRgba(byte[] rgba, int w, int h, int mipCount)
+		{
+			var levels = new byte[mipCount][];
+			levels[0] = rgba;
+			var (pw, ph) = (w, h);
+			for (var n = 1; n < mipCount; n++)
+			{
+				var nw = Math.Max(1, w >> n);
+				var nh = Math.Max(1, h >> n);
+				levels[n] = BoxDownsample(levels[n - 1], pw, ph, nw, nh);
+				(pw, ph) = (nw, nh);
+			}
+
+			return levels;
 		}
 
 		private static int MipCount(int w, int h)
 		{
 			var n = 1;
-			while ((w >> n) > 0 || (h >> n) > 0)
+			while (w >> n > 0 || h >> n > 0)
 				n++;
 			return n;
 		}
 
-		// Simple 2×2 box downsample (clamped for odd dimensions). Good enough for mip generation; the top mip is
-		// what's usually sampled and is authored at full quality by the caller (the upscaled image).
-		private static byte[] BoxDownsample(byte[] src, int sw, int sh, int dw, int dh)
+		private static (int W, int H)[] MipDims(int w, int h, int mipCount)
 		{
-			var dst = new byte[dw * dh * 4];
-			for (var y = 0; y < dh; y++)
-			for (var x = 0; x < dw; x++)
-			{
-				var x0 = Math.Min(x * 2, sw - 1);
-				var x1 = Math.Min(x * 2 + 1, sw - 1);
-				var y0 = Math.Min(y * 2, sh - 1);
-				var y1 = Math.Min(y * 2 + 1, sh - 1);
-				for (var c = 0; c < 4; c++)
-				{
-					var sum = src[(y0 * sw + x0) * 4 + c] + src[(y0 * sw + x1) * 4 + c] +
-					          src[(y1 * sw + x0) * 4 + c] + src[(y1 * sw + x1) * 4 + c];
-					dst[(y * dw + x) * 4 + c] = (byte)(sum / 4);
-				}
-			}
-
-			return dst;
-		}
-
-		private static void WriteU32(Stream s, uint v)
-		{
-			Span<byte> b = stackalloc byte[4];
-			BinaryPrimitives.WriteUInt32LittleEndian(b, v);
-			s.Write(b);
+			var dims = new (int, int)[mipCount];
+			for (var n = 0; n < mipCount; n++)
+				dims[n] = (Math.Max(1, w >> n), Math.Max(1, h >> n));
+			return dims;
 		}
 
 		private static void WriteU16(Stream s, ushort v)
 		{
 			Span<byte> b = stackalloc byte[2];
 			BinaryPrimitives.WriteUInt16LittleEndian(b, v);
+			s.Write(b);
+		}
+
+		private static void WriteU32(Stream s, uint v)
+		{
+			Span<byte> b = stackalloc byte[4];
+			BinaryPrimitives.WriteUInt32LittleEndian(b, v);
 			s.Write(b);
 		}
 	}

@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -18,6 +18,9 @@ namespace Faolan.Core.Database.Tables
 		// so the snapshot's objective region builds from the DB instead of BeachTailsTemplate.bin (#186).
 		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = new List<QuestGoalDefinition>();
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
 
 		[MaxLength(128)]
 		public string IndexGoalSteps { get; set; }
@@ -38,9 +41,6 @@ namespace Faolan.Core.Database.Tables
 		public uint IndexTableField2 { get; set; }
 		public uint IndexTableField3 { get; set; }
 		public uint IndexTrailerWord { get; set; }
-
-		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
 
 		// The objective's world-marker (map id + x/y) shown on the map; 0 when the quest has no map marker.
 		public uint MapId { get; set; }

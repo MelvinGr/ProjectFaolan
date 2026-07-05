@@ -31,7 +31,7 @@ namespace Faolan.GameServer.Dialogue
 		// shape ChatText/Feedback use). [u32 field][u16 xmlLen][xml][u8 bool].
 		public static byte[] BuildAppendText(uint playerInstance, uint npcHandle, byte[] xml, uint field = 1, byte trailing = 1, byte env = 0x00)
 		{
-			var c = Header((uint)GameServer0X2000RespondsOpcodes.KnubotAppendTextIIR, playerInstance, npcHandle, env).WriteUInt32(field).WriteUInt16((ushort)xml.Length).WriteArray(xml).WriteByte(trailing);
+			var c = Header((uint)GameServer0X2000RespondsOpcodes.KnubotAppendTextIIR, playerInstance, npcHandle, env).WriteUInt32(field).WriteUInt16(xml.Length).WriteArray(xml).WriteByte(trailing);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 
@@ -49,9 +49,9 @@ namespace Faolan.GameServer.Dialogue
 
 		public static byte[] BuildStringList(uint subOpcode, uint playerInstance, uint npcHandle, IReadOnlyList<byte[]> strings, byte env = 0x00)
 		{
-			var c = Header(subOpcode, playerInstance, npcHandle, env).WriteUInt32((uint)strings.Count);
+			var c = Header(subOpcode, playerInstance, npcHandle, env).WriteUInt32(strings.Count);
 			foreach (var str in strings)
-				c.WriteUInt16((ushort)str.Length).WriteArray(str);
+				c.WriteUInt16(str.Length).WriteArray(str);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 

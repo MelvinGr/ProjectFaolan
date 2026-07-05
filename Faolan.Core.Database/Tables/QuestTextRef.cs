@@ -23,6 +23,7 @@ namespace Faolan.Core.Database.Tables
 		// the client validates it, a wrong key yields blank text.
 		[MaxLength(256)]
 		public string KeyText { get; set; }
+
 		public uint Category { get; set; }
 
 		public uint QuestDefinitionId { get; set; }

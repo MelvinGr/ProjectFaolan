@@ -19,6 +19,27 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// The framing count word for this list: (records + 1) * 0x3F1.
 		public uint CountWord => ((uint)Pairs.Count + 1) * Frame;
 
+		public uint? Get(uint statId)
+		{
+			foreach (var (id, value) in Pairs)
+			{
+				if (id == statId)
+					return value;
+			}
+
+			return null;
+		}
+
+		// Sets a stat's value (every occurrence of the id) - the character-derived override (Level/HP/XP/...).
+		public void Set(uint statId, uint value)
+		{
+			for (var i = 0; i < Pairs.Count; i++)
+			{
+				if (Pairs[i].Id == statId)
+					Pairs[i] = (statId, value);
+			}
+		}
+
 		public void Write(FaolanStream w)
 		{
 			w.WriteUInt32(CountWord);
@@ -36,22 +57,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 			for (var i = 0u; i < records; i++)
 				list.Pairs.Add((r.ReadUInt32(), r.ReadUInt32()));
 			return list;
-		}
-
-		// Sets a stat's value (every occurrence of the id) - the character-derived override (Level/HP/XP/...).
-		public void Set(uint statId, uint value)
-		{
-			for (var i = 0; i < Pairs.Count; i++)
-				if (Pairs[i].Id == statId)
-					Pairs[i] = (statId, value);
-		}
-
-		public uint? Get(uint statId)
-		{
-			foreach (var (id, value) in Pairs)
-				if (id == statId)
-					return value;
-			return null;
 		}
 	}
 }

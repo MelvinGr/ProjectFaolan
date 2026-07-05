@@ -26,45 +26,43 @@ namespace Faolan.GameServer.Combat
 	// performed by a directional key sequence (spellweaving / reactive procs); TryParse returns false for those.
 	public static class ComboActionParser
 	{
-		private static readonly Dictionary<string, ComboInput> Map = new(StringComparer.OrdinalIgnoreCase)
+		private static readonly Dictionary<string, ComboInput> Map = new Dictionary<string, ComboInput>(StringComparer.OrdinalIgnoreCase)
 		{
 			["UL"] = ComboInput.UpperLeft,
 			["CombatUpperLeft"] = ComboInput.UpperLeft,
 			["UpperLeft"] = ComboInput.UpperLeft,
 			["Up Left"] = ComboInput.UpperLeft,
 			["UpLeft"] = ComboInput.UpperLeft,
-
 			["UR"] = ComboInput.UpperRight,
 			["CombatUpperRight"] = ComboInput.UpperRight,
 			["UpperRight"] = ComboInput.UpperRight,
 			["Up Right"] = ComboInput.UpperRight,
 			["UpRight"] = ComboInput.UpperRight,
-
 			["LL"] = ComboInput.LowerLeft,
 			["CombatLowerLeft"] = ComboInput.LowerLeft,
 			["LowerLeft"] = ComboInput.LowerLeft,
 			["Lower Left"] = ComboInput.LowerLeft,
-
 			["LR"] = ComboInput.LowerRight,
 			["CombatLowerRight"] = ComboInput.LowerRight,
 			["LowerRight"] = ComboInput.LowerRight,
 			["Lower Right"] = ComboInput.LowerRight,
-
 			["UP"] = ComboInput.Up,
 			["Up"] = ComboInput.Up,
-
 			["Head"] = ComboInput.Head,
 			["CombatHead"] = ComboInput.Head,
-
 			["Thrust"] = ComboInput.Thrust,
 			["CombatThrust"] = ComboInput.Thrust
 		};
 
 		// Non-directional Action tokens: the combo is triggered by a mechanic other than a key sequence (a reactive
 		// proc, or a spellweaving magic combo), so it has no directional grammar to match.
-		private static readonly HashSet<string> NonDirectional = new(StringComparer.OrdinalIgnoreCase)
+		private static readonly HashSet<string> NonDirectional = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 		{
-			"action", "MagicCombo", "Magic_Reactive", "Melee_Reactive", "Combo_Reactive"
+			"action",
+			"MagicCombo",
+			"Magic_Reactive",
+			"Melee_Reactive",
+			"Combo_Reactive"
 		};
 
 		// Parses the comma-separated Actions into the ComboInput sequence. Returns false (and an empty list) when the

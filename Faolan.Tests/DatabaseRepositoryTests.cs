@@ -62,7 +62,11 @@ namespace Faolan.Tests
 						Data3 = 3,
 						Data4 = 4
 					});
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
 					await ctx.SaveChangesAsync();
 				}
 
@@ -178,7 +182,11 @@ namespace Faolan.Tests
 						Name = "Test",
 						IpAddress = "127.0.0.1"
 					});
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
 					await ctx.SaveChangesAsync();
 				}
 
@@ -455,7 +463,11 @@ namespace Faolan.Tests
 						Name = "Test",
 						IpAddress = "127.0.0.1"
 					});
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
 					await ctx.SaveChangesAsync();
 				}
 
@@ -588,7 +600,11 @@ namespace Faolan.Tests
 						Id = 2040,
 						Name = "Test Destination"
 					}); // Character.MapId is a FK; the transform target must exist
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" }); // CreateCharacter's default MapId
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					}); // CreateCharacter's default MapId
 					ctx.RespawnPoints.Add(new RespawnPoint
 					{
 						Id = 7,

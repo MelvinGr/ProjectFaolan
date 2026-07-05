@@ -17,25 +17,20 @@ namespace Faolan.GameServer.Combat
 
 	public static class SpellweaveCatalog
 	{
-		// Necromancer (NecroL80 capture): trance buffs 0x37F29800/0x37E5A800/0x3969D000; weave elements Arcane Renewal
-		// 0x396AE9, Arcane Surge 0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D; fire stages
-		// 0x398/0x39B/0x39A/0x39D.
-		private static readonly SpellweaveProfile Necromancer = new(
-			TranceBuffs: [0x37F29800, 0x37E5A800, 0x3969D000],
-			WeaveElements: [0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D],
-			FireStages: [0x398, 0x39B, 0x39A, 0x39D],
-			StackingBuffBase: 0x37E5A8); // Spellweaving(1); refreshes 37e5a8 -> 37e5a9 -> 37e5aa each reappear
+		private static readonly SpellweaveProfile
+			Necromancer = new SpellweaveProfile([0x37F29800, 0x37E5A800, 0x3969D000],
+				[0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D],
+				[0x398, 0x39B, 0x39A, 0x39D],
+				0x37E5A8); // Spellweaving(1); refreshes 37e5a8 -> 37e5a9 -> 37e5aa each reappear
 
-		private static readonly Dictionary<Class, SpellweaveProfile> Profiles = new()
+		private static readonly Dictionary<Class, SpellweaveProfile> Profiles = new Dictionary<Class, SpellweaveProfile>
 		{
 			[Class.Necromancer] = Necromancer
 			// TODO: Demonologist / PriestOfMitra / TempestOfSet - need per-class spellweaving captures.
 		};
-
-		public static SpellweaveProfile ForClass(Class characterClass)
-		{
-			return Profiles.GetValueOrDefault(characterClass);
-		}
+		// Necromancer (NecroL80 capture): trance buffs 0x37F29800/0x37E5A800/0x3969D000; weave elements Arcane Renewal
+		// 0x396AE9, Arcane Surge 0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D; fire stages
+		// 0x398/0x39B/0x39A/0x39D.
 
 		// The universal ENERGY (yellow sprint-bar) max by class. Capture-derived: necro 8910, assassin 13984. Casters
 		// have the lower pool; everyone else the higher one (approximate until per-class energy captures land).
@@ -44,8 +39,13 @@ namespace Faolan.GameServer.Combat
 			return characterClass switch
 			{
 				Class.Necromancer or Class.Demonologist or Class.PriestOfMitra or Class.TempestOfSet => 8910,
-				_ => 13984
+				_                                                                                    => 13984
 			};
+		}
+
+		public static SpellweaveProfile ForClass(Class characterClass)
+		{
+			return Profiles.GetValueOrDefault(characterClass);
 		}
 	}
 }

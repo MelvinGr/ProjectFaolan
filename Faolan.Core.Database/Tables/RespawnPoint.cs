@@ -16,6 +16,7 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(128)]
 		public string Name { get; set; }
+
 		public uint MapId { get; set; }
 	}
 }

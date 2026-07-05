@@ -17,21 +17,21 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(NpcId))]
 		public virtual Npc Npc { get; set; }
 
-		// Decoded ApplySpell effect fields (payload @10 / @29 / @45 / @13 / @17 / @33). The effect spell id (@23) is the
-		// same as SpellId, and the @50 per-cast counter is session state (not stored) - both fall out of the builder.
-		public ushort Duration { get; set; }
-		public byte Magnitude { get; set; }
-		public byte Rank { get; set; }
-
 		public byte FlagA { get; set; }
 		public byte FlagB { get; set; }
 		public byte FlagC { get; set; }
-
-		// The full wire spell id the NPC casts: (rdbBase << 8) | rank. The client resolves the visual/effect from it.
-		public uint SpellId { get; set; }
+		public byte Magnitude { get; set; }
+		public byte Rank { get; set; }
 
 		// The NPC TYPE that casts this spell (#244, contract step done): the loader reads spells via this FK
 		// (Npc.Spells), so a spell whose caster has no Npc type isn't stored. Resolved from the caster name at import.
 		public uint NpcId { get; set; }
+
+		// The full wire spell id the NPC casts: (rdbBase << 8) | rank. The client resolves the visual/effect from it.
+		public uint SpellId { get; set; }
+
+		// Decoded ApplySpell effect fields (payload @10 / @29 / @45 / @13 / @17 / @33). The effect spell id (@23) is the
+		// same as SpellId, and the @50 per-cast counter is session state (not stored) - both fall out of the builder.
+		public ushort Duration { get; set; }
 	}
 }

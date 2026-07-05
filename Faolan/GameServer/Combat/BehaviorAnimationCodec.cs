@@ -15,99 +15,87 @@ namespace Faolan.GameServer.Combat
 	// and trailer are behavior-specific.
 	public static class BehaviorAnimationCodec
 	{
-		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
-		private const uint Bcc = (uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR;
-
 		public const ushort SeqBegin = 0x0004;
 		public const ushort SeqComplete = 0x000A;
-
-		// The shared BCC framing primitive: header + behaviorId + length-prefixed args + the behavior-specific trailer.
-		private static byte[] Build(uint actor, ushort seq, uint behaviorId, byte[] args, byte[] trailer)
-		{
-			return new FaolanStream()
-				.WriteUInt32(Bcc)
-				.WriteUInt32(Type)
-				.WriteUInt32(actor)
-				.WriteUInt16(seq)
-				.WriteUInt32(behaviorId)
-				.WriteUInt32(args.Length)
-				.WriteArray(args)
-				.WriteArray(trailer)
-				.ToArray();
-		}
-
-		// The caster's TRANCE-POSE animation on spellweave ACTIVATE (Captures/decode_spellweave.py frame 1645):
-		// behaviorId 1, args {f1=TranceAction, f3=4, f5=8, f6=0, f11=1199}, trailer [0x27][1][0][0][0]. Without it the
-		// trance buffs render but the character stays idle. Action params are capture-derived (necro).
-		private const uint SpellweaveTranceAction = 42041;
-
-		public static byte[] SpellweaveTrance(uint caster)
-		{
-			var args = new FaolanStream()
-				.WriteByte(0x08).WriteVarint(SpellweaveTranceAction)
-				.WriteByte(0x18).WriteVarint(4)
-				.WriteByte(0x28).WriteVarint(8)
-				.WriteByte(0x30).WriteVarint(0)
-				.WriteByte(0x58).WriteVarint(1199)
-				.ToArray();
-
-			var trailer = new FaolanStream()
-				.WriteUInt32(0x27).WriteUInt32(1).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
-				.ToArray();
-
-			return Build(caster, SeqBegin, behaviorId: 1, args, trailer);
-		}
-
-		// The caster's trance-EXIT animation on spellweave cancel/fire (cancel-weave capture, frame 141.61): behaviorId
-		// 1, args {f1=ExitAction, f3=6, f5=8, f6=0, f11=79}, trailer [4][0x27][0][0][0]. Without it the buffs clear but
-		// the character stays stuck in the trance pose. Action params are capture-derived (necro).
-		private const uint SpellweaveExitAction = 41302;
-
-		public static byte[] SpellweaveTranceExit(uint caster)
-		{
-			var args = new FaolanStream()
-				.WriteByte(0x08).WriteVarint(SpellweaveExitAction)
-				.WriteByte(0x18).WriteVarint(6)
-				.WriteByte(0x28).WriteVarint(8)
-				.WriteByte(0x30).WriteVarint(0)
-				.WriteByte(0x58).WriteVarint(79)
-				.ToArray();
-
-			var trailer = new FaolanStream()
-				.WriteUInt32(4).WriteUInt32(0x27).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
-				.ToArray();
-
-			return Build(caster, SeqBegin, behaviorId: 1, args, trailer);
-		}
+		private const uint Bcc = (uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR;
 
 		// The caster's component-ADD gesture on each weave add - a begin/complete pair carrying the added element
 		// (frames 1657/1658): behaviorId 4, args {f1=AddAction, f3=5, f5=8, f6=0, f10=SpellTarget{f1=0xC350, f2=caster}},
 		// trailer [1][element][0x01][0][0][0][completeFlag].
 		private const uint SpellweaveAddAction = 186463;
 
+		// The caster's trance-EXIT animation on spellweave cancel/fire (cancel-weave capture, frame 141.61): behaviorId
+		// 1, args {f1=ExitAction, f3=6, f5=8, f6=0, f11=79}, trailer [4][0x27][0][0][0]. Without it the buffs clear but
+		// the character stays stuck in the trance pose. Action params are capture-derived (necro).
+		private const uint SpellweaveExitAction = 41302;
+
+		// The caster's TRANCE-POSE animation on spellweave ACTIVATE (Captures/decode_spellweave.py frame 1645):
+		// behaviorId 1, args {f1=TranceAction, f3=4, f5=8, f6=0, f11=1199}, trailer [0x27][1][0][0][0]. Without it the
+		// trance buffs render but the character stays idle. Action params are capture-derived (necro).
+		private const uint SpellweaveTranceAction = 42041;
+		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
+
 		public static byte[] SpellweaveComponentAdd(uint caster, uint elementBaseId, bool complete)
 		{
-			var spellTarget = new FaolanStream()
-				.WriteByte(0x08).WriteVarint(Type)
-				.WriteByte(0x10).WriteVarint(caster)
-				.ToArray();
+			var spellTarget = new FaolanStream().WriteByte(0x08).WriteVarint(Type).WriteByte(0x10).WriteVarint(caster).ToArray();
 			var args = new FaolanStream()
-				.WriteByte(0x08).WriteVarint(SpellweaveAddAction)
-				.WriteByte(0x18).WriteVarint(5)
-				.WriteByte(0x28).WriteVarint(8)
-				.WriteByte(0x30).WriteVarint(0)
-				.WriteByte(0x52).WriteVarint((ulong)spellTarget.Length).WriteArray(spellTarget)
+				.WriteByte(0x08)
+				.WriteVarint(SpellweaveAddAction)
+				.WriteByte(0x18)
+				.WriteVarint(5)
+				.WriteByte(0x28)
+				.WriteVarint(8)
+				.WriteByte(0x30)
+				.WriteVarint(0)
+				.WriteByte(0x52)
+				.WriteVarint((ulong)spellTarget.Length)
+				.WriteArray(spellTarget)
 				.ToArray();
 
-			var trailer = new FaolanStream()
-				.WriteUInt32(1)
-				.WriteUInt32(elementBaseId)
-				.WriteByte(0x01)
-				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
-				.WriteByte(complete)
+			var trailer = new FaolanStream().WriteUInt32(1).WriteUInt32(elementBaseId).WriteByte(0x01).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).WriteByte(complete).ToArray();
+
+			return Build(caster,
+				complete
+					? SeqComplete
+					: SeqBegin,
+				4,
+				args,
+				trailer);
+		}
+
+		public static byte[] SpellweaveTrance(uint caster)
+		{
+			var args = new FaolanStream()
+				.WriteByte(0x08)
+				.WriteVarint(SpellweaveTranceAction)
+				.WriteByte(0x18)
+				.WriteVarint(4)
+				.WriteByte(0x28)
+				.WriteVarint(8)
+				.WriteByte(0x30)
+				.WriteVarint(0)
+				.WriteByte(0x58)
+				.WriteVarint(1199)
 				.ToArray();
 
-			return Build(caster, complete ? SeqComplete : SeqBegin, behaviorId: 4, args, trailer);
+			var trailer = new FaolanStream().WriteUInt32(0x27).WriteUInt32(1).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).ToArray();
+
+			return Build(caster, SeqBegin, 1, args, trailer);
+		}
+
+		public static byte[] SpellweaveTranceExit(uint caster)
+		{
+			var args = new FaolanStream().WriteByte(0x08).WriteVarint(SpellweaveExitAction).WriteByte(0x18).WriteVarint(6).WriteByte(0x28).WriteVarint(8).WriteByte(0x30).WriteVarint(0).WriteByte(0x58).WriteVarint(79).ToArray();
+
+			var trailer = new FaolanStream().WriteUInt32(4).WriteUInt32(0x27).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).ToArray();
+
+			return Build(caster, SeqBegin, 1, args, trailer);
+		}
+
+		// The shared BCC framing primitive: header + behaviorId + length-prefixed args + the behavior-specific trailer.
+		private static byte[] Build(uint actor, ushort seq, uint behaviorId, byte[] args, byte[] trailer)
+		{
+			return new FaolanStream().WriteUInt32(Bcc).WriteUInt32(Type).WriteUInt32(actor).WriteUInt16(seq).WriteUInt32(behaviorId).WriteUInt32(args.Length).WriteArray(args).WriteArray(trailer).ToArray();
 		}
 	}
 }

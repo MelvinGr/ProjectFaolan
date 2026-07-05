@@ -31,18 +31,6 @@ namespace Faolan.Tests
 			"f508f4c10000c35001316e7100000007e20000cf0d000000000000000400000000000000010000000000000001000000090000000000";
 
 		[Fact]
-		public void Parse_DecodesTheHeaderFields()
-		{
-			var p = GameActionListCodec.Parse(Convert.FromHexString(EmoteBody));
-
-			Assert.Equal(0x00017E03u, p.FrameHandle);
-			Assert.Equal(0x0000D014u, p.DynelHandle);
-			Assert.Equal(0u, p.Field3);
-			// the action tail carries the emote string verbatim (still-opaque grammar)
-			Assert.Contains("idle2_emote", Encoding.ASCII.GetString(p.ActionTail));
-		}
-
-		[Fact]
 		public void Parse_DecodesTheCreateEditorTemplateChoiceRecord()
 		{
 			var p = GameActionListCodec.Parse(Convert.FromHexString(TemplateChoiceBodyA));
@@ -54,9 +42,19 @@ namespace Faolan.Tests
 			Assert.Contains("StygianSlaver=50000:655254", Encoding.ASCII.GetString(p.ActionTail));
 		}
 
-		[Theory]
-		[InlineData(EmoteBody), InlineData(NumericBody)]
-		[InlineData(TemplateChoiceBodyA), InlineData(TemplateChoiceBodyB), InlineData(WorldEntryBody)]
+		[Fact]
+		public void Parse_DecodesTheHeaderFields()
+		{
+			var p = GameActionListCodec.Parse(Convert.FromHexString(EmoteBody));
+
+			Assert.Equal(0x00017E03u, p.FrameHandle);
+			Assert.Equal(0x0000D014u, p.DynelHandle);
+			Assert.Equal(0u, p.Field3);
+			// the action tail carries the emote string verbatim (still-opaque grammar)
+			Assert.Contains("idle2_emote", Encoding.ASCII.GetString(p.ActionTail));
+		}
+
+		[Theory, InlineData(EmoteBody), InlineData(NumericBody), InlineData(TemplateChoiceBodyA), InlineData(TemplateChoiceBodyB), InlineData(WorldEntryBody)]
 		public void Parse_ThenBuild_RoundTripsByteExact(string hex)
 		{
 			var body = Convert.FromHexString(hex);

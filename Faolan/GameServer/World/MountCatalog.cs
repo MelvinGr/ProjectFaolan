@@ -23,6 +23,17 @@ namespace Faolan.GameServer.World
 	// CaptureMountImporter and rendered via the normal NPC-spawn path (SpawnMountForPlayer).
 	public static class MountCatalog
 	{
+		// The summon CHANNEL: retail casts the summon spell, then applies the ride buff ~545ms later (mount capture
+		// SummonMount frame 498 -> ride buff frame 520 = 0.545s), during which the client plays the horse-runs-up
+		// animation. Applying the ride buff instantly (as we did) mounts with NO visible run-up. (The DB spell 0x3BAD7D
+		// is mislabelled "Stagger" with CastTime 0, so this comes from the capture, not the Spell row.)
+		public const int SummonChannelMs = 545;
+
+		// The DISMOUNT: the ride buff's end twin (rank 01, empty payload) - removes the mounted state. Pressing the
+		// mount button while mounted toggles it; retail runs the SAME channel (cast bar + horse-runs-away animation)
+		// then applies this end-twin + a StatUpd clearing the mount stat (0xBA=0). Mount-dismount capture frame 1449.
+		public const uint DismountSpell = 0x31EB1501u;
+
 		// The captured mount-summon spell (channelled ApplySpell 0x6B87E316 / spell 0x3BAD7D). Both fading-horse
 		// variants use it; the swift variant's own id is not separately captured, so it shares this summon.
 		public const uint FadingHorseSummonSpell = 0x3BAD7Du;
@@ -33,20 +44,6 @@ namespace Faolan.GameServer.World
 		// spawns the horse but never seats the player (proven in-client 2026-06-17).
 		public const uint RideSpell = 0x31EB1500u;
 
-		// The DISMOUNT: the ride buff's end twin (rank 01, empty payload) - removes the mounted state. Pressing the
-		// mount button while mounted toggles it; retail runs the SAME channel (cast bar + horse-runs-away animation)
-		// then applies this end-twin + a StatUpd clearing the mount stat (0xBA=0). Mount-dismount capture frame 1449.
-		public const uint DismountSpell = 0x31EB1501u;
-
-		// The summon CHANNEL: retail casts the summon spell, then applies the ride buff ~545ms later (mount capture
-		// SummonMount frame 498 -> ride buff frame 520 = 0.545s), during which the client plays the horse-runs-up
-		// animation. Applying the ride buff instantly (as we did) mounts with NO visible run-up. (The DB spell 0x3BAD7D
-		// is mislabelled "Stagger" with CastTime 0, so this comes from the capture, not the Spell row.)
-		public const int SummonChannelMs = 545;
-
-		// Frame 520's 54-byte ride-buff payload, verbatim (capture truth): +8 u32 BE = duration 8_640_000 cs = 24 h,
-		// the spell base 0x31EB15 rides at +23, and the trailing u32 is the per-cast counter (the only field #221
-		// observed differing between apply instances).
 		private static readonly byte[] RideBuffPayloadBytes =
 		[
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x83, 0xD6, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -54,21 +51,19 @@ namespace Faolan.GameServer.World
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x15, 0x60, 0xF9, 0xBB
 		];
 
-		// A fresh copy per cast (ApplySpell treats caller-supplied data as replayed content; keep the captured
-		// original immutable).
-		public static byte[] RideBuffPayload()
-		{
-			return (byte[])RideBuffPayloadBytes.Clone();
-		}
-
 		public static readonly IReadOnlyList<MountDef> All =
 		[
-			new MountDef(0x3E34F1u, "Fading Black Horse", FadingHorseSummonSpell, RideStat: 0x00313C9Bu),
-			new MountDef(0x3E34F2u, "Swift Fading Black Horse", FadingHorseSummonSpell, RideStat: 0x00313C9Bu)
+			new MountDef(0x3E34F1u, "Fading Black Horse", FadingHorseSummonSpell, 0x00313C9Bu),
+			new MountDef(0x3E34F2u, "Swift Fading Black Horse", FadingHorseSummonSpell, 0x00313C9Bu)
 		];
 
 		// The default mount the GM `.mount` command summons when given no argument (the in-client-observed Tortage mount).
 		public static MountDef Default => All[0];
+
+		// Frame 520's 54-byte ride-buff payload, verbatim (capture truth): +8 u32 BE = duration 8_640_000 cs = 24 h,
+		// the spell base 0x31EB15 rides at +23, and the trailing u32 is the per-cast counter (the only field #221
+		// observed differing between apply instances).
+
 		private static readonly Dictionary<uint, MountDef> ById = BuildById();
 		private static readonly Dictionary<string, MountDef> ByName = BuildByName();
 
@@ -82,6 +77,13 @@ namespace Faolan.GameServer.World
 			return name != null && ByName.TryGetValue(name.ToLowerInvariant(), out var m)
 				? m
 				: null;
+		}
+
+		// A fresh copy per cast (ApplySpell treats caller-supplied data as replayed content; keep the captured
+		// original immutable).
+		public static byte[] RideBuffPayload()
+		{
+			return (byte[])RideBuffPayloadBytes.Clone();
 		}
 
 		private static Dictionary<uint, MountDef> BuildById()

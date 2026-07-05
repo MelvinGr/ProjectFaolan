@@ -14,6 +14,7 @@ namespace Faolan.Core.Database.Tables
 
 		[ConstrainToEnumValues]
 		public AccountState State { get; set; }
+
 		[ConstrainToEnumValues]
 		public AccountType Type { get; set; }
 

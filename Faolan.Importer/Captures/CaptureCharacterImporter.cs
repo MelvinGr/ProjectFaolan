@@ -281,10 +281,7 @@ namespace Faolan.Importer.Captures
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
 
 			// Worn equipment: every IIR InventoryEntry whose template is a DB item.
-			var equipment = new CharacterEquipment
-			{
-				CharacterId = character.Id
-			};
+			var equipment = new CharacterEquipment { CharacterId = character.Id };
 			var worn = 0;
 			foreach (var entry in message.InventoryEntries)
 			{
@@ -514,8 +511,10 @@ namespace Faolan.Importer.Captures
 		{
 			KnownSpellList known = null;
 			foreach (var body in snapshotBodies.OrderByDescending(b => b.Length))
+			{
 				if (KnownSpellList.TryExtractFromSnapshot(body, out known))
 					break;
+			}
 
 			if (known == null)
 				return 0;
@@ -564,6 +563,7 @@ namespace Faolan.Importer.Captures
 			}
 
 			for (var i = 0; i < pairs.Count; i++)
+			{
 				db.CharacterStats.Add(new CharacterStat
 				{
 					CharacterId = characterId,
@@ -571,6 +571,7 @@ namespace Faolan.Importer.Captures
 					StatId = (CharacterStatId)pairs[i].Id,
 					Value = pairs[i].Value
 				});
+			}
 
 			await db.SaveChangesAsync();
 			return pairs.Count;

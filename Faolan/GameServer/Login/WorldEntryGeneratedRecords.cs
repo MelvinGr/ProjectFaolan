@@ -49,7 +49,9 @@ namespace Faolan.GameServer
 		internal static byte[] BuildMapChange(INetworkClient client, Map map, uint playfieldToken)
 		{
 			var character = client.Session.Character;
-			var charInstance = (map?.PlayfieldInstanced ?? true) ? client.Session.Account.ClientInstance : 0u;
+			var charInstance = map?.PlayfieldInstanced ?? true
+				? client.Session.Account.ClientInstance
+				: 0u;
 			var count = map?.PlayfieldCount ?? 2u;
 			var fieldB = map?.PlayfieldFieldB ?? 3u;
 			var flags = map?.PlayfieldFlags ?? 0u;
@@ -60,11 +62,18 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.MapChange);
-					s.WriteArray(CreateEditorRecordBuilder.BuildPlayfieldFiir(
-						character.PositionX, character.PositionY, character.PositionZ,
-						character.MapId, charInstance, count, playfieldToken,
-						nearClip: 15.0f, farClip: BitConverter.UInt32BitsToSingle(0x40E3944Fu),
-						flags: flags, field58: 0x01000000u, fieldB: fieldB));
+					s.WriteArray(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX,
+						character.PositionY,
+						character.PositionZ,
+						character.MapId,
+						charInstance,
+						count,
+						playfieldToken,
+						15.0f,
+						BitConverter.UInt32BitsToSingle(0x40E3944Fu),
+						flags,
+						0x01000000u,
+						fieldB));
 				});
 			return ps.WriteLengthHash().ToArray();
 		}

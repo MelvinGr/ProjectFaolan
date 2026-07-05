@@ -41,18 +41,18 @@ namespace Faolan.GameServer.FullCharSnapshot
 			w.WriteUInt32(Marker);
 			foreach (var id in QuestIds)
 				w.WriteUInt32(id);
-			w.WriteUInt32((uint)QuestIds.Count);
+			w.WriteUInt32(QuestIds.Count);
 			w.WriteUInt32(Sentinel);
 
 			w.WriteUInt32(TableMagic);
 			w.WriteUInt32(TableField1);
 			w.WriteUInt32(TableField2);
 			w.WriteUInt32(TableField3);
-			w.WriteUInt32((uint)GoalIds.Count);
+			w.WriteUInt32(GoalIds.Count);
 			for (var i = 0; i < GoalIds.Count; i++)
 			{
 				w.WriteUInt32(GoalIds[i]);
-				w.WriteUInt32((uint)(i + 1));
+				w.WriteUInt32(i + 1);
 			}
 
 			w.WriteArray(Trailer);

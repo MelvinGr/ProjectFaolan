@@ -27,7 +27,11 @@ Console.WriteLine($"Faolan test client -> {opt.Host}:{opt.Port}  user={opt.User}
 
 // The client picks its own conversation-id endpoint; the server echoes it back as the receiver on every reply.
 var clientEndpoint = ConanEndpoints.EndpointBytes(0x00000001, 1);
-byte[] Server(uint type) => ConanEndpoints.EndpointBytes(type, 1);
+
+byte[] Server(uint type)
+{
+	return ConanEndpoints.EndpointBytes(type, 1);
+}
 
 var timeout = TimeSpan.FromSeconds(10);
 
@@ -46,11 +50,13 @@ using var universe = new ProtocolConnection();
 await universe.ConnectAsync(opt.Host, opt.Port);
 Console.WriteLine("[universe] connected");
 
-await universe.SendAsync(Build(Server(0x60dba0), UniverseAgentOpcodes.InitiateAuthentication, p =>
-{
-	p.WriteString(opt.User);
-	p.WriteUInt32(0);
-}));
+await universe.SendAsync(Build(Server(0x60dba0),
+	UniverseAgentOpcodes.InitiateAuthentication,
+	p =>
+	{
+		p.WriteString(opt.User);
+		p.WriteUInt32(0);
+	}));
 Console.WriteLine("[universe] -> InitiateAuthentication");
 
 var challengePacket = await universe.ReadUntilAsync((ushort)UniverseAgentResponseOpcodes.DispatchChallenge, timeout, Log);
@@ -84,12 +90,14 @@ using var player = new ProtocolConnection();
 await player.ConnectAsync(paHost, paPort);
 Console.WriteLine($"[player] connected -> {paHost}:{paPort}");
 
-await player.SendAsync(Build(Server(0x8204), PlayerAgentOpcodes.RequestAuth, p =>
-{
-	p.WriteUInt32(accountId);
-	p.WriteUInt32(0);          // cookie (unused for the account lookup)
-	p.WriteUInt32(authStatus);
-}));
+await player.SendAsync(Build(Server(0x8204),
+	PlayerAgentOpcodes.RequestAuth,
+	p =>
+	{
+		p.WriteUInt32(accountId);
+		p.WriteUInt32(0); // cookie (unused for the account lookup)
+		p.WriteUInt32(authStatus);
+	}));
 Console.WriteLine("[player] -> RequestAuth");
 
 await player.ReadUntilAsync((ushort)PlayerAgentResponseOpcodes.InitAuth, timeout, Log);
@@ -107,20 +115,22 @@ Console.WriteLine($"[player] <- SmallCharList  ({count} character id(s))");
 
 // Ask for the full realm data by echoing the ids+challenges back; the server replies with the full character
 // list (names, level, class/race/sex, map) - the actual character-select screen content.
-await player.SendAsync(Build(Server(0x8204), PlayerAgentOpcodes.RequestCharRealmData, p =>
-{
-	p.WriteUInt32((uint)((roster.Count + 1) * 1009));
-	foreach (var (id, challenge) in roster)
+await player.SendAsync(Build(Server(0x8204),
+	PlayerAgentOpcodes.RequestCharRealmData,
+	p =>
 	{
-		p.WriteUInt32(id);
-		p.WriteString(challenge);
-	}
-}));
+		p.WriteUInt32((roster.Count + 1) * 1009);
+		foreach (var (id, challenge) in roster)
+		{
+			p.WriteUInt32(id);
+			p.WriteString(challenge);
+		}
+	}));
 Console.WriteLine("[player] -> RequestCharRealmData");
 
 var full = await player.ReadUntilAsync((ushort)PlayerAgentResponseOpcodes.SendCharacterList, timeout, Log);
 var b = full.Body;
-b.ReadUInt32();                          // ClientInstance
+b.ReadUInt32(); // ClientInstance
 var fullCount = b.ReadUInt32() / 1009 - 1;
 var characters = new List<(uint Id, string Name)>();
 Console.WriteLine();
@@ -128,24 +138,27 @@ Console.WriteLine($"===== CHARACTER SELECT — {fullCount} character(s) =====");
 for (var i = 0; i < fullCount; i++)
 {
 	var id = b.ReadUInt32();
-	b.ReadUInt32();                      // PlayerInstance
-	b.ReadUInt32();                      // id (repeat)
+	b.ReadUInt32(); // PlayerInstance
+	b.ReadUInt32(); // id (repeat)
 	var name = b.ReadString();
 	var realmId = b.ReadUInt32();
 	var sex = (Sex)(byte)b.ReadUInt32();
 	var lastConn = b.ReadString();
-	b.ReadUInt32();                      // 0
+	b.ReadUInt32(); // 0
 	var mapId = b.ReadUInt32();
 	var level = b.ReadUInt32();
 	var cls = (Class)(byte)b.ReadUInt32();
-	b.ReadUInt32(); b.ReadUInt32();      // 0, 0
-	b.ReadUInt32();                      // 0x60355308
-	b.ReadUInt32();                      // 2
+	b.ReadUInt32();
+	b.ReadUInt32(); // 0, 0
+	b.ReadUInt32(); // 0x60355308
+	b.ReadUInt32(); // 2
 	var race = (Race)(byte)b.ReadUInt32();
-	b.ReadString();                      // language
-	b.ReadUInt32(); b.ReadUInt32();      // 0, 0
-	b.ReadString();                      // per-char auth challenge
-	b.ReadUInt32(); b.ReadUInt32();      // 0, 1
+	b.ReadString(); // language
+	b.ReadUInt32();
+	b.ReadUInt32(); // 0, 0
+	b.ReadString(); // per-char auth challenge
+	b.ReadUInt32();
+	b.ReadUInt32(); // 0, 1
 	characters.Add((id, name));
 	Console.WriteLine($"  [{i}] \"{name}\"  L{level} {cls} · {race} · {sex}  map={mapId} realm={realmId}  id=0x{id:X8}  last={lastConn}");
 }
@@ -161,13 +174,19 @@ var target = characters[Math.Clamp(opt.CharIndex, 0, characters.Count - 1)];
 Console.WriteLine();
 Console.WriteLine($"Entering world as \"{target.Name}\" (0x{target.Id:X8})...");
 
-await player.SendAsync(Build(Server(0x8204), PlayerAgentOpcodes.EnterWorld, p =>
-{
-	p.WriteUInt32(target.Id);            // characterId (the only field the server uses)
-	p.WriteUInt32(0); p.WriteUInt32(0); p.WriteUInt32(0);
-	p.WriteByte(0);
-	p.WriteUInt32(0); p.WriteUInt32(0); p.WriteUInt32(0);
-}));
+await player.SendAsync(Build(Server(0x8204),
+	PlayerAgentOpcodes.EnterWorld,
+	p =>
+	{
+		p.WriteUInt32(target.Id); // characterId (the only field the server uses)
+		p.WriteUInt32(0);
+		p.WriteUInt32(0);
+		p.WriteUInt32(0);
+		p.WriteByte(0);
+		p.WriteUInt32(0);
+		p.WriteUInt32(0);
+		p.WriteUInt32(0);
+	}));
 Console.WriteLine("[player] -> EnterWorld");
 await player.ReadUntilAsync((ushort)PlayerAgentResponseOpcodes.Ox20B9, timeout, Log);
 Console.WriteLine("[player] <- Ox20B9");
@@ -184,13 +203,17 @@ while (gameServerAddr == null && DateTime.UtcNow < handoffDeadline)
 	var p = await player.ReadAsync(handoffDeadline - DateTime.UtcNow);
 	if (p.Opcode != (ushort)PlayerAgentResponseOpcodes.Ox1A07)
 		continue;
+
 	try
 	{
 		var s = p.Body.ReadString();
 		if (s.Contains(':') && s[(s.LastIndexOf(':') + 1)..].All(char.IsDigit))
 			gameServerAddr = s;
 	}
-	catch { /* not the string-bodied GameServer handoff */ }
+	catch
+	{
+		/* not the string-bodied GameServer handoff */
+	}
 }
 
 if (gameServerAddr == null)
@@ -208,12 +231,14 @@ await game.ConnectAsync(gsHost, gsPort);
 Console.WriteLine($"[game] connected -> {gsHost}:{gsPort}");
 
 // Existing-character login: the server sends the full world-entry burst straight after Hello.
-await game.SendAsync(Build(Server(0x8204), GameServerOpcodes.Hello, p =>
-{
-	p.WriteUInt32(target.Id);            // clientInstance = character id
-	p.WriteUInt32(accountId);
-	p.WriteString("v4.00.NoTS@369764");
-}));
+await game.SendAsync(Build(Server(0x8204),
+	GameServerOpcodes.Hello,
+	p =>
+	{
+		p.WriteUInt32(target.Id); // clientInstance = character id
+		p.WriteUInt32(accountId);
+		p.WriteString("v4.00.NoTS@369764");
+	}));
 Console.WriteLine("[game] -> Hello");
 Console.WriteLine();
 Console.WriteLine("===== WORLD-ENTRY BURST =====");
@@ -223,9 +248,18 @@ var pktCount = 0;
 while (true)
 {
 	ConanPacket p;
-	try { p = await game.ReadAsync(idle); }
-	catch (TimeoutException) { break; }
-	catch (IOException) { break; }
+	try
+	{
+		p = await game.ReadAsync(idle);
+	}
+	catch (TimeoutException)
+	{
+		break;
+	}
+	catch (IOException)
+	{
+		break;
+	}
 
 	pktCount++;
 	if (p.Opcode == 0x2000 && TryDecodeSnapshot(p))
@@ -271,38 +305,55 @@ static bool TryDecodeSnapshot(ConanPacket packet)
 	}
 }
 
-static void Log(ConanPacket p) => Console.WriteLine($"      (skipped 0x{p.Opcode:X4}, {p.Body.Length} body bytes)");
+static void Log(ConanPacket p)
+{
+	Console.WriteLine($"      (skipped 0x{p.Opcode:X4}, {p.Body.Length} body bytes)");
+}
 
 static (string Host, int Port) SplitAddr(string addr, string fallbackHost)
 {
 	var i = addr.LastIndexOf(':');
-	return i > 0 ? (addr[..i], int.Parse(addr[(i + 1)..])) : (fallbackHost, 7011);
+	return i > 0
+		? (addr[..i], int.Parse(addr[(i + 1)..]))
+		: (fallbackHost, 7011);
 }
 
 static Options ParseArgs(string[] a)
 {
 	var o = new Options();
 	for (var i = 0; i < a.Length; i++)
+	{
 		switch (a[i])
 		{
-			case "--host": o.Host = a[++i]; break;
-			case "--port": o.Port = int.Parse(a[++i]); break;
-			case "--user": o.User = a[++i]; break;
-			case "--pass": o.Pass = a[++i]; break;
-			case "--char": o.CharIndex = int.Parse(a[++i]); break;
+			case "--host":
+				o.Host = a[++i];
+				break;
+			case "--port":
+				o.Port = int.Parse(a[++i]);
+				break;
+			case "--user":
+				o.User = a[++i];
+				break;
+			case "--pass":
+				o.Pass = a[++i];
+				break;
+			case "--char":
+				o.CharIndex = int.Parse(a[++i]);
+				break;
 		}
+	}
 
 	return o;
 }
 
 namespace Faolan.TestClient
 {
-	sealed class Options
+	internal sealed class Options
 	{
-		public string Host = "127.0.0.1";
-		public int Port = 7010;
-		public string User = "faolan";
-		public string Pass = "";
 		public int CharIndex;
+		public int Port = 7010;
+		public string Host = "127.0.0.1";
+		public string Pass = "";
+		public string User = "faolan";
 	}
 }

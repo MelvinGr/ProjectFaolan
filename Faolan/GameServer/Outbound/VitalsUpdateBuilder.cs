@@ -1,6 +1,6 @@
-using Faolan.Core.Enums;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.FullCharSnapshot;

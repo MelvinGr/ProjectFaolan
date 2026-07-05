@@ -30,15 +30,6 @@ namespace Faolan.GameServer.Combat
 			return (gained, experience);
 		}
 
-		// Experience required to advance FROM `level` to level+1. Linear ramp (level 1->2 = 100, 2->3 = 200, ...).
-		public static uint XpForNextLevel(uint level)
-		{
-			var l = level == 0
-				? 1u
-				: level;
-			return 100u * l;
-		}
-
 		// Running-total experience needed to have REACHED `level` (sum of every XpForNextLevel below it). The
 		// NewLevelIIR level-up summary carries cumulative XP (retail's field 2/3 are the this-level/next-level
 		// thresholds), so this projects our within-level curve onto that running-total form. (Retail's real
@@ -50,6 +41,15 @@ namespace Faolan.GameServer.Combat
 				? 1u
 				: level;
 			return 100u * (l - 1) * l / 2;
+		}
+
+		// Experience required to advance FROM `level` to level+1. Linear ramp (level 1->2 = 100, 2->3 = 200, ...).
+		public static uint XpForNextLevel(uint level)
+		{
+			var l = level == 0
+				? 1u
+				: level;
+			return 100u * l;
 		}
 	}
 }

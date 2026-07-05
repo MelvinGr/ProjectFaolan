@@ -65,7 +65,7 @@ namespace Faolan.GameServer.World
 			return s
 				.WriteUInt32(0)
 				.WriteUInt32(0) // obj+0x6c / +0x70
-				.WriteUInt32((uint)positionBlob.Length)
+				.WriteUInt32(positionBlob.Length)
 				.WriteArray(positionBlob)
 				.WriteByte(0x00) // n3TeleportIIR trailing bool
 				.ToArray();

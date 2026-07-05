@@ -13,6 +13,26 @@ namespace Faolan.Tests
 	public class NetworkHardeningTests
 	{
 		[Fact]
+		public void Framer_DecompressionBomb_IsDroppedNotInflatedToOom()
+		{
+			// ~20 MB of zeros compresses to a few KB but would inflate past the 16 MB framing cap; the framer must
+			// drop it (no packet, no OOM) rather than materialise the full payload.
+			var bomb = new byte[20 * 1024 * 1024];
+			using var ms = new MemoryStream();
+			using (var z = new ZLibStream(ms, CompressionLevel.Optimal, true))
+				z.Write(bomb, 0, bomb.Length);
+			var compressed = ms.ToArray();
+
+			// Framer inflate path expects [0x80 00 00 05][5 skipped bytes][zlib data].
+			byte[] input = [0x80, 0x00, 0x00, 0x05, 0, 0, 0, 0, 0, .. compressed];
+
+			var framer = new ConanMessageFramer();
+			var packets = framer.PushBytes(input, input.Length).ToList();
+
+			Assert.Empty(packets);
+		}
+
+		[Fact]
 		public void ReadArrayUInt32Length_HostileLengthPrefix_ThrowsInsteadOfAllocating()
 		{
 			// A 0xFFFFFFFF length-prefix with no payload must be rejected, not turned into a ~4 GB allocation.
@@ -34,26 +54,6 @@ namespace Faolan.Tests
 			// len=3, exactly 3 payload bytes → the guard must not break the happy path.
 			var s = new FaolanStream([0, 0, 0, 3, 0xAA, 0xBB, 0xCC]);
 			Assert.Equal([0xAA, 0xBB, 0xCC], s.ReadArrayUInt32Length());
-		}
-
-		[Fact]
-		public void Framer_DecompressionBomb_IsDroppedNotInflatedToOom()
-		{
-			// ~20 MB of zeros compresses to a few KB but would inflate past the 16 MB framing cap; the framer must
-			// drop it (no packet, no OOM) rather than materialise the full payload.
-			var bomb = new byte[20 * 1024 * 1024];
-			using var ms = new MemoryStream();
-			using (var z = new ZLibStream(ms, CompressionLevel.Optimal, leaveOpen: true))
-				z.Write(bomb, 0, bomb.Length);
-			var compressed = ms.ToArray();
-
-			// Framer inflate path expects [0x80 00 00 05][5 skipped bytes][zlib data].
-			byte[] input = [0x80, 0x00, 0x00, 0x05, 0, 0, 0, 0, 0, .. compressed];
-
-			var framer = new ConanMessageFramer();
-			var packets = framer.PushBytes(input, input.Length).ToList();
-
-			Assert.Empty(packets);
 		}
 	}
 }

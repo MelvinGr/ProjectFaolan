@@ -19,6 +19,39 @@ namespace Faolan.GameServer.FullCharSnapshot
 	{
 		private readonly List<(CharacterStatId StatId, uint RawValue)> _records = [];
 
+		/// <summary>
+		///     Indexer accessor by stat id. The getter returns the player-facing value (0 if the stat is absent); the
+		///     setter adds-or-updates the record, applying the wire scale like <see cref="Set" />. For fluent chained
+		///     building keep using <see cref="Set" />/<see cref="SetRaw" />; for the raw wire value use <see cref="Records" />.
+		/// </summary>
+		public uint this[CharacterStatId statId]
+		{
+			get
+			{
+				foreach (var (id, raw) in _records)
+				{
+					if (id == statId)
+						return raw / statId.GetScale();
+				}
+
+				return 0;
+			}
+			set
+			{
+				var raw = value * statId.GetScale();
+				for (var i = 0; i < _records.Count; i++)
+				{
+					if (_records[i].StatId == statId)
+					{
+						_records[i] = (statId, raw);
+						return;
+					}
+				}
+
+				_records.Add((statId, raw));
+			}
+		}
+
 		public int Count => _records.Count;
 
 		/// <summary>The parsed/built records at wire scale, in order ([statId], [rawValue]).</summary>
@@ -37,35 +70,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return this;
 		}
 
-		/// <summary>
-		///     Indexer accessor by stat id. The getter returns the player-facing value (0 if the stat is absent); the
-		///     setter adds-or-updates the record, applying the wire scale like <see cref="Set" />. For fluent chained
-		///     building keep using <see cref="Set" />/<see cref="SetRaw" />; for the raw wire value use <see cref="Records" />.
-		/// </summary>
-		public uint this[CharacterStatId statId]
-		{
-			get
-			{
-				foreach (var (id, raw) in _records)
-					if (id == statId)
-						return raw / statId.GetScale();
-
-				return 0;
-			}
-			set
-			{
-				var raw = value * statId.GetScale();
-				for (var i = 0; i < _records.Count; i++)
-					if (_records[i].StatId == statId)
-					{
-						_records[i] = (statId, raw);
-						return;
-					}
-
-				_records.Add((statId, raw));
-			}
-		}
-
 		public byte[] ToArray()
 		{
 			using var stream = new FaolanStream();
@@ -76,7 +80,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		/// <summary>Writes <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian) into <paramref name="stream" />.</summary>
 		public FaolanStream WriteTo(FaolanStream stream)
 		{
-			stream.WriteByte((byte)_records.Count);
+			stream.WriteByte(_records.Count);
 			foreach (var (statId, rawValue) in _records)
 				stream.WriteUInt32(statId).WriteUInt32(rawValue);
 

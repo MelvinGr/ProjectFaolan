@@ -205,6 +205,17 @@ namespace Faolan.Core
 			return WriteArray(value);
 		}
 
+		public FaolanStream WriteByte(IConvertible value)
+		{
+			return WriteByte(UncheckedConvert.ToByte(value));
+		}
+
+		public new FaolanStream WriteByte(byte value)
+		{
+			base.WriteByte(value);
+			return this;
+		}
+
 		// Big-endian double for RAW packet bodies (not protobuf fields). Matches the wire format for the
 		// OverrideGameTweaks values; see WriteFloatBigEndian above for the raw-body endianness rationale.
 		public FaolanStream WriteDoubleBigEndian(double value)
@@ -268,20 +279,9 @@ namespace Faolan.Core
 			return WriteArrayByteLength(Encoding.UTF8.GetBytes(value ?? ""));
 		}
 
-		public FaolanStream WriteByte(IConvertible value)
-		{
-			return WriteByte(Convert.ToByte(value));
-		}
-
-		public new FaolanStream WriteByte(byte value)
-		{
-			base.WriteByte(value);
-			return this;
-		}
-
 		public FaolanStream WriteUInt16(IConvertible value)
 		{
-			return WriteUInt16(Convert.ToUInt16(value));
+			return WriteUInt16(UncheckedConvert.ToUInt16(value));
 		}
 
 		public FaolanStream WriteUInt16(ushort value)
@@ -294,7 +294,7 @@ namespace Faolan.Core
 
 		public FaolanStream WriteUInt32(IConvertible value)
 		{
-			return WriteUInt32(Convert.ToUInt32(value));
+			return WriteUInt32(UncheckedConvert.ToUInt32(value));
 		}
 
 		public FaolanStream WriteUInt32(uint value)
@@ -307,7 +307,7 @@ namespace Faolan.Core
 
 		public FaolanStream WriteUInt64(IConvertible value)
 		{
-			return WriteUInt64(Convert.ToUInt64(value));
+			return WriteUInt64(UncheckedConvert.ToUInt64(value));
 		}
 
 		public FaolanStream WriteUInt64(ulong value)

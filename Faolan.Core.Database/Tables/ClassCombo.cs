@@ -17,16 +17,16 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(Class), nameof(ComboId))]
 	public class ClassCombo
 	{
-		[ConstrainToEnumValues]
-		public Class Class { get; set; }
-
-		// FK into the Combos catalog (Combo.Id = the ComboBookIIR / CharacterCombo combo id).
-		public uint ComboId { get; set; }
-
 		[ForeignKey(nameof(ComboId))]
 		public virtual Combo Combo { get; set; }
 
 		// The character level this combo unlocks at FOR THIS CLASS.
 		public byte Level { get; set; }
+
+		[ConstrainToEnumValues]
+		public Class Class { get; set; }
+
+		// FK into the Combos catalog (Combo.Id = the ComboBookIIR / CharacterCombo combo id).
+		public uint ComboId { get; set; }
 	}
 }

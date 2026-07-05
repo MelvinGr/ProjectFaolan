@@ -36,7 +36,7 @@ namespace Faolan.Core.Network.Packets
 
 			var body = content.ToArray();
 			var s = new FaolanStream();
-			s.WriteUInt32((uint)body.Length);
+			s.WriteUInt32(body.Length);
 			s.WriteArray(body);
 			return s.ToArray();
 		}

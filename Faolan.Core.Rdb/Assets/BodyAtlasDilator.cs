@@ -14,7 +14,7 @@ namespace Faolan.Core.Rdb.Assets
 		// How close to the sampled background colour a pixel must be to count as gutter (per channel).
 		private const int BackgroundTolerance = 14;
 
-		private static readonly ConcurrentDictionary<long, byte[]> Cache = new();
+		private static readonly ConcurrentDictionary<long, byte[]> Cache = new ConcurrentDictionary<long, byte[]>();
 
 		// After the nearest-fill, smooth the gutter at growing scales so even the wide central gutter (the mirrored
 		// atlas's L/R divide) fills without a visible meeting-seam. Islands are re-pinned after every pass.
@@ -28,6 +28,78 @@ namespace Faolan.Core.Rdb.Assets
 				return rgba;
 
 			return Cache.GetOrAdd(Signature(rgba, width, height), _ => Compute(rgba, width, height));
+		}
+
+		// Separable box blur on the RGB channels (alpha untouched), edges clamped via a shrinking window count.
+		private static byte[] BoxBlur(byte[] rgba, int w, int h, int radius)
+		{
+			var tmp = (byte[])rgba.Clone();
+			var outp = (byte[])rgba.Clone();
+
+			for (var y = 0; y < h; y++)
+			{
+				var row = y * w;
+				for (var c = 0; c < 3; c++)
+				{
+					int sum = 0, cnt = 0;
+					for (var x = 0; x <= radius && x < w; x++)
+					{
+						sum += rgba[(row + x) * 4 + c];
+						cnt++;
+					}
+
+					for (var x = 0; x < w; x++)
+					{
+						tmp[(row + x) * 4 + c] = (byte)(sum / cnt);
+						var add = x + radius + 1;
+						var rem = x - radius;
+						if (add < w)
+						{
+							sum += rgba[(row + add) * 4 + c];
+							cnt++;
+						}
+
+						if (rem >= 0)
+						{
+							sum -= rgba[(row + rem) * 4 + c];
+							cnt--;
+						}
+					}
+				}
+			}
+
+			for (var x = 0; x < w; x++)
+			{
+				for (var c = 0; c < 3; c++)
+				{
+					int sum = 0, cnt = 0;
+					for (var y = 0; y <= radius && y < h; y++)
+					{
+						sum += tmp[(y * w + x) * 4 + c];
+						cnt++;
+					}
+
+					for (var y = 0; y < h; y++)
+					{
+						outp[(y * w + x) * 4 + c] = (byte)(sum / cnt);
+						var add = y + radius + 1;
+						var rem = y - radius;
+						if (add < h)
+						{
+							sum += tmp[(add * w + x) * 4 + c];
+							cnt++;
+						}
+
+						if (rem >= 0)
+						{
+							sum -= tmp[(rem * w + x) * 4 + c];
+							cnt--;
+						}
+					}
+				}
+			}
+
+			return outp;
 		}
 
 		private static byte[] Compute(byte[] src, int w, int h)
@@ -64,6 +136,15 @@ namespace Faolan.Core.Rdb.Assets
 			return outp;
 		}
 
+		private static void Copy(byte[] rgba, int dst, int src)
+		{
+			var d = dst * 4;
+			var s = src * 4;
+			rgba[d] = rgba[s];
+			rgba[d + 1] = rgba[s + 1];
+			rgba[d + 2] = rgba[s + 2];
+		}
+
 		// Gutter = the FLAT background reachable from the image border (a flood-fill). Two guards keep it from leaking into
 		// skin, which matters because the tan background is close to some skin tones: (1) a pixel must be near the sampled
 		// background colour, AND (2) it must be locally FLAT (tiny neighbour variation) - real skin, even tan skin, always
@@ -78,9 +159,7 @@ namespace Faolan.Core.Rdb.Assets
 			bool IsGutter(int i)
 			{
 				var o = i * 4;
-				if (Math.Abs(rgba[o] - br) >= BackgroundTolerance
-				    || Math.Abs(rgba[o + 1] - bg) >= BackgroundTolerance
-				    || Math.Abs(rgba[o + 2] - bb) >= BackgroundTolerance)
+				if (Math.Abs(rgba[o] - br) >= BackgroundTolerance || Math.Abs(rgba[o + 1] - bg) >= BackgroundTolerance || Math.Abs(rgba[o + 2] - bb) >= BackgroundTolerance)
 					return false;
 
 				return IsFlat(rgba, i, w, h);
@@ -173,6 +252,22 @@ namespace Faolan.Core.Rdb.Assets
 			return true;
 		}
 
+		private static int IslandNeighbour(bool[] gutter, int i, int w, int h)
+		{
+			var x = i % w;
+			var y = i / w;
+			if (x > 0 && !gutter[i - 1])
+				return i - 1;
+			if (x < w - 1 && !gutter[i + 1])
+				return i + 1;
+			if (y > 0 && !gutter[i - w])
+				return i - w;
+			if (y < h - 1 && !gutter[i + w])
+				return i + w;
+
+			return -1;
+		}
+
 		// Multi-source BFS grassfire from the island edges: each gutter pixel takes the colour of the first filled pixel
 		// to reach it, so gutter regions fill with their nearest island's colour. O(pixels).
 		private static void NearestFill(byte[] rgba, bool[] gutter, int w, int h)
@@ -230,107 +325,10 @@ namespace Faolan.Core.Rdb.Assets
 			}
 		}
 
-		private static int IslandNeighbour(bool[] gutter, int i, int w, int h)
-		{
-			var x = i % w;
-			var y = i / w;
-			if (x > 0 && !gutter[i - 1])
-				return i - 1;
-			if (x < w - 1 && !gutter[i + 1])
-				return i + 1;
-			if (y > 0 && !gutter[i - w])
-				return i - w;
-			if (y < h - 1 && !gutter[i + w])
-				return i + w;
-
-			return -1;
-		}
-
-		private static void Copy(byte[] rgba, int dst, int src)
-		{
-			var d = dst * 4;
-			var s = src * 4;
-			rgba[d] = rgba[s];
-			rgba[d + 1] = rgba[s + 1];
-			rgba[d + 2] = rgba[s + 2];
-		}
-
-		// Separable box blur on the RGB channels (alpha untouched), edges clamped via a shrinking window count.
-		private static byte[] BoxBlur(byte[] rgba, int w, int h, int radius)
-		{
-			var tmp = (byte[])rgba.Clone();
-			var outp = (byte[])rgba.Clone();
-
-			for (var y = 0; y < h; y++)
-			{
-				var row = y * w;
-				for (var c = 0; c < 3; c++)
-				{
-					int sum = 0, cnt = 0;
-					for (var x = 0; x <= radius && x < w; x++)
-					{
-						sum += rgba[(row + x) * 4 + c];
-						cnt++;
-					}
-
-					for (var x = 0; x < w; x++)
-					{
-						tmp[(row + x) * 4 + c] = (byte)(sum / cnt);
-						var add = x + radius + 1;
-						var rem = x - radius;
-						if (add < w)
-						{
-							sum += rgba[(row + add) * 4 + c];
-							cnt++;
-						}
-
-						if (rem >= 0)
-						{
-							sum -= rgba[(row + rem) * 4 + c];
-							cnt--;
-						}
-					}
-				}
-			}
-
-			for (var x = 0; x < w; x++)
-			{
-				for (var c = 0; c < 3; c++)
-				{
-					int sum = 0, cnt = 0;
-					for (var y = 0; y <= radius && y < h; y++)
-					{
-						sum += tmp[(y * w + x) * 4 + c];
-						cnt++;
-					}
-
-					for (var y = 0; y < h; y++)
-					{
-						outp[(y * w + x) * 4 + c] = (byte)(sum / cnt);
-						var add = y + radius + 1;
-						var rem = y - radius;
-						if (add < h)
-						{
-							sum += tmp[(add * w + x) * 4 + c];
-							cnt++;
-						}
-
-						if (rem >= 0)
-						{
-							sum -= tmp[(rem * w + x) * 4 + c];
-							cnt--;
-						}
-					}
-				}
-			}
-
-			return outp;
-		}
-
 		// Cheap content signature (dimensions + sparsely sampled bytes) to key the per-atlas cache.
 		private static long Signature(byte[] rgba, int width, int height)
 		{
-			long sig = ((long)width << 20) ^ ((long)height << 4) ^ rgba.Length;
+			var sig = ((long)width << 20) ^ ((long)height << 4) ^ rgba.Length;
 			for (var i = 0; i < rgba.Length; i += 4099)
 				sig = (sig * 1099511628211L) ^ rgba[i];
 

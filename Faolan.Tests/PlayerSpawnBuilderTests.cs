@@ -43,7 +43,11 @@ namespace Faolan.Tests
 			// The scaffold rows (entry table / id list) on a Character. Strie is an Assassin; the pre-IIR frame is now
 			// reconstructed from that class (not stored), so the from-scratch body equals the template's CONSTRUCTED
 			// form - same transform/rows/IIR, canonical FreshPreFrame(Assassin), EntryTableX 0xB7, no buff records.
-			var scaffoldCharacter = new Character { Id = scaffold.Handle, Class = Class.Assassin };
+			var scaffoldCharacter = new Character
+			{
+				Id = scaffold.Handle,
+				Class = Class.Assassin
+			};
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
 
 			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, position, rotation, scaffold.CharacterIir, scaffoldCharacter);

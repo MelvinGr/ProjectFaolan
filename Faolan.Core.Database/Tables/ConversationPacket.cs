@@ -26,6 +26,7 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(8192)]
 		public string ScreensJson { get; set; } // JSON array of the remoteformat XML screen(s); null for Open
+
 		public uint ConversationNodeId { get; set; }
 
 		// SetDialogueCamera (0x2015): the GameCharAgent sender instance (varies per conversation) + the 10 camera

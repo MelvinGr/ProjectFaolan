@@ -10,6 +10,7 @@ namespace Faolan.Core.Network
 		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
 		// 0x206E enter-world signal, which we answer with the 0x2002 world-address handoff.
 		bool AwaitingEnterWorld { get; set; }
+		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
 		bool HasFlushedCreateEditorPostReady { get; set; }
 
 		bool HasFlushedCreateWorldEntryBurst { get; set; }
@@ -24,6 +25,12 @@ namespace Faolan.Core.Network
 		// 0x2002 enter-world handoff). Gates the intro/cutscene bursts so they only fire on the first world
 		// entry, not on normal existing-character logins.
 		bool IsCreateWorldSession { get; set; }
+
+		// Spellweaving trance state (docs/combos.md): true between the activate and deactivate PerformSpecialAction
+		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
+		// trance is open, and is fired + cleared on deactivate.
+		bool IsSpellweaving { get; set; }
+		bool IsSprinting { get; set; }
 
 		// True on the OLD connection while a teleport/changemap handoff is in flight: DoTeleport has already
 		// persisted the authoritative destination position, so this connection's disconnect must NOT save its
@@ -61,27 +68,14 @@ namespace Faolan.Core.Network
 		// Monotonic counter stamped as field3 (the "phase") into each NormalAttack BehaviorControlCenter ack. In the
 		// capture it increments by 1 per player swing-ack; the client uses it to sequence the behaviour responses.
 		int NormalAttackAckPhase { get; set; }
-		List<uint> CreateEditorObservedRequestIds { get; }
-		List<uint> CreateEditorReadyRequestIds { get; }
-
-		// Spellweaving trance state (docs/combos.md): true between the activate and deactivate PerformSpecialAction
-		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
-		// trance is open, and is fired + cleared on deactivate.
-		bool IsSpellweaving { get; set; }
-
-		List<uint> WeaveComponents { get; }
 
 		// The Spellweaving(1) buff STACK level: each time the component picker reappears a fresh stack is applied at
 		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
 		int SpellweaveBuffStack { get; set; }
+		List<uint> CreateEditorObservedRequestIds { get; }
+		List<uint> CreateEditorReadyRequestIds { get; }
 
-		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
-		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
-		// client owns the visual during sprint; the server mirrors the drain/regen silently. EnergyMax 0 = uninitialised.
-		uint Energy { get; set; }
-		uint EnergyMax { get; set; }
-		bool IsSprinting { get; set; }
-		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
+		List<uint> WeaveComponents { get; }
 
 		string ConversationAnswerPath { get; set; }
 
@@ -112,6 +106,12 @@ namespace Faolan.Core.Network
 		uint ConversationTypeId { get; set; }
 		uint CreateEditorTempInstanceCount { get; set; }
 
+		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
+		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
+		// client owns the visual during sprint; the server mirrors the drain/regen silently. EnergyMax 0 = uninitialised.
+		uint Energy { get; set; }
+		uint EnergyMax { get; set; }
+
 		// Incrementing sequence number stamped into each 0xBADF5A4B morph-ack the creator sends back while
 		// the editor streams its SetMorphValue callbacks. Retail starts this at 2.
 		uint MorphAckCounter { get; set; }
@@ -132,34 +132,32 @@ namespace Faolan.Core.Network
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
 		public Account Account { get; set; }
-		public Character Character { get; set; }
 
 		public bool AwaitingEnterWorld { get; set; }
+		public bool EnergyLoopActive { get; set; }
 		public bool HasFlushedCreateEditorPostReady { get; set; }
 		public bool HasFlushedCreateWorldEntryBurst { get; set; }
 		public bool HasPendingCreateEditorReadyFollowUp { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
 		public bool IsCreateEditorConnection { get; set; }
 		public bool IsCreateWorldSession { get; set; }
+		public bool IsSpellweaving { get; set; }
+		public bool IsSprinting { get; set; }
 		public bool IsTeleportingOut { get; set; }
 		public bool PostMorphBurstSent { get; set; }
 		public bool WorldEntered { get; set; }
 		public byte[] ClientConversation { get; set; }
+		public Character Character { get; set; }
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
 		public Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; } = new Dictionary<uint, uint>();
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
+		public int SpellweaveBuffStack { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
-		public bool IsSpellweaving { get; set; }
 		public List<uint> WeaveComponents { get; } = [];
-		public int SpellweaveBuffStack { get; set; }
-		public uint Energy { get; set; }
-		public uint EnergyMax { get; set; }
-		public bool IsSprinting { get; set; }
-		public bool EnergyLoopActive { get; set; }
 		public string ConversationAnswerPath { get; set; }
 		public string ConversationNpcName { get; set; }
 		public string PendingCharacterName { get; set; }
@@ -168,6 +166,8 @@ namespace Faolan.Core.Network
 		public uint ConversationNpcHandle { get; set; }
 		public uint ConversationTypeId { get; set; }
 		public uint CreateEditorTempInstanceCount { get; set; }
+		public uint Energy { get; set; }
+		public uint EnergyMax { get; set; }
 		public uint MorphAckCounter { get; set; }
 		public uint MorphActivitySequence { get; set; }
 		public uint SelectedTargetHandle { get; set; }

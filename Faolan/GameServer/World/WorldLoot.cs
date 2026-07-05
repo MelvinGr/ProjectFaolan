@@ -85,7 +85,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // [12..16] = 0
 				.WriteByte(0x00) // [16]
-				.WriteUInt16((ushort)text.Length)
+				.WriteUInt16(text.Length)
 				.WriteArray(text)
 				.ToArray();
 		}

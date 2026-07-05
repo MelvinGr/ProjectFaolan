@@ -91,7 +91,7 @@ namespace Faolan.Core.Rdb.Assets
 					var x = Math.Min(bx * 4 + px, width - 1);
 					var y = Math.Min(by * 4 + py, height - 1);
 					var si = (y * width + x) * 4;
-					xs[py * 4 + px] = rgba[si];     // R = normal X
+					xs[py * 4 + px] = rgba[si]; // R = normal X
 					ys[py * 4 + px] = rgba[si + 1]; // G = normal Y
 				}
 
@@ -108,25 +108,6 @@ namespace Faolan.Core.Rdb.Assets
 			return (Math.Max(1, (w + 3) / 4), Math.Max(1, (h + 3) / 4));
 		}
 
-		// Gather a 4×4 tile's RGB (into rgb[16*3]) and, if `alpha` is non-empty, its alpha (into alpha[16]). Edge
-		// tiles clamp to the last row/column for non-multiple-of-4 sizes.
-		private static void GatherRgbA(ReadOnlySpan<byte> rgba, int w, int h, int bx, int by, Span<byte> rgb, Span<byte> alpha)
-		{
-			for (var py = 0; py < 4; py++)
-			for (var px = 0; px < 4; px++)
-			{
-				var x = Math.Min(bx * 4 + px, w - 1);
-				var y = Math.Min(by * 4 + py, h - 1);
-				var si = (y * w + x) * 4;
-				var ti = py * 4 + px;
-				rgb[ti * 3] = rgba[si];
-				rgb[ti * 3 + 1] = rgba[si + 1];
-				rgb[ti * 3 + 2] = rgba[si + 2];
-				if (!alpha.IsEmpty)
-					alpha[ti] = rgba[si + 3];
-			}
-		}
-
 		// 16 RGB texels → an 8-byte BC1 colour block. Always 4-colour mode (c0 >= c1) - valid for BC1 (opaque) and
 		// required for the BC3 colour block.
 		private static void EncodeColorBlock(ReadOnlySpan<byte> block, Span<byte> dst)
@@ -135,12 +116,18 @@ namespace Faolan.Core.Rdb.Assets
 			for (var i = 0; i < 16; i++)
 			{
 				int r = block[i * 3], g = block[i * 3 + 1], b = block[i * 3 + 2];
-				if (r < rMin) rMin = r;
-				if (g < gMin) gMin = g;
-				if (b < bMin) bMin = b;
-				if (r > rMax) rMax = r;
-				if (g > gMax) gMax = g;
-				if (b > bMax) bMax = b;
+				if (r < rMin)
+					rMin = r;
+				if (g < gMin)
+					gMin = g;
+				if (b < bMin)
+					bMin = b;
+				if (r > rMax)
+					rMax = r;
+				if (g > gMax)
+					gMax = g;
+				if (b > bMax)
+					bMax = b;
 			}
 
 			var c0 = To565(rMax, gMax, bMax);
@@ -164,8 +151,12 @@ namespace Faolan.Core.Rdb.Assets
 			Span<int> palB = stackalloc int[4];
 			From565(c0, out palR[0], out palG[0], out palB[0]);
 			From565(c1, out palR[1], out palG[1], out palB[1]);
-			palR[2] = (2 * palR[0] + palR[1]) / 3; palG[2] = (2 * palG[0] + palG[1]) / 3; palB[2] = (2 * palB[0] + palB[1]) / 3;
-			palR[3] = (palR[0] + 2 * palR[1]) / 3; palG[3] = (palG[0] + 2 * palG[1]) / 3; palB[3] = (palB[0] + 2 * palB[1]) / 3;
+			palR[2] = (2 * palR[0] + palR[1]) / 3;
+			palG[2] = (2 * palG[0] + palG[1]) / 3;
+			palB[2] = (2 * palB[0] + palB[1]) / 3;
+			palR[3] = (palR[0] + 2 * palR[1]) / 3;
+			palG[3] = (palG[0] + 2 * palG[1]) / 3;
+			palB[3] = (palB[0] + 2 * palB[1]) / 3;
 
 			dst[0] = (byte)(c0 & 0xff);
 			dst[1] = (byte)(c0 >> 8);
@@ -207,8 +198,10 @@ namespace Faolan.Core.Rdb.Assets
 			int vMin = 255, vMax = 0;
 			for (var i = 0; i < 16; i++)
 			{
-				if (v[i] < vMin) vMin = v[i];
-				if (v[i] > vMax) vMax = v[i];
+				if (v[i] < vMin)
+					vMin = v[i];
+				if (v[i] > vMax)
+					vMax = v[i];
 			}
 
 			dst[0] = (byte)vMax; // v0
@@ -218,11 +211,15 @@ namespace Faolan.Core.Rdb.Assets
 			pal[0] = vMax;
 			pal[1] = vMin;
 			if (vMax > vMin)
+			{
 				for (var i = 1; i <= 6; i++)
 					pal[i + 1] = ((7 - i) * vMax + i * vMin) / 7;
+			}
 			else
+			{
 				for (var i = 2; i < 8; i++)
 					pal[i] = vMax; // flat: index 0 = v0 = the flat value, so all-zero indices are exact
+			}
 
 			long bits = 0;
 			for (var i = 0; i < 16; i++)
@@ -246,11 +243,6 @@ namespace Faolan.Core.Rdb.Assets
 				dst[2 + i] = (byte)((bits >> (8 * i)) & 0xff);
 		}
 
-		private static ushort To565(int r, int g, int b)
-		{
-			return (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
-		}
-
 		private static void From565(ushort c, out int r, out int g, out int b)
 		{
 			var r5 = (c >> 11) & 0x1f;
@@ -259,6 +251,30 @@ namespace Faolan.Core.Rdb.Assets
 			r = (r5 << 3) | (r5 >> 2);
 			g = (g6 << 2) | (g6 >> 4);
 			b = (b5 << 3) | (b5 >> 2);
+		}
+
+		// Gather a 4×4 tile's RGB (into rgb[16*3]) and, if `alpha` is non-empty, its alpha (into alpha[16]). Edge
+		// tiles clamp to the last row/column for non-multiple-of-4 sizes.
+		private static void GatherRgbA(ReadOnlySpan<byte> rgba, int w, int h, int bx, int by, Span<byte> rgb, Span<byte> alpha)
+		{
+			for (var py = 0; py < 4; py++)
+			for (var px = 0; px < 4; px++)
+			{
+				var x = Math.Min(bx * 4 + px, w - 1);
+				var y = Math.Min(by * 4 + py, h - 1);
+				var si = (y * w + x) * 4;
+				var ti = py * 4 + px;
+				rgb[ti * 3] = rgba[si];
+				rgb[ti * 3 + 1] = rgba[si + 1];
+				rgb[ti * 3 + 2] = rgba[si + 2];
+				if (!alpha.IsEmpty)
+					alpha[ti] = rgba[si + 3];
+			}
+		}
+
+		private static ushort To565(int r, int g, int b)
+		{
+			return (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
 		}
 	}
 }

@@ -14,31 +14,19 @@ namespace Faolan.Tests
 	// (length - fullBc4Chain - 4) and validates the bytes, so planted "ATI1" noise no longer shifts the result.
 	public class FctxMixdContainerTests
 	{
-		// 8x8, single mip: BC4 detail = 2x2 blocks x8 = 32 B, BC5 normal top mip = 2x2 x16 = 64 B.
-		private const int W = 8, H = 8;
 		private const int Bc4Chain = 32, Bc5Top = 64;
 
-		private static byte[] Detail()
+		// 8x8, single mip: BC4 detail = 2x2 blocks x8 = 32 B, BC5 normal top mip = 2x2 x16 = 64 B.
+		private const int W = 8, H = 8;
+
+		[Fact]
+		public void MixdDetail_DecodesFullChainDespiteSpuriousAti1RunInDetail()
 		{
-			var detail = new byte[Bc4Chain];
-			for (var i = 0; i < detail.Length; i++) detail[i] = (byte)(0x80 + (i % 53));
-			"ATI1"u8.ToArray().CopyTo(detail, 20); // a spurious tag INSIDE the detail data -> what LastIndexOf grabs
-			return detail;
-		}
-
-		private static byte[] BuildMixd()
-		{
-			// pixels = [prefix: 24 B compact-normal + 64 B BC5][ "ATI1" ][32 B BC4 detail w/ a planted "ATI1" run]
-			var prefix = new byte[24 + Bc5Top];
-			for (var i = 0; i < prefix.Length; i++) prefix[i] = (byte)(0x40 + (i % 37)); // deterministic, no "ATI1" run
-
-			var pixels = prefix.Concat("ATI1"u8.ToArray()).Concat(Detail()).ToArray();
-
-			var header = new byte[24];
-			Encoding.ASCII.GetBytes("FCTX").CopyTo(header, 0);
-			header[12] = W; header[14] = H; header[16] = 1; // width u16, height u16, mip u8
-			Encoding.ASCII.GetBytes("MIXD").CopyTo(header, 20);
-			return header.Concat(pixels).ToArray();
+			// Under the old LastIndexOf split the planted tag (pixels[112]) leaves only 20 detail bytes after it -
+			// shorter than the 32-byte top mip - so the decode returned [] (failed). The computed anchor keeps the
+			// full 32-byte detail chain and decodes it correctly.
+			Assert.True(FctxConverter.TryDecodeTopMip(BuildMixd(), out var got, out _, out _, true));
+			Assert.Equal(BcDecoder.DecodeBc4(Detail(), W, H), got);
 		}
 
 		[Fact]
@@ -51,19 +39,37 @@ namespace Faolan.Tests
 			Assert.Equal((W, H), (w, h));
 
 			var prefix = new byte[24 + Bc5Top];
-			for (var i = 0; i < prefix.Length; i++) prefix[i] = (byte)(0x40 + (i % 37));
+			for (var i = 0; i < prefix.Length; i++)
+				prefix[i] = (byte)(0x40 + i % 37);
 			var expected = BcDecoder.DecodeBc5Normal(prefix.AsSpan(24, Bc5Top), W, H);
 			Assert.Equal(expected, got);
 		}
 
-		[Fact]
-		public void MixdDetail_DecodesFullChainDespiteSpuriousAti1RunInDetail()
+		private static byte[] BuildMixd()
 		{
-			// Under the old LastIndexOf split the planted tag (pixels[112]) leaves only 20 detail bytes after it -
-			// shorter than the 32-byte top mip - so the decode returned [] (failed). The computed anchor keeps the
-			// full 32-byte detail chain and decodes it correctly.
-			Assert.True(FctxConverter.TryDecodeTopMip(BuildMixd(), out var got, out _, out _, includeSingleChannel: true));
-			Assert.Equal(BcDecoder.DecodeBc4(Detail(), W, H), got);
+			// pixels = [prefix: 24 B compact-normal + 64 B BC5][ "ATI1" ][32 B BC4 detail w/ a planted "ATI1" run]
+			var prefix = new byte[24 + Bc5Top];
+			for (var i = 0; i < prefix.Length; i++)
+				prefix[i] = (byte)(0x40 + i % 37); // deterministic, no "ATI1" run
+
+			var pixels = prefix.Concat("ATI1"u8.ToArray()).Concat(Detail()).ToArray();
+
+			var header = new byte[24];
+			Encoding.ASCII.GetBytes("FCTX").CopyTo(header, 0);
+			header[12] = W;
+			header[14] = H;
+			header[16] = 1; // width u16, height u16, mip u8
+			Encoding.ASCII.GetBytes("MIXD").CopyTo(header, 20);
+			return header.Concat(pixels).ToArray();
+		}
+
+		private static byte[] Detail()
+		{
+			var detail = new byte[Bc4Chain];
+			for (var i = 0; i < detail.Length; i++)
+				detail[i] = (byte)(0x80 + i % 53);
+			"ATI1"u8.ToArray().CopyTo(detail, 20); // a spurious tag INSIDE the detail data -> what LastIndexOf grabs
+			return detail;
 		}
 	}
 }

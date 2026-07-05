@@ -15,12 +15,44 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy.Tradepost;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.Scripting;
+using Faolan.GameServer.World;
 
 namespace Faolan.GameServer
 {
 	partial class GameServerListener
 	{
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
+
+		// Shared pet-summon (#307, docs/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
+		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
+		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
+		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
+		internal async Task<WorldEntity> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
+		{
+			// The RIGHT model (#244/#307): spawn the pet from its creature TYPE (Npc.Data lifted stat core), no world
+			// placement. Fall back to the placement path only as a GM-test convenience (`.pet <any world NPC>`), so a
+			// creature that hasn't had its stat core lifted to the type yet can still be summoned as a follower.
+			var npcType = await Database.GetNpcByName(petTemplate);
+			var entity = npcType != null
+				? await _broadcaster.SpawnPetForPlayer(client, npcType)
+				: await _broadcaster.SpawnNpcForPlayer(client, petTemplate);
+			if (entity == null)
+				return null;
+
+			var owner = client.Session.Account.ClientInstance;
+			entity.OwnerHandle = owner;
+			await new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildAssign(owner,
+					entity.Handle,
+					combat
+						? PetIirCodec.CombatKind
+						: PetIirCodec.SocialKind)))
+				.SendAsync(client);
+
+			_broadcaster.SetNpcFollow(client, entity.Handle, true);
+			return entity;
+		}
 
 		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist
 		// a CharacterInventory row in the first free bag slot, then re-send the rebuilt 0x737A6DF9 inventory
@@ -500,8 +532,7 @@ namespace Faolan.GameServer
 			// Push Level AND a refreshed XP bar (Exp/MaxExp) so a GM `.level` ding shows exactly like an XP-driven ding
 			// (#209): the kill path (CombatService.PushLevelUp) sets the same three stats, so both level-up paths emit an
 			// identical Level + AttributeChanged-burst + vitals max push.
-			await SendStatUpdate(client,
-				new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)));
+			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)));
 			await SendVitals(client);
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
@@ -534,58 +565,6 @@ namespace Faolan.GameServer
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
-		}
-
-		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
-		// Level to 25). The stat's wire scale is applied automatically.
-		private static Task SetStatCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var statId = (CharacterStatId)Convert.ToUInt32(parts[0], 16);
-			var value = uint.Parse(parts[1]);
-
-			return SendStatUpdate(client, new CharacterStatBlock().Set(statId, value));
-		}
-
-		// .setstatrange <startHex> <endHex> <value>  - DEBUG sweep: push every stat id in [start, end] set to `value`
-		// in one 0x96B8DC59 update, to bisect which stat a client behaviour keys off (e.g. the spell-usability level).
-		private static Task SetStatRangeCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var start = Convert.ToUInt32(parts[0], 16);
-			var end = Convert.ToUInt32(parts[1], 16);
-			var value = uint.Parse(parts[2]);
-			var block = new CharacterStatBlock();
-			for (var id = start; id <= end; id++)
-				block.Set((CharacterStatId)id, value);
-			return SendStatUpdate(client, block);
-		}
-
-		// Shared pet-summon (#307, docs/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
-		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
-		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
-		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
-		internal async Task<World.WorldEntity> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
-		{
-			// The RIGHT model (#244/#307): spawn the pet from its creature TYPE (Npc.Data lifted stat core), no world
-			// placement. Fall back to the placement path only as a GM-test convenience (`.pet <any world NPC>`), so a
-			// creature that hasn't had its stat core lifted to the type yet can still be summoned as a follower.
-			var npcType = await Database.GetNpcByName(petTemplate);
-			var entity = npcType != null
-				? await _broadcaster.SpawnPetForPlayer(client, npcType)
-				: await _broadcaster.SpawnNpcForPlayer(client, petTemplate);
-			if (entity == null)
-				return null;
-
-			var owner = client.Session.Account.ClientInstance;
-			entity.OwnerHandle = owner;
-			await new PacketStream()
-				.WriteHeader(World.WorldFraming.Sender, World.WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(World.PetIirCodec.BuildAssign(owner, entity.Handle, combat ? World.PetIirCodec.CombatKind : World.PetIirCodec.SocialKind)))
-				.SendAsync(client);
-
-			_broadcaster.SetNpcFollow(client, entity.Handle, true);
-			return entity;
 		}
 
 		// .syschat - push a world/system chat line into the chat window via ChatTextIIR (#103). Sends the captured
@@ -713,6 +692,31 @@ namespace Faolan.GameServer
 				entity.Invisible
 					? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
 					: "Invisible <span style=\"color: red;\">OFF</span>.");
+		}
+
+		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
+		// Level to 25). The stat's wire scale is applied automatically.
+		private static Task SetStatCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var statId = (CharacterStatId)Convert.ToUInt32(parts[0], 16);
+			var value = uint.Parse(parts[1]);
+
+			return SendStatUpdate(client, new CharacterStatBlock().Set(statId, value));
+		}
+
+		// .setstatrange <startHex> <endHex> <value>  - DEBUG sweep: push every stat id in [start, end] set to `value`
+		// in one 0x96B8DC59 update, to bisect which stat a client behaviour keys off (e.g. the spell-usability level).
+		private static Task SetStatRangeCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var start = Convert.ToUInt32(parts[0], 16);
+			var end = Convert.ToUInt32(parts[1], 16);
+			var value = uint.Parse(parts[2]);
+			var block = new CharacterStatBlock();
+			for (var id = start; id <= end; id++)
+				block.Set((CharacterStatId)id, value);
+			return SendStatUpdate(client, block);
 		}
 
 		// Parses a wire handle from a GM-command argument: "0x"-prefixed hex or plain decimal. Returns false on a

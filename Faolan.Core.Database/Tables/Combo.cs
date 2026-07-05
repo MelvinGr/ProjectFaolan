@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+
 namespace Faolan.Core.Database.Tables
 {
 	// A combo definition catalog entry, imported from the client RDB type 1010206 ("Combo animation defs") - which,
@@ -8,31 +9,30 @@ namespace Faolan.Core.Database.Tables
 	// ComboBookIIR grants and CharacterCombo stores). The catalog counterpart of Spell / Ability.
 	public class Combo : BaseEntity
 	{
-		// The combo id (Id, from BaseEntity) is the RDB 1010206 entry id = the ComboBookIIR/CharacterCombo combo id.
-
-		[MaxLength(128)]
-		public string Name { get; set; }
-
 		// The character level the combo unlocks at (XML `level`). This IS present here (unlike the ability templates).
 		public byte Level { get; set; }
-
-		// The feat this combo belongs to (XML `featid`) - links into the class feat tree (1000020), i.e. the class it
-		// is for. 0 when the XML omits it.
-		public uint FeatId { get; set; }
-
-		public uint ParentId { get; set; } // combo-tree parent (XML `parentid`)
-		public uint GameActionId { get; set; } // XML `gameactionid`
 		public int Cooldown { get; set; } // seconds (XML `cooldown`)
-		public int Stamina { get; set; } // XML `stamina`
 		public int Criteria { get; set; } // weapon/state criteria code (XML `criteria`)
 		public int Quality { get; set; } // XML `quality`
-
-		[MaxLength(128)]
-		public string Animation { get; set; } // XML `animation`
+		public int Stamina { get; set; } // XML `stamina`
 
 		// The input action sequence that performs the combo, comma-separated (e.g. "CombatUpperRight,CombatUpperLeft"),
 		// from the child <action name="..."/> elements in order.
 		[MaxLength(128)]
 		public string Actions { get; set; }
+
+		[MaxLength(128)]
+		public string Animation { get; set; } // XML `animation`
+		// The combo id (Id, from BaseEntity) is the RDB 1010206 entry id = the ComboBookIIR/CharacterCombo combo id.
+
+		[MaxLength(128)]
+		public string Name { get; set; }
+
+		// The feat this combo belongs to (XML `featid`) - links into the class feat tree (1000020), i.e. the class it
+		// is for. 0 when the XML omits it.
+		public uint FeatId { get; set; }
+		public uint GameActionId { get; set; } // XML `gameactionid`
+
+		public uint ParentId { get; set; } // combo-tree parent (XML `parentid`)
 	}
 }

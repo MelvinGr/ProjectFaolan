@@ -23,11 +23,6 @@ namespace Faolan.Core.Rdb
 		private const int DetailStrideV5 = 44;
 		private const int Md5Off = 28; // the 16-byte content md5 inside a v5 detail record
 
-		// The before/after content hashes for one inlined resource. OldMd5 is the manifest key to locate it in
-		// RDBHashIndex.bin; NewMd5 + Size describe the blob we wrote (what the manifest must be updated to so the
-		// client's ResourceManager stops re-downloading it). See RdbManifestWriter (#295).
-		public readonly record struct InlineResult(uint Type, uint Id, byte[] OldMd5, byte[] NewMd5, uint Size);
-
 		// Inline the given raw blobs (the exact IOz1+zlib bytes a local entry stores, i.e. what the CDN returns) into
 		// `dataFileNumber`.rdbdata under rdbDir, and patch le.idx so each (type,id) reads from there. Appends to the
 		// data file (so re-runs accumulate), rewrites le.idx in place. Also rewrites each entry's 16-byte content md5
@@ -77,12 +72,12 @@ namespace Faolan.Core.Rdb
 					data.Write(blob, 0, blob.Length);
 
 					var d = detailOff + i * DetailStrideV5;
-					var oldMd5 = idx.AsSpan(d + Md5Off, 16).ToArray();     // manifest key (the resource's pre-edit content hash)
-					var newMd5 = MD5.HashData(blob);                       // the edited blob's content hash
-					idx[d] = dataFileNumber;                                                    // file
+					var oldMd5 = idx.AsSpan(d + Md5Off, 16).ToArray(); // manifest key (the resource's pre-edit content hash)
+					var newMd5 = MD5.HashData(blob); // the edited blob's content hash
+					idx[d] = dataFileNumber; // file
 					BinaryPrimitives.WriteUInt32LittleEndian(idx.AsSpan(d + 4, 4), (uint)offset); // offset
 					BinaryPrimitives.WriteUInt32LittleEndian(idx.AsSpan(d + 8, 4), (uint)blob.Length); // size
-					newMd5.CopyTo(idx.AsSpan(d + Md5Off, 16));             // content md5 (client validates local data against this)
+					newMd5.CopyTo(idx.AsSpan(d + Md5Off, 16)); // content md5 (client validates local data against this)
 					results.Add(new InlineResult(type, id, oldMd5, newMd5, (uint)blob.Length));
 				}
 			}
@@ -90,8 +85,13 @@ namespace Faolan.Core.Rdb
 			// Rewrite le.idx atomically (temp + move) so a crash mid-write can't corrupt the index.
 			var tmp = idxPath + ".faolan-tmp";
 			File.WriteAllBytes(tmp, idx);
-			File.Move(tmp, idxPath, overwrite: true);
+			File.Move(tmp, idxPath, true);
 			return results;
 		}
+
+		// The before/after content hashes for one inlined resource. OldMd5 is the manifest key to locate it in
+		// RDBHashIndex.bin; NewMd5 + Size describe the blob we wrote (what the manifest must be updated to so the
+		// client's ResourceManager stops re-downloading it). See RdbManifestWriter (#295).
+		public readonly record struct InlineResult(uint Type, uint Id, byte[] OldMd5, byte[] NewMd5, uint Size);
 	}
 }

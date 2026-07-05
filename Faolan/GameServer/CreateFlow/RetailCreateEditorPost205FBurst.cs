@@ -23,7 +23,7 @@ namespace Faolan.GameServer.CreateFlow
 			Task StatIir(byte flag, uint statId, uint value) =>
 				new PacketStream()
 					.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.StatIIR).WriteArray(CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, flag, statId, value)))
+					.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR).WriteArray(CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, flag, statId, value)))
 					.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)

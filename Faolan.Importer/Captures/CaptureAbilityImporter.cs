@@ -26,9 +26,43 @@ namespace Faolan.Importer.Captures
 	public static class CaptureAbilityImporter
 	{
 		private const uint ChangeClassSubOpcode = 0xA36D3B74; // client->server character-editor script callback
+		private const uint ComboBookSubOpcode = 0xA8BBEB7F;
 		private const ushort AbilityGrantOpcode = 0x2052;
 		private const ushort IirCarrierOpcode = 0x2000; // ComboBookIIR rides the 0x2000 world-conversation carrier
-		private const uint ComboBookSubOpcode = 0xA8BBEB7F;
+
+		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
+		// from (retail never re-emits a ComboBookIIR on login - the combo book rides the 0x2076 world-entry snapshot
+		// instead; see ImportCharacterCombosAsync), so class membership comes from the catalog's name prefix (e.g.
+		// "Herald_..." = HeraldOfXotli). Hakotep's HoX lvl-24 0x2076 combo book validated that a catalog prefix reliably
+		// identifies the class, so these LITERAL class-name prefixes are trusted - and they are exactly the 8 archetypes
+		// that HAVE combos (matching the ellatha combos list), so casters (Necro/Demo/Priest/Tempest) correctly get none.
+		// Matched case-insensitively (the catalog has both "BearShaman_" and "Bearshaman_"). AMBIGUOUS prefixes are
+		// deliberately EXCLUDED (grant too little, not too much) - they map to multiple or uncertain classes and need a
+		// fan-out / feat-tree taxonomy + validation: archetype-shared (Soldier_/Rogue_ -> 3 classes each), the Tortage
+		// starters (Slave_/Oar_), feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack),
+		// NPC combos (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities.
+		private static readonly (string Prefix, Class Class)[] ClassComboPrefixes =
+		[
+			("Guardian_", Class.Guardian),
+			("Conqueror_", Class.Conqueror),
+			("DarkTemplar_", Class.DarkTemplar),
+			("Barbarian_", Class.Barbarian),
+			("Ranger_", Class.Ranger),
+			("Assassin_", Class.Assassin),
+			("BearShaman_", Class.BearShaman),
+			("Herald_", Class.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
+		];
+
+		// Abilities whose grant is LEVEL-gated, not part of the L1 create kit (#209/#73). Rest (269272) is absent
+		// from every create capture's login grants but arrives as an announced 0x2052 at the first ding (L1->L2:
+		// Blablabla frame 9937, Blablatest 1357, Stihetfv 685) and is in every L2+ char's login re-grant - so its
+		// unlock level is 2. The create-capture starter scan would otherwise misattribute it as a starting ability
+		// (the ding happens inside the create captures). GetStartingAbilities filters Level <= level, so a known
+		// level both keeps it out of the L1 kit and re-grants it on every L2+ login, matching all 30+ captures.
+		private static readonly Dictionary<uint, byte> KnownLevels = new Dictionary<uint, byte>
+		{
+			[269272] = 2 // Rest
+		};
 
 		// The few human-readable names the old archive knows (the rest are client-side / unknown).
 		[Obsolete]
@@ -42,16 +76,120 @@ namespace Faolan.Importer.Captures
 			[269272] = "Rest"
 		};
 
-		// Abilities whose grant is LEVEL-gated, not part of the L1 create kit (#209/#73). Rest (269272) is absent
-		// from every create capture's login grants but arrives as an announced 0x2052 at the first ding (L1->L2:
-		// Blablabla frame 9937, Blablatest 1357, Stihetfv 685) and is in every L2+ char's login re-grant - so its
-		// unlock level is 2. The create-capture starter scan would otherwise misattribute it as a starting ability
-		// (the ding happens inside the create captures). GetStartingAbilities filters Level <= level, so a known
-		// level both keeps it out of the L1 kit and re-grants it on every L2+ login, matching all 30+ captures.
-		private static readonly Dictionary<uint, byte> KnownLevels = new Dictionary<uint, byte>
+		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
+		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
+		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only
+		// abilities land at their high char levels -> naturally gated out of a fresh char). The data-driven replacement
+		// for IsStartingAbility + the single Ability.Class - true multi-class (Spellweaving lands under every captured
+		// caster class, not a wrong "generic"). The ability RDB template carries no class/level, so this is the source.
+		public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger logger = null)
 		{
-			[269272] = 2 // Rest
-		};
+			var grants = await db
+				.CharacterAbilities
+				.Join(db.Characters,
+				ca => ca.CharacterId,
+				c => c.Id,
+				(ca, c) => new
+				{
+					ca.AbilityId,
+					c.Level,
+					c.Class
+				})
+				.ToListAsync();
+
+			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
+
+			// Skip characters with an invalid class (0/1): create-flow chars captured BEFORE class selection carry an
+			// unset class the importer records as-is - real classes are the 12 defined Class enum values. Without this
+			// guard those pollute the access map with a phantom "class 1" holding the universal kit.
+			var inserted = 0;
+			var updated = 0;
+			foreach (var g in grants.Where(x => abilityIds.Contains(x.AbilityId) && Enum.IsDefined(x.Class)).GroupBy(x => (x.Class, x.AbilityId)))
+			{
+				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
+				if (existing.TryGetValue(g.Key, out var row))
+				{
+					if (row.Level != minLevel)
+					{
+						row.Level = minLevel;
+						updated++;
+					}
+				}
+				else
+				{
+					db.ClassAbilities.Add(new ClassAbility
+					{
+						Class = g.Key.Class,
+						AbilityId = g.Key.AbilityId,
+						Level = minLevel
+					});
+					inserted++;
+				}
+			}
+
+			if (inserted > 0 || updated > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassAbility rows ({Updated} levels updated) from per-character grants.", inserted, updated);
+			return (inserted, updated);
+		}
+
+		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's class-name prefixes - the combo
+		// analogue of DeriveClassAbilitiesAsync (which derives from grants; combos have none). Combo.Level supplies the
+		// per-class unlock level. Idempotent.
+		public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger logger = null)
+		{
+			var combos = await db
+				.Combos
+				.Select(c => new
+				{
+					c.Id,
+					c.Name,
+					c.Level
+				})
+				.ToListAsync();
+			var existing = await db.ClassCombos.ToDictionaryAsync(x => (x.Class, x.ComboId));
+
+			var inserted = 0;
+			var updated = 0;
+			foreach (var combo in combos)
+			{
+				if (combo.Name == null)
+					continue;
+
+				foreach (var (prefix, cls) in ClassComboPrefixes)
+				{
+					if (!combo.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+						continue;
+
+					if (existing.TryGetValue((cls, combo.Id), out var row))
+					{
+						if (row.Level != combo.Level)
+						{
+							row.Level = combo.Level;
+							updated++;
+						}
+					}
+					else
+					{
+						db.ClassCombos.Add(new ClassCombo
+						{
+							Class = cls,
+							ComboId = combo.Id,
+							Level = combo.Level
+						});
+						inserted++;
+					}
+				}
+			}
+
+			if (inserted > 0 || updated > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassCombo rows ({Updated} levels updated) from validated catalog prefixes.", inserted, updated);
+			return (inserted, updated);
+		}
 
 		// rawPackets = ALL captures. Catalogs every ability's Id + Slot/Data identity seen on the wire (the Data quad is
 		// also its RDB 1000020 TEA key, so RdbAbilityImporter can name it). The class<->ability ACCESS and per-class
@@ -101,6 +239,52 @@ namespace Faolan.Importer.Captures
 			return (grants.Count, inserted, updated);
 		}
 
+		// Seeds each captured character's granted ABILITY set (CharacterAbility rows) from the 0x2052 grants, keyed by
+		// the grant's RpcHeader receiver instance (= character id) - the ability twin of CaptureSpellImporter's learned-
+		// spell seeding. Abilities are NOT in the snapshot known-list, so this is the authoritative per-character set
+		// (the action bar is only shortcuts). Only characters already in the DB are touched; idempotent.
+		public static async Task<(int Characters, int Inserted)> ImportCharacterAbilitiesAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		{
+			var byCharacter = new Dictionary<uint, HashSet<uint>>();
+			foreach (var packet in rawPackets)
+				TryReadCharacterGrant(packet, byCharacter, false);
+
+			var (characters, inserted) = await SeedPerCharacterAsync(db,
+				byCharacter,
+				async cid => (await db.CharacterAbilities.Where(a => a.CharacterId == cid).Select(a => a.AbilityId).ToListAsync()).ToHashSet(),
+				(cid, id) => db.CharacterAbilities.Add(new CharacterAbility
+				{
+					CharacterId = cid,
+					AbilityId = id
+				}));
+
+			logger?.LogInformation("CaptureAbilityImporter: per-character ability sets for {C} characters, {I} new CharacterAbility rows.", characters, inserted);
+			return (characters, inserted);
+		}
+
+		// Seeds each captured character's COMBO book (CharacterCombo rows) from the ComboBookIIR grants (0x2000 carrier,
+		// sub-opcode 0xA8BBEB7F), keyed by the RpcHeader receiver instance (= character id). Combos are class/level
+		// content the client's combo book gains per level; a max-level imported character never dings, so this persisted
+		// set is what GrantCharacterCombos re-emits on login. Only characters already in the DB are touched; idempotent.
+		public static async Task<(int Characters, int Inserted)> ImportCharacterCombosAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		{
+			var byCharacter = new Dictionary<uint, HashSet<uint>>();
+			foreach (var packet in rawPackets)
+				TryReadCharacterGrant(packet, byCharacter, true);
+
+			var (characters, inserted) = await SeedPerCharacterAsync(db,
+				byCharacter,
+				async cid => (await db.CharacterCombos.Where(c => c.CharacterId == cid).Select(c => c.ComboId).ToListAsync()).ToHashSet(),
+				(cid, id) => db.CharacterCombos.Add(new CharacterCombo
+				{
+					CharacterId = cid,
+					ComboId = id
+				}));
+
+			logger?.LogInformation("CaptureAbilityImporter: combo books for {C} characters, {I} new CharacterCombo rows.", characters, inserted);
+			return (characters, inserted);
+		}
+
 		// The character class chosen in this capture, read from its ChangeClass editor callback (client->server
 		// 0xA36D3B74, body = [ack u32][instance u32][reserved u8][pbLen u32][protobuf: f3 varint=value, f4 string=token]).
 		// The editor sends class as 2x the real id (see HandleCommandPacket), so the class = value/2. Returns null when
@@ -140,157 +324,9 @@ namespace Faolan.Importer.Captures
 			return value;
 		}
 
-		// Seeds each captured character's granted ABILITY set (CharacterAbility rows) from the 0x2052 grants, keyed by
-		// the grant's RpcHeader receiver instance (= character id) - the ability twin of CaptureSpellImporter's learned-
-		// spell seeding. Abilities are NOT in the snapshot known-list, so this is the authoritative per-character set
-		// (the action bar is only shortcuts). Only characters already in the DB are touched; idempotent.
-		public static async Task<(int Characters, int Inserted)> ImportCharacterAbilitiesAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
-		{
-			var byCharacter = new Dictionary<uint, HashSet<uint>>();
-			foreach (var packet in rawPackets)
-				TryReadCharacterGrant(packet, byCharacter, isCombo: false);
-
-			var (characters, inserted) = await SeedPerCharacterAsync(db, byCharacter,
-				async cid => (await db.CharacterAbilities.Where(a => a.CharacterId == cid).Select(a => a.AbilityId).ToListAsync()).ToHashSet(),
-				(cid, id) => db.CharacterAbilities.Add(new CharacterAbility { CharacterId = cid, AbilityId = id }));
-
-			logger?.LogInformation("CaptureAbilityImporter: per-character ability sets for {C} characters, {I} new CharacterAbility rows.", characters, inserted);
-			return (characters, inserted);
-		}
-
-		// Seeds each captured character's COMBO book (CharacterCombo rows) from the ComboBookIIR grants (0x2000 carrier,
-		// sub-opcode 0xA8BBEB7F), keyed by the RpcHeader receiver instance (= character id). Combos are class/level
-		// content the client's combo book gains per level; a max-level imported character never dings, so this persisted
-		// set is what GrantCharacterCombos re-emits on login. Only characters already in the DB are touched; idempotent.
-		public static async Task<(int Characters, int Inserted)> ImportCharacterCombosAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
-		{
-			var byCharacter = new Dictionary<uint, HashSet<uint>>();
-			foreach (var packet in rawPackets)
-				TryReadCharacterGrant(packet, byCharacter, isCombo: true);
-
-			var (characters, inserted) = await SeedPerCharacterAsync(db, byCharacter,
-				async cid => (await db.CharacterCombos.Where(c => c.CharacterId == cid).Select(c => c.ComboId).ToListAsync()).ToHashSet(),
-				(cid, id) => db.CharacterCombos.Add(new CharacterCombo { CharacterId = cid, ComboId = id }));
-
-			logger?.LogInformation("CaptureAbilityImporter: combo books for {C} characters, {I} new CharacterCombo rows.", characters, inserted);
-			return (characters, inserted);
-		}
-
-		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
-		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
-		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only
-		// abilities land at their high char levels -> naturally gated out of a fresh char). The data-driven replacement
-		// for IsStartingAbility + the single Ability.Class - true multi-class (Spellweaving lands under every captured
-		// caster class, not a wrong "generic"). The ability RDB template carries no class/level, so this is the source.
-		public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger logger = null)
-		{
-			var grants = await db.CharacterAbilities
-				.Join(db.Characters, ca => ca.CharacterId, c => c.Id, (ca, c) => new { ca.AbilityId, c.Level, c.Class })
-				.ToListAsync();
-
-			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
-			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
-
-			// Skip characters with an invalid class (0/1): create-flow chars captured BEFORE class selection carry an
-			// unset class the importer records as-is - real classes are the 12 defined Class enum values. Without this
-			// guard those pollute the access map with a phantom "class 1" holding the universal kit.
-			var inserted = 0;
-			var updated = 0;
-			foreach (var g in grants.Where(x => abilityIds.Contains(x.AbilityId) && Enum.IsDefined(x.Class)).GroupBy(x => (x.Class, x.AbilityId)))
-			{
-				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
-				if (existing.TryGetValue(g.Key, out var row))
-				{
-					if (row.Level != minLevel)
-					{
-						row.Level = minLevel;
-						updated++;
-					}
-				}
-				else
-				{
-					db.ClassAbilities.Add(new ClassAbility { Class = g.Key.Class, AbilityId = g.Key.AbilityId, Level = minLevel });
-					inserted++;
-				}
-			}
-
-			if (inserted > 0 || updated > 0)
-				await db.SaveChangesAsync();
-
-			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassAbility rows ({Updated} levels updated) from per-character grants.", inserted, updated);
-			return (inserted, updated);
-		}
-
-		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
-		// from (retail never re-emits a ComboBookIIR on login - the combo book rides the 0x2076 world-entry snapshot
-		// instead; see ImportCharacterCombosAsync), so class membership comes from the catalog's name prefix (e.g.
-		// "Herald_..." = HeraldOfXotli). Hakotep's HoX lvl-24 0x2076 combo book validated that a catalog prefix reliably
-		// identifies the class, so these LITERAL class-name prefixes are trusted - and they are exactly the 8 archetypes
-		// that HAVE combos (matching the ellatha combos list), so casters (Necro/Demo/Priest/Tempest) correctly get none.
-		// Matched case-insensitively (the catalog has both "BearShaman_" and "Bearshaman_"). AMBIGUOUS prefixes are
-		// deliberately EXCLUDED (grant too little, not too much) - they map to multiple or uncertain classes and need a
-		// fan-out / feat-tree taxonomy + validation: archetype-shared (Soldier_/Rogue_ -> 3 classes each), the Tortage
-		// starters (Slave_/Oar_), feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack),
-		// NPC combos (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities.
-		private static readonly (string Prefix, Class Class)[] ClassComboPrefixes =
-		[
-			("Guardian_", Class.Guardian),
-			("Conqueror_", Class.Conqueror),
-			("DarkTemplar_", Class.DarkTemplar),
-			("Barbarian_", Class.Barbarian),
-			("Ranger_", Class.Ranger),
-			("Assassin_", Class.Assassin),
-			("BearShaman_", Class.BearShaman),
-			("Herald_", Class.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
-		];
-
-		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's class-name prefixes - the combo
-		// analogue of DeriveClassAbilitiesAsync (which derives from grants; combos have none). Combo.Level supplies the
-		// per-class unlock level. Idempotent.
-		public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger logger = null)
-		{
-			var combos = await db.Combos.Select(c => new { c.Id, c.Name, c.Level }).ToListAsync();
-			var existing = await db.ClassCombos.ToDictionaryAsync(x => (x.Class, x.ComboId));
-
-			var inserted = 0;
-			var updated = 0;
-			foreach (var combo in combos)
-			{
-				if (combo.Name == null)
-					continue;
-
-				foreach (var (prefix, cls) in ClassComboPrefixes)
-				{
-					if (!combo.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-						continue;
-
-					if (existing.TryGetValue((cls, combo.Id), out var row))
-					{
-						if (row.Level != combo.Level)
-						{
-							row.Level = combo.Level;
-							updated++;
-						}
-					}
-					else
-					{
-						db.ClassCombos.Add(new ClassCombo { Class = cls, ComboId = combo.Id, Level = combo.Level });
-						inserted++;
-					}
-				}
-			}
-
-			if (inserted > 0 || updated > 0)
-				await db.SaveChangesAsync();
-
-			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassCombo rows ({Updated} levels updated) from validated catalog prefixes.", inserted, updated);
-			return (inserted, updated);
-		}
-
 		// Shared per-character seeding: for every (characterId -> id set), skip characters not in the DB and ids already
 		// recorded, add the rest via the supplied factory, save once. Returns (characters touched, rows inserted).
-		private static async Task<(int Characters, int Inserted)> SeedPerCharacterAsync(IDatabaseContext db, Dictionary<uint, HashSet<uint>> byCharacter,
-			Func<uint, Task<HashSet<uint>>> loadExisting, Action<uint, uint> add)
+		private static async Task<(int Characters, int Inserted)> SeedPerCharacterAsync(IDatabaseContext db, Dictionary<uint, HashSet<uint>> byCharacter, Func<uint, Task<HashSet<uint>>> loadExisting, Action<uint, uint> add)
 		{
 			if (byCharacter.Count == 0)
 				return (0, 0);
@@ -322,46 +358,6 @@ namespace Faolan.Importer.Captures
 				await db.SaveChangesAsync();
 
 			return (characters, inserted);
-		}
-
-		// Reads one per-character grant into byCharacter, keyed by the RpcHeader receiver (= character id): an ability
-		// grant (0x2052, ability id = body word 1, doubled) or a ComboBookIIR combo (0x2000 carrier, sub 0xA8BBEB7F,
-		// comboId at body offset 18 after [len][subop][marker][instance][u16 addflag]).
-		private static void TryReadCharacterGrant(byte[] packetBytes, IDictionary<uint, HashSet<uint>> byCharacter, bool isCombo)
-		{
-			try
-			{
-				var packet = new ConanPacket(packetBytes);
-				var body = packet.Body.ReadRemainingArray();
-
-				uint id;
-				if (isCombo)
-				{
-					if (packet.Opcode != IirCarrierOpcode || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
-						return;
-					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4));
-				}
-				else
-				{
-					if (packet.Opcode != AbilityGrantOpcode || body.Length < 12)
-						return;
-					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)); // ability id (word 1)
-					if (id != BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)))
-						return; // id appears twice; guard against mis-parses
-				}
-
-				if (id == 0)
-					return;
-
-				var characterId = packet.Receiver.Instance;
-				(byCharacter.TryGetValue(characterId, out var set)
-					? set
-					: byCharacter[characterId] = new HashSet<uint>()).Add(id);
-			}
-			catch
-			{
-				// not a parseable per-character grant
-			}
 		}
 
 		// 0x2052 body (no length prefix): [slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]x2[1][0][u8].
@@ -447,6 +443,48 @@ namespace Faolan.Importer.Captures
 
 			classId = numericValue / 2;
 			return true;
+		}
+
+		// Reads one per-character grant into byCharacter, keyed by the RpcHeader receiver (= character id): an ability
+		// grant (0x2052, ability id = body word 1, doubled) or a ComboBookIIR combo (0x2000 carrier, sub 0xA8BBEB7F,
+		// comboId at body offset 18 after [len][subop][marker][instance][u16 addflag]).
+		private static void TryReadCharacterGrant(byte[] packetBytes, IDictionary<uint, HashSet<uint>> byCharacter, bool isCombo)
+		{
+			try
+			{
+				var packet = new ConanPacket(packetBytes);
+				var body = packet.Body.ReadRemainingArray();
+
+				uint id;
+				if (isCombo)
+				{
+					if (packet.Opcode != IirCarrierOpcode || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
+						return;
+
+					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4));
+				}
+				else
+				{
+					if (packet.Opcode != AbilityGrantOpcode || body.Length < 12)
+						return;
+
+					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)); // ability id (word 1)
+					if (id != BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)))
+						return; // id appears twice; guard against mis-parses
+				}
+
+				if (id == 0)
+					return;
+
+				var characterId = packet.Receiver.Instance;
+				(byCharacter.TryGetValue(characterId, out var set)
+					? set
+					: byCharacter[characterId] = new HashSet<uint>()).Add(id);
+			}
+			catch
+			{
+				// not a parseable per-character grant
+			}
 		}
 	}
 }

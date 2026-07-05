@@ -43,7 +43,9 @@ namespace Faolan.GameServer
 			{
 				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);
 				var nextXp = LevelingResolver.CumulativeXpForLevel(lvl + 1);
-				var currentXp = lvl == toLevel ? thisXp + finalRemainingXp : thisXp; // only the final level carries partial XP
+				var currentXp = lvl == toLevel
+					? thisXp + finalRemainingXp
+					: thisXp; // only the final level carries partial XP
 				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
 
 				await SendWorldIir(client, NewLevelIirCodec.Build(instance, lvl, deltas));
@@ -56,15 +58,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
-		private Task SendWorldIir(INetworkClient client, byte[] body)
-		{
-			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
-			ps.WriteArray(body);
-			return ps.SendAsync(client);
-		}
-
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute
 		// that rose (#209). This is the VISIBLE half of a level-up; the caller still pushes the new vitals maxima.
 		// `levelsGained` covers a multi-level jump (e.g. a `.level 40` set). The growth amounts are provisional
@@ -74,6 +67,15 @@ namespace Faolan.GameServer
 			var character = client.Session.Character;
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, newLevel, levelsGained))
 				await SendFeedback(client, AttributeChangedFeedback.BuildXml(attributeId, amount), AttributeChangedFeedback.TypeFlags, AttributeChangedFeedback.Footer);
+		}
+
+		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
+		private Task SendWorldIir(INetworkClient client, byte[] body)
+		{
+			var ps = new PacketStream();
+			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
+			ps.WriteArray(body);
+			return ps.SendAsync(client);
 		}
 	}
 }

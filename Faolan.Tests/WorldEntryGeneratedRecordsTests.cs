@@ -1,6 +1,7 @@
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.GameServer;
+using Faolan.GameServer.World;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -45,7 +46,7 @@ namespace Faolan.Tests
 		public void BuildMapChange_ReproducesCapturedRecord()
 		{
 			// map=null -> BuildMapChange uses the beach defaults (instanced, count 2, fieldB 3, flags 0), reproducing the beach capture.
-			var record = IirRecordCodec.Parse(GameServerListener.BuildMapChange(BeachClient(), null, Faolan.GameServer.World.WorldState.DefaultPlayfieldToken), 0);
+			var record = IirRecordCodec.Parse(GameServerListener.BuildMapChange(BeachClient(), null, WorldState.DefaultPlayfieldToken), 0);
 
 			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
 			Assert.Equal(IirMessageTypes.MapChange, record.IirType);

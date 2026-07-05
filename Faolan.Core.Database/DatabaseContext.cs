@@ -11,13 +11,14 @@ namespace Faolan.Core.Database
 	{
 		DatabaseFacade Database { get; } // from DbContext
 		DbSet<Ability> Abilities { get; }
-		DbSet<Combo> Combos { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AppearanceChoice> AppearanceChoices { get; }
 		DbSet<Character> Characters { get; }
+		DbSet<CharacterAbility> CharacterAbilities { get; }
 		DbSet<CharacterAttribute> CharacterAttributes { get; }
 		DbSet<CharacterBody> CharacterBodies { get; }
 		DbSet<CharacterBodyResource> CharacterBodyResources { get; }
+		DbSet<CharacterCombo> CharacterCombos { get; }
 		DbSet<CharacterEquipment> CharacterEquipment { get; }
 		DbSet<CharacterInventory> CharacterInventory { get; }
 		DbSet<CharacterMaxStats> CharacterMaxStats { get; }
@@ -26,15 +27,14 @@ namespace Faolan.Core.Database
 		DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; }
 		DbSet<CharacterShortcut> CharacterShortcuts { get; }
 		DbSet<CharacterSkill> CharacterSkills { get; }
-		DbSet<CharacterStat> CharacterStats { get; }
-		DbSet<CharacterAbility> CharacterAbilities { get; }
-		DbSet<CharacterCombo> CharacterCombos { get; }
 		DbSet<CharacterSpell> CharacterSpells { get; }
+		DbSet<CharacterStat> CharacterStats { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
 		DbSet<ChatMessage> ChatMessages { get; }
 		DbSet<ClassAbility> ClassAbilities { get; }
 		DbSet<ClassCombo> ClassCombos { get; }
 		DbSet<ClassSpell> ClassSpells { get; }
+		DbSet<Combo> Combos { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<Guild> Guilds { get; }
@@ -68,14 +68,15 @@ namespace Faolan.Core.Database
 	public class DatabaseContext : DbContext, IDatabaseContext
 	{
 		public DbSet<Ability> Abilities { get; set; }
-		public DbSet<Combo> Combos { get; set; }
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AppearanceChoice> AppearanceChoices { get; set; }
 		public DbSet<Character> Characters { get; set; }
+		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
 
 		public DbSet<CharacterAttribute> CharacterAttributes { get; set; }
 		public DbSet<CharacterBody> CharacterBodies { get; set; }
 		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
+		public DbSet<CharacterCombo> CharacterCombos { get; set; }
 		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
 		public DbSet<CharacterInventory> CharacterInventory { get; set; }
 
@@ -85,15 +86,14 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; set; }
 		public DbSet<CharacterShortcut> CharacterShortcuts { get; set; }
 		public DbSet<CharacterSkill> CharacterSkills { get; set; }
-		public DbSet<CharacterStat> CharacterStats { get; set; }
-		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
-		public DbSet<CharacterCombo> CharacterCombos { get; set; }
 		public DbSet<CharacterSpell> CharacterSpells { get; set; }
+		public DbSet<CharacterStat> CharacterStats { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
 		public DbSet<ChatMessage> ChatMessages { get; set; }
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
 		public DbSet<ClassCombo> ClassCombos { get; set; }
 		public DbSet<ClassSpell> ClassSpells { get; set; }
+		public DbSet<Combo> Combos { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<Guild> Guilds { get; set; }

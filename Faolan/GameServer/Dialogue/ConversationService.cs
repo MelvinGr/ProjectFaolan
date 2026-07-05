@@ -278,8 +278,8 @@ namespace Faolan.GameServer.Dialogue
 		private async Task ServeScreen(INetworkClient client, ConversationNode node, uint clickedNpcHandle)
 		{
 			var liveInstance = client.Session.Account.ClientInstance;
-			var oldInstanceVarint = Varint.Encode(node.CapturedInstance);
-			var newInstanceVarint = Varint.Encode(liveInstance);
+			var oldInstanceVarint = new FaolanStream().WriteVarint(node.CapturedInstance).ToArray();
+			var newInstanceVarint = new FaolanStream().WriteVarint(liveInstance).ToArray();
 
 			// The live player's name/guild are regenerated into each screen's remoteformat XML (replacing the captured
 			// player's), so a dialogue addresses the player who's actually talking. Guild is empty when guildless.

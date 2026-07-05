@@ -52,7 +52,7 @@ namespace Faolan.GameServer.Combat
 				.WriteUInt32(0)
 				.WriteUInt32(0x1b)
 				.WriteUInt32(2)
-				.WriteUInt32((uint)delta)
+				.WriteUInt32(delta)
 				.WriteUInt32(statId)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(caster)

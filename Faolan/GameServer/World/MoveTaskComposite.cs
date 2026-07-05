@@ -123,7 +123,7 @@ namespace Faolan.GameServer.World
 				case 4:
 					WriteHeader(s);
 					s.WriteByte(ListMin);
-					s.WriteByte((byte)Children.Count);
+					s.WriteByte(Children.Count);
 					foreach (var child in Children)
 						child.Write(s);
 					break;
@@ -213,7 +213,7 @@ namespace Faolan.GameServer.World
 				s.WriteUInt16(PathPacked1).WriteUInt16(PathPacked2);
 			else
 			{
-				s.WriteUInt32((uint)(Waypoints.Count / 3));
+				s.WriteUInt32(Waypoints.Count / 3);
 				foreach (var w in Waypoints)
 					s.WriteUInt32(w);
 			}

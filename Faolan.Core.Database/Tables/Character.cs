@@ -71,13 +71,15 @@ namespace Faolan.Core.Database.Tables
 		public bool IsDead { get; set; }
 		public byte GuildRank { get; set; }
 
+		[ConstrainToEnumValues]
+		public Class Class { get; set; }
+
 		public DateTimeOffset CreationDate { get; set; }
 		public DateTimeOffset? LastConnection { get; set; }
 
 		[ConstrainToEnumValues]
-		public Class Class { get; set; }
-		[ConstrainToEnumValues]
 		public Race Race { get; set; }
+
 		[ConstrainToEnumValues]
 		public Sex Sex { get; set; }
 

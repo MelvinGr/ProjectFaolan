@@ -73,7 +73,7 @@ namespace Faolan.Core.Rdb
 
 			var tmp = path + ".faolan-tmp";
 			File.WriteAllBytes(tmp, man);
-			File.Move(tmp, path, overwrite: true);
+			File.Move(tmp, path, true);
 			return patched;
 		}
 	}

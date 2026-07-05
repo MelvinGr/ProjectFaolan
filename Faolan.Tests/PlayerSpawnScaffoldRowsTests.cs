@@ -170,16 +170,6 @@ namespace Faolan.Tests
 			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(null, scaffold));
 		}
 
-		private static byte[] Golden(string name)
-		{
-			return File.ReadAllBytes(Path.Combine(GoldenDir(), name + ".bin"));
-		}
-
-		private static string GoldenDir([CallerFilePath] string thisFile = "")
-		{
-			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
-		}
-
 		// The frame + EntryTableX are no longer stored - TryApplyFrom reconstructs them from the character's class. So
 		// a captured spawn round-trips to its CONSTRUCTED form: identical rows (entry table / feats / pairs) + IIR, with
 		// the frame regenerated as FreshPreFrame(class), EntryTableX 0xB7, and transient buff/session records dropped.
@@ -192,11 +182,25 @@ namespace Faolan.Tests
 			return PlayerSpawnScaffoldCodec.Generate(s);
 		}
 
+		private static byte[] Golden(string name)
+		{
+			return File.ReadAllBytes(Path.Combine(GoldenDir(), name + ".bin"));
+		}
+
+		private static string GoldenDir([CallerFilePath] string thisFile = "")
+		{
+			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
+		}
+
 		private static byte[] RoundTripThroughRows(byte[] body, Class @class)
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
 
-			var character = new Character { Id = 0x02000005, Class = @class };
+			var character = new Character
+			{
+				Id = 0x02000005,
+				Class = @class
+			};
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
 
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out _)); // fresh instance, then rows overwrite

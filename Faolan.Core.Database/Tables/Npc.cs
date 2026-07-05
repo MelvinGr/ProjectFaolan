@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -19,12 +19,23 @@ namespace Faolan.Core.Database.Tables
 		// The spells this NPC type casts (#232) - now FK'd to the type instead of joined by name string.
 		public virtual ICollection<NpcSpell> Spells { get; set; } = new List<NpcSpell>();
 
+		// The type-level CharacterIIR stat CORE source (CharacterStats / NpcStats / Bcc) - the SAME kind of captured
+		// FA015807 body NpcSpawn.Data holds, but lifted to the TYPE (#244) so a creature can be spawned from its type
+		// ALONE, with a caller-supplied transform and NO world placement. This is what a summoned PET needs (#307):
+		// SummonPetForPlayer builds the spawn from a creature's type at the player's position. Populated once per type
+		// (from a representative NpcSpawn.Data, or - for summon-only creatures like the Deathless Acolyte pet - imported
+		// straight from a pet-summon capture). Null for types not yet lifted (those still spawn via NpcSpawn.Data).
+		public byte[] Data { get; set; }
+
 		// The creature's display name (the stable join key conversations/shops/spells use).
 		[MaxLength(128)]
 		public string Name { get; set; }
 
 		// Faction/community (NpcStats.community): 0 = neutral/friendly, > 0 = a hostile faction.
 		public uint Community { get; set; }
+
+		// Type-level level (drives the pet's max-health when spawned from the type). 0 = derive from Data / unknown.
+		public uint Level { get; set; }
 
 		// Deliberately raw uint, NOT the player Race/Sex enums, despite the names - a different domain: this is a
 		// CREATURE model-race code (observed 0..98, far beyond the 3 playable races Aquilonian/Cimmerian/Stygian), so
@@ -37,16 +48,5 @@ namespace Faolan.Core.Database.Tables
 
 		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId). Unique - one Npc row per template.
 		public uint TemplateId { get; set; }
-
-		// The type-level CharacterIIR stat CORE source (CharacterStats / NpcStats / Bcc) - the SAME kind of captured
-		// FA015807 body NpcSpawn.Data holds, but lifted to the TYPE (#244) so a creature can be spawned from its type
-		// ALONE, with a caller-supplied transform and NO world placement. This is what a summoned PET needs (#307):
-		// SummonPetForPlayer builds the spawn from a creature's type at the player's position. Populated once per type
-		// (from a representative NpcSpawn.Data, or - for summon-only creatures like the Deathless Acolyte pet - imported
-		// straight from a pet-summon capture). Null for types not yet lifted (those still spawn via NpcSpawn.Data).
-		public byte[] Data { get; set; }
-
-		// Type-level level (drives the pet's max-health when spawned from the type). 0 = derive from Data / unknown.
-		public uint Level { get; set; }
 	}
 }

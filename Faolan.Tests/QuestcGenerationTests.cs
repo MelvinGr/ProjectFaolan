@@ -25,20 +25,6 @@ namespace Faolan.Tests
 		// (it comes from CharacterQuest live). Everything else now rides in QuestDefinition (seeded for 10238).
 		private const uint BeachState = 1;
 
-		// The production helper (gated FAOLAN_GENERATE_BEACH_QUEST_TAILS path) builds the quest portion byte-identical
-		// to the beach template's @0..1292 - so flipping the flag splices identical bytes for a fresh beach char. #186.
-		[Fact]
-		public async Task BuildSingleQuestPortion_MatchesTemplate_ByteExact()
-		{
-			var def = await LoadDefinition(BeachStarterQuestId);
-			Assert.NotNull(def);
-
-			var portion = SnapshotTailsBuilder.BuildSingleQuestPortion(def, BeachState, 0x02165EFF);
-
-			Assert.Equal(SnapshotTailsBuilder.QuestPortionLength, portion.Length);
-			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
-		}
-
 		// The @609 objective region GENERATES from the DB per-goal model (QuestGoalDefinition rows seeded for the beach
 		// starter), reproducing the template's @609..1168 bytes exactly - so the whole quest region is now DB-sourced.
 		[Fact]
@@ -69,6 +55,20 @@ namespace Faolan.Tests
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.Equal(RegionEnd, built.Length);
 			Assert.Equal(template[..RegionEnd], built);
+		}
+
+		// The production helper (gated FAOLAN_GENERATE_BEACH_QUEST_TAILS path) builds the quest portion byte-identical
+		// to the beach template's @0..1292 - so flipping the flag splices identical bytes for a fresh beach char. #186.
+		[Fact]
+		public async Task BuildSingleQuestPortion_MatchesTemplate_ByteExact()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			var portion = SnapshotTailsBuilder.BuildSingleQuestPortion(def, BeachState, 0x02165EFF);
+
+			Assert.Equal(SnapshotTailsBuilder.QuestPortionLength, portion.Length);
+			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
 		}
 
 		// The WHOLE quest portion of the tails (@0..1292 = Quest_c + @609 + index) regenerates byte-exact from the DB

@@ -159,7 +159,9 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			var name = packet.Body.ReadString();
-			var form = packet.Body.Length - packet.Body.Position >= 1 ? packet.Body.ReadByte() : (byte)0; // guild-form (docs/create-guild-decode.md)
+			var form = packet.Body.Length - packet.Body.Position >= 1
+				? packet.Body.ReadByte()
+				: (byte)0; // guild-form (docs/create-guild-decode.md)
 			if (string.IsNullOrWhiteSpace(name) || character.GuildId != null)
 			{
 				_logger.LogWarning("CreateGuild rejected for {CharacterId:X8}: name \"{Name}\", already in guild: {InGuild}.", character.Id, name, character.GuildId != null);

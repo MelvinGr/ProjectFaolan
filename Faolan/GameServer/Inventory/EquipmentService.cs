@@ -1,4 +1,3 @@
-using Faolan.Core.Network.Protobuf;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,6 +5,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 
@@ -88,10 +88,7 @@ namespace Faolan.GameServer.Inventory
 					return;
 				}
 
-				var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment
-				{
-					CharacterId = character.Id
-				};
+				var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment { CharacterId = character.Id };
 
 				equipment[targetSlot] = item;
 
@@ -266,6 +263,5 @@ namespace Faolan.GameServer.Inventory
 				_logger.LogWarning(ex, "Failed to persist unequip from {Slot}.", fromSlot);
 			}
 		}
-
 	}
 }

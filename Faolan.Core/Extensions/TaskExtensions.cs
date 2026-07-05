@@ -14,7 +14,8 @@ namespace Faolan.Core.Extensions
 			///     swallowing + logging any exception (a detached continuation must never crash the caller, and an
 			///     unobserved faulted task is a silent leak). Replaces the
 			///     <c>_ = Task.Run(async () =&gt; { await Task.Delay(...); try { ... } catch { ... } })</c> boilerplate,
-			///     e.g. a deferred spell-cast resolution or the mount channel: <c>Task.RunAfter(delay, async () =&gt; { ... }, logger)</c>.
+			///     e.g. a deferred spell-cast resolution or the mount channel:
+			///     <c>Task.RunAfter(delay, async () =&gt; { ... }, logger)</c>.
 			/// </summary>
 			public static void RunAfter(TimeSpan delay, Func<Task> action, ILogger logger = null, [CallerMemberName] string caller = null)
 			{

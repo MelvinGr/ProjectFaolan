@@ -24,25 +24,6 @@ namespace Faolan.Core.Rdb.Assets
 		// The ATI1 (BC4) detail sub-texture inside a MIXD container is tagged "ATI1" immediately before its mip data.
 		private static ReadOnlySpan<byte> Ati1Tag => "ATI1"u8;
 
-		// Robustly locate the ATI1 detail sub-texture's tag inside a MIXD container's pixel bytes (the payload after
-		// the 24-byte FCTX header). The container is a chain of sub-textures (client MIXDTextureLoader,
-		// FUN_00de0bd0: a flags byte gives 1-3 sub-textures, each read with its own fourcc); for the body atlases
-		// that is [6 B/block compact-normal][BC5/ATI2 normal][ "ATI1" ][BC4 detail], with the ATI1 detail the FINAL
-		// sub-texture. Because the detail occupies a full smallest-first BC4 mip chain to the end of the payload, its
-		// tag sits at exactly (length - fullBc4Chain - 4). Anchoring by that computed position and VALIDATING the
-		// four tag bytes there is robust against a coincidental "ATI1" byte-run inside the compressed data (which a
-		// blind LastIndexOf would wrongly pick when it falls after the real tag). Falls back to the byte scan when
-		// the computed position doesn't validate (a MIXD whose layout differs), so it is never worse than the scan.
-		// Returns the offset of the tag, or -1 if no ATI1 sub-texture is found.
-		private static int LocateAti1Tag(ReadOnlySpan<byte> pixels, int width, int height, int mip)
-		{
-			var computed = pixels.Length - FullChainSize(width, height, mip, 8) - Ati1Tag.Length;
-			if (computed >= 0 && pixels.Slice(computed, Ati1Tag.Length).SequenceEqual(Ati1Tag))
-				return computed;
-
-			return pixels.LastIndexOf(Ati1Tag);
-		}
-
 		public static Result Convert(ReadOnlySpan<byte> payload)
 		{
 			if (!IsFctx(payload))
@@ -97,6 +78,35 @@ namespace Faolan.Core.Rdb.Assets
 		public static bool IsFctx(ReadOnlySpan<byte> payload)
 		{
 			return payload.Length >= 4 && payload[0] == (byte)'F' && payload[1] == (byte)'C' && payload[2] == (byte)'T' && payload[3] == (byte)'X';
+		}
+
+		// Decode the full-res tangent-space NORMAL map from a MIXD container to RGBA (X=R, Y=G, Z reconstructed). The
+		// MIXD body-atlas layout (1024x1024) is: [6 B/block compact-normal][BC5/ATI2 normal chain][ "ATI1" ][BC4
+		// detail chain] - the compact-normal seg1 is the client's DXT5-fallback source (redundant with the BC5, RE'd
+		// via FUN_00ddf960; not a gloss/AO map, so nothing to extract from it). The BC5 normal chain sits immediately
+		// before the "ATI1" tag and is smallest-first, so its full-res mip is the topLen bytes ending at the tag
+		// (located robustly via LocateAti1Tag). Returns false when there's no MIXD/ATI1 or the chain is too short.
+		public static bool TryDecodeMixdNormal(ReadOnlySpan<byte> payload, out byte[] rgba, out int width, out int height)
+		{
+			rgba = [];
+			width = height = 0;
+			if (!IsFctx(payload) || payload.Length < 24)
+				return false;
+
+			width = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(12, 2));
+			height = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(14, 2));
+			var mip = Math.Max(1, (int)payload[16]);
+			if (Encoding.ASCII.GetString(payload.Slice(20, 4)) != "MIXD")
+				return false;
+
+			var pixels = payload[24..];
+			var tag = LocateAti1Tag(pixels, width, height, mip);
+			var topLen = MipSize(width, height, 1, 16); // BC5 = 16 bytes/block
+			if (tag < topLen)
+				return false;
+
+			rgba = BcDecoder.DecodeBc5Normal(pixels.Slice(tag - topLen, topLen), width, height);
+			return true;
 		}
 
 		// Decode the full-resolution (top) mip of an FCTX directly to RGBA32 - for embedding a base-colour PNG in glTF.
@@ -203,35 +213,6 @@ namespace Faolan.Core.Rdb.Assets
 				: BcDecoder.DecodeBc4(chain.Slice(chain.Length - topLen, topLen), width, height);
 		}
 
-		// Decode the full-res tangent-space NORMAL map from a MIXD container to RGBA (X=R, Y=G, Z reconstructed). The
-		// MIXD body-atlas layout (1024x1024) is: [6 B/block compact-normal][BC5/ATI2 normal chain][ "ATI1" ][BC4
-		// detail chain] - the compact-normal seg1 is the client's DXT5-fallback source (redundant with the BC5, RE'd
-		// via FUN_00ddf960; not a gloss/AO map, so nothing to extract from it). The BC5 normal chain sits immediately
-		// before the "ATI1" tag and is smallest-first, so its full-res mip is the topLen bytes ending at the tag
-		// (located robustly via LocateAti1Tag). Returns false when there's no MIXD/ATI1 or the chain is too short.
-		public static bool TryDecodeMixdNormal(ReadOnlySpan<byte> payload, out byte[] rgba, out int width, out int height)
-		{
-			rgba = [];
-			width = height = 0;
-			if (!IsFctx(payload) || payload.Length < 24)
-				return false;
-
-			width = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(12, 2));
-			height = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(14, 2));
-			var mip = Math.Max(1, (int)payload[16]);
-			if (Encoding.ASCII.GetString(payload.Slice(20, 4)) != "MIXD")
-				return false;
-
-			var pixels = payload[24..];
-			var tag = LocateAti1Tag(pixels, width, height, mip);
-			var topLen = MipSize(width, height, 1, 16); // BC5 = 16 bytes/block
-			if (tag < topLen)
-				return false;
-
-			rgba = BcDecoder.DecodeBc5Normal(pixels.Slice(tag - topLen, topLen), width, height);
-			return true;
-		}
-
 		// Total bytes of a full smallest-first BCn mip chain (levels 1..mip) at the given block size.
 		private static int FullChainSize(int width, int height, int mip, int blockSize)
 		{
@@ -239,6 +220,25 @@ namespace Faolan.Core.Rdb.Assets
 			for (var n = 1; n <= mip; n++)
 				total += MipSize(width, height, n, blockSize);
 			return total;
+		}
+
+		// Robustly locate the ATI1 detail sub-texture's tag inside a MIXD container's pixel bytes (the payload after
+		// the 24-byte FCTX header). The container is a chain of sub-textures (client MIXDTextureLoader,
+		// FUN_00de0bd0: a flags byte gives 1-3 sub-textures, each read with its own fourcc); for the body atlases
+		// that is [6 B/block compact-normal][BC5/ATI2 normal][ "ATI1" ][BC4 detail], with the ATI1 detail the FINAL
+		// sub-texture. Because the detail occupies a full smallest-first BC4 mip chain to the end of the payload, its
+		// tag sits at exactly (length - fullBc4Chain - 4). Anchoring by that computed position and VALIDATING the
+		// four tag bytes there is robust against a coincidental "ATI1" byte-run inside the compressed data (which a
+		// blind LastIndexOf would wrongly pick when it falls after the real tag). Falls back to the byte scan when
+		// the computed position doesn't validate (a MIXD whose layout differs), so it is never worse than the scan.
+		// Returns the offset of the tag, or -1 if no ATI1 sub-texture is found.
+		private static int LocateAti1Tag(ReadOnlySpan<byte> pixels, int width, int height, int mip)
+		{
+			var computed = pixels.Length - FullChainSize(width, height, mip, 8) - Ati1Tag.Length;
+			if (computed >= 0 && pixels.Slice(computed, Ati1Tag.Length).SequenceEqual(Ati1Tag))
+				return computed;
+
+			return pixels.LastIndexOf(Ati1Tag);
 		}
 
 		// BCn block size at mip level n (1-based; n=1 is full resolution). Blocks cover 4x4 texel tiles.

@@ -52,10 +52,7 @@ namespace Faolan.GameServer.World
 		// simplest move; the dominant shape for the player's own position ticks. Validated 74/74.
 		public static byte[] BuildBarePositionBody(uint handle, Vector3 from)
 		{
-			return new FaolanStream()
-				.WriteUInt32(MoveTaskSubOpcode)
-				.WriteUInt32(WireType).WriteUInt32(handle)
-				.WriteUInt16(0).WriteVector3BigEndian(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
+			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(WireType).WriteUInt32(handle).WriteUInt16(0).WriteVector3BigEndian(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
 		}
 
 		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a
@@ -94,7 +91,7 @@ namespace Faolan.GameServer.World
 				.WriteByte(ModePath)
 				.WriteByte(0x01) // WaitMoveTask base header flags (bit0 -> no dur/rem floats)
 				.WriteByte(0x00) // PathMoveTask F-flags (no optional floats; waypoint-list branch)
-				.WriteUInt32((uint)waypoints.Count);
+				.WriteUInt32(waypoints.Count);
 			foreach (var w in waypoints)
 				s.WriteVector3BigEndian(w);
 			return s

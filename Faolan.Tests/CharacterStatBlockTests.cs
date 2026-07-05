@@ -1,6 +1,6 @@
-using Faolan.Core.Enums;
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Enums;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Xunit;

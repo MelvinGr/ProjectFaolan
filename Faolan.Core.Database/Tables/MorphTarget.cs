@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+
 namespace Faolan.Core.Database.Tables
 {
 	// One entry of the client's character-customization registry (RDB type 1000076 id 0): every selectable
