@@ -18,8 +18,8 @@ Delete an entry once it's installed + confirmed working.
 
 ## Non-tool follow-ups noticed (file as Gitea issues, not installs)
 
-- 3 xUnit `[Theory]` tests fail on .NET 10 with `System.OverflowException: Value 'True' of type
-  'System.Boolean' does not fit in Byte` (`BehaviorAnimationCodecTests.SpellweaveComponentAdd_MatchesCapture`
-  x2, `GuildPacketTests.GuildMemberRecord_Matches_CapturedBytes`). Pre-existing (fail on a clean checkout of
-  `development`), unrelated to any feature — an xUnit/runtime bool-InlineData coercion bug. Pin the xUnit
-  version or change the bool params to an enum/int.
+- (RESOLVED 2026-07-06) 3 tests failed with `OverflowException: Value 'True' ... does not fit in Byte`
+  (`BehaviorAnimationCodecTests.SpellweaveComponentAdd_MatchesCapture` x2,
+  `GuildPacketTests.GuildMemberRecord_Matches_CapturedBytes`). Not an xUnit bug — `UncheckedConvert` (the
+  `FaolanStream.WriteByte(IConvertible)` coercion helper) had no `bool` case, so writing a bool flag threw.
+  Fixed by adding `bool` (false=0/true=1) to every `UncheckedConvert.To*`; full suite green.

@@ -24,6 +24,8 @@ namespace Faolan.Core.Extensions
 
 				char v when v <= byte.MaxValue => unchecked((byte)v),
 
+				bool v => v ? (byte)1 : (byte)0,
+
 				Enum e => ToByte(ToEnumValue(e)),
 
 				_ => ThrowOverflow<byte>(value)
@@ -70,6 +72,8 @@ namespace Faolan.Core.Extensions
 
 				char v => unchecked((short)v),
 
+				bool v => v ? (short)1 : (short)0,
+
 				Enum e => ToInt16(ToEnumValue(e)),
 
 				_ => ThrowOverflow<short>(value)
@@ -95,6 +99,8 @@ namespace Faolan.Core.Extensions
 				ulong v and <= uint.MaxValue                    => unchecked((int)v),
 
 				char v => v,
+
+				bool v => v ? 1 : 0,
 
 				Enum e => ToInt32(ToEnumValue(e)),
 
@@ -122,6 +128,8 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
+				bool v => v ? 1L : 0L,
+
 				Enum e => ToInt64(ToEnumValue(e)),
 
 				_ => ThrowOverflow<long>(value)
@@ -147,6 +155,8 @@ namespace Faolan.Core.Extensions
 				ulong v and <= byte.MaxValue                      => unchecked((sbyte)v),
 
 				char v when v <= byte.MaxValue => unchecked((sbyte)v),
+
+				bool v => v ? (sbyte)1 : (sbyte)0,
 
 				Enum e => ToSByte(ToEnumValue(e)),
 
@@ -174,6 +184,8 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
+				bool v => v ? (ushort)1 : (ushort)0,
+
 				Enum e => ToUInt16(ToEnumValue(e)),
 
 				_ => ThrowOverflow<ushort>(value)
@@ -200,6 +212,8 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
+				bool v => v ? 1u : 0u,
+
 				Enum e => ToUInt32(ToEnumValue(e)),
 
 				_ => ThrowOverflow<uint>(value)
@@ -225,6 +239,8 @@ namespace Faolan.Core.Extensions
 				int v  => unchecked((ulong)v),
 
 				char v => v,
+
+				bool v => v ? 1UL : 0UL,
 
 				Enum e => ToUInt64(ToEnumValue(e)),
 
