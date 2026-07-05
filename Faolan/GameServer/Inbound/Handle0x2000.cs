@@ -304,14 +304,20 @@ namespace Faolan.GameServer
 						{
 							case ActionType.SummonMount:
 							{
-								// The mount summon/dismount is a CHANNELED cast that TOGGLES (pressing the same button while mounted
-								// dismounts). It goes through the same cast FSM as ActionType.CastSpell: a cast-BEGIN echo-ack makes
-								// the client channel + render the cast bar + play the animation (horse runs UP to mount, runs AWAY
-								// to dismount); then after the channel a cast-COMPLETE echo-ack (form-0x0a, phase 3) closes the bar
-								// and applies the outcome. MOUNT: ride buff 0x31EB1500 + StatUpd(0xBA=mount id, 0xBB=100) (frame 520).
-								// DISMOUNT: the end-twin 0x31EB1501 (empty payload) + StatUpd(0xBA=0) (frame 1449). Without the toggle
-								// the dismount channel re-mounts and the char gets stuck. Retail sends NO summon ApplySpell / no horse
-								// entity - the client animates it all. IsMounted lives on the player WorldEntity.
+								// SummonMount TOGGLES (pressing the same button while mounted dismounts) and the two directions time
+								// DIFFERENTLY:
+								//  - MOUNT is a SERVER-timed channel: the client shows the cast bar + horse-runs-up, and retail sends
+								//    the ride buff 545ms later (SummonChannelMs; capture frame 498->520). So we begin-echo-ack, then
+								//    after the channel complete-echo-ack + ride buff 0x31EB1500 + StatUpd(Mount=id, MountSpeed=100).
+								//  - DISMOUNT is CLIENT-driven: the client runs its OWN (longer) dismount channel + horse-runs-away, so
+								//    the server responds IMMEDIATELY with the end-twin 0x31EB1501 (empty payload) + StatUpd(Mount=0)
+								//    (capture frame 1449) rather than holding the mount state on a timer.
+								// Retail sends NO summon ApplySpell / no horse entity - the client animates it all. IsMounted lives on
+								// the player WorldEntity (without the toggle the press re-mounts and the char sticks).
+								// KNOWN COSMETIC (accepted): during the dismount the char briefly dips into the floor and re-grounds at
+								// animation end. Confirmed NOT server-side - retail sends nothing extra during the dismount window (only
+								// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
+								// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
 								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
 								var playerEntity = PlayerWorldEntity(client);
 								var dismounting = playerEntity?.IsMounted ?? false;
@@ -319,12 +325,30 @@ namespace Faolan.GameServer
 
 								var self = client.Session.Account.ClientInstance;
 								await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode); // cast begin: bar + animation
+
+								if (dismounting)
+								{
+									// Immediate: don't hold the mount state during the client's dismount channel.
+									var dismountAck = (byte[])rawPayload.Clone();
+									if (dismountAck.Length > 17)
+									{
+										dismountAck[16] = 0x00;
+										dismountAck[17] = 0x09;
+									}
+									await _combat.SendBehaviorEchoAck(client, dismountAck, 3);
+									await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
+									await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.Mount, 0), self);
+									if (playerEntity != null)
+										playerEntity.IsMounted = false;
+									break;
+								}
+
 								var mountCastPayload = (byte[])rawPayload.Clone();
 								_ = Task.Run(async () =>
 								{
 									try
 									{
-										await Task.Delay(MountCatalog.SummonChannelMs);
+										await Task.Delay(MountCatalog.SummonChannelMs); // horse runs up during the channel
 										if (client.Session?.Account == null)
 											return;
 										if (mountCastPayload.Length > 17)
@@ -332,27 +356,17 @@ namespace Faolan.GameServer
 											mountCastPayload[16] = 0x00;
 											mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
 										}
-										await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete
-
-										if (dismounting)
-										{
-											await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin: removes the ride buff (empty payload)
-											await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.Mount, 0), self); // clear the mount stat (frame 1449)
-										}
-										else
-										{
-											await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
-											await SendStatUpdate(client, new CharacterStatBlock()
-												.Set(CharacterStatId.Mount, mount.RideStat)
-												.Set(CharacterStatId.MountSpeed, 100), self); // the mount StatUpd (frame 520)
-										}
-
+										await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
+										await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
+										await SendStatUpdate(client, new CharacterStatBlock()
+											.Set(CharacterStatId.Mount, mount.RideStat)
+											.Set(CharacterStatId.MountSpeed, 100), self); // the mount StatUpd (frame 520)
 										if (playerEntity != null)
-											playerEntity.IsMounted = !dismounting;
+											playerEntity.IsMounted = true;
 									}
 									catch (Exception ex)
 									{
-										Logger.LogWarning(ex, "Deferred mount toggle failed.");
+										Logger.LogWarning(ex, "Deferred mount seat failed.");
 									}
 								});
 
