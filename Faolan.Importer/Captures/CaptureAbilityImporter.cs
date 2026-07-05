@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -217,6 +218,62 @@ namespace Faolan.Importer.Captures
 				await db.SaveChangesAsync();
 
 			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassAbility rows ({Updated} levels updated) from per-character grants.", inserted, updated);
+			return (inserted, updated);
+		}
+
+		// The RDB combo-catalog name-prefix -> class map, VALIDATED by capture. Unlike abilities, combos have no
+		// per-character grant to derive from (retail never re-emits a ComboBookIIR on login - the combo book rides the
+		// 0x2076 world-entry snapshot instead; see ImportCharacterCombosAsync), so class membership comes from the
+		// catalog's name prefix (e.g. "Herald_..." = HeraldOfXotli). Hakotep's HoX lvl-24 0x2076 combo book confirmed
+		// the "Herald_" catalog entries ARE HoX combos, so that prefix is trusted. Only capture-VALIDATED prefixes are
+		// listed (grant too little, not too much); ambiguous feat-tree / generic prefixes (Reaver/Liberator/Lich/
+		// Soldier/Rogue/Slave/combo_npc/...) are deliberately EXCLUDED until a capture validates them. Add a line per
+		// class as its combo membership is confirmed by a dump.
+		private static readonly (string Prefix, Class Class)[] ValidatedComboPrefixes =
+		[
+			("Herald_", Class.HeraldOfXotli) // Hakotep HoX lvl-24 0x2076 combo book (Hell Strikes/Molten Steel Slash/Burn to Death/...)
+		];
+
+		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's VALIDATED name prefixes - the combo
+		// analogue of DeriveClassAbilitiesAsync (which derives from grants; combos have none). Combo.Level supplies the
+		// per-class unlock level. Idempotent.
+		public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger logger = null)
+		{
+			var combos = await db.Combos.Select(c => new { c.Id, c.Name, c.Level }).ToListAsync();
+			var existing = await db.ClassCombos.ToDictionaryAsync(x => (x.Class, x.ComboId));
+
+			var inserted = 0;
+			var updated = 0;
+			foreach (var combo in combos)
+			{
+				if (combo.Name == null)
+					continue;
+
+				foreach (var (prefix, cls) in ValidatedComboPrefixes)
+				{
+					if (!combo.Name.StartsWith(prefix, StringComparison.Ordinal))
+						continue;
+
+					if (existing.TryGetValue((cls, combo.Id), out var row))
+					{
+						if (row.Level != combo.Level)
+						{
+							row.Level = combo.Level;
+							updated++;
+						}
+					}
+					else
+					{
+						db.ClassCombos.Add(new ClassCombo { Class = cls, ComboId = combo.Id, Level = combo.Level });
+						inserted++;
+					}
+				}
+			}
+
+			if (inserted > 0 || updated > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassCombo rows ({Updated} levels updated) from validated catalog prefixes.", inserted, updated);
 			return (inserted, updated);
 		}
 

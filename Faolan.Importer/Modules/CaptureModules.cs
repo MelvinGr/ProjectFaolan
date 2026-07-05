@@ -285,7 +285,10 @@ namespace Faolan.Importer.Modules
 			// Derive the class<->ability access (ClassAbility) from the per-character grants just imported (the data-driven
 			// replacement for IsStartingAbility - the ability RDB template has no class/level requirement).
 			var (caInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesAsync(ctx.Db);
-			return new ImportResult($"{aRows} ability rows ({aChars} chars), {cRows} combo rows ({cChars} chars); {caInserted} ClassAbility rows.");
+			// Combos have no per-character grant to derive from, so ClassCombo comes from the catalog's capture-validated
+			// name prefixes (e.g. Herald_ = HoX, confirmed by Hakotep's 0x2076 combo book) - see DeriveClassCombosAsync.
+			var (ccInserted, _) = await CaptureAbilityImporter.DeriveClassCombosAsync(ctx.Db);
+			return new ImportResult($"{aRows} ability rows ({aChars} chars), {cRows} combo rows ({cChars} chars); {caInserted} ClassAbility, {ccInserted} ClassCombo rows.");
 		}
 	}
 
