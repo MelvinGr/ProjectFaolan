@@ -5,26 +5,26 @@ Detailed handoff for the AoC combo (melee) + spellweaving (caster) systems. Comp
 
 ## 0. Status at a glance
 
+Tracked as **Gitea #141** (`needs-testing`). Full session write-up is in the #141 comment thread.
+
 | Piece                                                                   | State                                           |
 | ----------------------------------------------------------------------- | ----------------------------------------------- |
-| `ClassCombo` table + migration + enum CHECK                             | ✅ committed                                    |
-| `ClassCombo` filled (8 combo classes, 292 rows, casters empty)          | ✅ committed                                    |
-| Rank-superseding of the combo grant (one per family)                    | ✅ committed                                    |
-| `ComboActionParser` + `ComboService` (data side)                        | ✅ committed                                    |
-| Grant wired to `ClassCombo` (fixed necro learning fighter combos)       | ✅ committed                                    |
-| **Spellweave wire decode** (activate/add/deactivate + buffs/meter/fire) | ✅ DECODED (`Captures/decode_spellweave.py`)    |
-| Spellweave FSM (state machine, toggle + add detected in-client)         | ✅ committed (skeleton)                         |
-| Spellweave activate RESPONSE — 3 trance buffs + reactive element LIST   | ✅ built, byte-exact golden (`SpellweaveCodec`) |
-| Spellweave FIRE burst on deactivate (`0xF98E10B3` stages)               | ✅ built, byte-exact golden                     |
-| Spellweave METER drain, per-add re-send, componentIndex→effect table    | ❌ TODO (see §5)                                |
-| In-client verification of the necro weave end-to-end                    | ⏳ needs-testing                                |
-| **Melee wire decode** (cid → combo, animByte → direction)               | ⚠️ BLOCKED on client Ghidra RE                  |
-| Melee execution FSM                                                     | ❌ TODO (blocked by the decode)                 |
-| ~~Regression: necro pets went "permanent"~~                             | ✅ FIXED (`e1a1b501` importer + `33c8782a` data) |
+| `ClassCombo` table/grant/superseding + `ComboActionParser`/`ComboService` | ✅ committed (melee data side)                 |
+| **Spellweave wire decode** (activate/adds/fire/energy/DoT/cancel)       | ✅ DECODED (`Captures/decode_spellweave.py`)    |
+| Activate response: 3 trance buffs + reactive element LIST + trance-pose BCC | ✅ built, byte-exact, works in-client        |
+| Component picker (pick→hide→reappear ~8s) + per-add buff + add gesture BCC | ✅ built, works in-client                     |
+| Stacking Spellweaving(1) buff (37E5A8→A9→AA) each picker reappear        | ✅ built, works in-client (x2 overlap)          |
+| FIRE burst + CANCEL (buff end-twins + trance-EXIT BCC)                   | ✅ built, works in-client                       |
+| Energy bar (`0x200E` DispatchUpdateSprintbar) + `0x37E68C` gauge stream  | ⚠️ built but **drops to 0 in-client** (see §5)  |
+| DoT on energy-empty: `Exhausted` (0xB90) + `0x37E690` health drain       | ✅ built, VISUAL only (no authoritative death)  |
+| Server energy tracking (persistent regen loop; sprint mirror)            | ✅ built (sprint drain itself is client-side)   |
+| componentIndex→effect table + backlash roll                             | ❌ TODO (undecoded — needs a targeted dump)     |
+| Other-caster profiles (Demo / PoM / ToS)                                | ❌ TODO (need per-class captures)               |
+| **Melee wire decode** (cid → combo, animByte → direction) + execution   | ⚠️ BLOCKED on client Ghidra RE (§3)             |
 
-Commits this session (newest first): `5f1efb2a` spellweave FSM · `c2e87884`/`49662677`/`f02a8861` docs ·
-`50a4b4bb` ComboService · `02ffec0c` ComboActionParser · `753e5281`/`53dcce4e` fill ClassCombo(8 classes) ·
-`6bd680a9` superseding · `0424a594`/`45d1291c` derive ClassCombo(HoX) · `1d86a4c7` ClassCombo table + grant.
+All wire builders are **byte-exact** (16 golden tests: `SpellweaveCodecTests` + `BehaviorAnimationCodecTests`).
+Latest commit: `5298919d` (energy/DoT/Exhausted/cancel/stacking). The activate/adds/fire base is in `03d26328` /
+`4a9fe3c9`. Melee `ClassCombo` work is in the earlier `5f1efb2a`-and-before series.
 
 ## 1. The two mechanics (recap)
 
@@ -101,9 +101,25 @@ Timeline (clean dump): potions (BCC `RightClickItem` 0x0e) at 82.5/87.0/97.7s �
     `[len][6b87e316][EntityClass 0x0000c350][applyTo][u16 0][u32 spellId][EntityClass][applyFrom][data tail]`;
     duration lives at `data+8` in centiseconds (see `ApplySpell` in `PostReadyFollowUp.cs` + `ActiveBuff`). First
     buff verbatim: `000000506b87e3160000c3500802e5d4000037f298000000c3500802e5d40000…`.
-  - a **`CombatReactiveIIR`** (`0x54C02089`) s2c ack, a `0x204e` effect, and
-  - the **`e9f24184` trance meter** (from ~105.4s): s2c, a u32 at body offset 16 that DRAINS (~-90/tick) — the
-    trance gauge. Body: `00000051 e9f24184 0000c350 0802e5d4 000022ce…`.
+  - a **`CombatReactiveIIR`** (`0x54C02089`) s2c reactive element LIST (the addable weave elements), and a trance-pose
+    **BCC** animation (`0x642CD3D6`, action 42041 — `BehaviorAnimationCodec.SpellweaveTrance`).
+- **Energy bar (the yellow "sprint" bar) drains during the weave** — this is the visible trance gauge, and it is a
+  SEPARATE universal pool from the class-resource "stamina" stat (necro class stamina = 0; the energy pool exists
+  anyway). TWO packets per tick, same token:
+  - **`DispatchUpdateSprintbar` (`0x200E`)** — the packet that actually MOVES the bar. Body `[u32 energy][u8 01]`,
+    sender `GameCharAgentProject/0x54` → `GameCharInterfaceProject/instance`. Energy full = **8910** for the necro,
+    draining with an accelerating rate (`-90 → -270`). (`SendSprintBar` in `HandleGameCharAgentProject.cs`.)
+  - **`e9f24184` StatDamageIIR** — parallel "Spellweaving Cost" gauge (`0x37E68C`, scale `v@33`=`0x0F425C`); the
+    accounting twin (`SpellweaveCodec.BuildStatGauge`).
+- **DoT when energy empties**: the `Exhausted` debuff (spell `0xB90`, 100s) + the **`0x37E690` "Spellweaving"** gauge
+  (scale `0x1B`) drains HEALTH ~`-31705`/tick. Not in the clean dump — see the `..._cancel-weave..._take-dot-when-
+  stamina-empty...` capture. The `Exhausted` id is our choice (the client applies it locally; server applies too).
+- **Per-add response** (each add): the component's OWN spell applied immediately as a self-buff (necro components take
+  effect as you weave — idx0→Arcane Renewal 0x396AE9, etc.) + a begin/complete add-gesture BCC pair (action 186463).
+- **Stacking buff**: Spellweaving(1) refreshes to an INCREMENTED base each picker reappear (37E5A8→A9→AA), overlapping
+  the previous (retail's ~x2). The energy accelerating-drain rate rises with the stack.
+- **CANCEL / deactivate** (2nd `0x205A`): trance-buff end-twins (rank-1 removals of 37F298 + the current 37E5A8 stack
+  + 3969D0) + the **trance-EXIT BCC** (action 41302) that takes the char out of the pose + the fire burst.
 - **Add-component**: c2s `0x2000` → **`CombatReactiveIIR_c` (`0x54C02089`)**. TWO packets per add:
   - `0x03`-tagged (len 25): `rawPayload = [u32 len][u32 0x54C02089][u32 senderType 0x0000c350][u32 handle][u32 0]
 [u8 0x03][u32 componentIndex]` — `componentIndex` at `rawPayload[21:25]` (values **0, 1, 3** for the three
@@ -116,43 +132,43 @@ Timeline (clean dump): potions (BCC `RightClickItem` 0x0e) at 82.5/87.0/97.7s �
 
 ## 5. What's built for spellweaving + what's LEFT
 
-Built (`5f1efb2a` skeleton, then this session):
-- `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the state machine. Session state on
-  `NetworkClientSession`: `IsSpellweaving` + `WeaveComponents`.
-- **Activate RESPONSE on START** (§4 grammar): `StartAsync` resolves the caster's `SpellweaveProfile`
-  (`SpellweaveCatalog`) and emits the 3 trance buffs (via the listener's `ApplySpell` seam — their `DurationMs`
-  matches the capture, so that path is byte-exact) + the **reactive element LIST** (`SpellweaveCodec.BuildReactiveList`,
-  `0x54C02089`) which declares the addable weave elements the `componentIndex` indexes into. **This is what unblocks
-  the adds** (the client stalls at "started" without it).
-- **FIRE burst on DEACTIVATE**: `FireAsync` emits the `0xF98E10B3` stages (`SpellweaveCodec.BuildFireStage`).
-- The two new records are proven **byte-exact** vs the NecroL80 capture by `Faolan.Tests/SpellweaveCodecTests.cs`
-  (reactive list all-5 + consumed-element-zeroed, all 4 fire stages).
-- Wiring unchanged: `0x205A` `PerformSpecialAction` → `ToggleAsync`; `Handle0x2000` routes `CombatReactiveIIR` →
-  `AddComponentAsync`. The two new listener seams (`ApplySpell`, `SendWorldIir`) are passed to the service ctor.
-- `SpellweaveCatalog` currently has ONLY the Necromancer profile (capture-derived, real spell ids). The other 3
-  casters return no profile → the toggle reports "not available for your class yet" instead of opening a dead trance.
+The whole necro flow is built and (except the energy bar) **works in-client**, byte-exact. Architecture:
+- `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the FSM + the trance-meter loop. Session
+  state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`, `Energy`/`EnergyMax`/
+  `IsSprinting`/`EnergyLoopActive`. Driven via narrow listener **seams** (ctor args): `ApplySpellweaveBuff` (the
+  correct 54-byte buff blob — the shared 50-byte one fails `MagicBuffIIR_c::ReadSubClass`), `SendWorldIir`,
+  `SendBuffRemoval` (rank-1 end-twins), `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`.
+- `SpellweaveCodec` — reactive list / stat gauge / buff-data / fire-stage builders (byte-exact).
+- `BehaviorAnimationCodec` — the trance/component/exit BCC animations (BCC `0x642CD3D6` is the generic behaviour
+  channel; shared home with combat, NOT weave-specific).
+- `SpellweaveCatalog` — per-class `SpellweaveProfile` (ONLY Necromancer so far) + `EnergyMaxForClass`.
+- `HandleGameCharAgentProject.cs` — `SendSprintBar` (0x200E) + the persistent energy loop (`RunEnergyMirror`:
+  drain-on-sprint / regen-when-idle / step-aside-while-weaving; sprint drain itself is CLIENT-side, we only mirror).
 
-LEFT:
+LEFT (in rough priority):
 
-1. **In-client verification** of the necro weave end-to-end (needs-testing): drive the client as a necromancer,
-   activate → add → deactivate, confirm the trance opens and the adds flow. The byte-exact gate is met; this is the
-   live gate.
-2. **Trance METER drain-stream** (`0xE9F24184`, §4): the draining HUD gauge. Needs a per-trance timer to stream the
-   ticks (token climbs +90/tick, delta `-90`). Not required to unblock adds; decoded in the script, not built.
-3. **Per-add element re-send** — after each add, re-send the reactive list with the just-used element ZEROED (the
-   per-element cooldown; `BuildReactiveList` already takes `0` for a consumed slot — see the golden test — just wire
-   the re-send in `AddComponentAsync`).
-4. **`componentIndex → stat/effect` table** — the actual per-component contribution + backlash roll on fire (needs a
-   targeted dump enumerating a caster's components, or Ghidra).
-5. **Trance immobilisation** — have the Move handler reject motion while `IsSpellweaving`.
-6. **Other-caster profiles** (Demonologist / Priest of Mitra / Tempest of Set) — need per-class spellweaving captures.
+1. **⚠️ Energy bar drops straight to 0 on weave start (in-client bug).** We stream `0x200E` from `session.Energy`
+   (full 8910) with an accelerating drain + the `0x37E68C` gauge, energy loop is persistent. Still empties instantly.
+   Hypotheses to check with a **frame-by-frame diff of our `0x200E` stream vs the capture**: (a) client energy-MAX
+   mismatch so any token reads ~empty; (b) the `0x37E68C` gauge fighting the `0x200E`; (c) `session.Energy` stale-0 in
+   some path (e.g. the DoT phase left it 0 and regen hadn't caught up). This is the top thing to fix.
+2. **DoT authoritative death** — currently the `0x37E690` gauge only drains the client's health bar visually; wire it
+   to real vitals (`EntityVitals` + kill lifecycle) so over-weaving can actually kill.
+3. **`componentIndex → stat/effect` table** — the per-component contribution + backlash roll on fire (undecoded; needs
+   a targeted dump enumerating a caster's components, or Ghidra).
+4. **Trance immobilisation** — have the Move handler reject motion while `IsSpellweaving`.
+5. **Other-caster profiles** (Demonologist / Priest of Mitra / Tempest of Set) — need per-class spellweaving captures.
+6. **Tune approximations** — sprint drain/regen rates, the energy accelerating-drain curve, the `Exhausted` id, the
+   ~8s picker cooldown, and the per-element cooldown (currently the whole picker hides then reappears full, rather
+   than per-element zeroing) are all capture-approximate, not pinned.
 
 ## 6. Capture dumps (all under `Captures/`, `.tshark.json` are the parsed form)
 
 - Melee: `Hoxxling_mage-heraldofxotli_combos` (HoX), `Hakotep_hox_login_gameplay0` (HoX),
   `AssassinL23_rogue-assassin_login_combos` (Assassin +failed combos).
-- Spellweaving: `NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving` (CLEAN ground truth),
-  `NecroL80_mage-necromancer_login_spellweaving`.
+- Spellweaving: `NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving` (CLEAN ground truth for
+  activate/adds/fire), `NecroL80_mage-necromancer_login_spellweave_cancel-weave-and-buff_spellweave-take-dot-when-
+  stamina-empty-cancel-weave` (the DoT / Exhausted / energy-to-0 / cancel reference).
 - Convert a new pcapng: `Captures/tshark_dump.sh Captures/<file>.pcapng`.
 
 ## 7. Key code files
@@ -160,18 +176,20 @@ LEFT:
 - `Faolan.Core.Database/Tables/ClassCombo.cs`, `Combo.cs`, `CharacterCombo.cs`
 - `Faolan.Core.Database/DatabaseRepository.cs` — `GetClassCombos` + `ComboFamilyKey`/`IsRomanNumeral`
 - `Faolan.Importer/Captures/CaptureAbilityImporter.cs` — `DeriveClassCombosAsync` + `ClassComboPrefixes`
-- `Faolan/GameServer/Combat/ComboInput.cs` (parser), `ComboService.cs`, `SpellweaveService.cs`
-- `Faolan/GameServer/Combat/SpellweaveCodec.cs` — byte-exact reactive-list + fire-stage builders
-- `Faolan/GameServer/Combat/SpellweaveCatalog.cs` — per-class `SpellweaveProfile` (Necro seeded from capture)
-- `Faolan.Tests/SpellweaveCodecTests.cs` — the byte-exact golden tests · `Captures/decode_spellweave.py` — dissector
-- `Faolan/GameServer/Outbound/GrantAbilitiesBuilder.cs` — `GrantCharacterCombos`
-- `Faolan/GameServer/GameServerListener.cs` — `_spellweave` (ctor seams: `ApplySpell` + `SendWorldIir`), `PerformSpecialAction`
+- `Faolan/GameServer/Combat/ComboInput.cs` (parser), `ComboService.cs`
+- `Faolan/GameServer/Combat/SpellweaveService.cs` — the FSM + trance-meter/energy-drain loop
+- `Faolan/GameServer/Combat/SpellweaveCodec.cs` — reactive-list / stat-gauge / buff-data / fire-stage builders
+- `Faolan/GameServer/Combat/BehaviorAnimationCodec.cs` — trance / component / EXIT BCC animations (0x642CD3D6)
+- `Faolan/GameServer/Combat/SpellweaveCatalog.cs` — per-class `SpellweaveProfile` + `EnergyMaxForClass` (Necro only)
+- `Faolan/GameServer/Inbound/HandleGameCharAgentProject.cs` — `SendSprintBar` (0x200E) + the persistent energy loop
+- `Faolan/GameServer/Login/PostReadyFollowUp.cs` — `ApplySpellweaveBuff` (54-byte blob) + `SendBuffRemoval`
+- `Faolan.Tests/SpellweaveCodecTests.cs` + `BehaviorAnimationCodecTests.cs` — 16 golden tests · `Captures/decode_spellweave.py`
+- `Faolan/GameServer/GameServerListener.cs` — `_spellweave` ctor seams + `PerformSpecialAction` (0x205A) handler
 - `Faolan/GameServer/Inbound/Handle0x2000.cs` — `CombatReactiveIIR` add case
-- `Faolan.Core.Network/NetworkClientSession.cs` — `IsSpellweaving` + `WeaveComponents`
-- `Faolan.Core.Network/Packets/Opcodes.cs` — `CombatReactiveIIR` (c2s) + `PerformSpecialAction` (0x205A)
+- `Faolan.Core.Network/NetworkClientSession.cs` — weave + energy session state
 - `Faolan/GameServer/Combat/LevelComboCatalog.cs` — RETIRED (kept as capture-derived level→combo reference)
 
-## 9. Gotchas
+## 8. Gotchas
 
 - **Never `pkill -f Faolan.dll`** — it matches the Bash tool's own command line and kills the shell (exit 144, no
   output). Stop the server by PORT: `PID=$(ss -ltnp | grep ':7010' | grep -oP 'pid=\K[0-9]+' | head -1); kill -9

@@ -75,8 +75,15 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
   Body `[u32 0][u8 0x03][u32 componentIndex]` (+ a `02`-tagged twin ack). `componentIndex` = 0/1/3 for the three
   spells → an index into the caster's weave elements, NOT the Spell catalog id (the spell id never appears on the
   wire — matching "extra stats/effect per input"). The adds are ~10-15s apart (the paced trance cadence).
-- **Fire**: on deactivate, the s2c `f98e10b3` burst = the accumulated weave firing. Meter: s2c `0xe9f24184` (a u32
-  at offset 16 that drains, ~-90/tick) is the trance/weave state.
+- **Activate response** (s2c): 3 trance buffs (`ApplySpell 0x6B87E316`, ids 0x37F29800/0x37E5A800/0x3969D000) + the
+  reactive element LIST (`0x54C02089`, the addable elements) + a trance-pose BCC animation (`0x642CD3D6`).
+- **Energy bar** (the yellow "sprint" bar, a SEPARATE universal pool from the class-resource stamina stat) drains
+  during the weave: **`DispatchUpdateSprintbar 0x200E`** (`[u32 energy][u8 01]`) is the packet that moves the bar
+  (full 8910 for the necro), with a parallel `0xe9f24184` "Spellweaving Cost" gauge (`0x37E68C`). When energy hits 0:
+  the `Exhausted` debuff (0xB90) + the `0x37E690` gauge draining HEALTH (the over-weave DoT).
+- **Fire / cancel**: on the 2nd toggle, the s2c `f98e10b3` burst (the weave firing) + trance-buff end-twins + a
+  trance-EXIT BCC. Per add: the component's own spell as an immediate self-buff + add-gesture BCC; the Spellweaving(1)
+  buff re-applies at an incremented id each picker reappear (stacks ~x2).
 - `0x2085` (~2s heartbeat) and food/potion `RightClickItem` (BCC ActionType 0x0e) are NOT part of the weave.
 
 ## Remaining to implement (#2)
@@ -85,8 +92,9 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
    (the client picks the combo, then the directions confirm it) rather than free-chaining — resolve from whether a
    c2s activation packet references the combo id before the swings. Then a per-player FSM that matches the swing
    inputs against `GetPerformableCombosAsync` and fires the finisher (the s2c `ApplySpell` effect near the cluster).
-2. **Spellweaving** is a SEPARATE subsystem, and its wire is DECODED (above) — so it is implementable now: an
-   activate(`0x205a` toggle)→trance(immobilise)→add(`CombatReactiveIIR_c`, accumulate componentIndex)→deactivate
-   (`0x205a` toggle → fire `f98e10b3` + backlash) state machine. Remaining: map `componentIndex` → its stat/effect
-   contribution (the caster's weave-element table) and the backlash roll.
-3. In-client validation for both (drive the retail client, perform a combo / a weave, confirm the outcome).
+2. **Spellweaving** is BUILT for the Necromancer and (except the energy bar) works in-client — see
+   `docs/combos-spellweaving-handoff.md` §5 and **Gitea #141** (`needs-testing`) for the full state, code map, and
+   the open items. Top open bug: the **energy bar drops straight to 0** on weave start (the `0x200E` stream/scale
+   needs a frame-by-frame diff vs the capture). Also open: the `componentIndex`→effect table + backlash roll
+   (undecoded), authoritative DoT death, trance immobilisation, and the other 3 caster profiles.
+3. In-client validation for melee (drive the retail client, perform a combo, confirm the outcome).
