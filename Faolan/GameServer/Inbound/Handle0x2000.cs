@@ -337,7 +337,9 @@ namespace Faolan.GameServer
 									}
 									await _combat.SendBehaviorEchoAck(client, dismountAck, 3);
 									await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
-									await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.Mount, 0), self);
+									var dismountStats = new CharacterStatBlock();
+									dismountStats[CharacterStatId.Mount] = 0; // clear the mount stat (frame 1449)
+									await SendStatUpdate(client, dismountStats, self);
 									if (playerEntity != null)
 										playerEntity.IsMounted = false;
 									break;
@@ -358,9 +360,10 @@ namespace Faolan.GameServer
 										}
 										await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
 										await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
-										await SendStatUpdate(client, new CharacterStatBlock()
-											.Set(CharacterStatId.Mount, mount.RideStat)
-											.Set(CharacterStatId.MountSpeed, 100), self); // the mount StatUpd (frame 520)
+										var mountStats = new CharacterStatBlock(); // the mount StatUpd (frame 520)
+										mountStats[CharacterStatId.Mount] = mount.RideStat;
+										mountStats[CharacterStatId.MountSpeed] = 100;
+										await SendStatUpdate(client, mountStats, self);
 										if (playerEntity != null)
 											playerEntity.IsMounted = true;
 									}
