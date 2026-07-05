@@ -505,6 +505,7 @@ namespace Faolan.Core.Network.Packets
 			StatIIR = 0xf98e10b3, // = StatIIR_t
 			SelectDeselect = 0x0D155695, // = LookAtIIR_t
 			QueuePetCommand = 0x205B, // GameCharAgent method (16-bit opcode, >=0x2014): the pet command bar - body [type][petHandle][PetCommand] (#307)
+			TradeskillRequestIIR = 0x06B9CD94, // = TradeskillRequestIIR_c: client opened the Crafting->Recipes book; asks for its known-recipe list (reply = TradeskillReplyIIR 0x9062D559)
 			KnubotAnswer = 0x4D7D9123, // = KnubotAnswerIIR_c: the player picked a dialogue option (NPC chat); advances the conversation one stage
 
 			KnubotCloseChatWindow =
@@ -560,6 +561,7 @@ namespace Faolan.Core.Network.Packets
 			FormatFeedbackIIR = 0x8D5A8B6B, // FormatFeedbackIIR_t  (x68)
 			FullPlayerCharacterIIR = 0x737A6DF9, // FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below
 			GameActionListIIR = 0xF508F4C1, // GameActionListIIR_t  (x366)
+			TradeskillReplyIIR = 0x9062D559, // TradeskillReplyIIR_c - the recipe-book list (reply to TradeskillRequestIIR 0x06B9CD94)
 			GameTimeIIR = 0x4F57DC08, // GameTimeIIR_t  (x33) - "SetDayTime"
 			GuildUpdateIIR = 0x2550C99A, // GuildUpdateIIR_c  (x3)
 			HateListUpdateIIR = 0x8A01E5A1, // HateListUpdateIIR  (x61)

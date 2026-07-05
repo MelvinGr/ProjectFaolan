@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -825,6 +826,17 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServer0X2000Opcodes.TradeskillRequestIIR:
+				{
+					// The client opened the Crafting -> Recipes book and is asking for its recipe list. Answer with
+					// the TradeskillReplyIIR (0x9062D559) catalog from the DB so the book populates. See
+					// TradeskillRecipeCodec / docs/tradeskill-recipes.md.
+					_ = packet.Body.ReadRemainingArray();
+					await SendCraftingRecipeBook(client);
+
+					break;
+				}
+
 				case GameServer0X2000Opcodes.LegacyConanHimselfInstance:
 				{
 					var data = packet.Body.ReadRemainingArray();
@@ -863,6 +875,32 @@ namespace Faolan.GameServer
 					break;
 				}
 			}
+		}
+
+		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
+		// from the Recipe catalog, so the Crafting -> Recipes window populates. The carrier is the standard world IIR
+		// framing (GameAgent 0x58 -> GameInterface <instance>), body = [subop][0xC350][handle][reply], byte-exact vs
+		// the capture (docs/tradeskill-recipes.md). Empty catalog -> an empty (count=0x3F1) list, which opens the book
+		// cleanly with no recipes.
+		private async Task SendCraftingRecipeBook(INetworkClient client)
+		{
+			var handle = client.Session.Account.ClientInstance;
+			var rows = await Database.GetRecipes();
+			var records = rows
+				.Select(r => new TradeskillRecipeCodec.RecipeRecord(r.Id, r.Data))
+				.ToList();
+			var replyBody = TradeskillRecipeCodec.BuildReplyBody(records);
+
+			await new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.TradeskillReplyIIR)
+					.WriteUInt32(0x0000C350) // the ProtoID type marker (0xC350) preceding the target handle
+					.WriteUInt32(handle)
+					.WriteArray(replyBody))
+				.SendAsync(client);
+
+			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
 		}
 
 		// Handles the create-editor "instance echo": the client repeats its own client instance id as a 0x2000

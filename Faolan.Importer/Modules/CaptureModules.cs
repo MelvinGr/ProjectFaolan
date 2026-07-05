@@ -483,6 +483,33 @@ namespace Faolan.Importer.Modules
 	// Summonable PET creatures (#307): lifts each pet's captured FA015807 stat core onto its creature TYPE (Npc.Data)
 	// so a pet-summon spell spawns it FROM THE TYPE (no world placement). Opt-in like mounts; run against a pet-summon
 	// capture, e.g. `--only pets`.
+	// Crafting recipe-book catalog (TradeskillReplyIIR 0x9062D559) - the list served when the client opens the
+	// Recipes window. Opt-in (its only capture is one L80 char's full 603-recipe book).
+	public sealed class RecipesModule : IImportModule
+	{
+		public bool InDefaultSet => false;
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Crafting recipes book (TradeskillReplyIIR 0x9062D559, opt-in).";
+		public string Name => "recipes";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var recipes = ctx.Captures.SelectMany(c => CaptureRecipeImporter.Extract(c.Packets)).ToList();
+			var deduped = recipes.GroupBy(r => r.Id).Select(g => g.First()).ToList();
+			var (seen, added, updated) = await CaptureRecipeImporter.ImportAsync(ctx.Db, deduped);
+			return new ImportResult($"{seen} recipe(s), {added} new, {updated} updated.");
+		}
+	}
+
 	public sealed class PetsModule : IImportModule
 	{
 		public bool InDefaultSet => false;

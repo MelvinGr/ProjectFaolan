@@ -36,6 +36,7 @@ namespace Faolan.Importer.Cli
 			new QuestsModule(),
 			new MountsModule(), // opt-in
 			new PetsModule(), // opt-in (#307)
+			new RecipesModule(), // opt-in (crafting recipe book)
 			// --- tsv modules ---
 			new EllathaLevelsModule(),
 			new EllathaCombosModule(),

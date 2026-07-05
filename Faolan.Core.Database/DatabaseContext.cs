@@ -52,6 +52,7 @@ namespace Faolan.Core.Database
 		DbSet<NpcSpell> NpcSpells { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<PatrolWaypoint> PatrolWaypoints { get; }
+		DbSet<Recipe> Recipes { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
@@ -111,6 +112,7 @@ namespace Faolan.Core.Database
 		public DbSet<NpcSpell> NpcSpells { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
+		public DbSet<Recipe> Recipes { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
@@ -145,6 +147,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Item>().Property(i => i.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Map>().Property(m => m.Id).ValueGeneratedNever();
 			modelBuilder.Entity<LuaScript>().Property(l => l.Id).ValueGeneratedNever();
+			modelBuilder.Entity<Recipe>().Property(r => r.Id).ValueGeneratedNever();
 
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete

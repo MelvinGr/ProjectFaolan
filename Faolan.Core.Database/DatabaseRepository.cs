@@ -102,6 +102,7 @@ namespace Faolan.Core.Database
 		Task<Shop> GetShopByVendorName(string vendorName);
 
 		Task<Spell> GetSpell(uint id);
+		Task<Recipe[]> GetRecipes();
 		Task<Spell[]> GetSpells();
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
 
@@ -443,6 +444,14 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
+		}
+
+		// The crafting recipe-book catalog, ordered by recipe id (== the captured TradeskillReplyIIR record order),
+		// so the reconstructed list reproduces the capture byte-for-byte.
+		public async Task<Recipe[]> GetRecipes()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Recipes.OrderBy(r => r.Id).ToArrayAsync();
 		}
 
 		public async Task<Account> GetAccount(uint id)
