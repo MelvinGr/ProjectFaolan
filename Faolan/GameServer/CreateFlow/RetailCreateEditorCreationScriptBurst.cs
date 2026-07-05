@@ -37,13 +37,7 @@ namespace Faolan.GameServer
 			var id = client.Session.Account.ClientInstance;
 			var sender = new byte[]
 			{
-				0x0D,
-				0x13,
-				0xCE,
-				0x71,
-				0xB1,
-				0x10,
-				0x59
+				0x0D, 				0x13, 				0xCE, 				0x71, 				0xB1, 				0x10, 				0x59
 			};
 			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
@@ -70,60 +64,7 @@ namespace Faolan.GameServer
 					.WriteUInt32(id)
 					.WriteArray(0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
-					.WriteArray(0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x27,
-						0x10,
-						0x00,
-						0x01,
-						0x00,
-						0x00,
-						0x00,
-						0x01,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x0B,
-						0x90,
-						0x00,
-						0x00,
-						0x00,
-						0x01,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x01,
-						0x00,
-						0x00,
-						0x00,
-						0x00,
-						0x3D,
-						0x5F,
-						0xC9,
-						0x66))
+					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3D, 0x5F, 0xC9, 0x66))
 				.SendAsync(client);
 
 			await Iir(GameServer0X2000RespondsOpcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(W, id, 0x01, 0x00));
@@ -136,8 +77,7 @@ namespace Faolan.GameServer
 
 			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(id, [(0x1Bu, 0x1F40u), (0xBAu, 0x00u), (0x1FFu, 0x00u), (0x200u, 0x301u), (0x201u, 0x00u), (0x25Fu, 0x59EA5C54u)]));
 
-			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat + its RDB resource manifest,
-			// then the "PlayOrSkip" ScriptMessage (decoded by Captures/scripts/decode_scryscript.py).
+			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat + its RDB resource manifest, 			// then the "PlayOrSkip" ScriptMessage (decoded by Captures/scripts/decode_scryscript.py).
 			await IirRecord(ScryScript.BuildStep(id, CreateWorldScriptToken, 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
 			await IirRecord(ScryScript.BuildStep(id, "PlayOrSkip"));
 
@@ -148,6 +88,7 @@ namespace Faolan.GameServer
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(id, "texscript_183875", 1.0f, 0x01, 0x00000001u));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF95u, "texscript_183875", 1.0f, 0x01, 0x00000002u));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF94u, "texscript_183875", 1.0f, 0x01, 0x00000002u));
+
 			return;
 
 			// One IIR packet: 0x2000 envelope -> [u32 length][u32 IIR-id][body]. The length is recomputed, so editing

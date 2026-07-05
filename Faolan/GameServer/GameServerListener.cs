@@ -533,7 +533,7 @@ namespace Faolan.GameServer
 					else if (isNewCharacter) // New character -> show the creator
 					{
 						Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
-						await SendRetailCreateEditorInitialBurst(client, Database);
+						await RetailCreateEditorInitialBurst.SendRetailCreateEditorInitialBurst(client, Database);
 					}
 					else
 					{
@@ -1106,6 +1106,22 @@ namespace Faolan.GameServer
 		private static bool IsRetailCreateEditorFlow(INetworkClient client)
 		{
 			return client.Session.Character?.Name == null;
+		}
+
+		// Step 4: the enter-world handoff. The client learns the world server address ONLY from this 0x2002
+		// packet (the address is carried explicitly here, not derived). The client opens a brand-new connection
+		// to that address, which triggers the loading screen where the intro cinematic resources load. Retail used
+		// a SEPARATE world port (creator + 1); we advertise the SAME GameServer port, so the fresh connection
+		// lands back on the one GameServerListener (which serves the create-world entry path for the now-named
+		// character). Body = [0x00][byteLen "host:port"].
+		private async Task SendWorldHandoff(INetworkClient client)
+		{
+			var realm = await Database.GetRealm(client.Session.Character.RealmId);
+			var address = $"{realm.IpAddress}:{realm.Port}";
+
+			await new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.WorldHandoff).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
+
+			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}
 	}
 }

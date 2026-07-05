@@ -65,7 +65,7 @@ namespace Faolan.Tests
 			var repo = new DatabaseRepository(new SingleOptionsContextFactory(options));
 			var client = new RecordingNetworkClient(0x02000001); // the instance the golden was recorded with
 
-			await GameServerListener.SendRetailCreateEditorInitialBurst(client, repo);
+			await RetailCreateEditorInitialBurst.SendRetailCreateEditorInitialBurst(client, repo);
 
 			var bytes = client.Sent.SelectMany(p => p).ToArray();
 			Assert.Equal(Convert.ToHexString(Golden.Bytes("InitialBurst")), Convert.ToHexString(bytes));
