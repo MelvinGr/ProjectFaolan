@@ -111,19 +111,17 @@ namespace Faolan.Core.Network.Packets
 		public static Mail Parse(byte[] body)
 		{
 			var s = new FaolanStream(body);
-			var mail = new Mail { MailId = s.ReadUInt64() };
-
-			mail.RecipientClass = s.ReadUInt32();
-			mail.RecipientName = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
-			mail.SenderClass = s.ReadUInt32();
-			mail.SenderName = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
-
-			mail.BodyXml = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
-
-			mail.FooterWord = s.ReadUInt32();
-			mail.Money = s.ReadUInt64();
-			mail.Timestamp1 = s.ReadUInt32();
-			mail.Timestamp2 = s.ReadUInt32();
+			var mail = new Mail { MailId = s.ReadUInt64(),
+				RecipientClass = s.ReadUInt32(),
+				RecipientName = Encoding.ASCII.GetString(s.ReadArrayUInt16Length()),
+				SenderClass = s.ReadUInt32(),
+				SenderName = Encoding.ASCII.GetString(s.ReadArrayUInt16Length()),
+				BodyXml = Encoding.ASCII.GetString(s.ReadArrayUInt16Length()),
+				FooterWord = s.ReadUInt32(),
+				Money = s.ReadUInt64(),
+				Timestamp1 = s.ReadUInt32(),
+				Timestamp2 = s.ReadUInt32()
+			};
 
 			var count = s.ReadUInt32();
 			for (var i = 0; i < count; i++)

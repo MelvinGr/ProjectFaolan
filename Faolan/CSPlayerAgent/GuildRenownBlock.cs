@@ -116,22 +116,23 @@ namespace Faolan.CSPlayerAgent
 				throw new ArgumentException($"renown block must be {Length} bytes, got {block.Length}");
 
 			var o = 0;
-			var b = new GuildRenownBlock { Flag = block[o++] };
-			b.StatIds = ReadList(block, ref o);
-			b.BoolA = block[o++];
-			b.BoolB = block[o++];
-			b.Group1 = ReadU32s(block, ref o, 3);
-			b.BoolC = block[o++];
-			b.BoolD = block[o++];
-			b.Group2 = ReadU32s(block, ref o, 2);
-			b.List2 = ReadList(block, ref o);
-			b.Group3 = ReadU32s(block, ref o, 6);
-			b.RenownCounters = ReadU64s(block, ref o, 6);
-			b.Group4 = ReadU32s(block, ref o, 2);
-			b.Counters64B = ReadU64s(block, ref o, 8);
-			b.Counters64C = ReadU64s(block, ref o, 3);
-			b.Group5 = ReadU32(block, ref o);
-			b.Counters64D = ReadU64(block, ref o);
+			var b = new GuildRenownBlock { Flag = block[o++],
+				StatIds = ReadList(block, ref o),
+				BoolA = block[o++],
+				BoolB = block[o++],
+				Group1 = ReadU32s(block, ref o, 3),
+				BoolC = block[o++],
+				BoolD = block[o++],
+				Group2 = ReadU32s(block, ref o, 2),
+				List2 = ReadList(block, ref o),
+				Group3 = ReadU32s(block, ref o, 6),
+				RenownCounters = ReadU64s(block, ref o, 6),
+				Group4 = ReadU32s(block, ref o, 2),
+				Counters64B = ReadU64s(block, ref o, 8),
+				Counters64C = ReadU64s(block, ref o, 3),
+				Group5 = ReadU32(block, ref o),
+				Counters64D = ReadU64(block, ref o)
+			};
 
 			if (o != Length)
 				throw new InvalidOperationException($"renown block decoded {o} bytes, expected {Length}");

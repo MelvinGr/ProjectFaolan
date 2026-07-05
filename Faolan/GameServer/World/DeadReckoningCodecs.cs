@@ -105,9 +105,9 @@ namespace Faolan.GameServer.World
 			{
 				Handle = s.U32(),
 				Env = s.Byte(),
-				Flag1 = s.Byte()
+				Flag1 = s.Byte(),
+				Position = s.Vec3()
 			};
-			r.Position = s.Vec3();
 			if (r.Bit4)
 				r.FacingX = s.Float();
 			else

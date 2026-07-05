@@ -147,8 +147,7 @@ namespace Faolan.GameServer.Spawn
 		// byte-identical to the most-minimal captured NPC scaffolds (NpcSpawnPreIirTests.PreIir_BuildMinimal_*).
 		public static NpcSpawnPreIir BuildMinimal(uint category = DefaultCategory)
 		{
-			var scaffold = new NpcSpawnPreIir();
-			scaffold.Words[CategoryWordIndex] = category;
+			var scaffold = new NpcSpawnPreIir { Words = { [CategoryWordIndex] = category } };
 			return scaffold;
 		}
 

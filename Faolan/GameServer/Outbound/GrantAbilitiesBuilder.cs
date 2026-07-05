@@ -199,20 +199,6 @@ namespace Faolan.GameServer
 				Logger.LogInformation("GrantCharacterCombos: emitted {Count} combos to '{Name}' (class={Class}, level {Level}).", comboIds.Count, character.Name, character.Class, character.Level);
 		}
 
-		private async Task GrantStartingBuffs(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			// Self-buff: applyTo == applyFrom == the player's own handle (== ClientInstance == Character.Id), which is
-			// also what ApplySpell keys the ActiveBuffs registration on. Use the captured payload so the wire matches
-			// the retail starting buff byte-for-byte (modulo the per-cast trailing counter).
-			var self = client.Session.Account.ClientInstance;
-			await ApplySpell(client, self, self, ShieldBuffSpellId, ShieldBuffPayload);
-			Logger.LogInformation("GrantStartingBuffs: applied the shield self-buff 0x{Spell:X8} to '{Name}'.", ShieldBuffSpellId, character.Name);
-		}
-
 		// Re-grants the character's learned spells on login - the spell counterpart to GrantCharacterAbilities (#74).
 		// Retail re-sends a caster's whole learned set via DispatchLearnSpell on every world entry (invariant across
 		// every login capture: NecroL80 always relearns her 5, DemoL80 his 9); the client silently no-ops spells it

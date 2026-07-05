@@ -55,9 +55,9 @@ namespace Faolan.GameServer.Scripting
 			script.Globals["owner"] = proxy; // aliases seen in a few scripts
 			script.Globals["character"] = proxy;
 
-			var resource = new Table(script);
-			resource["Hash"] = (Func<string, double>)HashResource; // Resource.Hash("ABCD") - dotted, no self
-			resource["SpellID"] = (Func<DynValue, double>)(_ => 0);
+			var resource = new Table(script) { ["Hash"] = (Func<string, double>)HashResource, // Resource.Hash("ABCD") - dotted, no self
+				["SpellID"] = (Func<DynValue, double>)(_ => 0)
+			};
 			script.Globals["Resource"] = resource;
 
 			return script;
