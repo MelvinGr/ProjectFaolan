@@ -18,6 +18,38 @@ namespace Faolan.GameServer.Combat
 	{
 		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 
+		// The 54-byte MagicBuffIIR (0x6B87E316) DATA tail for a spellweave buff - the bytes AFTER the ApplySpell
+		// header ([op][0xC350][applyTo][u16 0][spellId][0xC350][applyFrom]). Constructed field-by-field (decoded from
+		// the trance + component buffs in the NecroL80 capture, frames 1644/1646/1648/1659, and proven byte-exact by
+		// SpellweaveCodecTests). Three fields vary: the duration (centiseconds), the spell BASE id (= full id >> 8),
+		// and a per-application effect NONCE; the rest are capture-derived constants (two 0x00010000 flags + two 0x50
+		// magnitude words). The generic 50-byte Scythe-Shield blob the shared ApplySpell default uses is the WRONG
+		// shape - the client's MagicBuffIIR_c::ReadSubClass runs off the end and rejects the buff ("Blob data may be
+		// inconsistent, data invalid"), so nothing renders.
+		//
+		// `durationCentiseconds` is the spell's DurationMs / 10 (the client counts it down and ApplySpell reads it
+		// back for expiry); `effectNonce` is a per-application unique id (so distinct buffs don't collapse onto one
+		// effect instance client-side).
+		public static byte[] BuildBuffData(uint spellBaseId, uint durationCentiseconds, uint effectNonce)
+		{
+			return new FaolanStream()
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(durationCentiseconds)
+				.WriteUInt32(0x00010000)
+				.WriteUInt32(0x00010000)
+				.WriteUInt16((ushort)0x0000)
+				.WriteUInt32(spellBaseId) // high byte 0 (base id < 0x1000000)
+				.WriteUInt32(0x00000050)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0x00000050)
+				.WriteUInt32(0)
+				.WriteUInt32(effectNonce)
+				.ToArray();
+		}
+
 		// The reactive element list (CombatReactiveIIR 0x54C02089): declares to the client which weave elements the
 		// caster can ADD while in the trance - this is what lets the client send the 0x03-tagged adds. componentIndex
 		// on an add indexes INTO this list. Record: [op][0xC350][caster][u32 0][u8 0x01][N x u32 elementBaseId].
@@ -37,6 +69,38 @@ namespace Faolan.GameServer.Combat
 				stream.WriteUInt32(element);
 
 			return stream.ToArray();
+		}
+
+		// The trance METER tick (StatDamageIIR 0xE9F24184) - the draining "Spellweaving Cost" gauge (spell 0x37E68C)
+		// the client shows while in the trance (frame 1654 onward). Streamed on a timer; `token` is the current gauge
+		// position (drains over the trance) and `delta` the signed change since the last tick. gaugeMax 1000028, mode
+		// 2, magnitude 80 are capture constants. Record: [op][0xC350][caster][u8 0][u32 token][0][0][0][u32 gaugeMax]
+		// [u32 mode=2][i32 delta][0][0xC350][caster][u32 1][0][u32 gauge=0x37E68C][u32 magnitude=80][0][0][0].
+		public const uint TranceMeterGauge = 0x37E68C; // "Spellweaving Cost"
+		private const uint TranceMeterMax = 1000028;
+		private const uint TranceMeterMagnitude = 80;
+
+		public static byte[] BuildTranceMeter(uint caster, uint token, int delta)
+		{
+			return new FaolanStream()
+				.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.StatDamageIIR)
+				.WriteUInt32(Type)
+				.WriteUInt32(caster)
+				.WriteByte(0x00)
+				.WriteUInt32(token)
+				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
+				.WriteUInt32(TranceMeterMax)
+				.WriteUInt32(2) // mode
+				.WriteUInt32((uint)delta) // signed drain since last tick
+				.WriteUInt32(0)
+				.WriteUInt32(Type)
+				.WriteUInt32(caster)
+				.WriteUInt32(1)
+				.WriteUInt32(0)
+				.WriteUInt32(TranceMeterGauge)
+				.WriteUInt32(TranceMeterMagnitude)
+				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
+				.ToArray();
 		}
 
 		// One fire-burst stage (StatIIR 0xF98E10B3) emitted per stage on DEACTIVATE: the accumulated weave firing.

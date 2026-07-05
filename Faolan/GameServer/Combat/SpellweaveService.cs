@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Microsoft.Extensions.Logging;
 
@@ -25,6 +26,15 @@ namespace Faolan.GameServer.Combat
 		private readonly Func<INetworkClient, uint, uint, uint, Task> _applySpell; // ApplySpell(client, applyTo, applyFrom, spellId)
 		private readonly Func<INetworkClient, byte[], Task> _sendIir; // send a record on the world-framed IIR carrier
 		private readonly ILogger _logger;
+
+		// Trance-meter drain (capture-approximate, frame 1654+: the "Spellweaving Cost" gauge starts ~0x22CE and drains
+		// ~119 every ~1.5s). Streamed on a self-rescheduling timer that stops when the trance closes.
+		private const uint TranceMeterStartToken = 0x22CE;
+		private const uint TranceMeterDrainPerTick = 119;
+		private const int TranceMeterIntervalMs = 1500;
+		// How long after a pick the component picker stays hidden before the server re-sends the reactive list to bring
+		// it back (capture: add#0 105.8s -> list re-send 114.0s, ~8s).
+		private const int ElementCooldownMs = 8000;
 
 		public SpellweaveService(
 			ILogger logger,
@@ -81,35 +91,98 @@ namespace Faolan.GameServer.Combat
 				foreach (var buff in profile.TranceBuffs)
 					await _applySpell(client, caster, caster, buff);
 
+			// The trance-pose animation (BCC): make the character play the spellweaving stance (without it the buffs
+			// render but the body stays idle).
+			if (_sendIir != null)
+				await _sendIir(client, BehaviorAnimationCodec.SpellweaveTrance(caster));
+
 			// The reactive element list: tells the client which weave elements it can add (the componentIndex on each
 			// add indexes into this list). This is what unblocks the adds.
 			if (_sendIir != null)
 				await _sendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
 
+			// The trance METER: stream the draining "Spellweaving Cost" gauge on a timer (the visible trance timer).
+			StartTranceMeter(client, caster);
+
 			await Feedback(client, "Spellweave started.");
-			// TODO: immobilise the caster for the trance (the move handler should reject motion while IsSpellweaving)
-			// and stream the 0xE9F24184 trance meter (the draining gauge) - see docs/combos-spellweaving-handoff.md.
+			// TODO: immobilise the caster for the trance (the move handler should reject motion while IsSpellweaving).
 		}
 
-		// A component add (CombatReactiveIIR) - only meaningful inside an open trance. Accumulates the index (which
-		// indexes into the caster's weave-element list).
+		// Streams the trance meter (0xE9F24184, "Spellweaving Cost") on a self-rescheduling timer while the trance is
+		// open, draining the gauge each tick. Stops as soon as IsSpellweaving clears (deactivate / logout). The
+		// drain curve is capture-approximate; the packet itself is byte-exact (SpellweaveCodec.BuildTranceMeter).
+		private void StartTranceMeter(INetworkClient client, uint caster)
+		{
+			var token = TranceMeterStartToken;
+
+			void Tick()
+			{
+				Task.RunAfter(TranceMeterIntervalMs, async () =>
+				{
+					var session = client.Session;
+					if (session?.Account == null || !session.IsSpellweaving)
+						return; // trance closed -> stop the loop
+
+					var drain = Math.Min(TranceMeterDrainPerTick, token);
+					token -= drain;
+					if (_sendIir != null)
+						await _sendIir(client, SpellweaveCodec.BuildTranceMeter(caster, token, -(int)drain));
+					Tick();
+				}, _logger);
+			}
+
+			Tick();
+		}
+
+		// A component add (CombatReactiveIIR) - only meaningful inside an open trance. componentIndex indexes into the
+		// caster's weave-element list. Retail answers each add with a burst (Captures/decode_spellweave.py, frames
+		// 1657-1661): the component's OWN spell applied immediately as a self-buff (necro: add idx0->Arcane Renewal
+		// 0x396AE9, idx1->Arcane Surge 0x3969D8, idx3->Death God 0x396A22 - so necro components take effect as you
+		// weave them), then a re-sent element list. Without that response the client only ever registers the FIRST
+		// pick (it never gets the ack that re-arms it). The animation BCC pair in that burst is not built yet.
 		public async Task AddComponentAsync(INetworkClient client, uint componentIndex)
 		{
 			var session = client.Session;
-			if (session?.Character == null)
+			if (session?.Character == null || session.Account == null)
 				return;
 
 			if (!session.IsSpellweaving)
 			{
-				_logger.LogInformation("Spellweave component 0x{Idx:X} ignored - no open weave for '{Name}'.", componentIndex, session.Character.Name);
+				_logger.LogInformation("Spellweave component #{Idx} ignored - no open weave for '{Name}'.", componentIndex, session.Character.Name);
 				return;
 			}
 
+			var profile = SpellweaveCatalog.ForClass(session.Character.Class);
+			var caster = session.Account.ClientInstance;
 			session.WeaveComponents.Add(componentIndex);
 			_logger.LogInformation("Spellweave ADD component #{Idx} (#{Count}) for '{Name}'.", componentIndex, session.WeaveComponents.Count, session.Character.Name);
+
+			var hasElement = profile != null && componentIndex < profile.WeaveElements.Length;
+
+			// The component-add gesture animation (BCC begin + complete), carrying the added element.
+			if (hasElement && _sendIir != null)
+			{
+				await _sendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], complete: false));
+				await _sendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], complete: true));
+			}
+
+			// Immediate component effect: apply the element's own spell as a self-buff (the full id is the base << 8).
+			if (hasElement && _applySpell != null)
+				await _applySpell(client, caster, caster, profile.WeaveElements[componentIndex] << 8);
+
+			// Do NOT re-send the reactive list now: the client HIDES the component picker itself once a component is
+			// picked (the capture sends no list after an add - the next one is frame 1705, ~8s later). Re-sending it
+			// immediately is what kept the picker up and let the player spam. Instead bring the picker back after the
+			// cooldown by re-sending the full list, so the flow is: pick -> picker disappears -> ~cooldown -> reappears.
+			if (profile != null && _sendIir != null)
+				Task.RunAfter(ElementCooldownMs, async () =>
+				{
+					var session = client.Session;
+					if (session?.Account != null && session.IsSpellweaving)
+						await _sendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
+				}, _logger);
+
 			await Feedback(client, $"Weave component added ({session.WeaveComponents.Count}).");
-			// TODO: re-send the reactive element list with the used element zeroed (the per-element cooldown), and
-			// apply the component's stat/effect contribution (needs the componentIndex -> effect table).
 		}
 
 		// Deactivate: fire the accumulated weave and close the trance. Emits the s2c fire burst (0xF98E10B3); the

@@ -191,6 +191,24 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
+		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
+		private static int _spellweaveEffectSeq;
+
+		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
+		// 54-byte MagicBuffIIR blob (SpellweaveCodec.BuildBuffData) instead of the shared 50-byte default - the client
+		// rejects the default shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's real
+		// duration so the client counts it down and ApplySpell arms the matching expiry. The narrow seam the
+		// SpellweaveService uses for every buff it emits.
+		private async Task ApplySpellweaveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
+		{
+			var spellBase = spellId >> 8;
+			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
+			var durationCs = (uint)((spell?.DurationMs ?? 0) / 10);
+			var nonce = 0x18000000u | ((uint)System.Threading.Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
+			await ApplySpell(client, applyTo, applyFrom, spellId, SpellweaveCodec.BuildBuffData(spellBase, durationCs, nonce));
+		}
+
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
 			if (!client.Session.HasPendingPost205FFollowUp)

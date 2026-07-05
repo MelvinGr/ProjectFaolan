@@ -129,7 +129,7 @@ namespace Faolan.GameServer
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAbilityGrant(c, a), (c, id) => SendLearnSpell(c, id)); // announced level-up ability + spell unlocks (#209/#73/#74)
 			_spellweave = new SpellweaveService(logger,
 				(c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
-				(c, to, from, spellId) => ApplySpell(c, to, from, spellId), // trance buffs on activate
+				(c, to, from, spellId) => ApplySpellweaveBuff(c, to, from, spellId), // trance + component buffs (correct 54-byte blob)
 				// reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body,
 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
 				(c, record) => SendWorldIir(c, new FaolanStream().WriteUInt32((uint)record.Length).WriteArray(record).ToArray()));

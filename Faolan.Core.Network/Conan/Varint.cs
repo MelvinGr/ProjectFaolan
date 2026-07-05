@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -7,6 +8,7 @@ namespace Faolan.Core.Network.Conan
 	// hand-rolled EncodeVarint / WriteVarint copies that used to live in PacketBurstHelper, SnapshotPrefix,
 	// ConversationReplay, ScryScript, PlayerSpawnScaffoldCodec and ProtoMessage. Use FaolanStream.WriteVarint for
 	// stream writes; these statics are for the byte[]/List<byte> builders.
+	[Obsolete]
 	public static class Varint
 	{
 		// The base-128 varint encoding of `value`.

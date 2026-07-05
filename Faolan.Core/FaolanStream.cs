@@ -323,11 +323,11 @@ namespace Faolan.Core
 		{
 			while (value >= 0x80)
 			{
-				WriteByte((byte)((value & 0x7F) | 0x80));
+				WriteByte((value & 0x7F) | 0x80);
 				value >>= 7;
 			}
 
-			return WriteByte((byte)value);
+			return WriteByte(value);
 		}
 
 		public FaolanStream WriteVector3(Vector3 value)
