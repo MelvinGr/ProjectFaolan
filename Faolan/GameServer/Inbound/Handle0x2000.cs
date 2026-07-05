@@ -106,7 +106,7 @@ namespace Faolan.GameServer
 						case MovingType.Sprint:
 						case MovingType.Rotate:
 						{
-							var sessionCharacter = client.Session.Character ?? client.Session.Account.Character;
+							var sessionCharacter = client.Session.Character;
 							if (sessionCharacter == null)
 							{
 								Logger.LogWarning(

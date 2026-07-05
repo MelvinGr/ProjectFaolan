@@ -125,7 +125,7 @@ namespace Faolan.PlayerAgent
 
 			// Resolve the active character via the repository (the session no longer lazy-loads Account.Characters):
 			// GetCharacterForAccount returns the direct id match, else the most-recently-created character.
-			var activeCharacter = account.Character ?? await Database.GetCharacterForAccount(account.Id, account.ClientInstance) ??
+			var activeCharacter = await Database.GetCharacterForAccount(account.Id, account.ClientInstance) ??
 				throw new Exception($"Unable to resolve active character for account {account.Id:X8} and client instance {account.ClientInstance:X8}");
 
 			var realm = await Database.GetRealm(activeCharacter.RealmId);

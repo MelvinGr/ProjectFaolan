@@ -111,9 +111,9 @@ namespace Faolan.Core.Network
 
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
-		private Character _character;
-
 		public Account Account { get; set; }
+		public Character Character { get; set; }
+
 		public bool AwaitingEnterWorld { get; set; }
 		public bool HasFlushedCreateEditorPostReady { get; set; }
 		public bool HasFlushedCreateWorldEntryBurst { get; set; }
@@ -125,12 +125,6 @@ namespace Faolan.Core.Network
 		public bool PostMorphBurstSent { get; set; }
 		public bool WorldEntered { get; set; }
 		public byte[] ClientConversation { get; set; }
-
-		public Character Character
-		{
-			get => _character ?? Account?.Character;
-			set => _character = value;
-		}
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
 		public Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; } = new Dictionary<uint, uint>();

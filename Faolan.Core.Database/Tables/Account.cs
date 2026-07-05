@@ -24,10 +24,6 @@ namespace Faolan.Core.Database.Tables
 		public bool GmGodMode { get; set; }
 		public bool GmInvisible { get; set; }
 
-		// In-memory only (set per session from ClientInstance); never persisted, so no FK to Character.
-		[NotMapped]
-		public Character? Character { get; set; }
-
 		public DateTimeOffset CreationDate { get; set; }
 		public DateTimeOffset? LastConnection { get; set; }
 

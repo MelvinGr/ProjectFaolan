@@ -82,9 +82,6 @@ namespace Faolan.CSPlayerAgent
 					}
 
 					account.ClientInstance = characterId;
-					account.Character = character.Id == characterId
-						? character
-						: null;
 					client.Session.Account = account;
 					client.Session.Character = character;
 

@@ -105,8 +105,7 @@ namespace Faolan.PlayerAgent
 					var unk6 = packet.Body.ReadUInt32();
 
 					client.Session.Account.ClientInstance = characterId;
-					client.Session.Account.Character = await Database.GetCharacter(characterId);
-					client.Session.Character = client.Session.Account.Character;
+					client.Session.Character = await Database.GetCharacter(characterId);
 					await Database.UpdateLastInfo(client.Session.Character, client.IpAddress);
 					await Database.SaveAccount(client.Session.Account);
 

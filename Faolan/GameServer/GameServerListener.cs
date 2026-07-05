@@ -428,9 +428,6 @@ namespace Faolan.GameServer
 
 					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
 					client.Session.Account.ClientInstance = clientInstance;
-					client.Session.Account.Character = resolvedCharacter?.Id == clientInstance
-						? resolvedCharacter
-						: null;
 					client.Session.Character = resolvedCharacter;
 					if (resolvedCharacter?.Id != clientInstance)
 					{

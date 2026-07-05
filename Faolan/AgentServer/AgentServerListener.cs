@@ -82,9 +82,6 @@ namespace Faolan.AgentServer
 
 					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
 					client.Session.Account.ClientInstance = clientInstance;
-					client.Session.Account.Character = resolvedCharacter?.Id == clientInstance
-						? resolvedCharacter
-						: null;
 					client.Session.Character = resolvedCharacter;
 
 					Logger.LogInformation("AgentServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
