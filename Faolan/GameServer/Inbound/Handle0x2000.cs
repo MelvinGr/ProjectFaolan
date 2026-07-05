@@ -304,21 +304,22 @@ namespace Faolan.GameServer
 						{
 							case ActionType.SummonMount:
 							{
-								// The client-initiated mount summon (#27): `from` is the mount/feat id on the bar
-								// (0x3E34F1 = "Fading Black Horse", 0x3E34F2 = "Swift Fading Black Horse").
-								// Retail duplicates as (mount capture frame 520): cast the summon spell (the CLIENT plays
-								// the whole horse-appears-out-of-view / runs-up / mounts animation from it), apply the RIDE
-								// buff (0x31EB1500 - seats the rider), and push the mount StatUpd (stat 0xBA = the mount id,
-								// 0xBB = 100). Retail spawns NO server horse entity - the client animates the entire mount
-								// from the spell. (We used to also SpawnMountForPlayer, which made the horse pop in on top of
-								// the player instead of running up - removed. #26/#27.)
+								// The mount summon/dismount is a CHANNELED cast that TOGGLES (pressing the same button while mounted
+								// dismounts). It goes through the same cast FSM as ActionType.CastSpell: a cast-BEGIN echo-ack makes
+								// the client channel + render the cast bar + play the animation (horse runs UP to mount, runs AWAY
+								// to dismount); then after the channel a cast-COMPLETE echo-ack (form-0x0a, phase 3) closes the bar
+								// and applies the outcome. MOUNT: ride buff 0x31EB1500 + StatUpd(0xBA=mount id, 0xBB=100) (frame 520).
+								// DISMOUNT: the end-twin 0x31EB1501 (empty payload) + StatUpd(0xBA=0) (frame 1449). Without the toggle
+								// the dismount channel re-mounts and the char gets stuck. Retail sends NO summon ApplySpell / no horse
+								// entity - the client animates it all. IsMounted lives on the player WorldEntity.
 								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
-								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} (spell 0x{Spell:X}). {Args}", from, mount.CreatureName, mount.SummonSpellId, args);
+								var playerEntity = PlayerWorldEntity(client);
+								var dismounting = playerEntity?.IsMounted ?? false;
+								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting ? "dismount" : "mount", args);
 
 								var self = client.Session.Account.ClientInstance;
-								await ApplySpell(client, self, self, mount.SummonSpellId); // summon cast: client plays the run-up animation
-								// Retail seats the rider ~545ms LATER (SummonChannelMs), after the run-up animation - not
-								// instantly, or the mount is instant with no visible run-up. Defer the ride buff + StatUpd.
+								await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode); // cast begin: bar + animation
+								var mountCastPayload = (byte[])rawPayload.Clone();
 								_ = Task.Run(async () =>
 								{
 									try
@@ -326,14 +327,32 @@ namespace Faolan.GameServer
 										await Task.Delay(MountCatalog.SummonChannelMs);
 										if (client.Session?.Account == null)
 											return;
-										await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
-										await SendStatUpdate(client, new CharacterStatBlock()
-											.Set((CharacterStatId)0xBA, mount.RideStat)
-											.Set((CharacterStatId)0xBB, 100), self); // the mount StatUpd (frame 520)
+										if (mountCastPayload.Length > 17)
+										{
+											mountCastPayload[16] = 0x00;
+											mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
+										}
+										await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete
+
+										if (dismounting)
+										{
+											await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin: removes the ride buff (empty payload)
+											await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.Mount, 0), self); // clear the mount stat (frame 1449)
+										}
+										else
+										{
+											await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
+											await SendStatUpdate(client, new CharacterStatBlock()
+												.Set(CharacterStatId.Mount, mount.RideStat)
+												.Set(CharacterStatId.MountSpeed, 100), self); // the mount StatUpd (frame 520)
+										}
+
+										if (playerEntity != null)
+											playerEntity.IsMounted = !dismounting;
 									}
 									catch (Exception ex)
 									{
-										Logger.LogWarning(ex, "Deferred mount seat failed.");
+										Logger.LogWarning(ex, "Deferred mount toggle failed.");
 									}
 								});
 

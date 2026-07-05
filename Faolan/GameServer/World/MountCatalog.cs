@@ -33,6 +33,11 @@ namespace Faolan.GameServer.World
 		// spawns the horse but never seats the player (proven in-client 2026-06-17).
 		public const uint RideSpell = 0x31EB1500u;
 
+		// The DISMOUNT: the ride buff's end twin (rank 01, empty payload) - removes the mounted state. Pressing the
+		// mount button while mounted toggles it; retail runs the SAME channel (cast bar + horse-runs-away animation)
+		// then applies this end-twin + a StatUpd clearing the mount stat (0xBA=0). Mount-dismount capture frame 1449.
+		public const uint DismountSpell = 0x31EB1501u;
+
 		// The summon CHANNEL: retail casts the summon spell, then applies the ride buff ~545ms later (mount capture
 		// SummonMount frame 498 -> ride buff frame 520 = 0.545s), during which the client plays the horse-runs-up
 		// animation. Applying the ride buff instantly (as we did) mounts with NO visible run-up. (The DB spell 0x3BAD7D

@@ -203,6 +203,11 @@ namespace Faolan.GameServer.World
 		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.
 		public uint OwnerHandle { get; set; }
 
+		// True while this player is riding a mount (#27). Pressing the SummonMount action toggles it: mount when false
+		// (ride buff + mount StatUpd), dismount when true (end-twin + StatUpd 0xBA=0). Without this the toggle re-mounts
+		// and the client gets stuck at the end of the dismount channel.
+		public bool IsMounted { get; set; }
+
 		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
 		public uint MapId { get; set; }
 

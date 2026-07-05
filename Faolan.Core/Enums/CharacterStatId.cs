@@ -51,6 +51,12 @@ namespace Faolan.Core.Enums
 		// built with the live zone's token here.
 		PlayfieldToken = 0x00BF,
 
+		// The mounted-state stats retail pushes with the ride buff (#27, mount-dismount capture frame 520): Mount = the
+		// mount id/appearance the player is riding (0 = dismounted), MountSpeed = the mount speed value (100). Cleared to
+		// 0 on dismount (frame 1449).
+		Mount = 0x00BA,
+		MountSpeed = 0x00BB,
+
 		// Undecoded slots of the 0x737A6DF9 tails stat sheet, numbered Unknown{i} so the whole block is enumerable
 		// (StatBlockSchema). Values are the raw wire stat ids; rename to a real name as each is decoded.
 		Unknown0 = 0x252, Unknown1 = 0x253, Unknown2 = 0x254, Unknown3 = 0x255, Unknown4 = 0x000, Unknown5 = 0x0E0,
