@@ -547,7 +547,6 @@ namespace Faolan.GameServer
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
-				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["grantmount"] = (client, arguments) => GrantMountCommand(client, arguments),
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
@@ -711,27 +710,6 @@ namespace Faolan.GameServer
 
 			var tin = character.Money;
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Wallet: {tin / 1000000} gold {tin / 10000 % 100} silver {tin / 100 % 100} copper {tin % 100} tin ({tin} tin total).");
-		}
-
-		// .mount [mountIdHex]  - server-force a mount summon, the same path the client-cast SummonMount now drives
-		// (#27): cast the summon spell (channeled ApplySpell 0x6B87E316 / 0xF508F4C1), spawn the mount creature at
-		// the player so it appears, then apply the captured RIDE buff (0x31EB1500) that seats the player - the
-		// in-client test 2026-06-17 proved the summon+spawn alone never mounts (#26). <mountId> selects the catalog
-		// mount (default 0x3E34F1 "Fading Black Horse").
-		private async Task MountCommand(INetworkClient client, string arguments)
-		{
-			var mount = MountCatalog.Default;
-			if (!string.IsNullOrWhiteSpace(arguments) && uint.TryParse(arguments.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase), NumberStyles.HexNumber, null, out var id))
-				mount = MountCatalog.ForId(id) ?? mount;
-
-			// Duplicate retail (mount capture frame 520): summon cast (client animates the horse run-up), ride buff
-			// (seats), + the mount StatUpd - NO server horse entity (that made it pop in on the player). #26/#27.
-			var self = client.Session.Account.ClientInstance;
-			await ApplySpell(client, self, self, mount.SummonSpellId); // the channeled summon cast (broadcast)
-			await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat the rider (#26)
-			await SendStatUpdate(client, new CharacterStatBlock()
-				.Set((CharacterStatId)0xBA, mount.RideStat)
-				.Set((CharacterStatId)0xBB, 100), self);
 		}
 
 		// .noloot <itemId> [on|off]  - flag an item OUT of (on, default) or back INTO (off) random loot rolls (#273).

@@ -33,6 +33,12 @@ namespace Faolan.GameServer.World
 		// spawns the horse but never seats the player (proven in-client 2026-06-17).
 		public const uint RideSpell = 0x31EB1500u;
 
+		// The summon CHANNEL: retail casts the summon spell, then applies the ride buff ~545ms later (mount capture
+		// SummonMount frame 498 -> ride buff frame 520 = 0.545s), during which the client plays the horse-runs-up
+		// animation. Applying the ride buff instantly (as we did) mounts with NO visible run-up. (The DB spell 0x3BAD7D
+		// is mislabelled "Stagger" with CastTime 0, so this comes from the capture, not the Spell row.)
+		public const int SummonChannelMs = 545;
+
 		// Frame 520's 54-byte ride-buff payload, verbatim (capture truth): +8 u32 BE = duration 8_640_000 cs = 24 h,
 		// the spell base 0x31EB15 rides at +23, and the trailing u32 is the per-cast counter (the only field #221
 		// observed differing between apply instances).

@@ -316,11 +316,26 @@ namespace Faolan.GameServer
 								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} (spell 0x{Spell:X}). {Args}", from, mount.CreatureName, mount.SummonSpellId, args);
 
 								var self = client.Session.Account.ClientInstance;
-								await ApplySpell(client, self, self, mount.SummonSpellId);
-								await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat the rider (#26)
-								await SendStatUpdate(client, new CharacterStatBlock()
-									.Set((CharacterStatId)0xBA, mount.RideStat)
-									.Set((CharacterStatId)0xBB, 100), self); // the mount StatUpd (frame 520)
+								await ApplySpell(client, self, self, mount.SummonSpellId); // summon cast: client plays the run-up animation
+								// Retail seats the rider ~545ms LATER (SummonChannelMs), after the run-up animation - not
+								// instantly, or the mount is instant with no visible run-up. Defer the ride buff + StatUpd.
+								_ = Task.Run(async () =>
+								{
+									try
+									{
+										await Task.Delay(MountCatalog.SummonChannelMs);
+										if (client.Session?.Account == null)
+											return;
+										await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
+										await SendStatUpdate(client, new CharacterStatBlock()
+											.Set((CharacterStatId)0xBA, mount.RideStat)
+											.Set((CharacterStatId)0xBB, 100), self); // the mount StatUpd (frame 520)
+									}
+									catch (Exception ex)
+									{
+										Logger.LogWarning(ex, "Deferred mount seat failed.");
+									}
+								});
 
 								break;
 							}
