@@ -5,9 +5,10 @@ From `NecroL80_mage-necromancer_login_summon_pet.pcapng` (necro lvl80 login in a
 
 ## What the capture shows (CORRECTED 2026-07-05 — an earlier pass wrongly called this a town-only login)
 
-The scene IS a town (guards `0x0001A2C8`–`0x0001A2D2`, traders), and the necro's login-time AoE hit the guard
-cluster (`ApplySpell 0x3BAD7D` @frame 221 — that id is the channelled combat/mount summon, applied to the guards
-here). **But there IS a real pet summon later in the session:**
+The scene IS a town (nearby entities decode to `"Guard"` `0x0001A2C8`–`0x0001A2D2`, `"Trader"`, `"Noblewoman"`).
+The guard cluster receives `ApplySpell 0x3BAD7D` + `GameActionList` + BCC @frame 221 — **purpose UNCONFIRMED**
+(likely ambient NPC state/buff + AI, NOT necessarily player combat; do not assume combat). **The confirmed
+signal is the real pet summon later in the session:**
 
 - **Frame 1197, C→S `BehaviorControlCenterIIR` (0x642CD3D6, 72 B):** the player activates the **summon ability**
   — a channelled BCC action. The body carries the player instance as a protobuf VARINT `d4 cb 8b 40`
