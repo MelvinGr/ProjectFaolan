@@ -430,21 +430,11 @@ namespace Faolan.GameServer
 								if (castMs == 0)
 									await Resolve();
 								else
-								{
-									_ = Task.Run(async () =>
+									Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
 									{
-										try
-										{
-											await Task.Delay(castMs);
-											if (client.Session?.Account != null)
-												await Resolve();
-										}
-										catch (Exception ex)
-										{
-											Logger.LogWarning(ex, "Deferred cast resolution failed for spell 0x{Spell:X}", spellId);
-										}
-									});
-								}
+										if (client.Session?.Account != null)
+											await Resolve();
+									}, Logger);
 
 								break;
 

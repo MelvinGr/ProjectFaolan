@@ -5,19 +5,19 @@ Detailed handoff for the AoC combo (melee) + spellweaving (caster) systems. Comp
 
 ## 0. Status at a glance
 
-| Piece | State |
-|---|---|
-| `ClassCombo` table + migration + enum CHECK | ✅ committed |
-| `ClassCombo` filled (8 combo classes, 292 rows, casters empty) | ✅ committed |
-| Rank-superseding of the combo grant (one per family) | ✅ committed |
-| `ComboActionParser` + `ComboService` (data side) | ✅ committed |
-| Grant wired to `ClassCombo` (fixed necro learning fighter combos) | ✅ committed |
-| **Spellweave wire decode** (activate/add/deactivate + buffs/meter/fire) | ✅ DECODED |
-| Spellweave FSM (state machine, toggle + add detected in-client) | ✅ committed (skeleton) |
-| Spellweave full activate RESPONSE (buffs+meter+reactive), per-add, fire | ❌ TODO (the real build) |
-| **Melee wire decode** (cid → combo, animByte → direction) | ⚠️ BLOCKED on client Ghidra RE |
-| Melee execution FSM | ❌ TODO (blocked by the decode) |
-| ⚠️ Regression: necro pets from a prior session went "permanent" | ❌ needs investigation (likely my importer run) |
+| Piece                                                                   | State                                           |
+| ----------------------------------------------------------------------- | ----------------------------------------------- |
+| `ClassCombo` table + migration + enum CHECK                             | ✅ committed                                    |
+| `ClassCombo` filled (8 combo classes, 292 rows, casters empty)          | ✅ committed                                    |
+| Rank-superseding of the combo grant (one per family)                    | ✅ committed                                    |
+| `ComboActionParser` + `ComboService` (data side)                        | ✅ committed                                    |
+| Grant wired to `ClassCombo` (fixed necro learning fighter combos)       | ✅ committed                                    |
+| **Spellweave wire decode** (activate/add/deactivate + buffs/meter/fire) | ✅ DECODED                                      |
+| Spellweave FSM (state machine, toggle + add detected in-client)         | ✅ committed (skeleton)                         |
+| Spellweave full activate RESPONSE (buffs+meter+reactive), per-add, fire | ❌ TODO (the real build)                        |
+| **Melee wire decode** (cid → combo, animByte → direction)               | ⚠️ BLOCKED on client Ghidra RE                  |
+| Melee execution FSM                                                     | ❌ TODO (blocked by the decode)                 |
+| ⚠️ Regression: necro pets from a prior session went "permanent"         | ❌ needs investigation (likely my importer run) |
 
 Commits this session (newest first): `5f1efb2a` spellweave FSM · `c2e87884`/`49662677`/`f02a8861` docs ·
 `50a4b4bb` ComboService · `02ffec0c` ComboActionParser · `753e5281`/`53dcce4e` fill ClassCombo(8 classes) ·
@@ -26,6 +26,7 @@ Commits this session (newest first): `5f1efb2a` spellweave FSM · `c2e87884`/`49
 ## 1. The two mechanics (recap)
 
 Both build an outcome from a sequence of player inputs; a class does ONE of them.
+
 - **Melee combo** — a FIXED catalog sequence of directional swings (`Combos.Actions`, e.g. `UR,UP`) in rapid
   succession → the combo's finisher. Classes: the 8 with `Combos` (soldiers, rogues, Bear Shaman, Herald of Xotli).
 - **Spellweaving** — FREE-FORM: activate → trance (immobilised) → add up to ~20 components (each blends
@@ -42,7 +43,7 @@ Both build an outcome from a sequence of player inputs; a class does ONE of them
   Derived by `CaptureAbilityImporter.DeriveClassCombosAsync` from the 8 literal class-name prefixes (Guardian,
   Conqueror, DarkTemplar, Barbarian, Ranger, Assassin, BearShaman, Herald) — exactly the 8 archetypes that have
   combos, so casters stay empty. Validated by Hakotep's HoX `0x2076` book. 292 rows. Ambiguous prefixes
-  (Soldier_/Rogue_ archetype-shared, feat-trees Reaver/Liberator/Lich/…, Slave_ starters, combo_npc, racials) are
+  (Soldier*/Rogue* archetype-shared, feat-trees Reaver/Liberator/Lich/…, Slave\_ starters, combo_npc, racials) are
   deliberately EXCLUDED.
 - **Grant** — `IDatabaseRepository.GetClassCombos(level, class)` returns the combos RANK-SUPERSEDED by family
   (`ComboFamilyKey` in `DatabaseRepository.cs`, the combo twin of `GetStartingBarSpells`): one per line at the
@@ -102,7 +103,7 @@ Timeline (clean dump): potions (BCC `RightClickItem` 0x0e) at 82.5/87.0/97.7s �
     trance gauge. Body: `00000051 e9f24184 0000c350 0802e5d4 000022ce…`.
 - **Add-component**: c2s `0x2000` → **`CombatReactiveIIR_c` (`0x54C02089`)**. TWO packets per add:
   - `0x03`-tagged (len 25): `rawPayload = [u32 len][u32 0x54C02089][u32 senderType 0x0000c350][u32 handle][u32 0]
-    [u8 0x03][u32 componentIndex]` — `componentIndex` at `rawPayload[21:25]` (values **0, 1, 3** for the three
+[u8 0x03][u32 componentIndex]` — `componentIndex` at `rawPayload[21:25]` (values **0, 1, 3** for the three
     spells → an index into the caster's weave ELEMENTS, NOT the Spell catalog id; the spell id never appears on the
     wire).
   - `0x02`-tagged (len 21): the ack twin (no index).
@@ -120,6 +121,7 @@ in-client**: activating a weave logs `Spellweave START for 'NecroL80'` — so th
 
 LEFT to make it actually work in-client (the real, byte-exact build; the client STALLS at "started" without the
 full activate response, because it never enters the interactive trance that lets it send the adds):
+
 1. **Send the activate RESPONSE on START** — the 3 trance buffs (`ApplySpell` 0x37F29800/0x37E5A800/0x3969D000),
    the `CombatReactiveIIR` ack, and the `e9f24184` meter. This is what unblocks the adds. (Have `ToggleAsync`
    return Started/Fired so the listener can emit the buffs on Started via the existing `ApplySpell` helper.)
@@ -151,22 +153,12 @@ full activate response, because it never enters the interactive trance that lets
 - `Faolan.Core.Network/Packets/Opcodes.cs` — `CombatReactiveIIR` (c2s) + `PerformSpecialAction` (0x205A)
 - `Faolan/GameServer/Combat/LevelComboCatalog.cs` — RETIRED (kept as capture-derived level→combo reference)
 
-## 8. ⚠️ Open regression — necro pets went "permanent"
-
-User reported that a necro's pets from a PRIOR session are now permanent. Prime suspect: the full importer run in
-`0424a594` (`dotnet run --project Faolan.Importer -- --skip characters`) over the Hakotep dumps folded
-per-session spawns into `faolan.db` as permanent `NpcSpawns` (the known "captures carry per-session bloat" risk —
-see the `npc_data_retirement_blocked_by_capture_bloat` note). NpcSpawns went 910 → 1049 that run. To check/back
-out: compare `NpcSpawns` against the pre-`0424a594` DB (`git show 0424a594~1:faolan.db`), and delete any
-pet-creature spawns that leaked in (necro pets = Arcanist/Magus/etc. per the pet subsystem `#307` note). NB
-`NpcSpawns` has no `TemplateId` column — check its actual schema before querying.
-
 ## 9. Gotchas
 
 - **Never `pkill -f Faolan.dll`** — it matches the Bash tool's own command line and kills the shell (exit 144, no
   output). Stop the server by PORT: `PID=$(ss -ltnp | grep ':7010' | grep -oP 'pid=\K[0-9]+' | head -1); kill -9
-  "$PID"`. (Memory: `gotcha_pkill_faolan_dll_self_match`.)
+"$PID"`. (Memory: `gotcha_pkill_faolan_dll_self_match`.)
 - Kill the server before writing `faolan.db`; don't `git checkout faolan.db` under a running server (makes it
   read-only → stuck at auth).
 - After `dotnet ef migrations add`, REBUILD before the server will apply the migration (or run `ef database
-  update` with the `$PWD/faolan.db` connection override).
+update` with the `$PWD/faolan.db` connection override).
