@@ -132,7 +132,10 @@ namespace Faolan.GameServer
 				(c, to, from, spellId) => ApplySpellweaveBuff(c, to, from, spellId), // trance + component buffs (correct 54-byte blob)
 				// reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body,
 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
-				(c, record) => SendWorldIir(c, new FaolanStream().WriteUInt32((uint)record.Length).WriteArray(record).ToArray()));
+				(c, record) => SendWorldIir(c, new FaolanStream().WriteUInt32((uint)record.Length).WriteArray(record).ToArray()),
+				(c, to, from, spellId) => SendBuffRemoval(c, to, from, spellId), // trance-buff end-twins on cancel/fire
+				(c, energy) => SendSprintBar(c, energy), // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
+				c => EnsureEnergyLoop(c)); // start the persistent energy tracking/regen loop
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_equipment = new EquipmentService(database, logger);

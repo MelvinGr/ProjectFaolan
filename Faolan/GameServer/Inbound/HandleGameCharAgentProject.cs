@@ -1,8 +1,11 @@
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -31,14 +34,22 @@ namespace Faolan.GameServer
 			var opcode = packet.Opcode;
 			if (opcode != 0x2000)
 			{
+				// SetSprintInputState (0x200C, the sprint key): a fire-and-forget input-state update retail does NOT
+				// reply to (#72). Body = [u16 state] (1 = on, 0 = off). Sprint drains the yellow ENERGY bar CLIENT-side
+				// (retail's server barely streams the bar during sprint - verified: 1 packet across a sprint-heavy
+				// capture). We don't reply or drive the bar; we only MIRROR the drain into the tracked session.Energy so
+				// spellweaving starts from the real current value and Exhausted can fire at 0 (docs/combos.md).
+				if (opcode == 0x200C)
+				{
+					var state = packet.Body != null && packet.Body.Length - packet.Body.Position >= sizeof(ushort)
+						? packet.Body.ReadUInt16()
+						: (ushort)0;
+					TrackSprintEnergy(client, state == 1);
+					return;
+				}
+
 				// Other GameCharAgentProject methods are not loading gates and retail's replies aren't decoded yet -
-				// log and no-op rather than misparse them as a 0x2000 ping. The dominant one is SetSprintInputState
-				// (0x200C, the sprint key - x2092 in captures): a fire-and-forget input-state update that retail does
-				// NOT reply to (verified - sprint uploads vastly outnumber ReportDimensionId downloads with no 1:1
-				// correlation; the old "answer each sprint with a ReportDimensionId" was a spurious packet, #72). This
-				// is the SOLE sprint path: every SetSprintInputState rides this class (receiver 0x5B9756FC), so it is
-				// routed here by class id and never reaches the opcode switch (where 0x200C collides with other
-				// methods) - so there is no separate sprint case there.
+				// log and no-op rather than misparse them as a 0x2000 ping.
 				Logger.LogDebug("GameCharAgentProject opcode 0x{Opcode:X4} (unhandled, no reply).", opcode);
 				return;
 			}
@@ -72,6 +83,92 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
+		}
+
+		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
+		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
+		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
+		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprint
+		private const int EnergyRegenPerTick = 600;
+		private const int EnergyTickMs = 1000;
+
+		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
+		{
+			if (client.Session?.Character == null)
+				return;
+
+			client.Session.IsSprinting = sprinting;
+			EnsureEnergyLoop(client);
+		}
+
+		// Inits the energy pool + starts the single persistent energy loop (idempotent). Called on sprint and on weave
+		// start, so energy is tracked + regenerates regardless of which happens first.
+		internal void EnsureEnergyLoop(INetworkClient client)
+		{
+			var session = client.Session;
+			if (session?.Character == null)
+				return;
+
+			if (session.EnergyMax == 0)
+			{
+				session.EnergyMax = SpellweaveCatalog.EnergyMaxForClass(session.Character.Class);
+				session.Energy = session.EnergyMax;
+			}
+
+			if (!session.EnergyLoopActive)
+				_ = RunEnergyMirror(client); // fire-and-forget; it logs its own exceptions
+		}
+
+		// The single per-session energy loop: drains while sprinting, REGENS when idle, and steps aside while weaving
+		// (the weave owns the drain + the 0x200E stream). Persistent - it keeps ticking for the whole session so energy
+		// recovers after a weave/sprint - and exits only on disconnect. A PeriodicTimer loop, not a self-rescheduling
+		// callback. EnergyLoopActive guards against a second loop.
+		private async Task RunEnergyMirror(INetworkClient client)
+		{
+			client.Session.EnergyLoopActive = true;
+			try
+			{
+				using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(EnergyTickMs));
+				while (await timer.WaitForNextTickAsync())
+				{
+					var session = client.Session;
+					if (session?.Account == null)
+						return; // disconnected
+
+					if (session.IsSpellweaving)
+						continue; // the weave owns the energy this tick
+					if (session.IsSprinting)
+						session.Energy -= (uint)Math.Min(SprintEnergyDrainPerTick, (int)session.Energy);
+					// Exhausted is client-driven for sprint (it owns the visual); nothing to send here.
+					else if (session.Energy < session.EnergyMax)
+						session.Energy = Math.Min(session.EnergyMax, session.Energy + EnergyRegenPerTick);
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Energy mirror loop failed.");
+			}
+			finally
+			{
+				var session = client.Session;
+				if (session != null)
+					session.EnergyLoopActive = false;
+			}
+		}
+
+		private static readonly byte[] SprintBarSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x54);
+
+		// DispatchUpdateSprintbar (0x200E): the ENERGY / sprint bar update - the yellow bar. Body = [u32 energy][u8 01].
+		// This is what actually MOVES the yellow bar (the e9f24184 "Spellweaving Cost" gauge is separate accounting).
+		// Retail streams it while weaving to drain the energy bar (decode_spellweave, sender GameCharAgentProject/0x54
+		// -> GameCharInterfaceProject/instance; energy full = 8910 for the necro).
+		private Task SendSprintBar(INetworkClient client, uint energy)
+		{
+			return new PacketStream()
+				.WriteHeader(SprintBarSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameCharInterfaceProjectDispatchOpcodes.DispatchUpdateSprintbar)
+				.WriteUInt32(energy)
+				.WriteByte(0x01)
+				.SendAsync(client);
 		}
 	}
 }

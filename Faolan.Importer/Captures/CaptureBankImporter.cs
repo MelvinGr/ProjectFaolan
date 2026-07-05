@@ -94,7 +94,7 @@ namespace Faolan.Importer.Captures
 				if (charInstance == 0 || blobLen <= 0 || BlobOffset + blobLen > inner.Length)
 					return;
 
-				var container = ((ReadOnlySpan<byte>)inner.AsSpan(BlobOffset, blobLen)).FromProtobuf<ProtoInventoryGame>();
+				var container = inner.AsSpan(BlobOffset, blobLen).FromProtobuf<ProtoInventoryGame>();
 				byCharacter[charInstance] = container; // last wins
 			}
 			catch

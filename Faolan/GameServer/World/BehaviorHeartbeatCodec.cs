@@ -31,7 +31,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(SubOpcode)
 				.WriteUInt32(Type)
 				.WriteUInt32(actor)
-				.WriteUInt16((ushort)0x0004)
+				.WriteUInt16(0x0004)
 				.WriteUInt32(IdleBehaviorId)
 				.WriteUInt32((uint)payload.Length)
 				.WriteArray(payload)

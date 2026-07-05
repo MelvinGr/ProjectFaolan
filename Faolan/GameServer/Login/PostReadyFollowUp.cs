@@ -204,7 +204,7 @@ namespace Faolan.GameServer
 		{
 			var spellBase = spellId >> 8;
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
-			var durationCs = (uint)((spell?.DurationMs ?? 0) / 10);
+			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			var nonce = 0x18000000u | ((uint)System.Threading.Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
 			await ApplySpell(client, applyTo, applyFrom, spellId, SpellweaveCodec.BuildBuffData(spellBase, durationCs, nonce));
 		}

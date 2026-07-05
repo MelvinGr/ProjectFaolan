@@ -57,7 +57,7 @@ namespace Faolan.GameServer.Spawn
 		// constant terminator body. Byte-identical to the 23 minimal-form NPCs in the beach burst.
 		public static byte[] BuildMinimalPostIir()
 		{
-			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32((uint)(MinimalPostIirLength - RecordLenBias)).WriteUInt32(MinimalRecordCount).WriteArray(MinimalBody).ToArray();
+			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(MinimalRecordCount).WriteArray(MinimalBody).ToArray();
 		}
 
 		// The fresh-spawn scaffold pass used by the live spawn path. Like WithMinimalScaffolds, but a HUMANOID

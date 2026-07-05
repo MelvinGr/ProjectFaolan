@@ -110,7 +110,7 @@ namespace Faolan.GameServer
 		// The WorldPrep burst streams one per combo id. Decoded by Captures/scripts/decode_create_iir_records.py.
 		public static byte[] BuildComboBookIir(uint handle, uint comboId, uint type = CharacterWireType)
 		{
-			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16((ushort)0x0001).WriteUInt32(comboId).ToArray();
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(0x0001).WriteUInt32(comboId).ToArray();
 		}
 
 		// CharInPlayIIR (0x864CFEF8): the "character is now in play" signal. 9 bytes:
@@ -212,7 +212,7 @@ namespace Faolan.GameServer
 			return new FaolanStream()
 				.WriteUInt32(type)
 				.WriteUInt32(handle)
-				.WriteUInt16((ushort)0x0000)
+				.WriteUInt16(0x0000)
 				.WriteByte((byte)(1 + nameBytes.Length))
 				.WriteByte(0x2A)
 				.WriteArray(nameBytes)

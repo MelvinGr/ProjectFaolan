@@ -12,7 +12,8 @@ namespace Faolan.GameServer.Combat
 	public sealed record SpellweaveProfile(
 		uint[] TranceBuffs, // ApplySpell (base<<8)|rank ids sent on activate to open the trance
 		uint[] WeaveElements, // element BASE ids (full spell id >> 8); the add's componentIndex indexes into this list
-		uint[] FireStages); // StatIIR fire ids emitted per stage on deactivate
+		uint[] FireStages, // StatIIR fire ids emitted per stage on deactivate
+		uint StackingBuffBase); // the Spellweaving(1) buff BASE re-applied at an incremented id each picker reappear (stacks)
 
 	public static class SpellweaveCatalog
 	{
@@ -22,7 +23,8 @@ namespace Faolan.GameServer.Combat
 		private static readonly SpellweaveProfile Necromancer = new(
 			TranceBuffs: [0x37F29800, 0x37E5A800, 0x3969D000],
 			WeaveElements: [0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D],
-			FireStages: [0x398, 0x39B, 0x39A, 0x39D]);
+			FireStages: [0x398, 0x39B, 0x39A, 0x39D],
+			StackingBuffBase: 0x37E5A8); // Spellweaving(1); refreshes 37e5a8 -> 37e5a9 -> 37e5aa each reappear
 
 		private static readonly Dictionary<Class, SpellweaveProfile> Profiles = new()
 		{
@@ -33,6 +35,17 @@ namespace Faolan.GameServer.Combat
 		public static SpellweaveProfile ForClass(Class characterClass)
 		{
 			return Profiles.GetValueOrDefault(characterClass);
+		}
+
+		// The universal ENERGY (yellow sprint-bar) max by class. Capture-derived: necro 8910, assassin 13984. Casters
+		// have the lower pool; everyone else the higher one (approximate until per-class energy captures land).
+		public static uint EnergyMaxForClass(Class characterClass)
+		{
+			return characterClass switch
+			{
+				Class.Necromancer or Class.Demonologist or Class.PriestOfMitra or Class.TempestOfSet => 8910,
+				_ => 13984
+			};
 		}
 	}
 }

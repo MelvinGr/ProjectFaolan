@@ -940,7 +940,7 @@ namespace Faolan.GameServer
 			var petHandle = packet.Body.ReadUInt32();
 			var command = packet.Body.ReadUInt32<PetCommand>();
 			var owner = client.Session.Account.ClientInstance;
-			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, (PetCommand)command);
+			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, command);
 
 			if (command == PetCommand.Dismiss)
 			{

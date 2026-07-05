@@ -43,11 +43,20 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void BuildTranceMeter_MatchesCapture()
+		public void BuildStatGauge_Stamina_MatchesCapture()
 		{
-			// frame#1654: the first "Spellweaving Cost" gauge tick (token 0x22CE, delta -90).
-			var bytes = SpellweaveCodec.BuildTranceMeter(0x0802E5D4, 0x22CE, -90);
+			// frame#1654: the first "Spellweaving Cost" (stamina) gauge tick (token 0x22CE, delta -90).
+			var bytes = SpellweaveCodec.BuildStatGauge(0x0802E5D4, 0x22CE, -90, SpellweaveCodec.StaminaGauge, SpellweaveCodec.StaminaScale);
 			Assert.Equal("e9f241840000c3500802e5d400000022ce000000000000000000000000000f425c00000002ffffffa6000000000000c3500802e5d400000001000000000037e68c00000050000000000000000000000000",
+				System.Convert.ToHexStringLower(bytes));
+		}
+
+		[Fact]
+		public void BuildStatGauge_HealthDot_MatchesCapture()
+		{
+			// the "Spellweaving" health DoT gauge that hits when stamina empties (token 602395, delta -31705, scale 0x1B).
+			var bytes = SpellweaveCodec.BuildStatGauge(0x0802E5D4, 602395, -31705, SpellweaveCodec.DotGauge, SpellweaveCodec.DotScale);
+			Assert.Equal("e9f241840000c3500802e5d4000009311b0000000000000000000000000000001b00000002ffff8427000000000000c3500802e5d400000001000000000037e69000000050000000000000000000000000",
 				System.Convert.ToHexStringLower(bytes));
 		}
 

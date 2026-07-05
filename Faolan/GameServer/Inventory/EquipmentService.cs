@@ -39,7 +39,7 @@ namespace Faolan.GameServer.Inventory
 				return;
 
 			var kind = (int)move.SourceContainerId.Type;
-			var pos = (int)move.SourceItemPos;
+			var pos = move.SourceItemPos;
 			if (kind == (int)FullCharSnapshotBuilder.EquippedKind)
 				return; // equipped items are unequipped, not dropped, through this path
 
@@ -132,8 +132,8 @@ namespace Faolan.GameServer.Inventory
 
 			var sKind = (int)move.SourceContainerId.Type;
 			var dKind = (int)move.DestinationContainerId.Type;
-			var sPos = (int)move.SourceItemPos;
-			var dPos = (int)move.DestinationItemPos;
+			var sPos = move.SourceItemPos;
+			var dPos = move.DestinationItemPos;
 
 			const int equipped = (int)FullCharSnapshotBuilder.EquippedKind;
 			if (sKind == equipped || dKind == equipped)

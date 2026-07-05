@@ -17,6 +17,15 @@ namespace Faolan.Tests
 				System.Convert.ToHexStringLower(bytes));
 		}
 
+		[Fact]
+		public void SpellweaveTranceExit_MatchesCapture()
+		{
+			// cancel-weave capture, frame 141.61: the caster's trance-exit animation on cancel/fire.
+			var bytes = BehaviorAnimationCodec.SpellweaveTranceExit(0x0802E5D4);
+			Assert.Equal("642cd3d60000c3500802e5d40004000000010000000c08d6c202180628083000584f0000000400000027000000000000000000000000",
+				System.Convert.ToHexStringLower(bytes));
+		}
+
 		[Theory]
 		[InlineData(false, "642cd3d60000c3500802e5d40004000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000000")] // frame#1657 begin
 		[InlineData(true, "642cd3d60000c3500802e5d4000a000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000001")] // frame#1658 complete

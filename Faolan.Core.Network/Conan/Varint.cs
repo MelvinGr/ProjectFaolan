@@ -12,24 +12,12 @@ namespace Faolan.Core.Network.Conan
 	public static class Varint
 	{
 		// The base-128 varint encoding of `value`.
+		[Obsolete("Use FaolanStream.WriteVarint instead.")]
 		public static byte[] Encode(ulong value)
 		{
 			var bytes = new List<byte>(5);
 			Write(bytes, value);
 			return bytes.ToArray();
-		}
-
-		// The number of bytes Encode(value) produces (without allocating).
-		public static int Length(ulong value)
-		{
-			var length = 1;
-			while (value >= 0x80)
-			{
-				value >>= 7;
-				length++;
-			}
-
-			return length;
 		}
 
 		// Reads a base-128 varint from `stream`.

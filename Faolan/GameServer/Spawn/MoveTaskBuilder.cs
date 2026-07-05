@@ -47,7 +47,7 @@ namespace Faolan.GameServer.Spawn
 				.WriteUInt32(SubOpcode)
 				.WriteUInt32(Ack)
 				.WriteUInt32(handle)
-				.WriteUInt16((ushort)0) // prefix 00 00
+				.WriteUInt16(0) // prefix 00 00
 				.WriteVector3BigEndian(currentPosition)
 				// segment-list + move-block header (04 01 00 02 01 01 00 00 00 00)
 				.WriteArray(0x04, 0x01, 0x00, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00)
@@ -80,11 +80,11 @@ namespace Faolan.GameServer.Spawn
 		public static byte[] BuildStationary(uint handle, Vector3 position)
 		{
 			return new FaolanStream()
-				.WriteUInt32((uint)(BodyLength - 4))
+				.WriteUInt32(BodyLength - 4)
 				.WriteUInt32(SubOpcode)
 				.WriteUInt32(Ack)
 				.WriteUInt32(handle)
-				.WriteUInt16((ushort)0) // prefix 00 00
+				.WriteUInt16(0) // prefix 00 00
 				.WriteVector3BigEndian(position)
 				.WriteByte(0x06) // stationary terminator (vs 0x04 = a movement segment follows)
 				.ToArray();

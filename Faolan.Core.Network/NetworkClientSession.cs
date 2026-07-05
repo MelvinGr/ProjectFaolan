@@ -68,7 +68,21 @@ namespace Faolan.Core.Network
 		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
 		// trance is open, and is fired + cleared on deactivate.
 		bool IsSpellweaving { get; set; }
+
 		List<uint> WeaveComponents { get; }
+
+		// The Spellweaving(1) buff STACK level: each time the component picker reappears a fresh stack is applied at
+		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
+		int SpellweaveBuffStack { get; set; }
+
+		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
+		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
+		// client owns the visual during sprint; the server mirrors the drain/regen silently. EnergyMax 0 = uninitialised.
+		uint Energy { get; set; }
+		uint EnergyMax { get; set; }
+		bool IsSprinting { get; set; }
+		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
+
 		string ConversationAnswerPath { get; set; }
 
 		// The active NPC conversation's position in the dialogue TREE. The runtime serves the screen for the current
@@ -141,6 +155,11 @@ namespace Faolan.Core.Network
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
 		public bool IsSpellweaving { get; set; }
 		public List<uint> WeaveComponents { get; } = [];
+		public int SpellweaveBuffStack { get; set; }
+		public uint Energy { get; set; }
+		public uint EnergyMax { get; set; }
+		public bool IsSprinting { get; set; }
+		public bool EnergyLoopActive { get; set; }
 		public string ConversationAnswerPath { get; set; }
 		public string ConversationNpcName { get; set; }
 		public string PendingCharacterName { get; set; }

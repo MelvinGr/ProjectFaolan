@@ -38,7 +38,7 @@ namespace Faolan.GameServer.Combat
 				.WriteUInt32(durationCentiseconds)
 				.WriteUInt32(0x00010000)
 				.WriteUInt32(0x00010000)
-				.WriteUInt16((ushort)0x0000)
+				.WriteUInt16(0x0000)
 				.WriteUInt32(spellBaseId) // high byte 0 (base id < 0x1000000)
 				.WriteUInt32(0x00000050)
 				.WriteUInt32(0)
@@ -71,16 +71,20 @@ namespace Faolan.GameServer.Combat
 			return stream.ToArray();
 		}
 
-		// The trance METER tick (StatDamageIIR 0xE9F24184) - the draining "Spellweaving Cost" gauge (spell 0x37E68C)
-		// the client shows while in the trance (frame 1654 onward). Streamed on a timer; `token` is the current gauge
-		// position (drains over the trance) and `delta` the signed change since the last tick. gaugeMax 1000028, mode
-		// 2, magnitude 80 are capture constants. Record: [op][0xC350][caster][u8 0][u32 token][0][0][0][u32 gaugeMax]
-		// [u32 mode=2][i32 delta][0][0xC350][caster][u32 1][0][u32 gauge=0x37E68C][u32 magnitude=80][0][0][0].
-		public const uint TranceMeterGauge = 0x37E68C; // "Spellweaving Cost"
-		private const uint TranceMeterMax = 1000028;
-		private const uint TranceMeterMagnitude = 80;
+		// A spellweave stat-gauge tick (StatDamageIIR 0xE9F24184) - the client's draining gauge. Two are used: the
+		// STAMINA gauge ("Spellweaving Cost" 0x37E68C, scale 0x0F425C) that drains while weaving, and, once stamina
+		// empties, the health DoT gauge ("Spellweaving" 0x37E690, scale 0x1B) that damages the caster. `token` is the
+		// current bar value (drains toward 0), `delta` the signed change since the last tick; `scale` is the gauge's
+		// per-type constant (v@33). mode 2, magnitude 80 are shared constants. Byte-exact vs frames 1654 (stamina) and
+		// the DoT frame (0x37E690) of the cancel-weave/DoT capture. Record: [op][0xC350][caster][u8 0][u32 token][0][0]
+		// [0][u32 scale][u32 mode=2][i32 delta][0][0xC350][caster][u32 1][0][u32 gaugeId][u32 magnitude=80][0][0][0].
+		public const uint StaminaGauge = 0x37E68C;   // "Spellweaving Cost" -> the yellow stamina bar
+		public const uint DotGauge = 0x37E690;        // "Spellweaving" -> the health DoT when stamina is empty
+		public const uint StaminaScale = 0x000F425C;  // v@33 for the stamina gauge
+		public const uint DotScale = 0x0000001B;      // v@33 for the DoT gauge
+		private const uint GaugeMagnitude = 80;
 
-		public static byte[] BuildTranceMeter(uint caster, uint token, int delta)
+		public static byte[] BuildStatGauge(uint caster, uint token, int delta, uint gaugeId, uint scale)
 		{
 			return new FaolanStream()
 				.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.StatDamageIIR)
@@ -89,7 +93,7 @@ namespace Faolan.GameServer.Combat
 				.WriteByte(0x00)
 				.WriteUInt32(token)
 				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
-				.WriteUInt32(TranceMeterMax)
+				.WriteUInt32(scale)
 				.WriteUInt32(2) // mode
 				.WriteUInt32((uint)delta) // signed drain since last tick
 				.WriteUInt32(0)
@@ -97,8 +101,8 @@ namespace Faolan.GameServer.Combat
 				.WriteUInt32(caster)
 				.WriteUInt32(1)
 				.WriteUInt32(0)
-				.WriteUInt32(TranceMeterGauge)
-				.WriteUInt32(TranceMeterMagnitude)
+				.WriteUInt32(gaugeId)
+				.WriteUInt32(GaugeMagnitude)
 				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
 				.ToArray();
 		}

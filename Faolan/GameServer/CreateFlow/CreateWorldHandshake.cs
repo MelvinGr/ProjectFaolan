@@ -136,7 +136,7 @@ namespace Faolan.GameServer
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetMorphValueIIR);
 					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
-					s.WriteUInt16((ushort)0);
+					s.WriteUInt16(0);
 					s.WriteStringByteLength(morphValue);
 					s.WriteUInt32(floatBits);
 					s.WriteByte(0);

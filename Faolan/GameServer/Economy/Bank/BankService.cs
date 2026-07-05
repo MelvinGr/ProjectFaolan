@@ -103,7 +103,7 @@ namespace Faolan.GameServer.Economy.Bank
 			// Withdraw (bank -> bag): the item now lives in the bag; push the live add so it renders there too.
 			if (sKind == bank && dKind == bag)
 			{
-				var dPos = (int)move.DestinationItemPos;
+				var dPos = move.DestinationItemPos;
 				var rows = await _database.GetCharacterInventory(character.Id);
 				var row = rows.FirstOrDefault(r => r.Container == bag && r.Slot == dPos);
 				if (row?.ItemId == null)
@@ -135,7 +135,7 @@ namespace Faolan.GameServer.Economy.Bank
 		// [u16 0x0f][u16 recordId]. Sent once per occupied bank slot before the BankIIR content.
 		public static void WriteBankSlotRegistration(FaolanStream s, uint charInstance, uint slot, ushort recordId)
 		{
-			s.WriteUInt32(FullCharSnapshotBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(0x17u).WriteUInt16((ushort)0x000F).WriteUInt16(recordId);
+			s.WriteUInt32(FullCharSnapshotBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(0x17u).WriteUInt16(0x000F).WriteUInt16(recordId);
 		}
 
 		private static byte[] SerializeContainer(ProtoInventoryGame container)

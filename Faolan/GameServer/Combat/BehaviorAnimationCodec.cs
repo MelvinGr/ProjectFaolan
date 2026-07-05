@@ -58,6 +58,28 @@ namespace Faolan.GameServer.Combat
 			return Build(caster, SeqBegin, behaviorId: 1, args, trailer);
 		}
 
+		// The caster's trance-EXIT animation on spellweave cancel/fire (cancel-weave capture, frame 141.61): behaviorId
+		// 1, args {f1=ExitAction, f3=6, f5=8, f6=0, f11=79}, trailer [4][0x27][0][0][0]. Without it the buffs clear but
+		// the character stays stuck in the trance pose. Action params are capture-derived (necro).
+		private const uint SpellweaveExitAction = 41302;
+
+		public static byte[] SpellweaveTranceExit(uint caster)
+		{
+			var args = new FaolanStream()
+				.WriteByte(0x08).WriteVarint(SpellweaveExitAction)
+				.WriteByte(0x18).WriteVarint(6)
+				.WriteByte(0x28).WriteVarint(8)
+				.WriteByte(0x30).WriteVarint(0)
+				.WriteByte(0x58).WriteVarint(79)
+				.ToArray();
+
+			var trailer = new FaolanStream()
+				.WriteUInt32(4).WriteUInt32(0x27).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)
+				.ToArray();
+
+			return Build(caster, SeqBegin, behaviorId: 1, args, trailer);
+		}
+
 		// The caster's component-ADD gesture on each weave add - a begin/complete pair carrying the added element
 		// (frames 1657/1658): behaviorId 4, args {f1=AddAction, f3=5, f5=8, f6=0, f10=SpellTarget{f1=0xC350, f2=caster}},
 		// trailer [1][element][0x01][0][0][0][completeFlag].
