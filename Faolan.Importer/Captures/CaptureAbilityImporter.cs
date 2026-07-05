@@ -221,20 +221,30 @@ namespace Faolan.Importer.Captures
 			return (inserted, updated);
 		}
 
-		// The RDB combo-catalog name-prefix -> class map, VALIDATED by capture. Unlike abilities, combos have no
-		// per-character grant to derive from (retail never re-emits a ComboBookIIR on login - the combo book rides the
-		// 0x2076 world-entry snapshot instead; see ImportCharacterCombosAsync), so class membership comes from the
-		// catalog's name prefix (e.g. "Herald_..." = HeraldOfXotli). Hakotep's HoX lvl-24 0x2076 combo book confirmed
-		// the "Herald_" catalog entries ARE HoX combos, so that prefix is trusted. Only capture-VALIDATED prefixes are
-		// listed (grant too little, not too much); ambiguous feat-tree / generic prefixes (Reaver/Liberator/Lich/
-		// Soldier/Rogue/Slave/combo_npc/...) are deliberately EXCLUDED until a capture validates them. Add a line per
-		// class as its combo membership is confirmed by a dump.
-		private static readonly (string Prefix, Class Class)[] ValidatedComboPrefixes =
+		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
+		// from (retail never re-emits a ComboBookIIR on login - the combo book rides the 0x2076 world-entry snapshot
+		// instead; see ImportCharacterCombosAsync), so class membership comes from the catalog's name prefix (e.g.
+		// "Herald_..." = HeraldOfXotli). Hakotep's HoX lvl-24 0x2076 combo book validated that a catalog prefix reliably
+		// identifies the class, so these LITERAL class-name prefixes are trusted - and they are exactly the 8 archetypes
+		// that HAVE combos (matching the ellatha combos list), so casters (Necro/Demo/Priest/Tempest) correctly get none.
+		// Matched case-insensitively (the catalog has both "BearShaman_" and "Bearshaman_"). AMBIGUOUS prefixes are
+		// deliberately EXCLUDED (grant too little, not too much) - they map to multiple or uncertain classes and need a
+		// fan-out / feat-tree taxonomy + validation: archetype-shared (Soldier_/Rogue_ -> 3 classes each), the Tortage
+		// starters (Slave_/Oar_), feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack),
+		// NPC combos (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities.
+		private static readonly (string Prefix, Class Class)[] ClassComboPrefixes =
 		[
-			("Herald_", Class.HeraldOfXotli) // Hakotep HoX lvl-24 0x2076 combo book (Hell Strikes/Molten Steel Slash/Burn to Death/...)
+			("Guardian_", Class.Guardian),
+			("Conqueror_", Class.Conqueror),
+			("DarkTemplar_", Class.DarkTemplar),
+			("Barbarian_", Class.Barbarian),
+			("Ranger_", Class.Ranger),
+			("Assassin_", Class.Assassin),
+			("BearShaman_", Class.BearShaman),
+			("Herald_", Class.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
 		];
 
-		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's VALIDATED name prefixes - the combo
+		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's class-name prefixes - the combo
 		// analogue of DeriveClassAbilitiesAsync (which derives from grants; combos have none). Combo.Level supplies the
 		// per-class unlock level. Idempotent.
 		public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger logger = null)
@@ -249,9 +259,9 @@ namespace Faolan.Importer.Captures
 				if (combo.Name == null)
 					continue;
 
-				foreach (var (prefix, cls) in ValidatedComboPrefixes)
+				foreach (var (prefix, cls) in ClassComboPrefixes)
 				{
-					if (!combo.Name.StartsWith(prefix, StringComparison.Ordinal))
+					if (!combo.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
 						continue;
 
 					if (existing.TryGetValue((cls, combo.Id), out var row))
