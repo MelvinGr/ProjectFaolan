@@ -16,15 +16,24 @@ namespace Faolan.GameServer.World
 
 	public static class PetSummonCatalog
 	{
-		// Confirmed from NecroL80_..._casting-with-chat-notes.pcapng (spell id = the CastSpell trailer; pet template =
-		// the summoned FA015807 creature's decoded name). The necro "Deathless Acolyte" is the SPELL name; the two
-		// pet CREATURES it summons are named "Arcanist" (0x5E2F5) and "Magus" (0x5E2F0). "Pleasurable Company" is the
-		// generic social companion (0x4105E9). Add more as captured.
+		// Confirmed from the necro captures (spell id = the CastSpell trailer; pet template = the summoned FA015807
+		// creature's decoded name). The full necro pet roster is in NecroL80_..._mount-horse_all-necro-summons_dismiss-all
+		// (all 12 summoned + mass-dismissed). "Pleasurable Company" is the generic SOCIAL companion (non-combat, not
+		// targetable); everything else is a combat pet.
 		private static readonly Dictionary<uint, PetSummon> BySpell = new()
 		{
-			[0x0005E2F5] = new PetSummon(0x0005E2F5, "Arcanist", Combat: true),          // Deathless Acolyte: Arcanist
-			[0x0005E2F0] = new PetSummon(0x0005E2F0, "Magus", Combat: true),             // Deathless Acolyte: Magnus
 			[0x004105E9] = new PetSummon(0x004105E9, "Pleasurable Company", Combat: false),
+			[0x0005E2F5] = new PetSummon(0x0005E2F5, "Arcanist", Combat: true),
+			[0x0005E2F0] = new PetSummon(0x0005E2F0, "Magus", Combat: true),
+			[0x0005E2F6] = new PetSummon(0x0005E2F6, "Reaper", Combat: true),
+			[0x0005E321] = new PetSummon(0x0005E321, "Archmagus", Combat: true),
+			[0x0005E322] = new PetSummon(0x0005E322, "Blood Arcanist", Combat: true),
+			[0x0004F813] = new PetSummon(0x0004F813, "Corruptor", Combat: true),
+			[0x0004F814] = new PetSummon(0x0004F814, "Blighted One", Combat: true),
+			[0x0004F815] = new PetSummon(0x0004F815, "Necrotic Bomb", Combat: true),
+			[0x0004F816] = new PetSummon(0x0004F816, "Harvester", Combat: true),
+			[0x0004F817] = new PetSummon(0x0004F817, "Life-stealer", Combat: true),
+			[0x00127EDD] = new PetSummon(0x00127EDD, "Mutilator", Combat: true),
 		};
 
 		public static PetSummon ForSpell(uint spellId) => BySpell.GetValueOrDefault(spellId);
