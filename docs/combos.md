@@ -43,13 +43,28 @@ resolves the blend + a backlash roll on deactivate.
 
 ## Wire decode (IN PROGRESS)
 
-**Melee** (`Captures/Hakotep_hox_login_gameplay0` — a HoX executed 3 two-step combos):
-- A combo is a **sequence of `NormalAttack` (BehaviorControlCenter, ActionType 0xF)** c2s actions; the pairs group
-  by a shared trailing id.
-- Each `NormalAttack` carries a **direction code** in its variable payload (NB offset 22 is the payload LENGTH, per
-  `SendUnarmedAttackResponse`, so the direction is AFTER offset 26 — the earlier "direction = 0x12/0x13/0x15/0x16"
-  read was actually the length field). **TODO: pin the direction code → `ComboInput` map** from this capture.
-- Overlaps the `#20` "Real Combat" directional-arc decode (per-direction mitigation).
+**Melee** (dumps: `Hakotep_hox_login_gameplay0`, `Hoxxling_mage-heraldofxotli_combos` [HoX], plus
+`AssassinL23_rogue-assassin_login_combos` [Assassin, incl. a few DELIBERATELY FAILED combos]):
+- A combo is a **sequence of `NormalAttack` (BehaviorControlCenter, ActionType 0xF)** c2s actions. **No separate
+  activation packet** precedes the swings (checked the 3s before a combo's first swing: only heartbeat + move) —
+  the swings ARE the input, not an "activate combo X then confirm" flow.
+- Swing payload (after the offset-i+18 LENGTH; NB the earlier "direction 0x12/0x15" read was that length field):
+  `[08][animByte][2B marker][u32 counter][u32 cid = 0x300038XX][tail]`.
+  - **`cid`** (offset 8) groups the swings of one combo attempt and REPEATS per combo-type within a session (the
+    Assassin's `b6`/`cb`/`9a` recur). But it does NOT cleanly encode the catalog combo id — the cid low-byte
+    matched the combo-id low-byte for the HoX (`b0`=Molten Steel Slash II, `bf`=Pillar I, `f1`=Body/Spirit Wrack I,
+    `fa`=Hell Strikes II) but FAILED on the Assassin (`b6`/`cb`/`9a`/`84` have no such combo) → coincidence, it's a
+    client-side handle.
+  - **`animByte`** (offset 1) varies per swing but is **class/weapon-relative, not a class-independent direction
+    code**: HoX uses `b2`/`b3`/`b4`, Assassin uses `c0`/`c2`/`c4`. For the HoX `b2/b3/b4` lined up with `UL/UR/UP`
+    (matching Pillar `UL,UR,UP`, Molten Steel Slash `UL,UR`, Hell Strikes `UL,UP`), but the Assassin (whose combos
+    also use `LL`/`LR`) only surfaced 3 byte values, so it reads more like a **weapon swing-animation index** than a
+    raw direction. `[08][animByte][f105]` marks the FIRST swing of a combo; continuations carry a class marker
+    (`c702` HoX / `8403` Assassin).
+- **Blocked in-packet**: pinning `cid → combo` and `animByte → ComboInput` reliably needs **client-side RE**
+  (Ghidra) — how the client derives the `cid` and selects the swing anim per (combo, direction, weapon). Overlaps
+  the `#20` "Real Combat" directional decode. `ComboActionParser`/`ComboService` are ready to consume the map once
+  pinned.
 
 **Spellweaving** (`Captures/NecroL80_mage-necromancer_login_spellweaving`):
 - c2s inputs are NOT BCC swings; they ride `0x2000` carrier packets carrying small ids (`0xaa11/aa12/aa13/aa57…`)
