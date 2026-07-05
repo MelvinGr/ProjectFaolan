@@ -199,6 +199,10 @@ namespace Faolan.GameServer.World
 		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
 		public uint Level { get; set; }
 
+		// If this entity is a PET, the handle of the owner (the summoner's client instance); 0 = not a pet (#307).
+		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.
+		public uint OwnerHandle { get; set; }
+
 		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
 		public uint MapId { get; set; }
 

@@ -503,6 +503,7 @@ namespace Faolan.Core.Network.Packets
 			ScryScriptIIR = 0xa36d3b74, // = ScryScriptIIR_c: cutscene/scry scripts + char-editor callbacks (IntroDone, ChangeSex, TheNameIs, ClientLoadingDone, ...)
 			StatIIR = 0xf98e10b3, // = StatIIR_t
 			SelectDeselect = 0x0D155695, // = LookAtIIR_t
+			QueuePetCommand = 0x205B, // GameCharAgent method (16-bit opcode, >=0x2014): the pet command bar - body [type][petHandle][PetCommand] (#307)
 			KnubotAnswer = 0x4D7D9123, // = KnubotAnswerIIR_c: the player picked a dialogue option (NPC chat); advances the conversation one stage
 
 			KnubotCloseChatWindow =
@@ -514,6 +515,16 @@ namespace Faolan.Core.Network.Packets
 			LegacyCreateEchoInstanceStrie = 0x02165EFF, // create-flow client instance echo (Strie, older retail create capture) - NOT an IIR id
 			LegacyCreateEchoInstanceRetail = 0x021662C8, // create-flow client instance echo (account-stricken998 create-no-worldenter) - NOT an IIR id
 			LegacyConanHimselfInstance = 0x1101B4F6 // ConanHimself manual char instance - NOT an IIR id
+		}
+
+		// The `command` word of a QueuePetCommand (0x205B) packet - the pet command bar (#307, docs/summon-pet-decode.md).
+		// Confirmed from the necro-pet capture (chat-annotated): Defend (0x1F6) and Dismiss (0x1F8). The other stance
+		// buttons (attack / follow / stay / aggressive / defensive / passive) are the neighbouring 0x1Fx codes - add
+		// them as captured.
+		public enum PetCommand : uint
+		{
+			Defend = 0x1F6, // "defend" - the pet guards the owner
+			Dismiss = 0x1F8 // dismiss the pet (server despawns it + sends PetIIR mode-1)
 		}
 
 		// Every 32-bit sub-opcode carried inside a 0x2000 packet is an "IIR" (Incremental Information Replication)

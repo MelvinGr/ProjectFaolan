@@ -553,7 +553,7 @@ namespace Faolan.GameServer
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
 				["despawnobj"] = (client, arguments) => DespawnWorldObjectCommand(client, arguments),
 				["npcfollow"] = (client, arguments) => NpcFollowCommand(client, arguments),
-				["pet"] = (client, arguments) => PetCommand(client, arguments),
+				["pet"] = (client, arguments) => SummonPetCommand(client, arguments),
 				["shield"] = (client, arguments) => CombatShieldCommand(client, arguments),
 				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
 				["kill"] = (client, arguments) => KillCommand(client, arguments),
@@ -1305,7 +1305,7 @@ namespace Faolan.GameServer
 		// on the existing mid-session spawn (SpawnNpcForPlayer) + companion-follow (SetNpcFollow, #262). The retail
 		// necro-pet path (a summon spell that spawns an owned, commandable minion) is the follow-up - see #307 and
 		// docs/summon-pet-decode.md; this gives a working following minion now via a GM trigger.
-		private async Task PetCommand(INetworkClient client, string arguments)
+		private async Task SummonPetCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
 			var name = (arguments ?? "").Trim();
@@ -1315,15 +1315,32 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var entity = await _broadcaster.SpawnNpcForPlayer(client, name);
+			var entity = await SummonPetForPlayer(client, name, combat: true);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				entity == null
+					? $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data)."
+					: $"Summoned {entity.Name} (0x{entity.Handle:X8}) as your pet (dismiss with the pet bar).");
+		}
+
+		// Shared pet-summon (#307, docs/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
+		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
+		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
+		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
+		internal async Task<World.WorldEntity> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
+		{
+			var entity = await _broadcaster.SpawnNpcForPlayer(client, petTemplate);
 			if (entity == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data).");
-				return;
-			}
+				return null;
+
+			var owner = client.Session.Account.ClientInstance;
+			entity.OwnerHandle = owner;
+			await new PacketStream()
+				.WriteHeader(World.WorldFraming.Sender, World.WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(World.PetIirCodec.BuildAssign(owner, entity.Handle, combat ? World.PetIirCodec.CombatKind : World.PetIirCodec.SocialKind)))
+				.SendAsync(client);
 
 			_broadcaster.SetNpcFollow(client, entity.Handle, true);
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Summoned {entity.Name} (0x{entity.Handle:X8}) as a follower minion.");
+			return entity;
 		}
 
 		private async Task SpawnNpcCommand(INetworkClient client, string arguments)

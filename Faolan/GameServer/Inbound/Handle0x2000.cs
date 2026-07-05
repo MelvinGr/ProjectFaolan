@@ -79,6 +79,12 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServer0X2000Opcodes.QueuePetCommand:
+				{
+					await HandlePetCommand(client, packet);
+					break;
+				}
+
 				case GameServer0X2000Opcodes.Move:
 				{
 					var dataobjdec = packet.Body.ReadUInt32();
@@ -396,6 +402,20 @@ namespace Faolan.GameServer
 									}
 
 									await _combat.SendBehaviorEchoAck(client, completePayload, 3);
+
+									// #307: a PET-SUMMON spell spawns the pet (creature + PetIIR owner-assign + follow) instead
+									// of applying a target effect - this is what hooks pet summoning to real spell casts, not
+									// just the .pet GM command. Decoded from the necro-pet capture (docs/summon-pet-decode.md):
+									// cast (CastSpell) -> after the channel -> FA015807 pet spawn + PetIIR. PetSummonCatalog maps
+									// the summon spell id -> pet template + kind.
+									if (World.PetSummonCatalog.ForSpell(spellId) is { } petSummon)
+									{
+										var pet = await SummonPetForPlayer(client, petSummon.PetTemplate, petSummon.Combat);
+										Logger.LogInformation("CastSpell 0x{Spell:X} pet-summon '{Template}' -> {Result}.", spellId, petSummon.PetTemplate,
+											pet != null ? $"0x{pet.Handle:X8}" : "no spawnable template (pet-creature import needed)");
+										return;
+									}
+
 									await ApplySpell(client,
 										casterHandle,
 										targetHandle == 0
@@ -855,6 +875,30 @@ namespace Faolan.GameServer
 			}
 			else
 				Logger.LogInformation("Ignoring standalone create-editor instance-echo after the expected bursts already flushed.");
+		}
+
+		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
+		// [u32 command]. Decoded commands (#307, docs/summon-pet-decode.md): 0x1F8 = dismiss, 0x1F6 = defend.
+		// Dismiss = retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. Other commands are logged for now
+		// (attack/follow/stay AI is a follow-up; a .pet-summoned minion already follows via SetNpcFollow).
+		private async Task HandlePetCommand(INetworkClient client, ConanPacket packet)
+		{
+			packet.Body.ReadUInt32(); // type 0xC350
+			var petHandle = packet.Body.ReadUInt32();
+			var command = packet.Body.ReadUInt32<PetCommand>();
+			var owner = client.Session.Account.ClientInstance;
+			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, (PetCommand)command);
+
+			if (command == PetCommand.Dismiss)
+			{
+				await new PacketStream()
+					.WriteHeader(World.WorldFraming.Sender, World.WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s.WriteArray(World.PetIirCodec.BuildRemove(owner, petHandle)))
+					.SendAsync(client);
+
+				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
+				Logger.LogInformation(removed != null ? "Pet 0x{Pet:X8} dismissed (despawned)." : "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", petHandle);
+			}
 		}
 	}
 }
