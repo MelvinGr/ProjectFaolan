@@ -40,7 +40,7 @@ namespace Faolan.GameServer
 		// WorldState.DefaultPlayfieldToken. Everything else is UNIVERSAL - the same bytes on every map. `--report
 		// mapchange` proved this: across all captures the ONLY per-session variation is the position, so there are NO
 		// per-map build constants and nothing here is beach-specific (the old hardcoded beach spawn was the one leak).
-		internal static byte[] BuildMapChange(INetworkClient client)
+		internal static byte[] BuildMapChange(INetworkClient client, uint playfieldToken)
 		{
 			var character = client.Session.Character;
 			var mapId = character.MapId;
@@ -72,12 +72,12 @@ namespace Faolan.GameServer
 					s.WriteUInt32(0x00000000);
 					s.WriteUInt32(0x00000002);
 					s.WriteUInt32(0x00009C50);
-					s.WriteUInt32(World.WorldState.DefaultPlayfieldToken); // playfield id (the one token every entry stamps)
+					s.WriteUInt32(playfieldToken); // playfield id (the one token every entry stamps)
 					s.WriteUInt32(0x00000000);
 					s.WriteByte(0x01);
 					s.WriteUInt32(0x00000018);
 					s.WriteUInt32(0x00000001);
-					s.WriteUInt32(World.WorldState.DefaultPlayfieldToken); // playfield id (the one token every entry stamps)
+					s.WriteUInt32(playfieldToken); // playfield id (the one token every entry stamps)
 					s.WriteUInt32(0x0000CB20);
 					s.WriteUInt32(0x41700000); // float 15.0
 					s.WriteUInt32(0x40E3944F); // float 7.1111

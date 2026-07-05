@@ -52,6 +52,12 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(128)]
 		public string Name { get; set; }
+
+		// The map's real playfield-instance token (#305) - the value the client scopes the character to when it loads
+		// this playfield. The client keys per-area behaviour on it (e.g. mount permission: a wrong token makes a
+		// mountable zone read as no-mount). Sourced from the map's capture (the despawn/snapshot token, e.g. Old
+		// Tarantia = 0x00507927). 0 = unknown → the world-entry falls back to WorldState.DefaultPlayfieldToken (beach).
+		public uint PlayfieldToken { get; set; }
 	}
 
 	// How the live world creates copies (instances) of a map (#268). Retail's playfield-instance token is the

@@ -852,12 +852,15 @@ namespace Faolan.GameServer.World
 		}
 
 		// Resolves the playfield token a map's world-entry will stamp for a cross-map teleport's destination announce.
-		// The (burst-less) world-entry stamps the same constant token for every playfield (WorldState.DefaultPlayfieldToken,
-		// threaded through map-change/spawn/world-objects), so the announce carries THAT value to line up with the
-		// destination's entry (#219 / #211) - no longer re-extracted from a stored MapWorldBurst.
-		public Task<uint> ResolveMapPlayfieldToken(uint mapId)
+		// The map's real playfield-instance token (#305), threaded through map-change/spawn/world-objects/snapshot so
+		// they agree by construction. Sourced per-map from Map.PlayfieldToken (the value the client scopes the
+		// character to when it loads that playfield; the client keys per-area behaviour on it - e.g. mount permission,
+		// so a wrong token makes Old Tarantia read as the no-mount Tortage beach). Falls back to the beach default when
+		// a map has no captured token yet, preserving the prior single-token behaviour for un-sourced maps.
+		public async Task<uint> ResolveMapPlayfieldToken(uint mapId)
 		{
-			return Task.FromResult(WorldState.DefaultPlayfieldToken);
+			var token = (await _database.GetMap(mapId))?.PlayfieldToken ?? 0;
+			return token != 0 ? token : WorldState.DefaultPlayfieldToken;
 		}
 
 		// On world entry: re-send the player's persisted active quests so their journal is restored.

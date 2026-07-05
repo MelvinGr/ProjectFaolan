@@ -183,14 +183,19 @@ namespace Faolan.GameServer
 			// to the playfield it loaded, so a snapshot token that disagrees with the map-change/spawn hides the abilities
 			// tab (a server-minted id fails exactly this way). No more extract-the-token-back-out-of-the-snapshot. (Per-map
 			// sourcing is a follow-up - the beach id is used for every map for now, exactly as the spawn/map-change do.)
-			var playfieldToken = BeachPlayfieldId;
+			// #305: the token is now sourced PER-MAP (Map.PlayfieldToken), falling back to the beach default for maps with
+			// no captured token. Threaded identically through the map-change, snapshot, world objects, spawn transform and
+			// the zone so they still agree by construction - only the source value changes. A wrong (beach) token in a
+			// mountable zone like Old Tarantia made the client read it as the no-mount Tortage beach.
+			var mapToken = (await Database.GetMap(mapId))?.PlayfieldToken ?? 0;
+			var playfieldToken = mapToken != 0 ? mapToken : BeachPlayfieldId;
 			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
 			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken);
 
-			var toSend = new List<byte[]>(worldObjectRows.Length + 5) { BuildMapChange(client) };
+			var toSend = new List<byte[]>(worldObjectRows.Length + 5) { BuildMapChange(client, playfieldToken) };
 			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken));
 
-			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, BeachPlayfieldId);
+			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, playfieldToken);
 			if (playerSpawn != null)
 			{
 				toSend.Add(playerSpawn);
