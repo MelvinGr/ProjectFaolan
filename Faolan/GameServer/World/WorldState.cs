@@ -19,6 +19,10 @@ namespace Faolan.GameServer.World
 		// follower ~one step behind; its MoveTasks track the player ~6-7u apart). A follower never leashes/aggros.
 		public const float FollowStopRange = 4f;
 
+		// A pet holds a tighter distance to its FORMATION SLOT than a lone escort keeps to the player, so the fan-out
+		// slots stay distinct (a 4u stop would let two pets share one slot). #307.
+		public const float PetFollowSlotStop = 1.5f;
+
 		// #272 smooth movement: the client interpolates a MoveTask's from->to segment over the implied time, so the server
 		// must feed it retail-sized segments - retail's chase/follow stream is ~6-7u steps. The model still steps Position
 		// every tick (combat/interest fidelity), but a MoveTask is only broadcast once the entity has travelled this far
@@ -189,11 +193,18 @@ namespace Faolan.GameServer.World
 							continue;
 						}
 
-						var fdx = leader.Position.X - entity.Position.X;
-						var fdz = leader.Position.Z - entity.Position.Z;
+						// A PET (OwnerHandle != 0) follows a per-pet FORMATION SLOT around the leader, not the leader's
+						// exact spot, so multiple pets fan out instead of stacking (#307). The slot is deterministic
+						// from the handle (stable, no per-tick jitter) and settles at a tighter stop so it holds its
+						// place. Escort/quest followers (Casilda, OwnerHandle == 0) keep the exact-follow path (#262).
+						var isPet = entity.OwnerHandle != 0;
+						var (ox, oz) = isPet ? FollowFormationOffset(entity.Handle) : (0f, 0f);
+						var stop = isPet ? PetFollowSlotStop : FollowStopRange;
+						var fdx = leader.Position.X + ox - entity.Position.X;
+						var fdz = leader.Position.Z + oz - entity.Position.Z;
 						var fdist = MathF.Sqrt(fdx * fdx + fdz * fdz);
-						if (fdist > FollowStopRange)
-							StepAndStream(entity, fdx, fdz, fdist, FollowStopRange, WorldTickEffectType.NpcFollow, leader);
+						if (fdist > stop)
+							StepAndStream(entity, fdx, fdz, fdist, stop, WorldTickEffectType.NpcFollow, leader);
 						else
 							// Caught up: flush the trailing approach (a real ~6u segment toward the leader, so its facing
 							// points straight at her) and close the move with a single StopIIR (#262/#272).
@@ -430,6 +441,17 @@ namespace Faolan.GameServer.World
 			}
 
 			return nearest;
+		}
+
+		// A deterministic per-pet formation slot offset (X, Z) on a small ring around the leader, so multiple pets
+		// following one player fan out instead of piling on the same spot (#307). Derived from the entity handle so
+		// it is STABLE across ticks (no per-tick jitter that would make the pet jitter in place): the handle picks an
+		// angle around the circle and one of a few radius rings (so more than a ring's worth of pets don't collide).
+		private static (float X, float Z) FollowFormationOffset(uint handle)
+		{
+			var angle = handle % 3600 * (MathF.PI / 1800f); // 0..2π in 0.1° steps, deterministic per handle
+			var radius = 3f + handle % 3;                    // 3 / 4 / 5u rings
+			return (radius * MathF.Cos(angle), radius * MathF.Sin(angle));
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),
