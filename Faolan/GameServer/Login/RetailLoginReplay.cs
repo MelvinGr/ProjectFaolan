@@ -27,7 +27,7 @@ namespace Faolan.GameServer
 		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
 		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
 		// one. (There is no hand-built login/teleport path anymore.)
-		private const uint DefaultWorldMapId = Map.TortageBeachId;
+		//private const uint DefaultWorldMapId = Map.TortageBeachId;
 
 		// Male (Sex 0): loincloth in the legs slot, no chest item.
 		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth

@@ -58,6 +58,21 @@ namespace Faolan.Core.Database.Tables
 		// mountable zone read as no-mount). Sourced from the map's capture (the despawn/snapshot token, e.g. Old
 		// Tarantia = 0x00507927). 0 = unknown → the world-entry falls back to WorldState.DefaultPlayfieldToken (beach).
 		public uint PlayfieldToken { get; set; }
+
+		// The per-map PlayfieldFIIR (0x5D85BFC7 MapChange) rule fields (#308). This packet is the playfield the client
+		// enters, and the client keys per-area rules on it (mount permission FIXED via PlayfieldFlags). The values are
+		// NOT universal - they differ beach vs mainland; sourced per-map from the capture. Defaults (set by the
+		// migration) are the beach/Tortage values so un-sourced maps behave as before; Old Tarantia (mainland) carries
+		// the "shared world" set. See WorldEntryGeneratedRecords.BuildMapChange / CreateEditorRecordBuilder.BuildPlayfieldFiir.
+		public uint PlayfieldCount { get; set; } = 2; // the PlayfieldProxy "count" word (beach 2, Old Tarantia 1)
+		public uint PlayfieldFieldB { get; set; } = 3; // trailer word before the FFFF pair (beach 0x3, Old Tarantia 0x0)
+		public uint PlayfieldFlags { get; set; } // the final PlayfieldFIIR flag word (beach 0, Old Tarantia 1 - the mount-rule bit)
+		// word3 = the player instance when instanced (beach), else 0 (shared/mainland). NB this is the WIRE-layer
+		// counterpart of InstanceMode (#268): same concept (is this playfield instanced?) but a different layer -
+		// InstanceMode drives the server's zone-COPY policy, this only sets the client-facing PlayfieldFIIR word.
+		// They should fold into one (word3 = InstanceMode != Shared ? instance : 0) once the beach/Tortage maps are
+		// modelled as instanced in InstanceMode; kept separate for now so this stays a wire change (no zone-copy side effect).
+		public bool PlayfieldInstanced { get; set; } = true;
 	}
 
 	// How the live world creates copies (instances) of a map (#268). Retail's playfield-instance token is the

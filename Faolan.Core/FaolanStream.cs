@@ -163,7 +163,7 @@ namespace Faolan.Core
 
 		public FaolanStream WriteArrayByteLength(params ReadOnlySpan<byte> value)
 		{
-			WriteByte(checked((byte)value.Length));
+			WriteByte(value.Length);
 			return WriteArray(value);
 		}
 
@@ -182,7 +182,7 @@ namespace Faolan.Core
 
 		public FaolanStream WriteArrayUInt16Length(params ReadOnlySpan<byte> value)
 		{
-			WriteUInt16(checked((ushort)value.Length));
+			WriteUInt16(value.Length);
 			return WriteArray(value);
 		}
 
@@ -203,22 +203,6 @@ namespace Faolan.Core
 		{
 			WriteUInt32(value.Length);
 			return WriteArray(value);
-		}
-
-		public FaolanStream WriteByte(Enum value)
-		{
-			return WriteByte(Convert.ToByte(value));
-		}
-
-		public FaolanStream WriteByte(bool value)
-		{
-			return WriteByte(Convert.ToByte(value));
-		}
-
-		public new FaolanStream WriteByte(byte value)
-		{
-			base.WriteByte(value);
-			return this;
 		}
 
 		// Big-endian double for RAW packet bodies (not protobuf fields). Matches the wire format for the
@@ -284,17 +268,18 @@ namespace Faolan.Core
 			return WriteArrayByteLength(Encoding.UTF8.GetBytes(value ?? ""));
 		}
 
-		public FaolanStream WriteUInt16(Enum value)
+		public FaolanStream WriteByte(IConvertible value)
 		{
-			return WriteUInt16(Convert.ToUInt16(value));
+			return WriteByte(Convert.ToByte(value));
 		}
 
-		public FaolanStream WriteUInt16(short value)
+		public new FaolanStream WriteByte(byte value)
 		{
-			return WriteUInt16((ushort)value);
+			base.WriteByte(value);
+			return this;
 		}
 
-		public FaolanStream WriteUInt16(bool value)
+		public FaolanStream WriteUInt16(IConvertible value)
 		{
 			return WriteUInt16(Convert.ToUInt16(value));
 		}
@@ -307,22 +292,7 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
-		public FaolanStream WriteUInt32(Enum value)
-		{
-			return WriteUInt32(Convert.ToUInt32(value));
-		}
-
-		public FaolanStream WriteUInt32(int value)
-		{
-			return WriteUInt32((uint)value);
-		}
-
-		public FaolanStream WriteUInt32(long value)
-		{
-			return WriteUInt32((uint)value);
-		}
-
-		public FaolanStream WriteUInt32(bool value)
+		public FaolanStream WriteUInt32(IConvertible value)
 		{
 			return WriteUInt32(Convert.ToUInt32(value));
 		}
@@ -335,14 +305,9 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
-		public FaolanStream WriteUInt64(Enum value)
+		public FaolanStream WriteUInt64(IConvertible value)
 		{
 			return WriteUInt64(Convert.ToUInt64(value));
-		}
-
-		public FaolanStream WriteUInt64(long value)
-		{
-			return WriteUInt64((ulong)value);
 		}
 
 		public FaolanStream WriteUInt64(ulong value)

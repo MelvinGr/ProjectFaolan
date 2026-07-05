@@ -187,12 +187,12 @@ namespace Faolan.GameServer
 			// no captured token. Threaded identically through the map-change, snapshot, world objects, spawn transform and
 			// the zone so they still agree by construction - only the source value changes. A wrong (beach) token in a
 			// mountable zone like Old Tarantia made the client read it as the no-mount Tortage beach.
-			var mapToken = (await Database.GetMap(mapId))?.PlayfieldToken ?? 0;
+			var mapToken = map?.PlayfieldToken ?? 0;
 			var playfieldToken = mapToken != 0 ? mapToken : BeachPlayfieldId;
 			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
 			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken);
 
-			var toSend = new List<byte[]>(worldObjectRows.Length + 5) { BuildMapChange(client, playfieldToken) };
+			var toSend = new List<byte[]>(worldObjectRows.Length + 5) { BuildMapChange(client, map, playfieldToken) };
 			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken));
 
 			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, playfieldToken);

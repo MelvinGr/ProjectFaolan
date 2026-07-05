@@ -155,7 +155,7 @@ namespace Faolan.GameServer
 		// and `field58` (a u32 at [58:62] - 0 in some captures, 0x01000000 in others) are not yet semantically
 		// pinned, so they're passed through. Constructing this drives the map change from the Map row + the session
 		// token instead of replaying the captured MapChange.
-		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags, uint field58 = 0u)
+		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags, uint field58 = 0u, uint fieldB = 0u)
 		{
 			return new FaolanStream()
 				.WriteUInt32(0u)
@@ -181,7 +181,7 @@ namespace Faolan.GameServer
 				.WriteUInt32(0x0000CB20u)
 				.WriteFloatBigEndian(nearClip)
 				.WriteFloatBigEndian(farClip)
-				.WriteUInt32(0u)
+				.WriteUInt32(fieldB) // [previously hardcoded 0]: beach capture carries 0x3, retail Old Tarantia 0x0
 				.WriteUInt32(0xFFFFFFFFu)
 				.WriteUInt32(0xFFFFFFFFu)
 				.WriteUInt32(0x00000007u)
