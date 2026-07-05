@@ -66,12 +66,18 @@ resolves the blend + a backlash roll on deactivate.
   the `#20` "Real Combat" directional decode. `ComboActionParser`/`ComboService` are ready to consume the map once
   pinned.
 
-**Spellweaving** (`Captures/NecroL80_mage-necromancer_login_spellweaving`):
-- c2s inputs are NOT BCC swings; they ride `0x2000` carrier packets carrying small ids (`0xaa11/aa12/aa13/aa57…`)
-  — consistent with the activate / add-component / deactivate actions, not a matched sequence.
-- **TODO: decode the three actions** — spellweave ACTIVATE (enter trance + immobilise), ADD-COMPONENT (the
-  `0xaaXX` ids = the spell components; each blends stats/effect), and DEACTIVATE (fire the accumulated weave +
-  the backlash roll).
+**Spellweaving** — DECODED (`Captures/NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving`, a necro
+that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then stopped):
+- **Activate / deactivate = a TOGGLE**: c2s method `0x205a`, body `[u32 0x000000fc]` (same value both times, like
+  the mount toggle) — enter the trance (immobilise) on the first, fire + leave on the second.
+- **Add-component**: c2s `0x2000` carrier, IIR sub `0x54C02089` = **`CombatReactiveIIR_c`** (reader `FUN_0082c720`,
+  docs/iir-readers-combat-world.md) — the same family as the catalog's `*_Reactive`/`MagicCombo` Action markers.
+  Body `[u32 0][u8 0x03][u32 componentIndex]` (+ a `02`-tagged twin ack). `componentIndex` = 0/1/3 for the three
+  spells → an index into the caster's weave elements, NOT the Spell catalog id (the spell id never appears on the
+  wire — matching "extra stats/effect per input"). The adds are ~10-15s apart (the paced trance cadence).
+- **Fire**: on deactivate, the s2c `f98e10b3` burst = the accumulated weave firing. Meter: s2c `0xe9f24184` (a u32
+  at offset 16 that drains, ~-90/tick) is the trance/weave state.
+- `0x2085` (~2s heartbeat) and food/potion `RightClickItem` (BCC ActionType 0x0e) are NOT part of the weave.
 
 ## Remaining to implement (#2)
 
@@ -79,7 +85,8 @@ resolves the blend + a backlash roll on deactivate.
    (the client picks the combo, then the directions confirm it) rather than free-chaining — resolve from whether a
    c2s activation packet references the combo id before the swings. Then a per-player FSM that matches the swing
    inputs against `GetPerformableCombosAsync` and fires the finisher (the s2c `ApplySpell` effect near the cluster).
-2. **Spellweaving** is a SEPARATE subsystem (free-form, not a catalog match): an activate→trance→accumulate→
-   deactivate state machine that immobilises the caster, sums the added components' stat/effect contributions,
-   and on deactivate fires the blend + rolls backlash. Decode the 3 actions first.
+2. **Spellweaving** is a SEPARATE subsystem, and its wire is DECODED (above) — so it is implementable now: an
+   activate(`0x205a` toggle)→trance(immobilise)→add(`CombatReactiveIIR_c`, accumulate componentIndex)→deactivate
+   (`0x205a` toggle → fire `f98e10b3` + backlash) state machine. Remaining: map `componentIndex` → its stat/effect
+   contribution (the caster's weave-element table) and the backlash roll.
 3. In-client validation for both (drive the retail client, perform a combo / a weave, confirm the outcome).
