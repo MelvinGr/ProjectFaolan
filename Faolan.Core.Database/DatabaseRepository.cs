@@ -965,30 +965,46 @@ namespace Faolan.Core.Database
 		}
 
 		// The combos a character of `class` has access to up to `level`, from the class<->combo ACCESS map (ClassCombo)
-		// - the combo analogue of GetClassAbilities. Casters have no rows, so they get no combos (see ClassCombo). The
-		// table ships empty until populated from dumps, so this returns nothing today (the safe default).
+		// - the combo analogue of GetClassAbilities. Casters have no rows, so they get no combos (see ClassCombo).
+		// RANK-SUPERSEDED like the spell bar (GetStartingBarSpells): one combo per family (the highest rank the
+		// character qualifies for), so a lvl-24 HoX gets Hell Strikes II, NOT both I and II - matching the retail
+		// 0x2076 combo book (Hakotep). Family grouping is ComboFamilyKey.
 		public async Task<Combo[]> GetClassCombos(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassCombos
+			var candidates = await ctx.ClassCombos
 				.Where(cc => cc.Class == @class && cc.Level <= level)
 				.Include(cc => cc.Combo)
-				.OrderBy(cc => cc.Level).ThenBy(cc => cc.ComboId)
 				.Select(cc => cc.Combo)
-				.ToArrayAsync();
+				.ToListAsync();
+
+			return HighestRankPerFamily(candidates);
 		}
 
 		// The combos a character of `class` unlocks in the level band (fromExclusive, toInclusive] - the combo analogue
-		// of GetClassAbilitiesUnlockedBetween, used to grant the ding's newly-unlocked combos on level-up.
+		// of GetClassAbilitiesUnlockedBetween, used to grant the ding's newly-unlocked combos on level-up. Also
+		// rank-superseded within the band (a multi-level ding that crosses two ranks of a line grants only the higher).
 		public async Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassCombos
+			var candidates = await ctx.ClassCombos
 				.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive)
 				.Include(cc => cc.Combo)
-				.OrderBy(cc => cc.Level).ThenBy(cc => cc.ComboId)
 				.Select(cc => cc.Combo)
-				.ToArrayAsync();
+				.ToListAsync();
+
+			return HighestRankPerFamily(candidates);
+		}
+
+		// Collapses a combo set to one entry per family - the highest rank (by Level, then Id) - ordered low->high by
+		// first-acquired level. The combo twin of the spell-bar family collapse in GetStartingBarSpells.
+		private static Combo[] HighestRankPerFamily(IEnumerable<Combo> combos)
+		{
+			return combos
+				.GroupBy(c => ComboFamilyKey(c.Name))
+				.Select(g => g.OrderByDescending(c => c.Level).ThenByDescending(c => c.Id).First())
+				.OrderBy(c => c.Level).ThenBy(c => c.Id)
+				.ToArray();
 		}
 
 		// SPELLS a character has learned by its current level (#74): every spell its class (or the generic Class 0 set)
@@ -1046,6 +1062,63 @@ namespace Faolan.Core.Database
 			return (i >= 0
 				? name[..i]
 				: name).TrimEnd();
+		}
+
+		// Interior lowercase words allowed inside a combo DISPLAY name (e.g. "Burn to Death", "Body and Spirit Wrack").
+		private static readonly HashSet<string> ComboNameConnectors = new(StringComparer.OrdinalIgnoreCase)
+		{
+			"to", "of", "and", "the", "for", "a", "in", "on", "from", "with", "your", "our", "my"
+		};
+
+		// The combo-family key: groups the ranks of one combo LINE (Hell Strikes I/II/III...) so the grant can pick
+		// just the highest rank the character qualifies for - the combo analogue of StripRankSuffix for spells. Combo
+		// catalog names are ENGINE names ({Class}_{level}_{tags}_{Display Name}_{RankRoman}, e.g.
+		// Herald_05_multihit_Hell_Strikes_I), so the family is the trailing DISPLAY-name run (Capitalized words +
+		// interior connectors like "to"/"and"), normalised (lowercased, separators stripped) after dropping the class
+		// prefix and a trailing roman-numeral rank. This groups I..V of a line regardless of the differing level/tag
+		// prefix, and merges the "80b" / space-in-name / "khitai" variants that share a display name (validated in
+		// Python against the Herald catalog: a lvl-24 HoX collapses to the 5 the retail 0x2076 book shows).
+		private static string ComboFamilyKey(string name)
+		{
+			if (string.IsNullOrEmpty(name))
+				return name ?? "";
+
+			var tokens = name.Split('_', StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length <= 1)
+				return name.ToLowerInvariant();
+
+			var end = tokens.Length;
+			if (IsRomanNumeral(tokens[end - 1])) // drop a trailing rank
+				end--;
+
+			// Walk back over the trailing display run (stop before the class prefix at index 0).
+			var start = end;
+			for (var i = end - 1; i >= 1; i--)
+			{
+				var t = tokens[i];
+				if (t.Length > 0 && (char.IsUpper(t[0]) || ComboNameConnectors.Contains(t)))
+					start = i;
+				else
+					break;
+			}
+
+			if (start >= end) // no display run found - fall back to the whole name
+				return name.ToLowerInvariant().Replace("_", "").Replace(" ", "");
+
+			return string.Concat(tokens[start..end]).ToLowerInvariant().Replace(" ", "");
+		}
+
+		// True for a combo rank token (I, II, III, IV, V, VI, VII, ...): uppercase roman numeral characters only.
+		private static bool IsRomanNumeral(string s)
+		{
+			if (string.IsNullOrEmpty(s) || s.Length > 5)
+				return false;
+
+			foreach (var c in s)
+				if (c is not ('I' or 'V' or 'X'))
+					return false;
+
+			return true;
 		}
 
 		// The class spells whose unlock level (Spells.Level) falls in (fromLevelExclusive, toLevelInclusive] - the
