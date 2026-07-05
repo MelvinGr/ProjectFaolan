@@ -44,6 +44,20 @@ namespace Faolan.GameServer
 
 			switch (pbOpcode)
 			{
+				case GameServer0X2000Opcodes.CombatReactiveIIR:
+				{
+					// Spellweave ADD-COMPONENT (docs/combos.md). Each add is two packets: a 0x03-tagged carrier that
+					// carries the componentIndex, and a 0x02-tagged ack twin (no index). rawPayload =
+					// [u32 len][u32 sub][u32 senderType][u32 handle][u32 0][u8 tag][u32 componentIndex?].
+					if (rawPayload.Length >= 25 && rawPayload[20] == 0x03)
+					{
+						var componentIndex = BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(21, 4));
+						await _spellweave.AddComponentAsync(client, componentIndex);
+					}
+
+					break;
+				}
+
 				case GameServer0X2000Opcodes.StatIIR:
 				{
 					if (client.Session.Character?.Name == null)

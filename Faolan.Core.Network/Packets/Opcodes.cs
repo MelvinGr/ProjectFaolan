@@ -497,6 +497,7 @@ namespace Faolan.Core.Network.Packets
 		public enum GameServer0X2000Opcodes : uint
 		{
 			Interact = 0x642CD3D6, // = BehaviorControlCenterIIR_c: generic action channel (world-object interaction, spells, right-click, inventory/equipment)
+			CombatReactiveIIR = 0x54C02089, // = CombatReactiveIIR_c: spellweave add-component (c2s) - the caster combo (docs/combos.md)
 			CloseGame = 0x6B6FD368, // = CharacterActionIIR_t
 			ReadyForPlayScreen = 0x864cfef8, // = CharInPlayIIR_t
 			Move = 0x4517aa81, // = CharDCMoveIIR_t

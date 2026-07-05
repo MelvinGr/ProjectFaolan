@@ -62,6 +62,7 @@ namespace Faolan.GameServer
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
 		private readonly CombatService _combat;
+		private readonly SpellweaveService _spellweave;
 
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
@@ -125,6 +126,7 @@ namespace Faolan.GameServer
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAbilityGrant(c, a), (c, id) => SendLearnSpell(c, id)); // announced level-up ability + spell unlocks (#209/#73/#74)
+			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg)); // caster combo (docs/combos.md)
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_equipment = new EquipmentService(database, logger);
@@ -860,9 +862,12 @@ namespace Faolan.GameServer
 
 				case GameServerOpcodes.PerformSpecialAction:
 				{
+					// The spellweave activate/deactivate TOGGLE (docs/combos.md): first press opens the trance, second
+					// fires the accumulated weave. Body word is the toggle param (0xfc in the capture).
 					var counter = packet.Body.ReadUInt32();
 
-					Logger.LogInformation("0x205A counter={Counter:X4}", counter);
+					Logger.LogInformation("0x205A (PerformSpecialAction) param={Counter:X4}", counter);
+					await _spellweave.ToggleAsync(client, counter);
 
 					break;
 				}

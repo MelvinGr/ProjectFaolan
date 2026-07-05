@@ -63,6 +63,12 @@ namespace Faolan.Core.Network
 		int NormalAttackAckPhase { get; set; }
 		List<uint> CreateEditorObservedRequestIds { get; }
 		List<uint> CreateEditorReadyRequestIds { get; }
+
+		// Spellweaving trance state (docs/combos.md): true between the activate and deactivate PerformSpecialAction
+		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
+		// trance is open, and is fired + cleared on deactivate.
+		bool IsSpellweaving { get; set; }
+		List<uint> WeaveComponents { get; }
 		string ConversationAnswerPath { get; set; }
 
 		// The active NPC conversation's position in the dialogue TREE. The runtime serves the screen for the current
@@ -133,6 +139,8 @@ namespace Faolan.Core.Network
 		public int NormalAttackAckPhase { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
+		public bool IsSpellweaving { get; set; }
+		public List<uint> WeaveComponents { get; } = [];
 		public string ConversationAnswerPath { get; set; }
 		public string ConversationNpcName { get; set; }
 		public string PendingCharacterName { get; set; }
