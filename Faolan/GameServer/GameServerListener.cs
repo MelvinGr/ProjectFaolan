@@ -507,8 +507,11 @@ namespace Faolan.GameServer
 
 					case GameServerOpcodes.PlayStockphraseAsSubtitle:
 					{
+						// #234 create-cutscene speech: the client is asking us to resolve a stock phrase
+						// ({stock_N}) and BLOCKS up to 60 s for the 0x205D reply. Answer it (Kalanthes's beach
+						// lines) instead of silently timing out. See CreateFlow/StockPhraseResponder.cs.
 						if (packet.Body != null)
-							LogPacketBodyDebug("GameServer 0x205E body", packet.Body.ToArray());
+							await _createFlow.HandlePlayStockphraseAsSubtitle(client, packet.Body.ToArray());
 
 						break;
 					}

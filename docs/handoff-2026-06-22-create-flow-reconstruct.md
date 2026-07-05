@@ -1,5 +1,45 @@
 # Handoff — Create-character flow reconstruct (#234)
 
+> ## UPDATE — 2026-07-06 (autonomous session): SPEECH BLOCKER ROOT-CAUSED + FIXED (server-side after all) — implemented, byte-exact-gated, needs in-client test
+>
+> **The "Kalanthes doesn't speak" blocker is NOT client-side. It's an unanswered request/response.** Ghidra
+> (`AgeOfConan.exe`, project `/home/melvin/Development/Ghidra/Aoc`, `Captures/ghidra/DumpSpeech.java`) shows the
+> client's `playstockphraseassubtitle` script command = `PlayStockphraseAsSubtitleScriptCommand_t::Execute`
+> (`FUN_00a606a0`) is a **request/response**, not a purely local play:
+> - **case 0** fires a c2s proxy call and starts a timeout; **case 1** WAITS; on expiry it logs
+>   `PlayStockphraseAsSubtitleScriptCommand_t::Execute: Timed out after %.1f seconds` (the 60 s timeout = the
+>   "Kalanthes silent / cutscene drags" symptom).
+> - The c2s request is **`PlayStockphraseAsSubtitle(ID32 npcId, String "{stock_N}", int threadCtx)`** =
+>   GameCharAgent wire **0x205E**. The server answers **`ReceivedStockPhraseText(int threadCtx, String rfText)`**
+>   = GameCharInterface dispatch index 0x5D → wire **0x205D** (`FUN_004c78a0` reads `i_nThreadContextInstanceNr`
+>   then `i_rfText`).
+>
+> **Why earlier sessions missed it:** they watched *Kalanthes's* entity handle for server packets and saw none —
+> but 0x205D is addressed to the **player's** GameCharInterface, not to Kalanthes. And session 3b's
+> `cinematiccam ... BCC error` really is a red herring (also fires at char-select). The actual missing packet is
+> 0x205D. Our server *received* 0x205E at `GameServerListener` but only **logged** it → every line timed out.
+> (Even the old verbatim burst couldn't have worked: it replayed the captured 0x205D with the **hoxxling**
+> threadCtx, which can never match a live client's request correlator.)
+>
+> **The wire (decoded from `Captures/Blablabla_soldier-guardian_create_*` 0x205E→0x205D pairs):**
+> - req 0x205E: `[ProtoID npcId=0xC350,<Kalanthes handle>][u16-len String "{stock_N}"][u32 threadCtx]`
+> - resp 0x205D: `[u32 threadCtx][u16-len String <remoteformat id=".." category="50000" key=".." knubot="388">]`
+> - The beach speech is a **class-independent** fixed set: `{stock_48,49,50,51,52,56}` → remoteformat ids
+>   6195..6200. The `id`/`key`/`knubot` are **byte-identical across every capture** (hoxxling / guardian /
+>   demonologist) — stable content; only threadCtx is per-session. So we echo the live threadCtx and replay the
+>   stable remoteformat for the requested `{stock_N}`.
+>
+> **Implemented:** `Faolan/GameServer/CreateFlow/StockPhraseResponder.cs` (parse 0x205E, reply 0x205D from the
+> `{stock_N}` table), wired at the `GameServerListener` 0x205E case. Byte-exact-gated by
+> `StockPhraseResponderTests` (6 stock phrases + the request parse, all == capture). Unknown stock phrases are
+> logged (surface the gap) not faked. **NEEDS IN-CLIENT TEST** (a create run — gated on the cutscene arming, #1):
+> confirm Kalanthes now speaks WelcomeTutorial instead of timing out. RE trail:
+> `/tmp/.../speech_fns.txt` reproducible via `Captures/ghidra/DumpSpeech.java` + `DecompileFns.java`
+> `FNS=00a606a0,004c78a0`.
+>
+> **Everything below predates this update.**
+
+
 > ## UPDATE — session 3b (2026-06-22): SPEECH ROOT CAUSE = missing BehaviorControlCenter cutscene packets (client log: cinematic-state BCC error → playstockphraseassubtitle times out 60s)
 >
 > Two ScryScript fixes landed this session (both verified byte-exact vs retail via a fresh loopback capture +
