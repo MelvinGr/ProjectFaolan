@@ -667,21 +667,6 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// Despawn a STATIC world-object handle for the caller (e.g. the Casilda chain decor): world objects are
-		// delivered in the world burst with a fixed CapturedHandle and are NOT tracked in the world model, so the
-		// world-model path above can't reach them. This sends the same n3ToClientQuit (with the live playfield token)
-		// straight to the caller. Returns false only if the caller isn't in a known zone (no playfield token yet).
-		public async Task<bool> DespawnWorldObjectForPlayer(INetworkClient client, uint handle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || _sim.World.ZoneForEntity(player).PlayfieldToken == 0)
-				return false;
-
-			await SendWorldDespawn(client, _sim.World.ZoneForEntity(player).PlayfieldToken, handle);
-			_logger.LogInformation("Despawn: world object 0x{Handle:X8} for {Player}.", handle, player.Name);
-			return true;
-		}
-
 		// Loads a map's NPCs from NpcSpawns into the world model ONCE (on first entry), so the server has an
 		// authoritative shared view of the map's NPCs - the model fix at the heart of the roadmap (NPCs are otherwise
 		// only per-player burst replays the server doesn't track). The tick/AI/combat will drive these; clients still
@@ -910,22 +895,6 @@ namespace Faolan.GameServer.World
 				await DropBeachWall(client);
 		}
 
-		// #188 construct path: send an NPC dialogue line (KnubotAppendText) built from remoteformat XML + the live
-		// player/NPC endpoints - the dialogue VM's CONSTRUCT side, vs ConversationService's ConversationPacket replay.
-		public Task SendKnubotAppendText(INetworkClient client, uint npcHandle, byte[] xml)
-		{
-			var record = KnubotCodec.BuildAppendText(client.Session.Account.ClientInstance, npcHandle, xml);
-			return SendWorldRecord(client, record);
-		}
-
-		// #188 construct path: open the Knubot chat window for the player against an NPC (KnubotOpenChatWindow), built
-		// from the live endpoints rather than replaying a captured packet. Self-contained record (SendWorldRecord).
-		public Task SendKnubotOpenChatWindow(INetworkClient client, uint npcHandle)
-		{
-			var record = KnubotCodec.BuildOpenChatWindow(client.Session.Account.ClientInstance, npcHandle);
-			return SendWorldRecord(client, record);
-		}
-
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
 		// from the first definition. The trailing "tracked quest" pointer is the captured no-track block; pinning the
 		// multi-quest tracked variant needs more decode (docs/quest-log-handover.md).
@@ -976,33 +945,6 @@ namespace Faolan.GameServer.World
 					: "stopped following",
 				player.Name);
 			return npc;
-		}
-
-		// .spawnbag: drop a standalone loot bag at the player. Now that mid-session spawns carry the live playfield
-		// token and render (#23), a brand-new loot object renders on its own - so this no longer needs the old
-		// dead-NPC-corpse-reuse workaround (that bag was a Crocodile that respawned back to life after ~15s and was
-		// never IsLoot, so it couldn't be opened). The bag is a real IsLoot world object: no vitals, no respawn, it
-		// just lingers until its expiry. Returns the bag, or null if the map has no loot template.
-		public async Task<WorldEntity> SpawnLootBagForPlayer(INetworkClient client, IReadOnlyList<uint> itemTemplates, uint cashTin)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return null;
-
-			var bag = await SpawnLootBagAt(player.MapId, player.InstanceId, player.Position, player.Rotation, itemTemplates, cashTin, player.Handle);
-			if (bag != null)
-				_logger.LogInformation("Loot: .spawnbag bag 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).", bag.Handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
-
-			return bag;
-		}
-
-		// Spawns a mount entity (a captured FA015807 "Horse" NpcSpawn, e.g. "Fading Black Horse") at the player's
-		// position - the summon's visible payoff. The cast is broadcast separately; the player actually RIDING
-		// (the MountedRun movement transition) is the client's part and in-client-gated. The mount has no
-		// vitals (not killable) and is non-hostile.
-		public Task SpawnMountForPlayer(INetworkClient client, string mountName)
-		{
-			return SpawnNpcForPlayer(client, mountName, false);
 		}
 
 		// Spawns a captured NPC (any NpcSpawns row with spawn Data, matched by NAME - the stable key) at the
