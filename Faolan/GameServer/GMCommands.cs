@@ -80,28 +80,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot} (live DispatchAddItem).");
 		}
 
-		// .hurt [amount] / .heal [amount]  - apply a health delta to the player's own live vitals and push the
-		// 0x96B8DC59 update so the health bar moves (combat-loop test without needing a target). Default 100.
-		private Task AdjustOwnHealthCommand(INetworkClient client, string arguments, bool heal)
-		{
-			var amount = int.TryParse(arguments, out var parsed)
-				? parsed
-				: 100;
-			var vitals = _combat.GetOrAddPlayerVitals(client);
-			vitals.ApplyHealthDelta(heal
-				? amount
-				: -amount);
-
-			return SendStatUpdate(client, vitals.ToVitalsBlock());
-		}
-
-		private Task ApplySpellTest(uint characterId, uint id)
-		{
-			var client = ClientForCharacter(characterId);
-			CapturedBuffPayloads.TryGetValue(id, out var payload);
-			return ApplySpell(client, client.Session.Character.Id, client.Session.Character.Id, id, payload);
-		}
-
 		// .ban &lt;account|character name&gt;   - ban an account (sets State = Banned; login rejects non-Active accounts).
 		// .unban &lt;account|character name&gt; - lift a ban (State = Active). Accepts either the account username OR one of
 		// its character names. Banning also kicks the account's live world connections (the State change alone only
@@ -161,106 +139,6 @@ namespace Faolan.GameServer
 					: $"Unbanned account '{account.UserName}'.");
 		}
 
-		// .bind  - bind the Totem of Origin to a resurrection point. You can only bind to a point you've already
-		// DISCOVERED (or the always-known starter) on this map - the real trigger is a wayfarer NPC binding you to one
-		// (no capture yet), so this GM bootstrap binds to the nearest KNOWN point, mirroring the death-respawn rule
-		// (RespawnResolver.ClosestKnown). The chosen point's map+position is materialized into the bind columns.
-		private async Task BindCommand(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			var entity = _simulation.PlayerWorldEntity(client);
-			var mapId = entity?.MapId ?? character.MapId;
-			var position = entity?.Position ?? character.Position;
-
-			var points = await Database.GetRespawnPoints(mapId);
-			var discovered = new HashSet<uint>(await Database.GetDiscoveredRespawnPointIds(character.Id));
-			var point = RespawnResolver.ClosestKnown(position, points, discovered);
-			if (point == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(character.Id, "<span style=\"color: red;\">No discovered resurrection point on this map - find one first.</span>");
-				return;
-			}
-
-			character.BindRespawnPointId = point.Id;
-			await Database.SaveCharacterBind(character.Id, point.Id);
-
-			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Bind point set: {point.Name} ({point.MapId}).");
-		}
-
-		// .buffs  - list the server-tracked active buffs on the player (the registry CancelBuff removes from).
-		private async Task BuffsCommand(INetworkClient client)
-		{
-			var characterId = client.Session.Character.Id;
-			var entity = PlayerWorldEntity(client);
-			if (entity == null || entity.ActiveBuffs.IsEmpty)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "No server-tracked buffs.");
-				return;
-			}
-
-			var now = DateTimeOffset.UtcNow;
-			var lines = entity.ActiveBuffs.Values.OrderBy(b => b.AppliedAt).Select(b => $"0x{b.BuffId:X8} (for {(now - b.AppliedAt).TotalSeconds:F0}s{(b.DurationSeconds is double d ? $", expires after {d:F0}s" : "")})");
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Active buffs: {string.Join(", ", lines)}");
-		}
-
-		// .cancelbuff <id> | .cancelbuff all  - cancel a server-tracked buff on the player. <id> accepts hex
-		// (0x000B9000 / 000B9000 / B9000) or decimal. Removes the entry from the ActiveBuffs registry (stops tick
-		// stat-effects / re-assertion, makes .buffs accurate) AND pushes the decoded server->client buff-removal
-		// (#253: the ApplySpell rank-1 "end" twin with an empty payload, from the mount-dismount captures) so the
-		// client clears the icon LIVE - no relog needed.
-		private async Task CancelBuffCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var entity = PlayerWorldEntity(client);
-			if (entity == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Not in the world.");
-				return;
-			}
-
-			var arg = (arguments ?? "").Trim();
-			if (arg.Length == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .cancelbuff &lt;id&gt; | .cancelbuff all");
-				return;
-			}
-
-			if (string.Equals(arg, "all", StringComparison.OrdinalIgnoreCase))
-			{
-				var ids = entity.ActiveBuffs.Keys.ToArray();
-				foreach (var id in ids)
-				{
-					if (entity.ActiveBuffs.TryRemove(id, out var removedAll))
-						await SendBuffRemoval(client, entity.Handle, removedAll.CasterHandle, id); // #253/#274: live icon clear (mirror applyFrom)
-				}
-
-				Logger.LogInformation("CancelBuff (.cancelbuff all): removed {Count} buff(s) from {CharId:X8}.", ids.Length, characterId);
-				await _agentServerDispatcher.SendSystemMessage(characterId,
-					ids.Length > 0
-						? $"Cancelled {ids.Length} buff(s)."
-						: "No server-tracked buffs to cancel.");
-				return;
-			}
-
-			var hex = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-				? arg[2..]
-				: arg;
-			if (!uint.TryParse(hex, NumberStyles.HexNumber, null, out var buffId) && !uint.TryParse(arg, out buffId))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Unrecognised buff id '{arg}'. Use hex (0x000B9000) or decimal; see .buffs.");
-				return;
-			}
-
-			if (entity.ActiveBuffs.TryRemove(buffId, out var removed))
-			{
-				await SendBuffRemoval(client, entity.Handle, removed.CasterHandle, buffId); // #253/#274: push the live buff-removal so the icon clears (mirror applyFrom)
-				Logger.LogInformation("CancelBuff (.cancelbuff): buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, characterId);
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Cancelled buff 0x{buffId:X8}.");
-			}
-			else
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Buff 0x{buffId:X8} is not tracked (see .buffs).");
-		}
-
 		// .delete [<handle>]  - PERMANENTLY remove the player's currently SELECTED target (or the given handle): despawn
 		// it live for nearby players AND delete its NpcSpawn row(s) so it never renders again. The tool for scrubbing
 		// captured import artifacts (phantom players that happened to be in the pcap when the world was captured). A
@@ -298,47 +176,6 @@ namespace Faolan.GameServer
 					: null,
 				10f);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
-		}
-
-		// .despawnnpc <handle>  - despawn a non-player entity by its wire handle (hex with 0x prefix, or decimal)
-		// in the caller's zone: n3ToClientQuit to players in range + removal from the world model. The cleanup
-		// complement to .spawnnpc; handles come from list_zone_entities or the spawn message.
-		private async Task DespawnNpcCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var arg = (arguments ?? "").Trim();
-			if (arg.Length == 0 || !TryParseHandle(arg, out var handle))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .despawnnpc <handle> (0x-hex or decimal)");
-				return;
-			}
-
-			var entity = await _broadcaster.DespawnEntityForPlayer(client, handle);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				entity == null
-					? $"No despawnable entity 0x{handle:X8} in this zone (unknown handle, or a player)."
-					: $"Despawned {entity.Name} (0x{handle:X8}).");
-		}
-
-		// .despawnobj <handle>  - despawn a STATIC world object by its wire handle (the Casilda chain decor is
-		// 0x00015DD8). Unlike .despawnnpc, world objects aren't in the live world model, so this sends n3ToClientQuit
-		// straight to the caller with the live playfield token. Live-only: the object returns on relog (the world
-		// burst re-sends it). Used to "free" Casilda from the chains when the intro chain completes (#266/#267).
-		private async Task DespawnWorldObjectCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var arg = (arguments ?? "").Trim();
-			if (arg.Length == 0 || !TryParseHandle(arg, out var handle))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .despawnobj <handle> (0x-hex or decimal; the Casilda chain is 0x15DD8)");
-				return;
-			}
-
-			var sent = await _broadcaster.DespawnWorldObjectForPlayer(client, handle);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				sent
-					? $"Despawned world object 0x{handle:X8} (live only - returns on relog)."
-					: $"Can't despawn 0x{handle:X8} - your zone has no playfield token yet.");
 		}
 
 		// toPosition: an explicit destination within the map (e.g. a bind/recall point); null = the map's spawn point.
@@ -409,91 +246,6 @@ namespace Faolan.GameServer
 			await SendWorldHandoff(client);
 		}
 
-		// .feedback  - pops the on-screen FIFO notification banner (top of screen, NOT chat) via FormatFeedbackIIR
-		// (0x8D5A8B6B / showfifomessagefromserver). Replays the proven GenericDisplayAreaName banner addressed to the
-		// live session, to demonstrate the overlay channel. (Arbitrary literal text is a follow-up - needs a
-		// literal-text FIFO template or an RDB string id.)
-		private async Task FeedbackCommand(INetworkClient client)
-		{
-			await SendAreaNameBanner(client);
-			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent an on-screen FIFO banner (FormatFeedbackIIR / showfifomessagefromserver).");
-		}
-
-		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the
-		// number of players saved.
-		// .grantability <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant. Makes the
-		// ability appear so it can be dragged to the hotbar and cast, which is how the spell/mana drain is tested. The
-		// grant is transient (not persisted) - it is re-sent only by login's GrantCharacterAbilities. (The real spell
-		// grant DispatchLearnSpell 0x200A is a separate command - see .learnspell / #73.)
-		private async Task GrantAbilityCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			if (!uint.TryParse((arguments ?? "").Trim(), out var id))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .grantability &lt;abilityId&gt;  (see .abilitylist)");
-				return;
-			}
-
-			var ability = await Database.GetAbility(id);
-			if (ability == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No grantable ability with id {id} (see .abilitylist).</span>");
-				return;
-			}
-
-			await SendAbilityGrant(client, ability);
-			var label = string.IsNullOrEmpty(ability.Name)
-				? id.ToString()
-				: ability.Name;
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Granted {label} (id {id}, slot {ability.Slot}). Drag it to your hotbar to use it.");
-		}
-
-		private async Task GrantMountCommand(INetworkClient client, string arguments)
-		{
-			var character = client.Session.Character;
-			var mount = MountCatalog.Default;
-			if (!string.IsNullOrWhiteSpace(arguments) && uint.TryParse(arguments.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase), NumberStyles.HexNumber, null, out var id))
-				mount = MountCatalog.ForId(id) ?? mount;
-
-			await Database.SetCharacterShortcut(character.Id, MountShortcutSlot, MountShortcutType, mount.Id);
-			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Granted mount '{mount.CreatureName}' (0x{mount.Id:X}) to the action bar. Relog or it appears on the bar; click it to summon.");
-		}
-
-		// .guild create <name>  - create a guild with the player as leader (test bootstrap for the guild flow;
-		// the capture-true path is the CreateGuild RPC on the CsPlayerAgent connection, which a guild registrar
-		// NPC window triggers). The in-world tag (0x2550C99A) shows immediately; the guild WINDOW state (0x203F)
-		// arrives on the CsPlayerAgent connection at the next login.
-		private async Task GuildCommand(INetworkClient client, string arguments)
-		{
-			var character = client.Session.Character;
-			var characterId = character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length < 2 || !parts[0].Equals("create", StringComparison.OrdinalIgnoreCase))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .guild create <name>");
-				return;
-			}
-
-			var name = parts[1].Trim();
-			if (character.GuildId != null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "<span style=\"color: red;\">You are already in a guild.</span>");
-				return;
-			}
-
-			var guild = await Database.CreateGuild(name, characterId);
-			if (guild == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">Guild name \"{name}\" is taken.</span>");
-				return;
-			}
-
-			character.GuildId = guild.Id;
-			character.GuildRank = Character.GuildLeaderRank;
-			await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Guild \"{guild.Name}\" created (id {guild.Id}). Relog to load the guild window.");
-		}
-
 		private async Task HandleGmCommand(INetworkClient client, string commandText)
 		{
 			string command;
@@ -530,49 +282,21 @@ namespace Faolan.GameServer
 				["save"] = (client, _) => SaveChanges(client.Session.Character.Id),
 				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
 				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id),
-				["spells"] = (client, _) => SendListAllSpells(client.Session.Character.Id),
-				["abilitylist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
-				["grantability"] = (client, arguments) => GrantAbilityCommand(client, arguments),
-				["teleport"] = (client, arguments) => TeleportCommand(client, arguments),
+				["teleport"] = TeleportCommand,
 				["position"] = (client, _) => PositionCommand(client),
-				["bind"] = (client, _) => BindCommand(client),
 				["recall"] = (client, _) => RecallToBindCommand(client),
-				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
-				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
-				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),
-				["setstatrange"] = (client, arguments) => SetStatRangeCommand(client, arguments),
-				["level"] = (client, arguments) => SetLevelCommand(client, arguments),
-				["learnspell"] = (client, arguments) => LearnSpellCommand(client, arguments),
-				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
-				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
+				["setstat"] = SetStatCommand,
+				["setstatrange"] = SetStatRangeCommand,
+				["level"] = SetLevelCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
-				["grantmount"] = (client, arguments) => GrantMountCommand(client, arguments),
-				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
-				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
-				["despawnobj"] = (client, arguments) => DespawnWorldObjectCommand(client, arguments),
-				["npcfollow"] = (client, arguments) => NpcFollowCommand(client, arguments),
-				["pet"] = (client, arguments) => SummonPetCommand(client, arguments),
-				["shield"] = (client, arguments) => CombatShieldCommand(client, arguments),
-				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
-				["kill"] = (client, arguments) => KillCommand(client, arguments),
-				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
-				["removeitem"] = (client, arguments) => RemoveItemCommand(client, arguments),
-				["feedback"] = (client, _) => FeedbackCommand(client),
+				["delete"] = DeleteCommand,
+				["kill"] = KillCommand,
+				["additem"] = AddItemCommand,
+				["removeitem"] = RemoveItemCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
-				["npcsay"] = (client, _) => NpcSayCommand(client),
-				["world"] = (client, _) => SendWorldInfo(client),
-				["quest"] = (client, arguments) => QuestCommand(client, arguments),
-				["tag"] = (client, arguments) => TagCommand(client, arguments),
-				["lua"] = (client, arguments) => LuaCommand(client, arguments),
+				["lua"] = LuaCommand,
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
-				["shop"] = (client, arguments) => OpenShopCommand(client, arguments),
-				["guild"] = (client, arguments) => GuildCommand(client, arguments),
-				["money"] = (client, arguments) => MoneyCommand(client, arguments),
-				["buffs"] = (client, _) => BuffsCommand(client),
-				["cancelbuff"] = (client, arguments) => CancelBuffCommand(client, arguments),
-				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments),
-				["noloot"] = (client, arguments) => NoLootCommand(client, arguments),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
 			};
@@ -618,29 +342,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Killed target 0x{targetHandle:X8}.");
 		}
 
-		// .learnspell <id>  - live-grant a real spell to the player via DispatchLearnSpell (0x200A), the decoded
-		// spell-grant path (#73), without a relog. Distinct from .grantability, which grants a catalog ABILITY via the
-		// 0x2052 ability-grant. <id> is the spell id (hex with 0x or decimal); e.g. ".learnspell 0x3006ff" - any
-		// captured DispatchLearnSpell id (see Captures/scripts/decode_learn_spell.py).
-		private async Task LearnSpellCommand(INetworkClient client, string arguments)
-		{
-			var character = client.Session.Character;
-			var arg = (arguments ?? "").Trim();
-			var ok = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-				? uint.TryParse(arg.AsSpan(2), NumberStyles.HexNumber, null, out var spellId)
-				: uint.TryParse(arg, out spellId);
-			if (!ok || spellId == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(character.Id, "Usage: .learnspell <id>  (hex 0x.. or decimal)");
-				return;
-			}
-
-			await SendLearnSpell(client, spellId);
-			// Persist so the spell rides GrantCharacterSpells on the next login (#74), like a real learn.
-			var added = await Database.AddCharacterSpell(character.Id, spellId);
-			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Learned spell 0x{spellId:X}.{(added ? "" : " (already known)")}");
-		}
-
 		// .lua run <scriptId>  - run an RDB LuaArchive script against the player (the conversation/quest VM engine):
 		// reads the player's tags/quests, runs the script, persists any tags it adds, and reports its effects. Proves
 		// the Lua VM end-to-end on a real character (see protocol_conversation_routing).
@@ -673,169 +374,6 @@ namespace Faolan.GameServer
 				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
 		}
 
-		// .money            - show the wallet balance.
-		// .money <tin>      - set the balance (and push the 0x2005 wallet update so the client HUD reflects it).
-		// .money +<tin>     - add to the balance.
-		//
-		// The wallet wire unit is TIN, the game's smallest coin (100 tin = 1 copper, 100 copper = 1 silver,
-		// 100 silver = 1 gold) - verified in-client 2026-06-12: .money 100 displays as 1 copper.
-		private async Task MoneyCommand(INetworkClient client, string arguments)
-		{
-			var character = client.Session.Character;
-			var characterId = character.Id;
-			var arg = (arguments ?? "").Trim();
-
-			if (arg.Length > 0)
-			{
-				var add = arg[0] == '+';
-				if (!ulong.TryParse(add
-						    ? arg[1..]
-						    : arg,
-					    out var amount))
-				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .money [&lt;tin&gt; | +&lt;tin&gt;]");
-					return;
-				}
-
-				character.Money = add
-					? character.Money + amount
-					: amount;
-				await Database.SetCharacterMoney(character.Id, character.Money);
-				await SendMoneyUpdate(client,
-					character.Money,
-					add
-						? MoneyUpdateReason.Gain
-						: MoneyUpdateReason.Spend);
-			}
-
-			var tin = character.Money;
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Wallet: {tin / 1000000} gold {tin / 10000 % 100} silver {tin / 100 % 100} copper {tin % 100} tin ({tin} tin total).");
-		}
-
-		// .noloot <itemId> [on|off]  - flag an item OUT of (on, default) or back INTO (off) random loot rolls (#273).
-		// .noloot list               - list the Normal-typed items currently excluded (the unique/quest exclusions).
-		// The change persists to faolan.db, so it survives a restart and a re-import. Use it to stop a unique item (e.g.
-		// Ape King's Treasure) that retail bags carried from being randomly redropped; quest/resource items are already
-		// excluded by their type.
-		private async Task NoLootCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-			if (parts.Length >= 1 && parts[0].Equals("list", StringComparison.OrdinalIgnoreCase))
-			{
-				var excluded = await Database.GetRandomLootExcludedItems();
-				await _agentServerDispatcher.SendSystemMessage(characterId,
-					excluded.Length == 0
-						? "No unique items are excluded from random loot."
-						: $"Excluded from random loot ({excluded.Length}): {string.Join(", ", excluded.Select(i => $"'{i.Name}' ({i.Id})"))}");
-				return;
-			}
-
-			if (parts.Length is < 1 or > 2 || !uint.TryParse(parts[0], out var itemId) ||
-			    (parts.Length == 2 && !parts[1].Equals("on", StringComparison.OrdinalIgnoreCase) && !parts[1].Equals("off", StringComparison.OrdinalIgnoreCase)))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .noloot &lt;itemId&gt; [on|off]  or  .noloot list");
-				return;
-			}
-
-			var exclude = parts.Length < 2 || parts[1].Equals("on", StringComparison.OrdinalIgnoreCase);
-			var item = await Database.GetItem(itemId);
-			if (!await Database.SetItemRandomLootExcluded(itemId, exclude))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"No item with id {itemId}.");
-				return;
-			}
-
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				exclude
-					? $"'{item?.Name}' ({itemId}) will no longer drop as random loot."
-					: $"'{item?.Name}' ({itemId}) can drop as random loot again.");
-		}
-
-		// .npcfollow <handle> [stop]  - make a non-player entity follow you (companion-follow, #262), or 'stop' to
-		// release it. The world tick steps it toward you and streams MoveTasks (the same server-driven follow retail
-		// uses for Casilda after her rescue). Test bootstrap for the quest-driven trigger.
-		private async Task NpcFollowCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var stop = parts.Length > 0 && parts[^1].Equals("stop", StringComparison.OrdinalIgnoreCase);
-			// Handle = first non-"stop" arg, else the currently SELECTED target (click Casilda, then .npcfollow).
-			var handleArg = parts.FirstOrDefault(p => !p.Equals("stop", StringComparison.OrdinalIgnoreCase));
-			var handle = handleArg != null && TryParseHandle(handleArg, out var parsed)
-				? parsed
-				: client.Session.SelectedTargetHandle;
-			if (handle == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .npcfollow [&lt;handle&gt;] [stop]  (no handle = your selected target)");
-				return;
-			}
-
-			var npc = _broadcaster.SetNpcFollow(client, handle, !stop);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				npc == null ? $"No followable entity 0x{handle:X8} in this zone." : stop ? $"{npc.Name} (0x{handle:X8}) stopped following." : $"{npc.Name} (0x{handle:X8}) now follows you.");
-		}
-
-		// .shield [handle] [L M R | packed]  - set an entity's directional shield-arc distribution (#20 decode 2):
-		// broadcasts a CombatShieldIIR (0xCFFD0519) whose u32 is the decimal-packed per-direction count
-		// (hundreds=Left, tens=Mid, units=Right; the client clamps digit-sum > 3 back to 111 = one per arc).
-		// No handle = the selected target; no value = the retail default 111. The in-client verification
-		// bootstrap for the blue arcs (does the target's combat rose light up?).
-		private async Task CombatShieldCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-			// Leading handle arg only when it parses as one AND isn't a bare shield digit (handles are hex/large).
-			var i = 0;
-			var handle = client.Session.SelectedTargetHandle;
-			if (parts.Length > 0 && (parts.Length == 2 || parts.Length == 4) && TryParseHandle(parts[0], out var parsedHandle))
-			{
-				handle = parsedHandle;
-				i = 1;
-			}
-
-			if (handle == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .shield [&lt;handle&gt;] [L M R | packed]  (no handle = your selected target; no value = 111)");
-				return;
-			}
-
-			var value = CombatShieldBuilder.DefaultDistribution;
-			if (parts.Length - i == 3 && uint.TryParse(parts[i], out var l) && uint.TryParse(parts[i + 1], out var m) && uint.TryParse(parts[i + 2], out var r))
-				value = l * 100 + m * 10 + r;
-			else if (parts.Length - i == 1 && uint.TryParse(parts[i], out var packed))
-				value = packed;
-
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(CombatShieldBuilder.Build(handle, value)))
-				.SendAsync(client);
-
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Shield distribution {value} (L{value / 100 % 10} M{value / 10 % 10} R{value % 10}) sent for 0x{handle:X8}.");
-		}
-
-		// .npcsay - re-serve the player's CURRENT conversation NPC's greeting through the real dialogue VM
-		// (ConversationService.ServeGreeting: PickConversationScreen -> ServeScreen, constructed via KnubotCodec from the
-		// conversation DB). Folds the old captured-sample bootstrap into #188 - it now exercises the production path on
-		// real DB dialogue, not a baked line. Requires an active conversation (open one by talking to an NPC first).
-		private async Task NpcSayCommand(INetworkClient client)
-		{
-			var session = client.Session;
-			if (session.ConversationNpcName == null || session.ConversationNpcHandle == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(session.Character.Id, ".npcsay: talk to an NPC first - this re-serves that NPC's greeting through the dialogue VM (#188).");
-				return;
-			}
-
-			var served = await _conversation.ServeGreeting(client, session.ConversationNpcName, session.ConversationTypeId, session.ConversationNpcHandle);
-			await _agentServerDispatcher.SendSystemMessage(session.Character.Id,
-				served
-					? $"Re-served {session.ConversationNpcName}'s greeting via the dialogue VM (constructed)."
-					: $"No conversation screen for {session.ConversationNpcName}.");
-		}
-
 		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger
 		// is interacting with an auctioneer NPC). Sends DispatchOpenTradepost so the client opens the AH window and
 		// then sends TradepostOpen + searches, which the TradepostHandler answers with listings.
@@ -866,36 +404,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bank.Items.Count} item(s).");
 		}
 
-		// .shop [vendorName]  - serve a vendor window for testing the SELL/BUY round-trip (PoC bootstrap; the real
-		// trigger is the client's own NPC trade-initiation, which the shop window is gated on - a cold push sets up
-		// the server state but doesn't pop the window in-client). Records the open shop on the session so a BuyItem
-		// resolves; without an argument it picks the first imported shop. Buy a slot to exercise
-		// DispatchAddItem + the cash debit.
-		private async Task OpenShopCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var vendor = (arguments ?? "").Trim();
-
-			var shop = string.IsNullOrEmpty(vendor)
-				? await Database.GetFirstShop()
-				: await Database.GetShopByVendorName(vendor);
-			if (shop == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId,
-					string.IsNullOrEmpty(vendor)
-						? "No shops imported."
-						: $"No shop for vendor \"{vendor}\".");
-				return;
-			}
-
-			// The window renders against the vendor NPC's handle; for the bootstrap we don't have the vendor's
-			// entity, so address it to the player's own world handle (the window is cold-push-gated anyway).
-			var entity = PlayerWorldEntity(client);
-			await _shop.SendShopData(client, shop, entity?.Handle ?? 0);
-
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Served shop \"{shop.VendorName}\" ({shop.Items.Count} wares). Buy a slot to test the grant+debit (window render is client-gated).");
-		}
-
 		// .position  - print the caller's current map + live position (the in-world entity transform when
 		// connected, else the persisted Character position). Formatted so the x y z can be pasted into .teleport.
 		private Task PositionCommand(INetworkClient client)
@@ -906,113 +414,6 @@ namespace Faolan.GameServer
 			var pos = entity?.Position ?? character.Position;
 			return _agentServerDispatcher.SendSystemMessage(character.Id,
 				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
-		}
-
-		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
-		// sends QuestIIR so it appears (the client renders the quest text from its RDB by id); `remove` drops it;
-		// `list` shows the player's active quests. Quest IDs are RDB quest ids (e.g. 13479). The full accept/branch
-		// logic is the pinned RDB Lua quest VM - this is the state foundation (docs/archive/quests-and-combat.md).
-		private async Task QuestCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var sub = parts.Length > 0
-				? parts[0].ToLowerInvariant()
-				: "list";
-
-			if (sub == "list")
-			{
-				var quests = await Database.GetCharacterQuests(characterId);
-				var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId).ToList();
-				await _agentServerDispatcher.SendSystemMessage(characterId,
-					active.Count == 0
-						? "No active quests."
-						: $"Active quests: {string.Join(", ", active)}");
-				return;
-			}
-
-			// .quest journal [<id>] - (re)send the seeded journal CONTENT (title/description/objective) for one quest
-			// or every active quest with a definition. The J-panel renders this; QuestIIR/.quest add only drive state.
-			if (sub == "journal")
-			{
-				var defs = new List<QuestDefinition>();
-				if (parts.Length > 1 && uint.TryParse(parts[1], out var only))
-				{
-					var def = await Database.GetQuestDefinition(only);
-					if (def != null)
-						defs.Add(def);
-				}
-				else
-				{
-					foreach (var q in (await Database.GetCharacterQuests(characterId)).Where(q => q.State == QuestState.Active))
-					{
-						var def = await Database.GetQuestDefinition(q.QuestId);
-						if (def != null)
-							defs.Add(def);
-					}
-				}
-
-				if (defs.Count == 0)
-				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, "No seeded quest definition for the requested quest(s).");
-					return;
-				}
-
-				foreach (var def in defs)
-					await _broadcaster.SendQuestFullUpdate(client, def);
-				await _broadcaster.SendQuestJournal(client, defs);
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Sent journal content for {defs.Count} quest(s): {string.Join(", ", defs.Select(d => d.QuestId))}.");
-				return;
-			}
-
-			if (parts.Length < 2 || !uint.TryParse(parts[1], out var questId))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove|complete <questId> | .quest journal [<id>] | .quest list");
-				return;
-			}
-
-			switch (sub)
-			{
-				case "add":
-				{
-					// .quest add <id> [count] [target name...] - optional kill objective: kill <count> of <target>.
-					var required = parts.Length > 2 && uint.TryParse(parts[2], out var c)
-						? c
-						: 0;
-					var target = parts.Length > 3
-						? string.Join(' ', parts.Skip(3))
-						: null;
-					await Database.SetCharacterQuest(characterId, questId, QuestState.Active, 0, required, target);
-					await _broadcaster.SendQuestIir(client, questId, WorldQuest.StateActive);
-					if (required > 0)
-						await _broadcaster.SendQuestGoal(client, questId, 0, 0);
-					await _agentServerDispatcher.SendSystemMessage(characterId,
-						target != null
-							? $"Quest {questId} added: kill {required} {target}."
-							: $"Quest {questId} added to journal.");
-					break;
-				}
-
-				case "remove":
-					await Database.RemoveCharacterQuest(characterId, questId);
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} removed.");
-					break;
-				case "complete":
-					// Mark a quest complete (test bootstrap for quest-gated dialogue, #37): persists State=Completed so
-					// HasCompletedQuest(id) flips, which the conversation VM reads (e.g. Casilda's post-quest greeting).
-					// (The wire "quest complete" journal update isn't decoded - only the persisted state, which the VM
-					// reads, is needed for the dialogue flip; the kill-quest path persists the same way via CombatService.)
-					await Database.SetCharacterQuest(characterId, questId, QuestState.Completed);
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} marked complete (HasCompletedQuest flips; talk to the quest NPC to see post-quest dialogue).");
-					break;
-				default:
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove|complete <questId> | .quest list");
-					break;
-			}
-
-			// #261: a journal change can reveal/hide quest-gated NPCs (e.g. .quest add 13479 spawns Scavenger Tuut) -
-			// re-run interest so gated visibility updates live, mirroring the conversation accept path.
-			await _broadcaster.RefreshQuestVisibility(client);
 		}
 
 		// .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The real
@@ -1101,48 +502,10 @@ namespace Faolan.GameServer
 			return _agentServerDispatcher.SendSystemMessage(characterId, $"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}");
 		}
 
-		// .abilitylist  - list the grantable ability catalog (id / name / slot) for use with .grantability. These are
-		// what can actually be handed out via the proven 0x2052 grant; the Spell table (.spells) has no grant
-		// identity quad, so its rows can be cast but not granted. A trailing * marks the universal starting kit.
-		private async Task SendGrantableAbilityList(uint characterId)
-		{
-			var abilities = await Database.GetAbilities();
-			if (abilities.Length == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "No abilities in the catalog.");
-				return;
-			}
-
-			var lines = abilities.Select(a => $"{a.Id}: {(string.IsNullOrEmpty(a.Name) ? "(unnamed)" : a.Name)} [slot {a.Slot}]").JoinAsString("<br />");
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Grantable abilities (.grantability &lt;id&gt;):<br />{lines}");
-		}
-
 		private async Task SendListAllMaps(uint characterId)
 		{
 			var maps = await Database.GetMaps();
 			await _agentServerDispatcher.SendSystemMessage(characterId, maps.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
-		}
-
-		private async Task SendListAllSpells(uint characterId)
-		{
-			var spells = await Database.GetSpells();
-			await _agentServerDispatcher.SendSystemMessage(characterId, spells.Select(s => $"{s.Id}: {s.Name}").JoinAsString("<br />"));
-		}
-
-		// .world  - report the live world model around the caller: their map, the players/NPCs in that zone, and how
-		// many entities are within interest range. A window into the shared simulation (handy for the 2-player test).
-		private Task SendWorldInfo(INetworkClient client)
-		{
-			var entity = PlayerWorldEntity(client);
-			if (entity == null)
-				return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "World: you are not registered in the world model yet.");
-
-			var zone = _simulation.World.ZoneForEntity(entity);
-			var players = zone.Entities.Count(e => e.IsPlayer);
-			var npcs = zone.Entities.Count(e => !e.IsPlayer);
-			var nearby = zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle).Count();
-			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
-				$"World map {entity.MapId}: {players} player(s), {npcs} NPC(s) in zone; {nearby} entity(ies) within {WorldSimulation.PlayerInterestRange:0} of you.");
 		}
 
 		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist,
@@ -1233,77 +596,6 @@ namespace Faolan.GameServer
 			return SendStatUpdate(client, block);
 		}
 
-		// .vitals [health] [stamina] [mana]  - push a 0x96B8DC59 vitals update. With no args, sends the character's
-		// own MaxStats (or class/level defaults). With args (player-facing values; the ×100 scale is applied),
-		// missing stamina/mana default to the health value.
-		private Task SetVitalsCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length == 0)
-				return SendVitals(client);
-
-			var health = uint.Parse(parts[0]);
-			var stamina = parts.Length > 1
-				? uint.Parse(parts[1])
-				: health;
-			var mana = parts.Length > 2
-				? uint.Parse(parts[2])
-				: health;
-
-			return SendVitals(client, health, stamina, mana);
-		}
-
-		// .spawnbag  - drop a loot bag at your feet with a couple of random items + some coins (the same bag a kill
-		// can drop). Open it and "loot all" to grant the items live (DispatchAddItem) and the coins (TryLootCash).
-		private async Task SpawnBagCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-
-			var items = await Database.GetRandomBuildableItems(Random.Shared.Next(2, 4)); // 2-3 items
-			if (items.Length == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "No snapshot-buildable items in the DB to fill a bag with.");
-				return;
-			}
-
-			var templates = items.Select(i => i.Id).ToList();
-			var cash = (uint)Random.Shared.Next(50, 500);
-
-			var bag = await _broadcaster.SpawnLootBagForPlayer(client, templates, cash);
-			if (bag == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Couldn't spawn a loot bag here (this map has no captured loot-bag template).");
-				return;
-			}
-
-			var names = string.Join(", ", items.Select(i => i.Name));
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Dropped {bag.Name} (0x{bag.Handle:X8}) with {items.Length} items [{names}] + {cash} tin. Open it and loot all.");
-		}
-
-		// .spawnnpc <npc name>  - spawn a captured NPC (any NpcSpawns row with spawn Data, matched by name,
-		// case-insensitive, e.g. ".spawnnpc crocodile") at the player. Killable + hostile per its row; the test
-		// bootstrap for combat/AI work and the seam the MCP spawn_npc tool routes through.
-		// .pet <npc name>  - MINION MVP (#307): summon a creature that renders next to you and FOLLOWS you, built
-		// on the existing mid-session spawn (SpawnNpcForPlayer) + companion-follow (SetNpcFollow, #262). The retail
-		// necro-pet path (a summon spell that spawns an owned, commandable minion) is the follow-up - see #307 and
-		// docs/summon-pet-decode.md; this gives a working following minion now via a GM trigger.
-		private async Task SummonPetCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var name = (arguments ?? "").Trim();
-			if (name.Length == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .pet <npc name>  - summon a creature that follows you (minion MVP)");
-				return;
-			}
-
-			var entity = await SummonPetForPlayer(client, name, combat: true);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				entity == null
-					? $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data)."
-					: $"Summoned {entity.Name} (0x{entity.Handle:X8}) as your pet (dismiss with the pet bar).");
-		}
-
 		// Shared pet-summon (#307, docs/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
 		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
 		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
@@ -1331,23 +623,6 @@ namespace Faolan.GameServer
 			return entity;
 		}
 
-		private async Task SpawnNpcCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var name = (arguments ?? "").Trim();
-			if (name.Length == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .spawnnpc <npc name> (captured name, e.g. .spawnnpc Crocodile)");
-				return;
-			}
-
-			var entity = await _broadcaster.SpawnNpcForPlayer(client, name);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				entity == null
-					? $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data; any map)."
-					: $"Spawned {entity.Name} (handle 0x{entity.Handle:X8}, level {entity.Level}{(entity.Hostile ? ", hostile" : "")}).");
-		}
-
 		// .syschat - push a world/system chat line into the chat window via ChatTextIIR (#103). Sends the captured
 		// localized CriteriaYou line (arbitrary literal text needs a literal-text remoteformat template, like the
 		// FIFO banner). The test bootstrap for the ChatTextIIR path.
@@ -1355,25 +630,6 @@ namespace Faolan.GameServer
 		{
 			await SendSampleWorldChat(client);
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent a world/system chat line (ChatTextIIR 0xE0B51102).");
-		}
-
-		// .tag add <id> | .tag list  - manage the player's quest-state tags (the flags RDB Lua scripts read/write).
-		private async Task TagCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length >= 2 && parts[0].Equals("add", StringComparison.OrdinalIgnoreCase) && uint.TryParse(parts[1], out var tagId))
-			{
-				await Database.AddCharacterTag(characterId, tagId);
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Tag {tagId} set.");
-				return;
-			}
-
-			var tags = await Database.GetCharacterTags(characterId);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				tags.Length == 0
-					? "No tags."
-					: $"Tags: {string.Join(", ", tags)}");
 		}
 
 		// .teleport <mapId>  - move the character to another playfield via the retail HANDOFF + RECONNECT.
