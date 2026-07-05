@@ -68,9 +68,15 @@ namespace Faolan.GameServer
 					s.WriteUInt32(0x0000C79C);
 					s.WriteUInt32(mapId); // map (beach = 0x00000FAA)
 					s.WriteUInt32(0x00000000);
-					s.WriteUInt32(instance); // the live player instance
+					// #308: these two PlayfieldProxy words are NOT universal - the beach capture carries [instance][2] but
+					// the retail Old Tarantia (map 2000) capture carries [0][1]. They look like the playfield-instance +
+					// mode the client uses to decide whether to (re)load the playfield; sending the beach pair on a non-beach
+					// map appears to leave the client on the beach playfield definition (splash 4010 -> no-mount flags).
+					// Match the capture per-map: beach keeps [instance][2] (golden-verified), others send [0][1].
+					var onBeach = mapId == Faolan.Core.Database.Tables.Map.TortageBeachId;
+					s.WriteUInt32(onBeach ? instance : 0u);
 					s.WriteUInt32(0x00000000);
-					s.WriteUInt32(0x00000002);
+					s.WriteUInt32(onBeach ? 0x00000002u : 0x00000001u);
 					s.WriteUInt32(0x00009C50);
 					s.WriteUInt32(playfieldToken); // playfield id (the one token every entry stamps)
 					s.WriteUInt32(0x00000000);
@@ -80,12 +86,15 @@ namespace Faolan.GameServer
 					s.WriteUInt32(playfieldToken); // playfield id (the one token every entry stamps)
 					s.WriteUInt32(0x0000CB20);
 					s.WriteUInt32(0x41700000); // float 15.0
-					s.WriteUInt32(0x40E3944F); // float 7.1111
-					s.WriteUInt32(0x00000003);
+					s.WriteUInt32(0x40E3944F); // float 7.1111 (a per-session facing/scale float, left as-is)
+					// #308: two more per-map PlayfieldFIIR flag words - beach = [0x3][...0x0], retail Old Tarantia (2000) =
+					// [0x0][...0x1]. Candidates for the playfield-rule flag the mount check reads. Beach keeps its
+					// golden-verified pair; non-beach maps send the retail Old Tarantia pair.
+					s.WriteUInt32(onBeach ? 0x00000003u : 0x00000000u);
 					s.WriteUInt32(0xFFFFFFFF);
 					s.WriteUInt32(0xFFFFFFFF);
 					s.WriteUInt32(0x00000007);
-					s.WriteUInt32(0x00000000);
+					s.WriteUInt32(onBeach ? 0x00000000u : 0x00000001u);
 				});
 			return ps.WriteLengthHash().ToArray();
 		}
