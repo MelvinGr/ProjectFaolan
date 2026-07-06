@@ -259,7 +259,7 @@ namespace Faolan.GameServer
             if (character?.BindRespawnPointId is uint bindPointId)
                 bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 
-            await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);
+            await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);
             Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
         }
 

@@ -27,12 +27,9 @@ namespace Faolan.PlayerAgent
 			var opcode = (PlayerAgentOpcodes)packet.Opcode;
 			LogPacketReceived(packet, opcode);
 
-			// Remember the client's conversation id (the sender field's value bytes; SenderBytes.ToArray() is
-			// [0x0a][len][value], so skip the 2-byte tag+len) so responses echo it back as the receiver,
-			// matching retail instead of a hardcoded capture id.
-			var senderField = packet.SenderBytes.ToArray();
-			if (senderField.Length > 2)
-				client.Session.ClientConversation = senderField[2..];
+			// Remember the client's conversation id (the sender endpoint's bytes) so responses echo it back as the
+			// receiver, matching retail instead of a hardcoded capture id.
+			client.Session.ClientConversation = packet.Sender.ToProtobuf();
 
 			switch (opcode)
 			{

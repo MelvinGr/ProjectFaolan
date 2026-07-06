@@ -33,8 +33,7 @@ namespace Faolan.Core.Network.Extensions
 					? packet.HeaderData.ToHex(true)
 					: "null";
 
-				// TODO: FIX THIS (dont treat as byte[])
-				return $"new PacketStream()\r\n\t.WriteHeader({packet.SenderBytes.ToArray().ToHex(true)}, {packet.ReceiverBytes.ToArray().ToHex(true)}, true, {packet.Opcode.ToHex()}, {headerData})\r\n" + (packet.Body != null
+				return $"new PacketStream()\r\n\t.WriteHeader({packet.Sender.ToProtobuf().ToHex(true)}, {packet.Receiver.ToProtobuf().ToHex(true)}, true, {packet.Opcode.ToHex()}, {headerData})\r\n" + (packet.Body != null
 					? $"\t.WriteArray({packet.Body.ToArray().ToHex(true)})\r\n"
 					: "") + ".Send(client);\r\n";
 			}

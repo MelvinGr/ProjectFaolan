@@ -129,6 +129,34 @@ namespace Faolan.Core
 			return (T)Enum.ToObject(typeof(T), ReadUInt32());
 		}
 
+		// Little-endian uint32 (protobuf fixed32) - the read counterpart to the LE floats/fixed32 fields, distinct
+		// from the big-endian ReadUInt32 the raw wire integers use.
+		public uint ReadUInt32LittleEndian()
+		{
+			Span<byte> buffer = stackalloc byte[sizeof(uint)];
+			ReadExactly(buffer);
+
+			return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
+		}
+
+		// A base-128 varint (protobuf LEB128) - the read counterpart to WriteVarint.
+		public ulong ReadVarint()
+		{
+			ulong result = 0;
+			var shift = 0;
+			while (true)
+			{
+				var b = ReadByte();
+				result |= (ulong)(b & 0x7F) << shift;
+				if ((b & 0x80) == 0)
+					return result;
+
+				shift += 7;
+				if (shift > 63)
+					throw new InvalidDataException("Invalid protobuf varint (too long).");
+			}
+		}
+
 		public ulong ReadUInt64()
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(ulong)];

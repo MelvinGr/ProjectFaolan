@@ -87,20 +87,20 @@ namespace Faolan.CSPlayerAgent
 
 					// Remember this connection's reply endpoints so guild events (invites, member-joined) can be
 					// pushed to it later without an incoming packet to echo.
-					_guild.RememberReplyEndpoints(client, packet.ReceiverBytes, packet.SenderBytes);
+					_guild.RememberReplyEndpoints(client, packet.Receiver, packet.Sender);
 
-					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchAuthenticateAck).WriteUInt32(authReply).SendAsync(client);
+					await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchAuthenticateAck).WriteUInt32(authReply).SendAsync(client);
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
-					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01]).WriteArray(0x00, 0x00, 0x03, 0xF1).SendAsync(client);
+					await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01]).WriteArray(0x00, 0x00, 0x03, 0xF1).SendAsync(client);
 
 					//if(character.Name == null)
 					{
 						await new PacketStream()
-							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderRemoved, [0x01])
+							.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderRemoved, [0x01])
 							.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
 							.WriteByte(0x01)
 							.SendAsync(client);

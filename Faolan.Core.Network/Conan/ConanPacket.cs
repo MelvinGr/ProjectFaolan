@@ -8,15 +8,14 @@ namespace Faolan.Core.Network.Conan
 	public class ConanPacket : Packet
 	{
 		public readonly byte[] HeaderData; // Remaining data
-		public readonly ProtoMessage ReceiverBytes;
-		public readonly ProtoMessage SenderBytes;
 		public readonly uint Crc32;
 		public readonly ushort Opcode;
-		public ProtoEndpoint Receiver => DecodeEndpoint(ReceiverBytes);
 
-		// Typed view of the header endpoints. Sender = RpcHeader.caller_id, Receiver = RpcHeader.endpoint_id; each
-		// carries Type (object-class id) + Instance (the addressed object). See ConanEndpoints.
-		public ProtoEndpoint Sender => DecodeEndpoint(SenderBytes);
+		// Typed header endpoints, read straight off the header stream (ProtoEndpoint.Read). Sender = RpcHeader.caller_id
+		// (field 1), Receiver = RpcHeader.endpoint_id (field 2); each carries Type (object-class id) + Instance (the
+		// addressed object). See ConanEndpoints. Echo them back with WriteHeader(receiver, sender, ...) for a reply.
+		public readonly ProtoEndpoint Sender;
+		public readonly ProtoEndpoint Receiver;
 
 		public ConanPacket(byte[] bytes) : base(bytes)
 		{
@@ -28,8 +27,8 @@ namespace Faolan.Core.Network.Conan
 				; //Console.WriteLine($"Invalid {GetType().Name}");
 
 			using var header = new FaolanStream(Stream.ReadArrayUInt32Length());
-			SenderBytes = ProtoMessage.Parse(header, 1);
-			ReceiverBytes = ProtoMessage.Parse(header, 1);
+			Sender = ProtoEndpoint.Read(header);
+			Receiver = ProtoEndpoint.Read(header);
 			Opcode = header.ReadUInt16();
 			HeaderData = header.ReadRemainingArray();
 
@@ -39,16 +38,6 @@ namespace Faolan.Core.Network.Conan
 		public override string ToString()
 		{
 			return $"Opcode: {Opcode.ToHex()} Length: {Length}{(Body != null ? Environment.NewLine + Body.ToArray().ToHex() : "")}";
-		}
-
-		private static ProtoEndpoint DecodeEndpoint(ProtoMessage field)
-		{
-			var inner = field.Fields.Count > 0
-				? field.Fields[0].RawBytes
-				: null;
-			return inner != null
-				? ((ReadOnlySpan<byte>)inner).FromProtobuf<ProtoEndpoint>()
-				: new ProtoEndpoint();
 		}
 	}
 }

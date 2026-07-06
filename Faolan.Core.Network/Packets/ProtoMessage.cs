@@ -6,6 +6,7 @@ using System.Linq;
 
 namespace Faolan.Core.Network.Packets
 {
+    [Obsolete]
     public sealed class ProtoMessage
     {
         public List<ProtoField> Fields { get; } = [];

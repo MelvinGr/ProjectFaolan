@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Protobuf;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -35,7 +36,7 @@ namespace Faolan.CSPlayerAgent
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
 		// headers - those packets are not replies, so there is no incoming packet to echo.
-		private readonly ConcurrentDictionary<INetworkClient, (ProtoMessage Sender, ProtoMessage Receiver)> _replyEndpoints = new ConcurrentDictionary<INetworkClient, (ProtoMessage Sender, ProtoMessage Receiver)>();
+		private readonly ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)> _replyEndpoints = new ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)>();
 
 		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = new ConcurrentDictionary<uint, PendingGuildInvite>();
 		private readonly Func<uint, INetworkClient> _clientForCharacter;
@@ -89,7 +90,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			_logger.LogInformation("{Character} joined guild \"{Guild}\" (invited by {Inviter}).", character.Name, guild.Name, invite.InviterName);
-			await SendGuildFullUpdate(client, packet.ReceiverBytes, packet.SenderBytes, guild, character);
+			await SendGuildFullUpdate(client, packet.Receiver, packet.Sender, guild, character);
 			await BroadcastGuildMemberJoined(guild, character); // includes the joiner, matching retail order
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
@@ -111,7 +112,7 @@ namespace Faolan.CSPlayerAgent
 				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
 				// taken verbatim from the capture (Dahviie, same-guild reply).
 				await new PacketStream()
-					.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGuildUpdateMember)
+					.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGuildUpdateMember)
 					.WriteUInt32(targetId)
 					.WriteUInt32(Guild.WireType)
 					.WriteUInt32(targetGuildId)
@@ -131,7 +132,7 @@ namespace Faolan.CSPlayerAgent
 			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
 			// is a server-wide constant rather than guild data.
 			await new PacketStream()
-				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGuildUpdateOther)
+				.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGuildUpdateOther)
 				.WriteUInt32(targetId)
 				.WriteUInt32(Guild.WireType)
 				.WriteUInt32(targetGuildId)
@@ -181,7 +182,7 @@ namespace Faolan.CSPlayerAgent
 			character.GuildRank = Character.GuildLeaderRank;
 
 			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character} (form 0x{Form:X2}).", guild.Name, guild.Id, character.Name, form);
-			await SendGuildFullUpdate(client, packet.ReceiverBytes, packet.SenderBytes, guild, character);
+			await SendGuildFullUpdate(client, packet.Receiver, packet.Sender, guild, character);
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
 
@@ -256,7 +257,7 @@ namespace Faolan.CSPlayerAgent
 
 		// Remember a connected client's reply endpoints (captured from its Authenticate packet) so guild pushes can
 		// be addressed to it later. Called by the listener on auth.
-		public void RememberReplyEndpoints(INetworkClient client, ProtoMessage sender, ProtoMessage receiver)
+		public void RememberReplyEndpoints(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver)
 		{
 			_replyEndpoints[client] = (sender, receiver);
 		}
@@ -273,7 +274,7 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			await SendGuildFullUpdate(client, packet.ReceiverBytes, packet.SenderBytes, guild, character);
+			await SendGuildFullUpdate(client, packet.Receiver, packet.Sender, guild, character);
 		}
 
 		// Fans a member-joined record out to every online member of the guild (their reply endpoints were
@@ -340,7 +341,7 @@ namespace Faolan.CSPlayerAgent
 		//   [renown block][self member record][selfContribution u32][other member records ... to packet end]
 		// The renown block is built per-guild from Guild.Renown (GuildRenownBlock.ForRenown), now that the 277-byte
 		// block is a typed codec (#219) - our created guilds no longer carry the captured guild's feat/city numbers.
-		private async Task SendGuildFullUpdate(INetworkClient client, ProtoMessage sender, ProtoMessage receiver, Guild guild, Character self)
+		private async Task SendGuildFullUpdate(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character self)
 		{
 			var ps = new PacketStream();
 			ps
@@ -368,7 +369,7 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x202F member joined: [member ID32][member record]. Retail fans this out to every online guild member
 		// (including the joiner, right after its 0x203F).
-		private Task SendGuildMemberJoined(INetworkClient client, ProtoMessage sender, ProtoMessage receiver, Character member)
+		private Task SendGuildMemberJoined(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Character member)
 		{
 			var ps = new PacketStream();
 			ps.WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildMemberJoined).WriteUInt32(CharacterWireType).WriteUInt32(member.Id);
@@ -421,7 +422,7 @@ namespace Faolan.CSPlayerAgent
 				.WriteArray(new byte[48]);
 		}
 
-		private static Task SendGuildInvite(INetworkClient client, ProtoMessage sender, ProtoMessage receiver, Guild guild, uint inviteeId, string inviterName)
+		private static Task SendGuildInvite(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, uint inviteeId, string inviterName)
 		{
 			var ps = new PacketStream();
 			ps.WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildInvite);
