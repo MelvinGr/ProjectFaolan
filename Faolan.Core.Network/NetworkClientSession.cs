@@ -13,7 +13,6 @@ namespace Faolan.Core.Network
 		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
 		bool HasFlushedCreateEditorPostReady { get; set; }
 
-		bool HasFlushedCreateWorldEntryBurst { get; set; }
 		bool HasPendingPost205FFollowUp { get; set; }
 
 		// True on the character-creator (editor) GameServer connection: set in the Hello handler when a
@@ -102,7 +101,6 @@ namespace Faolan.Core.Network
 		uint ConversationEndedNpcHandle { get; set; }
 		uint ConversationNpcHandle { get; set; }
 		uint ConversationTypeId { get; set; }
-		uint CreateEditorTempInstanceCount { get; set; }
 
 		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
 		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
@@ -134,7 +132,6 @@ namespace Faolan.Core.Network
 		public bool AwaitingEnterWorld { get; set; }
 		public bool EnergyLoopActive { get; set; }
 		public bool HasFlushedCreateEditorPostReady { get; set; }
-		public bool HasFlushedCreateWorldEntryBurst { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
 		public bool IsCreateEditorConnection { get; set; }
 		public bool IsCreateWorldSession { get; set; }
@@ -161,7 +158,6 @@ namespace Faolan.Core.Network
 		public uint ConversationEndedNpcHandle { get; set; }
 		public uint ConversationNpcHandle { get; set; }
 		public uint ConversationTypeId { get; set; }
-		public uint CreateEditorTempInstanceCount { get; set; }
 		public uint Energy { get; set; }
 		public uint EnergyMax { get; set; }
 		public uint MorphAckCounter { get; set; }

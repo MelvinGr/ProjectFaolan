@@ -910,31 +910,16 @@ namespace Faolan.GameServer
                     client.Session.CreateEditorObservedRequestIds.Add(requestId.Value);
             }
 
-            client.Session.CreateEditorTempInstanceCount++;
-
-            if (client.Session.HasPendingPost205FFollowUp)
+            // Retail just ACKs the client's create-editor instance-echoes (there is no special post-0x205F burst); the
+            // burst that actually launches the editor is sent on CharInPlayIIR. So an echo carrying a request id gets a
+            // plain ack, and one without is ignored.
+            if (requestId.HasValue)
             {
-                Logger.LogInformation("Queued create-editor instance-echo #{Count} while post-0x205F follow-up is pending.", client.Session.CreateEditorTempInstanceCount);
-
-                if (client.Session.CreateEditorTempInstanceCount >= 3)
-                {
-                    Logger.LogInformation("Flushing create-editor post-0x205F burst after {Count}x instance echo.", client.Session.CreateEditorTempInstanceCount);
-                    await CreateFlowService.SendRetailCreateEditorPost205FBurst(client);
-                    client.Session.HasPendingPost205FFollowUp = false;
-                    client.Session.HasFlushedCreateWorldEntryBurst = true;
-                    client.Session.CreateEditorTempInstanceCount = 0;
-                }
-            }
-            else if (requestId.HasValue)
-            {
-                // A standalone create-editor instance-echo (the post-0x205F burst already flushed): just ack it. The
-                // post-READY burst that launches the editor is sent DIRECTLY from the CharInPlayIIR handler (retail's
-                // f90 -> f95), so there is no echo-count deferral or deadlock-breaker here.
-                Logger.LogInformation("Acknowledging standalone create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
+                Logger.LogInformation("Acknowledging create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
                 await CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId.Value);
             }
             else
-                Logger.LogInformation("Ignoring standalone create-editor instance-echo after the expected bursts already flushed.");
+                Logger.LogInformation("Ignoring create-editor instance-echo with no request id.");
         }
 
         // QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]

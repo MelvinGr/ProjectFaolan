@@ -54,30 +54,10 @@ namespace Faolan.GameServer
 
                     if (IsRetailCreateEditorFlow(client))
                     {
-                        if (client.Session.HasFlushedCreateWorldEntryBurst)
-                        {
-                            Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Retail create-editor post-0x205F burst was already flushed; ignoring later 0x205F.", unk0, characterId);
-                            break;
-                        }
-
+                        // Create-editor phase: retail sends no download in response to 0x205F - it just acks the
+                        // client's polls and waits for CharInPlayIIR (which triggers the editor-launch burst).
                         client.Session.HasPendingPost205FFollowUp = true;
-                        client.Session.CreateEditorTempInstanceCount = 0;
-                        Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Armed the retail create-editor post-0x205F follow-up.", unk0, characterId);
-                        break;
-                    }
-
-                    // The new-character create flow only performs the one-shot world-entry download
-                    // (AccessWindow + SetDayTime + 0xF98E10B3 + SpawnCheck burst) on the FIRST 0x205F. In the
-                    // retail create capture the client sends a second 0x205F after ReadyForPlayScreen, but
-                    // retail sends NO download in response to it - it just continues receiving the client's
-                    // normal in-world 0x02165EFF stream. Re-arming the handoff here re-replayed the 8KB
-                    // world-entry burst mid-world, which broke the client. So only arm the create handoff once.
-                    if (client.Session.HasFlushedCreateWorldEntryBurst)
-                    {
-                        Logger.LogInformation(
-                            "0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Create world-entry burst was already flushed; not re-arming the post-0x205F handoff (retail sends no download on the second 0x205F).",
-                            unk0,
-                            characterId);
+                        Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Create-editor phase; awaiting CharInPlayIIR.", unk0, characterId);
                         break;
                     }
 
