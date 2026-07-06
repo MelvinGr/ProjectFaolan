@@ -212,9 +212,8 @@ namespace Faolan.GameServer
 			// are RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
 			switch (packet.Receiver.Type)
 			{
-				// Tradepost (auction house + mail). IsInbound also matches the TradepostInterface SENDER (robust to header
-				// caller/endpoint ordering), hence the guard rather than a plain class-constant case.
-				case var _ when TradepostProtocol.IsInbound(packet):
+				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
+				case TradepostProtocol.AgentType:
 					await TradepostHandler.Handle(_tradepost, client, packet, Logger, Database);
 					return;
 

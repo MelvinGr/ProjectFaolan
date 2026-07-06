@@ -57,12 +57,5 @@ namespace Faolan.GameServer.Economy.Tradepost
 			DispatchDeleteCanceledMail = 0x2006,
 			DispatchDeleteCanceledMailItem = 0x2007
 		}
-
-		// Inbound (client->server) tradepost packets address the TradepostAgent endpoint. We accept either field
-		// matching, to be robust to caller/endpoint ordering in the header.
-		public static bool IsInbound(ConanPacket packet)
-		{
-			return packet.Receiver.Type == AgentType || packet.Sender.Type == InterfaceType;
-		}
 	}
 }
