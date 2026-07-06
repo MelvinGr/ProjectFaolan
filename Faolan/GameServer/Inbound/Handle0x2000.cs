@@ -189,19 +189,9 @@ namespace Faolan.GameServer
 
                 case GameServer0X2000Opcodes.CharInPlayIIR: //peer0_160
                 {
-                    // 0x2024 also = GameCharAgent.RespawnMe: when the player is DEAD this is their pick on the release
-                    // screen (DispatchValidResurrectionSpots), body = [u32 spawnPointId]. Route to respawn, not the
-                    // login ReadyForPlayScreen path (they share the opcode).
-                    if (_simulation.IsAwaitingRespawn(client))
-                    {
-                        var spawnPointId = packet.Body != null && packet.Body.Length - packet.Body.Position >= sizeof(uint)
-                            ? packet.Body.ReadUInt32()
-                            : 0;
-                        Logger.LogInformation("RespawnMe (0x2024): {Char} chose resurrection spot {SpawnPointId}.", client.Session.Character?.Name, spawnPointId);
-                        await _simulation.RespawnAtChosenPoint(client, spawnPointId);
-                        break;
-                    }
-
+                    // A dead player's resurrection-spot pick is a separate RespawnMe (0x2024 GameCharAgent, ->
+                    // HandleGameCharAgentPacket); the client never sends CharInPlayIIR while dead (verified in the
+                    // die-then-resurrect captures). So CharInPlayIIR is always the "ready" signal here.
                     // An unnamed character IS the create-editor phase (IsRetailCreateEditorFlow is exactly this check).
                     if (client.Session.Character?.Name == null)
                     {

@@ -186,13 +186,6 @@ namespace Faolan.GameServer.World
             _logger = logger;
         }
 
-        // True while the player is dead and awaiting resurrection (used to route the c2s 0x2024 to RespawnMe rather
-        // than the login ReadyForPlayScreen - they share the opcode).
-        public bool IsAwaitingRespawn(INetworkClient client)
-        {
-            return Players.TryGetValue(client, out var entity) && entity.Vitals?.IsDead == true;
-        }
-
         // The player's live world entity for this connection (authoritative transform + vitals), or null if not in the
         // world yet.
         public WorldEntity PlayerWorldEntity(INetworkClient client)
