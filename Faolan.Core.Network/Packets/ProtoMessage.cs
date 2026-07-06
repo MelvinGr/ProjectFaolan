@@ -6,276 +6,278 @@ using System.Linq;
 
 namespace Faolan.Core.Network.Packets
 {
-	public sealed class ProtoMessage
-	{
-		public List<ProtoField> Fields { get; } = [];
+    public sealed class ProtoMessage
+    {
+        public List<ProtoField> Fields { get; } = [];
 
-		public byte[] ToArray()
-		{
-			return Fields.SelectMany(x => x.ToArray()).ToArray();
-		}
+        public byte[] ToArray()
+        {
+            return Fields.SelectMany(x => x.ToArray()).ToArray();
+        }
 
-		// The canonical base-128 varint (protobuf LEB128) codec for the Conan wire, merged in from the retired
-		// Conan.Varint. FaolanStream.WriteVarint is the stream writer; these serve the byte[]/List<byte> builders
-		// (ProtoField below + the GameServer packet codecs - ScryScript, SnapshotPrefix, CombatService).
-		public static ulong ReadVarint(Stream stream)
-		{
-			ulong result = 0;
-			var shift = 0;
-			while (true)
-			{
-				var value = stream.ReadByte();
-				if (value < 0)
-					throw new InvalidDataException("Unexpected end of protobuf varint.");
+        // The canonical base-128 varint (protobuf LEB128) codec for the Conan wire, merged in from the retired
+        // Conan.Varint. FaolanStream.WriteVarint is the stream writer; these serve the byte[]/List<byte> builders
+        // (ProtoField below + the GameServer packet codecs - ScryScript, SnapshotPrefix, CombatService).
+        public static ulong ReadVarint(Stream stream)
+        {
+            ulong result = 0;
+            var shift = 0;
+            while (true)
+            {
+                var value = stream.ReadByte();
+                if (value < 0)
+                    throw new InvalidDataException("Unexpected end of protobuf varint.");
 
-				var b = (byte)value;
-				result |= (ulong)(b & 0x7F) << shift;
-				if ((b & 0x80) == 0)
-					return result;
+                var b = (byte)value;
+                result |= (ulong)(b & 0x7F) << shift;
+                if ((b & 0x80) == 0)
+                    return result;
 
-				shift += 7;
-				if (shift > 63)
-					throw new InvalidDataException("Invalid protobuf varint (too long).");
-			}
-		}
+                shift += 7;
+                if (shift > 63)
+                    throw new InvalidDataException("Invalid protobuf varint (too long).");
+            }
+        }
 
-		// Appends `value` as a base-128 varint to `bytes`.
-		public static void WriteVarint(ICollection<byte> bytes, ulong value)
-		{
-			while (value >= 0x80)
-			{
-				bytes.Add((byte)((value & 0x7F) | 0x80));
-				value >>= 7;
-			}
+        // Appends `value` as a base-128 varint to `bytes`.
+        public static void WriteVarint(ICollection<byte> bytes, ulong value)
+        {
+            while (value >= 0x80)
+            {
+                bytes.Add((byte)((value & 0x7F) | 0x80));
+                value >>= 7;
+            }
 
-			bytes.Add((byte)value);
-		}
+            bytes.Add((byte)value);
+        }
 
-		public static ProtoMessage Parse(MemoryStream stream, int? max = null)
-		{
-			var message = new ProtoMessage();
+        public static ProtoMessage Parse(MemoryStream stream, int? max = null)
+        {
+            var message = new ProtoMessage();
 
-			while (stream.Position < stream.Length && (max == null || message.Fields.Count < max))
-				message.Fields.Add(ProtoField.Read(stream));
+            while (stream.Position < stream.Length && (max == null || message.Fields.Count < max))
+                message.Fields.Add(ProtoField.Read(stream));
 
-			return message;
-		}
+            return message;
+        }
 
-		public static ProtoMessage Parse(MemoryStream stream, long byteLength, int? max = null)
-		{
-			if (byteLength < 0)
-				throw new ArgumentOutOfRangeException(nameof(byteLength));
+        public static ProtoMessage Parse(MemoryStream stream, long byteLength, int? max = null)
+        {
+            if (byteLength < 0)
+                throw new ArgumentOutOfRangeException(nameof(byteLength));
 
-			var end = stream.Position + byteLength;
+            var end = stream.Position + byteLength;
 
-			if (end > stream.Length)
-				throw new InvalidOperationException($"Requested protobuf parse length {byteLength} exceeds stream bounds. Position={stream.Position}, Length={stream.Length}.");
+            if (end > stream.Length)
+                throw new InvalidOperationException($"Requested protobuf parse length {byteLength} exceeds stream bounds. Position={stream.Position}, Length={stream.Length}.");
 
-			var message = new ProtoMessage();
+            var message = new ProtoMessage();
 
-			while (stream.Position < end && (max == null || message.Fields.Count < max))
-				message.Fields.Add(ProtoField.Read(stream));
+            while (stream.Position < end && (max == null || message.Fields.Count < max))
+                message.Fields.Add(ProtoField.Read(stream));
 
-			if (stream.Position != end && max == null)
-				throw new InvalidOperationException($"Protobuf parse ended at offset {stream.Position}, expected {end}.");
+            if (stream.Position != end && max == null)
+                throw new InvalidOperationException($"Protobuf parse ended at offset {stream.Position}, expected {end}.");
 
-			return message;
-		}
+            return message;
+        }
 
-		public static ProtoMessage Parse(ReadOnlySpan<byte> data, int? max = null)
-		{
-			using var stream = new MemoryStream(data.ToArray(), false);
-			return Parse(stream, max);
-		}
-	}
+        public static ProtoMessage Parse(ReadOnlySpan<byte> data, int? max = null)
+        {
+            using var stream = new MemoryStream(data.ToArray(), false);
+            return Parse(stream, max);
+        }
+    }
 
-	public sealed class ProtoField
-	{
-		public byte[]? RawBytes { get; set; }
-		public required int FieldNumber { get; init; }
-		public required int WireType { get; init; }
+    public sealed class ProtoField
+    {
+        public byte[]? RawBytes { get; set; }
+        public required int FieldNumber { get; init; }
+        public required int WireType { get; init; }
 
-		public ProtoMessage? MessageValue { get; set; }
+        public ProtoMessage? MessageValue { get; set; }
 
-		public uint Fixed32Value
-		{
-			get
-			{
-				if (WireType != 5)
-					throw new InvalidOperationException($"Field {FieldNumber} is not fixed32.");
+        public uint Fixed32Value
+        {
+            get
+            {
+                if (WireType != 5)
+                    throw new InvalidOperationException($"Field {FieldNumber} is not fixed32.");
 
-				if (RawBytes is not { Length: 4 })
-					throw new InvalidOperationException($"Field {FieldNumber} does not contain 4 fixed32 bytes.");
+                if (RawBytes is not { Length: 4 })
+                    throw new InvalidOperationException($"Field {FieldNumber} does not contain 4 fixed32 bytes.");
 
-				return BinaryPrimitives.ReadUInt32LittleEndian(RawBytes);
-			}
+                return BinaryPrimitives.ReadUInt32LittleEndian(RawBytes);
+            }
 
-			set
-			{
-				if (WireType != 5)
-					throw new InvalidOperationException($"Field {FieldNumber} is not fixed32.");
+            set
+            {
+                if (WireType != 5)
+                    throw new InvalidOperationException($"Field {FieldNumber} is not fixed32.");
 
-				RawBytes = new byte[4];
-				BinaryPrimitives.WriteUInt32LittleEndian(RawBytes, value);
-			}
-		}
+                RawBytes = new byte[4];
+                BinaryPrimitives.WriteUInt32LittleEndian(RawBytes, value);
+            }
+        }
 
-		public ulong Fixed64Value
-		{
-			get
-			{
-				if (WireType != 1)
-					throw new InvalidOperationException($"Field {FieldNumber} is not fixed64.");
+        public ulong Fixed64Value
+        {
+            get
+            {
+                if (WireType != 1)
+                    throw new InvalidOperationException($"Field {FieldNumber} is not fixed64.");
 
-				if (RawBytes is not { Length: 8 })
-					throw new InvalidOperationException($"Field {FieldNumber} does not contain 8 fixed64 bytes.");
+                if (RawBytes is not { Length: 8 })
+                    throw new InvalidOperationException($"Field {FieldNumber} does not contain 8 fixed64 bytes.");
 
-				return BinaryPrimitives.ReadUInt64LittleEndian(RawBytes);
-			}
+                return BinaryPrimitives.ReadUInt64LittleEndian(RawBytes);
+            }
 
-			set
-			{
-				if (WireType != 1)
-					throw new InvalidOperationException($"Field {FieldNumber} is not fixed64.");
+            set
+            {
+                if (WireType != 1)
+                    throw new InvalidOperationException($"Field {FieldNumber} is not fixed64.");
 
-				RawBytes = new byte[8];
-				BinaryPrimitives.WriteUInt64LittleEndian(RawBytes, value);
-			}
-		}
+                RawBytes = new byte[8];
+                BinaryPrimitives.WriteUInt64LittleEndian(RawBytes, value);
+            }
+        }
 
-		public ulong VarintValue { get; set; }
+        public ulong VarintValue { get; set; }
 
-		public byte[] ToArray()
-		{
-			var bytes = new List<byte>();
+        public byte[] ToArray()
+        {
+            var bytes = new List<byte>();
 
-			ProtoMessage.WriteVarint(bytes, (ulong)((FieldNumber << 3) | WireType));
+            ProtoMessage.WriteVarint(bytes, (ulong)((FieldNumber << 3) | WireType));
 
-			switch (WireType)
-			{
-				case 0:
-				{
-					ProtoMessage.WriteVarint(bytes, VarintValue);
-					break;
-				}
+            switch (WireType)
+            {
+                case 0:
+                {
+                    ProtoMessage.WriteVarint(bytes, VarintValue);
+                    break;
+                }
 
-				case 1:
-				{
-					if (RawBytes is not { Length: 8 })
-						throw new InvalidOperationException($"Field {FieldNumber} is fixed64 but does not contain 8 bytes.");
+                case 1:
+                {
+                    if (RawBytes is not { Length: 8 })
+                        throw new InvalidOperationException($"Field {FieldNumber} is fixed64 but does not contain 8 bytes.");
 
-					bytes.AddRange(RawBytes);
-					break;
-				}
+                    bytes.AddRange(RawBytes);
+                    break;
+                }
 
-				case 2:
-				{
-					var payload = MessageValue != null
-						? MessageValue.ToArray()
-						: RawBytes ?? [];
+                case 2:
+                {
+                    var payload = MessageValue != null
+                        ? MessageValue.ToArray()
+                        : RawBytes ?? [];
 
-					ProtoMessage.WriteVarint(bytes, (ulong)payload.Length);
-					bytes.AddRange(payload);
+                    ProtoMessage.WriteVarint(bytes, (ulong)payload.Length);
+                    bytes.AddRange(payload);
 
-					break;
-				}
+                    break;
+                }
 
-				case 5:
-				{
-					if (RawBytes is not { Length: 4 })
-						throw new InvalidOperationException($"Field {FieldNumber} is fixed32 but does not contain 4 bytes.");
+                case 5:
+                {
+                    if (RawBytes is not { Length: 4 })
+                        throw new InvalidOperationException($"Field {FieldNumber} is fixed32 but does not contain 4 bytes.");
 
-					bytes.AddRange(RawBytes);
-					break;
-				}
+                    bytes.AddRange(RawBytes);
+                    break;
+                }
 
-				default:
-					throw new NotSupportedException($"Unsupported protobuf wire type {WireType}.");
-			}
+                default:
+                {
+                    throw new NotSupportedException($"Unsupported protobuf wire type {WireType}.");
+                }
+            }
 
-			return bytes.ToArray();
-		}
+            return bytes.ToArray();
+        }
 
-		public static ProtoField Read(MemoryStream stream)
-		{
-			var tag = ProtoMessage.ReadVarint(stream);
+        public static ProtoField Read(MemoryStream stream)
+        {
+            var tag = ProtoMessage.ReadVarint(stream);
 
-			var fieldNumber = (int)(tag >> 3);
-			var wireType = (int)(tag & 7);
+            var fieldNumber = (int)(tag >> 3);
+            var wireType = (int)(tag & 7);
 
-			if (fieldNumber == 0)
-				throw new InvalidOperationException("Invalid protobuf field number 0.");
+            if (fieldNumber == 0)
+                throw new InvalidOperationException("Invalid protobuf field number 0.");
 
-			return wireType switch
-			{
-				0 => new ProtoField
-				{
-					FieldNumber = fieldNumber,
-					WireType = wireType,
-					VarintValue = ProtoMessage.ReadVarint(stream)
-				},
+            return wireType switch
+            {
+                0 => new ProtoField
+                {
+                    FieldNumber = fieldNumber,
+                    WireType = wireType,
+                    VarintValue = ProtoMessage.ReadVarint(stream)
+                },
 
-				1 => new ProtoField
-				{
-					FieldNumber = fieldNumber,
-					WireType = wireType,
-					RawBytes = ReadBytes(stream, 8)
-				},
+                1 => new ProtoField
+                {
+                    FieldNumber = fieldNumber,
+                    WireType = wireType,
+                    RawBytes = ReadBytes(stream, 8)
+                },
 
-				2 => ReadLengthDelimited(stream, fieldNumber),
+                2 => ReadLengthDelimited(stream, fieldNumber),
 
-				5 => new ProtoField
-				{
-					FieldNumber = fieldNumber,
-					WireType = wireType,
-					RawBytes = ReadBytes(stream, 4)
-				},
+                5 => new ProtoField
+                {
+                    FieldNumber = fieldNumber,
+                    WireType = wireType,
+                    RawBytes = ReadBytes(stream, 4)
+                },
 
-				_ => throw new NotSupportedException($"Unsupported protobuf wire type {wireType} at offset {stream.Position}.")
-			};
-		}
+                _ => throw new NotSupportedException($"Unsupported protobuf wire type {wireType} at offset {stream.Position}.")
+            };
+        }
 
-		private static byte[] ReadBytes(MemoryStream stream, int length)
-		{
-			if (length < 0)
-				throw new InvalidOperationException("Cannot read a negative number of bytes.");
+        private static byte[] ReadBytes(MemoryStream stream, int length)
+        {
+            if (length < 0)
+                throw new InvalidOperationException("Cannot read a negative number of bytes.");
 
-			if (stream.Position + length > stream.Length)
-				throw new InvalidOperationException($"Attempted to read {length} bytes beyond protobuf payload bounds.");
+            if (stream.Position + length > stream.Length)
+                throw new InvalidOperationException($"Attempted to read {length} bytes beyond protobuf payload bounds.");
 
-			var bytes = new byte[length];
-			var read = stream.Read(bytes, 0, length);
+            var bytes = new byte[length];
+            var read = stream.Read(bytes, 0, length);
 
-			if (read != length)
-				throw new InvalidOperationException("Unexpected end of protobuf stream.");
+            if (read != length)
+                throw new InvalidOperationException("Unexpected end of protobuf stream.");
 
-			return bytes;
-		}
+            return bytes;
+        }
 
-		private static ProtoField ReadLengthDelimited(MemoryStream stream, int fieldNumber)
-		{
-			var length = checked((int)ProtoMessage.ReadVarint(stream));
-			var bytes = ReadBytes(stream, length);
+        private static ProtoField ReadLengthDelimited(MemoryStream stream, int fieldNumber)
+        {
+            var length = checked((int)ProtoMessage.ReadVarint(stream));
+            var bytes = ReadBytes(stream, length);
 
-			ProtoMessage? nested = null;
+            ProtoMessage? nested = null;
 
-			try
-			{
-				using var nestedStream = new MemoryStream(bytes, false);
-				nested = ProtoMessage.Parse(nestedStream);
-			}
-			catch
-			{
-				// Keep as raw bytes if nested parsing fails.
-			}
+            try
+            {
+                using var nestedStream = new MemoryStream(bytes, false);
+                nested = ProtoMessage.Parse(nestedStream);
+            }
+            catch
+            {
+                // Keep as raw bytes if nested parsing fails.
+            }
 
-			return new ProtoField
-			{
-				FieldNumber = fieldNumber,
-				WireType = 2,
-				RawBytes = bytes,
-				MessageValue = nested
-			};
-		}
-	}
+            return new ProtoField
+            {
+                FieldNumber = fieldNumber,
+                WireType = 2,
+                RawBytes = bytes,
+                MessageValue = nested
+            };
+        }
+    }
 }
