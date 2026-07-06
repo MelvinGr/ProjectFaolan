@@ -856,6 +856,17 @@ namespace Faolan.GameServer
 		// bind/home playfield (the Totem of Origin destination, #64); body = the player's ID32. Retail answers each
 		// with a 4-byte 0x2002 [u32 playfieldId] (verified 1:1 across 13 captures). Routed here by receiver class so
 		// it never collides with GameAgent.ChatVicinity, which shares opcode 0x2002.
+		// #197: after each recv batch drains, fire the create-editor post-morph trio deterministically (when the
+		// batch that carried Finish + the SetMorphValue burst is fully received) instead of the debounce timer.
+		// Guarded to the create-editor customization phase; a no-op for every other connection/batch.
+		protected override Task ReceivedBatchComplete(INetworkClient client)
+		{
+			if (client.Session.IsCreateEditorConnection)
+				return _createFlow.FlushPostMorphBurstOnBatchDrained(client);
+
+			return Task.CompletedTask;
+		}
+
 		private async Task HandleRequestBindLocation(INetworkClient client, ConanPacket packet)
 		{
 			// body = [u32 ID32 type][u32 requesterId]; tolerate a SHORT/empty poll (the client sends a bare-header

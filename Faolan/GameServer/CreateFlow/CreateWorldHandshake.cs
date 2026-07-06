@@ -32,24 +32,48 @@ namespace Faolan.GameServer.CreateFlow
 
 			var sequence = ++client.Session.MorphActivitySequence;
 
+			// FALLBACK ONLY. The deterministic, retail-faithful trigger is FlushPostMorphBurstOnBatchDrained,
+			// fired when the TCP recv that carried Finish + the SetMorphValue burst drains (#197 - retail sends
+			// the trio once the client's customization batch is fully received, not after a wall-clock delay).
+			// This timer only catches the rare case where that burst is split across recvs, so the editor can
+			// never hang waiting for the trio; it's a long safety net, not the primary path.
 			_ = Task.Run((Func<Task>)(async () =>
 			{
 				try
 				{
-					await Task.Delay(350);
+					await Task.Delay(1500);
 
-					// A newer morph/Finish arrived, or another scheduled task already sent it -> let the latest win.
-					if (client.Session.MorphActivitySequence != sequence || client.Session.PostMorphBurstSent)
+					// A newer morph/Finish arrived (the burst is still streaming) -> a later task / the batch-drain
+					// will send it. TrySend also no-ops if it was already sent.
+					if (client.Session.MorphActivitySequence != sequence)
 						return;
 
-					client.Session.PostMorphBurstSent = true;
-					await SendPostMorphBurst(client);
+					await TrySendPostMorphBurstOnce(client);
 				}
 				catch (Exception e)
 				{
-					_logger.LogWarning(e, "Character-editor: failed to send the post-morph burst.");
+					_logger.LogWarning(e, "Character-editor: failed to send the post-morph burst (fallback timer).");
 				}
 			}));
+		}
+
+		// #197 deterministic trigger: the client sends Finish + its SetMorphValue batch in one burst; retail sends
+		// the post-morph trio once that recv batch is fully received. Called from the listener's batch-drained hook
+		// (ReceivedBatchComplete). No-op until Finish/a morph has been seen this session, and sends exactly once.
+		internal Task FlushPostMorphBurstOnBatchDrained(INetworkClient client)
+		{
+			return TrySendPostMorphBurstOnce(client);
+		}
+
+		private async Task TrySendPostMorphBurstOnce(INetworkClient client)
+		{
+			// MorphActivitySequence > 0 means Finish (or a morph) has been processed - i.e. the customization is
+			// being committed. Guarded single-send so the batch-drain trigger and the fallback timer can't double it.
+			if (client.Session.MorphActivitySequence == 0 || client.Session.PostMorphBurstSent)
+				return;
+
+			client.Session.PostMorphBurstSent = true;
+			await SendPostMorphBurst(client);
 		}
 
 		// Builds an outgoing 0xA36D3B74 script callback: subOpcode + ack(0xC350) + clientInstance +

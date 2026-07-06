@@ -31,6 +31,11 @@ namespace Faolan.Core.Network
 
 		public Func<INetworkClient, Packet, Task>? ReceivedPacket { get; init; }
 
+		// Fired once after every TCP recv whose bytes produced at least one complete packet, when that recv's
+		// packets have all been dispatched (the "batch drained" boundary). Lets a listener react to the END of a
+		// client's callback burst deterministically instead of counting/debouncing packets (#197). Default: unused.
+		public Func<INetworkClient, Task>? ReceivedBatchComplete { get; init; }
+
 		public INetworkClientSession Session { get; } = new NetworkClientSession();
 
 		public string? IpAddress => field ??= (Socket.RemoteEndPoint as IPEndPoint)?.Address.ToString();
@@ -164,6 +169,7 @@ namespace Faolan.Core.Network
 
 		private async Task DataReceivedAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
 		{
+			var dispatchedAny = false;
 			foreach (var frame in _messageFramer.PushBytes(data.ToArray(), data.Length))
 			{
 				cancellationToken.ThrowIfCancellationRequested();
@@ -176,7 +182,12 @@ namespace Faolan.Core.Network
 
 				if (ReceivedPacket != null)
 					await ReceivedPacket(this, packet);
+				dispatchedAny = true;
 			}
+
+			// The batch this recv carried is fully dispatched - signal the "batch drained" boundary (#197).
+			if (dispatchedAny && ReceivedBatchComplete != null)
+				await ReceivedBatchComplete(this);
 		}
 
 		private void LogRawPacket(string direction, byte[] bytes)

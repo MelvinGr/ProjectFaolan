@@ -91,6 +91,18 @@ namespace Faolan.Core.Network
 								Logger.LogError(ex, "Exception in ReceivedPacket");
 								client.Stop();
 							}
+						},
+						ReceivedBatchComplete = async client =>
+						{
+							try
+							{
+								await ReceivedBatchComplete(client);
+							}
+							catch (Exception ex)
+							{
+								Logger.LogError(ex, "Exception in ReceivedBatchComplete");
+								client.Stop();
+							}
 						}
 					};
 
@@ -187,5 +199,13 @@ namespace Faolan.Core.Network
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, TPacket packet);
+
+		// Called once after each recv batch's packets are all dispatched (see NetworkClient.ReceivedBatchComplete).
+		// Default no-op; the GameServer overrides it to fire the create-editor post-morph burst deterministically
+		// (#197) instead of the debounce timer. Other listeners are unaffected.
+		protected virtual Task ReceivedBatchComplete(INetworkClient client)
+		{
+			return Task.CompletedTask;
+		}
 	}
 }
