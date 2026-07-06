@@ -87,7 +87,7 @@ namespace Faolan.GameServer.World
 
 		public static byte[] BuildDeathPose(uint dyingHandle, Vector3 position)
 		{
-			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(0x0000C350).WriteUInt32(dyingHandle).WriteUInt16(0x0000).WriteVector3BigEndian(position).WriteByte(DeadMovementType).ToArray();
+			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(0x0000C350).WriteUInt32(dyingHandle).WriteUInt16(0x0000).WriteVector3(position).WriteByte(DeadMovementType).ToArray();
 		}
 
 		public static byte[] BuildKilledBy(uint dyingHandle, uint killerEndpoint)

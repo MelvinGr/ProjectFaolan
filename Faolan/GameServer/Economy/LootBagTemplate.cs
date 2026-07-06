@@ -38,13 +38,13 @@ namespace Faolan.GameServer.Economy
 			w.WriteUInt32(NodeTag);
 			w.WriteUInt32(NodeType);
 			w.WriteUInt64(0); // children / flags
-			w.WriteFloatBigEndian(-0.5f); // AABB min x
-			w.WriteFloatBigEndian(-0.5f); // AABB min y
-			w.WriteFloatBigEndian(-0.5f); // AABB min z
-			w.WriteFloatBigEndian(0.5f); // AABB max x
-			w.WriteFloatBigEndian(0.5f); // AABB max y
-			w.WriteFloatBigEndian(0.5f); // AABB max z
-			w.WriteFloatBigEndian(1.0f); // scale
+			w.WriteFloat(-0.5f); // AABB min x
+			w.WriteFloat(-0.5f); // AABB min y
+			w.WriteFloat(-0.5f); // AABB min z
+			w.WriteFloat(0.5f); // AABB max x
+			w.WriteFloat(0.5f); // AABB max y
+			w.WriteFloat(0.5f); // AABB max z
+			w.WriteFloat(1.0f); // scale
 			w.WriteUInt32(0);
 			w.WriteByte(0);
 			return w.ToArray();

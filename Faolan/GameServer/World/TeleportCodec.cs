@@ -52,7 +52,7 @@ namespace Faolan.GameServer.World
 		public static byte[] BuildDestination(uint clientInstance, uint destMapId, Vector3 position, uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
 		{
 			// The 20-byte spawn-position blob the dest reader pulls via the length-prefixed sub-stream.
-			var positionBlob = new FaolanStream().WriteUInt32(PositionBlobTag).WriteVector3BigEndian(position).WriteUInt32(destDescriptor).ToArray();
+			var positionBlob = new FaolanStream().WriteUInt32(PositionBlobTag).WriteVector3(position).WriteUInt32(destDescriptor).ToArray();
 
 			var s = new FaolanStream()
 				.WriteUInt32(N3TeleportSubOpcode)
@@ -60,7 +60,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x00) // env
 				.WriteArray(new byte[24]) // 6 leading words = 0
-				.WriteFloatBigEndian(1.0f); // 7th leading word = 1.0
+				.WriteFloat(1.0f); // 7th leading word = 1.0
 			WritePlayfieldProxy(s, destMapId, ProxyReadyFlag, ProxyInstanceWord, destPlayfieldToken);
 			return s
 				.WriteUInt32(0)
@@ -89,11 +89,11 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(ReceiverClass)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x00) // env
-				.WriteVector3BigEndian(position)
+				.WriteVector3(position)
 				.WriteUInt32(0)
-				.WriteFloatBigEndian(facingX)
+				.WriteFloat(facingX)
 				.WriteUInt32(0)
-				.WriteFloatBigEndian(facingZ)
+				.WriteFloat(facingZ)
 				.WriteByte(PlayfieldProxyVersion)
 				.WriteUInt32(0x0000C7A0) // proxy[0] (revive uses 0xC7A0, not 0xC79C)
 				.WriteUInt32(mapId) // proxy[1] = current map

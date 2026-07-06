@@ -48,19 +48,19 @@ namespace Faolan.GameServer.Spawn
 				.WriteUInt32(Ack)
 				.WriteUInt32(handle)
 				.WriteUInt16(0) // prefix 00 00
-				.WriteVector3BigEndian(currentPosition)
+				.WriteVector3(currentPosition)
 				// segment-list + move-block header (04 01 00 02 01 01 00 00 00 00)
 				.WriteArray(0x04, 0x01, 0x00, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00)
 				.WriteByte(waypoints.Count);
 			foreach (var wp in waypoints)
-				stream.WriteVector3BigEndian(wp);
+				stream.WriteVector3(wp);
 
 			return stream
 				// block trailer: flag 00, speed, 12 pad bytes
 				.WriteByte(0x00)
-				.WriteFloatBigEndian(speed)
+				.WriteFloat(speed)
 				.WriteArray(new byte[12])
-				.WriteVector3BigEndian(currentPosition) // anchor
+				.WriteVector3(currentPosition) // anchor
 				.WriteByte(0x00)
 				.WriteByte(0x01) // terminator
 				.ToArray();
@@ -85,7 +85,7 @@ namespace Faolan.GameServer.Spawn
 				.WriteUInt32(Ack)
 				.WriteUInt32(handle)
 				.WriteUInt16(0) // prefix 00 00
-				.WriteVector3BigEndian(position)
+				.WriteVector3(position)
 				.WriteByte(0x06) // stationary terminator (vs 0x04 = a movement segment follows)
 				.ToArray();
 		}

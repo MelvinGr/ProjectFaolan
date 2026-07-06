@@ -44,13 +44,13 @@ namespace Faolan.Tests
 		public void GameTweaksBody_MatchesRetailBytes()
 		{
 			// Build the body with the same FaolanStream primitives the listener uses (Ox20EC handler):
-			//   [u32 header][ per tweak: WriteString(name) -> u16 len + ASCII, WriteDoubleBigEndian(value) ] *
+			//   [u32 header][ per tweak: WriteString(name) -> u16 len + ASCII, WriteDouble(value) ] *
 			Assert.Equal(19, Tweaks.Length); // retail logs "ApplyDynamicGameTweaks: Applying 19 gametweaks"
 
 			var stream = new FaolanStream();
 			stream.WriteUInt32(0x00004ED4u);
 			foreach (var (name, value) in Tweaks)
-				stream.WriteString(name).WriteDoubleBigEndian(value);
+				stream.WriteString(name).WriteDouble(value);
 
 			Assert.Equal(RetailGameTweaksBody, stream.ToArray());
 		}
@@ -58,7 +58,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void WriteDoubleBigEndian_IsBigEndian()
 		{
-			var bytes = new FaolanStream().Also(s => s.WriteDoubleBigEndian(1.0)).ToArray();
+			var bytes = new FaolanStream().Also(s => s.WriteDouble(1.0)).ToArray();
 			// 1.0d = 0x3FF0000000000000, big-endian on the wire.
 			Assert.Equal(new byte[]
 				{

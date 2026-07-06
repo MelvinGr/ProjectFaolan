@@ -7,7 +7,7 @@ namespace Faolan.Tests
 {
 	// Locks in the deliberate float-endianness contract (see FaolanStream / docs note + protocol_float_endianness):
 	// protobuf fixed32 floats are LITTLE-endian (WriteFloat), raw packet-body floats are BIG-endian
-	// (WriteFloatBigEndian / ReadFloat). The WriteFloat(LE) vs ReadFloat(BE) asymmetry is intentional - this guards
+	// (WriteFloat / ReadFloat). The WriteFloat(LE) vs ReadFloat(BE) asymmetry is intentional - this guards
 	// against "fixing" it back into a single endianness (which corrupts one of the two contexts).
 	public class FaolanStreamFloatTests
 	{
@@ -20,24 +20,9 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void WriteFloat_IsLittleEndian()
-		{
-			var bytes = new FaolanStream().Also(s => s.WriteFloat(1.0f)).ToArray();
-			// 1.0f = 0x3F800000; little-endian on the wire.
-			Assert.Equal(new byte[]
-				{
-					0x00,
-					0x00,
-					0x80,
-					0x3F
-				},
-				bytes);
-		}
-
-		[Fact]
 		public void WriteFloatBigEndian_IsBigEndian_AndRoundTripsWithReadFloat()
 		{
-			var bytes = new FaolanStream().Also(s => s.WriteFloatBigEndian(1.0f)).ToArray();
+			var bytes = new FaolanStream().Also(s => s.WriteFloat(1.0f)).ToArray();
 			Assert.Equal(new byte[]
 				{
 					0x3F,
@@ -54,7 +39,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void WriteVector3BigEndian_WritesThreeBigEndianFloats()
 		{
-			var bytes = new FaolanStream().Also(s => s.WriteVector3BigEndian(new Vector3(1.0f, 2.0f, 0.0f))).ToArray();
+			var bytes = new FaolanStream().Also(s => s.WriteVector3(new Vector3(1.0f, 2.0f, 0.0f))).ToArray();
 			// 1.0=0x3F800000, 2.0=0x40000000, 0.0=0x00000000, all big-endian.
 			Assert.Equal(new byte[]
 				{

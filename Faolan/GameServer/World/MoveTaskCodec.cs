@@ -38,7 +38,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteVector3BigEndian(from)
+				.WriteVector3(from)
 				.WriteByte(ModeApproachTarget)
 				.WriteUInt32(WireType)
 				.WriteUInt32(targetHandle)
@@ -52,7 +52,7 @@ namespace Faolan.GameServer.World
 		// simplest move; the dominant shape for the player's own position ticks. Validated 74/74.
 		public static byte[] BuildBarePositionBody(uint handle, Vector3 from)
 		{
-			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(WireType).WriteUInt32(handle).WriteUInt16(0).WriteVector3BigEndian(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
+			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(WireType).WriteUInt32(handle).WriteUInt16(0).WriteVector3(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
 		}
 
 		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a
@@ -64,10 +64,10 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteVector3BigEndian(from)
+				.WriteVector3(from)
 				.WriteByte(0x02)
-				.WriteVector3BigEndian(to)
-				.WriteQuaternionBigEndian(facing)
+				.WriteVector3(to)
+				.WriteQuaternion(facing)
 				.WriteUInt16(0)
 				.ToArray();
 		}
@@ -87,19 +87,19 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteVector3BigEndian(from)
+				.WriteVector3(from)
 				.WriteByte(ModePath)
 				.WriteByte(0x01) // WaitMoveTask base header flags (bit0 -> no dur/rem floats)
 				.WriteByte(0x00) // PathMoveTask F-flags (no optional floats; waypoint-list branch)
 				.WriteUInt32(waypoints.Count);
 			foreach (var w in waypoints)
-				s.WriteVector3BigEndian(w);
+				s.WriteVector3(w);
 			return s
 				.WriteByte(0x00) // trailer byte
-				.WriteFloatBigEndian(pathLength)
+				.WriteFloat(pathLength)
 				.WriteUInt64(0)
 				.WriteUInt32(0) // 12 zero bytes
-				.WriteVector3BigEndian(from)
+				.WriteVector3(from)
 				.ToArray();
 		}
 
@@ -131,18 +131,18 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteVector3BigEndian(from)
+				.WriteVector3(from)
 				.WriteByte(ModePath)
 				.WriteByte(0x01) // WaitMoveTask base header flags (bit0 SET -> no duration; retail 2-point form)
 				.WriteByte(0x00) // PathMoveTask F-flags (no optional floats; waypoint-list branch)
 				.WriteUInt32(2) // two control points: the spline needs >= 2 (client assert)
-				.WriteVector3BigEndian(from)
-				.WriteVector3BigEndian(to)
+				.WriteVector3(from)
+				.WriteVector3(to)
 				.WriteByte(0x00) // trailer byte
-				.WriteFloatBigEndian(pathLength)
+				.WriteFloat(pathLength)
 				.WriteUInt64(0)
 				.WriteUInt32(0) // 12 zero bytes
-				.WriteVector3BigEndian(to) // anchor = DESTINATION (#272)
+				.WriteVector3(to) // anchor = DESTINATION (#272)
 				.ToArray();
 		}
 

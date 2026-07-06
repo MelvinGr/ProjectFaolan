@@ -33,7 +33,7 @@ namespace Faolan.GameServer.World
 		// from n3ToClientQuit's 0x01 marker + u32 playfield token.
 		public static byte[] BuildFadeBody(uint typeTag, uint handle, float fadeSeconds)
 		{
-			return new FaolanStream().WriteUInt32(FadeSubOpcode).WriteUInt32(typeTag).WriteUInt32(handle).WriteByte(0x00).WriteFloatBigEndian(fadeSeconds).ToArray();
+			return new FaolanStream().WriteUInt32(FadeSubOpcode).WriteUInt32(typeTag).WriteUInt32(handle).WriteByte(0x00).WriteFloat(fadeSeconds).ToArray();
 		}
 
 		// NewCurrentLooter / NewAllowedLooter RESET (looter -> none) once the bag is emptied. 21 B:

@@ -46,12 +46,12 @@ namespace Faolan.GameServer
 
 		internal static void WriteValidResurrectionSpotsBody(FaolanStream s, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
-			s.WriteVector3BigEndian(deathPosition);
+			s.WriteVector3(deathPosition);
 			s.WriteUInt32(ResSpotsHeader);
 
 			foreach (var spot in spots)
 			{
-				s.WriteFloatBigEndian(spot.PositionX).WriteFloatBigEndian(spot.PositionY).WriteFloatBigEndian(spot.PositionZ);
+				s.WriteFloat(spot.PositionX).WriteFloat(spot.PositionY).WriteFloat(spot.PositionZ);
 				s.WriteUInt32(ResSpotConstA);
 				s.WriteUInt32(spot.MapId);
 				s.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0);

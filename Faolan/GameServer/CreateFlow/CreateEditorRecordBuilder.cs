@@ -145,7 +145,7 @@ namespace Faolan.GameServer.CreateFlow
 		// big-endian. Constructing it lets the server drive the sky/lighting time instead of replaying the capture.
 		public static byte[] BuildGameTimeIir(ulong dayTime, byte flag, ulong timestamp, float rate = 1.0f)
 		{
-			return new FaolanStream().WriteUInt32(0u).WriteUInt32(0u).WriteUInt64(dayTime).WriteByte(flag).WriteUInt64(timestamp).WriteFloatBigEndian(rate).ToArray();
+			return new FaolanStream().WriteUInt32(0u).WriteUInt32(0u).WriteUInt64(dayTime).WriteByte(flag).WriteUInt64(timestamp).WriteFloat(rate).ToArray();
 		}
 
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
@@ -161,9 +161,9 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteUInt32(0u)
 				.WriteUInt32(0u)
 				.WriteByte(0x00) // [0:9] prefix
-				.WriteFloatBigEndian(posX)
-				.WriteFloatBigEndian(posY)
-				.WriteFloatBigEndian(posZ) // [9:21] reference position
+				.WriteFloat(posX)
+				.WriteFloat(posY)
+				.WriteFloat(posZ) // [9:21] reference position
 				.WriteByte(0x62)
 				.WriteUInt32(0x0000C79Cu)
 				.WriteUInt32(mapId)
@@ -179,8 +179,8 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteUInt32(0x00000001u)
 				.WriteUInt32(playfieldToken) // token again
 				.WriteUInt32(0x0000CB20u)
-				.WriteFloatBigEndian(nearClip)
-				.WriteFloatBigEndian(farClip)
+				.WriteFloat(nearClip)
+				.WriteFloat(farClip)
 				.WriteUInt32(fieldB) // [previously hardcoded 0]: beach capture carries 0x3, retail Old Tarantia 0x0
 				.WriteUInt32(0xFFFFFFFFu)
 				.WriteUInt32(0xFFFFFFFFu)
@@ -216,7 +216,7 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteByte(1 + nameBytes.Length)
 				.WriteByte(0x2A)
 				.WriteArray(nameBytes)
-				.WriteFloatBigEndian(weight)
+				.WriteFloat(weight)
 				.WriteByte(p)
 				.WriteUInt32(q)
 				.ToArray();

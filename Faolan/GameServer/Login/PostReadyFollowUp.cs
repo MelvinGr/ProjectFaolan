@@ -8440,9 +8440,9 @@ namespace Faolan.GameServer
 
 				await new PacketStream()
 					.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots)
-					.WriteVector3BigEndian(character!.Position)
+					.WriteVector3(character!.Position)
 					.WriteUInt32(0x000007E2)
-					.WriteVector3BigEndian(character.Position)
+					.WriteVector3(character.Position)
 					.WriteArray(newTail)
 					.SendAsync(client);
 				return;

@@ -1394,8 +1394,8 @@ namespace Faolan.GameServer.World
 					.WriteUInt32(move.DataObject)
 					.WriteUInt32(move.DataClientInstance)
 					.WriteUInt16(move.MovingType)
-					.WriteVector3BigEndian(move.Position)
-					.WriteVector3BigEndian(move.Rotation)
+					.WriteVector3(move.Position)
+					.WriteVector3(move.Rotation)
 					.WriteArray(move.Tail))
 				.SendAsync(recipient);
 		}

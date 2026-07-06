@@ -167,8 +167,8 @@ namespace Faolan.GameServer
 									.WriteUInt32(dataobjdec)
 									.WriteUInt32(dataclientinst)
 									.WriteUInt16(relayMovingType)
-									.WriteVector3BigEndian(livePosition)
-									.WriteVector3BigEndian(liveRotation)
+									.WriteVector3(livePosition)
+									.WriteVector3(liveRotation)
 									.WriteArray(datadat))
 								.SendAsync(client);
 
