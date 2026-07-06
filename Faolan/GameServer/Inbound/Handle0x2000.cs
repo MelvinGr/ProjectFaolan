@@ -80,15 +80,6 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.LegacyCreateEchoInstanceStrie:
-				case GameServer0X2000Opcodes.LegacyCreateEchoInstanceRetail:
-				{
-					// Legacy fixed-instance echoes from older captures (retail 0x021662C8 / Strie 0x02165EFF).
-					// The normal path is the dynamic-instance pre-switch check above; this stays as a fallback.
-					await HandleCreateEditorInstanceEcho(client, packet);
-					break;
-				}
-
 				case GameServer0X2000Opcodes.ScryScriptIIR:
 				{
 					await _createFlow.HandleCommandPacket(client, packet);
@@ -833,13 +824,6 @@ namespace Faolan.GameServer
 					// TradeskillRecipeCodec / docs/tradeskill-recipes.md.
 					_ = packet.Body.ReadRemainingArray();
 					await SendCraftingRecipeBook(client);
-
-					break;
-				}
-
-				case GameServer0X2000Opcodes.LegacyConanHimselfInstance:
-				{
-					var data = packet.Body.ReadRemainingArray();
 
 					break;
 				}

@@ -394,9 +394,7 @@ namespace Faolan.Core.Network.Packets
 
 		// The 0x2000 sub-opcodes the GameServer HANDLES (client->server). These are the same IIR ids as
 		// GameServer0X2000RespondsOpcodes (the full catalog); kept as a separate handler-facing enum with the
-		// descriptive names the handler switch reads by, with the real client IIR type noted per line. The three
-		// "LegacyCreateEcho*" values are NOT IIR ids - they are client instance ids the create-editor client echoes
-		// back as the sub-opcode (the normal path matches the live instance dynamically; these are static fallbacks).
+		// descriptive names the handler switch reads by, with the real client IIR type noted per line.
 		public enum GameServer0X2000Opcodes : uint
 		{
 			Interact = 0x642CD3D6, // = BehaviorControlCenterIIR_c: generic action channel (world-object interaction, spells, right-click, inventory/equipment)
@@ -416,10 +414,7 @@ namespace Faolan.Core.Network.Packets
 			DropItem = 0x72491DE9, // = DeleteItemIIR_t: client-side inventory action; no matching bag-content response packet is decoded yet
 			MoveItemInInventory = 0x2A8A1B49, // = MoveInventoryItemIIR_t: client-side slot move action
 			DeleteQuest = 0x97E02314, // = QuestIIR_c
-			InventoryClaimsButton = 0x06EC1255, // = CoreClaimIIR: tiny post-ready/request-side packet, not actual bag contents
-			LegacyCreateEchoInstanceStrie = 0x02165EFF, // create-flow client instance echo (Strie, older retail create capture) - NOT an IIR id
-			LegacyCreateEchoInstanceRetail = 0x021662C8, // create-flow client instance echo (account-stricken998 create-no-worldenter) - NOT an IIR id
-			LegacyConanHimselfInstance = 0x1101B4F6 // ConanHimself manual char instance - NOT an IIR id
+			InventoryClaimsButton = 0x06EC1255 // = CoreClaimIIR: tiny post-ready/request-side packet, not actual bag contents
 		}
 
 		// The `command` word of a QueuePetCommand (0x205B) packet - the pet command bar (#307, docs/summon-pet-decode.md).
