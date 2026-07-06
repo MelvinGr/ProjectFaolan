@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Extensions;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Network.Conan;
@@ -84,7 +85,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s);
-			Assert.True(reparsed.Root.ToArray().SequenceEqual(root));
+			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(root));
 			Assert.True(reparsed.Tails.ToArray().SequenceEqual(tails));
 		}
 
@@ -154,7 +155,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-			return (parts.Prefix, parts.Root.ToArray(), parts.Tails.ToArray());
+			return (parts.Prefix, parts.Root.ToProtobuf(), parts.Tails.ToArray());
 		}
 	}
 }

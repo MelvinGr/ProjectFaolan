@@ -196,7 +196,7 @@ namespace Faolan.Importer.Extractors
 			var blob = body.ReadArrayUInt32Length();
 
 			using var ms = new MemoryStream(blob, false);
-			var container = ProtoMessage.Parse(ms);
+			var container = Serializer.Deserialize<ProtoInventoryGame>(ms);
 			if (InventorySnapshotInspector.GetContainerKind(container) != (ulong)InventorySnapshotInspector.ContainerKind.Bank)
 				return;
 
@@ -259,7 +259,7 @@ namespace Faolan.Importer.Extractors
 		// `types` (optional) receives the item's classification from the container it was found in - only the
 		// specific kinds (Quest/Resource) are recorded; Normal items are left to the DB default. Kept separate from
 		// CapturedItem so the identity quad's equality (the conflict check) is unaffected.
-		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoMessage root, IDictionary<uint, ItemType> types = null)
+		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoFullCharacterIIR root, IDictionary<uint, ItemType> types = null)
 		{
 			var map = new Dictionary<uint, CapturedItem>();
 
@@ -339,7 +339,7 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		private static bool TryReadInventoryRoot(byte[] packetBytes, out ProtoMessage root)
+		private static bool TryReadInventoryRoot(byte[] packetBytes, out ProtoFullCharacterIIR root)
 		{
 			root = null;
 

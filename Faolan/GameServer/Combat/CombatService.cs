@@ -630,7 +630,7 @@ namespace Faolan.GameServer.Combat
         private static byte[] EncodeBehaviorPhase(uint value)
         {
             var bytes = new List<byte> { 0x18 };
-            ProtoMessage.WriteVarint(bytes, value);
+            Varint.WriteVarint(bytes, value);
             return bytes.ToArray();
         }
 

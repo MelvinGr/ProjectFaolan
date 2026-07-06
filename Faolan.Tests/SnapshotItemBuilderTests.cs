@@ -6,7 +6,9 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Protobuf;
+using ProtoBuf;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
@@ -47,7 +49,7 @@ namespace Faolan.Tests
 			var equipped = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Equipped);
 			var captured = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot);
 			Assert.NotNull(captured);
-			var expected = captured!.MessageValue!.ToArray();
+			var expected = captured!.ToProtobuf();
 
 			// 2) Import the items from this capture into a temp DB and load the Slave Manacles template.
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-snap-{Guid.NewGuid():N}.db");
@@ -64,15 +66,15 @@ namespace Faolan.Tests
 				Assert.NotNull(item);
 
 				// 3) Build the entry from the DB template + captured per-instance state, assert byte-identical.
-				var built = SnapshotItemBuilder.BuildEntry(Slot, ItemId, RecordId, Count, item, Hash);
-				var produced = built.MessageValue!.ToArray();
+				var built = SnapshotItemBuilder.BuildListEntry(Slot, ItemId, RecordId, Count, item, Hash);
+				var produced = built.ToProtobuf();
 
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(produced));
 
 				// 4) And via the item's own hash (harvested into Items) - the fully DB-driven path.
 				Assert.Equal(Hash, item.Hash);
 				Assert.True(SnapshotItemBuilder.TryBuildEntry(Slot, ItemId, RecordId, Count, item, out var auto));
-				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(auto.MessageValue!.ToArray()));
+				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(auto.ToProtobuf()));
 			}
 			finally
 			{
@@ -117,16 +119,17 @@ namespace Faolan.Tests
 				var bag = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Bag);
 				var before = InventorySnapshotInspector.GetContainerEntries(bag).ToList();
 				var original = before[0];
-				var slot = InventorySnapshotInspector.GetEntrySlot(original) ?? 0;
+				var slot = InventorySnapshotInspector.GetEntrySlot(original);
 				var itemId = InventorySnapshotInspector.GetEntryItemId(original) ?? 0;
 				var recordId = InventorySnapshotInspector.GetEntryRecordId(original) ?? 0;
 				var count = InventorySnapshotInspector.GetEntryCount(original) ?? 1;
 
-				var built = SnapshotItemBuilder.BuildEntry(slot, itemId, recordId, count, item, hash);
-				bag.Fields[bag.Fields.IndexOf(original)] = built;
+				var built = SnapshotItemBuilder.BuildListEntry(slot, itemId, recordId, count, item, hash);
+				bag.Items[bag.Items.IndexOf(original)] = built;
 
 				// Re-serialize the whole root and re-parse, as the live path does.
-				var reparsed = ProtoMessage.Parse(parts.Root.ToArray());
+				using var reparsedStream = new MemoryStream(parts.Root.ToProtobuf(), false);
+				var reparsed = Serializer.Deserialize<ProtoFullCharacterIIR>(reparsedStream);
 				var bag2 = InventorySnapshotInspector.GetContainer(reparsed, InventorySnapshotInspector.ContainerKind.Bag);
 				var after = InventorySnapshotInspector.GetContainerEntries(bag2).ToList();
 

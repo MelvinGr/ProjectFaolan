@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Extensions;
 using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -43,7 +44,7 @@ namespace Faolan.Tests
 			Assert.NotNull(captured);
 
 			// 2) Decode those bytes with the generated, schema-accurate types.
-			using var ms = new MemoryStream(captured!.MessageValue!.ToArray());
+			using var ms = new MemoryStream(captured!.ToProtobuf());
 			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(ms);
 
 			Assert.NotNull(entry.Item);
@@ -97,7 +98,7 @@ namespace Faolan.Tests
 
 			// One inventory entry round-trips exactly.
 			var equipped = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Equipped);
-			var entryBytes = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot)!.MessageValue!.ToArray();
+			var entryBytes = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot)!.ToProtobuf();
 			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(new MemoryStream(entryBytes));
 			using var em = new MemoryStream();
 			Serializer.Serialize(em, entry);
@@ -105,7 +106,7 @@ namespace Faolan.Tests
 
 			// The whole snapshot body round-trips exactly through ProtoFullCharacterIIR (unknown fields preserved
 			// via IExtensible).
-			var rootBytes = parts.Root.ToArray();
+			var rootBytes = parts.Root.ToProtobuf();
 			var root = Serializer.Deserialize<ProtoFullCharacterIIR>(new MemoryStream(rootBytes));
 			using var rm = new MemoryStream();
 			Serializer.Serialize(rm, root);

@@ -893,7 +893,7 @@ namespace Faolan.Importer.Cli
                     s.ReadUInt32();
                     s.ReadUInt32();
                     var rootMsg = InventorySnapshotInspector.ParseInventoryRoot(s);
-                    Console.WriteLine($"    inventory-root: OK ({rootMsg.Fields.Count} fields)");
+                    Console.WriteLine($"    inventory-root: OK ({rootMsg.Inventories.Count} containers)");
                 }
                 catch (Exception ex)
                 {

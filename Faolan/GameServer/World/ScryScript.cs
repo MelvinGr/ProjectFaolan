@@ -76,8 +76,8 @@ namespace Faolan.GameServer.World
 
         private static void WriteBytesField(List<byte> w, int field, byte[] value)
         {
-            ProtoMessage.WriteVarint(w, (ulong)((field << 3) | 2)); // wire type 2 (length-delimited)
-            ProtoMessage.WriteVarint(w, (ulong)value.Length);
+            Varint.WriteVarint(w, (ulong)((field << 3) | 2)); // wire type 2 (length-delimited)
+            Varint.WriteVarint(w, (ulong)value.Length);
             w.AddRange(value);
         }
 
@@ -98,8 +98,8 @@ namespace Faolan.GameServer.World
 
         private static void WriteVarintField(List<byte> w, int field, ulong value)
         {
-            ProtoMessage.WriteVarint(w, (ulong)(field << 3)); // wire type 0 (varint)
-            ProtoMessage.WriteVarint(w, value);
+            Varint.WriteVarint(w, (ulong)(field << 3)); // wire type 0 (varint)
+            Varint.WriteVarint(w, value);
         }
     }
 }

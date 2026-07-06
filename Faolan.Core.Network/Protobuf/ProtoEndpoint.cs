@@ -4,7 +4,7 @@ namespace Faolan.Core.Network.Protobuf
 {
 	// Hand-rolled reader for the RpcHeader endpoint fields, the counterpart to ToProtobuf() (locked byte-exact by
 	// ProtoEndpointGoldenTests). ConanPacket reads the header's caller_id (field 1, tag 0x0A) then endpoint_id
-	// (field 2, tag 0x12) straight off the FaolanStream with this, instead of the generic ProtoMessage.Parse +
+	// (field 2, tag 0x12) straight off the FaolanStream with this, instead of a generic protobuf tree walk +
 	// protobuf-net round-trip - the endpoint wire is fixed and tiny: [tag][len][ 0x0D type(fixed32 LE)  0x10
 	// instance(varint)  (0x18 token(varint))? ].
 	public partial class ProtoEndpoint

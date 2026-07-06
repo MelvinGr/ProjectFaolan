@@ -27,7 +27,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		{
 			var prefix = new List<byte>(8);
 			prefix.AddRange(BaseVersion);
-			ProtoMessage.WriteVarint(prefix, RootLengthConstant + (ulong)rootLength);
+			Varint.WriteVarint(prefix, RootLengthConstant + (ulong)rootLength);
 			prefix.AddRange(Trailing);
 			return [.. prefix];
 		}

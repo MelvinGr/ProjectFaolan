@@ -20,23 +20,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// proven to re-serialize the wire byte-for-byte (AocProtocolDecodeTests).
 	public static class SnapshotItemBuilder
 	{
-		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1)
-		{
-			var entry = BuildListEntry(slot, itemId, recordId, count, item, hash, flags, f7);
-
-			using var ms = new MemoryStream();
-			Serializer.Serialize(ms, entry);
-
-			// Wrap the serialized entry as the container's field-4 message (the live path swaps this into the parsed
-			// ProtoMessage snapshot tree, which stays the lossless carrier for the rest of the packet).
-			return new ProtoField
-			{
-				FieldNumber = 4,
-				WireType = 2,
-				MessageValue = ProtoMessage.Parse(ms.ToArray())
-			};
-		}
-
 		// Builds the bare per-item entry (ProtoInventoryGameEntry, i.e. InventoryListEntry.item without the Pos
 		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
 		// GameCharInterface.DispatchAddItem (s2c 0x2020) carries as i_cEntry - the live, mid-session counterpart
@@ -99,13 +82,13 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 		// Convenience overload: an item is buildable iff it has an hash (DB column, harvested from captures).
 		// Returns false otherwise so the caller can fall back to the verbatim capture for that item.
-		public static bool TryBuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, out ProtoField entry, ulong flags = 1, ulong f7 = 1)
+		public static bool TryBuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, out ProtoInventoryGame.InventoryListEntry entry, ulong flags = 1, ulong f7 = 1)
 		{
 			entry = null;
 			if (item == null || item.Hash == 0)
 				return false;
 
-			entry = BuildEntry(slot, itemId, recordId, count, item, item.Hash, flags, f7);
+			entry = BuildListEntry(slot, itemId, recordId, count, item, item.Hash, flags, f7);
 			return true;
 		}
 

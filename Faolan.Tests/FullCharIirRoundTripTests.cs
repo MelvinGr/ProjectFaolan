@@ -47,7 +47,7 @@ namespace Faolan.Tests
 					stream.ReadUInt32(); // subop
 					stream.ReadUInt32(); // c350
 					stream.ReadUInt32(); // instance
-					rootBytes = InventorySnapshotInspector.ParseInventoryPacketBody(stream).Root.ToArray();
+					rootBytes = InventorySnapshotInspector.ParseInventoryPacketBody(stream).Root.ToProtobuf();
 				}
 				catch
 				{
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 					stream.ReadUInt32(); // c350
 					stream.ReadUInt32(); // instance
 					parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-					rootBytes = parts.Root.ToArray();
+					rootBytes = parts.Root.ToProtobuf();
 				}
 				catch (Exception e)
 				{

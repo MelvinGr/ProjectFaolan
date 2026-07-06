@@ -96,7 +96,7 @@ namespace Faolan.Tests
 			s2.ReadUInt32();
 			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s2);
 			Assert.True(reparsed.Tails.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
-			Assert.True(reparsed.Root.ToArray().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
+			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
 			return;
 
 			Item Mk(uint id, uint d1, uint d2, uint d3, uint d4, uint arch)
@@ -147,7 +147,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(s);
-			return (parts.Prefix, parts.Root.ToArray().Length, parts.Tails.ToArray());
+			return (parts.Prefix, parts.Root.ToProtobuf().Length, parts.Tails.ToArray());
 		}
 
 		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).
@@ -159,7 +159,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			var instance = s.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(s);
-			var root = parts.Root.ToArray();
+			var root = parts.Root.ToProtobuf();
 			return (parts.Prefix, root.Length, parts.Tails.ToArray(), instance, root);
 		}
 	}

@@ -6,6 +6,7 @@ using Faolan.Core;
 using Faolan.Core.Crypt;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Extensions;
 using Faolan.GameServer.FullCharSnapshot;
 using Xunit;
 
@@ -44,7 +45,7 @@ namespace Faolan.Tests
 				s.WriteUInt32(c350);
 				s.WriteUInt32(instance);
 				s.WriteArray(parts.Prefix);
-				s.WriteArray(parts.Root.ToArray());
+				s.WriteArray(parts.Root.ToProtobuf());
 				s.WriteArray(parts.Tails.ToArray());
 			});
 			stream.WriteLengthHash();
@@ -85,7 +86,7 @@ namespace Faolan.Tests
 			rebuilt.WriteUInt32(c350);
 			rebuilt.WriteUInt32(instance);
 			rebuilt.WriteArray(parts.Prefix);
-			rebuilt.WriteArray(parts.Root.ToArray());
+			rebuilt.WriteArray(parts.Root.ToProtobuf());
 			rebuilt.WriteArray(parts.Tails.ToArray());
 
 			body.Position = 0;
@@ -143,7 +144,7 @@ namespace Faolan.Tests
 				s.WriteUInt32(c350);
 				s.WriteUInt32(instance);
 				s.WriteArray(parts.Prefix);
-				s.WriteArray(parts.Root.ToArray());
+				s.WriteArray(parts.Root.ToProtobuf());
 				s.WriteArray(parts.Tails.ToArray());
 			});
 			stream.WriteLengthHash();
@@ -187,7 +188,7 @@ namespace Faolan.Tests
 			rebuilt.WriteUInt32(c350);
 			rebuilt.WriteUInt32(instance);
 			rebuilt.WriteArray(parts.Prefix);
-			rebuilt.WriteArray(parts.Root.ToArray());
+			rebuilt.WriteArray(parts.Root.ToProtobuf());
 			rebuilt.WriteArray(parts.Tails.ToArray());
 
 			body.Position = 0;
