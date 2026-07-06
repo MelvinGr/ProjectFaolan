@@ -232,7 +232,7 @@ Console.WriteLine($"[game] connected -> {gsHost}:{gsPort}");
 
 // Existing-character login: the server sends the full world-entry burst straight after Hello.
 await game.SendAsync(Build(Server(0x8204),
-	GameServerOpcodes.Hello,
+	GameAgentOpcodes.Authenticate2,
 	p =>
 	{
 		p.WriteUInt32(target.Id); // clientInstance = character id

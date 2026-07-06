@@ -190,50 +190,6 @@ namespace Faolan.Core.Network.Packets
 			Ox20D0 = 0x20D0
 		}
 
-		// Handler-facing opcodes for the GameServer connection's blanket switch. The connection MULTIPLEXES four
-		// RPC class-pairs (GameAgent, GameCharAgent, GameCharAgentProject, TradepostAgent - see
-		// docs/aoc-opcode-ids.md), so the same 16-bit value can be different methods per receiver class; the
-		// correct dispatch key is (class id, opcode) and tradepost already routes by class. The small class
-		// tables top out at 0x2013 (TradepostAgent) / 0x200C (project) / 0x200A (GameAgent), so every value
-		// >= 0x2014 is unambiguously a GameCharAgent method and is named from that table; lower values keep their
-		// behavior-derived names with the per-class candidates noted. Full per-class catalogs are below
-		// (GameAgentOpcodes / GameCharAgentOpcodes / GameCharAgentProjectOpcodes).
-		public enum GameServerOpcodes : ushort
-		{
-			Hello = 0x2003, // GameAgent.Authenticate2 (the auth packet); COLLIDES with GameCharAgent.SetTutorialStats (x80 in captures)
-			Ping = 0x2005, // GameAgent.Ping; GameCharAgent.GuildInfoUpdate shares the value
-			PassBlob = 0x2000, // GameAgent.PassBlob - the IIR carrier (sub-opcode in body); COLLIDES with GameCharAgentProject.RequestAggroStatus (x7621)
-			ChatCommand = 0x2002, // GameAgent.ChatVicinity (typed chat, carries GM commands); COLLIDES with GameCharAgent.RequestBindLocation (x49)
-			SetSprintInputState = 0x200C, // GameCharAgentProject.SetSprintInputState (x2092 - the sprint key)
-			VanityToggle = 0x200B, // GameCharAgentProject.ToggleVanityArmorFilter
-
-			// >= 0x2014: GameCharAgent methods (unambiguous).
-			SplitStack = 0x201D, // GameCharAgent.SplitInventoryItem
-			CancelBuff = 0x201E, // right-click-cancel a buff; body = [u32 buffId][u32 charId]
-			StackInventoryItemIfPossible = 0x201F, // (handled as "SpawnCheck" historically, after the C++ Faolan docs p.160-161; only logged)
-			UpdateQuestMarkerNPC = 0x2020, // ALSO the world-entry spawn-poll trigger we answer with 0x2008 (x5631)
-			RespawnMe = 0x2024, // the player's "release/resurrect" click; body = [u32 token] (corpse/request id)
-			CloseShop = 0x2032, // vendor window closed; body = [shop ID32]
-			BuyFromShop = 0x2033, // GameCharAgent.BuyItem; body = [shop ID32][u32 pos]
-			SellToShop = 0x2034, // GameCharAgent.SellItem; body = [shop ID32][u32 container][u32 charId][u32 slot]
-			UndoLastSoldItem = 0x2035, // body empty (single-step undo of the last sale)
-			TryLootAll = 0x2043, // loot-window take; body = [loot typetag][bag handle]
-			CloseLootBag = 0x2044, // client closes the loot window; body = [loot typetag][bag handle]
-			TryLootCash = 0x2045, // loot the bag's coins; body = [loot typetag][bag handle]; fires on every loot (1:1 with TryLootAll)
-			TryLootItem = 0x2046, // single drag-out; body = [loot typetag][bag handle][u32 itemIndex][0000c350][playerHandle][0000000a]
-			PerformSpecialAction = 0x205A,
-			DoSkillSellback = 0x205C,
-			PlayStockphraseAsSubtitle = 0x205E,
-			CinematicTransition = 0x205F, // heavy in the create flow (the post-205F follow-up gate)
-			MoveTradeItemInternal = 0x206A, // (was "request change map(?)" - the old guess predates the table)
-			RequestShortcutBar = 0x206D, // sent at login
-			AddShortcut = 0x206E, // drag an item/ability onto the hotbar; body = [u32 type][u32 slot][u32 targetId][u32 0]
-			UpdateShortcut = 0x206F, // body = [u32 barPageSlot][u32 flag(0/1)][u32 container=0x68 backpack] (#71)
-			RemoveShortcut = 0x2071, // body = [u32 slot]
-			GetInstanceListForCurrentPlayfield = 0x207B, // the 'Select instance' button
-			SetHideInspectOption = 0x207E,
-			LatencyCheck = 0x2085 // GameCharAgent.Ping (client 0x2085 -> server 0x2082)
-		}
 
 		// The behavior-nickname GameServerRespondOpcodes enum was RETIRED (2026-06-16): every s2c send now uses the
 		// recovered per-class dispatch enum below (values are byte-identical, so the wire is unchanged and the
