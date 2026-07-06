@@ -76,6 +76,10 @@ namespace Faolan.GameServer
 		// item-grant/wallet ports. The loot Inbound cases delegate to it. See World/LootService.cs.
 		private readonly LootService _loot;
 
+		// Connection keep-alive / latency replies (LatencyCheck 0x2085 -> Pong, Ping 0x2005 -> GameServerStats).
+		// See World/KeepAliveService.cs.
+		private readonly KeepAliveService _keepAlive;
+
 		// The RDB Lua VM (conversation/quest scripting); stateless + reusable.
 		private readonly LuaScriptVm _luaVm = new LuaScriptVm();
 
@@ -136,6 +140,7 @@ namespace Faolan.GameServer
 				c => EnsureEnergyLoop(c)); // start the persistent energy tracking/regen loop
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
+			_keepAlive = new KeepAliveService();
 			_shortcutBar = new ShortcutBarService(database, logger);
 			_equipment = new EquipmentService(database, logger);
 			_itemUse = new ItemUseService(database, RecallToBindCommand, logger);
@@ -624,19 +629,7 @@ namespace Faolan.GameServer
 
 					case GameServerOpcodes.LatencyCheck: // latency check (client 0x2085 -> server 0x2082)
 					{
-						var counter = packet.Body.ReadUInt32();
-
-						// Retail reply body = [counter echoed][0x00000012][server tick]. The tick is a monotonically
-						// increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s latency interval, ms
-						// precision). Sent on the GameCharAgent conversation sub-id 0x08 with headerData 0x01.
-						var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
-
-						await new PacketStream()
-							.WriteHeader(LatencyResponseSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
-							.WriteUInt32(counter)
-							.WriteUInt32(0x00000012)
-							.WriteUInt32(tick)
-							.SendAsync(client);
+						await _keepAlive.HandleLatencyCheck(client, packet);
 
 						break;
 					}
@@ -711,15 +704,7 @@ namespace Faolan.GameServer
 
 					case GameServerOpcodes.Ping: // client 0x2005 (empty) -> server Pong 0x2009
 					{
-						// Reply on the GameAgent conversation sub-id 0x08. Body = [float][0][0]; retail's leading
-						// float is a varying server-load/fps metric (~80-83 in dumps) - we have no equivalent, so a
-						// fixed plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
-						await new PacketStream()
-							.WriteHeader(PingResponseSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchGameServerStats)
-							.WriteUInt32(0x42B32A07)
-							.WriteUInt32(0)
-							.WriteUInt32(0)
-							.SendAsync(client);
+						await _keepAlive.HandlePing(client);
 
 						break;
 					}
