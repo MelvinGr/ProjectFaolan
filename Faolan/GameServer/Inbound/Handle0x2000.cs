@@ -65,9 +65,7 @@ namespace Faolan.GameServer
                     {
                         if (IsRetailCreateEditorFlow(client))
                         {
-                            Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}, pendingReady={PendingReady}.",
-                                client.Session.HasPendingPost205FFollowUp,
-                                client.Session.HasPendingCreateEditorReadyFollowUp);
+                            Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}.", client.Session.HasPendingPost205FFollowUp);
                             break;
                         }
 
@@ -927,50 +925,11 @@ namespace Faolan.GameServer
                     client.Session.CreateEditorTempInstanceCount = 0;
                 }
             }
-            else if (client.Session.HasPendingCreateEditorReadyFollowUp)
-            {
-                if (requestId.HasValue && !client.Session.CreateEditorReadyRequestIds.Contains(requestId.Value))
-                    client.Session.CreateEditorReadyRequestIds.Add(requestId.Value);
-
-                Logger.LogInformation("Queued create-editor post-ready instance-echo #{Count}; uniqueRequestIds={UniqueCount}.", client.Session.CreateEditorTempInstanceCount, client.Session.CreateEditorReadyRequestIds.Count);
-
-                // Retail waits for at least one post-ready echo before sending the 0x2024 / 0x864CFEF8 /
-                // 0xF508F4C1 follow-up; the live client can stall before the full 5-id burst, so flush on the
-                // first decoded post-ready request and let later standalone ones flow through the ack path.
-                if (requestId.HasValue)
-                {
-                    Logger.LogInformation("Flushing create-editor post-ready burst using observed request ids [{RequestIds}].", string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
-                    await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
-                    client.Session.HasPendingCreateEditorReadyFollowUp = false;
-                    client.Session.CreateEditorTempInstanceCount = 0;
-                    client.Session.CreateEditorReadyRequestIds.Clear();
-                }
-            }
             else if (requestId.HasValue)
             {
-                // Break the create-editor DEADLOCK. Retail's client sends its own ReadyForPlayScreen once the editor
-                // scene finishes loading, which arms HasPendingCreateEditorReadyFollowUp and flushes the post-ready
-                // burst (the 0x2024 + the 0xA36D3B74 "NEW_character_creation" script that actually LAUNCHES the editor).
-                // Our live client never reaches that point - it just re-echoes its preview instances (e.g. 9FF92-96)
-                // forever while we only ack them, so the editor never appears (black/loading screen). So once the
-                // post-0x205F burst has flushed and the client has settled into re-echoing a few distinct preview
-                // instances, flush the post-ready burst OURSELVES (once) to launch the editor.
-                if (client.Session.HasFlushedCreateWorldEntryBurst && !client.Session.HasFlushedCreateEditorPostReady)
-                {
-                    if (!client.Session.CreateEditorReadyRequestIds.Contains(requestId.Value))
-                        client.Session.CreateEditorReadyRequestIds.Add(requestId.Value);
-
-                    if (client.Session.CreateEditorReadyRequestIds.Count >= 3)
-                    {
-                        Logger.LogInformation("Create-editor deadlock breaker: client never sent ReadyForPlayScreen; proactively flushing the post-ready burst using observed request ids [{RequestIds}].",
-                            string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
-                        await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
-                        client.Session.HasFlushedCreateEditorPostReady = true;
-                        client.Session.CreateEditorReadyRequestIds.Clear();
-                        return;
-                    }
-                }
-
+                // A standalone create-editor instance-echo (the post-0x205F burst already flushed): just ack it. The
+                // post-READY burst that launches the editor is sent DIRECTLY from the CharInPlayIIR handler (retail's
+                // f90 -> f95), so there is no echo-count deferral or deadlock-breaker here.
                 Logger.LogInformation("Acknowledging standalone create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
                 await CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId.Value);
             }

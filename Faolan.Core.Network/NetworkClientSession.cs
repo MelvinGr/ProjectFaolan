@@ -14,7 +14,6 @@ namespace Faolan.Core.Network
 		bool HasFlushedCreateEditorPostReady { get; set; }
 
 		bool HasFlushedCreateWorldEntryBurst { get; set; }
-		bool HasPendingCreateEditorReadyFollowUp { get; set; }
 		bool HasPendingPost205FFollowUp { get; set; }
 
 		// True on the character-creator (editor) GameServer connection: set in the Hello handler when a
@@ -73,7 +72,6 @@ namespace Faolan.Core.Network
 		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
 		int SpellweaveBuffStack { get; set; }
 		List<uint> CreateEditorObservedRequestIds { get; }
-		List<uint> CreateEditorReadyRequestIds { get; }
 
 		List<uint> WeaveComponents { get; }
 
@@ -137,7 +135,6 @@ namespace Faolan.Core.Network
 		public bool EnergyLoopActive { get; set; }
 		public bool HasFlushedCreateEditorPostReady { get; set; }
 		public bool HasFlushedCreateWorldEntryBurst { get; set; }
-		public bool HasPendingCreateEditorReadyFollowUp { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
 		public bool IsCreateEditorConnection { get; set; }
 		public bool IsCreateWorldSession { get; set; }
@@ -156,7 +153,6 @@ namespace Faolan.Core.Network
 		public int NormalAttackAckPhase { get; set; }
 		public int SpellweaveBuffStack { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
-		public List<uint> CreateEditorReadyRequestIds { get; } = [];
 		public List<uint> WeaveComponents { get; } = [];
 		public string ConversationAnswerPath { get; set; }
 		public string ConversationNpcName { get; set; }
