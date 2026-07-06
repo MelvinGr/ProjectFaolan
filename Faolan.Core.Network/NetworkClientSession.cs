@@ -54,10 +54,6 @@ namespace Faolan.Core.Network
 		// that conversation routing keys on. Populated when the burst is replayed.
 		Dictionary<uint, string> SpawnedNpcNamesByHandle { get; }
 
-		// Live NPC entity handle -> max health (player-facing = the spawn's CharacterStats.health / 100), captured
-		// from the world-burst spawns. Combat seeds an NPC's vitals from this so its health bar matches what the
-		// client rendered from the spawn, instead of a flat placeholder. Populated alongside SpawnedNpcNamesByHandle.
-		Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; }
 
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
@@ -83,11 +79,6 @@ namespace Faolan.Core.Network
 		// model - Mode and Field3 were session-volatile counters, not branch ids; memory protocol_conversation_routing.)
 		string ConversationNpcName { get; set; }
 
-		// Name chosen in the character-creation editor (from the "TheNameIs" script callback).
-		// Stored separately from Character.Name so the create-editor flow (which gates on
-		// Character.Name == null) is not disturbed mid-stream. The eventual enter-world/commit step
-		// will promote this to the persisted character.
-		string PendingCharacterName { get; set; }
 
 		// The GameAgent sender instance the active conversation's packets use (retail varies it per conversation,
 		// e.g. 0x0a). The close must be sent from this SAME instance or the client won't match it to the dialogue
@@ -144,7 +135,6 @@ namespace Faolan.Core.Network
 		public Character Character { get; set; }
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
-		public Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; } = new Dictionary<uint, uint>();
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
@@ -153,7 +143,6 @@ namespace Faolan.Core.Network
 		public List<uint> WeaveComponents { get; } = [];
 		public string ConversationAnswerPath { get; set; }
 		public string ConversationNpcName { get; set; }
-		public string PendingCharacterName { get; set; }
 		public uint ConversationAgentInstance { get; set; }
 		public uint ConversationEndedNpcHandle { get; set; }
 		public uint ConversationNpcHandle { get; set; }

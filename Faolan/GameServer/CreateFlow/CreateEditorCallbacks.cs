@@ -99,9 +99,8 @@ namespace Faolan.GameServer.CreateFlow
 		//     deterministic trigger is "Finish + the morph batch drained", the ~350ms timer fakes that).
 		//   - TheNameIs -> NicknameOk / NicknameTaken / NicknameInvalid (SendNicknameAccepted/Rejected).
 		//
-		// The chosen name is captured into Session.PendingCharacterName rather than Character.Name, so the
-		// create-editor gating (which keys on Character.Name == null) is not disturbed mid-stream;
-		// promoting it to a persisted character is the separate enter-world step.
+		// TheNameIs commits the chosen name straight to the character row (CommitCharacterName); the
+		// create-editor gating keys on Character.Name so the commit is what promotes it out of the editor.
 		internal async Task HandleCommandPacket(INetworkClient client, ConanPacket packet)
 		{
 			var ack = packet.Body.ReadUInt32();
@@ -235,7 +234,6 @@ namespace Faolan.GameServer.CreateFlow
 					// separate connection/session that re-loads the character from the database) sees a
 					// named character and takes the normal world-entry path. The client may try several
 					// names (e.g. Stricken -> Strickennn -> Strickenen); the last one that sticks wins.
-					client.Session.PendingCharacterName = valueString;
 					var commit = await CommitCharacterName(client, valueString);
 
 					if (commit == NameCommitResult.Committed && client.Session.Character?.Name == valueString)

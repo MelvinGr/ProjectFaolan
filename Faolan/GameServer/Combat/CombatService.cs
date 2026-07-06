@@ -403,7 +403,9 @@ namespace Faolan.GameServer.Combat
             return _combat.GetOrAdd(targetHandle,
                 () =>
                 {
-                    var maxHealth = client.Session.SpawnedNpcMaxHealthByHandle.GetValueOrDefault(targetHandle, CombatResolver.DefaultNpcMaxHealth);
+                    // NPCs spawned via the world burst get their real vitals from the simulation; this fallback only
+                    // covers NPCs with no world entity (e.g. the built-NPC test), so a default max is correct.
+                    var maxHealth = CombatResolver.DefaultNpcMaxHealth;
                     return EntityVitals.FromMax(maxHealth, 0, maxHealth);
                 });
         }
