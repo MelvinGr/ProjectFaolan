@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -26,7 +26,7 @@ namespace Faolan.GameServer.World
 		public const byte ModePath = 0x01;
 		public const byte ModeStationary = 0x02;
 		public const int BodyLength = 57;
-		public const uint MoveTaskSubOpcode = (uint)GameServer0X2000RespondsOpcodes.MoveTaskIIR;
+		public const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
 		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
 
 		// mode-08: approach/face a target entity - [u16 0][from 3 floats][0x08][u32 0xC350 type][u32 targetHandle]

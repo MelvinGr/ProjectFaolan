@@ -1,6 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Combat
 {
@@ -68,7 +68,7 @@ namespace Faolan.GameServer.Combat
 		// The 0x7BD4 tail is constant across the captured burst.
 		public static byte[] BuildFireStage(uint caster, uint fireId)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR).WriteUInt32(Type).WriteUInt32(caster).WriteByte(0x01).WriteUInt32(fireId).WriteUInt32(0x00007BD4).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.StatIIR).WriteUInt32(Type).WriteUInt32(caster).WriteByte(0x01).WriteUInt32(fireId).WriteUInt32(0x00007BD4).ToArray();
 		}
 
 		// The reactive element list (CombatReactiveIIR 0x54C02089): declares to the client which weave elements the
@@ -79,7 +79,7 @@ namespace Faolan.GameServer.Combat
 		// pass 0 for a consumed slot to reproduce that. tag 0x01 is a constant "list active" flag.
 		public static byte[] BuildReactiveList(uint caster, uint[] elementBaseIds)
 		{
-			var stream = new FaolanStream().WriteUInt32(GameServer0X2000RespondsOpcodes.CombatReactiveIIR).WriteUInt32(Type).WriteUInt32(caster).WriteUInt32(0).WriteByte(0x01);
+			var stream = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.CombatReactiveIIR).WriteUInt32(Type).WriteUInt32(caster).WriteUInt32(0).WriteByte(0x01);
 
 			foreach (var element in elementBaseIds)
 				stream.WriteUInt32(element);
@@ -90,7 +90,7 @@ namespace Faolan.GameServer.Combat
 		public static byte[] BuildStatGauge(uint caster, uint token, int delta, uint gaugeId, uint scale)
 		{
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.StatDamageIIR)
+				.WriteUInt32(GameServer0X2000Opcodes.StatDamageIIR)
 				.WriteUInt32(Type)
 				.WriteUInt32(caster)
 				.WriteByte(0x00)

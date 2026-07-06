@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -21,7 +21,7 @@ namespace Faolan.GameServer.World
 	//   f6 = sub-message {f1=0, f2=0}.
 	public static class ScryScript
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.ScryScriptIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR;
 		public const uint TypeTagAck = EntityClass.Character;
 
 		// The no-token form: a StartScriptGroupOnClient (type 0) callback that runs a script group by id, with no

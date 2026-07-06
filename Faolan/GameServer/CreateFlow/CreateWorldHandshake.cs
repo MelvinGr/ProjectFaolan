@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -86,7 +86,7 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.ScryScriptIIR);
+					s.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR);
 					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteByte(0x00);
@@ -151,7 +151,7 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetMorphValueIIR);
+					s.WriteUInt32(GameServer0X2000Opcodes.SetMorphValueIIR);
 					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteUInt16(0);
@@ -174,7 +174,7 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetNameIIR);
+					s.WriteUInt32(GameServer0X2000Opcodes.SetNameIIR);
 					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteUInt32(0u);

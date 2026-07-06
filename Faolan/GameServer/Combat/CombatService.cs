@@ -8,8 +8,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.World;
@@ -211,7 +211,7 @@ namespace Faolan.GameServer.Combat
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
+					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 					.WriteUInt32(0x0000C350u)
 					.WriteUInt32(instance)
 					.WriteUInt16(next)
@@ -571,7 +571,7 @@ namespace Faolan.GameServer.Combat
 
 			using var s = new FaolanStream();
 			s
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
+				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 				.WriteUInt32(0x0000C350u)
 				.WriteUInt32(instance)
 				.WriteUInt16(seq + 1)

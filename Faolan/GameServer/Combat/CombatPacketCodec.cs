@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Combat
 {
@@ -18,8 +18,8 @@ namespace Faolan.GameServer.Combat
 	{
 		public const int DamageResultBodyLength = 37;
 		public const int EnergyBodyLength = 17;
-		public const uint DamageResultSubOpcode = (uint)GameServer0X2000RespondsOpcodes.DamageResultIIR;
-		public const uint EnergySubOpcode = (uint)GameServer0X2000RespondsOpcodes.EnergyIIR;
+		public const uint DamageResultSubOpcode = (uint)GameServer0X2000Opcodes.DamageResultIIR;
+		public const uint EnergySubOpcode = (uint)GameServer0X2000Opcodes.EnergyIIR;
 
 		// The NormalAttack behaviorId carried by an attack BehaviorControlCenterIIR.
 		private const uint NormalAttackBehaviorId = 0x0000000F;
@@ -90,7 +90,7 @@ namespace Faolan.GameServer.Combat
 				.ToArray();
 
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
+				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 				.WriteUInt32(SpellTargetTypeWord)
 				.WriteUInt32(npcHandle)
 				.WriteUInt16(NpcAttackAckSeq)

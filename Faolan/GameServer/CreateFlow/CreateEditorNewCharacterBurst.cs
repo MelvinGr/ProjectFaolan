@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.CreateFlow
 {
@@ -45,7 +45,7 @@ namespace Faolan.GameServer.CreateFlow
 			aBuffer = new PacketStream();
 			aBuffer.WriteHeader(Sender2, Receiver2, GameInterfaceDispatchOpcodes.DispatchPassBlob);
 			aBuffer.WriteUInt32(0x00000089);
-			aBuffer.WriteUInt32(GameServer0X2000RespondsOpcodes.GameActionListIIR);
+			aBuffer.WriteUInt32(GameServer0X2000Opcodes.GameActionListIIR);
 			aBuffer.WriteUInt32(0x0000c350);
 			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData81);

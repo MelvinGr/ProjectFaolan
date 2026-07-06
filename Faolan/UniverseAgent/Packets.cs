@@ -1,22 +1,15 @@
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.UniverseAgent
 {
 	partial class UniverseAgentListener
 	{
 		private static readonly byte[] Sender = [0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01];
-
-		public enum InvalidLoginReasons : byte
-		{
-			InternalSystemError = 0x04,
-			InvalidLogin = 0x0e,
-			AccountFrozen = 0x17
-		}
-
 		private Task SendPlayerAgentRealm(INetworkClient client)
 		{
 			return new PacketStream()

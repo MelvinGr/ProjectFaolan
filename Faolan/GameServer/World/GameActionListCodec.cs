@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -23,7 +23,7 @@ namespace Faolan.GameServer.World
 	{
 		public const uint ConstFour = 4;
 		public const uint Head = 0x000007E2;
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.GameActionListIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
 		public const ulong ConstOne = 1;
 		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
 

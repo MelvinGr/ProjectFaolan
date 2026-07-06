@@ -1,5 +1,5 @@
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.Core.Network.AgentServer
 {

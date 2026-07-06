@@ -1,7 +1,7 @@
 ﻿using System;
 using Faolan.Core.Network.Conan;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network
 {
 	namespace Opcodes
 	{
@@ -172,12 +172,223 @@ namespace Faolan.Core.Network.Packets
 			Ox20D0 = 0x20D0
 		}
 
-
-		// s2c sends use the recovered per-class dispatch enums below (GameInterfaceDispatchOpcodes /
-		// GameCharInterfaceDispatchOpcodes / CSPlayerInterfaceDispatchOpcodes). The old behavior-nickname
-		// GameServerRespondOpcodes enum was retired 2026-06-16 (its values were byte-identical); see git for
-		// the nickname -> recovered-name map.
-
+		// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.
+		// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
+		// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
+		public enum CSPlayerInterfaceDispatchOpcodes : ushort
+		{
+			DispatchAuthenticateAck = 0x2000,
+			DispatchTeamInvite = 0x2001,
+			DispatchTargetIsBusy = 0x2002,
+			DispatchTargetIsCriminal = 0x2003,
+			DispatchTeamCharacterApplied = 0x2004,
+			DispatchYouAlreadySentRequest = 0x2005,
+			DispatchTargetIsAlreadyInTeam = 0x2006,
+			DispatchTeamInvitationTimedOut = 0x2007,
+			DispatchTargetDeclinedTeamInvite = 0x2008,
+			DispatchYouAreNoLongerInvited = 0x2009,
+			DispatchYouInvitedToTeam = 0x200A,
+			DispatchInviteWithInviterFactionPoints = 0x200B,
+			DispatchExtendedCharacterInfo = 0x200C,
+			DispatchExtendedCharacterInfoNotFound = 0x200D,
+			DispatchYouJoinedTeam = 0x200E,
+			DispatchTeamSearchResult = 0x200F,
+			DispatchCharacterSearchResult = 0x2010,
+			DispatchCharacterNameSearchResult = 0x2011,
+			DispatchTeamLeave = 0x2012,
+			DispatchTeamJoin = 0x2013,
+			DispatchTeamMemberUpdate = 0x2014,
+			DispatchTeamDisband = 0x2015,
+			DispatchSetNewTeamLeader = 0x2016,
+			DispatchTeamLootOptionChanged = 0x2017,
+			DispatchTeamMasterLooterChanged = 0x2018,
+			DispatchTeamSummonRequest = 0x2019,
+			DispatchTeamSummonTimedOut = 0x201A,
+			DispatchYouAreNoLongerSummoned = 0x201B,
+			DispatchTeamSummonRequestDeclined = 0x201C,
+			DispatchTeamSummonRequestAccepted = 0x201D,
+			DispatchTeamSummonRequestFailedInvalidPF = 0x201E,
+			DispatchTeamSummonRequestFailedAlreadyInSameInstance = 0x201F,
+			DispatchWarningTeamSizeTooLarge = 0x2020,
+			Reserved0x2021 = 0x2021,
+			DispatchYouGotKickedFromTeam = 0x2022,
+			DispatchVoteKickStarted = 0x2023,
+			DispatchVoteKickFailed = 0x2024,
+			DispatchVoteKickEnded = 0x2025,
+			DispatchCharacterLookingForTeamStatus = 0x2026,
+			DispatchTeamLookingForMemberStatus = 0x2027,
+			DispatchDeleteCanceledMail = 0x2028,
+			DispatchDeleteCanceledMailItem = 0x2029,
+			DispatchGuildInvite = 0x202A,
+			Reserved0x202B = 0x202B,
+			Reserved0x202C = 0x202C,
+			Reserved0x202D = 0x202D,
+			DispatchGuildMemberLeft = 0x202E,
+			DispatchGuildMemberJoined = 0x202F,
+			DispatchGuildMemberUpdate = 0x2030,
+			DispatchGuildInviteReplyToInviter = 0x2031,
+			DispatchGuildGMPromoteFeedback = 0x2032,
+			DispatchGuildGMDemoteFeedback = 0x2033,
+			DispatchGuildInviteNoSuchName = 0x2034,
+			Reserved0x2035 = 0x2035,
+			DispatchGuildPvPPointInfo = 0x2036,
+			DispatchGuildRenownInfo = 0x2037,
+			DispatchGuildRankingsUpdate = 0x2038,
+			DispatchGuildRenownHistoryUpdate = 0x2039,
+			DispatchClientAddGuildRenown = 0x203A,
+			DispatchInformAboutRankings = 0x203B,
+			DispatchInformAboutRankingWinners = 0x203C,
+			DispatchRankingCaluculationCountdown = 0x203D,
+			DispatchPersonalRenownCapReached = 0x203E,
+			DispatchGuildUpdate = 0x203F,
+			DispatchGuildRenownUpdate = 0x2040,
+			DispatchGuildName = 0x2041,
+			DispatchGuildUpdateMember = 0x2042,
+			DispatchGuildUpdateOther = 0x2043,
+			DispatchGuildCreated = 0x2044,
+			DispatchGuildNonAlphanumericName = 0x2045,
+			Reserved0x2046 = 0x2046,
+			Reserved0x2047 = 0x2047,
+			DispatchGuildBadName = 0x2048,
+			DispatchGuildNameWaitTime = 0x2049,
+			Reserved0x204A = 0x204A,
+			Reserved0x204B = 0x204B,
+			Reserved0x204C = 0x204C,
+			Reserved0x204D = 0x204D,
+			DispatchGuildOnInviteCooldown = 0x204E,
+			Reserved0x204F = 0x204F,
+			DispatchGuildTaxError = 0x2050,
+			DispatchGuildInvalidGoverningForm = 0x2051,
+			DispatchGuildUpdateCash = 0x2052,
+			Reserved0x2053 = 0x2053,
+			DispatchGuildTaxChanged = 0x2054,
+			DispatchGuildGoverningFormChanged = 0x2055,
+			DispatchGuildRecruitmentModeChanged = 0x2056,
+			DispatchGuildMessageOfTheDayChanged = 0x2057,
+			Reserved0x2058 = 0x2058,
+			DispatchGuildNameChanged = 0x2059,
+			DispatchGMGuildNameChanged = 0x205A,
+			DispatchGuildMemberList = 0x205B,
+			DispatchGuildSearchResult = 0x205C,
+			DispatchGuildSetPvPPoints = 0x205D,
+			DispatchGuildSetPvPKillPoints = 0x205E,
+			DispatchGuildSetPvPTotalKills = 0x205F,
+			DispatchGuildSetPvPSeasonalKills = 0x2060,
+			DispatchGuildSetGuildWar = 0x2061,
+			DispatchGuildSetGuildAsDefenderOfWar = 0x2062,
+			DispatchAddGuildFeat = 0x2063,
+			DispatchRemoveGuildFeat = 0x2064,
+			DispatchGuildRankChanged = 0x2065,
+			DispatchGuildApplicationRequest = 0x2066,
+			Reserved0x2067 = 0x2067,
+			DispatchGuildApplicationRejected = 0x2068,
+			DispatchGuildMergeRequest = 0x2069,
+			DispatchGuildMergeRequestFailed = 0x206A,
+			DispatchGuildCityBooked = 0x206B,
+			DispatchGuildCityBookingFailed = 0x206C,
+			DispatchNewVulnerabilityWindowData = 0x206D,
+			Reserved0x206E = 0x206E,
+			DispatchGuildIsMassivePvPCityOwner = 0x206F,
+			DispatchGuildIsMassivePvPCityAttacker = 0x2070,
+			DispatchFeedbackMessage = 0x2071,
+			DispatchRequestBattleKeepInformation = 0x2072,
+			DispatchGMReplyGuildInfoFromChar = 0x2073,
+			Reserved0x2074 = 0x2074,
+			DispatchPvPMatchMakingWantsToStart = 0x2075,
+			DispatchPvPMatchMakingPlayerJoined = 0x2076,
+			DispatchPvPMatchMakingPlayerChangedSide = 0x2077,
+			DispatchPvPMatchMakingPlayerLeft = 0x2078,
+			DispatchPvPMatchMakingPlayerKicked = 0x2079,
+			DispatchPvPMatchMakingErrorCode = 0x207A,
+			DispatchPvPMatchMakingYouJoinedMatch = 0x207B,
+			Reserved0x207C = 0x207C,
+			DispatchPvPMatchMakingMatchInfo = 0x207D,
+			DispatchPvPMatchMakingSearchResult = 0x207E,
+			DispatchPvPMatchMakingStartClicked = 0x207F,
+			DispatchPvPMatchMakingYouAreInMatchMaking = 0x2080,
+			Reserved0x2081 = 0x2081,
+			Reserved0x2082 = 0x2082,
+			DispatchPvPMatchMakingMatchSay = 0x2083,
+			DispatchPvPMatchMakingCollectingMorePlayers = 0x2084,
+			DispatchPvPMatchMakingNewMatchLeader = 0x2085,
+			DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking = 0x2086,
+			Reserved0x2087 = 0x2087,
+			Reserved0x2088 = 0x2088,
+			DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide = 0x2089,
+			DispatchPvPMatchMakingCantLockToSideMustPickASideFirst = 0x208A,
+			DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide = 0x208B,
+			DispatchPvPMatchMakingCharacterNowLockedToSide = 0x208C,
+			DispatchPvPMatchMakingCharacterNoLongerLockedToSide = 0x208D,
+			Reserved0x208E = 0x208E,
+			Reserved0x208F = 0x208F,
+			Reserved0x2090 = 0x2090,
+			Reserved0x2091 = 0x2091,
+			DispatchPvPMatchMakingInfoRequestReturn = 0x2092,
+			DispatchYouJoinedRaid = 0x2093,
+			DispatchRaidTeamJoined = 0x2094,
+			DispatchRaidTeamLeft = 0x2095,
+			DispatchRaidTeamUpdate = 0x2096,
+			DispatchRaidCharacterUpdate = 0x2097,
+			DispatchRaidNewRaidLeader = 0x2098,
+			DispatchRaidLootOptionChanged = 0x2099,
+			DispatchRaidNewMasterLooter = 0x209A,
+			DispatchRaidInvite = 0x209B,
+			DispatchRaidTargetIsBusy = 0x209C,
+			DispatchRaidIsAlreadyInRaid = 0x209D,
+			DispatchRaidInvitationTimedOut = 0x209E,
+			DispatchRaidTargetDeclinedRaidInvite = 0x209F,
+			DispatchRaidYouAreNoLongerInvited = 0x20A0,
+			Reserved0x20A1 = 0x20A1,
+			DispatchRaidCantInviteInvalidSubscriptionFlags = 0x20A2,
+			Reserved0x20A3 = 0x20A3,
+			DispatchRaidCantCreateInvalidMemberSubscriptionFlags = 0x20A4,
+			DispatchMassivePvpInfoRequestReturn = 0x20A5,
+			DispatchMassivePvPBattleQueueFeedback = 0x20A6,
+			DispatchMassivePvpStartCountDown = 0x20A7,
+			DispatchMassivePvpBattleQueueStatusUpdate = 0x20A8,
+			DispatchBattleKeepInfoRequestReturnPhase1And2 = 0x20A9,
+			DispatchBattleKeepInfoRequestReturnPhase3And4 = 0x20AA,
+			DispatchYouGotMailNotification = 0x20AB,
+			Reserved0x20AC = 0x20AC,
+			DispatchDebugFullGameServerList = 0x20AD,
+			DispatchDebugGameServerConnected = 0x20AE,
+			DispatchDebugGameServerDisconnected = 0x20AF,
+			DispatchDebugClientConnected = 0x20B0,
+			DispatchDebugClientChanged = 0x20B1,
+			DispatchDebugClientDisconnected = 0x20B2,
+			DispatchDebugFullClientList = 0x20B3,
+			DispatchDebugFullTeamListBurst = 0x20B4,
+			DispatchDebugAddTeam = 0x20B5,
+			DispatchDebugRemoveTeam = 0x20B6,
+			DispatchDebugUpdateTeam = 0x20B7,
+			DispatchDebugFullMatchListBurst = 0x20B8,
+			DispatchDebugAddMatch = 0x20B9,
+			DispatchDebugMatchChanged = 0x20BA,
+			DispatchDebugRemoveMatch = 0x20BB,
+			DispatchDebugAddIDToMatchMaking = 0x20BC,
+			DispatchDebugRemoveIDFromMatchMaking = 0x20BD,
+			DispatchItemSalesUpdateBalance = 0x20BE,
+			DispatchItemSalesCoupons = 0x20BF,
+			Reserved0x20C0 = 0x20C0,
+			DispatchCSFeedback = 0x20C1,
+			DispatchGroupFinderSignupFailed = 0x20C2,
+			Reserved0x20C3 = 0x20C3,
+			DispatchGroupFinderSignupSuccess = 0x20C4,
+			DispatchGroupFinderRemoved = 0x20C5,
+			DispatchGroupFinderReadyCheck = 0x20C6,
+			Reserved0x20C7 = 0x20C7,
+			Reserved0x20C8 = 0x20C8,
+			DispatchGroupFinderReadyCheckStatus = 0x20C9,
+			DispatchGroupFinderReadyCheckRejected = 0x20CA,
+			DispatchGroupFinderPlayfieldInfo = 0x20CB,
+			DispatchGroupFinderFeaturedPlayfieldInfo = 0x20CC,
+			DispatchGroupFinderFeaturedRaidNeededRoleUpdated = 0x20CD,
+			DispatchGroupFinderReceivedNeededRole = 0x20CE,
+			DispatchGroupFinderReceivedRotatingActivityChildInfo = 0x20CF,
+			DispatchGroupFinderUpdateFeaturedActivities = 0x20D0,
+			DispatchReturnWorldStat = 0x20D1,
+			DispatchInvalidWorldStat = 0x20D2
+		}
 
 		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from
 		// --- docs/aoc-client-rpc-methods.json (opcode = 0x2000 + table position). Most are not handled yet;
@@ -392,41 +603,6 @@ namespace Faolan.Core.Network.Packets
 			RunLua = 0x20A8
 		}
 
-		// The 0x2000 sub-opcodes the GameServer HANDLES (client->server). These are the same IIR ids as
-		// GameServer0X2000RespondsOpcodes (the full catalog); kept as a separate handler-facing enum with the
-		// descriptive names the handler switch reads by, with the real client IIR type noted per line.
-		public enum GameServer0X2000Opcodes : uint
-		{
-			Interact = 0x642CD3D6, // = BehaviorControlCenterIIR_c: generic action channel (world-object interaction, spells, right-click, inventory/equipment)
-			CombatReactiveIIR = 0x54C02089, // = CombatReactiveIIR_c: spellweave add-component (c2s) - the caster combo (docs/combos.md)
-			CloseGame = 0x6B6FD368, // = CharacterActionIIR_t
-			ReadyForPlayScreen = 0x864CFEF8, // = CharInPlayIIR_t
-			Move = 0x4517AA81, // = CharDCMoveIIR_t
-			ScryScriptIIR = 0xA36D3B74, // = ScryScriptIIR_c: cutscene/scry scripts + char-editor callbacks (IntroDone, ChangeSex, TheNameIs, ClientLoadingDone, ...)
-			StatIIR = 0xF98E10B3, // = StatIIR_t
-			SelectDeselect = 0x0D155695, // = LookAtIIR_t
-			QueuePetCommand = 0x205B, // GameCharAgent method (16-bit opcode, >=0x2014): the pet command bar - body [type][petHandle][PetCommand] (#307)
-			TradeskillRequestIIR = 0x06B9CD94, // = TradeskillRequestIIR_c: client opened the Crafting->Recipes book; asks for its known-recipe list (reply = TradeskillReplyIIR 0x9062D559)
-			KnubotAnswer = 0x4D7D9123, // = KnubotAnswerIIR_c: the player picked a dialogue option (NPC chat); advances the conversation one stage
-
-			KnubotCloseChatWindow =
-				0xC4AF39EB, // = KnubotCloseChatWindowIIR_c: the player closed the NPC chat window (ESC/X). The client double-sends it; the server just tears down its conversation state (#217). Same IIR type the server sends to close the window s2c.
-			DropItem = 0x72491DE9, // = DeleteItemIIR_t: client-side inventory action; no matching bag-content response packet is decoded yet
-			MoveItemInInventory = 0x2A8A1B49, // = MoveInventoryItemIIR_t: client-side slot move action
-			DeleteQuest = 0x97E02314, // = QuestIIR_c
-			InventoryClaimsButton = 0x06EC1255 // = CoreClaimIIR: tiny post-ready/request-side packet, not actual bag contents
-		}
-
-		// The `command` word of a QueuePetCommand (0x205B) packet - the pet command bar (#307, docs/summon-pet-decode.md).
-		// Confirmed from the necro-pet capture (chat-annotated): Defend (0x1F6) and Dismiss (0x1F8). The other stance
-		// buttons (attack / follow / stay / aggressive / defensive / passive) are the neighbouring 0x1Fx codes - add
-		// them as captured.
-		public enum PetCommand : uint
-		{
-			Defend = 0x1F6, // "defend" - the pet guards the owner
-			Dismiss = 0x1F8 // dismiss the pet (server despawns it + sends PetIIR mode-1)
-		}
-
 		// Every 32-bit sub-opcode carried inside a 0x2000 packet is an "IIR" (Incremental Information Replication)
 		// message id = the BKDR-31 hash of the client's IIR C++ type name (h = h*31 + c; == Java String.hashCode),
 		// recovered by RE'ing AgeOfConan.exe (docs/archive/opcode-re-plan.md + docs/aoc-opcode-ids.md). Members are named
@@ -434,7 +610,7 @@ namespace Faolan.Core.Network.Packets
 		// the occurrence count across all captures. This is the full catalog of every IIR id observed on the wire
 		// (server->client AND client->server - the id is the message type, direction-independent), even ones the
 		// server doesn't emit yet. The few descriptive aliases the server code uses are at the bottom.
-		public enum GameServer0X2000RespondsOpcodes : uint
+		public enum GameServer0X2000Opcodes : uint
 		{
 			AreaFormulaIIR = 0xCE30BE4E, // AreaFormulaIIR_t  (x42)
 			BankIIR = 0x0BA1C1CB, // BankIIR_t  (x3)
@@ -459,6 +635,7 @@ namespace Faolan.Core.Network.Packets
 			FormatFeedbackIIR = 0x8D5A8B6B, // FormatFeedbackIIR_t  (x68)
 			FullPlayerCharacterIIR = 0x737A6DF9, // FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below
 			GameActionListIIR = 0xF508F4C1, // GameActionListIIR_t  (x366)
+			TradeskillRequestIIR = 0x06B9CD94, // TradeskillRequestIIR_c - recipe-book REQUEST (client opened Crafting->Recipes); reply = TradeskillReplyIIR
 			TradeskillReplyIIR = 0x9062D559, // TradeskillReplyIIR_c - the recipe-book list (reply to TradeskillRequestIIR 0x06B9CD94)
 			GameTimeIIR = 0x4F57DC08, // GameTimeIIR_t  (x33) - "SetDayTime"
 			GuildUpdateIIR = 0x2550C99A, // GuildUpdateIIR_c  (x3)
@@ -509,6 +686,7 @@ namespace Faolan.Core.Network.Packets
 			N3TeleportIIR = 0x5A32F0D7, // n3TeleportIIR_t  (x27) - teleport
 			N3ToClientFadeIIR = 0x66180B20, // n3ToClientFadeIIR_t  (x87) - screen fade
 			N3ToClientQuitIIR = 0x04B82B2D, // n3ToClientQuitIIR_t  (x3249)
+			QueuePetCommand = 0x205B // NOT an IIR hash: the pet command bar (#307) rides the 0x2000 carrier carrying the 16-bit GameCharAgentOpcodes.QueuePetCommand; kept here for Handle0X2000's switch
 
 			// FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization carve-out (nested 101/104/112/113
 			// container blocks, 83-byte item tails): the RE notes live in docs/fullplayer-snapshot-reader.md.
@@ -810,224 +988,6 @@ namespace Faolan.Core.Network.Packets
 			DispatchOnFacebookFriendSignedUp = 0x20B2,
 			DispatchRequestGetEffect = 0x20B3,
 			DispatchSignalWorldStatChanged = 0x20B4
-		}
-
-		// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.
-		// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
-		// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
-		public enum CSPlayerInterfaceDispatchOpcodes : ushort
-		{
-			DispatchAuthenticateAck = 0x2000,
-			DispatchTeamInvite = 0x2001,
-			DispatchTargetIsBusy = 0x2002,
-			DispatchTargetIsCriminal = 0x2003,
-			DispatchTeamCharacterApplied = 0x2004,
-			DispatchYouAlreadySentRequest = 0x2005,
-			DispatchTargetIsAlreadyInTeam = 0x2006,
-			DispatchTeamInvitationTimedOut = 0x2007,
-			DispatchTargetDeclinedTeamInvite = 0x2008,
-			DispatchYouAreNoLongerInvited = 0x2009,
-			DispatchYouInvitedToTeam = 0x200A,
-			DispatchInviteWithInviterFactionPoints = 0x200B,
-			DispatchExtendedCharacterInfo = 0x200C,
-			DispatchExtendedCharacterInfoNotFound = 0x200D,
-			DispatchYouJoinedTeam = 0x200E,
-			DispatchTeamSearchResult = 0x200F,
-			DispatchCharacterSearchResult = 0x2010,
-			DispatchCharacterNameSearchResult = 0x2011,
-			DispatchTeamLeave = 0x2012,
-			DispatchTeamJoin = 0x2013,
-			DispatchTeamMemberUpdate = 0x2014,
-			DispatchTeamDisband = 0x2015,
-			DispatchSetNewTeamLeader = 0x2016,
-			DispatchTeamLootOptionChanged = 0x2017,
-			DispatchTeamMasterLooterChanged = 0x2018,
-			DispatchTeamSummonRequest = 0x2019,
-			DispatchTeamSummonTimedOut = 0x201A,
-			DispatchYouAreNoLongerSummoned = 0x201B,
-			DispatchTeamSummonRequestDeclined = 0x201C,
-			DispatchTeamSummonRequestAccepted = 0x201D,
-			DispatchTeamSummonRequestFailedInvalidPF = 0x201E,
-			DispatchTeamSummonRequestFailedAlreadyInSameInstance = 0x201F,
-			DispatchWarningTeamSizeTooLarge = 0x2020,
-			Reserved0x2021 = 0x2021,
-			DispatchYouGotKickedFromTeam = 0x2022,
-			DispatchVoteKickStarted = 0x2023,
-			DispatchVoteKickFailed = 0x2024,
-			DispatchVoteKickEnded = 0x2025,
-			DispatchCharacterLookingForTeamStatus = 0x2026,
-			DispatchTeamLookingForMemberStatus = 0x2027,
-			DispatchDeleteCanceledMail = 0x2028,
-			DispatchDeleteCanceledMailItem = 0x2029,
-			DispatchGuildInvite = 0x202A,
-			Reserved0x202B = 0x202B,
-			Reserved0x202C = 0x202C,
-			Reserved0x202D = 0x202D,
-			DispatchGuildMemberLeft = 0x202E,
-			DispatchGuildMemberJoined = 0x202F,
-			DispatchGuildMemberUpdate = 0x2030,
-			DispatchGuildInviteReplyToInviter = 0x2031,
-			DispatchGuildGMPromoteFeedback = 0x2032,
-			DispatchGuildGMDemoteFeedback = 0x2033,
-			DispatchGuildInviteNoSuchName = 0x2034,
-			Reserved0x2035 = 0x2035,
-			DispatchGuildPvPPointInfo = 0x2036,
-			DispatchGuildRenownInfo = 0x2037,
-			DispatchGuildRankingsUpdate = 0x2038,
-			DispatchGuildRenownHistoryUpdate = 0x2039,
-			DispatchClientAddGuildRenown = 0x203A,
-			DispatchInformAboutRankings = 0x203B,
-			DispatchInformAboutRankingWinners = 0x203C,
-			DispatchRankingCaluculationCountdown = 0x203D,
-			DispatchPersonalRenownCapReached = 0x203E,
-			DispatchGuildUpdate = 0x203F,
-			DispatchGuildRenownUpdate = 0x2040,
-			DispatchGuildName = 0x2041,
-			DispatchGuildUpdateMember = 0x2042,
-			DispatchGuildUpdateOther = 0x2043,
-			DispatchGuildCreated = 0x2044,
-			DispatchGuildNonAlphanumericName = 0x2045,
-			Reserved0x2046 = 0x2046,
-			Reserved0x2047 = 0x2047,
-			DispatchGuildBadName = 0x2048,
-			DispatchGuildNameWaitTime = 0x2049,
-			Reserved0x204A = 0x204A,
-			Reserved0x204B = 0x204B,
-			Reserved0x204C = 0x204C,
-			Reserved0x204D = 0x204D,
-			DispatchGuildOnInviteCooldown = 0x204E,
-			Reserved0x204F = 0x204F,
-			DispatchGuildTaxError = 0x2050,
-			DispatchGuildInvalidGoverningForm = 0x2051,
-			DispatchGuildUpdateCash = 0x2052,
-			Reserved0x2053 = 0x2053,
-			DispatchGuildTaxChanged = 0x2054,
-			DispatchGuildGoverningFormChanged = 0x2055,
-			DispatchGuildRecruitmentModeChanged = 0x2056,
-			DispatchGuildMessageOfTheDayChanged = 0x2057,
-			Reserved0x2058 = 0x2058,
-			DispatchGuildNameChanged = 0x2059,
-			DispatchGMGuildNameChanged = 0x205A,
-			DispatchGuildMemberList = 0x205B,
-			DispatchGuildSearchResult = 0x205C,
-			DispatchGuildSetPvPPoints = 0x205D,
-			DispatchGuildSetPvPKillPoints = 0x205E,
-			DispatchGuildSetPvPTotalKills = 0x205F,
-			DispatchGuildSetPvPSeasonalKills = 0x2060,
-			DispatchGuildSetGuildWar = 0x2061,
-			DispatchGuildSetGuildAsDefenderOfWar = 0x2062,
-			DispatchAddGuildFeat = 0x2063,
-			DispatchRemoveGuildFeat = 0x2064,
-			DispatchGuildRankChanged = 0x2065,
-			DispatchGuildApplicationRequest = 0x2066,
-			Reserved0x2067 = 0x2067,
-			DispatchGuildApplicationRejected = 0x2068,
-			DispatchGuildMergeRequest = 0x2069,
-			DispatchGuildMergeRequestFailed = 0x206A,
-			DispatchGuildCityBooked = 0x206B,
-			DispatchGuildCityBookingFailed = 0x206C,
-			DispatchNewVulnerabilityWindowData = 0x206D,
-			Reserved0x206E = 0x206E,
-			DispatchGuildIsMassivePvPCityOwner = 0x206F,
-			DispatchGuildIsMassivePvPCityAttacker = 0x2070,
-			DispatchFeedbackMessage = 0x2071,
-			DispatchRequestBattleKeepInformation = 0x2072,
-			DispatchGMReplyGuildInfoFromChar = 0x2073,
-			Reserved0x2074 = 0x2074,
-			DispatchPvPMatchMakingWantsToStart = 0x2075,
-			DispatchPvPMatchMakingPlayerJoined = 0x2076,
-			DispatchPvPMatchMakingPlayerChangedSide = 0x2077,
-			DispatchPvPMatchMakingPlayerLeft = 0x2078,
-			DispatchPvPMatchMakingPlayerKicked = 0x2079,
-			DispatchPvPMatchMakingErrorCode = 0x207A,
-			DispatchPvPMatchMakingYouJoinedMatch = 0x207B,
-			Reserved0x207C = 0x207C,
-			DispatchPvPMatchMakingMatchInfo = 0x207D,
-			DispatchPvPMatchMakingSearchResult = 0x207E,
-			DispatchPvPMatchMakingStartClicked = 0x207F,
-			DispatchPvPMatchMakingYouAreInMatchMaking = 0x2080,
-			Reserved0x2081 = 0x2081,
-			Reserved0x2082 = 0x2082,
-			DispatchPvPMatchMakingMatchSay = 0x2083,
-			DispatchPvPMatchMakingCollectingMorePlayers = 0x2084,
-			DispatchPvPMatchMakingNewMatchLeader = 0x2085,
-			DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking = 0x2086,
-			Reserved0x2087 = 0x2087,
-			Reserved0x2088 = 0x2088,
-			DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide = 0x2089,
-			DispatchPvPMatchMakingCantLockToSideMustPickASideFirst = 0x208A,
-			DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide = 0x208B,
-			DispatchPvPMatchMakingCharacterNowLockedToSide = 0x208C,
-			DispatchPvPMatchMakingCharacterNoLongerLockedToSide = 0x208D,
-			Reserved0x208E = 0x208E,
-			Reserved0x208F = 0x208F,
-			Reserved0x2090 = 0x2090,
-			Reserved0x2091 = 0x2091,
-			DispatchPvPMatchMakingInfoRequestReturn = 0x2092,
-			DispatchYouJoinedRaid = 0x2093,
-			DispatchRaidTeamJoined = 0x2094,
-			DispatchRaidTeamLeft = 0x2095,
-			DispatchRaidTeamUpdate = 0x2096,
-			DispatchRaidCharacterUpdate = 0x2097,
-			DispatchRaidNewRaidLeader = 0x2098,
-			DispatchRaidLootOptionChanged = 0x2099,
-			DispatchRaidNewMasterLooter = 0x209A,
-			DispatchRaidInvite = 0x209B,
-			DispatchRaidTargetIsBusy = 0x209C,
-			DispatchRaidIsAlreadyInRaid = 0x209D,
-			DispatchRaidInvitationTimedOut = 0x209E,
-			DispatchRaidTargetDeclinedRaidInvite = 0x209F,
-			DispatchRaidYouAreNoLongerInvited = 0x20A0,
-			Reserved0x20A1 = 0x20A1,
-			DispatchRaidCantInviteInvalidSubscriptionFlags = 0x20A2,
-			Reserved0x20A3 = 0x20A3,
-			DispatchRaidCantCreateInvalidMemberSubscriptionFlags = 0x20A4,
-			DispatchMassivePvpInfoRequestReturn = 0x20A5,
-			DispatchMassivePvPBattleQueueFeedback = 0x20A6,
-			DispatchMassivePvpStartCountDown = 0x20A7,
-			DispatchMassivePvpBattleQueueStatusUpdate = 0x20A8,
-			DispatchBattleKeepInfoRequestReturnPhase1And2 = 0x20A9,
-			DispatchBattleKeepInfoRequestReturnPhase3And4 = 0x20AA,
-			DispatchYouGotMailNotification = 0x20AB,
-			Reserved0x20AC = 0x20AC,
-			DispatchDebugFullGameServerList = 0x20AD,
-			DispatchDebugGameServerConnected = 0x20AE,
-			DispatchDebugGameServerDisconnected = 0x20AF,
-			DispatchDebugClientConnected = 0x20B0,
-			DispatchDebugClientChanged = 0x20B1,
-			DispatchDebugClientDisconnected = 0x20B2,
-			DispatchDebugFullClientList = 0x20B3,
-			DispatchDebugFullTeamListBurst = 0x20B4,
-			DispatchDebugAddTeam = 0x20B5,
-			DispatchDebugRemoveTeam = 0x20B6,
-			DispatchDebugUpdateTeam = 0x20B7,
-			DispatchDebugFullMatchListBurst = 0x20B8,
-			DispatchDebugAddMatch = 0x20B9,
-			DispatchDebugMatchChanged = 0x20BA,
-			DispatchDebugRemoveMatch = 0x20BB,
-			DispatchDebugAddIDToMatchMaking = 0x20BC,
-			DispatchDebugRemoveIDFromMatchMaking = 0x20BD,
-			DispatchItemSalesUpdateBalance = 0x20BE,
-			DispatchItemSalesCoupons = 0x20BF,
-			Reserved0x20C0 = 0x20C0,
-			DispatchCSFeedback = 0x20C1,
-			DispatchGroupFinderSignupFailed = 0x20C2,
-			Reserved0x20C3 = 0x20C3,
-			DispatchGroupFinderSignupSuccess = 0x20C4,
-			DispatchGroupFinderRemoved = 0x20C5,
-			DispatchGroupFinderReadyCheck = 0x20C6,
-			Reserved0x20C7 = 0x20C7,
-			Reserved0x20C8 = 0x20C8,
-			DispatchGroupFinderReadyCheckStatus = 0x20C9,
-			DispatchGroupFinderReadyCheckRejected = 0x20CA,
-			DispatchGroupFinderPlayfieldInfo = 0x20CB,
-			DispatchGroupFinderFeaturedPlayfieldInfo = 0x20CC,
-			DispatchGroupFinderFeaturedRaidNeededRoleUpdated = 0x20CD,
-			DispatchGroupFinderReceivedNeededRole = 0x20CE,
-			DispatchGroupFinderReceivedRotatingActivityChildInfo = 0x20CF,
-			DispatchGroupFinderUpdateFeaturedActivities = 0x20D0,
-			DispatchReturnWorldStat = 0x20D1,
-			DispatchInvalidWorldStat = 0x20D2
 		}
 
 		// Resolves an inbound GameServer RPC (receiver class id, 16-bit method opcode) to its recovered method name

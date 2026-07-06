@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Spawn;
 
 namespace Faolan.GameServer.Spawn
@@ -10,7 +10,7 @@ namespace Faolan.GameServer.Spawn
 	public static class PlayerSpawnScaffoldCodec
 	{
 		public const uint Marker = 0x3F1;
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.SimpleCharFullUpdateIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 		private const int BuffRecordSize = 60;
 
 		public static byte[] Generate(PlayerSpawnScaffold s)

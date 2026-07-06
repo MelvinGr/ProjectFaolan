@@ -1,6 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Economy.Shop
 {
@@ -22,7 +22,7 @@ namespace Faolan.GameServer.Economy.Shop
 		public static byte[] BuildTradeSelectEcho(uint playerInstance, uint vendorHandle)
 		{
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.LookAtIIR)
+				.WriteUInt32(GameServer0X2000Opcodes.LookAtIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(playerInstance)
 				.WriteByte(0)

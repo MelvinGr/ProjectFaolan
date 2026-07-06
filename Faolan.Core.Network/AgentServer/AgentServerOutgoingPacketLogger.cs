@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Interfaces;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.AgentServer

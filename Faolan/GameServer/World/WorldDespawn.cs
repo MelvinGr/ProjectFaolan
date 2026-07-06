@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -16,7 +16,7 @@ namespace Faolan.GameServer.World
 	public static class WorldDespawn
 	{
 		public const int BodyLength = 17; // [subop][typeTag][handle][marker][token] = 4+4+4+1+4
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3ToClientQuitIIR; // n3ToClientQuitIIR_t
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR; // n3ToClientQuitIIR_t
 		public const uint TypeTagAck = EntityClass.Character; // the ack TypeTag shared by the IIR record family
 		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
 

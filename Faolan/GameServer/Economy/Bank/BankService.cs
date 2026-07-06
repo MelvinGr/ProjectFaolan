@@ -5,8 +5,8 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.World;
@@ -30,7 +30,7 @@ namespace Faolan.GameServer.Economy.Bank
 	{
 		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
 
-		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // BankIIR_t
+		private const uint BankIirSubOpcode = (uint)GameServer0X2000Opcodes.BankIIR; // BankIIR_t
 		private const uint BankMaxSize = 50; // captured bank capacity
 		private const ushort BankRegisterOpcode = 0x201C;
 		private readonly IDatabaseRepository _database;

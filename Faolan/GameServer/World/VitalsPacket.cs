@@ -2,8 +2,8 @@ using System;
 using System.Buffers.Binary;
 using Faolan.Core;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.FullCharSnapshot;
 
 namespace Faolan.GameServer.World
@@ -24,7 +24,7 @@ namespace Faolan.GameServer.World
 		public static byte[] BuildStatBlockBody(uint entityHandle, CharacterStatBlock stats)
 		{
 			using var s = new FaolanStream();
-			s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR).WriteUInt32(VitalsMarker).WriteUInt32(entityHandle).WriteUInt32(0x00000000);
+			s.WriteUInt32(GameServer0X2000Opcodes.StatUpdateIIR).WriteUInt32(VitalsMarker).WriteUInt32(entityHandle).WriteUInt32(0x00000000);
 			stats.WriteTo(s);
 			return s.ToArray();
 		}
@@ -40,7 +40,7 @@ namespace Faolan.GameServer.World
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR);
+					s.WriteUInt32(GameServer0X2000Opcodes.StatUpdateIIR);
 					s.WriteUInt32(VitalsMarker);
 					s.WriteUInt32(handle);
 					s.WriteUInt32(0x00000000);
@@ -60,7 +60,7 @@ namespace Faolan.GameServer.World
 			stats = new CharacterStatBlock();
 			if (body.Length < 16)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000RespondsOpcodes.StatUpdateIIR)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.StatUpdateIIR)
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != VitalsMarker)
 				return false;

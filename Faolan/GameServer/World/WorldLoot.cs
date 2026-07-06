@@ -1,7 +1,7 @@
 using System.Text;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -11,15 +11,15 @@ namespace Faolan.GameServer.World
 	public static class WorldLoot
 	{
 		public const float DefaultFadeSeconds = 3.0f;
-		public const uint BagConsumedVisualSubOpcode = (uint)GameServer0X2000RespondsOpcodes.UpdateSimpleDynelIIR; // 0x30536411
+		public const uint BagConsumedVisualSubOpcode = (uint)GameServer0X2000Opcodes.UpdateSimpleDynelIIR; // 0x30536411
 		public const uint EntityTypeTag = EntityClass.Character; // the entity-frame typetag carried inside NewCurrentLooter
-		public const uint FadeSubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3ToClientFadeIIR; // n3ToClientFadeIIR_t - graceful fade-out despawn
+		public const uint FadeSubOpcode = (uint)GameServer0X2000Opcodes.N3ToClientFadeIIR; // n3ToClientFadeIIR_t - graceful fade-out despawn
 
-		public const uint LootRemoveItemsSubOpcode = (uint)GameServer0X2000RespondsOpcodes.LootRemoveItemsIIR; // 0x70010162
+		public const uint LootRemoveItemsSubOpcode = (uint)GameServer0X2000Opcodes.LootRemoveItemsIIR; // 0x70010162
 		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
-		public const uint NewAllowedLooterSubOpcode = (uint)GameServer0X2000RespondsOpcodes.NewAllowedLooterIIR; // 0x1E2E0139
-		public const uint NewCurrentLooterSubOpcode = (uint)GameServer0X2000RespondsOpcodes.NewCurrentLooterIIR; // NewCurrentLooterIIR_c
-		public const uint VisualChangeSubOpcode = (uint)GameServer0X2000RespondsOpcodes.SimpleDynelVisualChangeIIR; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
+		public const uint NewAllowedLooterSubOpcode = (uint)GameServer0X2000Opcodes.NewAllowedLooterIIR; // 0x1E2E0139
+		public const uint NewCurrentLooterSubOpcode = (uint)GameServer0X2000Opcodes.NewCurrentLooterIIR; // NewCurrentLooterIIR_c
+		public const uint VisualChangeSubOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
 
 		// UpdateSimpleDynelIIR (0x30536411): the bag's visual update as it's consumed (sent right before the fade).
 		// 24 B: [subop][lootTypetag][bagHandle][00000000][00000000][01][00 01 01].

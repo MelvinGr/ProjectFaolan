@@ -1,6 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Combat
 {
@@ -28,7 +28,7 @@ namespace Faolan.GameServer.Combat
 
 		public static byte[] Build(uint entityHandle, uint packedValue)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000RespondsOpcodes.CombatShieldIIR).WriteUInt32(EntityClass.Character).WriteUInt32(entityHandle).WriteUInt32(packedValue).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.CombatShieldIIR).WriteUInt32(EntityClass.Character).WriteUInt32(entityHandle).WriteUInt32(packedValue).ToArray();
 		}
 	}
 }

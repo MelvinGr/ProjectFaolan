@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Importer.Captures;
 using Xunit;
 
@@ -24,7 +24,7 @@ namespace Faolan.Tests
 				return; // capture not present in this checkout - nothing to assert
 
 			var packets = TsharkCaptureReader.Read(Capture);
-			var reply = packets.FirstOrDefault(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000RespondsOpcodes.TradeskillReplyIIR);
+			var reply = packets.FirstOrDefault(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000Opcodes.TradeskillReplyIIR);
 			Assert.NotEqual(default, reply);
 
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 				return;
 
 			var packets = TsharkCaptureReader.Read(Capture);
-			var reply = packets.First(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000RespondsOpcodes.TradeskillReplyIIR);
+			var reply = packets.First(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000Opcodes.TradeskillReplyIIR);
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
 			var records = TradeskillRecipeCodec.ParseReplyBody(reply.Bytes.AsSpan(sub + 12).ToArray());
 

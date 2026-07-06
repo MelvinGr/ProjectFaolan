@@ -6,8 +6,8 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
@@ -92,7 +92,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.Move:
+				case GameServer0X2000Opcodes.CharDCMoveIIR:
 				{
 					var dataobjdec = packet.Body.ReadUInt32();
 					var dataclientinst = packet.Body.ReadUInt32();
@@ -189,7 +189,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.ReadyForPlayScreen: //peer0_160
+				case GameServer0X2000Opcodes.CharInPlayIIR: //peer0_160
 				{
 					// 0x2024 also = GameCharAgent.RespawnMe: when the player is DEAD this is their pick on the release
 					// screen (DispatchValidResurrectionSpots), body = [u32 spawnPointId]. Route to respawn, not the
@@ -233,7 +233,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.KnubotAnswer:
+				case GameServer0X2000Opcodes.KnubotAnswerIIR:
 				{
 					// The player picked a dialogue option. The chosen option INDEX is the last u32 of the body; it
 					// selects the branch, so route to the child screen at the extended answer-path (AdvanceConversation).
@@ -246,7 +246,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.KnubotCloseChatWindow:
+				case GameServer0X2000Opcodes.KnubotCloseChatWindowIIR:
 					// The player closed the NPC chat window (ESC/X). The client signals this with its OWN
 					// KnubotCloseChatWindow (the client double-sends it); retail just accepts it. We must tear down the
 					// conversation session state so the dialogue stays closed - leaving it set let the next interaction
@@ -255,7 +255,7 @@ namespace Faolan.GameServer
 					ConversationService.EndConversation(client);
 					break;
 
-				case GameServer0X2000Opcodes.Interact:
+				case GameServer0X2000Opcodes.BehaviorControlCenterIIR:
 				{
 					// Important capture observation:
 					// world-object interactions appear to be the likely trigger path for the container-style
@@ -686,7 +686,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.CloseGame: // Also received when Activating feat point ??
+				case GameServer0X2000Opcodes.CharacterActionIIR: // Also received when Activating feat point ??
 				{
 					var unk0 = packet.Body.ReadUInt32();
 					var clientInst = packet.Body.ReadUInt32();
@@ -698,7 +698,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.SelectDeselect:
+				case GameServer0X2000Opcodes.LookAtIIR:
 				{
 					// LookAtIIR (0x0D155695): the client selects/deselects an entity. Body (after the 0x2000 framing):
 					//   [u32 0x0000C350 type][u32 selectorInstance=self] [u8 00 00 00 pad]
@@ -720,7 +720,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.DropItem:
+				case GameServer0X2000Opcodes.DeleteItemIIR:
 				{
 					var unk0 = packet.Body.ReadUInt32(); // c350
 					var clientInst = packet.Body.ReadUInt32();
@@ -741,7 +741,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.MoveItemInInventory:
+				case GameServer0X2000Opcodes.MoveInventoryItemIIR:
 				{
 					// The recovered client schema names this message ProtoMoveInventoryItemIIR:
 					//   { source_container_id, source_item_pos, destination_container_id, destination_item_pos }
@@ -768,7 +768,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.DeleteQuest:
+				case GameServer0X2000Opcodes.QuestIIR:
 				{
 					var unk0 = packet.Body.ReadUInt32();
 					var clientInst = packet.Body.ReadUInt32();
@@ -810,7 +810,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.InventoryClaimsButton:
+				case GameServer0X2000Opcodes.CoreClaimIIR:
 				{
 					var data = packet.Body.ReadRemainingArray();
 
@@ -845,7 +845,7 @@ namespace Faolan.GameServer
 					// After we relocate the player on resurrect (IntendedTeleport + n3Teleport, #214), the client echoes
 					// the teleport records back; benign acks, no reply needed - log quietly instead of spamming a system
 					// message into chat.
-					if ((uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.N3TeleportIIR || (uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.IntendedTeleportIIR)
+					if ((uint)pbOpcode == (uint)GameServer0X2000Opcodes.N3TeleportIIR || (uint)pbOpcode == (uint)GameServer0X2000Opcodes.IntendedTeleportIIR)
 					{
 						Logger.LogDebug("GameServer 0x2000 client teleport-ack {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
 						break;
@@ -878,7 +878,7 @@ namespace Faolan.GameServer
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.TradeskillReplyIIR)
+					.WriteUInt32((uint)GameServer0X2000Opcodes.TradeskillReplyIIR)
 					.WriteUInt32(0x0000C350) // the ProtoID type marker (0xC350) preceding the target handle
 					.WriteUInt32(handle)
 					.WriteArray(replyBody))

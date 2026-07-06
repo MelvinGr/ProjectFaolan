@@ -5,7 +5,7 @@ using System.Numerics;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -18,7 +18,7 @@ namespace Faolan.GameServer.Spawn
 	//   [u32 bodyLen=27][u32 0x96C46740][u32 ack=0xC350][u32 handle][00 00][vec3 pos (3x BE f32)][06]
 	public static class MoveTaskBuilder
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.MoveTaskIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
 		private const int BodyLength = 31;
 		private const uint Ack = EntityClass.Character;
 

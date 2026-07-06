@@ -1,6 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Combat
 {
@@ -26,7 +26,7 @@ namespace Faolan.GameServer.Combat
 		public static byte[] Build(uint applyTo, uint applyFrom, uint spellId, byte[] payload)
 		{
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.MagicBuffIIR)
+				.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(applyTo)
 				.WriteUInt16(0)

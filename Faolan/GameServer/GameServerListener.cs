@@ -11,8 +11,8 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.GameServer;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
@@ -119,7 +119,7 @@ namespace Faolan.GameServer
 			logger,
 			configuration,
 			database,
-			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
+			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000Opcodes)))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -473,7 +473,7 @@ namespace Faolan.GameServer
 							        PacketBuffer aBuffer = new PacketBuffer();
 							        aBuffer.WriteHeader(sender, receiver, null, 0x2009, true);
 							        aBuffer.WriteUInt32(0x00000067);
-							        aBuffer.WriteUInt32(GameServer0X2000RespondsOpcodes.N3TeleportIIR);
+							        aBuffer.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR);
 							        aBuffer.WriteUInt32(0x0000c350);
 							        aBuffer.WriteUInt32(client.client.Account.nClientInst);
 							        aBuffer.WriteByte(0);

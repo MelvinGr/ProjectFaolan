@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Dialogue
@@ -24,26 +24,26 @@ namespace Faolan.GameServer.Dialogue
 		// remoteformat (id="0"), retail's "nothing (more) to say" reply.
 		public static byte[] BuildAnswerList(uint playerInstance, uint npcHandle, IReadOnlyList<byte[]> options, byte env = 0x00)
 		{
-			return BuildStringList((uint)GameServer0X2000RespondsOpcodes.KnubotAnswerListIIR, playerInstance, npcHandle, options, env);
+			return BuildStringList((uint)GameServer0X2000Opcodes.KnubotAnswerListIIR, playerInstance, npcHandle, options, env);
 		}
 
 		// KnubotAppendTextIIR_c (0x4A3D899A) - an NPC dialogue line. The string is the `remoteformat` XML (the same
 		// shape ChatText/Feedback use). [u32 field][u16 xmlLen][xml][u8 bool].
 		public static byte[] BuildAppendText(uint playerInstance, uint npcHandle, byte[] xml, uint field = 1, byte trailing = 1, byte env = 0x00)
 		{
-			var c = Header((uint)GameServer0X2000RespondsOpcodes.KnubotAppendTextIIR, playerInstance, npcHandle, env).WriteUInt32(field).WriteUInt16(xml.Length).WriteArray(xml).WriteByte(trailing);
+			var c = Header((uint)GameServer0X2000Opcodes.KnubotAppendTextIIR, playerInstance, npcHandle, env).WriteUInt32(field).WriteUInt16(xml.Length).WriteArray(xml).WriteByte(trailing);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 
 		public static byte[] BuildCloseChatWindow(uint playerInstance, uint npcHandle, IReadOnlyList<byte[]> options, byte env = 0x00)
 		{
-			return BuildStringList((uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR, playerInstance, npcHandle, options, env);
+			return BuildStringList((uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR, playerInstance, npcHandle, options, env);
 		}
 
 		// KnubotOpenChatWindowIIR_c (0x045B0B0F) - opens the dialogue window. A single trailing byte.
 		public static byte[] BuildOpenChatWindow(uint playerInstance, uint npcHandle, byte value = 0x00, byte env = 0x00)
 		{
-			var c = Header((uint)GameServer0X2000RespondsOpcodes.KnubotOpenChatWindowIIR, playerInstance, npcHandle, env).WriteByte(value);
+			var c = Header((uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR, playerInstance, npcHandle, env).WriteByte(value);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 

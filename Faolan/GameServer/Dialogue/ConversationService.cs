@@ -10,8 +10,8 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -25,16 +25,16 @@ namespace Faolan.GameServer.Dialogue
 	public sealed class ConversationService
 	{
 		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
-		private const uint KnubotAnswerListSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAnswerListIIR;
+		private const uint KnubotAnswerListSubOpcode = (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR;
 
 		// The Knubot packets we CONSTRUCT from the typed codec (KnubotCodec) instead of replaying+substituting (#188):
 		// ALL FOUR record types - the spoken line (AppendText), the window-open, the answer list and the close. Their
 		// content (XML / options / value) is lifted from the captured record and rebuilt with the LIVE player/NPC
 		// endpoints - byte-identical to the substitution path (ConversationConstruct tests) but routed through the
 		// typed codec, the step toward sourcing the line content from RDB/Lua instead of the captured packet.
-		private const uint KnubotAppendTextSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAppendTextIIR;
-		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR;
-		private const uint KnubotOpenChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotOpenChatWindowIIR;
+		private const uint KnubotAppendTextSubOpcode = (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR;
+		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR;
+		private const uint KnubotOpenChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR;
 
 		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
 		// answer list (the remoteformat is id="0" with no options) - retail's "this NPC has nothing (more) to say"

@@ -1,6 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Combat
 {
@@ -17,7 +17,7 @@ namespace Faolan.GameServer.Combat
 	{
 		public const ushort SeqBegin = 0x0004;
 		public const ushort SeqComplete = 0x000A;
-		private const uint Bcc = (uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR;
+		private const uint Bcc = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
 
 		// The caster's component-ADD gesture on each weave add - a begin/complete pair carrying the added element
 		// (frames 1657/1658): behaviorId 4, args {f1=AddAction, f3=5, f5=8, f6=0, f10=SpellTarget{f1=0xC350, f2=caster}},

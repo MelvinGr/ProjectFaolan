@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.AgentServer

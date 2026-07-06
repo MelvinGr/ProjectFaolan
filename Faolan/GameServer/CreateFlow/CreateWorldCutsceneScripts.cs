@@ -4,8 +4,8 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.World;
 
 // ScryScript (the destiny cutscene step builder)
@@ -133,7 +133,7 @@ namespace Faolan.GameServer.CreateFlow
 			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000RespondsOpcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x36B0)))
+				.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x36B0)))
 				.SendAsync(client);
 			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
 			await SendScry(client,

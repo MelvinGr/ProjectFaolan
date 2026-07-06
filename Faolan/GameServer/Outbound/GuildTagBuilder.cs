@@ -4,8 +4,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -50,7 +50,7 @@ namespace Faolan.GameServer
 			guildName = string.Empty;
 			if (body.Length < 16) // subop(4) + type(4) + char(4) + u16 0(2) + u16 str-len(2)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000RespondsOpcodes.GuildUpdateIIR)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.GuildUpdateIIR)
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != CharacterWireType)
 				return false;
@@ -69,7 +69,7 @@ namespace Faolan.GameServer
 		// Factored out so it can be built and round-tripped without a live client (GuildPacketTests).
 		internal static void WriteGuildTagBody(FaolanStream s, uint characterId, string guildName)
 		{
-			s.WriteUInt32(GameServer0X2000RespondsOpcodes.GuildUpdateIIR);
+			s.WriteUInt32(GameServer0X2000Opcodes.GuildUpdateIIR);
 			s.WriteUInt32(CharacterWireType);
 			s.WriteUInt32(characterId);
 			s.WriteUInt16(0);

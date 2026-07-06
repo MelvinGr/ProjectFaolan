@@ -5,7 +5,7 @@ using System.Text;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -61,9 +61,9 @@ namespace Faolan.GameServer.World
 		// TODO: harvest this per quest into QuestDefinition; 3 is the captured value for Casilda's 13479 (and the only
 		// value observed for active quests so far - a different quest 0x..27 used 1).
 		public const uint FullUpdateStateActive = 3;
-		public const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestFullUpdateIIR; // one quest's full detail
-		public const uint QuestGoalSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestGoalIIR; // QuestGoalIIR_c - objective progress
-		public const uint QuestIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestIIR; // QuestIIR_c - add/update/remove a quest in the journal
+		public const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR; // one quest's full detail
+		public const uint QuestGoalSubOpcode = (uint)GameServer0X2000Opcodes.QuestGoalIIR; // QuestGoalIIR_c - objective progress
+		public const uint QuestIirSubOpcode = (uint)GameServer0X2000Opcodes.QuestIIR; // QuestIIR_c - add/update/remove a quest in the journal
 
 		// --- Journal CONTENT packets (Captures/scripts/decode_quest.py, byte-exact golden tests) ----------
 		//
@@ -74,8 +74,8 @@ namespace Faolan.GameServer.World
 		// Builders emit from the subopcode onward; the 4-byte length prefix is added by the send layer
 		// (matching BuildQuestIir/BuildQuestGoal).
 
-		public const uint QuestJournalSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestJournalIIR; // the J-panel quest list
-		public const uint QuestLogListSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestLogListIIR; // the active-quest LIST that POPULATES the J-panel
+		public const uint QuestJournalSubOpcode = (uint)GameServer0X2000Opcodes.QuestJournalIIR; // the J-panel quest list
+		public const uint QuestLogListSubOpcode = (uint)GameServer0X2000Opcodes.QuestLogListIIR; // the active-quest LIST that POPULATES the J-panel
 
 		// Quest state codes (from the capture). On completion retail sends QuestIIR twice for the quest: state 2
 		// (active/update) then state 4 (completed) - see the Stihetfv compeltefirstquest capture (13479 idx858/860).

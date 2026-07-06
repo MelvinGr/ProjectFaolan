@@ -5,8 +5,8 @@ using System.IO;
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
@@ -24,7 +24,7 @@ namespace Faolan.Importer.Extractors
 	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/archive/spawn-dissection-plan.md Phase 5.
 	public static class ItemHashHarvester
 	{
-		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // 0x0BA1C1CB - same framing
+		private const uint BankIirSubOpcode = (uint)GameServer0X2000Opcodes.BankIIR; // 0x0BA1C1CB - same framing
 
 		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
 		// numbers as ContainerKind (Bag=Normal 104 / Resource 112 / Quest 113), so those map straight. EXCEPT the

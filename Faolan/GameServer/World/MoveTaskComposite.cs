@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -15,7 +15,7 @@ namespace Faolan.GameServer.World
 	// raw u32 bits so float values round-trip exactly.
 	public sealed class MoveTaskComposite
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.MoveTaskIIR; // 0x96C46740
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
 		private const uint WireType = EntityClass.Character; // 0xC350
 		public MoveTaskNode Task { get; set; } = new MoveTaskNode();
 		public uint FromX { get; set; }

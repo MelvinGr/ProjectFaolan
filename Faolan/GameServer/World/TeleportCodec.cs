@@ -1,6 +1,6 @@
 using System.Numerics;
 using Faolan.Core;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -16,8 +16,8 @@ namespace Faolan.GameServer.World
 	// the spawn position inside a length-prefixed blob (FUN_00cbf5d0). Every byte is reader-accounted (TeleportHandoffTests).
 	public static class TeleportCodec
 	{
-		public const uint IntendedTeleportSubOpcode = (uint)GameServer0X2000RespondsOpcodes.IntendedTeleportIIR; // 0x10D27BC0
-		public const uint N3TeleportSubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3TeleportIIR; // 0x5A32F0D7
+		public const uint IntendedTeleportSubOpcode = (uint)GameServer0X2000Opcodes.IntendedTeleportIIR; // 0x10D27BC0
+		public const uint N3TeleportSubOpcode = (uint)GameServer0X2000Opcodes.N3TeleportIIR; // 0x5A32F0D7
 		private const byte PlayfieldProxyVersion = 0x62; // 'b' - the PlayfieldProxy stream version (FUN_00a6a600)
 		private const uint PlayfieldClassWord = 0x0000C79C; // PlayfieldProxy u32[0] (constant in the captures)
 		private const uint PositionBlobTag = 0x00018704; // first word of the length-prefixed spawn-position blob

@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Interfaces;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Conan
@@ -45,7 +45,7 @@ namespace Faolan.Core.Network.Conan
 						packet.Bytes.Length);
 					LogDebugDetails(opcodeName, packet);
 
-					if (subOpcodeValue == (uint)GameServer0X2000RespondsOpcodes.StatIIR && data.Length >= 25)
+					if (subOpcodeValue == (uint)GameServer0X2000Opcodes.StatIIR && data.Length >= 25)
 					{
 						var unk0 = data.ReadUInt32();
 						var characterId = data.ReadUInt32();

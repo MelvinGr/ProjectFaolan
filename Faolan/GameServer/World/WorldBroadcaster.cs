@@ -13,8 +13,8 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Economy;
@@ -48,7 +48,7 @@ namespace Faolan.GameServer.World
 		private const float PatrolWalkSpeed = 6f;
 
 		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
-		private const uint LootBagSubOpcode = (uint)GameServer0X2000RespondsOpcodes.LootBagFullUpdateIIR;
+		private const uint LootBagSubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR;
 
 		// The combat-mode stat value the captured beach melee mobs send at aggro (strickenbla capture, #218): the tick
 		// before each mob's first swing it pushes `CombatMode = 4`, which is what draws its weapon. (The player uses 1
@@ -1309,7 +1309,7 @@ namespace Faolan.GameServer.World
 			var record = captive
 				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
 				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
-			var body = new FaolanStream().WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
+			var body = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
 			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.",
 				captive
 					? "CAPTIVE"

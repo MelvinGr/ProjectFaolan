@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -45,7 +45,7 @@ namespace Faolan.GameServer.World
 
 	public static class CharDCMoveCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.CharDCMoveIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR;
 		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(CharDCMove r)
@@ -144,7 +144,7 @@ namespace Faolan.GameServer.World
 	// 7 big-endian floats). The trailing rotation is a unit 2D heading embedded in 4 floats.
 	public static class StopCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.StopIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.StopIIR;
 		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte env = 0x00)
@@ -172,7 +172,7 @@ namespace Faolan.GameServer.World
 	// (FUN_00a33770; the client finite-checks the pos & rot).
 	public static class SetPosCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.SetPosIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.SetPosIIR;
 		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte flag = 0x00, byte env = 0x00)

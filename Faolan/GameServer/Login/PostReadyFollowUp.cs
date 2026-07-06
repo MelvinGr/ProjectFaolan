@@ -8,8 +8,8 @@ using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -162,7 +162,7 @@ namespace Faolan.GameServer
 			await new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000RespondsOpcodes.MagicBuffIIR)
+					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(applyTo) //Apply to ?
 					.WriteUInt16(0x0000)
@@ -8531,7 +8531,7 @@ namespace Faolan.GameServer
 			return new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR)
+					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(client.Session.Account.ClientInstance)
 					.WriteByte(0x01)
@@ -8560,7 +8560,7 @@ namespace Faolan.GameServer
 			return new PacketStream()
 				.WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000RespondsOpcodes.GameTimeIIR)
+					.WriteUInt32(GameServer0X2000Opcodes.GameTimeIIR)
 					/*.WriteArray(
 					    0x00, 0x00, 0x00, 0x00,
 					    0x00, 0x00, 0x00, 0x00,

@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Combat
@@ -15,7 +15,7 @@ namespace Faolan.GameServer.Combat
 	// CombatShieldIIR_c (0xCFFD0519) - a single u32 shield value on the target (FUN_0113e000).
 	public static class CombatShieldCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.CombatShieldIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
 		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint value, byte env = 0x00)
@@ -40,7 +40,7 @@ namespace Faolan.GameServer.Combat
 	// ThreatLevelIIR_c (0x1745EF6C) - a threat/aggro level (u32) plus a bool (FUN_007a8fd0).
 	public static class ThreatLevelCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.ThreatLevelIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ThreatLevelIIR;
 		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint threat, byte flag, byte env = 0x00)
@@ -68,7 +68,7 @@ namespace Faolan.GameServer.Combat
 	// hates.
 	public static class HateListCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.HateListUpdateIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.HateListUpdateIIR;
 		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint target, uint count = 1, byte flag = 0x00, byte env = 0x00)
@@ -109,7 +109,7 @@ namespace Faolan.GameServer.Combat
 	public static class StatDamageCodec
 	{
 		public const int WordCount = 17;
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.StatDamageIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.StatDamageIIR;
 		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint[] words, byte env = 0x00)

@@ -1,4 +1,4 @@
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 using Faolan.GameServer.Dialogue;
 using Faolan.Tests.Support;
 using Xunit;
@@ -16,8 +16,8 @@ namespace Faolan.Tests
 		public void CloseOpcode_IsTheKnubotCloseChatWindowIir()
 		{
 			// The c2s close opcode == the same IIR type the server sends s2c to close the window.
-			Assert.Equal(0xC4AF39EBu, (uint)GameServer0X2000Opcodes.KnubotCloseChatWindow);
-			Assert.Equal((uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR, (uint)GameServer0X2000Opcodes.KnubotCloseChatWindow);
+			Assert.Equal(0xC4AF39EBu, (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR);
+			Assert.Equal((uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR, (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR);
 		}
 
 		[Fact]

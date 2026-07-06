@@ -1,6 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Combat
 {
@@ -19,7 +19,7 @@ namespace Faolan.GameServer.Combat
 		public static byte[] BuildDamageResult(uint target, uint attacker, uint damage, uint type)
 		{
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.DamageResultIIR)
+				.WriteUInt32(GameServer0X2000Opcodes.DamageResultIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(target)
 				.WriteByte(0)
@@ -42,7 +42,7 @@ namespace Faolan.GameServer.Combat
 		public static byte[] BuildStatDamage(uint target, uint statValue, int delta, uint statId, uint caster, uint idx, uint spellBaseId)
 		{
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.StatDamageIIR)
+				.WriteUInt32(GameServer0X2000Opcodes.StatDamageIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(target)
 				.WriteByte(0)

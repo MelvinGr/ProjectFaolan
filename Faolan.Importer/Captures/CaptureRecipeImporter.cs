@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,7 +24,7 @@ namespace Faolan.Importer.Captures
 			var recipes = new List<Recipe>();
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000RespondsOpcodes.TradeskillReplyIIR)
+				if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.TradeskillReplyIIR)
 					continue;
 
 				// Locate the sub-opcode inside the raw packet, then step past [subop][0xC350][handle] to the reply body.

@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.CreateFlow
 {
@@ -24,8 +24,8 @@ namespace Faolan.GameServer.CreateFlow
 			};
 			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232u, 7, 41413, 1, 24, 0));
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039233u, 7, 41413, 1, 24, 0));
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232u, 7, 41413, 1, 24, 0));
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039233u, 7, 41413, 1, 24, 0));
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat)
 				.WriteArray(0x00, 0x00, 0x00, 0x68)
@@ -98,46 +98,46 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteUInt32(id)
 				.WriteArray(0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x7D, 0x08, 0xC2, 0x92, 0xA5, 0xD9, 0xB1, 0xEC, 0x8A, 0xEC, 0x20, 0x12, 0x04, 0x08, 0x00, 0x10, 0x01, 0x12, 0x08, 0x08, 0x08, 0x10, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x12, 0x06, 0x08, 0x17, 0x10, 0x93, 0xD6, 0x5C, 0x12, 0x04, 0x08, 0x2E, 0x10, 0x07, 0x1A, 0x53, 0x0A, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6, 0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25, 0xD2, 0xC7, 0xED, 0x8D, 0x12, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6, 0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25, 0xD2, 0xC7, 0xED, 0x8D, 0x1A, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6, 0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25, 0xD2, 0xC7, 0xED, 0x8D, 0x25, 0x15, 0x4B, 0x33, 0x00, 0x2D, 0x15, 0x4B, 0x33, 0x00, 0x38, 0x01, 0x45, 0x35, 0x50, 0x55, 0x43, 0x00, 0x00, 0x00, 0x00)
 				.SendAsync(client);
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, 				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 1, 8, 0, 0, 0x10, 0x0004F250, "OPC1", [0x03, 0x7A, 0xC2, 0xFE, 0x60, 0xE0, 0x46, 0xBF, 0x84, 0x92, 0x3D, 0x28, 0xBA, 0xD0, 0xF2, 0x52]));
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, 				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 1, 8, 0, 0, 0x10, 0x0004F250, "OPC1", [0x03, 0x7A, 0xC2, 0xFE, 0x60, 0xE0, 0x46, 0xBF, 0x84, 0x92, 0x3D, 0x28, 0xBA, 0xD0, 0xF2, 0x52]));
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat)
 				.WriteArray(0x00, 0x00, 0x00, 0x65)
 				.WriteUInt32(id)
 				.WriteArray(0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x17, 0x00, 0x17, 0x2B, 0x15)
 				.SendAsync(client);
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, 				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 2, 8, 0, 1, 0x05, 0x0004F1E2, "M9W9", [0x82, 0x53, 0x0E, 0xE7, 0x11, 0xC4, 0x46, 0x3F, 0x25, 0xAB, 0x1C, 0xE4, 0xD1, 0xAB, 0xA0, 0x6F]));
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, 				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 2, 8, 0, 1, 0x05, 0x0004F1E2, "M9W9", [0x82, 0x53, 0x0E, 0xE7, 0x11, 0xC4, 0x46, 0x3F, 0x25, 0xAB, 0x1C, 0xE4, 0xD1, 0xAB, 0xA0, 0x6F]));
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat)
 				.WriteArray(0x00, 0x00, 0x00, 0x65)
 				.WriteUInt32(id)
 				.WriteArray(0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x17, 0x00, 0x17, 0x2B, 0x17)
 				.SendAsync(client);
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, 				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 3, 8, 0, 2, 0x12, 0x00334B15, "CUP5", [0xDD, 0x60, 0xBF, 0x99, 0x76, 0x09, 0x73, 0xF6, 0x79, 0x49, 0xED, 0xCA, 0x8D, 0xED, 0xC7, 0xD2]));
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, 				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 3, 8, 0, 2, 0x12, 0x00334B15, "CUP5", [0xDD, 0x60, 0xBF, 0x99, 0x76, 0x09, 0x73, 0xF6, 0x79, 0x49, 0xED, 0xCA, 0x8D, 0xED, 0xC7, 0xD2]));
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat)
 				.WriteArray(0x00, 0x00, 0x00, 0x65)
 				.WriteUInt32(id)
 				.WriteArray(0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x17, 0x00, 0x17, 0x2B, 0x19)
 				.SendAsync(client);
-			await Iir(GameServer0X2000RespondsOpcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x00, 0x0360, 0x03)); // #189: was verbatim
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000012Cu));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00000708u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001770u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000017D4u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001838u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000189Cu));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000019C8u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001A90u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001AF4u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001BBCu));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001FA4u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Cu));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Du));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Eu));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Fu));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002070u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002071u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000020D0u));
+			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x00, 0x0360, 0x03)); // #189: was verbatim
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000012Cu));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00000708u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001770u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000017D4u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001838u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000189Cu));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000019C8u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001A90u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001AF4u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001BBCu));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001FA4u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Cu));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Du));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Eu));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Fu));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002070u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002071u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000020D0u));
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility)
 				.WriteArray(0x00, 0x00, 0x00, 0x6C, 0x00, 0x0B, 0xBC, 0x46, 0x00, 0x0B, 0xBC, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x4B, 0x4D, 0x39, 0x36, 0xC0, 0xEB, 0xA3, 0x41, 0x80, 0x61, 0x06, 0xF3, 0x12, 0xB8, 0x35, 0x3E, 0xB3, 0xC3, 0x96, 0x42, 0xC0, 0xEB, 0xA3, 0x41, 0x80, 0x61, 0x06, 0xF3, 0x12, 0xB8, 0x35, 0x3E, 0xB3, 0xC3, 0x96, 0x42, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01)
@@ -162,35 +162,35 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility)
 				.WriteArray(0x00, 0x00, 0x04, 0xE4, 0x00, 0x39, 0xE7, 0x83, 0x00, 0x39, 0xE7, 0x83, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x37, 0x30, 0x39, 0x4C, 0x14, 0xBD, 0x51, 0x26, 0x54, 0x6D, 0xD8, 0x6B, 0x7C, 0x60, 0xBD, 0x85, 0x1F, 0x3F, 0x36, 0xC6, 0x14, 0xBD, 0x51, 0x26, 0x54, 0x6D, 0xD8, 0x6B, 0x7C, 0x60, 0xBD, 0x85, 0x1F, 0x3F, 0x36, 0xC6, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01)
 				.SendAsync(client);
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003520u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416544u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416541u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416542u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416548u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165F1u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165EFu));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416546u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416545u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165F0u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416547u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416543u));
-			await Iir(GameServer0X2000RespondsOpcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416549u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003908u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0001E5F0u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DBC0u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DD50u));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000503FCu));
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000504C4u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003520u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416544u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416541u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416542u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416548u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165F1u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165EFu));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416546u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416545u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165F0u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416547u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416543u));
+			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416549u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003908u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0001E5F0u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DBC0u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DD50u));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000503FCu));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000504C4u));
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility)
 				.WriteArray(0x00, 0x00, 0x04, 0xE6, 0x00, 0x4B, 0x3E, 0xC8, 0x00, 0x4B, 0x3E, 0xC8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x4C, 0x31, 0x44, 0x53, 0xB3, 0xAE, 0xE6, 0xAA, 0x50, 0x9C, 0xCD, 0x1E, 0xB4, 0xE9, 0xF4, 0xB4, 0x7E, 0xCF, 0xE7, 0xD2, 0xB3, 0xAE, 0xE6, 0xAA, 0x50, 0x9C, 0xCD, 0x1E, 0xB4, 0xE9, 0xF4, 0xB4, 0x7E, 0xCF, 0xE7, 0xD2, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01)
 				.SendAsync(client);
-			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
-			await Iir(GameServer0X2000RespondsOpcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x08)); // #189: was verbatim
-			await Iir(GameServer0X2000RespondsOpcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
+			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
+			await Iir(GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x08)); // #189: was verbatim
+			await Iir(GameServer0X2000Opcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
 			return;
 
-			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
+			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)
 			{
 				return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
 			}

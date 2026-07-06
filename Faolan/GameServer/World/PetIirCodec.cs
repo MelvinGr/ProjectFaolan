@@ -1,6 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -15,7 +15,7 @@ namespace Faolan.GameServer.World
 	//   the capture shows a COMBAT pet = (0,2,2) and a SOCIAL pet = (5,0,1).
 	public static class PetIirCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.PetIIR;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.PetIIR;
 		private const byte Env = 0x00;
 		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 
