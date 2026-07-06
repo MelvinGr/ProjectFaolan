@@ -1,9 +1,8 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Faolan.Core.Network.Interfaces;
-using ICSharpCode.SharpZipLib.Zip.Compression;
 
 namespace Faolan.Core.Network.Conan
 {
@@ -11,13 +10,20 @@ namespace Faolan.Core.Network.Conan
 	{
 		private const int MaxPacketSize = 16 * 1024 * 1024;
 
-		private static readonly byte[] InflateStartSequence = [0x80, 0x00, 0x00, 0x05];
+		// The compression-stream marker: a fixed 9-byte control frame = this 4-byte tag (0x80000005) + 5 trailing
+		// bytes. Retail only ever sends it SERVER->CLIENT to open the download compression stream; our server does not
+		// compress, and our client emits a standalone 9-byte marker with NO compressed payload (plaintext packets
+		// surround it). We do not decompress inbound, so we SKIP the whole marker and keep parsing. This is deliberate:
+		// the old code decoded/decompressed on this tag (and the NetworkClient read loop dropped the whole recv buffer
+		// on it), which - when TCP coalesced the marker with the packets behind it - silently ate them, giving the
+		// non-deterministic loss of the post-ready 0x205f grant-arm packet (abilities/spellbar intermittently empty).
+		private const uint CompressionMarkerTag = 0x80000005u;
+		private const int CompressionMarkerLength = 9;
 
 		private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
 		private byte[] _packetBuffer;
-
-		private Inflater? _inflater;
 		private int _packetBytesRead;
+		private int _markerSkipRemaining;
 
 		public IEnumerable<byte[]> PushBytes(byte[] bytes, int length)
 		{
@@ -27,15 +33,22 @@ namespace Faolan.Core.Network.Conan
 			if (length < 0 || length > bytes.Length)
 				throw new ArgumentOutOfRangeException(nameof(length));
 
-			bytes = PrepareBytes(bytes, length);
-			length = bytes.Length;
-
 			var packets = new List<byte[]>();
 			var offset = 0;
 
 			while (offset < length)
 			{
 				var bytesAvailable = length - offset;
+
+				// Consume any outstanding compression-marker bytes first (the 9-byte marker can straddle recv
+				// boundaries, so the remaining count is carried across pushes).
+				if (_markerSkipRemaining > 0)
+				{
+					var skip = Math.Min(_markerSkipRemaining, bytesAvailable);
+					offset += skip;
+					_markerSkipRemaining -= skip;
+					continue;
+				}
 
 				if (_packetBuffer != null)
 				{
@@ -64,21 +77,31 @@ namespace Faolan.Core.Network.Conan
 
 					if (_packetBytesRead == sizeof(int))
 					{
-						var packetLength = BitConverter.ToInt32(_packetLengthBuffer.Reverse().ToArray(), 0);
+						var raw = BinaryPrimitives.ReadUInt32BigEndian(_packetLengthBuffer);
 
-						if (packetLength < 0 || packetLength > MaxPacketSize)
+						// Compression-stream marker: skip its remaining 5 bytes and keep parsing (see CompressionMarkerTag).
+						// Handled BEFORE the length-range guard so it is never mistaken for a hostile length, and so any
+						// packets coalesced behind it in the same recv still get framed.
+						if (raw == CompressionMarkerTag)
+						{
+							_markerSkipRemaining = CompressionMarkerLength - sizeof(int);
+							_packetBytesRead = 0;
+							continue;
+						}
+
+						if (raw > MaxPacketSize)
 						{
 							ResetPacketState();
 							break;
 						}
 
-						if (packetLength == 0)
+						if (raw == 0)
 						{
 							_packetBytesRead = 0;
 							continue;
 						}
 
-						_packetBuffer = new byte[packetLength];
+						_packetBuffer = new byte[raw];
 						_packetBytesRead = 0;
 					}
 				}
@@ -87,73 +110,10 @@ namespace Faolan.Core.Network.Conan
 			return packets;
 		}
 
-		private byte[] PrepareBytes(byte[] bytes, int length)
-		{
-			if (length == 0)
-				return [];
-
-			var input = bytes.Length == length
-				? bytes
-				: bytes.Take(length).ToArray();
-
-			if (HasInflateStartSequence(input))
-			{
-				_inflater = new Inflater();
-				ResetPacketState();
-
-				return input.Length > 9
-					? Decompress(_inflater, input.Skip(9).ToArray()) ?? []
-					: [];
-			}
-
-			if (_inflater == null)
-				return input;
-
-			return Decompress(_inflater, input) ?? [];
-		}
-
 		private void ResetPacketState()
 		{
 			_packetBuffer = null;
 			_packetBytesRead = 0;
-		}
-
-		private static byte[]? Decompress(Inflater inflater, byte[] input)
-		{
-			try
-			{
-				inflater.SetInput(input);
-
-				using var bos = new MemoryStream(input.Length);
-				var buf = new byte[10240];
-
-				while (!inflater.IsFinished && !inflater.IsNeedingInput)
-				{
-					var count = inflater.Inflate(buf);
-
-					if (count <= 0)
-						break;
-
-					// Cap total inflated output: a few-KB compressed packet could otherwise inflate to gigabytes
-					// (a zlib bomb) → OOM. A decompressed packet still has to fit the MaxPacketSize framing budget,
-					// so anything past that is hostile - drop it (null → the connection gets no data from this push).
-					if (bos.Length + count > MaxPacketSize)
-						return null;
-
-					bos.Write(buf, 0, count);
-				}
-
-				return bos.ToArray();
-			}
-			catch
-			{
-				return null;
-			}
-		}
-
-		private static bool HasInflateStartSequence(byte[] bytes)
-		{
-			return bytes.Length >= InflateStartSequence.Length && bytes[0] == InflateStartSequence[0] && bytes[1] == InflateStartSequence[1] && bytes[2] == InflateStartSequence[2] && bytes[3] == InflateStartSequence[3];
 		}
 	}
 }

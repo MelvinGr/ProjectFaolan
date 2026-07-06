@@ -216,16 +216,6 @@ namespace Faolan.Core.Network
                     }
 
                     var buffer = _tcpBuffer.AsMemory(0, bytesRead);
-
-                    // zlib compression marker: 0x80000005
-                    if (buffer.Length >= 4 && buffer.Span[0] == 0x80 && buffer.Span[1] == 0x00 && buffer.Span[2] == 0x00 && buffer.Span[3] == 0x05)
-                    {
-                        // TODO: handle compressed stream.
-                        // buffer = Decompress(buffer[9..]);
-
-                        continue;
-                    }
-
                     await DataReceivedAsync(buffer, cancellationToken);
                 }
             }
