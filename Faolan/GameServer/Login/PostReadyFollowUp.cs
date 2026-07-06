@@ -245,8 +245,12 @@ namespace Faolan.GameServer
 			{
 				Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
 				await SendReadyForPlayScreen(client);
-				// Retail grants the starting abilities (0x2052) right after 0x2024, not during world entry.
+				// Retail grants the starting abilities (0x2052) + combo book right after 0x2024, not during world entry
+				// (faolan necro login capture: abilities at frame 192, just after ReadyForPlayScreen). Both are granted
+				// here, post-snapshot: neither rides the FullChar snapshot known-list (spells do), so a pre-snapshot grant
+				// is discarded by the client's identity reconstruction.
 				await GrantCharacterAbilities(client);
+				await GrantCharacterCombos(client);
 				// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
 				// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
 				// the pre-snapshot GrantCharacterSpells re-send is absorbed silently. (The old PendingSpellLearns

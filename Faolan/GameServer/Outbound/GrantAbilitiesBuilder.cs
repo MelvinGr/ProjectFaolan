@@ -57,10 +57,10 @@ namespace Faolan.GameServer
 			// retail 0x2052 grants) - NOT the bar (the bar is only shortcuts). A freshly-created character with no set
 			// gets the class-starting kit. We resolve them here ONLY to seed the default bar layout below; the actual
 			// 0x2052 WIRE grants (+ the combo book) are NOT sent here. Retail sends them AFTER the FullChar snapshot and
-			// after 0x2024 ReadyForPlayScreen (faolan necro login capture: abilities at frame 192, snapshot at 81) -
-			// see GrantPostReadyAbilitiesAndCombos, called from the CharInPlayIIR post-ready handler. Granting them
-			// pre-snapshot (the old behaviour) had the snapshot reconstruction discard them (abilities are NOT in the
-			// snapshot known-list, unlike spells), so the abilities tab + ability-slot shortcuts came up empty.
+			// after 0x2024 ReadyForPlayScreen (faolan necro login capture: abilities at frame 192, snapshot at 81),
+			// driven by the 0x205f post-ready flush (FlushPendingPost205FFollowUp -> GrantCharacterAbilities/Combos).
+			// Granting them pre-snapshot (the old behaviour) had the snapshot reconstruction discard them (abilities are
+			// NOT in the snapshot known-list, unlike spells), so the abilities tab + ability-slot shortcuts came up empty.
 			var abilities = await GetLoadoutAbilities(character);
 
 			// The BAR layout is only SEEDED when the character has none. An imported or player-customised bar is left
@@ -108,18 +108,6 @@ namespace Faolan.GameServer
 				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeSpell, spellId);
 
 			Logger.LogInformation("EnsureCharacterLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).", character.Name, character.Class, abilities.Length, spells.Length);
-		}
-
-		// Grants the character's abilities (0x2052) + combo book at the RETAIL post-ready position: after the FullChar
-		// snapshot and 0x2024 ReadyForPlayScreen, driven by the client's CharInPlayIIR (faolan necro login capture:
-		// abilities land at frame 192, right after 0x2024; the snapshot is frame 81). This MUST be post-snapshot -
-		// abilities are not carried in the snapshot known-list (only spells are), so the snapshot's identity
-		// reconstruction discards any grant sent before it. Kept off the fragile 0x205f arming path (that packet can be
-		// dropped mid-burst); CharInPlayIIR is 0x2000-wrapped and reliably delivered.
-		private async Task GrantPostReadyAbilitiesAndCombos(INetworkClient client)
-		{
-			await GrantCharacterAbilities(client);
-			await GrantCharacterCombos(client);
 		}
 
 		// The abilities to grant a character on login: its authoritative per-character set (CharacterAbility, imported
