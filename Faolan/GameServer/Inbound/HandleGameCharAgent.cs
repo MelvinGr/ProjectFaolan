@@ -365,29 +365,24 @@ namespace Faolan.GameServer
 
                 case GameCharAgentOpcodes.AddShortcut:
                 {
-                    // 0x206E collides: in-game it's MoveItemToBar, but on the character-creator connection it's
-                    // the "enter world" signal. The client sends it several times; answer the first with the
-                    // 0x2002 world handoff, ignore the rest.
-                    // TODO: THIS IS FALSE?? 0x206E is just MoveItemToBar, this is also needed for new characters to put there starting spells etc on the bar
-                    if (client.Session.IsCreateEditorConnection)
-                    {
-                        if (client.Session.AwaitingEnterWorld)
-                        {
-                            client.Session.AwaitingEnterWorld = false;
-                            // #234: wash the new char ashore - retail's create flow sends a changemap-prep
-                            // (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn on the
-                            // EDITOR connection right before the handoff (Blablabla create capture f444/449: dest map
-                            // 0x0FAA, pos 322.5,150,704.9, descriptor 0x32). Without it the player stays at the drowning
-                            // cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
-                            await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
-                            await SendWorldHandoff(client);
-                        }
-
-                        break;
-                    }
-
-                    // In-game (non-editor): the player dragged an ability/item onto the bar - persist it.
+                    // 0x206E = MoveItemToBar: ALWAYS a bar drag ([u32 type][u32 slot][u32 id][u32 unk]). During create
+                    // the client populates the NEW character's starting bar with it right after CharCreationFinished
+                    // (verified in the Blablatest/Hoxxling create captures: the starting abilities + spells at slots
+                    // 0x64.. / 0x4E20..), BEFORE entering the world - so persist it on the editor connection too, or a
+                    // fresh character loses its retail starting bar and falls back to our seeded default.
                     await _shortcutBar.HandleAddShortcut(client, packet);
+
+                    // On the editor connection the FIRST post-world-prep 0x206E also signals "ready to enter world":
+                    // answer it once with the 0x2002 handoff. #234: wash the new char ashore first with a changemap-prep
+                    // (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn - Blablabla create
+                    // capture f444/449 (dest map 0x0FAA, pos 322.5,150,704.9, descriptor 0x32) - else the player stays
+                    // at the drowning cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
+                    if (client.Session.IsCreateEditorConnection && client.Session.AwaitingEnterWorld)
+                    {
+                        client.Session.AwaitingEnterWorld = false;
+                        await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
+                        await SendWorldHandoff(client);
+                    }
 
                     break;
                 }
