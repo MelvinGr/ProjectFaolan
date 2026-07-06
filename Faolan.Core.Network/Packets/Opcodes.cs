@@ -317,7 +317,7 @@ namespace Faolan.Core.Network.Packets
 			RequestWaveRespawnTimerUpdate = 0x2028,
 			RespawnMeHere = 0x2029,
 			GMRequestSpellData = 0x202A,
-			RMGetQuestFromQuestgiver = 0x202B,
+			RM_GetQuestFromQuestgiver = 0x202B,
 			GMRequestFeatData = 0x202C,
 			GMRequestFeatClassData = 0x202D,
 			AdjustSkill = 0x202E,
