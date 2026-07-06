@@ -68,12 +68,12 @@ namespace Faolan.Core.Network
 
 					var networkClient = new NetworkClient<TPacket, TMessageFramer, TPacketFactory>(socket, Logger, _outgoingPacketLogger)
 					{
-						Disconnected = client =>
+						Disconnected = async client =>
 						{
 							try
 							{
 								_clients.TryRemove(client, out _);
-								ClientDisconnected(client);
+								await ClientDisconnected(client);
 							}
 							catch (Exception ex)
 							{
@@ -107,7 +107,7 @@ namespace Faolan.Core.Network
 					};
 
 					_clients.TryAdd(networkClient, 0);
-					ClientConnected(networkClient);
+					await ClientConnected(networkClient);
 
 					networkClient.Start();
 				}
@@ -126,14 +126,16 @@ namespace Faolan.Core.Network
 			}
 		}
 
-		protected virtual void ClientConnected(INetworkClient client)
+		protected virtual Task ClientConnected(INetworkClient client)
 		{
 			Logger.LogInformation("Client connected: {IpAddress}", client.IpAddress);
+			return Task.CompletedTask;
 		}
 
-		protected virtual void ClientDisconnected(INetworkClient client)
+		protected virtual Task ClientDisconnected(INetworkClient client)
 		{
 			Logger.LogInformation("Client disconnected: {IpAddress}", client.IpAddress);
+			return Task.CompletedTask;
 		}
 
 		protected INetworkClient ClientForAccount(uint accountId)

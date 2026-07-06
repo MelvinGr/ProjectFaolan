@@ -32,10 +32,10 @@ namespace Faolan.CSPlayerAgent
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
 		}
 
-		protected override void ClientDisconnected(INetworkClient client)
+		protected override Task ClientDisconnected(INetworkClient client)
 		{
 			_guild.OnClientDisconnected(client);
-			base.ClientDisconnected(client);
+			return base.ClientDisconnected(client);
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)

@@ -177,28 +177,28 @@ namespace Faolan.GameServer
 			await base.StopAsync(cancellationToken);
 		}
 
-		protected override void ClientDisconnected(INetworkClient client)
+		protected override async Task ClientDisconnected(INetworkClient client)
 		{
 			var entity = _simulation.PlayerWorldEntity(client);
 			if (entity != null)
 			{
 				// Tell everyone who could see this player that it left (n3ToClientQuit) BEFORE removing it from the
-				// zone, so ResolveRemove still sees the leaver's viewers. Fire-and-forget: the connection is going away.
-				_ = _broadcaster.BroadcastPlayerDespawn(entity);
+				// zone, so ResolveRemove still sees the leaver's viewers - now awaited (ClientDisconnected is a Task),
+				// so the despawn deterministically lands before RemovePlayer instead of racing it.
+				await _broadcaster.BroadcastPlayerDespawn(entity);
 				_simulation.RemovePlayer(client, out _);
 				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
-				// loses where they were. Fire-and-forget: the connection is going away so we can't await; logged.
-				// EXCEPT on a teleport-out: DoTeleport already saved the destination, and this connection's entity
-				// still holds the stale pre-teleport position which would clobber it (#28).
+				// loses where they were. EXCEPT on a teleport-out: DoTeleport already saved the destination, and this
+				// connection's entity still holds the stale pre-teleport position which would clobber it (#28).
 				if (!client.Session.IsTeleportingOut)
-					_ = _persistence.SavePlayerState(client, entity);
+					await _persistence.SavePlayerState(client, entity);
 				else
 					Logger.LogInformation("Teleport-out: skipping stale-position save for {Name} (0x{Handle:X8}); destination already persisted.", entity.Name, entity.Handle);
 				client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
 				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
 			}
 
-			base.ClientDisconnected(client);
+			await base.ClientDisconnected(client);
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)

@@ -27,7 +27,7 @@ namespace Faolan.Core.Network
 	{
 		protected readonly ILogger Logger;
 		protected readonly Socket Socket;
-		public Action<INetworkClient>? Disconnected { get; init; }
+		public Func<INetworkClient, Task>? Disconnected { get; init; }
 
 		public Func<INetworkClient, Packet, Task>? ReceivedPacket { get; init; }
 
@@ -164,7 +164,10 @@ namespace Faolan.Core.Network
 			}
 
 			Socket.Close();
-			Disconnected?.Invoke(this);
+			// Disconnect cleanup can be async (persistence / despawn broadcast). Stop() is a sync void called from
+			// sync paths too, so fire-and-forget the returned Task - Server's Disconnected wrapper awaits
+			// ClientDisconnected internally and logs any fault.
+			_ = Disconnected?.Invoke(this);
 		}
 
 		private async Task DataReceivedAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
