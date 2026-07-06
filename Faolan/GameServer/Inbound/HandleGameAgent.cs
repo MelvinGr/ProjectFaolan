@@ -98,7 +98,6 @@ namespace Faolan.GameServer
 
                     client.Session.LastGameServer2020RequestId = null;
                     client.Session.HasPendingPost205FFollowUp = false;
-                    client.Session.HasFlushedCreateEditorPostReady = false;
                     client.Session.CreateEditorObservedRequestIds.Clear();
                     client.Session.MorphAckCounter = 0;
                     client.Session.MorphActivitySequence = 0;

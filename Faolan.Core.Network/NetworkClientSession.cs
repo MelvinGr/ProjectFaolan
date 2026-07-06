@@ -11,7 +11,6 @@ namespace Faolan.Core.Network
 		// 0x206E enter-world signal, which we answer with the 0x2002 world-address handoff.
 		bool AwaitingEnterWorld { get; set; }
 		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
-		bool HasFlushedCreateEditorPostReady { get; set; }
 
 		bool HasPendingPost205FFollowUp { get; set; }
 
@@ -122,7 +121,6 @@ namespace Faolan.Core.Network
 
 		public bool AwaitingEnterWorld { get; set; }
 		public bool EnergyLoopActive { get; set; }
-		public bool HasFlushedCreateEditorPostReady { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
 		public bool IsCreateEditorConnection { get; set; }
 		public bool IsCreateWorldSession { get; set; }

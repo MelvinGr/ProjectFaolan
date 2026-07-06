@@ -202,28 +202,15 @@ namespace Faolan.GameServer
                         break;
                     }
 
+                    // An unnamed character IS the create-editor phase (IsRetailCreateEditorFlow is exactly this check).
                     if (client.Session.Character?.Name == null)
                     {
-                        if (IsRetailCreateEditorFlow(client))
-                        {
-                            // Retail answers the editor's CharInPlayIIR DIRECTLY with the post-ready burst - the 0x2024
-                            // ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the creation script that launches the
-                            // editor (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95). No
-                            // instance-echo counting or deferral - CharInPlayIIR IS the trigger.
-                            if (client.Session.HasFlushedCreateEditorPostReady)
-                                Logger.LogInformation("Create-editor: post-ready burst already sent; ignoring the repeat CharInPlayIIR.");
-                            else
-                            {
-                                Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
-                                await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
-                                client.Session.HasFlushedCreateEditorPostReady = true;
-                            }
-                        }
-                        else
-                        {
-                            await SendReadyForPlayScreen(client);
-                            await CreateFlowService.HandleNewCharacter(client, packet);
-                        }
+                        // Retail answers the editor's CharInPlayIIR DIRECTLY with the post-ready burst - the 0x2024
+                        // ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the creation script that launches the
+                        // editor (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95). No
+                        // instance-echo counting or deferral - CharInPlayIIR IS the trigger.
+                        Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
+                        await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
                     }
                     else
                     {
