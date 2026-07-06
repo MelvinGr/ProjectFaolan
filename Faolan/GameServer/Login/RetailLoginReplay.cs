@@ -73,7 +73,9 @@ namespace Faolan.GameServer
 		// is the one documented create-verified entry (Strie) and is kept.
 		private static readonly Dictionary<Class, uint> StarterClassWeapon = new Dictionary<Class, uint>
 		{
-			[Class.Assassin] = 3735601 // Marlin Spike
+			[Class.Assassin] = 3735601, // Marlin Spike
+			[Class.Necromancer] = 3395744, // Broken Bottle (0x33D0A0; necro create capture, BccIIR slot-6)
+			[Class.TempestOfSet] = 215711 // Broken Bottle (0x34A9F - the OTHER bottle; tempest create capture, BccIIR slot-6)
 		};
 
 		// Loads the character's CharacterEquipment (creating it and seeding default starter gear if absent), with the

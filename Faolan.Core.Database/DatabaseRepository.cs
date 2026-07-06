@@ -1054,8 +1054,10 @@ namespace Faolan.Core.Database
 
 		// SPELLS a character has learned by its current level (#74): every spell its class (or the generic Class 0 set)
 		// has ACCESS to (ClassSpells) whose unlock level (Spells.Level - NOT ClassSpells, which is pure membership) is
-		// at or below `level`. Coverage is whatever the class<->spell map supplied (only the create-capture starters
-		// today; a class-aware ellatha scrape fills the progression). The spell analogue of GetClassAbilities.
+		// at or below `level`. ClassSpells now holds the full per-class progression (ellatha scrape); the create
+		// captures are the level-1 truth, so the importer pins the create-granted spells to Level 1 and pushes the
+		// rest above it (a level-1 create must yield exactly the capture's f239 grant). The spell analogue of
+		// GetClassAbilities.
 		public async Task<uint[]> GetStartingSpells(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

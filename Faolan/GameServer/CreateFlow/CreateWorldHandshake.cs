@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
@@ -198,8 +199,41 @@ namespace Faolan.GameServer.CreateFlow
 			// Step 3: the world-prep / scene burst that lets the client proceed to enter-world (0x206E).
 			await SendWorldPrepBurst(client);
 
+			// Step 3b: grant the class's starting SPELLS so the client places them on the starting bar. The
+			// world-prep burst hardcodes only the 0x2052 ABILITY grants; retail also sends the class spells as
+			// DispatchLearnSpell (0x200A) on the same GameCharInterface framing, during create right BEFORE the
+			// client's 0x206E bar drags (Blablatest necro f239: Ice Strike R1 + Frozen Hatred). Class-aware, so
+			// casters get spells and melee get none (matching the barbarian capture the burst was seeded from).
+			// With the client's bar drags now persisted, these land on the bar (the client only bars what it was
+			// granted); without it a fresh caster's bar has abilities but no spells.
+			await GrantCreateStartingSpells(client);
+
 			// The client will now send 0x206E (enter world); answer it with the 0x2002 world handoff.
 			client.Session.AwaitingEnterWorld = true;
+		}
+
+		// Grants the character's class-starting spells during create as DispatchLearnSpell (0x200A) packets - the
+		// spell counterpart to the world-prep burst's hardcoded 0x2052 ability grants. The client bars each granted
+		// spell, so these MUST arrive before its 0x206E bar drags. The body is just the 4-byte spell id (retail
+		// f239). Melee classes resolve to an empty set (no starting spells).
+		private async Task GrantCreateStartingSpells(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var id = client.Session.Account.ClientInstance;
+			var sender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C);
+			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id);
+
+			var spells = await _database.GetStartingSpells(character.Level, character.Class);
+			foreach (var spellId in spells)
+				await new PacketStream()
+					.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchLearnSpell)
+					.WriteUInt32(spellId)
+					.SendAsync(client);
+
+			_logger.LogInformation("Create: granted {Count} starting spell(s) (0x200A) to '{Name}' (class={Class}) so the client bars them.", spells.Length, character.Name, character.Class);
 		}
 
 		// Reject a chosen name so the client re-prompts instead of dead-ending (no loading screen). Retail answers a
