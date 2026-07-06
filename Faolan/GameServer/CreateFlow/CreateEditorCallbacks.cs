@@ -87,10 +87,17 @@ namespace Faolan.GameServer.CreateFlow
 		//     field 6 (bytes)  = trailing nested block (ignored)
 		//
 		// These callbacks are how the editor reports the player's choices (sex/race/head/size/class/
-		// voice/name) and lifecycle events (IntroDone, ClientLoadingDone, Move). The retail capture
-		// Stricken_soldier-guardian_create_random-actions.json proves the server sends
-		// NO responses to any of these (ChangeSex/Finish/SetMorphValue/TheNameIs all stream client->server
-		// with zero downstream replies); the client self-advances. So this handler is parse-only.
+		// voice/name) and lifecycle events (IntroDone, ClientLoadingDone, Move). Most Change* callbacks are
+		// parse-only (the client self-advances), BUT three DO get a server reply - proven from the retail
+		// create captures (#197 analysis 2026-07-06, contradicting the older "zero replies" note here):
+		//   - SetMorphValue -> a 0xBADF5A4B MorphAck echoing each morph value (Hoxxling_..._modified_all_sliders:
+		//     36 client morphs @f553 -> 34 acks @f562; distinct from the ~5 hairmesh/texscript setup 0xBADF5A4B
+		//     the server sends earlier at editor init).
+		//   - Finish -> the post-morph trio (StatIIR + StartScriptGroup + StatUpdate) that prompts TheNameIs.
+		//     Finish arrives in the SAME client batch as the morphs but BEFORE them, and retail sends the trio
+		//     AFTER acking the batch's morphs - which is why SchedulePostMorphBurst debounces (see #197: the
+		//     deterministic trigger is "Finish + the morph batch drained", the ~350ms timer fakes that).
+		//   - TheNameIs -> NicknameOk / NicknameTaken / NicknameInvalid (SendNicknameAccepted/Rejected).
 		//
 		// The chosen name is captured into Session.PendingCharacterName rather than Character.Name, so the
 		// create-editor gating (which keys on Character.Name == null) is not disturbed mid-stream;
