@@ -11,7 +11,7 @@ namespace Faolan.CSPlayerAgent
 		private static Task SendGuildList(INetworkClient client, ConanPacket packet)
 		{
 			return new PacketStream()
-				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.RenownRankings)
+				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGuildRankingsUpdate)
 				.WriteArray(0x00,
 					0x00,
 					0xbd,
@@ -4711,7 +4711,7 @@ namespace Faolan.CSPlayerAgent
 		private static Task SendQuickGuildSummary(INetworkClient client, ConanPacket packet)
 		{
 			return new PacketStream()
-				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20A5, [0x01])
+				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchMassivePvpInfoRequestReturn, [0x01])
 				.WriteArray(0x67,
 					0x9f,
 					0xb0,

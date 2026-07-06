@@ -172,23 +172,6 @@ namespace Faolan.Core.Network.Packets
 			Ox20D0 = 0x20D0
 		}
 
-		// Server->client. The live build's CSPlayerInterface dispatch table has unnamed extra methods (indices
-		// drift vs the recovered name table), so these are named by decoded CONTENT, not by table position.
-		public enum CsPlayerAgentResponseOpcodes : ushort
-		{
-			Authenticate = 0x2000,
-			GuildInvite = 0x202A, // [guild ID32][guildName][invitee ID32][inviterName]
-			GuildMemberJoined = 0x202F, // [member ID32][member record]
-			GuildMemberUpdate = 0x2030, // [member record]
-			RenownRankings = 0x2038,
-			RenownHistory = 0x2039,
-			GuildFullUpdate = 0x203F, // guild header + MOTD + renown block + self record + roster
-			GuildInfoSameGuild = 0x2042,
-			GuildInfoOtherGuild = 0x2043,
-			Ox20A5 = 0x20A5,
-			Ox20C5 = 0x20C5,
-			Ox20D0 = 0x20D0
-		}
 
 		// s2c sends use the recovered per-class dispatch enums below (GameInterfaceDispatchOpcodes /
 		// GameCharInterfaceDispatchOpcodes / CSPlayerInterfaceDispatchOpcodes). The old behavior-nickname

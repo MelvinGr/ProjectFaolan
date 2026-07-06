@@ -26,7 +26,7 @@ namespace Faolan.CSPlayerAgent
 			logger,
 			configuration,
 			database,
-			new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CsPlayerAgentResponseOpcodes)))
+			new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceDispatchOpcodes)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
@@ -89,18 +89,18 @@ namespace Faolan.CSPlayerAgent
 					// pushed to it later without an incoming packet to echo.
 					_guild.RememberReplyEndpoints(client, packet.ReceiverBytes, packet.SenderBytes);
 
-					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Authenticate).WriteUInt32(authReply).SendAsync(client);
+					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchAuthenticateAck).WriteUInt32(authReply).SendAsync(client);
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
-					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20D0, [0x01]).WriteArray(0x00, 0x00, 0x03, 0xF1).SendAsync(client);
+					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01]).WriteArray(0x00, 0x00, 0x03, 0xF1).SendAsync(client);
 
 					//if(character.Name == null)
 					{
 						await new PacketStream()
-							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20C5, [0x01])
+							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderRemoved, [0x01])
 							.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
 							.WriteByte(0x01)
 							.SendAsync(client);

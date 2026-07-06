@@ -111,7 +111,7 @@ namespace Faolan.CSPlayerAgent
 				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
 				// taken verbatim from the capture (Dahviie, same-guild reply).
 				await new PacketStream()
-					.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.GuildInfoSameGuild)
+					.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGuildUpdateMember)
 					.WriteUInt32(targetId)
 					.WriteUInt32(Guild.WireType)
 					.WriteUInt32(targetGuildId)
@@ -131,7 +131,7 @@ namespace Faolan.CSPlayerAgent
 			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
 			// is a server-wide constant rather than guild data.
 			await new PacketStream()
-				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.GuildInfoOtherGuild)
+				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CSPlayerInterfaceDispatchOpcodes.DispatchGuildUpdateOther)
 				.WriteUInt32(targetId)
 				.WriteUInt32(Guild.WireType)
 				.WriteUInt32(targetGuildId)
@@ -344,7 +344,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(sender, receiver, CsPlayerAgentResponseOpcodes.GuildFullUpdate)
+				.WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildUpdate)
 				.WriteByte(CoreGuildStreamVersion)
 				.WriteUInt32(guild.Id)
 				.WriteByte(GuildGovernmentForm)
@@ -371,7 +371,7 @@ namespace Faolan.CSPlayerAgent
 		private Task SendGuildMemberJoined(INetworkClient client, ProtoMessage sender, ProtoMessage receiver, Character member)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(sender, receiver, CsPlayerAgentResponseOpcodes.GuildMemberJoined).WriteUInt32(CharacterWireType).WriteUInt32(member.Id);
+			ps.WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildMemberJoined).WriteUInt32(CharacterWireType).WriteUInt32(member.Id);
 			WriteGuildMemberRecord(ps, member);
 			return ps.SendAsync(client);
 		}
@@ -424,7 +424,7 @@ namespace Faolan.CSPlayerAgent
 		private static Task SendGuildInvite(INetworkClient client, ProtoMessage sender, ProtoMessage receiver, Guild guild, uint inviteeId, string inviterName)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(sender, receiver, CsPlayerAgentResponseOpcodes.GuildInvite);
+			ps.WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildInvite);
 			WriteGuildInviteBody(ps, guild, inviteeId, inviterName);
 			return ps.SendAsync(client);
 		}
