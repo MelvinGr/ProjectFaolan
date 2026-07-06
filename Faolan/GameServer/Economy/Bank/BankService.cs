@@ -72,7 +72,7 @@ namespace Faolan.GameServer.Economy.Bank
 			}
 
 			var record = BuildBankIirRecord(charInstance, SerializeContainer(bank));
-			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(record).SendAsync(client);
+			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
 
 			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
 		}

@@ -192,7 +192,7 @@ namespace Faolan.GameServer.CreateFlow
 
 			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
 			{
-				return new PacketStream().WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
+				return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
 			}
 		}
 	}

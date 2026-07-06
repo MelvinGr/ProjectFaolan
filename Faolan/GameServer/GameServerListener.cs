@@ -897,7 +897,7 @@ namespace Faolan.GameServer
 				TeleportCodec.BuildBegin(instance, destMapId),
 				TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
 			})
-				await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+				await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// Step 4: the enter-world handoff. The client learns the world server address ONLY from this 0x2002
@@ -911,7 +911,7 @@ namespace Faolan.GameServer
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
 			var address = $"{realm.IpAddress}:{realm.Port}";
 
-			await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.WorldHandoff).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
+			await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchRedirectToServer).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}

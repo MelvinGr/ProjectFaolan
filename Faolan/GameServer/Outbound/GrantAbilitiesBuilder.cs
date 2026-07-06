@@ -177,7 +177,7 @@ namespace Faolan.GameServer
 
 			foreach (var comboId in comboIds)
 			{
-				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArray(ComboBookIirCodec.Build(instance, comboId)).SendAsync(client);
+				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(ComboBookIirCodec.Build(instance, comboId)).SendAsync(client);
 			}
 
 			if (comboIds.Count > 0)

@@ -31,7 +31,7 @@ namespace Faolan.GameServer
 
 			// record 0: 0x00002000, 17-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50)
 				.WriteUInt32(instance)
 				.WriteArray(0x00)
@@ -52,7 +52,7 @@ namespace Faolan.GameServer
 			{
 				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
 				await new PacketStream()
-					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteUInt32(startFixed3d.Length)
 					.WriteArray(startFixed3d)
 					.SendAsync(client);
@@ -77,7 +77,7 @@ namespace Faolan.GameServer
 			{
 				var startCasildaScene = ScryScript.BuildStartScriptGroup(instance, 385910);
 				await new PacketStream()
-					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteUInt32(startCasildaScene.Length)
 					.WriteArray(startCasildaScene)
 					.SendAsync(client);
@@ -90,7 +90,7 @@ namespace Faolan.GameServer
 			if (false)
 			{
 				await new PacketStream()
-					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(instance)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)
@@ -100,7 +100,7 @@ namespace Faolan.GameServer
 				// verbatim; byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture).
 				var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
 				await new PacketStream()
-					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteUInt32(welcomeTutorial.Length)
 					.WriteArray(welcomeTutorial)
 					.SendAsync(client);
@@ -114,7 +114,7 @@ namespace Faolan.GameServer
 			{
 				var approachCasilda = ScryScript.BuildStep(instance, "ApproachCasilda");
 				await new PacketStream()
-					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteUInt32(approachCasilda.Length)
 					.WriteArray(approachCasilda)
 					.SendAsync(client);
@@ -127,7 +127,7 @@ namespace Faolan.GameServer
 
 			// record 5: 0x00002000, 154-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -286,13 +286,13 @@ namespace Faolan.GameServer
 
 			// record 6: 0x00002000, 21-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00, 0x00, 0x00, 0x11, 0x04, 0xB8, 0x2B, 0x2D, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x08, 0x18, 0xE4, 0x01, 0x00, 0x4F, 0xE4, 0x28)
 				.SendAsync(client);
 
 			// record 7: 0x00002000, 298-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x01,
@@ -595,7 +595,7 @@ namespace Faolan.GameServer
 
 			// record 8: 0x00002000, 370-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x01,
@@ -970,7 +970,7 @@ namespace Faolan.GameServer
 
 			// record 9: 0x00002000, 322-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x01,
@@ -1297,7 +1297,7 @@ namespace Faolan.GameServer
 
 			// record 10: 0x00002000, 250-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -1552,7 +1552,7 @@ namespace Faolan.GameServer
 
 			// record 11: 0x00002000, 202-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -1759,13 +1759,13 @@ namespace Faolan.GameServer
 
 			// record 12: 0x00002000, 21-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00, 0x00, 0x00, 0x11, 0x04, 0xB8, 0x2B, 0x2D, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x08, 0x18, 0xDA, 0x01, 0x00, 0x4F, 0xE4, 0x28)
 				.SendAsync(client);
 
 			// record 13: 0x00002000, 39-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -1809,7 +1809,7 @@ namespace Faolan.GameServer
 
 			// record 14: 0x00002000, 60-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -1874,7 +1874,7 @@ namespace Faolan.GameServer
 
 			// record 15: 0x00002000, 36-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -1915,7 +1915,7 @@ namespace Faolan.GameServer
 
 			// record 16: 0x00002000, 125-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -2045,7 +2045,7 @@ namespace Faolan.GameServer
 
 			// record 17: 0x00002000, 198-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -2248,7 +2248,7 @@ namespace Faolan.GameServer
 
 			// record 18: 0x00002000, 39-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x00,
@@ -2292,7 +2292,7 @@ namespace Faolan.GameServer
 
 			// record 19: 0x00002000, 1711-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
 					0x06,

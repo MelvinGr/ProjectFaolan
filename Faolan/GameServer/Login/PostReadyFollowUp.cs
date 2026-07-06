@@ -160,7 +160,7 @@ namespace Faolan.GameServer
 				durationMs = ActiveBuff.DurationMsFromPayload(data);
 
 			await new PacketStream()
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.MagicBuffIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -299,7 +299,7 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Sending deferred new-character AccessWindow/SetDayTime after the post-0x205F follow-up.");
 
 				await new PacketStream() // AccessWindow packet
-					.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x0E), [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], GameServerCarrierOpcodes.IirCarrier)
+					.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x0E), [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArray(0x00, 0x00, 0x1F, 0x93, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(client.Session.Account.ClientInstance)
 					.WriteArray(0x00,
@@ -8408,7 +8408,7 @@ namespace Faolan.GameServer
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
 
 			return new PacketStream()
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, [])))
 				.SendAsync(client);
 		}
@@ -8500,7 +8500,7 @@ namespace Faolan.GameServer
 		private static Task SendExistingCharacterPostReadyDataPacket(INetworkClient client, uint opcode, byte[] tail)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(opcode)
 					.WriteUInt32(EntityClass.Character)
@@ -8529,7 +8529,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -8558,7 +8558,7 @@ namespace Faolan.GameServer
 			var receiver0 = LoginWorldReceiver(client);
 
 			return new PacketStream()
-				.WriteHeader(sender0, receiver0, GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.GameTimeIIR)
 					/*.WriteArray(

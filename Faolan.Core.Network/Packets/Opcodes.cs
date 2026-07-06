@@ -178,19 +178,6 @@ namespace Faolan.Core.Network.Packets
 		// GameServerRespondOpcodes enum was retired 2026-06-16 (its values were byte-identical); see git for
 		// the nickname -> recovered-name map.
 
-		// The two CARRIER opcodes kept as readable nicknames (they aren't a single dispatch method, so the recovered
-		// DispatchPassBlob / DispatchRedirectToServer names obscure intent at the ~600 call sites that use them). The
-		// values equal their GameInterface dispatch counterparts, so the wire is identical.
-		public enum GameServerCarrierOpcodes : ushort
-		{
-			// The generic IIR carrier (s2c 0x2000): the real method is a sub-opcode in the body. = GameInterface
-			// DispatchPassBlob. Almost every world/create/login s2c record is sent under this opcode.
-			IirCarrier = GameInterfaceDispatchOpcodes.DispatchPassBlob,
-
-			// Enter-world/teleport world-address advert ([0x00][byteLen][host:port]); the client reconnects to the
-			// advertised GameServer. = GameInterface DispatchRedirectToServer.
-			WorldHandoff = GameInterfaceDispatchOpcodes.DispatchRedirectToServer
-		}
 
 		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from
 		// --- docs/aoc-client-rpc-methods.json (opcode = 0x2000 + table position). Most are not handled yet;

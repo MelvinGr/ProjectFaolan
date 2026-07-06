@@ -38,7 +38,7 @@ namespace Faolan.GameServer
 		internal static byte[] BuildGuildTag(INetworkClient client, uint characterId, string guildName)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => WriteGuildTagBody(s, characterId, guildName));
+			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => WriteGuildTagBody(s, characterId, guildName));
 			return ps.WriteLengthHash().ToArray();
 		}
 

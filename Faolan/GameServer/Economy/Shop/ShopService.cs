@@ -260,7 +260,7 @@ namespace Faolan.GameServer.Economy.Shop
 		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).

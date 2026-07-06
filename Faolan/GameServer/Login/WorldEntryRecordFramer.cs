@@ -84,7 +84,7 @@ namespace Faolan.GameServer
 		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArray(bodyWithLenPrefix);
+			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(bodyWithLenPrefix);
 			return ps.WriteLengthHash().ToArray();
 		}
 	}

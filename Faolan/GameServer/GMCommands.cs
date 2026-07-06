@@ -42,7 +42,7 @@ namespace Faolan.GameServer
 			var owner = client.Session.Account.ClientInstance;
 			entity.OwnerHandle = owner;
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildAssign(owner,
 					entity.Handle,
 					combat

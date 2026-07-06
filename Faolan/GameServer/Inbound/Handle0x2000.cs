@@ -170,7 +170,7 @@ namespace Faolan.GameServer
 							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
 							// nearby players is the next step.
 							await new PacketStream()
-								.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+								.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 								.WriteArrayUInt32Length(s => s
 									.WriteUInt32(pbOpcode)
 									.WriteUInt32(dataobjdec)
@@ -892,7 +892,7 @@ namespace Faolan.GameServer
 			var replyBody = TradeskillRecipeCodec.BuildReplyBody(records);
 
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.TradeskillReplyIIR)
 					.WriteUInt32(0x0000C350) // the ProtoID type marker (0xC350) preceding the target handle
@@ -1004,7 +1004,7 @@ namespace Faolan.GameServer
 			if (command == PetCommand.Dismiss)
 			{
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildRemove(owner, petHandle)))
 					.SendAsync(client);
 

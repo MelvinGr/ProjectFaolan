@@ -104,7 +104,7 @@ namespace Faolan.GameServer
 				category = 1;
 
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, instance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteUInt32(targetType)
 				.WriteUInt32(targetInstance)
 				.WriteUInt32(category) // cCategory: 0 = friendly, 1 = hostile, 2 = neutral

@@ -132,7 +132,7 @@ namespace Faolan.GameServer.CreateFlow
 			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
 			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
 			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000RespondsOpcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x36B0)))
 				.SendAsync(client);
 			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
@@ -146,7 +146,7 @@ namespace Faolan.GameServer.CreateFlow
 					f6Field2: 7004418));
 			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 385910));
 			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, id), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00)
 				.SendAsync(client);
 		}
@@ -155,7 +155,7 @@ namespace Faolan.GameServer.CreateFlow
 		// every rendered NPC move goes out on).
 		private Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// The intro TRANSFORM: a stationary (from==to) mode-2 MoveTask placing Kalanthes at his cutscene start.
@@ -212,7 +212,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			var id = client.Session.Account.ClientInstance;
 			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(scry))
 				.SendAsync(client);
 		}

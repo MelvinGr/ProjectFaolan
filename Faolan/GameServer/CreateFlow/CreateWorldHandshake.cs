@@ -83,7 +83,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			var instance = client.Session.Account.ClientInstance;
 			return new PacketStream()
-				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.ScryScriptIIR);
@@ -112,7 +112,7 @@ namespace Faolan.GameServer.CreateFlow
 		private Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
 			return new PacketStream()
-				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(subOpcode);
@@ -127,7 +127,7 @@ namespace Faolan.GameServer.CreateFlow
 		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
 		private Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
-			return new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
+			return new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
 		}
 
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
@@ -148,7 +148,7 @@ namespace Faolan.GameServer.CreateFlow
 				: 0xBCF5C28Fu;
 
 			return new PacketStream()
-				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetMorphValueIIR);
@@ -171,7 +171,7 @@ namespace Faolan.GameServer.CreateFlow
 			var instance = client.Session.Account.ClientInstance;
 
 			await new PacketStream()
-				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetNameIIR);

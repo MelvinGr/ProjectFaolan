@@ -176,14 +176,14 @@ namespace Faolan.GameServer.World
 				Record(def, QuestTextSlot.Objective),
 				Record(def, QuestTextSlot.ObjectiveLocalized));
 
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// Sends a QuestGoal (objective progress) to the player.
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestGoal(client.Session.Account.ClientInstance, questId, goalId, count)))
 				.SendAsync(client);
 		}
@@ -192,7 +192,7 @@ namespace Faolan.GameServer.World
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestIir(client.Session.Account.ClientInstance, questId, state)))
 				.SendAsync(client);
 		}
@@ -329,7 +329,7 @@ namespace Faolan.GameServer.World
 				if (viewer.Client == null)
 					continue;
 
-				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(viewer.Client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(viewer.Client);
+				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(viewer.Client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(viewer.Client);
 			}
 		}
 
@@ -790,7 +790,7 @@ namespace Faolan.GameServer.World
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle)))
 				.SendAsync(client);
 
@@ -912,7 +912,7 @@ namespace Faolan.GameServer.World
 			var trailing = WorldQuest.BuildTrackedQuestPointer();
 
 			var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
@@ -922,7 +922,7 @@ namespace Faolan.GameServer.World
 		public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{
 			var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds, Record(trackedDef, QuestTextSlot.AreaTitle));
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
 		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
@@ -1324,7 +1324,7 @@ namespace Faolan.GameServer.World
 		// placed at the corpse's spot.
 		private Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier).WriteArray(body).SendAsync(recipient);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
 		}
 
 		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
@@ -1371,7 +1371,7 @@ namespace Faolan.GameServer.World
 			}
 
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(subjectHandle, token)))
 				.SendAsync(recipient);
 		}
@@ -1380,7 +1380,7 @@ namespace Faolan.GameServer.World
 		// dedicated builders share - e.g. the NPC MoveTask chase step).
 		private Task SendWorldIir(INetworkClient recipient, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(recipient);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(recipient);
 		}
 
 		// Forwards a player's Move to `recipient` (same body - the moving entity's handle + transform - only the
@@ -1388,7 +1388,7 @@ namespace Faolan.GameServer.World
 		private Task SendWorldMove(INetworkClient recipient, MoveForward move)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(move.Subop)
 					.WriteUInt32(move.DataObject)
@@ -1405,7 +1405,7 @@ namespace Faolan.GameServer.World
 		// double-prefix it). Mirrors ChatTextSender. Use SendWorldIir for bare bodies (MoveTask/loot/vitals).
 		private Task SendWorldRecord(INetworkClient recipient, byte[] record)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier).WriteArray(record).SendAsync(recipient);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(record).SendAsync(recipient);
 		}
 
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
@@ -1429,7 +1429,7 @@ namespace Faolan.GameServer.World
 			// mid-session/interest spawns reuse arbitrary rows, so without this they carry a stale token and never render.
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
 
-			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier).WriteArray(body).SendAsync(recipient);
+			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
 		}
 
 		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled

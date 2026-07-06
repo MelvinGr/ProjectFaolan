@@ -22,7 +22,7 @@ namespace Faolan.GameServer
 		{
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.GameTime);
@@ -58,7 +58,7 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.MapChange);

@@ -57,7 +57,7 @@ namespace Faolan.GameServer.CreateFlow
 
 			// MagicBuff carries the instance twice (caster + target).
 			await new PacketStream()
-				.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.MagicBuffIIR)
 					.WriteArray(0x00, 0x00, 0xC3, 0x50)
@@ -95,14 +95,14 @@ namespace Faolan.GameServer.CreateFlow
 			// a body never desyncs it.
 			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
 			{
-				return new PacketStream().WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
+				return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
 			}
 
 			// Sends a fully-built IIR record (one that already begins with its sub-opcode, e.g. ScryScript.BuildStep);
 			// the length prefix is recomputed by WriteArrayUInt32Length.
 			Task IirRecord(byte[] record)
 			{
-				return new PacketStream().WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
+				return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
 			}
 		}
 	}
