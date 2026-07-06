@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Packets
 			Whisper = 0x001E, // incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info
 			ChannelChat = 0x0041, // a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000]
 			Ox0014 = 0x0014, // sender id + name; also sent before a ChannelChat so the client can show the speaker
-			Ox003C = 0x003c,
+			Ox003C = 0x003C,
 			Ox0064 = 0x0064 // echo of the client's chat-init handshake
 		}
 
@@ -190,33 +190,10 @@ namespace Faolan.Core.Network.Packets
 			Ox20D0 = 0x20D0
 		}
 
-
-		// The behavior-nickname GameServerRespondOpcodes enum was RETIRED (2026-06-16): every s2c send now uses the
-		// recovered per-class dispatch enum below (values are byte-identical, so the wire is unchanged and the
-		// capture-replay golden tests hold). The nickname -> recovered-name map, for reference:
-		//   IirCarrier 0x2000        -> GameServerCarrierOpcodes.IirCarrier (= GameInterface DispatchPassBlob)
-		//   WorldHandoff 0x2002      -> GameServerCarrierOpcodes.WorldHandoff (= GameInterface DispatchRedirectToServer)
-		//   UpdateBindLocation 0x2002-> GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation
-		//   AckAuthenticate 0x2001   -> GameInterfaceDispatchOpcodes.DispatchAckAuthenticate
-		//   GameInterfaceNoArg2004   -> GameInterfaceDispatchOpcodes.Reserved0x2004 (no recovered name)
-		//   UpdateCash 0x2005        -> GameCharInterfaceDispatchOpcodes.DispatchUpdateCash
-		//   SpawnCheck 0x2008        -> GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker (per-char)
-		//   Pong 0x2009              -> GameInterfaceDispatchOpcodes.DispatchGameServerStats (the stats keepalive)
-		//   ReportDimensionId 0x200b -> GameInterfaceDispatchOpcodes.DispatchReportDimesionID
-		//   ReportServerId 0x200c    -> GameInterfaceDispatchOpcodes.DispatchReportServerID
-		//   SetDialogueCamera 0x2015 -> GameCharInterfaceDispatchOpcodes.DispatchSetDialogueCamera
-		//   SetItemStat 0x201C       -> GameCharInterfaceDispatchOpcodes.DispatchSetItemStat
-		//   RemoveItem 0x201F        -> GameCharInterfaceDispatchOpcodes.DispatchRemoveItem
-		//   AddItem 0x2020           -> GameCharInterfaceDispatchOpcodes.DispatchAddItem
-		//   ReadyForPlayScreen 0x2024-> GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots
-		//   ShopData 0x2033          -> GameCharInterfaceDispatchOpcodes.DispatchShopData
-		//   ItemSoldToShop 0x2035    -> GameCharInterfaceDispatchOpcodes.DispatchItemSoldToShop
-		//   GuildRankingsUpdate 0x2038 -> CSPlayerInterfaceDispatchOpcodes.DispatchGuildRankingsUpdate
-		//   AddSpecialAbility 0x2052 -> GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility
-		//   ReceivedStockPhraseText 0x205D -> GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText
-		//   ShortcutBarReply 0x2076  -> GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply
-		//   LatencyCheckResponse 0x2082 -> GameCharInterfaceDispatchOpcodes.DispatchPong (the per-char pong)
-		//   MassivePvpInfoRequestReturn 0x20A5 -> CSPlayerInterfaceDispatchOpcodes.DispatchMassivePvpInfoRequestReturn
+		// s2c sends use the recovered per-class dispatch enums below (GameInterfaceDispatchOpcodes /
+		// GameCharInterfaceDispatchOpcodes / CSPlayerInterfaceDispatchOpcodes). The old behavior-nickname
+		// GameServerRespondOpcodes enum was retired 2026-06-16 (its values were byte-identical); see git for
+		// the nickname -> recovered-name map.
 
 		// The two CARRIER opcodes kept as readable nicknames (they aren't a single dispatch method, so the recovered
 		// DispatchPassBlob / DispatchRedirectToServer names obscure intent at the ~600 call sites that use them). The
@@ -455,10 +432,10 @@ namespace Faolan.Core.Network.Packets
 			Interact = 0x642CD3D6, // = BehaviorControlCenterIIR_c: generic action channel (world-object interaction, spells, right-click, inventory/equipment)
 			CombatReactiveIIR = 0x54C02089, // = CombatReactiveIIR_c: spellweave add-component (c2s) - the caster combo (docs/combos.md)
 			CloseGame = 0x6B6FD368, // = CharacterActionIIR_t
-			ReadyForPlayScreen = 0x864cfef8, // = CharInPlayIIR_t
-			Move = 0x4517aa81, // = CharDCMoveIIR_t
-			ScryScriptIIR = 0xa36d3b74, // = ScryScriptIIR_c: cutscene/scry scripts + char-editor callbacks (IntroDone, ChangeSex, TheNameIs, ClientLoadingDone, ...)
-			StatIIR = 0xf98e10b3, // = StatIIR_t
+			ReadyForPlayScreen = 0x864CFEF8, // = CharInPlayIIR_t
+			Move = 0x4517AA81, // = CharDCMoveIIR_t
+			ScryScriptIIR = 0xA36D3B74, // = ScryScriptIIR_c: cutscene/scry scripts + char-editor callbacks (IntroDone, ChangeSex, TheNameIs, ClientLoadingDone, ...)
+			StatIIR = 0xF98E10B3, // = StatIIR_t
 			SelectDeselect = 0x0D155695, // = LookAtIIR_t
 			QueuePetCommand = 0x205B, // GameCharAgent method (16-bit opcode, >=0x2014): the pet command bar - body [type][petHandle][PetCommand] (#307)
 			TradeskillRequestIIR = 0x06B9CD94, // = TradeskillRequestIIR_c: client opened the Crafting->Recipes book; asks for its known-recipe list (reply = TradeskillReplyIIR 0x9062D559)
@@ -575,34 +552,8 @@ namespace Faolan.Core.Network.Packets
 			SetDayTime = GameTimeIIR,
 			ApplySpell = MagicBuffIIR
 
-			// FullPlayerCharacterIIR (0x737A6DF9) carve-out - the player inventory/bag serialization:
-			// - after a 34-byte preamble, the body contains nested container-style blocks linked by field 6:
-			//   101 -> f6 -> 104 -> f6 -> 112 -> f6 -> 113 -> f7=0
-			// - each block currently looks like { f1=containerRef, f2=?, f3=?, repeated f4=itemEntry, f6=nextBlock? }
-			// - confirmed blocks currently seen with the same shared owner/root handle: 101, 104, 112, 113
-			// - block 101 carries 21 indices that exactly match the known Spawn appearance/customization ids
-			//   (1,2,3,5,6,7,9,10,11,12,14,15,16,18,20,21,1002,1007,1011,1016,1018)
-			// - block 104 is the strongest bag section: indices 0..29 line up with observed bag-slot moves,
-			//   and a nested tiny message shaped like { f1=26, f2=count } reproduces stack counts such as
-			//   20,78,100,34,96,83,82,56,4,1,5,3 from the earlier bag notes
-			// - by count profile alone, 112 now looks resource-like (many non-1 stacks) and 113 looks quest-like
-			//   (mostly count=1); this tentatively matches the CharacterEquipment model's Bag/Resources/Quest split
-			// - the tiny message { f1=23, f2=value } now looks like a local inventory-record id rather than an
-			//   item template id: across 104/112/113 it forms one perfect contiguous range 168534..168658
-			//   and is the only tiny submessage that is present on every parsed entry in this sample
-			// - { f1=26, f2=value } behaves like an optional stack-count field; when omitted, the entry still
-			//   behaves like count=1, which matches the mostly-singleton quest-style block 113
-			// - { f1=0, f2=value } behaves like optional instance state/flags rather than item type metadata
-			//   because the same 4-character tail code can reappear with different count and even different
-			//   presence/absence of this field (e.g. repeated codes in 104/112)
-			// - each item entry ends with a stable 83-byte tail shaped like:
-			//   { f1=len20, f2=len20, f3=len20, f4=fixed32, f5=fixed32, f7=varint, f8=fixed32 }
-			//   where f1/f2/f3 are byte-identical, f4 always equals f5 in current samples, and f8 behaves like
-			//   a short 4-character hash/type code because it uniquely determines the whole tail signature
-			// - rare optional tiny submessages also exist (currently seen with leading kinds 265, 8, and 1290),
-			//   which likely carry special-case item properties rather than core bag-slot state
-			// - no server->client inventory packet follows later MoveItemInInventory requests, so the client
-			//   appears to learn the initial bag state here rather than via a small incremental sync packet
+			// FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization carve-out (nested 101/104/112/113
+			// container blocks, 83-byte item tails): the RE notes live in docs/fullplayer-snapshot-reader.md.
 		}
 
 		// PlayerAgent opcodes do NOT map onto the recovered PlayerAgent/PlayerInterface tables (25 methods, max
@@ -611,30 +562,26 @@ namespace Faolan.Core.Network.Packets
 		public enum PlayerAgentOpcodes : ushort
 		{
 			RequestAuth = 0x2083,
-			RequestSmallCharList = 0x20c1, //0xDAD1D206,
-			RequestCharRealmData = 0x208e, //0xA3E1FE0D
-			Ox20A6 = 0x20a6,
-			EnterWorld = 0x20b6, //0xDD85FB0E
-			Ox20D6 = 0x20d6, //0xDD9EC209
-			CreateCharacter = 0x20de,
+			RequestSmallCharList = 0x20C1, //0xDAD1D206,
+			RequestCharRealmData = 0x208E, //0xA3E1FE0D
+			Ox20A6 = 0x20A6,
+			EnterWorld = 0x20B6, //0xDD85FB0E
+			Ox20D6 = 0x20D6, //0xDD9EC209
+			CreateCharacter = 0x20DE,
 			Ox20EC = 0x20EC,
-			DeleteCharacter = 0x209d // 0x86979E0C:
+			DeleteCharacter = 0x209D // 0x86979E0C:
 		}
 
 		public enum PlayerAgentResponseOpcodes : ushort
 		{
-			Ox20B9 = 0x20b9,
-			Ox209C = 0x209c,
+			Ox20B9 = 0x20B9,
+			Ox209C = 0x209C,
 			InitAuth = 0x2091,
-			SmallCharList = 0x20a5,
-			SendCharacterList = 0x20ef,
-			SendRealmList = 0x20cc,
-			SendCharacterRealmData = 0x208c,
+			SmallCharList = 0x20A5,
+			SendCharacterList = 0x20EF,
+			SendRealmList = 0x20CC,
+			SendCharacterRealmData = 0x208C,
 
-			//SendCsPlayerAgent = 0x00001A07,
-			//SendAgentServer = 0x00001A07,
-			//SendGameServer = 0x00001A07,
-			//SendLast = 0x00001A07,
 			Ox1A07 = 0x1A07
 		}
 

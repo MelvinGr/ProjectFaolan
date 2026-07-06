@@ -359,3 +359,38 @@ writeup + retail Necro captures in **`docs/handoff-2026-06-17-perclass-snapshot.
   parsing + diffing the Necro (Mage) vs Strie (Rogue) world-entry snapshots.
 - A tails-stat-block patch was tried and **reverted** (it didn't change the sheet and made the client drop
   equipped gear). `decode_statblock.py`'s `[64]=mana` / `[78]=archetype` labels are wrong — corrected in that file.
+
+## Inventory/bag carve-out (moved from Opcodes.cs 2026-07-06)
+
+RE notes on the FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization, formerly a comment block in the `GameServer0X2000RespondsOpcodes` enum:
+
+```
+FullPlayerCharacterIIR (0x737A6DF9) carve-out - the player inventory/bag serialization:
+- after a 34-byte preamble, the body contains nested container-style blocks linked by field 6:
+  101 -> f6 -> 104 -> f6 -> 112 -> f6 -> 113 -> f7=0
+- each block currently looks like { f1=containerRef, f2=?, f3=?, repeated f4=itemEntry, f6=nextBlock? }
+- confirmed blocks currently seen with the same shared owner/root handle: 101, 104, 112, 113
+- block 101 carries 21 indices that exactly match the known Spawn appearance/customization ids
+  (1,2,3,5,6,7,9,10,11,12,14,15,16,18,20,21,1002,1007,1011,1016,1018)
+- block 104 is the strongest bag section: indices 0..29 line up with observed bag-slot moves,
+  and a nested tiny message shaped like { f1=26, f2=count } reproduces stack counts such as
+  20,78,100,34,96,83,82,56,4,1,5,3 from the earlier bag notes
+- by count profile alone, 112 now looks resource-like (many non-1 stacks) and 113 looks quest-like
+  (mostly count=1); this tentatively matches the CharacterEquipment model's Bag/Resources/Quest split
+- the tiny message { f1=23, f2=value } now looks like a local inventory-record id rather than an
+  item template id: across 104/112/113 it forms one perfect contiguous range 168534..168658
+  and is the only tiny submessage that is present on every parsed entry in this sample
+- { f1=26, f2=value } behaves like an optional stack-count field; when omitted, the entry still
+  behaves like count=1, which matches the mostly-singleton quest-style block 113
+- { f1=0, f2=value } behaves like optional instance state/flags rather than item type metadata
+  because the same 4-character tail code can reappear with different count and even different
+  presence/absence of this field (e.g. repeated codes in 104/112)
+- each item entry ends with a stable 83-byte tail shaped like:
+  { f1=len20, f2=len20, f3=len20, f4=fixed32, f5=fixed32, f7=varint, f8=fixed32 }
+  where f1/f2/f3 are byte-identical, f4 always equals f5 in current samples, and f8 behaves like
+  a short 4-character hash/type code because it uniquely determines the whole tail signature
+- rare optional tiny submessages also exist (currently seen with leading kinds 265, 8, and 1290),
+  which likely carry special-case item properties rather than core bag-slot state
+- no server->client inventory packet follows later MoveItemInInventory requests, so the client
+  appears to learn the initial bag state here rather than via a small incremental sync packet
+```
