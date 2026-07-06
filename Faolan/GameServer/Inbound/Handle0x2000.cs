@@ -61,19 +61,9 @@ namespace Faolan.GameServer
 
                 case GameServer0X2000Opcodes.StatIIR:
                 {
+                    // Create-editor (unnamed) avatar stat stream: retail sends no response, we just observe it.
                     if (client.Session.Character?.Name == null)
-                    {
-                        if (IsRetailCreateEditorFlow(client))
-                        {
-                            Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}.", client.Session.HasPendingPost205FFollowUp);
-                            break;
-                        }
-
-                        if (client.Session.HasPendingPost205FFollowUp)
-                            Logger.LogInformation("Queued new-character 0xF98E10B3 while post-0x205F handoff is still pending.");
-                        else
-                            Logger.LogInformation("Ignoring standalone new-character 0xF98E10B3 because the post-0x205F handoff has already been flushed.");
-                    }
+                        Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}.", client.Session.HasPendingPost205FFollowUp);
 
                     break;
                 }
@@ -189,24 +179,15 @@ namespace Faolan.GameServer
 
                 case GameServer0X2000Opcodes.CharInPlayIIR: //peer0_160
                 {
-                    // A dead player's resurrection-spot pick is a separate RespawnMe (0x2024 GameCharAgent, ->
-                    // HandleGameCharAgentPacket); the client never sends CharInPlayIIR while dead (verified in the
-                    // die-then-resurrect captures). So CharInPlayIIR is always the "ready" signal here.
-                    // An unnamed character IS the create-editor phase (IsRetailCreateEditorFlow is exactly this check).
-                    if (client.Session.Character?.Name == null)
-                    {
-                        // Retail answers the editor's CharInPlayIIR DIRECTLY with the post-ready burst - the 0x2024
-                        // ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the creation script that launches the
-                        // editor (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95). No
-                        // instance-echo counting or deferral - CharInPlayIIR IS the trigger.
-                        Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
-                        await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
-                    }
-                    else
-                    {
-                        await SendReadyForPlayScreen(client);
-                        await SendExistingCharacterPostReadyFollowUp(client);
-                    }
+                    // CharInPlayIIR is ONLY sent by the create-editor (unnamed) client: retail login and the create
+                    // WORLD entry both use 0x205f, and a dead player's respawn pick is a separate RespawnMe (0x2024
+                    // GameCharAgent) - all verified in captures. So a named character never reaches this; nothing to do.
+                    // Retail answers the editor's CharInPlayIIR DIRECTLY with the post-ready burst - the 0x2024
+                    // ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the creation script that launches the
+                    // editor (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95). No
+                    // instance-echo counting or deferral - CharInPlayIIR IS the trigger.
+                    Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
+                    await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
 
                     break;
                 }
