@@ -389,7 +389,7 @@ namespace Faolan.GameServer
 
 		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger
 		// is interacting with an auctioneer NPC). Sends DispatchOpenTradepost so the client opens the AH window and
-		// then sends TradepostOpen + searches, which the TradepostHandler answers with listings.
+		// then sends TradepostOpen + searches, which HandleTradepostPacket answers with listings.
 		private async Task OpenAuctionHouseCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;

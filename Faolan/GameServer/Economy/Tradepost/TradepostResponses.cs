@@ -151,5 +151,30 @@ namespace Faolan.GameServer.Economy.Tradepost
 			stream.WriteLengthHash();
 			return stream.ToArray();
 		}
+
+		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
+		// Category is echoed back as the search-results `head` (const 0x7E2 in the captures).
+		public static SearchQuery ParseSearch(FaolanStream body)
+		{
+			if (body == null)
+				return new SearchQuery("", 0x7e2, 0, 0);
+
+			try
+			{
+				var lang = Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
+				var cat = body.ReadUInt32(); // category root (const 0x7E2 in captures)
+				var page = body.ReadUInt32();
+				body.ReadUInt32(); // cat2 (mirror of cat)
+				var itemId = body.ReadUInt32();
+				return new SearchQuery(lang, cat, page, itemId);
+			}
+			catch (Exception)
+			{
+				return new SearchQuery("", 0x7e2, 0, 0);
+			}
+		}
+
+		public readonly record struct SearchQuery(string Lang, uint Category, uint Page, uint ItemId);
+
 	}
 }

@@ -213,7 +213,7 @@ namespace Faolan.GameServer
 			{
 				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
 				case ConanEndpoints.TradepostAgentType:
-					await TradepostHandler.Handle(_tradepost, client, packet, Logger, Database);
+					await HandleTradepostPacket(client, packet);
 					return;
 
 				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
