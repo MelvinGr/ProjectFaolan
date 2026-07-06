@@ -1027,7 +1027,10 @@ namespace Faolan.Core.Database
 				.ClassSpells
 				.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
-				.Where(s => s.Level <= level)
+				// Level 0 = UNKNOWN unlock level (not yet imported - most of the catalog). Exclude it: treating it as
+				// "<= level" put every unleveled spell (incl. high ranks like "Aura of Dread Fury (Rank 5)") on a
+				// level-1 character's bar. Only spells with a KNOWN unlock level at/under the character seed the bar.
+				.Where(s => s.Level > 0 && s.Level <= level)
 				.Select(s => new
 				{
 					s.Id,
@@ -1060,7 +1063,10 @@ namespace Faolan.Core.Database
 				.ClassSpells
 				.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
-				.Where(s => s.Level <= level)
+				// Level 0 = UNKNOWN unlock level (not yet imported). Exclude it so a fresh level-1 character's
+				// spellbook is not seeded with every unleveled spell in the class map (which are mostly high-rank,
+				// 0-mana placeholders). Only KNOWN-leveled spells at/under the character's level are learned.
+				.Where(s => s.Level > 0 && s.Level <= level)
 				.OrderBy(s => s.Level)
 				.ThenBy(s => s.Id)
 				.Select(s => s.Id)
