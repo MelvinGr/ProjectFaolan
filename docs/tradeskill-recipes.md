@@ -61,6 +61,10 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
 - The catalog is served **whole** to every character (the one capture is an L80 necro's full book). Real
   per-character known-recipe filtering (which recipes a char has learned) needs per-char recipe data — none
   is captured yet. An empty catalog yields a valid empty list (book opens, no recipes).
-- Normalise the ingredient/result sub-lists (item ids + keys) into child tables so recipes are queryable,
-  not just replayable.
+- ~~Normalise the ingredient/result sub-lists into child tables so recipes are queryable.~~ **DONE:**
+  `RecipeItem` (Role ingredient/result, Position, ItemId, Flag, Hash, Data1..4 = the item DecryptionKey,
+  Trailing) via `TradeskillRecipeCodec.ParseRecordItems`; the importer seeds it (2476 rows: 1873
+  ingredients + 603 results). `Recipe.Data` stays the byte-exact wire source; the child rows are the
+  queryable projection. The element layout is fixed 18 u32 (ingredient) / 17 u32 (result):
+  `[0]=[1]=itemId, [2]=0, [3]=Flag, [4]=Hash, [5..8]=[9..12]=key, [13..16]=const, [17]=Trailing`.
 - `type=1` single-`RecipeLearnt` form + the `LearnRecipe` GameAction (`FUN_0112d750`) are not built yet.

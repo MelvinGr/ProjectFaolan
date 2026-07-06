@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations.Schema;
 
+using System.Collections.Generic;
+
 namespace Faolan.Core.Database.Tables
 {
 	// A crafting/tradeskill recipe, as served in the TradeskillReplyIIR_c (0x9062D559) recipe-book list the client
@@ -20,5 +22,9 @@ namespace Faolan.Core.Database.Tables
 		// 1-byte flag. The wire list element is [u32 Id][Data]; the builder reproduces exactly that.
 		[Column(TypeName = "BLOB")]
 		public byte[] Data { get; set; } = [];
+
+		// The decoded ingredient (input) + result (output) items - a queryable projection of Data's KEY1/listC
+		// element lists (TradeskillRecipeCodec.ParseRecordItems). Data stays the byte-exact wire source.
+		public virtual ICollection<RecipeItem> Items { get; set; } = new List<RecipeItem>();
 	}
 }

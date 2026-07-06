@@ -31,6 +31,17 @@ namespace Faolan.Core.Network.Packets
 		// A single parsed recipe: its id (the record's list-key) and the verbatim record body AFTER that id.
 		public readonly record struct RecipeRecord(uint Id, byte[] Data);
 
+		// One ingredient/result item inside a recipe (KEY1 = ingredients, listC = results). Fields decoded from
+		// the fixed element layout (18 u32 for ingredients, 17 for results): [0]=[1]=item id, [2]=0, [3]=Flag,
+		// [4]=Hash, [5..8]=[9..12]=the item's 16-byte TEA DecryptionKey (D1..D4), [13..16]=a global constant,
+		// and (ingredients only) [17]=Trailing. Role: 0 = ingredient (input), 1 = result (output).
+		public readonly record struct RecipeItemElement(
+			byte Role, int Position, uint ItemId, uint Flag, uint Hash,
+			uint Data1, uint Data2, uint Data3, uint Data4, uint Trailing);
+
+		public const byte RoleIngredient = 0;
+		public const byte RoleResult = 1;
+
 		// Parse the reply IIR body (starting at the [u8 env] byte, i.e. just past [subop][0xC350][handle]) into its
 		// recipe records. Throws on a malformed stream so a bad decode surfaces rather than silently truncating.
 		public static List<RecipeRecord> ParseReplyBody(ReadOnlySpan<byte> body)
@@ -77,6 +88,53 @@ namespace Faolan.Core.Network.Packets
 			}
 
 			return body.ToArray();
+		}
+
+		// Parse the ingredient + result items out of a recipe record body (the bytes AFTER the u32 recipe id -
+		// i.e. Recipe.Data): [u32 x3 header][KEY1 ingredients][u32 x4][KEY2][listC results][u32][u8]. A queryable
+		// projection of the record; the record itself still ships verbatim from Recipe.Data.
+		public static List<RecipeItemElement> ParseRecordItems(ReadOnlySpan<byte> recordData)
+		{
+			var p = 12; // header x3
+			var items = new List<RecipeItemElement>();
+
+			var ingredients = ReadFramed(recordData, ref p);
+			for (var i = 0; i < ingredients; i++)
+				items.Add(ReadElement(recordData, ref p, RoleIngredient, i, hasTrailing: true));
+
+			p += 16; // mid x4
+			var key2 = ReadFramed(recordData, ref p);
+			p += key2 * 4; // KEY2 = list of u32
+
+			var results = ReadFramed(recordData, ref p);
+			for (var i = 0; i < results; i++)
+				items.Add(ReadElement(recordData, ref p, RoleResult, i, hasTrailing: false));
+
+			return items;
+		}
+
+		private static RecipeItemElement ReadElement(ReadOnlySpan<byte> data, ref int p, byte role, int position, bool hasTrailing)
+		{
+			var itemId = Read(data, ref p); // [0] item id
+			Read(data, ref p); //             [1] item id (dup)
+			Read(data, ref p); //             [2] = 0
+			var flag = Read(data, ref p); //  [3]
+			var hash = Read(data, ref p); //  [4]
+			var d1 = Read(data, ref p);
+			var d2 = Read(data, ref p);
+			var d3 = Read(data, ref p);
+			var d4 = Read(data, ref p); //    [5..8] = the item DecryptionKey
+			p += 32; //                       [9..12] key dup + [13..16] global constant (8 u32)
+			var trailing = hasTrailing ? Read(data, ref p) : 0u; // [17] (ingredients only)
+
+			return new RecipeItemElement(role, position, itemId, flag, hash, d1, d2, d3, d4, trailing);
+		}
+
+		private static uint Read(ReadOnlySpan<byte> data, ref int p)
+		{
+			var v = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(p, 4));
+			p += 4;
+			return v;
 		}
 
 		// The byte length of one record starting at `start` (walking the fixed fields + the three 0x3F1-framed

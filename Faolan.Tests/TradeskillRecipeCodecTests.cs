@@ -40,6 +40,34 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void ParseRecordItems_DecodesTheIngredientsAndResults()
+		{
+			if (!File.Exists(Capture))
+				return;
+
+			var packets = TsharkCaptureReader.Read(Capture);
+			var reply = packets.First(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000RespondsOpcodes.TradeskillReplyIIR);
+			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
+			var records = TradeskillRecipeCodec.ParseReplyBody(reply.Bytes.AsSpan(sub + 12).ToArray());
+
+			// Recipe 9 (the first record) = 3 ingredients + 1 result (validated against the capture bytes).
+			var recipe9 = records.First(r => r.Id == 9);
+			var items = TradeskillRecipeCodec.ParseRecordItems(recipe9.Data);
+			var ingredients = items.Where(i => i.Role == TradeskillRecipeCodec.RoleIngredient).ToList();
+			var results = items.Where(i => i.Role == TradeskillRecipeCodec.RoleResult).ToList();
+
+			Assert.Equal(3, ingredients.Count);
+			Assert.Single(results);
+			Assert.Equal(0x3cd8d7u, ingredients[0].ItemId); // first ingredient item id
+			Assert.Equal(0xa8d92184u, ingredients[0].Data1); // its DecryptionKey word 1
+			Assert.Equal(0x265c8u, results[0].ItemId); // the produced item id
+
+			// Every recipe's items parse cleanly (no over/under-run of the record body).
+			foreach (var rec in records)
+				Assert.NotEmpty(TradeskillRecipeCodec.ParseRecordItems(rec.Data));
+		}
+
+		[Fact]
 		public void BuildReplyBody_EmptyCatalog_IsAValidEmptyList()
 		{
 			// The correct reply for a character with no learned recipes: env=0, version=1, type=3, count=0x3F1.

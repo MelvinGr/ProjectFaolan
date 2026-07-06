@@ -36,7 +36,24 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				foreach (var r in TradeskillRecipeCodec.ParseReplyBody(p.Bytes.AsSpan(bodyStart)))
-					recipes.Add(new Recipe { Id = r.Id, Data = r.Data });
+				{
+					var recipe = new Recipe { Id = r.Id, Data = r.Data };
+					foreach (var e in TradeskillRecipeCodec.ParseRecordItems(r.Data))
+						recipe.Items.Add(new RecipeItem
+						{
+							Role = (RecipeItemRole)e.Role,
+							Position = e.Position,
+							ItemId = e.ItemId,
+							Flag = e.Flag,
+							Hash = e.Hash,
+							Data1 = e.Data1,
+							Data2 = e.Data2,
+							Data3 = e.Data3,
+							Data4 = e.Data4,
+							Trailing = e.Trailing
+						});
+					recipes.Add(recipe);
+				}
 			}
 
 			// De-dupe by recipe id (keep first) in case a capture carries the list more than once.
@@ -52,7 +69,7 @@ namespace Faolan.Importer.Captures
 			var updated = 0;
 			foreach (var r in recipes)
 			{
-				var existing = await db.Recipes.FirstOrDefaultAsync(x => x.Id == r.Id);
+				var existing = await db.Recipes.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == r.Id);
 				if (existing == null)
 				{
 					db.Recipes.Add(r);
@@ -61,6 +78,9 @@ namespace Faolan.Importer.Captures
 				else
 				{
 					existing.Data = r.Data;
+					existing.Items.Clear(); // cascade-delete the old rows, then re-add the freshly parsed set
+					foreach (var item in r.Items)
+						existing.Items.Add(item);
 					updated++;
 				}
 			}

@@ -53,6 +53,7 @@ namespace Faolan.Core.Database
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<PatrolWaypoint> PatrolWaypoints { get; }
 		DbSet<Recipe> Recipes { get; }
+		DbSet<RecipeItem> RecipeItems { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
@@ -113,6 +114,7 @@ namespace Faolan.Core.Database
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
 		public DbSet<Recipe> Recipes { get; set; }
+		public DbSet<RecipeItem> RecipeItems { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
@@ -148,6 +150,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Map>().Property(m => m.Id).ValueGeneratedNever();
 			modelBuilder.Entity<LuaScript>().Property(l => l.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Recipe>().Property(r => r.Id).ValueGeneratedNever();
+			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Recipe).WithMany(r => r.Items).HasForeignKey(ri => ri.RecipeId).OnDelete(DeleteBehavior.Cascade);
 
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
