@@ -205,634 +205,623 @@ namespace Faolan.GameServer
 		{
 			var opcode = (GameServerOpcodes)packet.Opcode;
 
-			// Tradepost (auction house) + mail ride the GameServer RPC layer; their 0x20xx methods COLLIDE with
-			// ordinary opcodes, so route them by RPC class id before the opcode switch (docs/tradepost-protocol.md).
-			if (TradepostProtocol.IsInbound(packet))
+			// This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes,
+			// so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
+			// class route consumes the packet. See docs/protocol_gameserver_rpc_multiplexing.md + tradepost-protocol.md.
+			// The two sub-0x2014 opcodes 0x2002/0x2003 are the ONLY ones that also arrive on GameCharAgent (there they
+			// are RequestBindLocation / SetTutorialStats); the opcode switch below then only ever sees the GameAgent form.
+			switch (packet.Receiver.Type)
 			{
-				await TradepostHandler.Handle(_tradepost, client, packet, Logger, Database);
-				return;
-			}
+				// Tradepost (auction house + mail). IsInbound also matches the TradepostInterface SENDER (robust to header
+				// caller/endpoint ordering), hence the guard rather than a plain class-constant case.
+				case var _ when TradepostProtocol.IsInbound(packet):
+					await TradepostHandler.Handle(_tradepost, client, packet, Logger, Database);
+					return;
 
-			// GameCharAgentProject (0x5B9756FC, the "post-ready family") rides this same RPC layer and its method
-			// ids COLLIDE with ordinary 0x2000 opcodes, so route it by class id BEFORE the opcode switch (like
-			// Tradepost). The in-world RequestAggroStatus poll lives here and GATES the loading screen finishing:
-			// without the reply the client retries it forever and never opens the chat (CommunityServer) connection.
-			// Gated to existing-character world login - the create-editor / create-world flows have their own
-			// elaborate handshake on this class and must not be diverted. See HandleGameCharAgentProject.
-			if (packet.Receiver.Type == ConanEndpoints.GameCharAgentProjectType && !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession && client.Session.Character?.Name != null)
-			{
-				await HandleGameCharAgentProject(client, packet);
-				return;
+				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
+				// screen (without the reply the client retries forever + never opens chat). Existing-character world login
+				// only - the create-editor/create-world flows own this class during their own handshake and must not divert.
+				case ConanEndpoints.GameCharAgentProjectType
+					when !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession && client.Session.Character?.Name != null:
+					await HandleGameCharAgentProject(client, packet);
+					return;
+
+				// GameCharAgent-addressed 0x2002/0x2003 (the GameAgent forms fall through to the opcode switch below).
+				case ConanEndpoints.GameCharAgentType:
+					LogPacketReceived(packet, opcode);
+					switch (opcode)
+					{
+						case GameServerOpcodes.ChatCommand: // 0x2002 = RequestBindLocation
+							await HandleRequestBindLocation(client, packet);
+							break;
+
+						case GameServerOpcodes.Hello: // 0x2003 = SetTutorialStats (Tortage tutorial tracking)
+							var tutorialStat = packet.Body.Length - packet.Body.Position >= sizeof(uint)
+								? packet.Body.ReadUInt32()
+								: 0;
+							Logger.LogDebug("GameCharAgent.SetTutorialStats(0x{Value:X8}); no reply.", tutorialStat);
+							break;
+					}
+
+					return;
 			}
 
 			if (opcode is not (GameServerOpcodes.Ping or GameServerOpcodes.LatencyCheck))
 				LogPacketReceived(packet, opcode);
 
-			// Class-first routing for the sub-0x2014 opcodes that COLLIDE between GameAgent (the connection class:
-			// auth/chat/ping/PassBlob) and GameCharAgent (per-character). These two are the only opcodes that arrive
-			// on BOTH classes (confirmed across every capture), so resolve them by receiver class HERE - the same
-			// pattern as the Tradepost / GameCharAgentProject routes above - and the opcode switch below then only
-			// ever sees the GameAgent form:
-			//   0x2002  GameAgent.ChatVicinity          vs  GameCharAgent.RequestBindLocation
-			//   0x2003  GameAgent.Authenticate2 (Hello) vs  GameCharAgent.SetTutorialStats
-			// (Everything else in the switch is either GameAgent-only - 0x2000/0x2005 - or unambiguously GameCharAgent
-			// at opcode >= 0x2014; 0x200B/0x200C are GameCharAgentProject-only and routed out above.)
-			if (packet.Receiver.Type == ConanEndpoints.GameCharAgentType)
+			switch (opcode)
 			{
-				switch (opcode)
+				case GameServerOpcodes.Hello:
 				{
-					case GameServerOpcodes.ChatCommand: // 0x2002 = GameCharAgent.RequestBindLocation
+					// 0x2003 = GameAgent.Authenticate2 (the connection Hello: clientInstance + accountId + version).
+					// The GameCharAgent.SetTutorialStats collision on this opcode is resolved by the class-first route
+					// above, so here the body is always the >= 12-byte Authenticate2. Guard defensively anyway: a short
+					// body would over-read and drop the client.
+					if (packet.Body.Length - packet.Body.Position < 12)
 					{
-						await HandleRequestBindLocation(client, packet);
+						Logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", packet.Body.Length - packet.Body.Position);
 						break;
 					}
 
-					case GameServerOpcodes.Hello: // 0x2003 = GameCharAgent.SetTutorialStats (Tortage tutorial tracking)
+					var clientInstance = packet.Body.ReadUInt32(); // 0x0802e5d4 0x1101b4f5
+					var accountId = packet.Body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
+					var clientVersion = packet.Body.ReadString();
+
+					client.Session.Account = await Database.GetAccount(accountId);
+					if (client.Session.Account == null)
+						throw new Exception($"Account not found: {accountId:X}");
+
+					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
+					client.Session.Account.ClientInstance = clientInstance;
+					client.Session.Character = resolvedCharacter;
+					if (resolvedCharacter?.Id != clientInstance)
 					{
-						var tutorialStat = packet.Body.Length - packet.Body.Position >= sizeof(uint)
-							? packet.Body.ReadUInt32()
-							: 0;
-						Logger.LogDebug("GameCharAgent.SetTutorialStats(0x{Value:X8}); no reply.", tutorialStat);
-						break;
-					}
-				}
-			}
-			else
-			{
-				switch (opcode)
-				{
-					case GameServerOpcodes.Hello:
-					{
-						// 0x2003 = GameAgent.Authenticate2 (the connection Hello: clientInstance + accountId + version).
-						// The GameCharAgent.SetTutorialStats collision on this opcode is resolved by the class-first route
-						// above, so here the body is always the >= 12-byte Authenticate2. Guard defensively anyway: a short
-						// body would over-read and drop the client.
-						if (packet.Body.Length - packet.Body.Position < 12)
-						{
-							Logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", packet.Body.Length - packet.Body.Position);
-							break;
-						}
-
-						var clientInstance = packet.Body.ReadUInt32(); // 0x0802e5d4 0x1101b4f5
-						var accountId = packet.Body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
-						var clientVersion = packet.Body.ReadString();
-
-						client.Session.Account = await Database.GetAccount(accountId);
-						if (client.Session.Account == null)
-							throw new Exception($"Account not found: {accountId:X}");
-
-						var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
-						client.Session.Account.ClientInstance = clientInstance;
-						client.Session.Character = resolvedCharacter;
-						if (resolvedCharacter?.Id != clientInstance)
-						{
-							Logger.LogInformation(
-								"GameServer Hello: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8} while preserving the retail temporary instance for create-flow traffic.",
-								clientInstance,
-								resolvedCharacter?.Id ?? 0,
-								accountId);
-						}
-
-						Logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
-
-						/*if (clientVersion != "v4.00.NoTS@369764")
-						{
-						    Logger.Info("Incompatible client connects to the Server");
-						    //break;
-						}*/
-
-						// Character creation has two phases on this GameServer connection:
-						//  1) CREATOR: the client connects on the temp instance 0x021662C8 and we send the
-						//     verbatim editor burst (RetailCreateEditorInitialBurst) so the creator UI appears.
-						//     Auth replies use the editor conversation family so the client associates the burst.
-						//  2) ENTER-WORLD: after the player customises + names, the world entry is sent (handled
-						//     out of the post-0x205F / ReadyForPlayScreen path), not here.
-						// Existing-character login uses the legacy conversation family + the world entry.
-						var isNewCharacter = client.Session.Character.Name == null;
-
-						// Post-creation WORLD connection: the client reconnects with the same (now named) character
-						// instance, but this is the SECOND GameServer connection - the one opened after the 0x2002
-						// enter-world handoff. It is recognised by the character id being in PendingCreateWorldEntry
-						// (added when the name was committed on the editor connection). Consume it here so a later
-						// normal login of the same character does not re-trigger the intro. This connection needs the
-						// full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
-						// auth + the intro/cutscene), so skip the helper auth for it.
-						var isCreateWorldEntry = !isNewCharacter && _createFlow.TryConsumePendingCreateWorldEntry(clientInstance);
-						client.Session.IsCreateWorldSession = isCreateWorldEntry;
-						client.Session.IsCreateEditorConnection = isNewCharacter;
-
-						if (!isCreateWorldEntry)
-						{
-							// New (unnamed) characters take the create-editor path; existing characters log in normally.
-							var authSender = isNewCharacter
-								? RetailCreatePost205FSender
-								: null;
-							var authReceiver = isNewCharacter
-								? CreateEditorFraming.Receiver(client)
-								: null;
-
-							await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
-							await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
-							await AckAuthenticate(client, 1, authSender, authReceiver);
-						}
-
-						client.Session.LastGameServer2020RequestId = null;
-						client.Session.HasPendingPost205FFollowUp = false;
-						client.Session.HasPendingCreateEditorReadyFollowUp = false;
-						client.Session.HasFlushedCreateWorldEntryBurst = false;
-						client.Session.HasFlushedCreateEditorPostReady = false;
-						client.Session.CreateEditorTempInstanceCount = 0;
-						client.Session.CreateEditorObservedRequestIds.Clear();
-						client.Session.CreateEditorReadyRequestIds.Clear();
-						client.Session.MorphAckCounter = 0;
-						client.Session.MorphActivitySequence = 0;
-						client.Session.PostMorphBurstSent = false;
-						client.Session.AwaitingEnterWorld = false;
-						client.Session.CreateWorldChunkIndex = 0;
-						// IsCreateEditorConnection / IsCreateWorldSession were set above from this connection's role.
-
-						if (isCreateWorldEntry) // Post-creation enter-world -> full retail creation world entry (-> scene)
-						{
-							// Force the Tortage intro spawn onto the character (covers resumed characters that
-							// never went through CreateCharacter), so the live SpawnPlayer uses the right position.
-							var spawnRows = await Database.SetCreationSpawn(client.Session.Character);
-							Logger.LogInformation(
-								"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
-								clientInstance,
-								client.Session.Character.Id,
-								client.Session.Character.Name,
-								spawnRows,
-								client.Session.Character.PositionX,
-								client.Session.Character.PositionY,
-								client.Session.Character.PositionZ,
-								client.Session.Character.MapId);
-							// #234 reconstruct (docs/handoff-2026-06-22-create-flow-reconstruct.md): the verbatim
-							// SendCreateWorldSceneBurst delivers the captured `hoxxling` world (wrong char) -> after the
-							// cutscene the client drops the connection and the reconnect hangs. Send the PROVEN burst-less
-							// live-char world + the destiny cutscene's Scry-script overlay instead (SendCreateWorldWithCutscene):
-							// the created char lands on the beach as ITSELF and the cutscene drives to IntroDone. Cutscene
-							// actors stay invisible until #185; SendCreateWorldSceneBurst stays as the golden reference.
-							await _createFlow.SendCreateWorldWithCutscene(client);
-						}
-						else if (isNewCharacter) // New character -> show the creator
-						{
-							Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
-							await RetailCreateEditorInitialBurst.SendRetailCreateEditorInitialBurst(client, Database);
-						}
-						else
-						{
-							// Existing-character login: the DB-driven, burst-less world entry - the character's current-map
-							// world content is CONSTRUCTED from the DB (WorldObject/NpcSpawn tables) and addressed to this
-							// character, so the client builds the playfield and renders the NPCs. The 0x201c handshake comes
-							// from us; the player's own position/name/inventory are rebuilt from the DB too. (See SendWorldEntry.)
-							await SendWorldEntry(client);
-							// Abilities (0x2052) are granted AFTER 0x2024 ReadyForPlayScreen (in FlushPendingPost205FFollowUp),
-							// matching the retail login order (handshake -> 0x2024 -> 0x2052). Granting them eagerly here -
-							// before the client polled/was ready - is a divergence from the Strie login dump.
-
-							// Teleport/changemap re-entry: a full login arms the post-0x205F follow-up off the client's 0x205F,
-							// but a direct GameServer->GameServer changemap reconnect sends no 0x205F (retail confirms). Arm it
-							// here so the next 0x2020 poll flushes 0x2024 ReadyForPlayScreen (+ abilities) and the loading screen
-							// dismisses; otherwise the burst lands but the client loads forever (#28 / totem recall).
-							if (PendingTeleportReentry.TryRemove(clientInstance, out _))
-							{
-								client.Session.HasPendingPost205FFollowUp = true;
-								Logger.LogInformation(
-									"Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).",
-									clientInstance);
-							}
-						}
-
-						break;
+						Logger.LogInformation(
+							"GameServer Hello: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8} while preserving the retail temporary instance for create-flow traffic.",
+							clientInstance,
+							resolvedCharacter?.Id ?? 0,
+							accountId);
 					}
 
-					case GameServerOpcodes.PassBlob:
-					{
-						await Handle0X2000(client, packet);
+					Logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
 
-						break;
+					/*if (clientVersion != "v4.00.NoTS@369764")
+					{
+					    Logger.Info("Incompatible client connects to the Server");
+					    //break;
+					}*/
+
+					// Character creation has two phases on this GameServer connection:
+					//  1) CREATOR: the client connects on the temp instance 0x021662C8 and we send the
+					//     verbatim editor burst (RetailCreateEditorInitialBurst) so the creator UI appears.
+					//     Auth replies use the editor conversation family so the client associates the burst.
+					//  2) ENTER-WORLD: after the player customises + names, the world entry is sent (handled
+					//     out of the post-0x205F / ReadyForPlayScreen path), not here.
+					// Existing-character login uses the legacy conversation family + the world entry.
+					var isNewCharacter = client.Session.Character.Name == null;
+
+					// Post-creation WORLD connection: the client reconnects with the same (now named) character
+					// instance, but this is the SECOND GameServer connection - the one opened after the 0x2002
+					// enter-world handoff. It is recognised by the character id being in PendingCreateWorldEntry
+					// (added when the name was committed on the editor connection). Consume it here so a later
+					// normal login of the same character does not re-trigger the intro. This connection needs the
+					// full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
+					// auth + the intro/cutscene), so skip the helper auth for it.
+					var isCreateWorldEntry = !isNewCharacter && _createFlow.TryConsumePendingCreateWorldEntry(clientInstance);
+					client.Session.IsCreateWorldSession = isCreateWorldEntry;
+					client.Session.IsCreateEditorConnection = isNewCharacter;
+
+					if (!isCreateWorldEntry)
+					{
+						// New (unnamed) characters take the create-editor path; existing characters log in normally.
+						var authSender = isNewCharacter
+							? RetailCreatePost205FSender
+							: null;
+						var authReceiver = isNewCharacter
+							? CreateEditorFraming.Receiver(client)
+							: null;
+
+						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
+						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
+						await AckAuthenticate(client, 1, authSender, authReceiver);
 					}
 
-					case GameServerOpcodes.SetHideInspectOption:
-					{
-						if (packet.Body != null)
-						{
-							LogPacketBodyDebug("GameServer 0x207E body", packet.Body.ToArray());
-							if (packet.Body.Length > 0)
-								Logger.LogInformation("0x207E decoded: value0={Value0:X2}", packet.Body.ToArray()[0]);
-						}
+					client.Session.LastGameServer2020RequestId = null;
+					client.Session.HasPendingPost205FFollowUp = false;
+					client.Session.HasPendingCreateEditorReadyFollowUp = false;
+					client.Session.HasFlushedCreateWorldEntryBurst = false;
+					client.Session.HasFlushedCreateEditorPostReady = false;
+					client.Session.CreateEditorTempInstanceCount = 0;
+					client.Session.CreateEditorObservedRequestIds.Clear();
+					client.Session.CreateEditorReadyRequestIds.Clear();
+					client.Session.MorphAckCounter = 0;
+					client.Session.MorphActivitySequence = 0;
+					client.Session.PostMorphBurstSent = false;
+					client.Session.AwaitingEnterWorld = false;
+					client.Session.CreateWorldChunkIndex = 0;
+					// IsCreateEditorConnection / IsCreateWorldSession were set above from this connection's role.
 
-						break;
+					if (isCreateWorldEntry) // Post-creation enter-world -> full retail creation world entry (-> scene)
+					{
+						// Force the Tortage intro spawn onto the character (covers resumed characters that
+						// never went through CreateCharacter), so the live SpawnPlayer uses the right position.
+						var spawnRows = await Database.SetCreationSpawn(client.Session.Character);
+						Logger.LogInformation(
+							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
+							clientInstance,
+							client.Session.Character.Id,
+							client.Session.Character.Name,
+							spawnRows,
+							client.Session.Character.PositionX,
+							client.Session.Character.PositionY,
+							client.Session.Character.PositionZ,
+							client.Session.Character.MapId);
+						// #234 reconstruct (docs/handoff-2026-06-22-create-flow-reconstruct.md): the verbatim
+						// SendCreateWorldSceneBurst delivers the captured `hoxxling` world (wrong char) -> after the
+						// cutscene the client drops the connection and the reconnect hangs. Send the PROVEN burst-less
+						// live-char world + the destiny cutscene's Scry-script overlay instead (SendCreateWorldWithCutscene):
+						// the created char lands on the beach as ITSELF and the cutscene drives to IntroDone. Cutscene
+						// actors stay invisible until #185; SendCreateWorldSceneBurst stays as the golden reference.
+						await _createFlow.SendCreateWorldWithCutscene(client);
 					}
-
-					case GameServerOpcodes.CinematicTransition:
+					else if (isNewCharacter) // New character -> show the creator
 					{
-						var unk0 = packet.Body.ReadUInt32(); // 0xc350
-						var characterId = packet.Body.ReadUInt32();
+						Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
+						await RetailCreateEditorInitialBurst.SendRetailCreateEditorInitialBurst(client, Database);
+					}
+					else
+					{
+						// Existing-character login: the DB-driven, burst-less world entry - the character's current-map
+						// world content is CONSTRUCTED from the DB (WorldObject/NpcSpawn tables) and addressed to this
+						// character, so the client builds the playfield and renders the NPCs. The 0x201c handshake comes
+						// from us; the player's own position/name/inventory are rebuilt from the DB too. (See SendWorldEntry.)
+						await SendWorldEntry(client);
+						// Abilities (0x2052) are granted AFTER 0x2024 ReadyForPlayScreen (in FlushPendingPost205FFollowUp),
+						// matching the retail login order (handshake -> 0x2024 -> 0x2052). Granting them eagerly here -
+						// before the client polled/was ready - is a divergence from the Strie login dump.
 
-						if (IsRetailCreateEditorFlow(client))
+						// Teleport/changemap re-entry: a full login arms the post-0x205F follow-up off the client's 0x205F,
+						// but a direct GameServer->GameServer changemap reconnect sends no 0x205F (retail confirms). Arm it
+						// here so the next 0x2020 poll flushes 0x2024 ReadyForPlayScreen (+ abilities) and the loading screen
+						// dismisses; otherwise the burst lands but the client loads forever (#28 / totem recall).
+						if (PendingTeleportReentry.TryRemove(clientInstance, out _))
 						{
-							if (client.Session.HasFlushedCreateWorldEntryBurst)
-							{
-								Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Retail create-editor post-0x205F burst was already flushed; ignoring later 0x205F.", unk0, characterId);
-								break;
-							}
-
 							client.Session.HasPendingPost205FFollowUp = true;
-							client.Session.CreateEditorTempInstanceCount = 0;
-							Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Armed the retail create-editor post-0x205F follow-up.", unk0, characterId);
-							break;
+							Logger.LogInformation(
+								"Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).",
+								clientInstance);
 						}
+					}
 
-						// The new-character create flow only performs the one-shot world-entry download
-						// (AccessWindow + SetDayTime + 0xF98E10B3 + SpawnCheck burst) on the FIRST 0x205F. In the
-						// retail create capture the client sends a second 0x205F after ReadyForPlayScreen, but
-						// retail sends NO download in response to it - it just continues receiving the client's
-						// normal in-world 0x02165EFF stream. Re-arming the handoff here re-replayed the 8KB
-						// world-entry burst mid-world, which broke the client. So only arm the create handoff once.
+					break;
+				}
+
+				case GameServerOpcodes.PassBlob:
+				{
+					await Handle0X2000(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.SetHideInspectOption:
+				{
+					if (packet.Body != null)
+					{
+						LogPacketBodyDebug("GameServer 0x207E body", packet.Body.ToArray());
+						if (packet.Body.Length > 0)
+							Logger.LogInformation("0x207E decoded: value0={Value0:X2}", packet.Body.ToArray()[0]);
+					}
+
+					break;
+				}
+
+				case GameServerOpcodes.CinematicTransition:
+				{
+					var unk0 = packet.Body.ReadUInt32(); // 0xc350
+					var characterId = packet.Body.ReadUInt32();
+
+					if (IsRetailCreateEditorFlow(client))
+					{
 						if (client.Session.HasFlushedCreateWorldEntryBurst)
 						{
-							Logger.LogInformation(
-								"0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Create world-entry burst was already flushed; not re-arming the post-0x205F handoff (retail sends no download on the second 0x205F).",
-								unk0,
-								characterId);
+							Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Retail create-editor post-0x205F burst was already flushed; ignoring later 0x205F.", unk0, characterId);
 							break;
 						}
 
 						client.Session.HasPendingPost205FFollowUp = true;
-						Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0, characterId, characterId);
-
+						client.Session.CreateEditorTempInstanceCount = 0;
+						Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Armed the retail create-editor post-0x205F follow-up.", unk0, characterId);
 						break;
 					}
 
-					case GameServerOpcodes.UpdateQuestMarkerNPC:
+					// The new-character create flow only performs the one-shot world-entry download
+					// (AccessWindow + SetDayTime + 0xF98E10B3 + SpawnCheck burst) on the FIRST 0x205F. In the
+					// retail create capture the client sends a second 0x205F after ReadyForPlayScreen, but
+					// retail sends NO download in response to it - it just continues receiving the client's
+					// normal in-world 0x02165EFF stream. Re-arming the handoff here re-replayed the 8KB
+					// world-entry burst mid-world, which broke the client. So only arm the create handoff once.
+					if (client.Session.HasFlushedCreateWorldEntryBurst)
 					{
-						if (packet.Body?.Length >= sizeof(uint) * 4)
+						Logger.LogInformation(
+							"0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Create world-entry burst was already flushed; not re-arming the post-0x205F handoff (retail sends no download on the second 0x205F).",
+							unk0,
+							characterId);
+						break;
+					}
+
+					client.Session.HasPendingPost205FFollowUp = true;
+					Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0, characterId, characterId);
+
+					break;
+				}
+
+				case GameServerOpcodes.UpdateQuestMarkerNPC:
+				{
+					if (packet.Body?.Length >= sizeof(uint) * 4)
+					{
+						var ack0 = packet.Body.ReadUInt32();
+						var requestId = packet.Body.ReadUInt32();
+						var ack1 = packet.Body.ReadUInt32();
+						var characterId = packet.Body.ReadUInt32();
+						client.Session.LastGameServer2020RequestId = requestId;
+
+						// #245: the poll's requestId is a handle the client is CONFIRMING it built - record it so interest
+						// only ever despawns confirmed handles (a despawn for an unbuilt handle crashes a still-loading
+						// client: pcDynel == null). The self-handle poll is harmless (the player never despawns itself).
+						_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
+
+						// 0x2020 is the client polling a spawned entity (requestId = the entity handle). Retail
+						// answers each with a 0x2008 SpawnCheck echoing that handle (verified: dikketest world conn
+						// polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). This is what completes/renders
+						// each entity. Both existing-character login (burst-less world entry) AND post-creation world
+						// entry need it: the create-world flow's old hand-built batch answered the wrong, hardcoded
+						// capture handles (0x818xx) on Strie's instance, so its entities (incl. Kalanthes) were never
+						// confirmed and the intro cinematic ("invalid camera path Kalanthes") failed.
+						if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
+							await SendSpawnCheckResponse(client, requestId);
+
+						Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
+						Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}",
+							ack0,
+							requestId,
+							ack1,
+							characterId,
+							client.Session.HasPendingPost205FFollowUp);
+						await FlushPendingPost205FFollowUp(client);
+						packet.Body.Position = 0;
+					}
+					else
+						LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray());
+
+					break;
+				}
+
+				case GameServerOpcodes.DoSkillSellback:
+				{
+					if (packet.Body != null)
+						LogPacketBodyDebug("GameServer 0x205C body", packet.Body.ToArray());
+
+					break;
+				}
+
+				case GameServerOpcodes.PlayStockphraseAsSubtitle:
+				{
+					// #234 create-cutscene speech: the client is asking us to resolve a stock phrase
+					// ({stock_N}) and BLOCKS up to 60 s for the 0x205D reply. Answer it (Kalanthes's beach
+					// lines) instead of silently timing out. See CreateFlow/StockPhraseResponder.cs.
+					if (packet.Body != null)
+						await _createFlow.HandlePlayStockphraseAsSubtitle(client, packet.Body.ToArray());
+
+					break;
+				}
+
+				case GameServerOpcodes.RequestShortcutBar: // client asks for its saved hotbar at login; reply with the restored bar (#71)
+				{
+					await _shortcutBar.SendRestoredBar(client);
+
+					break;
+				}
+
+				case GameServerOpcodes.SellToShop:
+				{
+					await _shop.HandleSellItemToShop(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.UndoLastSoldItem:
+				{
+					await _shop.HandleUndoLastSoldItem(client);
+
+					break;
+				}
+
+				case GameServerOpcodes.BuyFromShop:
+				{
+					packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
+					var shopId = packet.Body.ReadUInt32();
+					var pos = packet.Body.ReadUInt32();
+
+					// Resolve the clicked slot against the open shop, debit the wallet and grant the item live
+					// (DispatchAddItem). The item-grant wall that gated this is gone (protocol_containeradditem).
+					await _shop.HandleBuyItemFromShop(client, shopId, pos);
+
+					break;
+				}
+
+				case GameServerOpcodes.CloseShop:
+				{
+					Logger.LogInformation("Shop closed by {Character}.", client.Session.Character?.Name);
+
+					break;
+				}
+
+				case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]
+				{
+					await _loot.HandleLootAll(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.TryLootItem: // single drag of one item out of the loot window
+				{
+					await _loot.HandleLootItem(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.CloseLootBag: // client closed the loot window; body = [typetag][bag handle]
+				{
+					await _loot.HandleCloseLootBag(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.TryLootCash: // loot the bag's coins; fires on every loot alongside TryLootAll
+				{
+					await _loot.HandleLootCash(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.RespawnMe: // the player's release/resurrect click; body = [u32 token]
+				{
+					var token = packet.Body?.Length >= sizeof(uint)
+						? packet.Body.ReadUInt32()
+						: 0;
+
+					// Retail respawn is click-driven (vitals restore + tombstone + teleport + re-render at the
+					// resurrection point); our simulation already implements that flow on a fallback timer - the
+					// click just triggers it immediately.
+					if (await _simulation.TryRespawnNow(client))
+						Logger.LogInformation("RespawnMe (token 0x{Token:X8}): player released; respawned.", token);
+					else
+						Logger.LogWarning("RespawnMe (token 0x{Token:X8}) from a player that is not dead; ignored.", token);
+
+					break;
+				}
+
+				case GameServerOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId][u32 charId]
+				{
+					var buffId = packet.Body.ReadUInt32();
+					var charId = packet.Body.ReadUInt32();
+
+					// The client removes its own icon (retail replies only a FormatFeedback text, no removal
+					// IIR); removing the entry from the server-side registry is what makes the cancel real.
+					var entity = _simulation.PlayerWorldEntity(client);
+					if (entity != null && entity.ActiveBuffs.TryRemove(buffId, out _))
+						Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, charId);
+					else
+						Logger.LogDebug("CancelBuff: buff 0x{Buff:X8} was not tracked for {CharId:X8} (cast before the registry, or an aura).", buffId, charId);
+
+					break;
+				}
+
+				case GameServerOpcodes.LatencyCheck: // latency check (client 0x2085 -> server 0x2082)
+				{
+					await _keepAlive.HandleLatencyCheck(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.MoveTradeItemInternal: // player-to-player trade window item move; not implemented
+				{
+					/*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
+					        byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
+
+					        PacketBuffer aBuffer = new PacketBuffer();
+					        aBuffer.WriteHeader(sender, receiver, null, 0x2009, true);
+					        aBuffer.WriteUInt32(0x00000067);
+					        aBuffer.WriteUInt32(GameServer0X2000RespondsOpcodes.N3TeleportIIR);
+					        aBuffer.WriteUInt32(0x0000c350);
+					        aBuffer.WriteUInt32(client.client.Account.nClientInst);
+					        aBuffer.WriteByte(0);
+					        aBuffer.WriteUInt64(0);
+					        aBuffer.WriteUInt64(0);
+					        aBuffer.WriteUInt64(0);
+					        aBuffer.WriteUInt32(0x3f800000);
+					        aBuffer.WriteByte(0x62);
+					        aBuffer.WriteUInt32(0x0000c79c);
+					        aBuffer.WriteUInt32(0x00000faa); //map
+					        aBuffer.WriteUInt32(client.client.Account.nClientInst);
+					        aBuffer.WriteUInt32(0x0000000a);
+					        aBuffer.WriteUInt32(0x00009c50);
+					        aBuffer.WriteUInt32(0x00030bde); //instance
+					        aBuffer.WriteUInt64(0);
+					        aBuffer.WriteUInt32(0x00000014);
+					        aBuffer.WriteUInt32(0x00018704);
+					        aBuffer.WriteUInt32(0x43a14000);
+					        aBuffer.WriteUInt32(0x43160000);
+					        aBuffer.WriteUInt32(0x4430399a);
+					        aBuffer.WriteUInt32(0x00000032);
+					        aBuffer.WriteByte(0);
+					        //Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
+					        aBuffer.Send(client);
+
+					        aBuffer = new PacketBuffer();
+					        aBuffer.WriteHeader(sender, receiver, null, 0x2002, true);
+					        //aBuffer.WriteUInt32(htonl(inet_addr(realm->worldServerIPAddress)));
+					        //aBuffer.WriteUInt16(realm->worldServerPort);
+					        aBuffer.WriteUInt32(Native.Network.htonl(Native.Network.inet_addr("127.0.0.1")));
+					        aBuffer.WriteUInt16(Program.GameServerPort);
+					        aBuffer.Send(client);*/
+
+					//var packetData = packet.Data?.ToArray().ToHexString();
+
+					break;
+				}
+
+				case GameServerOpcodes.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
+				{
+					LogPacketBodyDebug("GameServer 0x207B body", packet.Body?.ToArray());
+
+					//Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
+
+					break;
+				}
+
+				case GameServerOpcodes.PerformSpecialAction:
+				{
+					// The spellweave activate/deactivate TOGGLE (docs/combos.md): first press opens the trance, second
+					// fires the accumulated weave. Body word is the toggle param (0xfc in the capture).
+					var counter = packet.Body.ReadUInt32();
+
+					Logger.LogInformation("0x205A (PerformSpecialAction) param={Counter:X4}", counter);
+					await _spellweave.ToggleAsync(client, counter);
+
+					break;
+				}
+
+				case GameServerOpcodes.Ping: // client 0x2005 (empty) -> server Pong 0x2009
+				{
+					await _keepAlive.HandlePing(client);
+
+					break;
+				}
+
+				case GameServerOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
+				{
+					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray());
+
+					/*var part1 = packet.Data.ReadUInt32();
+					var spawnId = packet.Data.ReadUInt32();
+					var unk0 = packet.Data.ReadUInt32();
+					var nClientInst = packet.Data.ReadUInt32();
+
+					new PacketStream()
+					    .WriteHeader(Sender9, Receiver9, null, GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+					    .WriteUInt32(part1)
+					    .WriteUInt32(spawnId)
+					    .WriteByte(0)
+					    .Send(client);*/
+
+					break;
+				}
+
+				case GameServerOpcodes.SplitStack:
+				{
+					var unk0 = packet.Body.ReadUInt32();
+					var unk1 = packet.Body.ReadUInt32();
+					var sourceSlot = packet.Body.ReadUInt32();
+					var targetStackSize = packet.Body.ReadUInt32();
+					var targetSlot = packet.Body.ReadUInt32();
+
+					// 0x00, 0x00, 0x00, 0x68,
+					// 0x11, 0x01, 0xB4, 0xF5,
+					// 0x00, 0x00, 0x00, 0x09, // source slot
+					// 0x00, 0x00, 0x00, 0x29, // 41 (target stack size)
+					// 0x00, 0x00, 0x00, 0x13  // target Slot
+
+					// 0x00, 0x00, 0x00, 0x68,
+					// 0x11, 0x01, 0xB4, 0xF5,
+					// 0x00, 0x00, 0x00, 0x03, // source slot
+					// 0x00, 0x00, 0x00, 0x1C, // 28 (target stack size)
+					// 0x00, 0x00, 0x00, 0x04  // target Slot
+
+					// Persist the split so both stacks survive logout (bag container; the packet carries no kind).
+					await _equipment.PersistSplitStack(client, (int)sourceSlot, (int)targetSlot, targetStackSize);
+
+					break;
+				}
+
+				case GameServerOpcodes.ChatCommand:
+				{
+					// 0x2002 = GameAgent.ChatVicinity (typed chat, carries GM commands). The GameCharAgent.RequestBindLocation
+					// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
+					LogPacketBodyDebug("GameServer ChatCommand body", packet.Body?.ToArray());
+
+					var unk0 = packet.Body.ReadUInt32();
+					var unk1 = packet.Body.ReadUInt32();
+					var unk2 = packet.Body.ReadUInt32();
+					var unk3 = packet.Body.ReadUInt32();
+					var text = packet.Body.ReadString();
+
+					if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.Type >= AccountType.GameMaster)
+						await HandleGmCommand(client, text);
+					else
+						// "say" is proximity chat - only same-map players within range hear it (the sender always does).
+						// The GameServer owns the live positions, so it picks the recipients here.
+						await _agentServerDispatcher.CharacterSay(client.Session.Character.Id, text, _simulation.SayRecipients(client));
+
+					break;
+				}
+
+				case GameServerOpcodes.VanityToggle:
+				{
+					LogPacketBodyDebug("GameServer VanityToggle body", packet.Body?.ToArray());
+
+					break;
+				}
+
+				case GameServerOpcodes.RemoveShortcut: // body = [u32 slot]
+				{
+					await _shortcutBar.HandleRemoveShortcut(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.UpdateShortcut: // body = [u32 slot][u32 flag][u32 container]
+				{
+					await _shortcutBar.HandleUpdateShortcut(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.AddShortcut:
+				{
+					// 0x206E collides: in-game it's MoveItemToBar, but on the character-creator connection it's
+					// the "enter world" signal. The client sends it several times; answer the first with the
+					// 0x2002 world handoff, ignore the rest.
+					// TODO: THIS IS FALSE?? 0x206E is just MoveItemToBar, this is also needed for new characters to put there starting spells etc on the bar
+					if (client.Session.IsCreateEditorConnection)
+					{
+						if (client.Session.AwaitingEnterWorld)
 						{
-							var ack0 = packet.Body.ReadUInt32();
-							var requestId = packet.Body.ReadUInt32();
-							var ack1 = packet.Body.ReadUInt32();
-							var characterId = packet.Body.ReadUInt32();
-							client.Session.LastGameServer2020RequestId = requestId;
-
-							// #245: the poll's requestId is a handle the client is CONFIRMING it built - record it so interest
-							// only ever despawns confirmed handles (a despawn for an unbuilt handle crashes a still-loading
-							// client: pcDynel == null). The self-handle poll is harmless (the player never despawns itself).
-							_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
-
-							// 0x2020 is the client polling a spawned entity (requestId = the entity handle). Retail
-							// answers each with a 0x2008 SpawnCheck echoing that handle (verified: dikketest world conn
-							// polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). This is what completes/renders
-							// each entity. Both existing-character login (burst-less world entry) AND post-creation world
-							// entry need it: the create-world flow's old hand-built batch answered the wrong, hardcoded
-							// capture handles (0x818xx) on Strie's instance, so its entities (incl. Kalanthes) were never
-							// confirmed and the intro cinematic ("invalid camera path Kalanthes") failed.
-							if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
-								await SendSpawnCheckResponse(client, requestId);
-
-							Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
-							Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}",
-								ack0,
-								requestId,
-								ack1,
-								characterId,
-								client.Session.HasPendingPost205FFollowUp);
-							await FlushPendingPost205FFollowUp(client);
-							packet.Body.Position = 0;
-						}
-						else
-							LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray());
-
-						break;
-					}
-
-					case GameServerOpcodes.DoSkillSellback:
-					{
-						if (packet.Body != null)
-							LogPacketBodyDebug("GameServer 0x205C body", packet.Body.ToArray());
-
-						break;
-					}
-
-					case GameServerOpcodes.PlayStockphraseAsSubtitle:
-					{
-						// #234 create-cutscene speech: the client is asking us to resolve a stock phrase
-						// ({stock_N}) and BLOCKS up to 60 s for the 0x205D reply. Answer it (Kalanthes's beach
-						// lines) instead of silently timing out. See CreateFlow/StockPhraseResponder.cs.
-						if (packet.Body != null)
-							await _createFlow.HandlePlayStockphraseAsSubtitle(client, packet.Body.ToArray());
-
-						break;
-					}
-
-					case GameServerOpcodes.RequestShortcutBar: // client asks for its saved hotbar at login; reply with the restored bar (#71)
-					{
-						await _shortcutBar.SendRestoredBar(client);
-
-						break;
-					}
-
-					case GameServerOpcodes.SellToShop:
-					{
-						await _shop.HandleSellItemToShop(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.UndoLastSoldItem:
-					{
-						await _shop.HandleUndoLastSoldItem(client);
-
-						break;
-					}
-
-					case GameServerOpcodes.BuyFromShop:
-					{
-						packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
-						var shopId = packet.Body.ReadUInt32();
-						var pos = packet.Body.ReadUInt32();
-
-						// Resolve the clicked slot against the open shop, debit the wallet and grant the item live
-						// (DispatchAddItem). The item-grant wall that gated this is gone (protocol_containeradditem).
-						await _shop.HandleBuyItemFromShop(client, shopId, pos);
-
-						break;
-					}
-
-					case GameServerOpcodes.CloseShop:
-					{
-						Logger.LogInformation("Shop closed by {Character}.", client.Session.Character?.Name);
-
-						break;
-					}
-
-					case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]
-					{
-						await _loot.HandleLootAll(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.TryLootItem: // single drag of one item out of the loot window
-					{
-						await _loot.HandleLootItem(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.CloseLootBag: // client closed the loot window; body = [typetag][bag handle]
-					{
-						await _loot.HandleCloseLootBag(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.TryLootCash: // loot the bag's coins; fires on every loot alongside TryLootAll
-					{
-						await _loot.HandleLootCash(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.RespawnMe: // the player's release/resurrect click; body = [u32 token]
-					{
-						var token = packet.Body?.Length >= sizeof(uint)
-							? packet.Body.ReadUInt32()
-							: 0;
-
-						// Retail respawn is click-driven (vitals restore + tombstone + teleport + re-render at the
-						// resurrection point); our simulation already implements that flow on a fallback timer - the
-						// click just triggers it immediately.
-						if (await _simulation.TryRespawnNow(client))
-							Logger.LogInformation("RespawnMe (token 0x{Token:X8}): player released; respawned.", token);
-						else
-							Logger.LogWarning("RespawnMe (token 0x{Token:X8}) from a player that is not dead; ignored.", token);
-
-						break;
-					}
-
-					case GameServerOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId][u32 charId]
-					{
-						var buffId = packet.Body.ReadUInt32();
-						var charId = packet.Body.ReadUInt32();
-
-						// The client removes its own icon (retail replies only a FormatFeedback text, no removal
-						// IIR); removing the entry from the server-side registry is what makes the cancel real.
-						var entity = _simulation.PlayerWorldEntity(client);
-						if (entity != null && entity.ActiveBuffs.TryRemove(buffId, out _))
-							Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, charId);
-						else
-							Logger.LogDebug("CancelBuff: buff 0x{Buff:X8} was not tracked for {CharId:X8} (cast before the registry, or an aura).", buffId, charId);
-
-						break;
-					}
-
-					case GameServerOpcodes.LatencyCheck: // latency check (client 0x2085 -> server 0x2082)
-					{
-						await _keepAlive.HandleLatencyCheck(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.MoveTradeItemInternal: // player-to-player trade window item move; not implemented
-					{
-						/*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
-						        byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
-
-						        PacketBuffer aBuffer = new PacketBuffer();
-						        aBuffer.WriteHeader(sender, receiver, null, 0x2009, true);
-						        aBuffer.WriteUInt32(0x00000067);
-						        aBuffer.WriteUInt32(GameServer0X2000RespondsOpcodes.N3TeleportIIR);
-						        aBuffer.WriteUInt32(0x0000c350);
-						        aBuffer.WriteUInt32(client.client.Account.nClientInst);
-						        aBuffer.WriteByte(0);
-						        aBuffer.WriteUInt64(0);
-						        aBuffer.WriteUInt64(0);
-						        aBuffer.WriteUInt64(0);
-						        aBuffer.WriteUInt32(0x3f800000);
-						        aBuffer.WriteByte(0x62);
-						        aBuffer.WriteUInt32(0x0000c79c);
-						        aBuffer.WriteUInt32(0x00000faa); //map
-						        aBuffer.WriteUInt32(client.client.Account.nClientInst);
-						        aBuffer.WriteUInt32(0x0000000a);
-						        aBuffer.WriteUInt32(0x00009c50);
-						        aBuffer.WriteUInt32(0x00030bde); //instance
-						        aBuffer.WriteUInt64(0);
-						        aBuffer.WriteUInt32(0x00000014);
-						        aBuffer.WriteUInt32(0x00018704);
-						        aBuffer.WriteUInt32(0x43a14000);
-						        aBuffer.WriteUInt32(0x43160000);
-						        aBuffer.WriteUInt32(0x4430399a);
-						        aBuffer.WriteUInt32(0x00000032);
-						        aBuffer.WriteByte(0);
-						        //Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
-						        aBuffer.Send(client);
-
-						        aBuffer = new PacketBuffer();
-						        aBuffer.WriteHeader(sender, receiver, null, 0x2002, true);
-						        //aBuffer.WriteUInt32(htonl(inet_addr(realm->worldServerIPAddress)));
-						        //aBuffer.WriteUInt16(realm->worldServerPort);
-						        aBuffer.WriteUInt32(Native.Network.htonl(Native.Network.inet_addr("127.0.0.1")));
-						        aBuffer.WriteUInt16(Program.GameServerPort);
-						        aBuffer.Send(client);*/
-
-						//var packetData = packet.Data?.ToArray().ToHexString();
-
-						break;
-					}
-
-					case GameServerOpcodes.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
-					{
-						LogPacketBodyDebug("GameServer 0x207B body", packet.Body?.ToArray());
-
-						//Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
-
-						break;
-					}
-
-					case GameServerOpcodes.PerformSpecialAction:
-					{
-						// The spellweave activate/deactivate TOGGLE (docs/combos.md): first press opens the trance, second
-						// fires the accumulated weave. Body word is the toggle param (0xfc in the capture).
-						var counter = packet.Body.ReadUInt32();
-
-						Logger.LogInformation("0x205A (PerformSpecialAction) param={Counter:X4}", counter);
-						await _spellweave.ToggleAsync(client, counter);
-
-						break;
-					}
-
-					case GameServerOpcodes.Ping: // client 0x2005 (empty) -> server Pong 0x2009
-					{
-						await _keepAlive.HandlePing(client);
-
-						break;
-					}
-
-					case GameServerOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
-					{
-						LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray());
-
-						/*var part1 = packet.Data.ReadUInt32();
-						var spawnId = packet.Data.ReadUInt32();
-						var unk0 = packet.Data.ReadUInt32();
-						var nClientInst = packet.Data.ReadUInt32();
-
-						new PacketStream()
-						    .WriteHeader(Sender9, Receiver9, null, GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
-						    .WriteUInt32(part1)
-						    .WriteUInt32(spawnId)
-						    .WriteByte(0)
-						    .Send(client);*/
-
-						break;
-					}
-
-					case GameServerOpcodes.SplitStack:
-					{
-						var unk0 = packet.Body.ReadUInt32();
-						var unk1 = packet.Body.ReadUInt32();
-						var sourceSlot = packet.Body.ReadUInt32();
-						var targetStackSize = packet.Body.ReadUInt32();
-						var targetSlot = packet.Body.ReadUInt32();
-
-						// 0x00, 0x00, 0x00, 0x68,
-						// 0x11, 0x01, 0xB4, 0xF5,
-						// 0x00, 0x00, 0x00, 0x09, // source slot
-						// 0x00, 0x00, 0x00, 0x29, // 41 (target stack size)
-						// 0x00, 0x00, 0x00, 0x13  // target Slot
-
-						// 0x00, 0x00, 0x00, 0x68,
-						// 0x11, 0x01, 0xB4, 0xF5,
-						// 0x00, 0x00, 0x00, 0x03, // source slot
-						// 0x00, 0x00, 0x00, 0x1C, // 28 (target stack size)
-						// 0x00, 0x00, 0x00, 0x04  // target Slot
-
-						// Persist the split so both stacks survive logout (bag container; the packet carries no kind).
-						await _equipment.PersistSplitStack(client, (int)sourceSlot, (int)targetSlot, targetStackSize);
-
-						break;
-					}
-
-					case GameServerOpcodes.ChatCommand:
-					{
-						// 0x2002 = GameAgent.ChatVicinity (typed chat, carries GM commands). The GameCharAgent.RequestBindLocation
-						// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
-						LogPacketBodyDebug("GameServer ChatCommand body", packet.Body?.ToArray());
-
-						var unk0 = packet.Body.ReadUInt32();
-						var unk1 = packet.Body.ReadUInt32();
-						var unk2 = packet.Body.ReadUInt32();
-						var unk3 = packet.Body.ReadUInt32();
-						var text = packet.Body.ReadString();
-
-						if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.Type >= AccountType.GameMaster)
-							await HandleGmCommand(client, text);
-						else
-							// "say" is proximity chat - only same-map players within range hear it (the sender always does).
-							// The GameServer owns the live positions, so it picks the recipients here.
-							await _agentServerDispatcher.CharacterSay(client.Session.Character.Id, text, _simulation.SayRecipients(client));
-
-						break;
-					}
-
-					case GameServerOpcodes.VanityToggle:
-					{
-						LogPacketBodyDebug("GameServer VanityToggle body", packet.Body?.ToArray());
-
-						break;
-					}
-
-					case GameServerOpcodes.RemoveShortcut: // body = [u32 slot]
-					{
-						await _shortcutBar.HandleRemoveShortcut(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.UpdateShortcut: // body = [u32 slot][u32 flag][u32 container]
-					{
-						await _shortcutBar.HandleUpdateShortcut(client, packet);
-
-						break;
-					}
-
-					case GameServerOpcodes.AddShortcut:
-					{
-						// 0x206E collides: in-game it's MoveItemToBar, but on the character-creator connection it's
-						// the "enter world" signal. The client sends it several times; answer the first with the
-						// 0x2002 world handoff, ignore the rest.
-						// TODO: THIS IS FALSE?? 0x206E is just MoveItemToBar, this is also needed for new characters to put there starting spells etc on the bar
-						if (client.Session.IsCreateEditorConnection)
-						{
-							if (client.Session.AwaitingEnterWorld)
-							{
-								client.Session.AwaitingEnterWorld = false;
-								// #234: wash the new char ashore - retail's create flow sends a changemap-prep
-								// (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn on the
-								// EDITOR connection right before the handoff (Blablabla create capture f444/449: dest map
-								// 0x0FAA, pos 322.5,150,704.9, descriptor 0x32). Without it the player stays at the drowning
-								// cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
-								await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
-								await SendWorldHandoff(client);
-							}
-
-							break;
+							client.Session.AwaitingEnterWorld = false;
+							// #234: wash the new char ashore - retail's create flow sends a changemap-prep
+							// (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn on the
+							// EDITOR connection right before the handoff (Blablabla create capture f444/449: dest map
+							// 0x0FAA, pos 322.5,150,704.9, descriptor 0x32). Without it the player stays at the drowning
+							// cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
+							await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
+							await SendWorldHandoff(client);
 						}
 
-						// In-game (non-editor): the player dragged an ability/item onto the bar - persist it.
-						await _shortcutBar.HandleAddShortcut(client, packet);
-
 						break;
 					}
 
-					default:
-					{
-						// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
-						// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
-						LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
-						break;
-					}
+					// In-game (non-editor): the player dragged an ability/item onto the bar - persist it.
+					await _shortcutBar.HandleAddShortcut(client, packet);
+
+					break;
+				}
+
+				default:
+				{
+					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
+					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
+					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
+					break;
 				}
 			}
 		}
