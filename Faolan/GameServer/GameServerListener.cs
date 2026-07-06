@@ -212,7 +212,7 @@ namespace Faolan.GameServer
 			switch (packet.Receiver.Type)
 			{
 				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
-				case TradepostProtocol.AgentType:
+				case ConanEndpoints.TradepostAgentType:
 					await TradepostHandler.Handle(_tradepost, client, packet, Logger, Database);
 					return;
 

@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Opcodes;
 using System;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,17 +18,17 @@ namespace Faolan.GameServer.Economy.Tradepost
 	{
 		public static async Task Handle(TradepostService tradepost, INetworkClient client, ConanPacket packet, ILogger logger, IDatabaseRepository database)
 		{
-			var method = (TradepostProtocol.AgentMethod)packet.Opcode;
+			var method = (TradepostAgentOpcodes)packet.Opcode;
 			switch (method)
 			{
-				case TradepostProtocol.AgentMethod.UpdateItemTimeouts:
+				case TradepostAgentOpcodes.UpdateItemTimeouts:
 					// The client sends UpdateItemTimeouts (empty body) AFTER it received DispatchOpenTradepost
 					// (triggered by the auctioneer interaction / the .ah GM command) - the observed "window
 					// opened" signal; nothing to send back, just log.
 					logger.LogInformation("Tradepost: {Char} opened the auction house.", CharName(client));
 					break;
 
-				case TradepostProtocol.AgentMethod.ItemSearch:
+				case TradepostAgentOpcodes.ItemSearch:
 				{
 					var query = ParseSearch(packet.Body);
 					var listings = await database.GetTradepostListings(query.ItemId);
@@ -40,48 +41,48 @@ namespace Faolan.GameServer.Economy.Tradepost
 					break;
 				}
 
-				case TradepostProtocol.AgentMethod.BuyItem:
+				case TradepostAgentOpcodes.BuyItem:
 					// BUY -> debit the buyer + deliver the item via a system mail (mutates state, so the listener owns it).
 					await tradepost.HandleTradepostBuy(client, packet);
 					break;
 
-				case TradepostProtocol.AgentMethod.TradepostSellItem:
+				case TradepostAgentOpcodes.TradepostSellItem:
 					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
 					await tradepost.HandleTradepostSell(client, packet);
 					break;
 
-				case TradepostProtocol.AgentMethod.TradepostChangeItemPrice:
+				case TradepostAgentOpcodes.TradepostChangeItemPrice:
 					// Reprice the seller's own listing (addressed by origin bank slot).
 					await tradepost.HandleTradepostChangePrice(client, packet);
 					break;
 
-				case TradepostProtocol.AgentMethod.TradepostCancelSellItem:
+				case TradepostAgentOpcodes.TradepostCancelSellItem:
 					// Pull the seller's own listing and return the escrowed item to the bank.
 					await tradepost.HandleTradepostCancelSell(client, packet);
 					break;
 
-				case TradepostProtocol.AgentMethod.SendMail:
+				case TradepostAgentOpcodes.SendMail:
 					// Player-composed mail (optionally with a bank-item attachment) to another character.
 					await tradepost.HandleTradepostSendMail(client, packet);
 					break;
 
-				case TradepostProtocol.AgentMethod.CancelMail:
+				case TradepostAgentOpcodes.CancelMail:
 					// Recall/delete one of the player's mails.
 					await tradepost.HandleTradepostCancelMail(client, packet);
 					break;
 
-				case TradepostProtocol.AgentMethod.Close:
+				case TradepostAgentOpcodes.Close:
 					logger.LogInformation("Tradepost: {Char} closed the auction house.", CharName(client));
 					break;
 
 				// Mailbox retrieval ops: poll / preview / take the bought item / mark-read / delete (listener-owned,
 				// they read + grant from the DB-backed mail).
-				case TradepostProtocol.AgentMethod.GetAllMails:
-				case TradepostProtocol.AgentMethod.GetMailByID:
-				case TradepostProtocol.AgentMethod.GetItemData:
-				case TradepostProtocol.AgentMethod.GetMailItem:
-				case TradepostProtocol.AgentMethod.MarkMailRead:
-				case TradepostProtocol.AgentMethod.DeleteMail:
+				case TradepostAgentOpcodes.GetAllMails:
+				case TradepostAgentOpcodes.GetMailByID:
+				case TradepostAgentOpcodes.GetItemData:
+				case TradepostAgentOpcodes.GetMailItem:
+				case TradepostAgentOpcodes.MarkMailRead:
+				case TradepostAgentOpcodes.DeleteMail:
 					await tradepost.HandleTradepostMailOp(client, packet, method);
 					break;
 

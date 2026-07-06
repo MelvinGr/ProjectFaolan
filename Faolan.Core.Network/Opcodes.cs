@@ -787,13 +787,42 @@ namespace Faolan.Core.Network
 			DispatchOpenSiteInBrowserOnClient = 0x200F
 		}
 
+		// TradepostAgent client->server methods (the AH + mail selector after the endpoints) - the complete
+		// recovered TradepostAgent.client_to_server table (opcode = 0x2000 + position; alignment verified on
+		// ItemSearch/BuyItem/Close). The method ids COLLIDE with ordinary GameServer opcodes, so tradepost packets
+		// route by RPC class id (ConanEndpoints.TradepostAgentType), never by opcode alone. Behaviour that differs
+		// from the name is noted per line (docs/tradepost-protocol.md).
+		public enum TradepostAgentOpcodes : ushort
+		{
+		GetAllMails = 0x2000, // the mailbox poll
+		GetMailByID = 0x2001, // body [mailId:u64]
+		SendMail = 0x2002,
+		MarkMailRead = 0x2003, // also observed for the delete-side flow
+		CheckNewMail = 0x2004,
+		GetMailItems = 0x2005,
+		GetMailItem = 0x2006, // body [mailId][itemId]
+		GetItemData = 0x2007, // observed with a [mailId]-style body (was decoded as "GetMailItems")
+		DeleteMail = 0x2008,
+		CancelMail = 0x2009,
+		TradepostSellItem = 0x200A,
+		TradepostChangeItemPrice = 0x200B,
+		TradepostCancelSellItem = 0x200C,
+		ItemSearch = 0x200D, // TradepostItemSearch (query body)
+		BuyItem = 0x200E, // TradepostBuyItem [saleId:u64][searchResultId:u64]
+		TradepostOpen = 0x200F, // not observed in captures - the client opens with UpdateItemTimeouts instead
+		Close = 0x2010, // TradepostClose (empty body)
+		UpdateItemTimeouts = 0x2011, // TradepostUpdateItemTimeouts - sent (empty body) when the AH window opens
+		SetAsyncEnabled = 0x2012,
+		SetNumWorkerThreads = 0x2013
+		}
+
 		// TradepostInterface server->client dispatch table (8 methods; mail + tradepost search).
 		// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
 		// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
 		public enum TradepostInterfaceDispatchOpcodes : ushort
 		{
 			DispatchOpenTradepost = 0x2000,
-			Reserved0x2001 = 0x2001,
+			DispatchClose = 0x2001, // no-arg; the string catalog missed it (recovered from the TradepostInterface RE)
 			DispatchMailMessage = 0x2002,
 			DispatchSendMailResult = 0x2003,
 			DispatchRetrieveMailResult = 0x2004,

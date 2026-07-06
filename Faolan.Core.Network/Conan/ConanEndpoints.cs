@@ -34,6 +34,11 @@ namespace Faolan.Core.Network.Conan
 		// side, "Interface" = server->client dispatch side.
 		public const uint GameInterfaceType = 0x6C67C147; // = hash("GameInterface")
 
+		// Tradepost (auction house + mail) rides the GameServer RPC layer. TradepostAgent is the SERVER object the
+		// client calls (client->server); TradepostInterface is the CLIENT object the server dispatches to (s2c).
+		public const uint TradepostAgentType = 0x3D744981; // = hash("TradepostAgent")     (client -> server endpoint)
+		public const uint TradepostInterfaceType = 0xF2C2D5B5; // = hash("TradepostInterface") (server -> client endpoint)
+
 		public static ProtoEndpoint Endpoint(uint type, uint instance)
 		{
 			return new ProtoEndpoint

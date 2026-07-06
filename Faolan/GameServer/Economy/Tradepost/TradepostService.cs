@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Opcodes;
 using System;
 using System.Linq;
 using System.Text;
@@ -172,7 +173,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
 		// DeleteMail). All address the buyer's own mail by the wire MailId; GetMailItem grants the escrowed item.
-		internal async Task HandleTradepostMailOp(INetworkClient client, ConanPacket packet, TradepostProtocol.AgentMethod method)
+		internal async Task HandleTradepostMailOp(INetworkClient client, ConanPacket packet, TradepostAgentOpcodes method)
 		{
 			var character = client.Session.Character;
 			if (character == null)
@@ -182,7 +183,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 			switch (method)
 			{
-				case TradepostProtocol.AgentMethod.GetAllMails:
+				case TradepostAgentOpcodes.GetAllMails:
 				{
 					var mails = await _database.GetMailsForRecipient(character.Name);
 					foreach (var m in mails)
@@ -192,7 +193,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 					break;
 				}
 
-				case TradepostProtocol.AgentMethod.GetMailByID:
+				case TradepostAgentOpcodes.GetMailByID:
 				{
 					var mail = await _database.GetMailByWireId(packet.Body.ReadUInt64());
 					if (mail != null)
@@ -200,7 +201,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 					break;
 				}
 
-				case TradepostProtocol.AgentMethod.GetItemData:
+				case TradepostAgentOpcodes.GetItemData:
 				{
 					// Preview: the mail WITH its attachment (the client shows the item in the mail; nothing is granted).
 					var mail = await _database.GetMailByWireId(packet.Body.ReadUInt64());
@@ -209,7 +210,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 					break;
 				}
 
-				case TradepostProtocol.AgentMethod.GetMailItem:
+				case TradepostAgentOpcodes.GetMailItem:
 				{
 					var mailId = packet.Body.ReadUInt64();
 					var itemInstanceId = packet.Body.ReadUInt64();
@@ -217,7 +218,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 					break;
 				}
 
-				case TradepostProtocol.AgentMethod.MarkMailRead:
+				case TradepostAgentOpcodes.MarkMailRead:
 				{
 					var mailId = packet.Body.ReadUInt64();
 					await _database.SetMailRead(mailId, true);
@@ -225,7 +226,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 					break;
 				}
 
-				case TradepostProtocol.AgentMethod.DeleteMail:
+				case TradepostAgentOpcodes.DeleteMail:
 				{
 					var mailId = packet.Body.ReadUInt64();
 					await _database.DeleteMail(mailId);
