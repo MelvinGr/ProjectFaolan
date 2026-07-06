@@ -5,8 +5,7 @@ using Faolan.Core.Network.Protobuf;
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
 {
-	// The narrow set of cross-cutting OUTBOUND ops the economy/inventory collaborator services (ShopService /
-	// BankService / TradepostService) need to reach back to on the world listener: the wallet update and the two
+	// The narrow set of cross-cutting OUTBOUND ops the economy/inventory collaborator services (ShopService / BankService) need to reach back to on the world listener: the wallet update and the two
 	// live item grants. GameServerListener implements it (forwarding to its own Outbound builders), so those
 	// services depend on this three-method surface instead of the whole listener god-class - the same decoupling
 	// the per-op Func<> seams gave, collapsed into one named port now that several services share the same ops.

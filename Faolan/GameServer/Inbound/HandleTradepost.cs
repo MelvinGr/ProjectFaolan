@@ -11,7 +11,7 @@ namespace Faolan.GameServer
 	public partial class GameServerListener
 	{
 		// Inbound Tradepost (auction house) + mail dispatch, routed here by receiver class (TradepostAgentType) from
-		// ReceivedPacket. Mutating ops delegate to _tradepost (TradepostService); ItemSearch parses + replies via
+		// ReceivedPacket. Mutating ops are folded onto the listener (TradepostOps.cs); ItemSearch parses + replies via
 		// TradepostResponses. Grammar in docs/tradepost-protocol.md.
 		private async Task HandleTradepostPacket(INetworkClient client, ConanPacket packet)
 		{
@@ -37,28 +37,28 @@ namespace Faolan.GameServer
 
 				case TradepostAgentOpcodes.BuyItem:
 					// BUY -> debit the buyer + deliver the item via a system mail.
-					await _tradepost.HandleTradepostBuy(client, packet);
+					await HandleTradepostBuy(client, packet);
 					break;
 
 				case TradepostAgentOpcodes.TradepostSellItem:
 					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
-					await _tradepost.HandleTradepostSell(client, packet);
+					await HandleTradepostSell(client, packet);
 					break;
 
 				case TradepostAgentOpcodes.TradepostChangeItemPrice:
-					await _tradepost.HandleTradepostChangePrice(client, packet);
+					await HandleTradepostChangePrice(client, packet);
 					break;
 
 				case TradepostAgentOpcodes.TradepostCancelSellItem:
-					await _tradepost.HandleTradepostCancelSell(client, packet);
+					await HandleTradepostCancelSell(client, packet);
 					break;
 
 				case TradepostAgentOpcodes.SendMail:
-					await _tradepost.HandleTradepostSendMail(client, packet);
+					await HandleTradepostSendMail(client, packet);
 					break;
 
 				case TradepostAgentOpcodes.CancelMail:
-					await _tradepost.HandleTradepostCancelMail(client, packet);
+					await HandleTradepostCancelMail(client, packet);
 					break;
 
 				case TradepostAgentOpcodes.Close:
@@ -72,7 +72,7 @@ namespace Faolan.GameServer
 				case TradepostAgentOpcodes.GetMailItem:
 				case TradepostAgentOpcodes.MarkMailRead:
 				case TradepostAgentOpcodes.DeleteMail:
-					await _tradepost.HandleTradepostMailOp(client, packet, method);
+					await HandleTradepostMailOp(client, packet, method);
 					break;
 
 				default:

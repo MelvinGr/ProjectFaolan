@@ -97,8 +97,6 @@ namespace Faolan.GameServer
 		private readonly ShortcutBarService _shortcutBar;
 		private readonly SpellweaveService _spellweave;
 
-		// Auction-house buy->mail + mailbox ops + sell/list flow. Wallet/item-grant injected as seams. See Economy/Tradepost/TradepostService.cs.
-		private readonly TradepostService _tradepost;
 
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
@@ -146,7 +144,6 @@ namespace Faolan.GameServer
 			_itemUse = new ItemUseService(database, RecallToBindCommand, logger);
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
-			_tradepost = new TradepostService(database, logger, this);
 
 			InitGmCommands();
 		}
@@ -303,12 +300,6 @@ namespace Faolan.GameServer
 				await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 
-		// Step 4: the enter-world handoff. The client learns the world server address ONLY from this 0x2002
-		// packet (the address is carried explicitly here, not derived). The client opens a brand-new connection
-		// to that address, which triggers the loading screen where the intro cinematic resources load. Retail used
-		// a SEPARATE world port (creator + 1); we advertise the SAME GameServer port, so the fresh connection
-		// lands back on the one GameServerListener (which serves the create-world entry path for the now-named
-		// character). Body = [0x00][byteLen "host:port"].
 		private async Task SendWorldHandoff(INetworkClient client)
 		{
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
