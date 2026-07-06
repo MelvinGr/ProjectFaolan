@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Linq;
 using Faolan.Core.Network.Interfaces;
 
 namespace Faolan.Core.Network.Conan
@@ -9,6 +8,7 @@ namespace Faolan.Core.Network.Conan
 	public sealed class ConanMessageFramer : IMessageFramer
 	{
 		private const int MaxPacketSize = 16 * 1024 * 1024;
+		private const int HeaderSize = sizeof(int);
 
 		// The compression-stream marker: a fixed 9-byte control frame = this 4-byte tag (0x80000005) + 5 trailing
 		// bytes. Retail only ever sends it SERVER->CLIENT to open the download compression stream; our server does not
@@ -20,9 +20,13 @@ namespace Faolan.Core.Network.Conan
 		private const uint CompressionMarkerTag = 0x80000005u;
 		private const int CompressionMarkerLength = 9;
 
-		private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
-		private byte[] _packetBuffer;
-		private int _packetBytesRead;
+		private readonly byte[] _lengthBuffer = new byte[HeaderSize];
+
+		// The frame currently being filled: [HeaderSize big-endian length][payload], allocated once when the length is
+		// known so a completed packet is emitted with no extra copy. Null while the 4-byte length header is being read.
+		private byte[] _frame;
+		private int _lengthBytesRead;
+		private int _payloadBytesRead;
 		private int _markerSkipRemaining;
 
 		public IEnumerable<byte[]> PushBytes(byte[] bytes, int length)
@@ -50,70 +54,64 @@ namespace Faolan.Core.Network.Conan
 					continue;
 				}
 
-				if (_packetBuffer != null)
+				if (_frame != null)
 				{
-					var bytesRequested = _packetBuffer.Length - _packetBytesRead;
-					var bytesTransferred = Math.Min(bytesRequested, bytesAvailable);
+					// Read the payload straight into the frame, after its 4-byte length header.
+					var payloadLength = _frame.Length - HeaderSize;
+					var bytesTransferred = Math.Min(payloadLength - _payloadBytesRead, bytesAvailable);
 
-					Array.Copy(bytes, offset, _packetBuffer, _packetBytesRead, bytesTransferred);
+					Array.Copy(bytes, offset, _frame, HeaderSize + _payloadBytesRead, bytesTransferred);
 					offset += bytesTransferred;
-					_packetBytesRead += bytesTransferred;
+					_payloadBytesRead += bytesTransferred;
 
-					if (_packetBytesRead == _packetBuffer.Length)
+					if (_payloadBytesRead == payloadLength)
 					{
-						packets.Add(_packetLengthBuffer.Concat(_packetBuffer).ToArray());
-						_packetBuffer = null;
-						_packetBytesRead = 0;
+						packets.Add(_frame);
+						_frame = null;
+						_payloadBytesRead = 0;
 					}
+
+					continue;
 				}
-				else
+
+				// Accumulate the 4-byte big-endian length header (may straddle recv boundaries).
+				var headerTransferred = Math.Min(HeaderSize - _lengthBytesRead, bytesAvailable);
+				Array.Copy(bytes, offset, _lengthBuffer, _lengthBytesRead, headerTransferred);
+				offset += headerTransferred;
+				_lengthBytesRead += headerTransferred;
+
+				if (_lengthBytesRead < HeaderSize)
+					continue;
+
+				_lengthBytesRead = 0;
+				var raw = BinaryPrimitives.ReadUInt32BigEndian(_lengthBuffer);
+
+				// Compression-stream marker: skip its remaining 5 bytes and keep parsing (see CompressionMarkerTag).
+				// Handled BEFORE the length-range guard so it is never mistaken for a hostile length, and so any
+				// packets coalesced behind it in the same recv still get framed.
+				if (raw == CompressionMarkerTag)
 				{
-					var bytesRequested = _packetLengthBuffer.Length - _packetBytesRead;
-					var bytesTransferred = Math.Min(bytesRequested, bytesAvailable);
-
-					Array.Copy(bytes, offset, _packetLengthBuffer, _packetBytesRead, bytesTransferred);
-					offset += bytesTransferred;
-					_packetBytesRead += bytesTransferred;
-
-					if (_packetBytesRead == sizeof(int))
-					{
-						var raw = BinaryPrimitives.ReadUInt32BigEndian(_packetLengthBuffer);
-
-						// Compression-stream marker: skip its remaining 5 bytes and keep parsing (see CompressionMarkerTag).
-						// Handled BEFORE the length-range guard so it is never mistaken for a hostile length, and so any
-						// packets coalesced behind it in the same recv still get framed.
-						if (raw == CompressionMarkerTag)
-						{
-							_markerSkipRemaining = CompressionMarkerLength - sizeof(int);
-							_packetBytesRead = 0;
-							continue;
-						}
-
-						if (raw > MaxPacketSize)
-						{
-							ResetPacketState();
-							break;
-						}
-
-						if (raw == 0)
-						{
-							_packetBytesRead = 0;
-							continue;
-						}
-
-						_packetBuffer = new byte[raw];
-						_packetBytesRead = 0;
-					}
+					_markerSkipRemaining = CompressionMarkerLength - HeaderSize;
+					continue;
 				}
+
+				if (raw > MaxPacketSize)
+				{
+					_frame = null; // hostile length - drop the rest of this recv
+					break;
+				}
+
+				if (raw == 0)
+					continue;
+
+				// Allocate the whole frame ([length][payload]) once and stamp the header, so the completed packet is
+				// emitted directly - no per-packet Concat/copy.
+				_frame = new byte[HeaderSize + (int)raw];
+				BinaryPrimitives.WriteUInt32BigEndian(_frame, raw);
+				_payloadBytesRead = 0;
 			}
 
 			return packets;
-		}
-
-		private void ResetPacketState()
-		{
-			_packetBuffer = null;
-			_packetBytesRead = 0;
 		}
 	}
 }

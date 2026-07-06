@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -5,6 +6,7 @@ namespace Faolan.Core.Network.Packets
 {
 	// The canonical base-128 varint (protobuf LEB128) codec for the Conan wire, for the byte[]/List<byte> builders
 	// (ScryScript, SnapshotPrefix, CombatService). FaolanStream.Read/WriteVarint is the stream-side equivalent.
+	[Obsolete("Use FaolanStream")]
 	public static class Varint
 	{
 		public static ulong ReadVarint(Stream stream)
