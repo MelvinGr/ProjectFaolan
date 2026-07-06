@@ -27,6 +27,10 @@ namespace Faolan.Importer.Captures
 		// conversations (CharacterSearch etc.); the receiver-instance == character-id is the s2c-direction filter.
 		private const ushort LearnSpellOpcode = 0x200A;
 
+		// MoveItemToBar / AddShortcut. The client's first one ends the create starting-kit phase (its bar drags
+		// follow the grants); any DispatchLearnSpell after it is in-session leveling, not a starter.
+		private const ushort AddShortcutOpcode = 0x206E;
+
 		public static async Task<(int Seen, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
 		{
 			var ids = new HashSet<uint>();
@@ -146,6 +150,66 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
+		// Corrects each captured class's spell unlock LEVELS from the create grants (the level-1 truth). The ellatha
+		// scrape (EllathaSpellLevelImporter) tags many ranks with wrong levels - e.g. Ice Strike (Rank 1) at 7, or
+		// several non-granted ranks at 1 - so a naive "Level <= charLevel" starter query over-/under-grants a fresh
+		// caster. Rule: every spell a create capture GRANTS (0x200A) is level 1; every OTHER access row of that same
+		// captured class currently at level 1 is pushed above it. So a level-1 create yields EXACTLY the capture's
+		// grant (necro = Ice Strike R1 + Frozen Hatred). Must run AFTER the ellatha/wiki level modules (it overrides
+		// them). Idempotent; only classes whose create capture actually reached a grant are touched.
+		public static async Task<(int Pinned, int Bumped)> CorrectStarterLevelsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
+		{
+			var startersByClass = new Dictionary<uint, HashSet<uint>>();
+			foreach (var capture in createCaptures)
+			{
+				if (CaptureAbilityImporter.DetectClass(capture) is not { } cls)
+					continue;
+
+				var ids = new HashSet<uint>();
+				foreach (var packet in capture)
+				{
+					if (IsBarDrag(packet))
+						break; // create starters are granted BEFORE the client's first bar drag; later 0x200A = leveling
+					TryReadLearnSpellId(packet, ids);
+				}
+				if (ids.Count == 0)
+					continue; // no grant reached in this capture - leave the class's levels untouched
+
+				if (!startersByClass.TryGetValue(cls, out var set))
+					startersByClass[cls] = set = new HashSet<uint>();
+				set.UnionWith(ids);
+			}
+
+			var allStarters = startersByClass.Values.SelectMany(s => s).ToHashSet();
+			if (allStarters.Count == 0)
+				return (0, 0);
+
+			// 1. Create-granted spells are the level-1 truth.
+			var starterRows = await db.Spells.Where(s => allStarters.Contains(s.Id)).ToListAsync();
+			foreach (var s in starterRows)
+				s.Level = 1;
+
+			// 2. Every OTHER level-1 access row of a captured class is not actually a level-1 spell - push it above 1
+			//    (the ellatha scrape mis-tags non-granted ranks). A level-1 create then yields exactly the grant.
+			var bumped = 0;
+			foreach (var (cls, starters) in startersByClass)
+			{
+				var classSpellIds = await db.ClassSpells.Where(cs => (uint)cs.Class == cls).Select(cs => cs.SpellId).ToListAsync();
+				var l1 = await db.Spells.Where(sp => classSpellIds.Contains(sp.Id) && sp.Level == 1).ToListAsync();
+				foreach (var sp in l1)
+				{
+					if (starters.Contains(sp.Id))
+						continue;
+					sp.Level = 2;
+					bumped++;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("CaptureSpellImporter: pinned {Pinned} starter spells to level 1, bumped {Bumped} non-starter level-1 rows above it.", starterRows.Count, bumped);
+			return (starterRows.Count, bumped);
+		}
+
 		// Seeds each captured character's LEARNED spell set (CharacterSpell rows) from the DispatchLearnSpell grants
 		// in the captures, so GrantCharacterSpells re-grants them on login (#74). Retail re-sends a caster's whole
 		// learned set on every world entry, so a capture's grants ARE that character's spellbook. Attributed to the
@@ -221,6 +285,19 @@ namespace Faolan.Importer.Captures
 			catch
 			{
 				// not a parseable DispatchLearnSpell grant
+			}
+		}
+
+		// True if the packet is the client's MoveItemToBar (0x206E) - the create starting-kit boundary.
+		private static bool IsBarDrag(byte[] packetBytes)
+		{
+			try
+			{
+				return new ConanPacket(packetBytes).Opcode == AddShortcutOpcode;
+			}
+			catch
+			{
+				return false;
 			}
 		}
 

@@ -195,6 +195,24 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Corrects starter-spell unlock levels from the create grants (the level-1 truth), overriding the ellatha/wiki
+	// level scrape so a level-1 create yields EXACTLY that class's f239 grant. Runs after class-spells (which harvests
+	// the per-class grants); registration order (after the tsv level modules) places it after the ellatha/wiki levels.
+	public sealed class StarterSpellLevelsModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => ["class-spells"];
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Upsert, WriteMode.Overwrite };
+		public string Description => "Pin create-granted spells to level 1, push other class level-1 rows above it.";
+		public string Name => "starter-spell-levels";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (pinned, bumped) = await CaptureSpellImporter.CorrectStarterLevelsAsync(ctx.Db, ctx.CreateCaptures);
+			return new ImportResult($"{pinned} starter spells pinned to L1, {bumped} non-starter L1 rows bumped.");
+		}
+	}
+
 	// NPC dialogue trees, condition-tagged per capture then merged. Always a clean rebuild (handle-keyed stale
 	// rows must be purged), so Overwrite-only.
 	public sealed class ConversationsModule : IImportModule
