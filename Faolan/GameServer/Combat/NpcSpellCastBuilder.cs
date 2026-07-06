@@ -26,7 +26,7 @@ namespace Faolan.GameServer.Combat
 		public static byte[] Build(uint applyTo, uint applyFrom, uint spellId, byte[] payload)
 		{
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
+				.WriteUInt32(GameServer0X2000RespondsOpcodes.MagicBuffIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(applyTo)
 				.WriteUInt16(0)

@@ -528,13 +528,6 @@ namespace Faolan.Core.Network.Packets
 			N3ToClientFadeIIR = 0x66180B20, // n3ToClientFadeIIR_t  (x87) - screen fade
 			N3ToClientQuitIIR = 0x04B82B2D, // n3ToClientQuitIIR_t  (x3249)
 
-			// --- descriptive aliases used by the server code (same value as the IIR member above) ---
-			MapChange = PlayfieldFIIR,
-			Spawn = SimpleCharFullUpdateIIR,
-			SpawnObject = SimpleDynelFullUpdateIIR,
-			SetDayTime = GameTimeIIR,
-			ApplySpell = MagicBuffIIR
-
 			// FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization carve-out (nested 101/104/112/113
 			// container blocks, 83-byte item tails): the RE notes live in docs/fullplayer-snapshot-reader.md.
 		}

@@ -59,7 +59,7 @@ namespace Faolan.GameServer.CreateFlow
 			await new PacketStream()
 				.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.MagicBuffIIR)
 					.WriteArray(0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
 					.WriteArray(0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0xC3, 0x50)

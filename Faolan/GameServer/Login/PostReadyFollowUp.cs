@@ -162,7 +162,7 @@ namespace Faolan.GameServer
 			await new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.MagicBuffIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(applyTo) //Apply to ?
 					.WriteUInt16(0x0000)
@@ -8560,7 +8560,7 @@ namespace Faolan.GameServer
 			return new PacketStream()
 				.WriteHeader(sender0, receiver0, GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000RespondsOpcodes.SetDayTime)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.GameTimeIIR)
 					/*.WriteArray(
 					    0x00, 0x00, 0x00, 0x00,
 					    0x00, 0x00, 0x00, 0x00,
