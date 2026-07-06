@@ -227,6 +227,11 @@ namespace Faolan.GameServer
                     else
                     {
                         await SendReadyForPlayScreen(client);
+                        // Retail grants the abilities (0x2052) + combo book here, right after 0x2024 ReadyForPlayScreen
+                        // (post-snapshot) - NOT during world entry. They are not in the snapshot known-list, so a
+                        // pre-snapshot grant is discarded by the client's identity reconstruction (see
+                        // GrantPostReadyAbilitiesAndCombos). Done off the 0x205f arming path, which can be dropped mid-burst.
+                        await GrantPostReadyAbilitiesAndCombos(client);
                         await SendExistingCharacterPostReadyFollowUp(client);
                     }
 
