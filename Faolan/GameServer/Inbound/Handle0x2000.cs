@@ -208,14 +208,17 @@ namespace Faolan.GameServer
                     {
                         if (IsRetailCreateEditorFlow(client))
                         {
+                            // Retail answers the editor's CharInPlayIIR DIRECTLY with the post-ready burst - the 0x2024
+                            // ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the creation script that launches the
+                            // editor (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95). No
+                            // instance-echo counting or deferral - CharInPlayIIR IS the trigger.
                             if (client.Session.HasFlushedCreateEditorPostReady)
-                                Logger.LogInformation("Client sent ReadyForPlayScreen after the deadlock-breaker already flushed the post-ready burst; not re-flushing.");
+                                Logger.LogInformation("Create-editor: post-ready burst already sent; ignoring the repeat CharInPlayIIR.");
                             else
                             {
-                                client.Session.CreateEditorTempInstanceCount = 0;
-                                client.Session.CreateEditorReadyRequestIds.Clear();
-                                client.Session.HasPendingCreateEditorReadyFollowUp = true;
-                                Logger.LogInformation("Queued retail create-editor ReadyForPlayScreen follow-up; waiting for the post-ready 0x021662C8 burst before replying.");
+                                Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
+                                await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
+                                client.Session.HasFlushedCreateEditorPostReady = true;
                             }
                         }
                         else
