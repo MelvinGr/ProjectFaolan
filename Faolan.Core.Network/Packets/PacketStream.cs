@@ -28,24 +28,6 @@ namespace Faolan.Core.Network.Packets
 			return client.SendAsync(ToArray());
 		}
 
-		public PacketStream WriteHeader<T>(ProtoMessage sender, ProtoMessage receiver, T opcode, byte[] headerData = null) where T : struct
-		{
-			WriteUInt32(0); // Write empty length
-			WriteUInt32(0); // write empty crc32
-
-			WriteArrayUInt32Length(s =>
-			{
-				s.WriteArray(sender.ToArray());
-				s.WriteArray(receiver.ToArray());
-				s.WriteUInt16(Convert.ToUInt16(opcode));
-
-				if (headerData?.Length > 0)
-					s.WriteArray(headerData);
-			});
-
-			return this;
-		}
-
 		public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, T opcode, byte[] headerData = null) where T : struct
 		{
 			WriteUInt32(0); // Write empty length
