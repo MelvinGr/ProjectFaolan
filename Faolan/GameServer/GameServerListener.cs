@@ -203,7 +203,6 @@ namespace Faolan.GameServer
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
 		{
-			var opcode = (GameServerOpcodes)packet.Opcode;
 
 			// This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes,
 			// so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
@@ -228,23 +227,24 @@ namespace Faolan.GameServer
 				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
 				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
 				case ConanEndpoints.GameCharAgentType:
-					if (opcode is not GameServerOpcodes.LatencyCheck)
-						LogPacketReceived(packet, opcode);
+					var charOp = (GameCharAgentOpcodes)packet.Opcode;
+					if (charOp is not GameCharAgentOpcodes.Ping)
+						LogPacketReceived(packet, charOp);
 
-					switch (opcode)
+					switch (charOp)
 					{
-						case GameServerOpcodes.ChatCommand: // 0x2002 = RequestBindLocation
+						case GameCharAgentOpcodes.RequestBindLocation: // 0x2002 = RequestBindLocation
 							await HandleRequestBindLocation(client, packet);
 							return;
 
-						case GameServerOpcodes.Hello: // 0x2003 = SetTutorialStats (Tortage tutorial tracking)
+						case GameCharAgentOpcodes.SetTutorialStats: // 0x2003 = SetTutorialStats (Tortage tutorial tracking)
 							var tutorialStat = packet.Body.Length - packet.Body.Position >= sizeof(uint)
 								? packet.Body.ReadUInt32()
 								: 0;
 							Logger.LogDebug("GameCharAgent.SetTutorialStats(0x{Value:X8}); no reply.", tutorialStat);
 							return;
 
-						case GameServerOpcodes.SetHideInspectOption:
+						case GameCharAgentOpcodes.SetHideInspectOption:
 						{
 							if (packet.Body != null)
 							{
@@ -256,7 +256,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.CinematicTransition:
+						case GameCharAgentOpcodes.CinematicTransition:
 						{
 							var unk0 = packet.Body.ReadUInt32(); // 0xc350
 							var characterId = packet.Body.ReadUInt32();
@@ -296,7 +296,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.UpdateQuestMarkerNPC:
+						case GameCharAgentOpcodes.UpdateQuestMarkerNPC:
 						{
 							if (packet.Body?.Length >= sizeof(uint) * 4)
 							{
@@ -337,7 +337,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.DoSkillSellback:
+						case GameCharAgentOpcodes.DoSkillSellback:
 						{
 							if (packet.Body != null)
 								LogPacketBodyDebug("GameServer 0x205C body", packet.Body.ToArray());
@@ -345,7 +345,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.PlayStockphraseAsSubtitle:
+						case GameCharAgentOpcodes.PlayStockphraseAsSubtitle:
 						{
 							// #234 create-cutscene speech: the client is asking us to resolve a stock phrase
 							// ({stock_N}) and BLOCKS up to 60 s for the 0x205D reply. Answer it (Kalanthes's beach
@@ -356,28 +356,28 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.RequestShortcutBar: // client asks for its saved hotbar at login; reply with the restored bar (#71)
+						case GameCharAgentOpcodes.RequestShortcutBar: // client asks for its saved hotbar at login; reply with the restored bar (#71)
 						{
 							await _shortcutBar.SendRestoredBar(client);
 
 							break;
 						}
 
-						case GameServerOpcodes.SellToShop:
+						case GameCharAgentOpcodes.SellItem:
 						{
 							await _shop.HandleSellItemToShop(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.UndoLastSoldItem:
+						case GameCharAgentOpcodes.UndoLastSoldItem:
 						{
 							await _shop.HandleUndoLastSoldItem(client);
 
 							break;
 						}
 
-						case GameServerOpcodes.BuyFromShop:
+						case GameCharAgentOpcodes.BuyItem:
 						{
 							packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
 							var shopId = packet.Body.ReadUInt32();
@@ -390,42 +390,42 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.CloseShop:
+						case GameCharAgentOpcodes.CloseShop:
 						{
 							Logger.LogInformation("Shop closed by {Character}.", client.Session.Character?.Name);
 
 							break;
 						}
 
-						case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]
+						case GameCharAgentOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]
 						{
 							await _loot.HandleLootAll(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.TryLootItem: // single drag of one item out of the loot window
+						case GameCharAgentOpcodes.TryLootItem: // single drag of one item out of the loot window
 						{
 							await _loot.HandleLootItem(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.CloseLootBag: // client closed the loot window; body = [typetag][bag handle]
+						case GameCharAgentOpcodes.CloseLootBag: // client closed the loot window; body = [typetag][bag handle]
 						{
 							await _loot.HandleCloseLootBag(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.TryLootCash: // loot the bag's coins; fires on every loot alongside TryLootAll
+						case GameCharAgentOpcodes.TryLootCash: // loot the bag's coins; fires on every loot alongside TryLootAll
 						{
 							await _loot.HandleLootCash(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.RespawnMe: // the player's release/resurrect click; body = [u32 token]
+						case GameCharAgentOpcodes.RespawnMe: // the player's release/resurrect click; body = [u32 token]
 						{
 							var token = packet.Body?.Length >= sizeof(uint)
 								? packet.Body.ReadUInt32()
@@ -442,7 +442,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId][u32 charId]
+						case GameCharAgentOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId][u32 charId]
 						{
 							var buffId = packet.Body.ReadUInt32();
 							var charId = packet.Body.ReadUInt32();
@@ -458,14 +458,14 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.LatencyCheck: // latency check (client 0x2085 -> server 0x2082)
+						case GameCharAgentOpcodes.Ping: // latency check (client 0x2085 -> server 0x2082)
 						{
 							await _keepAlive.HandleLatencyCheck(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.MoveTradeItemInternal: // player-to-player trade window item move; not implemented
+						case GameCharAgentOpcodes.MoveTradeItemInternal: // player-to-player trade window item move; not implemented
 						{
 							/*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
 							        byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
@@ -512,7 +512,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
+						case GameCharAgentOpcodes.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
 						{
 							LogPacketBodyDebug("GameServer 0x207B body", packet.Body?.ToArray());
 
@@ -521,7 +521,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.PerformSpecialAction:
+						case GameCharAgentOpcodes.PerformSpecialAction:
 						{
 							// The spellweave activate/deactivate TOGGLE (docs/combos.md): first press opens the trance, second
 							// fires the accumulated weave. Body word is the toggle param (0xfc in the capture).
@@ -533,7 +533,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
+						case GameCharAgentOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
 						{
 							LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray());
 
@@ -552,7 +552,7 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.SplitStack:
+						case GameCharAgentOpcodes.SplitInventoryItem:
 						{
 							var unk0 = packet.Body.ReadUInt32();
 							var unk1 = packet.Body.ReadUInt32();
@@ -578,21 +578,21 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.RemoveShortcut: // body = [u32 slot]
+						case GameCharAgentOpcodes.RemoveShortcut: // body = [u32 slot]
 						{
 							await _shortcutBar.HandleRemoveShortcut(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.UpdateShortcut: // body = [u32 slot][u32 flag][u32 container]
+						case GameCharAgentOpcodes.UpdateShortcut: // body = [u32 slot][u32 flag][u32 container]
 						{
 							await _shortcutBar.HandleUpdateShortcut(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.AddShortcut:
+						case GameCharAgentOpcodes.AddShortcut:
 						{
 							// 0x206E collides: in-game it's MoveItemToBar, but on the character-creator connection it's
 							// the "enter world" signal. The client sends it several times; answer the first with the
@@ -634,12 +634,13 @@ namespace Faolan.GameServer
 
 				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
 				case ConanEndpoints.GameAgentType:
-					if (opcode is not GameServerOpcodes.Ping)
-						LogPacketReceived(packet, opcode);
+					var gaOp = (GameAgentOpcodes)packet.Opcode;
+					if (gaOp is not GameAgentOpcodes.UpdateGameServerStats)
+						LogPacketReceived(packet, gaOp);
 
-					switch (opcode)
+					switch (gaOp)
 					{
-						case GameServerOpcodes.Hello:
+						case GameAgentOpcodes.Authenticate2:
 						{
 							// 0x2003 = GameAgent.Authenticate2 (the connection Hello: clientInstance + accountId + version).
 							// The GameCharAgent.SetTutorialStats collision on this opcode is resolved by the class-first route
@@ -784,21 +785,21 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						case GameServerOpcodes.PassBlob:
+						case GameAgentOpcodes.PassBlob:
 						{
 							await Handle0X2000(client, packet);
 
 							break;
 						}
 
-						case GameServerOpcodes.Ping: // client 0x2005 (empty) -> server Pong 0x2009
+						case GameAgentOpcodes.UpdateGameServerStats: // client 0x2005 (empty) -> server Pong 0x2009
 						{
 							await _keepAlive.HandlePing(client);
 
 							break;
 						}
 
-						case GameServerOpcodes.ChatCommand:
+						case GameAgentOpcodes.ChatVicinity:
 						{
 							// 0x2002 = GameAgent.ChatVicinity (typed chat, carries GM commands). The GameCharAgent.RequestBindLocation
 							// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
@@ -816,13 +817,6 @@ namespace Faolan.GameServer
 								// "say" is proximity chat - only same-map players within range hear it (the sender always does).
 								// The GameServer owns the live positions, so it picks the recipients here.
 								await _agentServerDispatcher.CharacterSay(client.Session.Character.Id, text, _simulation.SayRecipients(client));
-
-							break;
-						}
-
-						case GameServerOpcodes.VanityToggle:
-						{
-							LogPacketBodyDebug("GameServer VanityToggle body", packet.Body?.ToArray());
 
 							break;
 						}
