@@ -3,6 +3,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using System;
 using System.Collections.Generic;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.World
 {

@@ -6,7 +6,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Parses/builds the DispatchTradepostSearchResults (S→C 0x2005) body - the auction-house listing grid.
 	// Wire grammar (decoded 2026-06-13 from the necrol80 auctionhouse capture, Captures/scripts/decode_tradepost.py,

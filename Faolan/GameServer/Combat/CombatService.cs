@@ -13,6 +13,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.Combat
 {

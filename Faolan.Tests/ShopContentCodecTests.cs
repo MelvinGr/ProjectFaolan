@@ -4,6 +4,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Economy.Shop;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {

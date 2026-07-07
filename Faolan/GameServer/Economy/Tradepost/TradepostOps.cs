@@ -12,6 +12,7 @@ using System;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

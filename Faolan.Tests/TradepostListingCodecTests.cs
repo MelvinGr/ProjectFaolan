@@ -3,6 +3,7 @@ using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {

@@ -1,6 +1,6 @@
 using System;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds the NewLevelIIR_t (sub-opcode 0x6D314743) body - the LEVEL-UP EVENT the client processes to draw the
 	// "Congratulations, you have reached level N!" center-screen banner and play the level-up visual/audio effect.

@@ -10,6 +10,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets;
 using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.Server;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Mcp.Tools
 {

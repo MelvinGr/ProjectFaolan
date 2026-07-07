@@ -8,7 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Parses/builds the DispatchShopData (DL 0x2033) vendor-window body. Wire grammar (decoded 2026-06-12,
 	// validated on all 11 captured vendor windows; dissector Captures/scripts/decode_shopdata.py):

@@ -2,6 +2,7 @@ using System;
 using Faolan.Core;
 using Faolan.Core.Network.Packets;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {

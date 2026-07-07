@@ -11,6 +11,7 @@ using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using ProtoBuf;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Importer.Extractors
 {

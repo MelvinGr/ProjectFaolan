@@ -1,6 +1,6 @@
 using Faolan.Core;
-using Faolan.Core.Network;
 using System.Collections.Generic;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {

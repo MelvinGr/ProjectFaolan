@@ -1,4 +1,5 @@
 using System.Text;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Core.Network.Packets
 {

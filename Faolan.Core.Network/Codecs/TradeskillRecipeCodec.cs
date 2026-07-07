@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// The recipe-book list carried in TradeskillReplyIIR_c (0x9062D559), the server's answer to the client's
 	// TradeskillRequestIIR_c (0x06B9CD94) when the Crafting -> Recipes window opens. Grammar recovered from

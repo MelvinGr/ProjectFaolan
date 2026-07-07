@@ -9,6 +9,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Importer.Captures
 {

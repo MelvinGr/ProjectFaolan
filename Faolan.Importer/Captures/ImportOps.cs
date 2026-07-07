@@ -11,6 +11,7 @@ using Faolan.GameServer.Spawn;
 using Faolan.GameServer.World;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Importer.Captures
 {

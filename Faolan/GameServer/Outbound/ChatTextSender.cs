@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
+using Faolan.Core.Network.Codecs;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

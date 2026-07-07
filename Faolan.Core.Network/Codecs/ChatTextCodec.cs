@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds/parses the ChatTextIIR (sub-opcode 0xE0B51102) body - a WORLD/SYSTEM chat line the server pushes into
 	// the client's chat window (distinct from FormatFeedbackIIR's on-screen FIFO overlay and from the AgentServer

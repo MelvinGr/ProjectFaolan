@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds the ComboBookIIR (sub-opcode 0xA8BBEB7F) body - grants ONE combo into the client's combo book. Sent as
 	// part of the create-flow world-prep burst (the starting combos) AND on a level-up ding (the combos unlocked at

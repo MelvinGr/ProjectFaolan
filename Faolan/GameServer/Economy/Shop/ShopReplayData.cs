@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.Economy.Shop
 {

@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network
+namespace Faolan.Core.Network.Codecs
 {
     // The common ground for the self-serializing wire types: an instance writes itself to a stream (Write) or a fresh
     // buffer (ToArray), and a static factory reads one back (Read). Read/Write are a matched pair - Read(stream over

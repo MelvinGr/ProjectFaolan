@@ -5,6 +5,7 @@ using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Importer.Captures;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {
