@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.Spawn
 {

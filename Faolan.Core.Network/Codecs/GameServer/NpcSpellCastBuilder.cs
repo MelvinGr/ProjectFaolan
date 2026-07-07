@@ -1,8 +1,9 @@
 using Faolan.Core;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Builds the ApplySpell (0x6B87E316) carrier content for an NPC casting a spell at the player - the wire piece
 	// of NPC spell-casting (#232). It is the SAME ApplySpell shape the player's self-buffs / offensive casts use,

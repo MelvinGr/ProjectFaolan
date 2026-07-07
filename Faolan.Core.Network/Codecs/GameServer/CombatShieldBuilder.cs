@@ -1,8 +1,9 @@
 using Faolan.Core;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// The directional-combat guard broadcast (#20 decode 2): CombatShieldIIR (0xCFFD0519) sets an entity's blue
 	// shield-arc distribution. Wire: [subop][C350][entity handle][u32 value]. Semantics RE'd from the client's

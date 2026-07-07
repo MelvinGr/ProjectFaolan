@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Core.Network.Packets
 {

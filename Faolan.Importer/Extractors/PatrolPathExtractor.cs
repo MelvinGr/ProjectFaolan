@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using Faolan.GameServer.World;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Importer.Extractors
 {

@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Codecs;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -7,7 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Builds a 96C46740 MoveTask body - the per-entity movement registration paired with each FA015807 spawn
 	// (without it the client never polls 0x2020 for the entity). The full form carries a multi-segment patrol

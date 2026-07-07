@@ -1,9 +1,10 @@
 using System.Collections.Generic;
+using Faolan.Core.Network.Codecs;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Builds the ShortcutBarReply (0x2076 DispatchShortcutBarReply) body - the player's saved action bar, sent at
 	// login in reply to RequestShortcutBar (0x206D). Decoded 2026-06-19 (#71) from every login dump (47/47;

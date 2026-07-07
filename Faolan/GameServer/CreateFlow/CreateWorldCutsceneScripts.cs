@@ -8,6 +8,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 
 // ScryScript (the destiny cutscene step builder)
 

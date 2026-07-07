@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Core.Network.GameServer.FullCharSnapshot
 {

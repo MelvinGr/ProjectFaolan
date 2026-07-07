@@ -7,6 +7,7 @@ using System.Text.Json;
 using Faolan.GameServer.World;
 using Xunit;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

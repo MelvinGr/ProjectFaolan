@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.World
 {
