@@ -143,6 +143,7 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — grammar decoded, one disambiguation left (#3)
 - 🟡 Data-driven item-use categorization — currently a per-id map (#207) · guild bank — bodies uncaptured (#132)
 - ⬜ Tradeskills: gathering nodes + crafting professions (#148) · worn-only "bag-poison" item rendering (#14)
+- ⬜ Gems / item socketing — gem slots that grant attribute bonuses (no issue yet)
 
 ### Social & guilds
 - ✅ Chat — local say, channels, system, whisper (plus a live "Claude" MCP channel)
@@ -169,8 +170,18 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - 🟡 Polished localized appearance names (hair, …) — the LDB id→index map is EXE-gated (#291)
 - ⬜ RDB write-back: inline CDN resources + optional texture upscale/replace (#295, parked)
 
-### Massive / endgame (not started)
-- ⬜ Minigames & massive PvP (#146) · sieges / battlekeeps / guild cities (#147)
+### Group PvE content (not started)
+- ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter scripting;
+  no issue yet)
+- ⬜ Factions & reputation — the Khitai / *Rise of the Godslayer* system: faction ranks, faction vendors, and
+  faction companions (expansion content; no issue yet)
+
+### Guild base & large-scale (not started)
+- ⬜ Guild base — player-built **guild cities** and **battlekeeps** in the Border Kingdoms: the central keep, walls
+  and gates, rank-gated structures, and hired NPC guards (#147)
+- ⬜ Sieges — massed guild-vs-guild siege warfare (siege weapons, destructible walls) fought over those keeps (#147)
+- ⬜ PvP progression — open-world PvP, PvP minigames, and the PvP-resource / consequence layer that feeds base
+  building (#146)
 
 ### Tooling
 - ✅ Importer (captures + client RDB → `faolan.db`) · Wireshark dissector · unattended ClientLauncher ·
