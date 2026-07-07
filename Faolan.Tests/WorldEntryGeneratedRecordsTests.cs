@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.GameServer;
@@ -33,9 +35,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildGameTime_ReproducesCapturedRecord()
 		{
-			var record = IirRecordCodec.Parse(GameServerListener.BuildGameTime(BeachClient()), 0);
+			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient()));
 
-			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
+			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal(IirMessageTypes.GameTime, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			Assert.Equal(0x01472BDDu, record.FieldA);
@@ -46,13 +48,27 @@ namespace Faolan.Tests
 		public void BuildMapChange_ReproducesCapturedRecord()
 		{
 			// map=null -> BuildMapChange uses the beach defaults (instanced, count 2, fieldB 3, flags 0), reproducing the beach capture.
-			var record = IirRecordCodec.Parse(GameServerListener.BuildMapChange(BeachClient(), null, WorldState.DefaultPlayfieldToken), 0);
+			var record = DecodeIir(GameServerListener.BuildMapChange(BeachClient(), null, WorldState.DefaultPlayfieldToken));
 
-			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
+			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal(IirMessageTypes.MapChange, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			Assert.Equal(0x0043A140u, record.FieldA);
 			Assert.Equal(CapturedMapChangeBody, record.Body);
+		}
+
+		// Decodes a generated 0x2000 IIR download packet into its body fields. The framing (RpcHeader + opcode) is the
+		// self-describing length at offset 8 (body starts at 12 + that); the IIR body is [u32 bodyLen][u32 IirType]
+		// [u32 TypeTag][u32 Handle][u32 FieldA][payload]. Test-local so these assert the generated body field-by-field.
+		private static (uint Opcode, uint IirType, uint Handle, uint FieldA, byte[] Body) DecodeIir(byte[] packet)
+		{
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			return (
+				BinaryPrimitives.ReadUInt16BigEndian(packet.AsSpan(bodyStart - 2, 2)),
+				BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4)),
+				BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 12, 4)),
+				BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 16, 4)),
+				packet[(bodyStart + 20)..]);
 		}
 
 		private static RecordingNetworkClient BeachClient()

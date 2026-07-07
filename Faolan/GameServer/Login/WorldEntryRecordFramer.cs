@@ -79,7 +79,7 @@ namespace Faolan.GameServer
 
 		// Prepends the shared world-entry RpcHeader + outer length/CRC (the WriteHeader/WriteLengthHash path) to a
 		// record body that ALREADY carries its own [u32 bodyLen] prefix - i.e. the `packet[bodyStart..]` form that
-		// IirRecordCodec, SpawnPacketBuilder and WriteArrayUInt32Length all produce. This is the keystone that lets a
+		// SpawnPacketBuilder and WriteArrayUInt32Length produce. This is the keystone that lets a
 		// from-scratch record body reach the wire without a captured packet header.
 		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
