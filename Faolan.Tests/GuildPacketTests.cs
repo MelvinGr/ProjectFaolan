@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using System.Text;
 using Faolan.Core;
@@ -60,7 +61,7 @@ namespace Faolan.Tests
 		public void GuildTagBody_Matches_ExpectedLayout()
 		{
 			var s = new FaolanStream();
-			GameServerListener.WriteGuildTagBody(s, 0x01316E71, "Sepulchra Invictus");
+			new GuildTagBody(0x01316E71, "Sepulchra Invictus").Write(s);
 
 			// subop 2550C99A + type 0000C350 + char 01316E71 + u16 0 + len 0012 + "Sepulchra Invictus"
 			Assert.Equal("2550c99a0000c35001316e7100000012" + Convert.ToHexStringLower(Encoding.UTF8.GetBytes("Sepulchra Invictus")), Convert.ToHexStringLower(s.ToArray()));
@@ -72,10 +73,10 @@ namespace Faolan.Tests
 		public void GuildTagBody_RoundTrips(uint characterId, string guildName)
 		{
 			var s = new FaolanStream();
-			GameServerListener.WriteGuildTagBody(s, characterId, guildName);
+			new GuildTagBody(characterId, guildName).Write(s);
 			var body = s.ToArray();
 
-			Assert.True(GameServerListener.TryParseGuildTagBody(body, out var parsedId, out var parsedName));
+			Assert.True(GuildTagBody.TryParse(body, out var parsedId, out var parsedName));
 			Assert.Equal(characterId, parsedId);
 			Assert.Equal(guildName, parsedName);
 		}
@@ -84,10 +85,10 @@ namespace Faolan.Tests
 		public void TryParseGuildTagBody_RejectsWrongSubOpcode()
 		{
 			var s = new FaolanStream();
-			GameServerListener.WriteGuildTagBody(s, 0x01316E71, "X");
+			new GuildTagBody(0x01316E71, "X").Write(s);
 			var body = s.ToArray();
 			body[0] ^= 0xFF;
-			Assert.False(GameServerListener.TryParseGuildTagBody(body, out _, out _));
+			Assert.False(GuildTagBody.TryParse(body, out _, out _));
 		}
 	}
 }
