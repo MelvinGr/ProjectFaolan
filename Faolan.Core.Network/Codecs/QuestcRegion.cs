@@ -1,11 +1,9 @@
 using System;
-using Faolan.Core.Network.Codecs;
 using System.Collections.Generic;
 using System.Linq;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The Quest_c (List A) region at the START of the 0x737A6DF9 FullChar snapshot tails - the quest JOURNAL.
 	// Grammar recovered from the client reader FullPlayerCharacterIIR::ReadSubClass (FUN_0148c210 -> base
@@ -43,17 +41,10 @@ namespace Faolan.Core.Network.Codecs.GameServer
 
 		public List<QuestcRecord> Records { get; init; } = [];
 
-		public byte[] ToArray()
-		{
-			using var w = new FaolanStream();
-			Write(w);
-			return w.ToArray();
-		}
-
 		public void Write(FaolanStream w)
 		{
 			w.WriteUInt32(Version);
-			w.WriteUInt32(((uint)Records.Count + 1) * Frame);
+			w.WriteUInt32((Records.Count + 1) * Frame);
 			foreach (var record in Records)
 				record.Write(w);
 		}
@@ -128,12 +119,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
 		public ulong FieldF8 { get; init; } // @+0xf8 u64 (=15)
 
-		public byte[] ToArray()
-		{
-			using var s = new FaolanStream();
-			Write(s);
-			return s.ToArray();
-		}
 
 		public void Write(FaolanStream w)
 		{
@@ -288,8 +273,8 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		{
 			w.WriteUInt32(list.Count);
 			foreach (var rec in list)
-			foreach (var word in rec)
-				w.WriteUInt32(word);
+				foreach (var word in rec)
+					w.WriteUInt32(word);
 		}
 	}
 }

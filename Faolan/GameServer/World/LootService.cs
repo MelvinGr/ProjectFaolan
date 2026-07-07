@@ -1,7 +1,7 @@
-using Faolan.Core.Network.Codecs.GameServer;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
 using Microsoft.Extensions.Logging;
 

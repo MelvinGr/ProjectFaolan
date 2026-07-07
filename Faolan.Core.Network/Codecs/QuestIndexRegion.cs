@@ -1,11 +1,9 @@
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Database.Tables;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
     // The QUEST INDEX region of the 0x737A6DF9 tails - the bytes between the @609 objective region (see
     // QuestObjectiveRegion) and the access-window table. Two parts (decoded from the beach template + the 2-quest
@@ -40,13 +38,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
             public List<uint> GoalSteps { get; init; } = [];
             public uint TrailerQuestId { get; init; }
             public uint ChainWord { get; init; } // next held quest's AreaId, or the primary's IndexTrailerWord (last)
-        }
-
-        public byte[] ToArray()
-        {
-            using var w = new FaolanStream();
-            Write(w);
-            return w.ToArray();
         }
 
         public void Write(FaolanStream w)

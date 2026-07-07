@@ -2,10 +2,10 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Spawn;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds a player's FA015807 spawn BODY from scratch - no captured template (#210, the player analog of #185).
 	// The whole body is assembled into a typed PlayerSpawnScaffold and serialised by PlayerSpawnScaffoldCodec.Generate:
@@ -53,6 +53,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		}
 
 		// Quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
+		[Obsolete("Use FaolanStream")]
 		private static byte[] EncodeQuat(Quaternion q)
 		{
 			var b = new byte[20];
@@ -68,6 +69,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		}
 
 		// Vec3 = [0D x][15 y][1D z], each a little-endian fixed32 - the transform's protobuf float triple (15 bytes).
+		[Obsolete("Use FaolanStream")]
 		private static byte[] EncodeVec3(Vector3 v)
 		{
 			var b = new byte[15];

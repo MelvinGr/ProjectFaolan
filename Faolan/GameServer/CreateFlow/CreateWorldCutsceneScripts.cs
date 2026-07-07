@@ -1,6 +1,5 @@
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using System;
@@ -9,6 +8,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Opcodes;
 
 // ScryScript (the destiny cutscene step builder)
 
@@ -165,7 +165,7 @@ namespace Faolan.GameServer.CreateFlow
 
         // Sends a constructed Kalanthes MoveTask on the world conversation (WorldFraming + IirCarrier - the same framing
         // every rendered NPC move goes out on).
-        private Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
+        private static Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
         {
             return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
         }

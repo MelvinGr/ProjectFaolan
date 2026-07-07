@@ -1,11 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
-using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Packets;
 using Faolan.Importer.Captures;
 using Xunit;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.Tests
 {

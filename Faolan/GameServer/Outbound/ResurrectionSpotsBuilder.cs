@@ -1,10 +1,9 @@
 using System.Collections.Generic;
-using Faolan.Core.Network.Codecs.GameServer;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
@@ -34,7 +33,7 @@ namespace Faolan.GameServer
 		private static readonly byte[] ResurrectionSpotsSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
 
 		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.
-		private Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
+		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			var ps = new PacketStream();
 			ps.WriteHeader(ResurrectionSpotsSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);

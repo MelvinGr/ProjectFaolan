@@ -1,11 +1,10 @@
-using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using System.Text;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs;
 using Faolan.CSPlayerAgent;
-using Faolan.GameServer;
 using Xunit;
 
 namespace Faolan.Tests

@@ -1,3 +1,5 @@
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Core.Network.Codecs
 {
 	// Builds/parses the ChatTextIIR (sub-opcode 0xE0B51102) body - a WORLD/SYSTEM chat line the server pushes into
@@ -37,12 +39,6 @@ namespace Faolan.Core.Network.Codecs
 		// [len][subop][marker][instance][lead][xmlLen][xml][trailer]; Read recovers the (instance, xml).
 		public sealed record Message(uint Instance, byte[] Xml) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

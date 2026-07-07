@@ -9,7 +9,7 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private async Task Send0X201C(INetworkClient client)
+		private static async Task Send0X201C(INetworkClient client)
 		{
 			var sender = LoginWorld201CSender;
 			var receiver = LoginWorld201CReceiver(client);

@@ -1,12 +1,10 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
-using Faolan.Core;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Construct-side codecs for the dead-reckoning movement records (#190), decoded in docs/chardcmove-grammar.md.
 	// These are the per-tick movement broadcasts an entity streams; they complement MoveTaskCodec (the path/transform
@@ -210,6 +208,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 	}
 
 	// A tiny big-endian read cursor over a record body (the protocol is big-endian; floats are raw-body BE).
+	[Obsolete("Use FaolanStream")]
 	internal ref struct ReadCursor
 	{
 		private readonly ReadOnlySpan<byte> _b;

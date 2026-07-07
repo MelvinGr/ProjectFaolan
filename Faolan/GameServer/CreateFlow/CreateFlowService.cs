@@ -51,7 +51,7 @@ namespace Faolan.GameServer.CreateFlow
 		// Consumes (removes) a pending create-world-entry marker for `clientInstance`, returning true if one was set.
 		// The listener's world Hello calls this to recognise the post-creation world connection (and skip the helper
 		// auth), then take the create-world entry path; consuming it means a later normal login doesn't re-trigger the intro.
-		internal bool TryConsumePendingCreateWorldEntry(uint clientInstance)
+		internal static bool TryConsumePendingCreateWorldEntry(uint clientInstance)
 		{
 			return PendingCreateWorldEntry.TryRemove(clientInstance, out _);
 		}

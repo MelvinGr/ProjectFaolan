@@ -25,14 +25,14 @@ namespace Faolan.GameServer
 
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
 		// remoteformat template lands.
-		private Task SendSampleWorldChat(INetworkClient client)
+		private static Task SendSampleWorldChat(INetworkClient client)
 		{
 			return SendWorldChat(client, CriteriaSystemLineXml);
 		}
 
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
 		// GameInterface instance, on the world conversation.
-		private async Task SendWorldChat(INetworkClient client, string xml)
+		private static async Task SendWorldChat(INetworkClient client, string xml)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var body = ChatTextCodec.Build(instance, Encoding.ASCII.GetBytes(xml));

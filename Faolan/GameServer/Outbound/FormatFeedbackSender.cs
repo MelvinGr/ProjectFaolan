@@ -19,7 +19,7 @@ namespace Faolan.GameServer
 	{
 		// Pushes a FormatFeedback message (raw remoteformat XML) to the client's on-screen feedback. typeFlags =
 		// FifoBannerTypeFlags for the top-of-screen FIFO banner. Addressed to the player's GameInterface instance.
-		private async Task SendFeedback(INetworkClient client, string xml, uint typeFlags = FormatFeedbackCodec.FifoBannerTypeFlags, uint footer = 1)
+		private static async Task SendFeedback(INetworkClient client, string xml, uint typeFlags = FormatFeedbackCodec.FifoBannerTypeFlags, uint footer = 1)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.ASCII.GetBytes(xml));
@@ -63,7 +63,7 @@ namespace Faolan.GameServer
 		// that rose (#209). This is the VISIBLE half of a level-up; the caller still pushes the new vitals maxima.
 		// `levelsGained` covers a multi-level jump (e.g. a `.level 40` set). The growth amounts are provisional
 		// (Combat.AttributeGrowth) until real per-class tables exist.
-		private async Task SendLevelUpFeedback(INetworkClient client, uint newLevel, uint levelsGained = 1)
+		private static async Task SendLevelUpFeedback(INetworkClient client, uint newLevel, uint levelsGained = 1)
 		{
 			var character = client.Session.Character;
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, newLevel, levelsGained))
@@ -71,7 +71,7 @@ namespace Faolan.GameServer
 		}
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
-		private Task SendWorldIir(INetworkClient client, byte[] body)
+		private static Task SendWorldIir(INetworkClient client, byte[] body)
 		{
 			var ps = new PacketStream();
 			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);

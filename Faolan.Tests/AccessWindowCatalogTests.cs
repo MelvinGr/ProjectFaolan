@@ -1,5 +1,5 @@
 using System.IO;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Xunit;
 
 namespace Faolan.Tests

@@ -2,7 +2,6 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Spawn;
 using Faolan.Importer.Extractors;
@@ -13,8 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
 namespace Faolan.Importer.Captures
 {

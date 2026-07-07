@@ -1,8 +1,6 @@
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The continuous short-form BehaviorControlCenterIIR (0x642CD3D6) "AI / idle behavior pulse" retail streams ~10/s
 	// for every rendered entity (#225). It is what keeps a standing creature playing its IDLE animation instead of

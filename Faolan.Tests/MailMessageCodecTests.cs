@@ -1,5 +1,4 @@
 using System;
-using Faolan.Core.Network.Packets;
 using Xunit;
 using Faolan.Core.Network.Codecs;
 

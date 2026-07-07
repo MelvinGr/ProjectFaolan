@@ -1,9 +1,9 @@
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -236,7 +236,7 @@ namespace Faolan.GameServer
 
                 case GameCharAgentOpcodes.Ping: // latency check (client 0x2085 -> server 0x2082)
                 {
-                    await _keepAlive.HandleLatencyCheck(client, packet);
+                    await World.KeepAliveService.HandleLatencyCheck(client, packet);
 
                     break;
                 }

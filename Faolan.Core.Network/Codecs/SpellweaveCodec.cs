@@ -1,9 +1,7 @@
-using Faolan.Core;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Byte-exact builders for the spellweaving activate-response + fire wire (docs/combos.md, decoded in
 	// Captures/decode_spellweave.py from NecroL80_..._consuming-potions-food-spellweaving; caster 0x0802E5D4).

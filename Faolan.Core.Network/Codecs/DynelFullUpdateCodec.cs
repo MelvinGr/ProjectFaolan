@@ -1,6 +1,4 @@
-using Faolan.Core;
-
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Construct-side codec for the dynel-family full-update records (#187, docs/iir-readers-combat-world.md):
 	// DoorFullUpdateIIR_c (0x33A56FB0), DestructibleFullUpdateIIR_c (0x6BD56736), ClimbingDynelFullUpdateIIR_c

@@ -1,7 +1,6 @@
 using System;
 using System.Text;
-using Faolan.Core;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.Core.Network.Codecs.GameServer

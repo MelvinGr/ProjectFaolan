@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.GameServer
 	/// </summary>
 	public sealed class GameServerDispatcher : IGameServerDispatcher
 	{
-		private readonly List<IGameServerProvider> _providers = [];
+		private readonly List<IGameServerProvider> _providers = []; // TODO: use a concurrent collection instead of locking
 		private readonly Lock _lock = new Lock();
 
 		public void Register(IGameServerProvider provider)

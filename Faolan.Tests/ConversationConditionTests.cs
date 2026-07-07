@@ -14,7 +14,7 @@ namespace Faolan.Tests
 		{
 			var vm = new LuaScriptVm();
 			// A malformed gate must not hijack every player (the runtime uses permissive: false).
-			Assert.False(vm.RunCondition("this is not lua", new GameLuaPlayer([], []), false));
+			Assert.False(LuaScriptVm.RunCondition("this is not lua", new GameLuaPlayer([], []), false));
 		}
 
 		[Fact]
@@ -26,8 +26,8 @@ namespace Faolan.Tests
 			var afterQuest = new GameLuaPlayer([], [13479u]);
 			var beforeQuest = new GameLuaPlayer([], []);
 
-			Assert.True(vm.RunCondition(condition, afterQuest, false));
-			Assert.False(vm.RunCondition(condition, beforeQuest, false));
+			Assert.True(LuaScriptVm.RunCondition(condition, afterQuest, false));
+			Assert.False(LuaScriptVm.RunCondition(condition, beforeQuest, false));
 		}
 
 		[Fact]
@@ -36,8 +36,8 @@ namespace Faolan.Tests
 			var vm = new LuaScriptVm();
 			const string condition = "return player:HasTag(5001)";
 
-			Assert.True(vm.RunCondition(condition, new GameLuaPlayer([5001u], []), false));
-			Assert.False(vm.RunCondition(condition, new GameLuaPlayer([], []), false));
+			Assert.True(LuaScriptVm.RunCondition(condition, new GameLuaPlayer([5001u], []), false));
+			Assert.False(LuaScriptVm.RunCondition(condition, new GameLuaPlayer([], []), false));
 		}
 	}
 }

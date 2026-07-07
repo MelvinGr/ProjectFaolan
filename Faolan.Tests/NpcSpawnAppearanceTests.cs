@@ -1,7 +1,7 @@
 using System.Linq;
+using Faolan.Core.Network.Codecs;
 using Faolan.Tests.Support;
 using Xunit;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

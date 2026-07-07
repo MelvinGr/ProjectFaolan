@@ -1,9 +1,7 @@
-using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Microsoft.Extensions.Logging;
@@ -12,7 +10,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -474,7 +474,7 @@ namespace Faolan.GameServer
         // Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value],
         // byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
         // slot registrations (BankHandler), so the client applies it to the live bank cell.
-        private Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
+        private static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
         {
             return new PacketStream()
                 .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), (ushort)0x201C)

@@ -1,11 +1,9 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;
 using Xunit;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

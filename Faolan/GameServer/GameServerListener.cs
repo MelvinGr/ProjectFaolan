@@ -5,7 +5,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.GameServer;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
@@ -23,7 +22,7 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer
 {

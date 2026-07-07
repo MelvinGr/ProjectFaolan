@@ -3,11 +3,11 @@ using Faolan.Core.Extensions;
 using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer;
 using Faolan.Tests.Support;
 using Xunit;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 namespace Faolan.Tests
 {

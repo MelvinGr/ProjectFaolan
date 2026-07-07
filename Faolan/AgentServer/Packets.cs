@@ -123,12 +123,12 @@ namespace Faolan.AgentServer
 		// A chat-channel subscription (0x003C): [type][id][name][flag][0x0000]. Sent on AgentServer connect for each
 		// channel the character joins (~Trial/~Global/~LFG/~GlobalEnglish/~Playfield/~NewbieHelp). Byte layout
 		// verified from the raw login pcap.
-		private Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
+		private static Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
 		{
 			return new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox003C).WriteArrayUInt16Length(s => s.WriteByte(type).WriteUInt32(id).WriteString(name).WriteUInt32(flag).WriteUInt16(0x0000)).SendAsync(client);
 		}
 
-		private Task SendSystemMessage(INetworkClient client, string message)
+		private static Task SendSystemMessage(INetworkClient client, string message)
 		{
 			return new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.SystemMessage).WriteArrayUInt16Length(s => s.WriteUInt16(0x0000).WriteString(message).WriteUInt16(0x0000)).SendAsync(client);
 		}

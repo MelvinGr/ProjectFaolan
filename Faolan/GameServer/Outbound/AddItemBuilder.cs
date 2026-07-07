@@ -1,16 +1,13 @@
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Microsoft.Extensions.Logging;
-using ProtoBuf;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -143,7 +140,7 @@ namespace Faolan.GameServer
 
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
 		// updates (0x2005) ride.
-		private async Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
+		private static async Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
 		{
 			var charId = client.Session.Character.Id;
 

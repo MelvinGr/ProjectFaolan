@@ -7,10 +7,10 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs.GameServer;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -30,7 +30,7 @@ namespace Faolan.GameServer
 		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
-		private byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
+		private static byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
 		{
 			var character = client.Session.Character;
 			// The CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258):
@@ -49,7 +49,7 @@ namespace Faolan.GameServer
 				: BuildWorldEntrySpawn(client, body);
 		}
 
-		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, IReadOnlyList<QuestDefinition> snapshotQuests,
+		private static byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, IReadOnlyList<QuestDefinition> snapshotQuests,
 			QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet, uint? playfieldToken)
 		{
 			var instance = client.Session.Account.ClientInstance;
@@ -226,7 +226,7 @@ namespace Faolan.GameServer
 			// snapshot-eligible), so this is the only live delivery and there is no double-send.
 			if (isCreateEntry && character != null && beachDef != null)
 			{
-				await _broadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
+				await WorldBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
 				await _broadcaster.SendQuestFullUpdate(client, beachDef);
 				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
 			}

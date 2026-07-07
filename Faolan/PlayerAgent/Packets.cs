@@ -144,7 +144,7 @@ namespace Faolan.PlayerAgent
 				.SendAsync(client);
 		}
 
-		private Task SendOx20B9(INetworkClient client)
+		private static Task SendOx20B9(INetworkClient client)
 		{
 			return new PacketStream()
 				.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox20B9, [0x8B, 0xD8, 0x99, 0x02])

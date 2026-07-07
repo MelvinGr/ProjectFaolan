@@ -1,9 +1,9 @@
-using Faolan.Core.Enums;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Enums;
 
-namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
     /// <summary>
     ///     Builds the count-prefixed stat-record block shared by the <c>0x737A6DF9</c> snapshot and the

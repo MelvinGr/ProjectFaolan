@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
-using Faolan.Core.Network.Codecs.GameServer;
-using Faolan.Core;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;

@@ -1,8 +1,8 @@
+using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
-using System.Collections.Generic;
 
-namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
     // Builds a 0x737A6DF9 inventory container-entry (ProtoInventoryGame.items, field 4) from a DB Item template,
     // using the typed protobuf schema recovered from the client exe (Faolan.Core/Network/Protobuf, see

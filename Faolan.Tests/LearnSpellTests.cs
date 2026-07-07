@@ -1,6 +1,5 @@
-using Faolan.Core.Network.Codecs.GameServer;
 using System;
-using Faolan.GameServer;
+using Faolan.Core.Network.Codecs;
 using Xunit;
 
 namespace Faolan.Tests

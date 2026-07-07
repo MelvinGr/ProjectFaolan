@@ -13,8 +13,8 @@ namespace Faolan.Tests
         public void Condition_BadScript_DefaultsPermissive()
         {
             // A script that references an undefined global must not hard-block (returns the permissive default).
-            Assert.True(_vm.RunCondition("return somethingUndefined:Nope()", new FakePlayer()));
-            Assert.False(_vm.RunCondition("return somethingUndefined:Nope()", new FakePlayer(), false));
+            Assert.True(LuaScriptVm.RunCondition("return somethingUndefined:Nope()", new FakePlayer()));
+            Assert.False(LuaScriptVm.RunCondition("return somethingUndefined:Nope()", new FakePlayer(), false));
         }
 
         [Fact]
@@ -24,16 +24,16 @@ namespace Faolan.Tests
             const string src = "if player:HasTag(3104) then\n\treturn false\nelse\n\treturn true\nend";
             var p = new FakePlayer();
 
-            Assert.True(_vm.RunCondition(src, p)); // no tag -> true
+            Assert.True(LuaScriptVm.RunCondition(src, p)); // no tag -> true
             p.Tags.Add(3104);
-            Assert.False(_vm.RunCondition(src, p)); // tag set -> false
+            Assert.False(LuaScriptVm.RunCondition(src, p)); // tag set -> false
         }
 
         [Fact]
         public void Effect_AddTag_MutatesPlayer()
         {
             var p = new FakePlayer();
-            Assert.True(_vm.RunEffect("player:AddTag(2742)", p));
+            Assert.True(LuaScriptVm.RunEffect("player:AddTag(2742)", p));
             Assert.Contains(2742, p.Tags);
         }
 
@@ -43,7 +43,7 @@ namespace Faolan.Tests
             // A real multi-statement script form (AddTag + a guarded Count).
             const string src = "player:AddTag(1496)\nif not(player:HasTag(3104)) then\n\tplayer:Count(1000073)\nend";
             var p = new FakePlayer();
-            Assert.True(_vm.RunEffect(src, p));
+            Assert.True(LuaScriptVm.RunEffect(src, p));
             Assert.Contains(1496, p.Tags);
         }
 
@@ -51,7 +51,7 @@ namespace Faolan.Tests
         public void Effect_SolveGoal_Recorded()
         {
             var p = new FakePlayer();
-            Assert.True(_vm.RunEffect("player:SolveGoal(5744)", p));
+            Assert.True(LuaScriptVm.RunEffect("player:SolveGoal(5744)", p));
             Assert.Contains(5744, p.SolvedGoals);
         }
 
@@ -59,7 +59,7 @@ namespace Faolan.Tests
         public void Effect_SpawnItem_ResolvesResourceHash()
         {
             var p = new FakePlayer();
-            Assert.True(_vm.RunEffect("player:SpawnItem(Resource.Hash(\"K3CF\"),1)", p));
+            Assert.True(LuaScriptVm.RunEffect("player:SpawnItem(Resource.Hash(\"K3CF\"),1)", p));
             Assert.Single(p.SpawnedItems);
             Assert.Equal(1, p.SpawnedItems[0].Count);
             Assert.NotEqual(0, p.SpawnedItems[0].Hash); // hashed from "K3CF"

@@ -2,10 +2,8 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Extensions;
-using Faolan.GameServer.World;
 using Xunit;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

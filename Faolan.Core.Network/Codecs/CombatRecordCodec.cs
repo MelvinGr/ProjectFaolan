@@ -1,10 +1,8 @@
 using System;
-using Faolan.Core;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Construct-side codecs for the server->client combat-state records (#216/#218, docs/iir-readers-combat-world.md):
 	// the damage result, the combat shield, the threat level and the hate-list update. These are the records the
@@ -25,12 +23,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 
 		public sealed record Message(uint Handle, byte Env, uint Value) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{
@@ -62,12 +54,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 
 		public sealed record Message(uint Handle, byte Env, uint Threat, byte Flag) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{
@@ -103,12 +89,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 
 		public sealed record Message(uint Handle, byte Env, byte Flag, uint Marker, uint Target, uint Count) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{
@@ -162,12 +142,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 
 		public sealed record Message(uint Handle, byte Env, uint[] Words) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

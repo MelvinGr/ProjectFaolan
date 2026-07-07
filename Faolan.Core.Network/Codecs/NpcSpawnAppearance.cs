@@ -2,9 +2,8 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
-using Faolan.Core;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// One entry in a HUMANOID NPC's FA015807 post-IIR APPEARANCE / morph table: a morph id, its float value, and
 	// an optional texscript string (e.g. the "*ii=-1;*bl=-1" colour ref carried on the id 0x10D entry). This is
@@ -121,6 +120,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		// body-length field @0 (which tracks total body size 1:1, as in NpcSpawnScaffold.WithMinimalPostIir). This
 		// is the humanoid counterpart of WithMinimalPostIir: the from-DB appearance table instead of the captured
 		// blob. No-op (returns the body unchanged) if no CharacterIIR is found.
+		[Obsolete("NO TEMPLATING")]
 		public static byte[] WithAppearancePostIir(byte[] body, IReadOnlyList<NpcAppearanceMorph> morphs)
 		{
 			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))

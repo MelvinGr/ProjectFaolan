@@ -63,14 +63,7 @@ namespace Faolan.CSPlayerAgent
 		public ulong[] RenownCounters { get; set; } = new ulong[6];
 
 		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
-		public byte[] Encode() => ToArray();
-
-		public byte[] ToArray()
-		{
-			using var s = new FaolanStream();
-			Write(s);
-			return s.ToArray();
-		}
+		public byte[] Encode() => this.ToArray();
 
 		public void Write(FaolanStream s)
 		{

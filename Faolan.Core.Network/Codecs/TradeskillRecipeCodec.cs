@@ -130,6 +130,7 @@ namespace Faolan.Core.Network.Codecs
 			return new RecipeItemElement(role, position, itemId, flag, hash, d1, d2, d3, d4, trailing);
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static uint Read(ReadOnlySpan<byte> data, ref int p)
 		{
 			var v = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(p, 4));
@@ -168,6 +169,7 @@ namespace Faolan.Core.Network.Codecs
 			p += n * elementU32 * 4;
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static void AddU32(List<byte> to, uint value)
 		{
 			to.Add((byte)(value >> 24));

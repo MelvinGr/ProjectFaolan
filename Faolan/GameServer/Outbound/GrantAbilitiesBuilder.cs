@@ -1,17 +1,13 @@
-using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -204,7 +200,7 @@ namespace Faolan.GameServer
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
 		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
 		// level-up), false for the silent per-login re-grant.
-		private Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true)
+		private static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true)
 		{
 			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052).WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
 		}

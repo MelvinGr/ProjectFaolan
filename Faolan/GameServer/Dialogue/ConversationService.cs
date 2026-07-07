@@ -9,13 +9,13 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Dialogue
 {
@@ -91,7 +91,7 @@ namespace Faolan.GameServer.Dialogue
 			await ServeScreen(client, screen, client.Session.ConversationNpcHandle);
 		}
 
-		public Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
+		public static Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
 		{
 			// #217: the close's KnubotBase header carries the NPC handle the client uses to tear down THAT dialogue
 			// and RELEASE its dialogue camera. We used to re-address only the player instance and keep the captured
@@ -217,7 +217,7 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 				}
 
-				if (_luaVm.RunCondition(v.ConditionScript, player, false))
+				if (LuaScriptVm.RunCondition(v.ConditionScript, player, false))
 				{
 					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant.", npcName, answerPath);
 					return v;
@@ -269,7 +269,7 @@ namespace Faolan.GameServer.Dialogue
 			var ids = new List<uint> { grantDef.QuestId };
 			ids.AddRange(active.Where(q => q.State == QuestState.Active && q.QuestId != grantDef.QuestId).Select(q => q.QuestId));
 
-			await _broadcaster.SendQuestLogList(client, grantDef, ids);
+			await WorldBroadcaster.SendQuestLogList(client, grantDef, ids);
 			await _broadcaster.SendQuestFullUpdate(client, grantDef);
 		}
 

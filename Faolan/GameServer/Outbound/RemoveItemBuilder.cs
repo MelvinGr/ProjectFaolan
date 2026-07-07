@@ -1,10 +1,9 @@
 using System.Threading.Tasks;
-using Faolan.Core.Network.Codecs.GameServer;
-using Faolan.Core;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -43,7 +42,7 @@ namespace Faolan.GameServer
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
-		private async Task SendRemoveItem(INetworkClient client, uint containerType, uint itemPos, uint amountToRemove = 0)
+		private static async Task SendRemoveItem(INetworkClient client, uint containerType, uint itemPos, uint amountToRemove = 0)
 		{
 			var charId = client.Session.Character.Id;
 

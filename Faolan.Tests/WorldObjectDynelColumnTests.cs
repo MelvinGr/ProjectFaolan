@@ -1,9 +1,9 @@
 using System;
 using System.IO;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs;
 using Microsoft.Data.Sqlite;
 using Xunit;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

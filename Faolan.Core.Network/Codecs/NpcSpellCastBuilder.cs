@@ -1,9 +1,7 @@
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds the ApplySpell (0x6B87E316) carrier content for an NPC casting a spell at the player - the wire piece
 	// of NPC spell-casting (#232). It is the SAME ApplySpell shape the player's self-buffs / offensive casts use,
@@ -30,12 +28,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		// then the opaque 54-byte effect payload; Read recovers (applyTo, applyFrom, spellId, payload).
 		public sealed record NpcSpellCast(uint ApplyTo, uint ApplyFrom, uint SpellId, byte[] Payload) : ICodec<NpcSpellCast>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

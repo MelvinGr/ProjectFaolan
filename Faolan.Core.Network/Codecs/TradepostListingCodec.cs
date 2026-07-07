@@ -114,12 +114,6 @@ namespace Faolan.Core.Network.Codecs
 		// trailing ProtoInventoryGameEntry serialized length-prefixed); Read recovers the rows.
 		public sealed record ParsedResults(uint Head, IReadOnlyList<ParsedRow> Rows) : ICodec<ParsedResults>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

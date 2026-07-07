@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.World
 {

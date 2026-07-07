@@ -1,12 +1,12 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.CreateFlow
 {
@@ -81,7 +81,7 @@ namespace Faolan.GameServer.CreateFlow
 		// Builds an outgoing 0xA36D3B74 script callback: subOpcode + ack(0xC350) + clientInstance +
 		// reserved(0) + pbLength + protobuf{field1=5, field2=2, field3=0, field4=token, field5=value,
 		// field6={0,0}} - the same wire shape the client uses for its own callbacks.
-		private Task SendA36DCallback(INetworkClient client, string token, string value)
+		private static Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			return new PacketStream()
@@ -111,7 +111,7 @@ namespace Faolan.GameServer.CreateFlow
 		}
 
 		// Builds a creator-connection 0x2000 packet: subOpcode + ack(0xC350) + clientInstance + fixed tail.
-		private Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
+		private static Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
 			return new PacketStream()
 				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
@@ -127,16 +127,16 @@ namespace Faolan.GameServer.CreateFlow
 
 		// Sends a fully-built create-editor IIR record (one that already begins with its sub-opcode, e.g.
 		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
-		private Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
+		private static Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
-			return new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
+			return new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
 		}
 
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
 		//   subOpcode(0xBADF5A4B) ack(0xC350) clientInstance uint16(0) [byteLen morphValue] float byte(0) counter
 		// The float is a server-side default that is not present in the client's message: textures
 		// (values starting with '*') use 1.0, body morphs use -0.03 (the only two values seen in retail).
-		internal Task SendMorphValueAck(INetworkClient client, string morphValue)
+		internal static Task SendMorphValueAck(INetworkClient client, string morphValue)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var counter = client.Session.MorphAckCounter == 0
@@ -242,7 +242,7 @@ namespace Faolan.GameServer.CreateFlow
 		// use, echoes the name) or NicknameInvalid (empty/unsaveable, empty value). Verbatim grammar from
 		// Captures/Stricken_soldier-guardian_create_random-actions (frames 151 taken / 158 invalid / 193 ok). The client
 		// then simply re-sends TheNameIs with a new name - no other packets are needed.
-		internal Task SendNicknameRejected(INetworkClient client, string name, bool taken)
+		internal static Task SendNicknameRejected(INetworkClient client, string name, bool taken)
 		{
 			return taken
 				? SendA36DCallback(client, "NicknameTaken", name)
@@ -251,7 +251,7 @@ namespace Faolan.GameServer.CreateFlow
 
 		// The fixed trio the server sends after the last morph; tails are verbatim from dikketest with the
 		// client instance substituted. This is what nudges the client to send the TheNameIs callback.
-		private async Task SendPostMorphBurst(INetworkClient client)
+		private static async Task SendPostMorphBurst(INetworkClient client)
 		{
 			var instance = client.Session.Account.ClientInstance;
 

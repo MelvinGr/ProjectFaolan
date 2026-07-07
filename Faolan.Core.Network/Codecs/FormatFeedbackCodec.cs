@@ -1,3 +1,5 @@
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Core.Network.Codecs
 {
 	// Builds/parses the FormatFeedbackIIR (sub-opcode 0x8D5A8B6B) body - AoC's ON-SCREEN feedback / notification
@@ -39,12 +41,6 @@ namespace Faolan.Core.Network.Codecs
 		// [len][subop][marker][instance][lead][reserved][typeFlags][xmlLen][xml][footer]; Read recovers the fields.
 		public sealed record Message(uint Instance, uint TypeFlags, uint Footer, byte[] Xml) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

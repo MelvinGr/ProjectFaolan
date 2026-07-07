@@ -4,12 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer.World;
+using Faolan.Core.Network.Codecs;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Xunit;
 using Xunit.Sdk;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {
@@ -353,6 +352,7 @@ namespace Faolan.Tests
 		{
 			var path = Path.Combine(CapturesDir, "Stihetfv_soldier-conqueror_login.tshark.json");
 			using var doc = JsonDocument.Parse(File.ReadAllText(path));
+			Span<byte> needle = stackalloc byte[12];
 			foreach (var p in doc.RootElement.GetProperty("Packets").EnumerateArray())
 			{
 				var bh = p.GetProperty("BodyHex").GetString();
@@ -361,7 +361,6 @@ namespace Faolan.Tests
 
 				var body = Convert.FromHexString(bh);
 				// block header = [questId][1][questId]; find it and take 879 bytes.
-				Span<byte> needle = stackalloc byte[12];
 				BinaryPrimitives.WriteUInt32BigEndian(needle[..4], questId);
 				BinaryPrimitives.WriteUInt32BigEndian(needle.Slice(4, 4), 1);
 				BinaryPrimitives.WriteUInt32BigEndian(needle.Slice(8, 4), questId);

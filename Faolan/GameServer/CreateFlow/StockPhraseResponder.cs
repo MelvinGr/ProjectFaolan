@@ -68,7 +68,7 @@ namespace Faolan.GameServer.CreateFlow
 				return false;
 
 			int strLen = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(8, 2));
-			int tcOffset = 10 + strLen;
+			var tcOffset = 10 + strLen;
 			if (tcOffset + 4 > body.Length)
 				return false;
 

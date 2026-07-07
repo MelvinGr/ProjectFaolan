@@ -2,11 +2,11 @@ using System;
 using Faolan.Core.Extensions;
 using System.IO;
 using Faolan.Core;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer;
 using Xunit;
 using Xunit.Abstractions;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 namespace Faolan.Tests
 {

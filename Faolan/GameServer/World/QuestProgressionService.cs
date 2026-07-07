@@ -5,8 +5,8 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Codecs;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.World
 {

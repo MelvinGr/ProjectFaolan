@@ -1,12 +1,11 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The BehaviorControlCenterIIR (BccAck) echo-ack bodies, extracted from CombatService so they build without a
 	// live client: retail acks a client behaviour request by echoing it back with field3 (the phase) spliced in and
@@ -94,6 +93,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		}
 
 		// field3 as protobuf: tag 0x18 (field 3, varint) + the base-128 varint of `value`.
+		[Obsolete("Use FaolanStream")]
 		private static byte[] EncodeBehaviorPhase(uint value)
 		{
 			var bytes = new List<byte> { 0x18 };

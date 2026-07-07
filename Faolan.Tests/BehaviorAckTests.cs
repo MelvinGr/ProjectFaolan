@@ -1,7 +1,6 @@
-using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer.Combat;
+using Faolan.Core.Network.Codecs;
 using Xunit;
 
 namespace Faolan.Tests

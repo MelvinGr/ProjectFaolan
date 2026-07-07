@@ -1,6 +1,6 @@
-using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using Faolan.Core;
+using Faolan.Core.Network.Codecs;
 using Faolan.GameServer;
 using Xunit;
 

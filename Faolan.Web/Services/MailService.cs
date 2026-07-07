@@ -1,7 +1,7 @@
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Constants;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Web.Services

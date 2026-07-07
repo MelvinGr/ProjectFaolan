@@ -1,11 +1,11 @@
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Faolan.GameServer.CreateFlow;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -77,7 +77,7 @@ namespace Faolan.GameServer
                     // normal login of the same character does not re-trigger the intro. This connection needs the
                     // full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
                     // auth + the intro/cutscene), so skip the helper auth for it.
-                    var isCreateWorldEntry = !isNewCharacter && _createFlow.TryConsumePendingCreateWorldEntry(clientInstance);
+                    var isCreateWorldEntry = !isNewCharacter && CreateFlowService.TryConsumePendingCreateWorldEntry(clientInstance);
                     client.Session.IsCreateWorldSession = isCreateWorldEntry;
                     client.Session.IsCreateEditorConnection = isNewCharacter;
 
@@ -170,7 +170,7 @@ namespace Faolan.GameServer
 
                 case GameAgentOpcodes.UpdateGameServerStats: // client 0x2005 (empty) -> server Pong 0x2009
                 {
-                    await _keepAlive.HandlePing(client);
+                    await World.KeepAliveService.HandlePing(client);
 
                     break;
                 }

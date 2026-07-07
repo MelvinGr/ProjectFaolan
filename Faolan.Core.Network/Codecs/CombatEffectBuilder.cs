@@ -1,9 +1,7 @@
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds the two combat-EFFECT IIR carrier contents decoded from the guardian combat capture
 	// (Blablabla_..._random-actions-combat): the floating damage number and the buff/debuff stat effect (#274).
@@ -24,13 +22,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		// (NPC->player and player->NPC). Golden: fr 6514 = an NPC hitting the player for 83 (type 2).
 		public sealed record DamageResult(uint Target, uint Attacker, uint Damage, uint Type) : ICodec<DamageResult>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
-
 			public void Write(FaolanStream s)
 			{
 				s.WriteUInt32(GameServer0X2000Opcodes.DamageResultIIR)
@@ -70,12 +61,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		// and count=2 are constant across the capture. Golden: fr 6689 = Rend's stat-1 -8 from the trapper.
 		public sealed record StatDamage(uint Target, uint StatValue, int Delta, uint StatId, uint Caster, uint Idx, uint SpellBaseId) : ICodec<StatDamage>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

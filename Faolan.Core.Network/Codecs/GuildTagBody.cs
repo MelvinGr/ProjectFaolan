@@ -1,11 +1,10 @@
 using System;
 using System.Buffers.Binary;
 using System.Text;
-using Faolan.Core;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The GuildUpdateIIR_c (0x2550C99A) body - sets the entity's in-world guild tag (the guild name under the player
 	// name). Retail sends exactly one when the player joins a guild; the wire layout is
@@ -18,12 +17,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		private const uint SubOpcode = (uint)GameServer0X2000Opcodes.GuildUpdateIIR;
 		private const uint IirMarker = EntityClass.Character;
 
-		public byte[] ToArray()
-		{
-			using var s = new FaolanStream();
-			Write(s);
-			return s.ToArray();
-		}
 
 		public void Write(FaolanStream s)
 		{

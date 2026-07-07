@@ -1,8 +1,6 @@
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
 using System.Collections.Generic;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
     // A 0x3F1-framed StatList_t as the client reads it (CoreFullPlayerCharacterIIR reader, FUN_0139d450 -> the
     // StatPair_t reader FUN_0139d210 = [u32 statId][u32 value]; docs/fullplayer-snapshot-reader.md regions 9-10).
@@ -41,12 +39,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
             }
         }
 
-        public byte[] ToArray()
-        {
-            using var s = new FaolanStream();
-            Write(s);
-            return s.ToArray();
-        }
 
         public void Write(FaolanStream w)
         {

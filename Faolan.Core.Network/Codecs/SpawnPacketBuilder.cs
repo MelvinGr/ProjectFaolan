@@ -1,11 +1,10 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
-using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// SPLICE-side builder for an FA015807 entity Spawn body: takes a captured spawn (the map burst's player
 	// spawn) as the base, constructs the header + transform (position/rotation as typed ProtoVec3/ProtoQuat,
@@ -126,6 +125,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			return result;
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static void AddBigEndian(byte[] buffer, int offset, int delta)
 		{
 			var value = (uint)(BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4)) + delta);

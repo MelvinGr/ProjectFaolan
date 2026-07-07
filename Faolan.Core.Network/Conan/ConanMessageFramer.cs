@@ -31,8 +31,7 @@ namespace Faolan.Core.Network.Conan
 
 		public IEnumerable<byte[]> PushBytes(byte[] bytes, int length)
 		{
-			if (bytes == null)
-				throw new ArgumentNullException(nameof(bytes));
+			ArgumentNullException.ThrowIfNull(bytes);
 
 			if (length < 0 || length > bytes.Length)
 				throw new ArgumentOutOfRangeException(nameof(length));

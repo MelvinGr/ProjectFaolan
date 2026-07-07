@@ -3,7 +3,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Importer.Captures;
@@ -13,6 +12,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Xunit;
 
 namespace Faolan.Tests

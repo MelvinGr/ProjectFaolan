@@ -1,15 +1,13 @@
-using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 
-namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
     public sealed class FullCharSnapshotSubClass : ICodec<FullCharSnapshotSubClass>
     {
@@ -912,7 +910,7 @@ namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
 
             using var w = new FaolanStream();
             w.WriteUInt32(QuestcRegion.Version);
-            w.WriteUInt32(((uint)ordered.Count + 1) * QuestcRegion.Frame);
+            w.WriteUInt32((ordered.Count + 1) * QuestcRegion.Frame);
             foreach (var q in ordered)
             {
                 Record(q).Write(w);

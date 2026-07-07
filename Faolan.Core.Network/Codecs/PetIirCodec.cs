@@ -1,9 +1,7 @@
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// PetIIR_c (0x1F4CB0F7) — the server packet that binds a summoned creature to its OWNER, i.e. tells the client
 	// "this creature is YOUR pet" (so the pet UI + QueuePetCommand 0x205b become active). Decoded byte-exact from

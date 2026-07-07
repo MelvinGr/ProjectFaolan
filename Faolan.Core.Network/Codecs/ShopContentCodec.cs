@@ -3,8 +3,8 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
@@ -47,7 +47,7 @@ namespace Faolan.Core.Network.Codecs
 		public static bool LooksLikeShopData(ReadOnlySpan<byte> body)
 		{
 			return body.Length > 20 && BinaryPrimitives.ReadUInt32BigEndian(body) == Shop.WireType && BinaryPrimitives.ReadUInt32BigEndian(body[8..]) == CharacterWireType &&
-			       BinaryPrimitives.ReadUInt32BigEndian(body[16..]) == body.Length - 20;
+				   BinaryPrimitives.ReadUInt32BigEndian(body[16..]) == body.Length - 20;
 		}
 
 		public static ShopContent Parse(byte[] body)
@@ -64,13 +64,6 @@ namespace Faolan.Core.Network.Codecs
 		// header + the ProtoInventoryGame built from Entries; Read recovers the header + per-slot wares.
 		public sealed record ShopContent(uint ShopInstance, uint NpcHandle, uint MaxSize, IReadOnlyList<ShopEntry> Entries) : ICodec<ShopContent>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
-
 			public void Write(FaolanStream s)
 			{
 				var inv = new ProtoInventoryGame

@@ -16,7 +16,7 @@ namespace Faolan.GameServer.Scripting
 
 		// Evaluates a CONDITION script (returns true/false). On error or a non-boolean result, defaults to `permissive`
 		// so a missing/odd condition never hard-blocks a dialogue option.
-		public bool RunCondition(string source, ILuaPlayer player, bool permissive = true)
+		public static bool RunCondition(string source, ILuaPlayer player, bool permissive = true)
 		{
 			try
 			{
@@ -33,7 +33,7 @@ namespace Faolan.GameServer.Scripting
 
 		// Runs an EFFECT script (AddTag/SpawnItem/...). Returns false (swallowed) on a script error so one bad script
 		// doesn't break the caller; true if it ran clean.
-		public bool RunEffect(string source, ILuaPlayer player)
+		public static bool RunEffect(string source, ILuaPlayer player)
 		{
 			try
 			{
@@ -140,7 +140,7 @@ namespace Faolan.GameServer.Scripting
 			return _p.HasTag(tagId);
 		}
 
-		public void OpenSiteInBrowser(string url)
+		public static void OpenSiteInBrowser(string url)
 		{
 		}
 
@@ -154,7 +154,7 @@ namespace Faolan.GameServer.Scripting
 			_p.SpawnItem(resourceHash, count);
 		}
 
-		public void TriggerGetEffect(int effectId)
+		public static void TriggerGetEffect(int effectId)
 		{
 		}
 	}

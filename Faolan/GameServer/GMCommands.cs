@@ -8,15 +8,14 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer
 {
@@ -380,7 +379,7 @@ namespace Faolan.GameServer
 			var completed = (await Database.GetCharacterQuests(characterId)).Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
 			var player = new GameLuaPlayer(tags, completed);
 
-			var ok = _luaVm.RunEffect(script.Source, player);
+			var ok = LuaScriptVm.RunEffect(script.Source, player);
 			foreach (var t in player.AddedTags)
 				await Database.AddCharacterTag(characterId, (uint)t);
 

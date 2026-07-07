@@ -2,9 +2,9 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

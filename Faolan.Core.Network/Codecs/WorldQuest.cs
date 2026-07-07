@@ -2,12 +2,11 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Pure quest objective-tracking rules (docs/archive/quests-and-combat.md) - testable without the DB/network.
 	public static class QuestProgress
@@ -19,14 +18,14 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		public static bool Advances(CharacterQuest quest, QuestGoalDefinition goal, QuestGoalType triggerType, string targetName)
 		{
 			return quest.State == QuestState.Active && goal != null && goal.GoalType == triggerType && !string.IsNullOrEmpty(goal.TargetName) && !string.IsNullOrEmpty(targetName) &&
-			       goal.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase) && quest.GoalProgress < Math.Max(quest.GoalRequired, 1);
+				   goal.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase) && quest.GoalProgress < Math.Max(quest.GoalRequired, 1);
 		}
 
 		// True if killing an NPC named `npcName` advances this quest's kill objective (active, matching, not yet done).
 		public static bool AdvancesOnKill(CharacterQuest quest, string npcName)
 		{
 			return quest.State == QuestState.Active && !string.IsNullOrEmpty(quest.GoalTargetName) && !string.IsNullOrEmpty(npcName) && quest.GoalTargetName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
-			       quest.GoalProgress < quest.GoalRequired;
+				   quest.GoalProgress < quest.GoalRequired;
 		}
 	}
 
@@ -352,6 +351,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			WriteU32(w, playerHandle);
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static void WriteU32(List<byte> w, uint v)
 		{
 			w.Add((byte)(v >> 24));
@@ -360,6 +360,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			w.Add((byte)v);
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static void WriteU64(List<byte> w, ulong v)
 		{
 			WriteU32(w, (uint)(v >> 32));

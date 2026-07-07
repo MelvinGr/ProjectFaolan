@@ -1,6 +1,4 @@
-using Faolan.Core;
-
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The unit is TIN, the game's smallest coin (100 tin = 1 copper, ...). The 12-byte 0x2005 DispatchUpdateCash
 	// body [u64 balanceTin][u32 reason] - the absolute wallet balance, not a delta. Extracted from the

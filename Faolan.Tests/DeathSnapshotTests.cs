@@ -5,8 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Xunit;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
 namespace Faolan.Tests
 {

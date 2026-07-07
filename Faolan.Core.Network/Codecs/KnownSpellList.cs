@@ -1,11 +1,9 @@
 using System;
-using Faolan.Core.Network.Codecs;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
-using Faolan.Core;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The per-character KNOWN list carried inside the 0x737A6DF9 FullChar snapshot tails (the spellbook region): a
 	// 0x3F1-framed list of 12-byte records, one per spell/feat the character knows. Decoded byte-exact from the
@@ -27,16 +25,10 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		public List<KnownSpellRecord> Records { get; init; } = [];
 
 		// The count word + the records, big-endian (the on-wire bytes that replace the empty list's count word).
-		public byte[] ToArray()
-		{
-			using var w = new FaolanStream();
-			Write(w);
-			return w.ToArray();
-		}
 
 		public void Write(FaolanStream w)
 		{
-			w.WriteUInt32(((uint)Records.Count + 1) * Frame);
+			w.WriteUInt32((Records.Count + 1) * Frame);
 			foreach (var record in Records)
 			{
 				w.WriteUInt32(record.Id);

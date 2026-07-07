@@ -8,11 +8,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs;
 using Faolan.GameServer.CreateFlow;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

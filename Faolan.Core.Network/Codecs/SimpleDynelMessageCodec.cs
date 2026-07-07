@@ -1,12 +1,11 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Typed codec for the SimpleDynelFullUpdateIIR (0x66AEDD50) identity MESSAGE - the first "construct, don't
 	// replay" step for world dynels (#187 / #57). The reader was decoded by VTABLE-xref (docs/iir-subclass-readers.md,
@@ -179,6 +178,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			return true;
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static bool TryReadVarint(ReadOnlySpan<byte> b, ref int i, out ulong value)
 		{
 			value = 0;

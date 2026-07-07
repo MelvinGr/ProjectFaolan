@@ -8,7 +8,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
-using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Importer.Captures
 {

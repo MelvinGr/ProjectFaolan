@@ -1,12 +1,10 @@
 using System;
-using Faolan.Core.Network.Codecs;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The @609 OBJECTIVE-DETAIL region of the 0x737A6DF9 FullChar snapshot tails - the bytes between the Quest_c
 	// journal region (@0..609, see QuestcRegion) and the quest INDEX (the 0x000003F1 tag). Grammar decoded +
@@ -43,7 +41,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 
 		public void Write(FaolanStream w)
 		{
-			w.WriteUInt32(((uint)Goals.Count + 1) * Frame);
+			w.WriteUInt32((Goals.Count + 1) * Frame);
 			foreach (var goal in Goals)
 				goal.Write(w);
 		}
@@ -150,12 +148,6 @@ namespace Faolan.Core.Network.Codecs.GameServer
 		public uint Zero2 { get; init; }
 		public uint[] Reserved { get; init; } = new uint[ReservedWords]; // 7 words, all 0 in the template
 
-		public byte[] ToArray()
-		{
-			using var s = new FaolanStream();
-			Write(s);
-			return s.ToArray();
-		}
 
 		public void Write(FaolanStream w)
 		{

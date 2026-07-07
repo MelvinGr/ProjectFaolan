@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network
+namespace Faolan.Core.Network.Constants
 {
 	// In-world ENTITY object-class ids (the `type` half of an entity id `{type, instance}` = `ProtoID32` / the
 	// type field of a `ProtoEndpoint`). Every IIR record that targets an entity starts `[u32 type][u32 handle]`,

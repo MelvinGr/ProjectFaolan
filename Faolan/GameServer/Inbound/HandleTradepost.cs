@@ -1,9 +1,9 @@
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

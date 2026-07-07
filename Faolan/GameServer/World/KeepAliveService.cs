@@ -21,7 +21,7 @@ namespace Faolan.GameServer.World
 
 		// LatencyCheck (0x2085): reply body = [counter echoed][0x00000012][server tick]. The tick is a
 		// monotonically increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s interval, ms precision).
-		public Task HandleLatencyCheck(INetworkClient client, ConanPacket packet)
+		public static Task HandleLatencyCheck(INetworkClient client, ConanPacket packet)
 		{
 			var counter = packet.Body.ReadUInt32();
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
@@ -37,7 +37,7 @@ namespace Faolan.GameServer.World
 		// Ping (0x2005, empty): reply on GameAgent with GameServerStats. Body = [float][0][0]; retail's leading
 		// float is a varying server-load/fps metric (~80-83 in dumps) - we have no equivalent, so a fixed
 		// plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
-		public Task HandlePing(INetworkClient client)
+		public static Task HandlePing(INetworkClient client)
 		{
 			return new PacketStream()
 				.WriteHeader(PingSender, GameInterfaceReceiver(client), GameInterfaceDispatchOpcodes.DispatchGameServerStats)

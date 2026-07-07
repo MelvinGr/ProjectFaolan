@@ -1,11 +1,11 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Dialogue;
 using Xunit;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

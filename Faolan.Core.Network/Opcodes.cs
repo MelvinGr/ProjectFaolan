@@ -1,5 +1,5 @@
-using Faolan.Core.Network.Conan;
 using System;
+using Faolan.Core.Network.Conan;
 
 namespace Faolan.Core.Network
 {

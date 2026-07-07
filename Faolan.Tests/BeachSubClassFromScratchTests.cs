@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -197,7 +198,7 @@ namespace Faolan.Tests
 		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
 		private static int QuestRegionTrailerLength(FullCharSnapshotSubClass tails)
 		{
-			return (tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0);
+			return (tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0); // TODO: Fix ToArray()
 		}
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>

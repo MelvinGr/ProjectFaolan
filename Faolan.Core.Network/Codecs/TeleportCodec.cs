@@ -1,8 +1,7 @@
 using System.Numerics;
-using Faolan.Core;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// The change-map / teleport prep records the retail server sends before the 0x2002 handoff (#219), decoded
 	// byte-for-byte from the changemap captures (frames 4200/4212 map 2010, 4417/4420 map 2000) against the IIR

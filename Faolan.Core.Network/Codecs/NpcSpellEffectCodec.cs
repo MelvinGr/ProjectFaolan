@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Core;
 
 namespace Faolan.Core.Network.Codecs
 {
@@ -21,6 +20,7 @@ namespace Faolan.Core.Network.Codecs
 		public byte[] ToArray() => ToBytes();
 		public static NpcSpellEffect Read(FaolanStream s) => Parse(s.ReadArray(Length));
 
+		[Obsolete("Use FaolanStream")]
 		public byte[] ToBytes()
 		{
 			var b = new byte[Length];

@@ -1,3 +1,5 @@
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Core.Network.Codecs
 {
 	// Builds the ComboBookIIR (sub-opcode 0xA8BBEB7F) body - grants ONE combo into the client's combo book. Sent as
@@ -25,12 +27,6 @@ namespace Faolan.Core.Network.Codecs
 		// [len][subop][marker][instance][addFlag][comboId]; Read recovers the (instance, comboId).
 		public sealed record Message(uint Instance, uint ComboId) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Pure wire-body transforms extracted from WorldBroadcaster (they take captured/DB inputs, no world state): the
 	// patrol re-address, a QuestTextRef -> on-wire record, and the loot-bag contents splice. The broadcaster keeps
@@ -14,6 +14,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 	public static class WorldBroadcastBodies
 	{
 		// Re-addresses a captured MoveTask patrol body to a live handle + from-position (byte-exact round-trip).
+		[Obsolete("NO TEMPLATING")]
 		public static byte[] ReaddressPatrol(byte[] capturedBody, uint handle, Vector3 from)
 		{
 			var task = MoveTaskComposite.Parse(capturedBody);

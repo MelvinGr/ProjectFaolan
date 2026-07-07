@@ -1,12 +1,11 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Constants
 {
 	// Single source of truth for the in-game mail wire/DB constants, shared by the server's mail handler
 	// (GameServerListener / TradepostMailHandler) and the MCP economy tools. Decoded from the necrol80

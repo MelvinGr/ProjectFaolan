@@ -3,12 +3,12 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -94,7 +94,7 @@ namespace Faolan.GameServer
 
 		Task IWorldOutbound.SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
 		{
-			return _combat.SendDamageNumber(client, targetHandle, attackerHandle, damage);
+			return CombatService.SendDamageNumber(client, targetHandle, attackerHandle, damage);
 		}
 
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
@@ -131,12 +131,12 @@ namespace Faolan.GameServer
 
 		Task IWorldOutbound.SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
 		{
-			return _combat.SendNpcAttackAnimation(client, npcHandle, damage, swingCounter);
+			return CombatService.SendNpcAttackAnimation(client, npcHandle, damage, swingCounter);
 		}
 
 		Task IWorldOutbound.SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)
 		{
-			return _combat.SendNpcSpellCast(client, npcHandle, spell);
+			return CombatService.SendNpcSpellCast(client, npcHandle, spell);
 		}
 
 		Task IWorldOutbound.SendResurrectionScreen(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
@@ -175,7 +175,7 @@ namespace Faolan.GameServer
 
 		Task IWorldOutbound.SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
 		{
-			return _combat.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
+			return CombatService.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
 		}
 	}
 }

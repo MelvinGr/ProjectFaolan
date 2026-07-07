@@ -14,8 +14,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
 namespace Faolan.Importer.Cli
 {

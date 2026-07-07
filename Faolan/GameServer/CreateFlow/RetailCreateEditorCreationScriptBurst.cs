@@ -1,10 +1,10 @@
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.World;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.CreateFlow
 {
@@ -38,7 +38,7 @@ namespace Faolan.GameServer.CreateFlow
 			var id = client.Session.Account.ClientInstance;
 			var sender = new byte[]
 			{
-				0x0D, 				0x13, 				0xCE, 				0x71, 				0xB1, 				0x10, 				0x59
+				0x0D,               0x13,               0xCE,               0x71,               0xB1,               0x10,               0x59
 			};
 			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
@@ -103,7 +103,7 @@ namespace Faolan.GameServer.CreateFlow
 			// the length prefix is recomputed by WriteArrayUInt32Length.
 			Task IirRecord(byte[] record)
 			{
-				return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
+				return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
 			}
 		}
 	}

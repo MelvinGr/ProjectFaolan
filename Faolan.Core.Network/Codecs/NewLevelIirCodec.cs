@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs
 {
@@ -44,12 +45,6 @@ namespace Faolan.Core.Network.Codecs
 		// [len][subop][marker][instance][lead][newLevel][6 deltas]; Read recovers the fields. Deltas is always 6 words.
 		public sealed record Message(uint Instance, uint NewLevel, uint[] Deltas) : ICodec<Message>
 		{
-			public byte[] ToArray()
-			{
-				using var s = new FaolanStream();
-				Write(s);
-				return s.ToArray();
-			}
 
 			public void Write(FaolanStream s)
 			{

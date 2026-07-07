@@ -2,12 +2,10 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using System;
@@ -15,7 +13,8 @@ using System.Buffers.Binary;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -248,7 +247,7 @@ namespace Faolan.GameServer
                         // the player's combat stance, pushing the CombatMode stat so the client draws/sheathes the weapon -
                         // the player analogue of the NPC weapon-draw (#218). NEEDS in-client verification of the exact
                         // mechanism (stat push vs behavior-only) against a capture.
-                        await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+                        await Combat.CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
                         var drawn = _broadcaster.TogglePlayerCombatStance(client);
                         await _broadcaster.BroadcastPlayerCombatMode(client, drawn);
                         Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}",
@@ -299,7 +298,7 @@ namespace Faolan.GameServer
                                     args);
 
                                 var self = client.Session.Account.ClientInstance;
-                                await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode); // cast begin: bar + animation
+                                await Combat.CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode); // cast begin: bar + animation
 
                                 if (dismounting)
                                 {
@@ -311,7 +310,7 @@ namespace Faolan.GameServer
                                         dismountAck[17] = 0x09;
                                     }
 
-                                    await _combat.SendBehaviorEchoAck(client, dismountAck, 3);
+                                    await Combat.CombatService.SendBehaviorEchoAck(client, dismountAck, 3);
                                     await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
                                     var dismountStats = new CharacterStatBlock
                                     {
@@ -336,7 +335,7 @@ namespace Faolan.GameServer
                                             mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
                                         }
 
-                                        await _combat.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
+                                        await Combat.CombatService.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
                                         await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
                                         var mountStats = new CharacterStatBlock
                                         {
@@ -361,7 +360,7 @@ namespace Faolan.GameServer
                                 // container (0x68 = backpack), target = slot - decoded from the use_totem_of_origin
                                 // capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
                                 // is the capture's "long loading screen").
-                                await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+                                await Combat.CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
                                 await _itemUse.UseInventoryItem(client, (int)from, (int)target);
 
                                 break;
@@ -387,7 +386,7 @@ namespace Faolan.GameServer
                                 // client never channels - it sent only Mode 1, no progress ticks - and the cast looks
                                 // instant). Ack every cast packet (begin + channel ticks); the effect itself is resolved
                                 // once, below, after the cast time.
-                                await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+                                await Combat.CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 
                                 // Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
                                 // elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
@@ -425,7 +424,7 @@ namespace Faolan.GameServer
                                         completePayload[17] = 0x09;
                                     }
 
-                                    await _combat.SendBehaviorEchoAck(client, completePayload, 3);
+                                    await Combat.CombatService.SendBehaviorEchoAck(client, completePayload, 3);
 
                                     // #307: a PET-SUMMON spell spawns the pet (creature + PetIIR owner-assign + follow) instead
                                     // of applying a target effect - this is what hooks pet summoning to real spell casts, not
@@ -547,7 +546,7 @@ namespace Faolan.GameServer
                                         args.TypeId,
                                         args.Mode,
                                         args.Field3);
-                                    await _conversation.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
+                                    await ConversationService.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
                                 }
 
                                 break;
@@ -582,7 +581,7 @@ namespace Faolan.GameServer
 
                                         // Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
                                         // entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
-                                        await _combat.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, movedItem);
+                                        await Combat.CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, movedItem);
                                         await Send0X201CEntry(client, LoginWorld201CSender, LoginWorld201CReceiver(client), 0x00000065, target, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
                                         break;
@@ -602,7 +601,7 @@ namespace Faolan.GameServer
 
                                         // Retail's reply: the behavior ack with null identity + a 0x201C entry
                                         // (prefix 0x68, state 0). Capture frames 320-321.
-                                        await _combat.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, null);
+                                        await Combat.CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, null);
                                         await Send0X201CEntry(client, LoginWorld201CSender, LoginWorld201CReceiver(client), 0x00000068, 0, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
                                         break;
@@ -628,7 +627,7 @@ namespace Faolan.GameServer
                                 // stuck in the action's start state forever (cast bar never finishes / dodge never lands
                                 // back to idle) and the player soft-locks until relog. Acking with the request's Mode
                                 // returns control even when we don't yet model the action's effect.
-                                await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+                                await Combat.CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 
                                 break;
                             }

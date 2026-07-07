@@ -4,11 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Packets;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.Importer.Captures
 {

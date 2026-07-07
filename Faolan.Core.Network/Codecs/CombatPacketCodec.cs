@@ -1,10 +1,9 @@
-using Faolan.Core;
-using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
     // The small fixed-layout combat result packets, decoupled from CombatService's damage/kill logic. Both bodies are
     // the inner 0x2000 IIR record (the bytes WriteArrayUInt32Length wraps) framed on the world conversation. The

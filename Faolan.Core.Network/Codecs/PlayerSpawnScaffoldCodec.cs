@@ -1,11 +1,11 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Spawn;
 
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	public static class PlayerSpawnScaffoldCodec
 	{
@@ -276,6 +276,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			}
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static ulong ReadVarint(byte[] b, ref int i)
 		{
 			var v = 0UL;
@@ -291,6 +292,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			}
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static uint U32(byte[] b, ref int i)
 		{
 			var v = BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(i, 4));
@@ -298,6 +300,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			return v;
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static int VarintLength(ulong v)
 		{
 			var n = 1;
@@ -306,12 +309,14 @@ namespace Faolan.Core.Network.Codecs.GameServer
 			return n;
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static void WriteU32(byte[] b, ref int i, uint v)
 		{
 			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(i, 4), v);
 			i += 4;
 		}
 
+		[Obsolete("Use FaolanStream")]
 		private static void WriteVarint(byte[] b, ref int i, ulong v)
 		{
 			while (v >= 0x80)
