@@ -65,9 +65,9 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var portion = SnapshotTailsBuilder.BuildSingleQuestPortion(def, BeachState, 0x02165EFF);
+			var portion = SnapshotTails.BuildSingleQuestPortion(def, BeachState, 0x02165EFF);
 
-			Assert.Equal(SnapshotTailsBuilder.QuestPortionLength, portion.Length);
+			Assert.Equal(SnapshotTails.QuestPortionLength, portion.Length);
 			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
 		}
 

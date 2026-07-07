@@ -54,7 +54,7 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = SnapshotTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet);
+			var tails = SnapshotTails.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 
@@ -87,7 +87,7 @@ namespace Faolan.GameServer
 			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
 			{
 				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (SnapshotTailsBuilder.IsSnapshotEligible(def))
+				if (SnapshotTails.IsSnapshotEligible(def))
 					quests.Add(def);
 			}
 

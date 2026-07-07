@@ -864,7 +864,7 @@ namespace Faolan.GameServer.World
             foreach (var quest in active)
             {
                 var def = await _database.GetQuestDefinition(quest.QuestId);
-                if (SnapshotTailsBuilder.IsSnapshotEligible(def))
+                if (SnapshotTails.IsSnapshotEligible(def))
                     continue; // delivered in the snapshot's quest region
 
                 await SendQuestIir(client, quest.QuestId, WorldQuest.StateActive);

@@ -39,7 +39,7 @@ namespace Faolan.Tests
 				Class = Class.Assassin,
 				MaxStats = CharacterMaxStats.CreateDefaults(Class.Assassin, 1)
 			};
-			var built = SnapshotTailsBuilder.BuildFromScratch(def, strie, TemplateInstance);
+			var built = SnapshotTails.BuildFromScratch(def, strie, TemplateInstance);
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
@@ -70,8 +70,8 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var aliveTails = SnapshotTails.Deserialize(SnapshotTailsBuilder.BuildFromScratch(def, alive, live));
-			var deadTails = SnapshotTails.Deserialize(SnapshotTailsBuilder.BuildFromScratch(def, dead, live));
+			var aliveTails = SnapshotTails.Deserialize(SnapshotTails.BuildFromScratch(def, alive, live));
+			var deadTails = SnapshotTails.Deserialize(SnapshotTails.BuildFromScratch(def, dead, live));
 
 			Assert.Equal(4321u, aliveTails.PostAccessBlock!.CurrentHp); // alive: full current health
 			Assert.Equal(0u, deadTails.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
@@ -97,7 +97,7 @@ namespace Faolan.Tests
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			const uint live = 0x0802ABCD;
-			var built = SnapshotTailsBuilder.BuildFromScratch(def, null, live);
+			var built = SnapshotTails.BuildFromScratch(def, null, live);
 
 			// the template instance must be gone, the live one present (raw big-endian)
 			var needleOld = new byte[]
@@ -126,7 +126,7 @@ namespace Faolan.Tests
 
 			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
 			// re-addressing: the assembly must equal the captured tails exactly.
-			var built = SnapshotTailsBuilder.BuildFromScratch(def, null, TemplateInstance);
+			var built = SnapshotTails.BuildFromScratch(def, null, TemplateInstance);
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.Equal(template.Length, built.Length);
@@ -158,14 +158,14 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var built = SnapshotTailsBuilder.BuildFromScratch(def, character, live);
+			var built = SnapshotTails.BuildFromScratch(def, character, live);
 
 			// Re-parses without throwing, and is byte-lossless through the typed model.
 			var tails = SnapshotTails.Deserialize(built);
 			Assert.True(built.SequenceEqual(tails.ToArray()), "non-baseline from-scratch tails must round-trip losslessly");
 
 			// Region boundaries intact: the quest portion is the fixed beach length, the static access-window catalog parsed.
-			Assert.Equal(SnapshotTailsBuilder.QuestPortionLength, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
+			Assert.Equal(SnapshotTails.QuestPortionLength, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
 			Assert.NotEmpty(tails.AccessWindowEntries);
 
 			// The live character's vitals/XP landed in the decoded stat slots (the part the production flip changes).
