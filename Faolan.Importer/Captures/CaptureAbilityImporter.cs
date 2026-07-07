@@ -64,8 +64,8 @@ namespace Faolan.Importer.Captures
             [269272] = 2 // Rest
         };
 
-        // The few human-readable names the old archive knows (the rest are client-side / unknown).
-        [Obsolete]
+        // The few human-readable names the old archive knows (the rest are client-side / unknown). Still the only
+        // name source for these ability ids, so it is used at import time (not obsolete).
         private static readonly Dictionary<uint, string> KnownNames = new Dictionary<uint, string>
         {
             [769094] = "Normal Attack Left",
