@@ -12,7 +12,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

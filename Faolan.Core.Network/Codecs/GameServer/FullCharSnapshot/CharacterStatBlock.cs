@@ -3,7 +3,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 
-namespace Faolan.Core.Network.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
 {
     /// <summary>
     ///     Builds the count-prefixed stat-record block shared by the <c>0x737A6DF9</c> snapshot and the

@@ -6,7 +6,7 @@ using Faolan.Core.Network.Conan;
 using Faolan.GameServer;
 using Xunit;
 using Xunit.Abstractions;
-using Faolan.Core.Network.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 namespace Faolan.Tests
 {

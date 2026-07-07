@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Faolan.Core.Network.Codecs.GameServer;
 
-namespace Faolan.Core.Network.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
 {
     public sealed class FullCharSnapshotSubClass
     {

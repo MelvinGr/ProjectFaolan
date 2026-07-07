@@ -7,7 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;

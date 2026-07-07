@@ -11,7 +11,7 @@ using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
-using Faolan.Core.Network.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 namespace Faolan.GameServer.Economy.Bank
 {

@@ -4,7 +4,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
-using Faolan.Core.Network.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
