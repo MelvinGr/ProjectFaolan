@@ -61,7 +61,7 @@ namespace Faolan.GameServer.World
 
     // One node of the recursive move-task factory (FUN_00a46800): [u8 mode] + per-mode fields (and, for mode 4,
     // nested child nodes). Fields are kept as raw u32 bits for byte-exact float round-trip.
-    public sealed class MoveTaskNode
+    public sealed class MoveTaskNode : ICodec<MoveTaskNode>
     {
         // mode 3 Jump / 11 GroundAlign / 5 Ballistic-flag
         public byte Flag { get; set; }

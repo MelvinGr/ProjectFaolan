@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core;
+using Faolan.Core.Network;
 using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.FullCharSnapshot
@@ -115,7 +116,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		}
 	}
 
-	public sealed class QuestObjectiveGoal
+	public sealed class QuestObjectiveGoal : ICodec<QuestObjectiveGoal>
 	{
 		private const int ReservedWords = 7;
 		public byte[] Objective { get; init; } = []; // <remoteformat category=50304> ascii (u32-length-prefixed)

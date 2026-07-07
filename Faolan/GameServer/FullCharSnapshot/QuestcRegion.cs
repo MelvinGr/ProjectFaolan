@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Network;
 using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.FullCharSnapshot
@@ -90,7 +91,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		}
 	}
 
-	public sealed class QuestcRecord
+	public sealed class QuestcRecord : ICodec<QuestcRecord>
 	{
 		private const int ObjRecWords = 16;
 
