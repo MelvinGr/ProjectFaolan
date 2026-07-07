@@ -9,12 +9,12 @@ namespace Faolan.GameServer.FullCharSnapshot
 {
 	// Splits a FullChar (0x737A6DF9) snapshot body into its three regions and decodes the inventory root as the
 	// TYPED ProtoFullCharacterIIR (protobuf-net, IExtensible => lossless). Body layout after the [subOpcode][c350]
-	// [instance] header is [prefix][root protobuf][tails]. The prefix is the client's blob-length frame
+	// [instance] header is [prefix][root protobuf][sub-class]. The prefix is the client's blob-length frame
 	// [u8 flag][u32 BE blobLen][field5] (RetailLoginReplay.SetSnapshotBlobLength / n3InfoItemRemote::Construct):
 	// the client reads exactly blobLen bytes = field5 + root, so rootLength = blobLen - field5Len. A pure structural
 	// read - no byte scanning, and robust to a resized/re-lengthed prefix (unlike the earlier varint model).
 	// Test/RE tooling only: production BUILDS snapshots typed via FullCharSnapshotBuilder.
-	public static class InventorySnapshotInspector
+	public static class FullCharSnapshotReader
 	{
 		// Beach prefix = [u8 flag][u32 BE blobLen][field5 = 3 bytes]; blobLen counts field5 + root.
 		private const uint PrefixFlagBytes = 1;
@@ -28,7 +28,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			Resource = 112
 		}
 
-		// The three regions of a snapshot body: the exact prefix bytes, the typed inventory root, and the tails
+		// The three regions of a snapshot body: the exact prefix bytes, the typed inventory root, and the sub-class
 		// (reassembling Prefix + Root.ToProtobuf() + Tails.ToArray() reproduces the body byte-for-byte).
 		public sealed record InventoryPacketParts(byte[] Prefix, ProtoFullCharacterIIR Root, FullCharSnapshotSubClass SubClass);
 
@@ -43,12 +43,12 @@ namespace Faolan.GameServer.FullCharSnapshot
 			bodyStream.Position = prefixStart;
 			var prefix = bodyStream.ReadArray(prefixEnd - prefixStart);
 			var rootBytes = bodyStream.ReadArray(rootLength);
-			var tails = bodyStream.ReadRemainingArray();
+			var subClass = bodyStream.ReadRemainingArray();
 
 			using var rootStream = new MemoryStream(rootBytes, false);
 			var root = Serializer.Deserialize<ProtoFullCharacterIIR>(rootStream);
 
-			return new InventoryPacketParts(prefix, root, FullCharSnapshotSubClass.Deserialize(tails));
+			return new InventoryPacketParts(prefix, root, FullCharSnapshotSubClass.Deserialize(subClass));
 		}
 
 		// Consumes the prefix [flag][BE32 blobLen][field5] and returns the root length (blobLen - field5Len).
@@ -75,7 +75,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return GetContainerEntries(container).FirstOrDefault(e => e.Pos == slot);
 		}
 
-		// Decodes ONLY the inventory root (skips the tails, which for a high-level caster carry the whole
+		// Decodes ONLY the inventory root (skips the sub-class, which for a high-level caster carry the whole
 		// spellbook/pet/quest data and can be huge). Same structural split as ParseInventoryPacketBody.
 		public static ProtoFullCharacterIIR ParseInventoryRoot(FaolanStream bodyStream)
 		{

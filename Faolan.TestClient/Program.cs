@@ -18,7 +18,7 @@ using System.Security.Cryptography;
 //        PlayerAgent:          RequestAuth -> RequestSmallCharList -> RequestCharRealmData (char list w/ names) ->
 //          EnterWorld -> Ox20EC -> GameServer handoff
 //        GameServer:           Hello -> the world-entry burst, whose FullChar snapshot (0x737A6DF9) is decoded
-//          with the server's own InventorySnapshotInspector (containers + item templates printed).
+//          with the server's own FullCharSnapshotReader (containers + item templates printed).
 //
 // Usage: dotnet run --project Faolan.TestClient -- [--host 127.0.0.1] [--port 7010] --user <acct> --pass <pw> [--char N]
 
@@ -283,17 +283,17 @@ static bool TryDecodeSnapshot(ConanPacket packet)
 
         body.ReadUInt32(); // c350
         body.ReadUInt32(); // instance
-        var root = InventorySnapshotInspector.ParseInventoryPacketBody(body).Root;
+        var root = FullCharSnapshotReader.ParseInventoryPacketBody(body).Root;
 
-        Console.WriteLine("  >>> FullChar snapshot (0x737A6DF9) — decoded via InventorySnapshotInspector:");
-        foreach (InventorySnapshotInspector.ContainerKind kind in Enum.GetValues(typeof(InventorySnapshotInspector.ContainerKind)))
+        Console.WriteLine("  >>> FullChar snapshot (0x737A6DF9) — decoded via FullCharSnapshotReader:");
+        foreach (FullCharSnapshotReader.ContainerKind kind in Enum.GetValues(typeof(FullCharSnapshotReader.ContainerKind)))
         {
-            var container = InventorySnapshotInspector.GetContainer(root, kind);
-            var entries = InventorySnapshotInspector.GetContainerEntries(container).ToList();
+            var container = FullCharSnapshotReader.GetContainer(root, kind);
+            var entries = FullCharSnapshotReader.GetContainerEntries(container).ToList();
             if (entries.Count == 0)
                 continue;
 
-            var templates = entries.Select(e => InventorySnapshotInspector.GetEntryTemplateId(e)).Where(t => t.HasValue).Select(t => t!.Value);
+            var templates = entries.Select(e => FullCharSnapshotReader.GetEntryTemplateId(e)).Where(t => t.HasValue).Select(t => t!.Value);
             Console.WriteLine($"        {kind,-8}: {entries.Count,2} item(s)  templates=[{string.Join(", ", templates)}]");
         }
 

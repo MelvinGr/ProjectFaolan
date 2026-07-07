@@ -136,7 +136,7 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		private static ItemType ClassifyContainer(InventorySnapshotInspector.ContainerKind kind)
+		private static ItemType ClassifyContainer(FullCharSnapshotReader.ContainerKind kind)
 		{
 			return (uint)kind == EquippedContainerKind
 				? ItemType.Normal
@@ -197,14 +197,14 @@ namespace Faolan.Importer.Extractors
 
 			using var ms = new MemoryStream(blob, false);
 			var container = Serializer.Deserialize<ProtoInventoryGame>(ms);
-			if (InventorySnapshotInspector.GetContainerKind(container) != (ulong)InventorySnapshotInspector.ContainerKind.Bank)
+			if (FullCharSnapshotReader.GetContainerKind(container) != (ulong)FullCharSnapshotReader.ContainerKind.Bank)
 				return;
 
-			foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
+			foreach (var entry in FullCharSnapshotReader.GetContainerEntries(container))
 			{
-				var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
-				var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
-				var hash = InventorySnapshotInspector.GetEntryArchetype(entry);
+				var template = FullCharSnapshotReader.GetEntryTemplateId(entry);
+				var quad = FullCharSnapshotReader.GetEntryIdentityQuad(entry);
+				var hash = FullCharSnapshotReader.GetEntryArchetype(entry);
 				if (template.HasValue && quad.HasValue)
 					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
 			}
@@ -263,16 +263,16 @@ namespace Faolan.Importer.Extractors
 		{
 			var map = new Dictionary<uint, CapturedItem>();
 
-			foreach (InventorySnapshotInspector.ContainerKind kind in Enum.GetValues(typeof(InventorySnapshotInspector.ContainerKind)))
+			foreach (FullCharSnapshotReader.ContainerKind kind in Enum.GetValues(typeof(FullCharSnapshotReader.ContainerKind)))
 			{
-				var container = InventorySnapshotInspector.GetContainer(root, kind);
+				var container = FullCharSnapshotReader.GetContainer(root, kind);
 				var itemType = ClassifyContainer(kind);
 
-				foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
+				foreach (var entry in FullCharSnapshotReader.GetContainerEntries(container))
 				{
-					var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
-					var hash = InventorySnapshotInspector.GetEntryArchetype(entry);
-					var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
+					var template = FullCharSnapshotReader.GetEntryTemplateId(entry);
+					var hash = FullCharSnapshotReader.GetEntryArchetype(entry);
+					var quad = FullCharSnapshotReader.GetEntryIdentityQuad(entry);
 
 					if (template.HasValue && hash.HasValue && quad.HasValue)
 					{
@@ -355,7 +355,7 @@ namespace Faolan.Importer.Extractors
 			body.ReadUInt32(); // c350
 			body.ReadUInt32(); // instance
 
-			root = InventorySnapshotInspector.ParseInventoryPacketBody(body).Root;
+			root = FullCharSnapshotReader.ParseInventoryPacketBody(body).Root;
 			return true;
 		}
 

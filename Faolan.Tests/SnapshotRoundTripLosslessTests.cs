@@ -58,7 +58,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
 			return parts.Root.ToProtobuf();
 		}
 	}

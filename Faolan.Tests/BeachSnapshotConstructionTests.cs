@@ -3,6 +3,7 @@ using Faolan.Core.Extensions;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Network.Conan;
+using Faolan.GameServer;
 using Faolan.GameServer.FullCharSnapshot;
 using Xunit;
 using Xunit.Abstractions;
@@ -29,7 +30,7 @@ namespace Faolan.Tests
 		public void BeachPrefix_BuildsFromScratch_ByteIdentical()
 		{
 			var (prefix, root, _) = SplitBeach();
-			var built = SnapshotPrefix.Build(root.Length);
+			var built = GameServerListener.BuildSnapshotPrefix(root.Length);
 			Assert.Equal(prefix, built);
 		}
 
@@ -53,10 +54,6 @@ namespace Faolan.Tests
 					0x06
 				},
 				prefix[6..]); // trailing varint (769)
-
-			// prefix[4..6] varint = const + rootLen; pin the const for the beach template.
-			var varint = ReadVarint(prefix, 4, out _);
-			Assert.Equal(SnapshotPrefix.RootLengthConstant + (ulong)root.Length, varint);
 		}
 
 		// (The byte-exact tails build is proven against this same template by BeachTailsFromScratchTests
@@ -70,7 +67,7 @@ namespace Faolan.Tests
 		public void BeachSnapshot_PrefixPlusTails_ReassemblesConsistently()
 		{
 			var (_, root, tails) = SplitBeach();
-			var prefix = SnapshotPrefix.Build(root.Length);
+			var prefix = GameServerListener.BuildSnapshotPrefix(root.Length);
 
 			using var content = new FaolanStream();
 			content.WriteUInt32(0x737A6DF9);
@@ -84,7 +81,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			s.ReadUInt32();
-			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s);
+			var reparsed = FullCharSnapshotReader.ParseInventoryPacketBody(s);
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(root));
 			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails));
 		}
@@ -125,26 +122,8 @@ namespace Faolan.Tests
 				s.ReadUInt32();
 				s.ReadUInt32();
 				s.ReadUInt32();
-				return InventorySnapshotInspector.ParseInventoryPacketBody(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
+				return FullCharSnapshotReader.ParseInventoryPacketBody(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
 			}
-		}
-
-		private static ulong ReadVarint(byte[] data, int pos, out int end)
-		{
-			ulong v = 0;
-			var shift = 0;
-			end = pos;
-			while (end < data.Length)
-			{
-				var b = data[end++];
-				v |= (ulong)(b & 0x7F) << shift;
-				if ((b & 0x80) == 0)
-					break;
-
-				shift += 7;
-			}
-
-			return v;
 		}
 
 		private static (byte[] Prefix, byte[] Root, byte[] SubClass) SplitBeach()
@@ -154,7 +133,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
 			return (parts.Prefix, parts.Root.ToProtobuf(), parts.SubClass.ToArray());
 		}
 	}

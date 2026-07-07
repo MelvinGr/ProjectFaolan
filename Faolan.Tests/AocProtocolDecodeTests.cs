@@ -38,9 +38,9 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
-			var equipped = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Equipped);
-			var captured = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, FullCharSnapshotReader.ContainerKind.Equipped);
+			var captured = FullCharSnapshotReader.GetEntryBySlot(equipped, Slot);
 			Assert.NotNull(captured);
 
 			// 2) Decode those bytes with the generated, schema-accurate types.
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 
 		// Proves protobuf-net re-serializes BYTE-IDENTICALLY to the captured wire - both a single inventory entry and
 		// the whole 0x737A6DF9 snapshot body (ProtoFullCharacterIIR). This is the guarantee that lets the typed schema
-		// replace the hand-rolled SnapshotItemBuilder / InventorySnapshotInspector without changing any output byte.
+		// replace the hand-rolled SnapshotItemBuilder / FullCharSnapshotReader without changing any output byte.
 		[Fact]
 		public async Task GeneratedSchema_RoundTrips_CapturedSnapshot_ByteIdentical()
 		{
@@ -94,11 +94,11 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
 
 			// One inventory entry round-trips exactly.
-			var equipped = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Equipped);
-			var entryBytes = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot)!.ToProtobuf();
+			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, FullCharSnapshotReader.ContainerKind.Equipped);
+			var entryBytes = FullCharSnapshotReader.GetEntryBySlot(equipped, Slot)!.ToProtobuf();
 			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(new MemoryStream(entryBytes));
 			using var em = new MemoryStream();
 			Serializer.Serialize(em, entry);

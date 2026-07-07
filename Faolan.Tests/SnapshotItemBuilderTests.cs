@@ -45,9 +45,9 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
-			var equipped = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Equipped);
-			var captured = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, FullCharSnapshotReader.ContainerKind.Equipped);
+			var captured = FullCharSnapshotReader.GetEntryBySlot(equipped, Slot);
 			Assert.NotNull(captured);
 			var expected = captured!.ToProtobuf();
 
@@ -114,15 +114,15 @@ namespace Faolan.Tests
 				body.ReadUInt32();
 				body.ReadUInt32();
 				body.ReadUInt32();
-				var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
+				var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
 
-				var bag = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Bag);
-				var before = InventorySnapshotInspector.GetContainerEntries(bag).ToList();
+				var bag = FullCharSnapshotReader.GetContainer(parts.Root, FullCharSnapshotReader.ContainerKind.Bag);
+				var before = FullCharSnapshotReader.GetContainerEntries(bag).ToList();
 				var original = before[0];
-				var slot = InventorySnapshotInspector.GetEntrySlot(original);
-				var itemId = InventorySnapshotInspector.GetEntryItemId(original) ?? 0;
-				var recordId = InventorySnapshotInspector.GetEntryRecordId(original) ?? 0;
-				var count = InventorySnapshotInspector.GetEntryCount(original) ?? 1;
+				var slot = FullCharSnapshotReader.GetEntrySlot(original);
+				var itemId = FullCharSnapshotReader.GetEntryItemId(original) ?? 0;
+				var recordId = FullCharSnapshotReader.GetEntryRecordId(original) ?? 0;
+				var count = FullCharSnapshotReader.GetEntryCount(original) ?? 1;
 
 				var built = SnapshotItemBuilder.BuildListEntry(slot, itemId, recordId, count, item, hash);
 				bag.Items[bag.Items.IndexOf(original)] = built;
@@ -130,15 +130,15 @@ namespace Faolan.Tests
 				// Re-serialize the whole root and re-parse, as the live path does.
 				using var reparsedStream = new MemoryStream(parts.Root.ToProtobuf(), false);
 				var reparsed = Serializer.Deserialize<ProtoFullCharacterIIR>(reparsedStream);
-				var bag2 = InventorySnapshotInspector.GetContainer(reparsed, InventorySnapshotInspector.ContainerKind.Bag);
-				var after = InventorySnapshotInspector.GetContainerEntries(bag2).ToList();
+				var bag2 = FullCharSnapshotReader.GetContainer(reparsed, FullCharSnapshotReader.ContainerKind.Bag);
+				var after = FullCharSnapshotReader.GetContainerEntries(bag2).ToList();
 
 				Assert.Equal(before.Count, after.Count); // entry count unchanged (in-place replace)
-				var first = InventorySnapshotInspector.GetEntryBySlot(bag2, slot);
+				var first = FullCharSnapshotReader.GetEntryBySlot(bag2, slot);
 				Assert.NotNull(first);
-				Assert.Equal(SlaveManaclesId, InventorySnapshotInspector.GetEntryTemplateId(first!));
-				Assert.Equal(itemId, InventorySnapshotInspector.GetEntryItemId(first!));
-				Assert.Equal(recordId, InventorySnapshotInspector.GetEntryRecordId(first!));
+				Assert.Equal(SlaveManaclesId, FullCharSnapshotReader.GetEntryTemplateId(first!));
+				Assert.Equal(itemId, FullCharSnapshotReader.GetEntryItemId(first!));
+				Assert.Equal(recordId, FullCharSnapshotReader.GetEntryRecordId(first!));
 			}
 			finally
 			{

@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			s2.ReadUInt32();
 			s2.ReadUInt32();
 			s2.ReadUInt32();
-			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s2);
+			var reparsed = FullCharSnapshotReader.ParseInventoryPacketBody(s2);
 			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
 			return;
@@ -146,7 +146,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			s.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(s);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(s);
 			return (parts.Prefix, parts.Root.ToProtobuf().Length, parts.SubClass.ToArray());
 		}
 
@@ -158,7 +158,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			var instance = s.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(s);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(s);
 			var root = parts.Root.ToProtobuf();
 			return (parts.Prefix, root.Length, parts.SubClass.ToArray(), instance, root);
 		}

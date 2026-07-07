@@ -33,7 +33,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
 
 			var built = GameServerListener.BuildSnapshotPrefix(root.Length);
 			Assert.Equal(parts.Prefix, built);
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
+			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
 			return (parts.Root.ToProtobuf(), parts.SubClass.ToArray());
 		}
 	}
