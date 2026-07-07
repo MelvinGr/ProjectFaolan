@@ -143,7 +143,7 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — grammar decoded, one disambiguation left (#3)
 - 🟡 Data-driven item-use categorization — currently a per-id map (#207) · guild bank — bodies uncaptured (#132)
 - ⬜ Tradeskills: gathering nodes + crafting professions (#148) · worn-only "bag-poison" item rendering (#14)
-- ⬜ Gems / item socketing — gem slots that grant attribute bonuses (no issue yet)
+- ⬜ Gems / item socketing — gem slots that grant attribute bonuses (#311)
 
 ### Social & guilds
 - ✅ Chat — local say, channels, system, whisper (plus a live "Claude" MCP channel)
@@ -171,10 +171,10 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - ⬜ RDB write-back: inline CDN resources + optional texture upscale/replace (#295, parked)
 
 ### Group PvE content (not started)
-- ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter scripting;
-  no issue yet)
+- ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
+  scripting; #309)
 - ⬜ Factions & reputation — the Khitai / *Rise of the Godslayer* system: faction ranks, faction vendors, and
-  faction companions (expansion content; no issue yet)
+  faction companions (#310)
 
 ### Guild base & large-scale (not started)
 - ⬜ Guild base — player-built **guild cities** and **battlekeeps** in the Border Kingdoms: the central keep, walls
