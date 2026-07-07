@@ -16,6 +16,7 @@ using Faolan.GameServer.Economy.Tradepost;
 using Faolan.GameServer.FullCharSnapshot;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer
 {

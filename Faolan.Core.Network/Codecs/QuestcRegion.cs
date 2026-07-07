@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs
 {
 	// The Quest_c (List A) region at the START of the 0x737A6DF9 FullChar snapshot tails - the quest JOURNAL.
 	// Grammar recovered from the client reader FullPlayerCharacterIIR::ReadSubClass (FUN_0148c210 -> base

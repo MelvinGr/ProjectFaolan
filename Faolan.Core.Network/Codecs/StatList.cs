@@ -1,8 +1,7 @@
 using Faolan.Core;
 using System.Collections.Generic;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs
 {
     // A 0x3F1-framed StatList_t as the client reads it (CoreFullPlayerCharacterIIR reader, FUN_0139d450 -> the
     // StatPair_t reader FUN_0139d210 = [u32 statId][u32 value]; docs/fullplayer-snapshot-reader.md regions 9-10).

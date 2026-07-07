@@ -14,6 +14,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Importer.Captures
 {

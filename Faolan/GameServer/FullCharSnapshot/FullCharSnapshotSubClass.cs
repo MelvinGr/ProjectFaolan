@@ -7,6 +7,7 @@ using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Database.Tables;
 using System.Linq;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {

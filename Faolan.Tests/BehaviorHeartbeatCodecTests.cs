@@ -1,6 +1,7 @@
 using System;
 using Faolan.GameServer.World;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {

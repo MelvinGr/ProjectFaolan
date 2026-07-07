@@ -3,9 +3,8 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs
 {
 	// The per-character KNOWN list carried inside the 0x737A6DF9 FullChar snapshot tails (the spellbook region): a
 	// 0x3F1-framed list of 12-byte records, one per spell/feat the character knows. Decoded byte-exact from the

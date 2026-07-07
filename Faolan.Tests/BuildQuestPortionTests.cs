@@ -7,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.GameServer.FullCharSnapshot;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {

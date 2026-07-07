@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.World
 {

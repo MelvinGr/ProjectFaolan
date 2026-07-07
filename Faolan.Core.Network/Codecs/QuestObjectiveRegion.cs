@@ -4,9 +4,8 @@ using System.Linq;
 using System.Text;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.Codecs
 {
 	// The @609 OBJECTIVE-DETAIL region of the 0x737A6DF9 FullChar snapshot tails - the bytes between the Quest_c
 	// journal region (@0..609, see QuestcRegion) and the quest INDEX (the 0x000003F1 tag). Grammar decoded +

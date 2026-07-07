@@ -4,6 +4,7 @@ using System.Numerics;
 using Faolan.Core.Extensions;
 using Faolan.GameServer.World;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {

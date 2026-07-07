@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core;
 using Stat = Faolan.Core.Enums.CharacterStatId;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {
