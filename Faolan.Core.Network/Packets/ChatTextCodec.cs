@@ -32,7 +32,7 @@ namespace Faolan.Core.Network.Packets
 		public static byte[] Build(uint instance, byte[] xml)
 		{
 			var content = new FaolanStream();
-			content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(instance).WriteByte(LeadFlag).WriteUInt16((ushort)xml.Length).WriteArray(xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord);
+			content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(instance).WriteByte(LeadFlag).WriteUInt16(xml.Length).WriteArray(xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord);
 
 			var body = content.ToArray();
 			var s = new FaolanStream();

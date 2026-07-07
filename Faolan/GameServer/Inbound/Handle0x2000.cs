@@ -839,7 +839,7 @@ namespace Faolan.GameServer
             await new PacketStream()
                 .WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
                 .WriteArrayUInt32Length(s => s
-                    .WriteUInt32((uint)GameServer0X2000Opcodes.TradeskillReplyIIR)
+                    .WriteUInt32(GameServer0X2000Opcodes.TradeskillReplyIIR)
                     .WriteUInt32(0x0000C350) // the ProtoID type marker (0xC350) preceding the target handle
                     .WriteUInt32(handle)
                     .WriteArray(replyBody))
