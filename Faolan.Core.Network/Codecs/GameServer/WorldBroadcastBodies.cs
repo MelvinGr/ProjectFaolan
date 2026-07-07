@@ -37,10 +37,13 @@ namespace Faolan.Core.Network.Codecs.GameServer
 				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText ?? "");
 		}
 
-		// Splices the bag's ACTUAL contents (cash + rolled items) into a loot-bag body built from the captured
-		// template, keeping the inventory ENVELOPE and swapping only items + cash via LootBagMessageCodec. Per-item
-		// ids are synthetic (display only). Returns the body unchanged if the contents blob can't be located.
-		public static byte[] SpliceLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<(uint Pos, Item Item)> entries)
+		// Injects THIS drop's live contents (cash + rolled items) into an already-from-scratch-built loot-bag body
+		// (WorldObjectBuilder + LootBagTemplate build the identity + kd-tree + a scaffold ProtoLootBagIIR): keeps the
+		// constructed envelope and swaps the trailing [u32 len][ProtoLootBagIIR] for the live contents, via the typed
+		// LootBagMessageCodec. Nothing captured is replayed; the two-step split is only because the envelope builder
+		// is the generic dynel/bag one, so the loot-specific cash+items are injected here at drop time. Per-item ids
+		// are synthetic (display only). Returns the body unchanged if the contents blob can't be located.
+		public static byte[] WithLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<(uint Pos, Item Item)> entries)
 		{
 			if (body.Length <= 8 || !LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out var contentsStart))
 				return body;

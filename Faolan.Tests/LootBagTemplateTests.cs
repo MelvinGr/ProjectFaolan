@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	// LootBagTemplate.BuildBounds) + a clean codec-built ProtoLootBagIIR scaffold - reproduces a captured "Bag of loot"
 	// body's identity + geometry byte-for-byte, with no embedded asset and no baked capture state (the former
 	// LootBagKdTreeTail.bin carried the captured bag's stale OwnerId + a captured item). The live items + cash are
-	// spliced per drop (SpliceLootContents), so the at-rest template carries an EMPTY scaffold.
+	// spliced per drop (WithLootContents), so the at-rest template carries an EMPTY scaffold.
 	public class LootBagTemplateTests
 	{
 		[Fact]

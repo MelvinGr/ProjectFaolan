@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 	// The canonical "Bag of loot" definition, built ENTIRELY FROM SCRATCH (#193): the identity columns + the decoded
 	// kd-tree bounds (typed, BuildBounds) + a clean ProtoLootBagIIR scaffold (LootBagMessageCodec). No embedded asset
 	// and no baked capture state - the former LootBagKdTreeTail.bin carried the captured bag's stale OwnerId + a
-	// captured item, which SpliceLootContents only partly overwrote (it sets cash + items, leaving owner/inventory-id
+	// captured item; the live cash + items are injected by WithLootContents into a fully-constructed bag (owner/inventory-id
 	// baked); this constructs both halves so a spawned bag carries no session leftovers. WorldObjectBuilder.BuildFromScratch
 	// assembles header/transform + identity-from-columns + this tail; SpliceLootContents then splices the live items + cash.
 	public static class LootBagTemplate

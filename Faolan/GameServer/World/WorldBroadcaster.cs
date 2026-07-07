@@ -1467,7 +1467,7 @@ namespace Faolan.GameServer.World
             if (!WorldObjectBuilder.BuildFromScratch(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
                 return null;
 
-            body = WorldBroadcastBodies.SpliceLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1
+            body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1
 
             var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
             bag.InstanceId = instanceId; // the bag lives in the same map COPY as whatever dropped it (#268)
