@@ -87,7 +87,7 @@ namespace Faolan.Tests
 			return new RecordingNetworkClient(StriePlayerInstance);
 		}
 
-		private static (byte[] Root, byte[] Tails) SplitBeachSnapshot()
+		private static (byte[] Root, byte[] SubClass) SplitBeachSnapshot()
 		{
 			var packet = new ConanPacket(File.ReadAllBytes(SnapshotCap));
 			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
@@ -95,7 +95,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-			return (parts.Root.ToProtobuf(), parts.Tails.ToArray());
+			return (parts.Root.ToProtobuf(), parts.SubClass.ToArray());
 		}
 	}
 }

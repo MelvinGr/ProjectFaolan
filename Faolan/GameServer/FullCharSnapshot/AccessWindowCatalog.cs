@@ -4,9 +4,9 @@ namespace Faolan.GameServer.FullCharSnapshot
 {
 	// AUTO-GENERATED (#258) from BeachTailsTemplate.bin via the access-window typed model - the game-static
 	// PFAccessWindow_ playfield catalog the FullChar snapshot tails carry, identical for every character.
-	// Replaces the embedded AccessWindowTable.bin blob; SnapshotTails.SerializeAccessWindowEntries emits these
+	// Replaces the embedded AccessWindowTable.bin blob; FullCharSnapshotSubClass.SerializeAccessWindowEntries emits these
 	// byte-for-byte (guarded by BeachTailsFromScratchTests + AccessWindowCatalogTests). To regenerate if the
-	// content revision ever changes: parse BeachTailsTemplate.bin -> SnapshotTails.AccessWindowEntries and re-emit.
+	// content revision ever changes: parse BeachTailsTemplate.bin -> FullCharSnapshotSubClass.AccessWindowEntries and re-emit.
 	// Strings are Latin1 (one char per wire byte); non-ASCII bytes are \uXXXX-escaped (round-trips via Encoding.Latin1).
 	public static class AccessWindowCatalog
 	{

@@ -95,7 +95,7 @@ namespace Faolan.Tests
 			s2.ReadUInt32();
 			s2.ReadUInt32();
 			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s2);
-			Assert.True(reparsed.Tails.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
+			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
 			return;
 
@@ -139,7 +139,7 @@ namespace Faolan.Tests
 			Assert.Equal(prefix, GameServerListener.SetSnapshotBlobLength(prefix, rootLen));
 		}
 
-		private static (byte[] Prefix, int RootLen, byte[] Tails) Split(string bin)
+		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)
 		{
 			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
 			var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
@@ -147,11 +147,11 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(s);
-			return (parts.Prefix, parts.Root.ToProtobuf().Length, parts.Tails.ToArray());
+			return (parts.Prefix, parts.Root.ToProtobuf().Length, parts.SubClass.ToArray());
 		}
 
 		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).
-		private static (byte[] Prefix, int RootLen, byte[] Tails, uint Instance, byte[] Root) SplitFull(string bin)
+		private static (byte[] Prefix, int RootLen, byte[] SubClass, uint Instance, byte[] Root) SplitFull(string bin)
 		{
 			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
 			var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
@@ -160,7 +160,7 @@ namespace Faolan.Tests
 			var instance = s.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(s);
 			var root = parts.Root.ToProtobuf();
-			return (parts.Prefix, root.Length, parts.Tails.ToArray(), instance, root);
+			return (parts.Prefix, root.Length, parts.SubClass.ToArray(), instance, root);
 		}
 	}
 }

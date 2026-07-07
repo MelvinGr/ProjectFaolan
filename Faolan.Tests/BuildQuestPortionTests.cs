@@ -35,9 +35,9 @@ namespace Faolan.Tests
 				0x00, 0x00, 0x00, 0x00, // index count = 0
 				0x00, 0x01, 0x56, 0xE7 // terminal constant
 			];
-			Assert.Equal(golden, SnapshotTails.BuildEmptyQuestPortion());
+			Assert.Equal(golden, FullCharSnapshotSubClass.BuildEmptyQuestPortion());
 			// The empty-quest list/null-primary path must route to the same region.
-			Assert.Equal(golden, SnapshotTails.BuildQuestPortion([], null, 0));
+			Assert.Equal(golden, FullCharSnapshotSubClass.BuildQuestPortion([], null, 0));
 		}
 
 		// The whole 2-quest region (beach + Casilda) must reproduce the captured login snapshot's quest region
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 			Assert.NotNull(beach);
 			Assert.NotNull(casilda);
 
-			var built = SnapshotTails.BuildQuestPortion([beach, casilda], beach, CaptureInstance);
+			var built = FullCharSnapshotSubClass.BuildQuestPortion([beach, casilda], beach, CaptureInstance);
 			var golden = File.ReadAllBytes(GoldenPath);
 
 			var diff = -1;
@@ -122,8 +122,8 @@ namespace Faolan.Tests
 		public async Task BuildSingleQuestPortion_EqualsMultiQuestForm()
 		{
 			var beach = await LoadDefinition(10238);
-			var built = SnapshotTails.BuildQuestPortion([beach], beach, CaptureInstance);
-			var single = SnapshotTails.BuildSingleQuestPortion(beach, beach.SnapshotState, CaptureInstance);
+			var built = FullCharSnapshotSubClass.BuildQuestPortion([beach], beach, CaptureInstance);
+			var single = FullCharSnapshotSubClass.BuildSingleQuestPortion(beach, beach.SnapshotState, CaptureInstance);
 			Assert.True(single.SequenceEqual(built), "single-quest portion must equal the multi-quest form");
 		}
 

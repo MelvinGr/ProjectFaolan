@@ -46,7 +46,7 @@ namespace Faolan.Tests
 				s.WriteUInt32(instance);
 				s.WriteArray(parts.Prefix);
 				s.WriteArray(parts.Root.ToProtobuf());
-				s.WriteArray(parts.Tails.ToArray());
+				s.WriteArray(parts.SubClass.ToArray());
 			});
 			stream.WriteLengthHash();
 			var produced = stream.ToArray();
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 			rebuilt.WriteUInt32(instance);
 			rebuilt.WriteArray(parts.Prefix);
 			rebuilt.WriteArray(parts.Root.ToProtobuf());
-			rebuilt.WriteArray(parts.Tails.ToArray());
+			rebuilt.WriteArray(parts.SubClass.ToArray());
 
 			body.Position = 0;
 			var original = body.ToArray();
@@ -145,7 +145,7 @@ namespace Faolan.Tests
 				s.WriteUInt32(instance);
 				s.WriteArray(parts.Prefix);
 				s.WriteArray(parts.Root.ToProtobuf());
-				s.WriteArray(parts.Tails.ToArray());
+				s.WriteArray(parts.SubClass.ToArray());
 			});
 			stream.WriteLengthHash();
 			var produced = stream.ToArray();
@@ -189,7 +189,7 @@ namespace Faolan.Tests
 			rebuilt.WriteUInt32(instance);
 			rebuilt.WriteArray(parts.Prefix);
 			rebuilt.WriteArray(parts.Root.ToProtobuf());
-			rebuilt.WriteArray(parts.Tails.ToArray());
+			rebuilt.WriteArray(parts.SubClass.ToArray());
 
 			body.Position = 0;
 			var original = body.ToArray();

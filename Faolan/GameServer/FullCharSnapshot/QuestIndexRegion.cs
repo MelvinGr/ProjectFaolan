@@ -18,7 +18,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// The (goalId, idx) pairs map the quest's objective/step ids to the client's 1..n goal index. The block trailers
 	// CHAIN: each carries the NEXT held quest's AreaId, the last carries the primary (tracked) quest's IndexTrailerWord.
 	// Typed codec (Parse/ToArray round-trips byte-exact - QuestIndexRegionTests single-quest, BuildQuestPortionTests
-	// 2-quest) so SnapshotTails models it instead of the opaque blob (#186/#304). Build generates it from the held
+	// 2-quest) so FullCharSnapshotSubClass models it instead of the opaque blob (#186/#304). Build generates it from the held
 	// QuestDefinitions (their IndexMagic/IndexTableField/IndexGoalSteps/AreaId/IndexTrailerWord seeds).
 	public sealed class QuestIndexRegion
 	{

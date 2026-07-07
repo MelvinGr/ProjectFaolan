@@ -19,7 +19,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// starter (so ObjRec is carried verbatim as raw u32s and is not yet field-validated).
 	//
 	// Proven by a byte-exact round-trip golden test (QuestcRegionTests); the construct-don't-replay foundation
-	// for retiring BeachTailsTemplate.bin's quest region (Gitea #186). WIRED into SnapshotTails (it models the
+	// for retiring BeachTailsTemplate.bin's quest region (Gitea #186). WIRED into FullCharSnapshotSubClass (it models the
 	// tails' front region instead of the former opaque header+string fields) - the live snapshot is byte-
 	// identical (BeachSnapshotConstructionTests). Generating DIFFERENT quests from a character's CharacterQuests
 	// is the next step and is gated by an in-client chat-connect smoke test.

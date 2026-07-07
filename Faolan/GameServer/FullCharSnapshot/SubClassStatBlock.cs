@@ -6,15 +6,15 @@ using Stat = Faolan.Core.Enums.CharacterStatId;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {
-	// The fresh-character STAT-block skeleton (the SnapshotTails PostAccessBlock), relocated out of
+	// The fresh-character STAT-block skeleton (the FullCharSnapshotSubClass PostAccessBlock), relocated out of
 	// BeachTailsTemplate.bin so the stat region can be authored without the .bin (#186). Decoded by
 	// Captures/scripts/decode_statblock.py: of the 338 values, only ~14 distinct slots are character/map-derived (class
 	// HP/Mana/Stamina + hash, XP, the playfield token + position, one session slot) - the other 313 are this
 	// FIXED baseline, identical for every fresh character. CreateFreshBlock() returns a PostAccessBlock seeded with
 	// the skeleton; the caller patches the character-derived slots via the existing setters (CurrentHp/Mana/Stamina/
-	// CurrentXp + Level), exactly as SnapshotTailsBuilder already does on the parsed block - so generating == relocating
+	// CurrentXp + Level), exactly as FullCharSnapshotSubClass already does on the parsed block - so generating == relocating
 	// this baseline (the genuinely-fixed fresh-char stats) + the already-computed patches.
-	public static class TailsStatBlock
+	public static class SubClassStatBlock
 	{
 		public const int RepeatedRunLength = 148;
 		public const int RepeatedRunStart = 35; // the 35..182 sub-block is copied to 183..330 (Length 148)
@@ -23,7 +23,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
 		// 0xBF..0x40B (see WorldDespawn). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
-		// live zone's minted token (SnapshotTailsBuilder passes it in), never a captured one. Replaying a stale token
+		// live zone's minted token (FullCharSnapshotSubClass passes it in), never a captured one. Replaying a stale token
 		// HIDES the entire in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04) and mis-scopes
 		// despawns. SkeletonValueOf (the beach 0x4FE428) is the fresh/fallback value when no live token is given.
 		public const uint PlayfieldTokenStatId = (uint)Stat.PlayfieldToken;
@@ -82,7 +82,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// byte [id][0xFFFFFFFF][type] record; a null/empty list is just the count 0x3F1 (byte-identical to the fresh
 		// skeleton). Everything is CONSTRUCTED directly, so nothing scans the whole list (SetStat would otherwise also
 		// overwrite the trailer's 0x1 word and the known-list ids - the reason this used to be a fragile post-hoc splice).
-		public static TailsPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet, KnownSpellList known = null)
+		public static SubClassPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet, KnownSpellList known = null)
 		{
 			var displayedCount = StatList1.Length;
 			var sheetCount = sheet.Count - displayedCount;
@@ -113,7 +113,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 			values.AddRange(TrailerRest);
 
-			return new TailsPostAccessBlock
+			return new SubClassPostAccessBlock
 			{
 				Marker0 = Marker, // the two preceding empty framed lists (List E / F)
 				Marker1 = Marker,
@@ -121,8 +121,8 @@ namespace Faolan.GameServer.FullCharSnapshot
 				Values = values,
 				Trailer = [0x00],
 				// Non-null so HasKnownRepeatedStatTable is true and the caller's vitals patches (which write the +148
-				// copy too) fire; the run mirrors RepeatedBlockStartIndex/Offset on TailsPostAccessBlock.
-				LargestAdjacentRepeatedRun = new TailsRepeatedUInt32Run
+				// copy too) fire; the run mirrors RepeatedBlockStartIndex/Offset on SubClassPostAccessBlock.
+				LargestAdjacentRepeatedRun = new SubClassRepeatedUInt32Run
 				{
 					StartIndex = RepeatedRunStart,
 					Length = RepeatedRunLength,
@@ -131,7 +131,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			};
 		}
 
-		public static TailsPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
+		public static SubClassPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
 		{
 			// The fresh skeleton is just the baseline sheet run through the generic builder - byte-identical to the
 			// captured beach block (proven by BeachTailsFromScratchTests).
@@ -185,8 +185,8 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// so the former FindKnownSpellCountIndex landmark search + InjectKnownSpells splice are gone.)
 
 		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
-		// (mirrors SnapshotTails.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
-		public static byte[] Serialize(TailsPostAccessBlock block)
+		// (mirrors FullCharSnapshotSubClass.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
+		public static byte[] Serialize(SubClassPostAccessBlock block)
 		{
 			var w = new FaolanStream();
 			w.WriteUInt32(block.Marker0);

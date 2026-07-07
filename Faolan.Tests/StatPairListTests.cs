@@ -7,7 +7,7 @@ namespace Faolan.Tests
 	// Proves the recovered stat-block grammar: the FullChar snapshot's stat block is TWO 0x3F1-framed StatPair_t
 	// lists (docs/fullplayer-snapshot-reader.md regions 9-10), preceded by two empty framed lists and followed by a
 	// trailer. StatList#1 = 17 displayed stats (Level/XP/MaxXP/HP...), StatList#2 = 148 full-sheet stats. Parses the
-	// actual TailsStatBlock bytes with StatPairList and re-serializes them byte-exact.
+	// actual SubClassStatBlock bytes with StatPairList and re-serializes them byte-exact.
 	public class StatPairListTests
 	{
 		[Fact]
@@ -22,7 +22,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void StatBlock_ParsesAsTwoFramedStatPairLists_AndRoundTripsByteExact()
 		{
-			var original = TailsStatBlock.Serialize(TailsStatBlock.CreateFreshBlock());
+			var original = SubClassStatBlock.Serialize(SubClassStatBlock.CreateFreshBlock());
 
 			var r = new FaolanStream(original);
 			var emptyE = r.ReadUInt32(); // two empty framed lists (List E / F)

@@ -18,7 +18,7 @@ namespace Faolan.Tests
 	//
 	// Decoded (Captures/scripts/decode_death_snapshot.py): the dead-state is the tails stat block's
 	// current-health stat, statId 0x001B (CharacterStatId.HealthCurrent) = 0 (while HealthMax stays full).
-	// That maps 1:1 onto TailsPostAccessBlock.CurrentHp (Values[23]/[54], +[202]). These tests lock both halves:
+	// That maps 1:1 onto SubClassPostAccessBlock.CurrentHp (Values[23]/[54], +[202]). These tests lock both halves:
 	// the captured dead snapshot really has HealthCurrent==0, and the builder can produce that dead shape.
 	public class DeathSnapshotTests
 	{
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			// zero the current-health slots [23]/[54]/[202] while leaving the base/max slots [21]/[56]/[204] full -
 			// exactly the shape the retail dead snapshot carries.
 			const uint hp = 196, hpBase = 196;
-			var block = TailsStatBlock.CreateFreshBlock();
+			var block = SubClassStatBlock.CreateFreshBlock();
 			block.ApplyClassVitals(hp, hpBase, 0, 0, 217, 197);
 
 			Assert.Equal(hp, block.CurrentHp); // sanity: alive shape first

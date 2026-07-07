@@ -54,7 +54,7 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = SnapshotTails.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet);
+			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 
@@ -87,7 +87,7 @@ namespace Faolan.GameServer
 			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
 			{
 				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (SnapshotTails.IsSnapshotEligible(def))
+				if (FullCharSnapshotSubClass.IsSnapshotEligible(def))
 					quests.Add(def);
 			}
 
@@ -99,7 +99,7 @@ namespace Faolan.GameServer
 
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
 		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals,
-		// gametime), then runs interest for the NPCs. Beach-shaped (SnapshotTailsBuilder + BeachPlayfieldId); a non-beach
+		// gametime), then runs interest for the NPCs. Beach-shaped (FullCharSnapshotSubClass + BeachPlayfieldId); a non-beach
 		// map would get beach tails, so the flag is for a beach login until per-map sourcing lands.
 		private async Task SendBurstlessWorldEntry(INetworkClient client, uint mapId)
 		{

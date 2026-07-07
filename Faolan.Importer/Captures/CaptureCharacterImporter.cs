@@ -565,7 +565,7 @@ namespace Faolan.Importer.Captures
             List<(uint Id, uint Value)> pairs = null;
             foreach (var body in snapshotBodies.OrderByDescending(b => b.Length))
             {
-                pairs = TailsStatBlock.ExtractFromSnapshot(body);
+                pairs = SubClassStatBlock.ExtractFromSnapshot(body);
                 if (pairs != null)
                     break;
             }

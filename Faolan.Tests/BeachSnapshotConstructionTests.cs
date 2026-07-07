@@ -86,7 +86,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s);
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(root));
-			Assert.True(reparsed.Tails.ToArray().SequenceEqual(tails));
+			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails));
 		}
 
 		// Extracts the server-owned beach tails template asset from the capture (run once; the asset is committed).
@@ -100,32 +100,32 @@ namespace Faolan.Tests
 			Assert.Equal(9282, tails.Length);
 
 			// Round-trips through the structured model.
-			Assert.True(SnapshotTails.Deserialize(tails).ToArray().SequenceEqual(tails));
+			Assert.True(FullCharSnapshotSubClass.Deserialize(tails).ToArray().SequenceEqual(tails));
 		}
 
 		// Decode result (UnknownBefore progression block): two different L1 beach characters' tails are byte-
 		// identical except their instance references. Proves the beach tails are content-fixed + (level, vitals,
-		// instance), so SnapshotTailsBuilder's template + instance-swap fully reproduces them for any beach character.
+		// instance), so FullCharSnapshotSubClass's template + instance-swap fully reproduces them for any beach character.
 		[Fact]
 		public void TwoBeachCharacters_TailsDifferOnlyAtInstanceAndStats()
 		{
 			// strie-login-inventory.bin (instance 0x02165EFF) vs a second Strie beach login (different instance).
-			var a = Tails("strie-login-inventory.bin");
-			var b = Tails("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
+			var a = SubClass("strie-login-inventory.bin");
+			var b = SubClass("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
 			Assert.Equal(a.Length, b.Length);
 			// These two are the SAME session capture pair -> identical; the cross-character proof lives in the
 			// committed finding. Here we assert the builder substitutes the instance everywhere.
 			Assert.True(a.SequenceEqual(b));
 			return;
 
-			byte[] Tails(string file)
+			byte[] SubClass(string file)
 			{
 				var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
 				var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
 				s.ReadUInt32();
 				s.ReadUInt32();
 				s.ReadUInt32();
-				return InventorySnapshotInspector.ParseInventoryPacketBody(s).Tails.UnknownBeforeAccessWindowTable ?? [];
+				return InventorySnapshotInspector.ParseInventoryPacketBody(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
 			}
 		}
 
@@ -147,7 +147,7 @@ namespace Faolan.Tests
 			return v;
 		}
 
-		private static (byte[] Prefix, byte[] Root, byte[] Tails) SplitBeach()
+		private static (byte[] Prefix, byte[] Root, byte[] SubClass) SplitBeach()
 		{
 			var packet = new ConanPacket(File.ReadAllBytes(Cap));
 			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
@@ -155,7 +155,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-			return (parts.Prefix, parts.Root.ToProtobuf(), parts.Tails.ToArray());
+			return (parts.Prefix, parts.Root.ToProtobuf(), parts.SubClass.ToArray());
 		}
 	}
 }

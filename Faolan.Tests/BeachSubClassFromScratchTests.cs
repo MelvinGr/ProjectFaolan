@@ -39,7 +39,7 @@ namespace Faolan.Tests
 				Class = Class.Assassin,
 				MaxStats = CharacterMaxStats.CreateDefaults(Class.Assassin, 1)
 			};
-			var built = SnapshotTails.BuildFromScratch(def, strie, TemplateInstance);
+			var built = FullCharSnapshotSubClass.BuildFromScratch(def, strie, TemplateInstance);
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
@@ -70,15 +70,15 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var aliveTails = SnapshotTails.Deserialize(SnapshotTails.BuildFromScratch(def, alive, live));
-			var deadTails = SnapshotTails.Deserialize(SnapshotTails.BuildFromScratch(def, dead, live));
+			var aliveSubClass = FullCharSnapshotSubClass.Deserialize(FullCharSnapshotSubClass.BuildFromScratch(def, alive, live));
+			var deadSubClass = FullCharSnapshotSubClass.Deserialize(FullCharSnapshotSubClass.BuildFromScratch(def, dead, live));
 
-			Assert.Equal(4321u, aliveTails.PostAccessBlock!.CurrentHp); // alive: full current health
-			Assert.Equal(0u, deadTails.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
+			Assert.Equal(4321u, aliveSubClass.PostAccessBlock!.CurrentHp); // alive: full current health
+			Assert.Equal(0u, deadSubClass.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
 
 			// Max/base HP side is untouched by death - the slot [21] base stays full in both.
-			Assert.Equal(aliveTails.PostAccessBlock.Values[21], deadTails.PostAccessBlock.Values[21]);
-			Assert.True(deadTails.PostAccessBlock.Values[21] > 0u, "dead snapshot keeps the max-health side populated");
+			Assert.Equal(aliveSubClass.PostAccessBlock.Values[21], deadSubClass.PostAccessBlock.Values[21]);
+			Assert.True(deadSubClass.PostAccessBlock.Values[21] > 0u, "dead snapshot keeps the max-health side populated");
 			return;
 
 			CharacterMaxStats Stats()
@@ -97,7 +97,7 @@ namespace Faolan.Tests
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			const uint live = 0x0802ABCD;
-			var built = SnapshotTails.BuildFromScratch(def, null, live);
+			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null, live);
 
 			// the template instance must be gone, the live one present (raw big-endian)
 			var needleOld = new byte[]
@@ -126,7 +126,7 @@ namespace Faolan.Tests
 
 			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
 			// re-addressing: the assembly must equal the captured tails exactly.
-			var built = SnapshotTails.BuildFromScratch(def, null, TemplateInstance);
+			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null, TemplateInstance);
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.Equal(template.Length, built.Length);
@@ -158,14 +158,14 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var built = SnapshotTails.BuildFromScratch(def, character, live);
+			var built = FullCharSnapshotSubClass.BuildFromScratch(def, character, live);
 
 			// Re-parses without throwing, and is byte-lossless through the typed model.
-			var tails = SnapshotTails.Deserialize(built);
+			var tails = FullCharSnapshotSubClass.Deserialize(built);
 			Assert.True(built.SequenceEqual(tails.ToArray()), "non-baseline from-scratch tails must round-trip losslessly");
 
 			// Region boundaries intact: the quest portion is the fixed beach length, the static access-window catalog parsed.
-			Assert.Equal(SnapshotTails.QuestPortionLength, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
+			Assert.Equal(FullCharSnapshotSubClass.QuestPortionLength, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
 			Assert.NotEmpty(tails.AccessWindowEntries);
 
 			// The live character's vitals/XP landed in the decoded stat slots (the part the production flip changes).
@@ -195,7 +195,7 @@ namespace Faolan.Tests
 		}
 
 		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
-		private static int QuestRegionTrailerLength(SnapshotTails tails)
+		private static int QuestRegionTrailerLength(FullCharSnapshotSubClass tails)
 		{
 			return (tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0);
 		}

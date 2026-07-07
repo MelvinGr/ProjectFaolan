@@ -30,7 +30,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 		// The three regions of a snapshot body: the exact prefix bytes, the typed inventory root, and the tails
 		// (reassembling Prefix + Root.ToProtobuf() + Tails.ToArray() reproduces the body byte-for-byte).
-		public sealed record InventoryPacketParts(byte[] Prefix, ProtoFullCharacterIIR Root, SnapshotTails Tails);
+		public sealed record InventoryPacketParts(byte[] Prefix, ProtoFullCharacterIIR Root, FullCharSnapshotSubClass SubClass);
 
 		// `bodyStream` must be positioned right after the [subOpcode][c350][instance] header. The prefix's BE32
 		// blob length delimits the root (blobLen = field5Len + rootLength), so this is a pure structural split.
@@ -48,7 +48,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			using var rootStream = new MemoryStream(rootBytes, false);
 			var root = Serializer.Deserialize<ProtoFullCharacterIIR>(rootStream);
 
-			return new InventoryPacketParts(prefix, root, SnapshotTails.Deserialize(tails));
+			return new InventoryPacketParts(prefix, root, FullCharSnapshotSubClass.Deserialize(tails));
 		}
 
 		// Consumes the prefix [flag][BE32 blobLen][field5] and returns the root length (blobLen - field5Len).

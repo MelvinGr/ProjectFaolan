@@ -169,23 +169,23 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
 
-			var original = parts.Tails.ToArray();
-			parts.Tails.Level = parts.Tails.Level; // same-value writes are a no-op
-			Assert.Equal(original, parts.Tails.ToArray());
+			var original = parts.SubClass.ToArray();
+			parts.SubClass.Level = parts.SubClass.Level; // same-value writes are a no-op
+			Assert.Equal(original, parts.SubClass.ToArray());
 
-			parts.Tails.Level = 42;
-			var patched = SnapshotTails.Deserialize(parts.Tails.ToArray());
+			parts.SubClass.Level = 42;
+			var patched = FullCharSnapshotSubClass.Deserialize(parts.SubClass.ToArray());
 			Assert.Equal(42u, patched.Level);
-			Assert.Equal(original.Length, parts.Tails.ToArray().Length); // fixed-width patch, no resize
+			Assert.Equal(original.Length, parts.SubClass.ToArray().Length); // fixed-width patch, no resize
 
 			// The live-vitals/XP patch slots round-trip too. The bigboy capture is the tails model's reference
 			// fixture, so its stat table MUST be recognized - a silent skip here would mean the world-entry
 			// patch never fires.
-			Assert.True(parts.Tails.HasKnownRepeatedStatTable);
+			Assert.True(parts.SubClass.HasKnownRepeatedStatTable);
 			{
-				parts.Tails.PostAccessBlock!.CurrentHp = 1234;
-				parts.Tails.PostAccessBlock.CurrentXp = 5678;
-				var statPatched = SnapshotTails.Deserialize(parts.Tails.ToArray());
+				parts.SubClass.PostAccessBlock!.CurrentHp = 1234;
+				parts.SubClass.PostAccessBlock.CurrentXp = 5678;
+				var statPatched = FullCharSnapshotSubClass.Deserialize(parts.SubClass.ToArray());
 				Assert.Equal(1234u, statPatched.PostAccessBlock!.CurrentHp);
 				Assert.Equal(5678u, statPatched.PostAccessBlock.CurrentXp);
 			}

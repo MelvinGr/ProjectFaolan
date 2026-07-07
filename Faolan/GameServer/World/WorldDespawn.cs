@@ -60,7 +60,7 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// (The playfield token is now authored INTO the snapshot at build time - SnapshotTailsBuilder writes the live
+		// (The playfield token is now authored INTO the snapshot at build time - FullCharSnapshotSubClass writes the live
 		// zone token into stat slot 0xBF - so the former TryReplacePlayfieldToken in-place stamp is retired.)
 
 		private static bool TryLocateFramedToken(ReadOnlySpan<byte> snapshotBody, out uint token, out int tokenStart)

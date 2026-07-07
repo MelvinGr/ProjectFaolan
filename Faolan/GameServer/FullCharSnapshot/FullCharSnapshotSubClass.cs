@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {
-	public sealed class SnapshotTails
+	public sealed class FullCharSnapshotSubClass
 	{
 		[JsonIgnore]
 		public bool HasKnownRepeatedStatTable => PostAccessBlock?.LargestAdjacentRepeatedRun != null;
@@ -43,11 +43,11 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// Null when the tails carry no such region (no chapterTag at the boundary) - then it stays in UnknownBefore.
 		public QuestObjectiveRegion? QuestObjectives { get; init; }
 
-		public TailsPostAccessBlock? PostAccessBlock { get; init; }
+		public SubClassPostAccessBlock? PostAccessBlock { get; init; }
 
 		// Back-compat shim: the lead quest's STATE word (@20). World entry historically patched the live
 		// character "level" here - the field is actually the first Quest_c record's state (for a fresh beach
-		// char level == state == 1, so the write was a no-op). Kept so SnapshotTailsBuilder/RetailLoginReplay
+		// char level == state == 1, so the write was a no-op). Kept so FullCharSnapshotSubClass/RetailLoginReplay
 		// continue to compile and produce identical bytes.
 		[JsonIgnore]
 		public uint Level
@@ -88,7 +88,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return writer.ToArray();
 		}
 
-		public static SnapshotTails Deserialize(byte[] data)
+		public static FullCharSnapshotSubClass Deserialize(byte[] data)
 		{
 			ArgumentNullException.ThrowIfNull(data);
 
@@ -108,7 +108,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 				var questIndexNoAw = TryParseQuestIndex(data, afterObjectives, data.Length, out var afterIndexNoAw);
 				var unknownBeforeAccessWindowTable = data[afterIndexNoAw..];
 
-				return new SnapshotTails
+				return new FullCharSnapshotSubClass
 				{
 					Quests = quests,
 					QuestObjectives = questObjectives,
@@ -149,7 +149,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			var unknownAfterAccessWindowTable = data[checked((int)accessReader.Position)..];
 			var postAccessBlock = TryReadPostAccessBlock(unknownAfterAccessWindowTable);
 
-			return new SnapshotTails
+			return new FullCharSnapshotSubClass
 			{
 				Quests = quests,
 				QuestObjectives = questObjectives,
@@ -193,9 +193,9 @@ namespace Faolan.GameServer.FullCharSnapshot
 				throw new InvalidOperationException($"Unexpected byte at offset 0x{actualOffset:X8}. Expected 0x{expected:X2}, got 0x{actual:X2}.");
 		}
 
-		private static TailsRepeatedUInt32Run? FindLargestAdjacentRepeatedRun(List<uint> values)
+		private static SubClassRepeatedUInt32Run? FindLargestAdjacentRepeatedRun(List<uint> values)
 		{
-			TailsRepeatedUInt32Run? bestRun = null;
+			SubClassRepeatedUInt32Run? bestRun = null;
 
 			for (var startIndex = 0; startIndex < values.Count; startIndex++)
 			{
@@ -208,7 +208,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 					if (bestRun == null || length > bestRun.Length)
 					{
-						bestRun = new TailsRepeatedUInt32Run
+						bestRun = new SubClassRepeatedUInt32Run
 						{
 							StartIndex = startIndex,
 							Length = length,
@@ -433,7 +433,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return stream.Length - stream.Position;
 		}
 
-		private static TailsPostAccessLayout? TryBuildPostAccessLayout(List<uint> values)
+		private static SubClassPostAccessLayout? TryBuildPostAccessLayout(List<uint> values)
 		{
 			var repeatedRun = FindLargestAdjacentRepeatedRun(values);
 
@@ -445,7 +445,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			var footerStartIndex = repeatedRun.StartIndex + repeatedRun.Length * repeatedRun.RepeatCount;
 			var footer = CopyRange(values, footerStartIndex, values.Count - footerStartIndex);
 
-			return new TailsPostAccessLayout
+			return new SubClassPostAccessLayout
 			{
 				PrefixValues = prefix,
 				RepeatedValues = repeatedValues,
@@ -564,7 +564,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			}
 		}
 
-		private static TailsPostAccessBlock? TryReadPostAccessBlock(byte[] data)
+		private static SubClassPostAccessBlock? TryReadPostAccessBlock(byte[] data)
 		{
 			if (data.Length < 12)
 				return null;
@@ -610,7 +610,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 			var trailer = data[offset..];
 
-			return new TailsPostAccessBlock
+			return new SubClassPostAccessBlock
 			{
 				Marker0 = marker0,
 				Marker1 = marker1,
@@ -715,7 +715,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			writer.WriteByte(0);
 		}
 
-		private static void WritePostAccessBlock(FaolanStream writer, TailsPostAccessBlock block)
+		private static void WritePostAccessBlock(FaolanStream writer, SubClassPostAccessBlock block)
 		{
 			writer.WriteUInt32(block.Marker0);
 			writer.WriteUInt32(block.Marker1);
@@ -753,10 +753,10 @@ namespace Faolan.GameServer.FullCharSnapshot
 			writer.WriteByte(0);
 		}
 
-		// ---- FROM-SCRATCH construction (formerly SnapshotTailsBuilder) ----
+		// ---- FROM-SCRATCH construction (formerly the separate SnapshotTailsBuilder class) ----
 		// Builds the beach 0x737A6DF9 tails from a character + its held quests with NO captured template:
 		// the generated quest portion + the typed PFAccessWindow_ catalog (AccessWindowCatalog) + the code
-		// stat block (TailsStatBlock) with the live vitals/XP/known-spells. BeachTailsFromScratchTests proves
+		// stat block (SubClassStatBlock) with the live vitals/XP/known-spells. BeachTailsFromScratchTests proves
 		// it reproduces the retired BeachTailsTemplate.bin byte-for-byte (#186/#258).
 		// GENERATES the quest PORTION of the tails (@0..1292 = Quest_c journal + @609 objective region + index) from a
 		// quest's DB definition + its seeded snapshot-generation fields, with the player's live `instance` (#186). The
@@ -776,7 +776,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// is reference data, not generated. Emitted from the TYPED AccessWindowCatalog (the 86 PfAccessWindowEntry
 		// records, formerly the AccessWindowTable.bin blob, #258) so no captured byte-blob is shipped; byte-identical
 		// to the captured region (BeachTailsFromScratchTests). Identical for every character.
-		private static readonly byte[] AccessWindowTable = SnapshotTails.SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
+		private static readonly byte[] AccessWindowTable = FullCharSnapshotSubClass.SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
 
 		// #255: the multi-quest journal portion from the player's held quests. One QuestcRecord per quest (journal
 		// entries), but the objective (@609) region + the quest index belong to the PRIMARY (tracked) quest only -
@@ -800,7 +800,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three
 		// regions, each independently proven byte-exact: the generated quest portion (BuildQuestPortion, @0..1292),
 		// the game-static access-window catalog (AccessWindowCatalog typed entries, @1292..7917), and the code stat
-		// stat block (TailsStatBlock, @7917..end) authored with the character's vitals/XP + learned spells. Then stamps
+		// stat block (SubClassStatBlock, @7917..end) authored with the character's vitals/XP + learned spells. Then stamps
 		// this session's playfield token. For the captured beach character + instance this reproduces
 		// BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the template .bin is no longer needed.
 		// Single-quest convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
@@ -828,7 +828,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 			// #74/#71: the character's learned spells are built INTO the stat block's known-list (no-op when empty).
 			var knownList = KnownSpellList.FromSpellIds(knownSpellIds);
-			var imported = statSheet is { Count: > 0 } && statSheet.Count == TailsStatBlock.SheetSize;
+			var imported = statSheet is { Count: > 0 } && statSheet.Count == SubClassStatBlock.SheetSize;
 
 			// Build the full stat SHEET and apply every BY-ID override to IT, THEN construct the block (with the known-
 			// list) in one pass. The overrides MUST NOT be post-hoc SetStat calls on the built block: SetStat scans ALL
@@ -842,14 +842,14 @@ namespace Faolan.GameServer.FullCharSnapshot
 				// reset to baseline. XP (0x34) is authored positionally below; the playfield-token slot (0xBF) is set for
 				// BOTH paths just below (from the live zone token, not the stale captured one).
 				sheet = [.. statSheet.Select(s => ((uint)s.Id, s.Value))];
-				SetSheet(sheet, (uint)CharacterStatId.MaxExp, TailsStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
-				SetSheet(sheet, 0x39, TailsStatBlock.SkeletonValueOf(0x39));
+				SetSheet(sheet, (uint)CharacterStatId.MaxExp, SubClassStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
+				SetSheet(sheet, 0x39, SubClassStatBlock.SkeletonValueOf(0x39));
 			}
 			else
 			{
 				// No captured sheet (a freshly-created character): the fresh skeleton with its LEVEL patched (the
 				// skeleton hardcodes 1, so without this the client blocks every level-gated spell/item).
-				sheet = TailsStatBlock.FreshSheet();
+				sheet = SubClassStatBlock.FreshSheet();
 				if (character != null)
 					SetSheet(sheet, (uint)CharacterStatId.Level, character.Level);
 			}
@@ -857,9 +857,9 @@ namespace Faolan.GameServer.FullCharSnapshot
 			// The playfield-instance token (stat slot 0xBF) is SESSION/MAP state, not a character stat: write the LIVE
 			// zone token into it - so the client, the world objects, and the despawns all scope to the SAME token by
 			// construction (no post-hoc patch). Falls back to the fresh/beach value when no live token is given (golden).
-			SetSheet(sheet, TailsStatBlock.PlayfieldTokenStatId, playfieldToken ?? TailsStatBlock.SkeletonValueOf(TailsStatBlock.PlayfieldTokenStatId));
+			SetSheet(sheet, SubClassStatBlock.PlayfieldTokenStatId, playfieldToken ?? SubClassStatBlock.SkeletonValueOf(SubClassStatBlock.PlayfieldTokenStatId));
 
-			var block = TailsStatBlock.CreateBlock(sheet, knownList);
+			var block = SubClassStatBlock.CreateBlock(sheet, knownList);
 
 			// Positional post-ops (SetValue-based, confined to the stat region - they do NOT scan the inline known-list).
 			if (character != null)
@@ -879,7 +879,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 					block.CurrentHp = 0;
 			}
 
-			var statBytes = TailsStatBlock.Serialize(block);
+			var statBytes = SubClassStatBlock.Serialize(block);
 
 			// The tails are FULLY CONSTRUCTED for the live session - no post-hoc byte-patch: the quest portion is built
 			// with `instance`, the access-window + stat regions carry no per-session ids, and the playfield token is
@@ -954,7 +954,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		}
 
 		// Sets a stat id's value at EVERY occurrence in the sheet (a few ids appear in both StatList#1 and StatList#2).
-		// Applied to the sheet BEFORE the block is built, so - unlike TailsPostAccessBlock.SetStat - it never scans the
+		// Applied to the sheet BEFORE the block is built, so - unlike SubClassPostAccessBlock.SetStat - it never scans the
 		// inline known-list records.
 		private static void SetSheet(List<(uint Id, uint Value)> sheet, uint statId, uint value)
 		{
@@ -1046,7 +1046,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		}
 	}
 
-	public sealed class TailsPostAccessBlock
+	public sealed class SubClassPostAccessBlock
 	{
 		private const int RepeatedBlockEndIndex = 182;
 		private const int RepeatedBlockOffset = 148;
@@ -1056,9 +1056,9 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 		public List<uint> Values { get; init; } = [];
 
-		public TailsPostAccessLayout? Layout { get; init; }
+		public SubClassPostAccessLayout? Layout { get; init; }
 
-		public TailsRepeatedUInt32Run? LargestAdjacentRepeatedRun { get; init; }
+		public SubClassRepeatedUInt32Run? LargestAdjacentRepeatedRun { get; init; }
 
 		public uint BlockType { get; init; }
 
@@ -1343,7 +1343,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		}
 	}
 
-	public sealed class TailsPostAccessLayout
+	public sealed class SubClassPostAccessLayout
 	{
 		public int RepeatCount { get; init; }
 
@@ -1384,7 +1384,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public List<uint> RepeatedValues { get; init; } = [];
 	}
 
-	public sealed class TailsRepeatedUInt32Run
+	public sealed class SubClassRepeatedUInt32Run
 	{
 		public int Length { get; init; }
 
