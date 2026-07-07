@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer;
 using Xunit;
@@ -50,7 +51,7 @@ namespace Faolan.Tests
 				Data4 = data4
 			};
 
-			var body = GameServerListener.BuildAddSpecialAbilityBody(ability);
+			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(ability);
 
 			Assert.Equal(expectedHex, ToHex(body));
 		}
@@ -72,8 +73,8 @@ namespace Faolan.Tests
 				Data4 = 3015939650u
 			};
 
-			var announced = ToHex(GameServerListener.BuildAddSpecialAbilityBody(ability));
-			var silent = ToHex(GameServerListener.BuildAddSpecialAbilityBody(ability, false));
+			var announced = ToHex(AbilityGrantBody.BuildAddSpecialAbilityBody(ability));
+			var silent = ToHex(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, false));
 
 			Assert.EndsWith("0000000001", announced);
 			Assert.EndsWith("0000000000", silent);
@@ -94,15 +95,15 @@ namespace Faolan.Tests
 				Data3 = 4u,
 				Data4 = 5u
 			};
-			var body = GameServerListener.BuildAddSpecialAbilityBody(ability);
+			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(ability);
 
-			Assert.False(GameServerListener.TryParseAddSpecialAbilityBody(new byte[80], out _, out _)); // wrong length
+			Assert.False(AbilityGrantBody.TryParseAddSpecialAbilityBody(new byte[80], out _, out _)); // wrong length
 			var corruptId = (byte[])body.Clone();
 			corruptId[8] ^= 0xFF; // break the duplicated Id (field index 2)
-			Assert.False(GameServerListener.TryParseAddSpecialAbilityBody(corruptId, out _, out _));
+			Assert.False(AbilityGrantBody.TryParseAddSpecialAbilityBody(corruptId, out _, out _));
 			var corruptConst = (byte[])body.Clone();
 			corruptConst[14 * 4] ^= 0xFF; // break the B290805C constant
-			Assert.False(GameServerListener.TryParseAddSpecialAbilityBody(corruptConst, out _, out _));
+			Assert.False(AbilityGrantBody.TryParseAddSpecialAbilityBody(corruptConst, out _, out _));
 		}
 
 		// Build -> Parse must recover the exact Ability fields and announce flag (the body duplicates Id and Data1..4,
@@ -120,9 +121,9 @@ namespace Faolan.Tests
 				Data3 = data3,
 				Data4 = data4
 			};
-			var body = GameServerListener.BuildAddSpecialAbilityBody(original, announce);
+			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(original, announce);
 
-			Assert.True(GameServerListener.TryParseAddSpecialAbilityBody(body, out var parsed, out var parsedAnnounce));
+			Assert.True(AbilityGrantBody.TryParseAddSpecialAbilityBody(body, out var parsed, out var parsedAnnounce));
 			Assert.Equal(announce, parsedAnnounce);
 			Assert.Equal(original.Id, parsed.Id);
 			Assert.Equal(original.Slot, parsed.Slot);
