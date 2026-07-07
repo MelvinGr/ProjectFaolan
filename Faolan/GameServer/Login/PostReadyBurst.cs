@@ -23,6 +23,14 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 
+			// #304: the beach NPC spawns / MoveTasks / despawns below duplicate the DB-driven interest-streaming
+			// content - WorldBroadcaster spawns them from NpcSpawns on map 4010 (Poacher Marksman = Npcs 18 /
+			// NpcSpawns 10643, whole beach populated), and the despawn records even target capture-only ghost
+			// handles. Gated OFF so streaming owns them; flip true to restore the legacy verbatim burst. Once an
+			// in-client test confirms the beach still populates, delete the gated bytes outright.
+			// ReSharper disable once ConvertToConstant.Local - non-const so the gated records don't warn CS0162 unreachable
+			var EmitLegacyBeachNpcBurst = false;
+
 			// record -1: CoreClaimIIR (0x06EC1255). Retail (and our old raw-blob replay) sends this immediately
 			// before the CharInPlay record - it is the world-CLAIM signal that tells the client the playfield is
 			// fully claimed/loaded. WITHOUT it the world renders but the client never finishes "loading", so it
@@ -127,7 +135,8 @@ namespace Faolan.GameServer
 				await _broadcaster.SendBeachGateOnEntry(client);
 
 			// record 5: 0x00002000, 154-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -286,13 +295,15 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 6: 0x00002000, 21-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00, 0x00, 0x00, 0x11, 0x04, 0xB8, 0x2B, 0x2D, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x08, 0x18, 0xE4, 0x01, 0x00, 0x4F, 0xE4, 0x28)
 				.SendAsync(client);
 
 			// record 7: 0x00002000, 298-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -595,7 +606,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 8: 0x00002000, 370-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -970,7 +982,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 9: 0x00002000, 322-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -1297,7 +1310,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 10: 0x00002000, 250-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -1552,7 +1566,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 11: 0x00002000, 202-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -1759,7 +1774,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 12: 0x00002000, 21-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00, 0x00, 0x00, 0x11, 0x04, 0xB8, 0x2B, 0x2D, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x08, 0x18, 0xDA, 0x01, 0x00, 0x4F, 0xE4, 0x28)
 				.SendAsync(client);
@@ -1915,7 +1931,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 16: 0x00002000, 125-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -2045,7 +2062,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 17: 0x00002000, 198-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
@@ -2292,7 +2310,8 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			// record 19: 0x00002000, 1711-byte body
-			await new PacketStream()
+			if (EmitLegacyBeachNpcBurst)
+				await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(0x00,
 					0x00,
