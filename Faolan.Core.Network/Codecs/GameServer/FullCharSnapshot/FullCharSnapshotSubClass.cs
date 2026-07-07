@@ -11,7 +11,7 @@ using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
 {
-    public sealed class FullCharSnapshotSubClass
+    public sealed class FullCharSnapshotSubClass : ICodec<FullCharSnapshotSubClass>
     {
         [JsonIgnore]
         public bool HasKnownRepeatedStatTable => PostAccessBlock?.LargestAdjacentRepeatedRun != null;
@@ -67,7 +67,12 @@ namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
         public byte[] ToArray()
         {
             using var writer = new FaolanStream();
+            Write(writer);
+            return writer.ToArray();
+        }
 
+        public void Write(FaolanStream writer)
+        {
             writer.WriteArray(Quests.ToArray());
 
             if (QuestObjectives != null)
@@ -85,9 +90,10 @@ namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
                 WritePostAccessBlock(writer, PostAccessBlock);
             else
                 writer.WriteArray(UnknownAfterAccessWindowTable);
-
-            return writer.ToArray();
         }
+
+        // ICodec stream Read: the sub-class is the whole trailing region, so consume the rest and parse it.
+        public static FullCharSnapshotSubClass Read(FaolanStream s) => Deserialize(s.ReadRemainingArray());
 
         public static FullCharSnapshotSubClass Deserialize(byte[] data)
         {
