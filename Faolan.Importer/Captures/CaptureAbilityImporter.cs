@@ -487,7 +487,7 @@ namespace Faolan.Importer.Captures
                 var characterId = packet.Receiver.Instance;
                 (byCharacter.TryGetValue(characterId, out var set)
                     ? set
-                    : byCharacter[characterId] = new HashSet<uint>()).Add(id);
+                    : byCharacter[characterId] = []).Add(id);
             }
             catch
             {

@@ -949,7 +949,7 @@ namespace Faolan.Importer.Cli
                 {
                     counts[kv.Key] = counts.GetValueOrDefault(kv.Key) + 1;
                     if (!samples.TryGetValue(kv.Key, out var l))
-                        samples[kv.Key] = l = new List<uint>();
+                        samples[kv.Key] = l = [];
                     if (l.Count < 8)
                         l.Add(kv.Value);
                 }
