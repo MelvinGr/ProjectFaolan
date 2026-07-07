@@ -74,7 +74,7 @@ namespace Faolan.Tests
 		// region isn't byte-compared: the capture's char COMPLETED the beach quest, so its beach record carries
 		// obj-list progress a held-but-fresh beach record doesn't - that record is proven separately + in production.)
 		[Fact]
-		public void BuildSingle_Casilda13479_MatchesTheCapturedRecord_ByteForByte()
+		public async Task BuildSingle_Casilda13479_MatchesTheCapturedRecord_ByteForByte()
 		{
 			var golden = File.ReadAllBytes(GoldenPath);
 			// the 13479 record's signature in the region: [listKey=0x34A7][ver=1][questId=0x34A7]
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 			var off = IndexOf(golden, sig);
 			Assert.True(off >= 0, "13479 record signature present in the golden region");
 
-			var casilda = LoadDefinition(13479).GetAwaiter().GetResult();
+			var casilda = await LoadDefinition(13479);
 			Assert.NotNull(casilda);
 			var rec = QuestcRecord.BuildSingle(casilda, casilda.SnapshotState, casilda.SnapshotN, casilda.SnapshotFieldEc, casilda.SnapshotFieldF0, casilda.SnapshotFieldF8, casilda.SnapshotField28);
 			using var w = new FaolanStream();

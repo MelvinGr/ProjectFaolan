@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			var (events, _) = MoveTo(zone, a, 1, 0);
 
 			Assert.False(events.Has(1, 99, InterestEventType.Spawn)); // NPC comes from the burst, not interest (yet)
-			Assert.False(a.Known.Contains(99));
+			Assert.DoesNotContain(99u, a.Known);
 		}
 
 		[Fact]
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 			var events = new WorldEvents(InterestManager.ResolveMove(zone, a, Range, true));
 
 			Assert.True(events.Has(1, 99, InterestEventType.Spawn)); // NPC now streamed from the model
-			Assert.True(a.Known.Contains(99));
+			Assert.Contains(99u, a.Known);
 		}
 
 		[Fact]
@@ -126,7 +126,7 @@ namespace Faolan.Tests
 			var events = new WorldEvents(InterestManager.ResolveRemove(zone, a));
 
 			Assert.True(events.Has(2, 1, InterestEventType.Despawn)); // B told A is gone
-			Assert.False(b.Known.Contains(1));
+			Assert.DoesNotContain(1u, b.Known);
 		}
 
 		[Fact]
@@ -145,7 +145,7 @@ namespace Faolan.Tests
 			var (events, _) = MoveTo(zone, a, 5000, 0); // a runs far away
 
 			Assert.False(events.Has(1, 2, InterestEventType.Despawn)); // no despawn for the unconfirmed handle
-			Assert.False(a.Known.Contains(2)); // but it's dropped from Known
+			Assert.DoesNotContain(2u, a.Known); // but it's dropped from Known
 		}
 
 		private static (WorldEvents events, Zone zone) MoveTo(Zone zone, WorldEntity mover, float x, float z)
