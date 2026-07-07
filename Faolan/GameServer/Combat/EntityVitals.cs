@@ -1,6 +1,6 @@
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 
 namespace Faolan.GameServer.Combat
 {

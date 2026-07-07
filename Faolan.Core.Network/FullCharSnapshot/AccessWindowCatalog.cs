@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.FullCharSnapshot
 {
 	// AUTO-GENERATED (#258) from BeachTailsTemplate.bin via the access-window typed model - the game-static
 	// PFAccessWindow_ playfield catalog the FullChar snapshot tails carry, identical for every character.

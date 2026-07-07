@@ -10,7 +10,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Economy;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Microsoft.Extensions.Logging;
 using System;

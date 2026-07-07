@@ -8,7 +8,7 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;

@@ -6,7 +6,7 @@ using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Economy.Tradepost;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;

@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Faolan.Core.Network.Codecs;

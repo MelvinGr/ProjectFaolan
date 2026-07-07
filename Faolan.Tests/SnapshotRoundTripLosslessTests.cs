@@ -5,7 +5,7 @@ using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Xunit;
 using Xunit.Abstractions;
 

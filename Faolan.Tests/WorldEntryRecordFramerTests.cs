@@ -5,7 +5,7 @@ using System.IO;
 using Faolan.Core;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.Tests.Support;
 using Xunit;
 

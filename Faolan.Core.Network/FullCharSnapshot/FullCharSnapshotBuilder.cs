@@ -3,7 +3,7 @@ using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.FullCharSnapshot
 {
 	// Builds the FullChar (0x737A6DF9) snapshot's four inventory containers entirely from the character's DB
 	// items - the generation counterpart of the older in-place entry swap. Layout facts from every captured
@@ -133,12 +133,12 @@ namespace Faolan.GameServer.FullCharSnapshot
 		// Unique within the character, stable across logins: epoch | kind | slot | instance-low. Internal so the
 		// live DispatchAddItem grant path (GrantItemToBackpack) computes the same itemId/recordId the next login's
 		// snapshot will, keeping the live add and the snapshot in agreement on the entry's identity.
-		internal static ulong ItemId(uint instance, uint kind, ulong slot)
+		public static ulong ItemId(uint instance, uint kind, ulong slot)
 		{
 			return ItemIdEpoch | ((kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
 		}
 
-		internal static ulong RecordId(uint instance, uint kind, ulong slot)
+		public static ulong RecordId(uint instance, uint kind, ulong slot)
 		{
 			return ((kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
 		}

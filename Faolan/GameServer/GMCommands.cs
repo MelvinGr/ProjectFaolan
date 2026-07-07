@@ -13,7 +13,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy.Tradepost;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Faolan.Core.Network.Codecs;

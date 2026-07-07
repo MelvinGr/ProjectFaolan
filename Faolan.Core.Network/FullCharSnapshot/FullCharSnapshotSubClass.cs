@@ -9,7 +9,7 @@ using Faolan.Core.Database.Tables;
 using System.Linq;
 using Faolan.Core.Network.Codecs;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.FullCharSnapshot
 {
 	public sealed class FullCharSnapshotSubClass
 	{

@@ -3,7 +3,7 @@ using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

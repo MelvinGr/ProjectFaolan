@@ -7,7 +7,7 @@ using Faolan.Core.Crypt;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Extensions;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Xunit;
 
 namespace Faolan.Tests

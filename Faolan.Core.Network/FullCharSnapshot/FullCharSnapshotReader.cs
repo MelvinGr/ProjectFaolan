@@ -5,7 +5,7 @@ using Faolan.Core;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.GameServer.FullCharSnapshot
+namespace Faolan.Core.Network.FullCharSnapshot
 {
 	// Splits a FullChar (0x737A6DF9) snapshot body into its three regions and decodes the inventory root as the
 	// TYPED ProtoFullCharacterIIR (protobuf-net, IExtensible => lossless). Body layout after the [subOpcode][c350]

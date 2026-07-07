@@ -4,7 +4,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.TestClient;
 using System.Security.Cryptography;
 
