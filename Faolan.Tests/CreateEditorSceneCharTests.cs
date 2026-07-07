@@ -2,10 +2,10 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.GameServer.CreateFlow;
-using Faolan.GameServer.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Abstractions;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

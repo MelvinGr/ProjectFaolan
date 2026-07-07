@@ -5,7 +5,7 @@ using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// SPLICE-side builder for an FA015807 entity Spawn body: takes a captured spawn (the map burst's player
 	// spawn) as the base, constructs the header + transform (position/rotation as typed ProtoVec3/ProtoQuat,

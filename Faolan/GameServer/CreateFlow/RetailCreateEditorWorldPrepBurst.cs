@@ -3,6 +3,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.CreateFlow
 {

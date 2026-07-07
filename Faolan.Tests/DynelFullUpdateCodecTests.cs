@@ -1,6 +1,5 @@
 using System;
 using System.Text;
-using Faolan.GameServer.Spawn;
 using Xunit;
 using Faolan.Core.Network.Codecs.GameServer;
 

@@ -6,7 +6,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.GameServer;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Bridges a stored NpcSpawn row to a wire FA015807 (SimpleCharFullUpdate) body, addressed to a live session
 	// handle. The transform (position/rotation) is driven by the row's structured columns; the pre-IIR float block

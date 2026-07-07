@@ -1,9 +1,9 @@
 using System;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

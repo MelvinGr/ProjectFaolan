@@ -4,6 +4,7 @@ using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs.GameServer;
 
 // ScryScript (the cutscene step builder)
 

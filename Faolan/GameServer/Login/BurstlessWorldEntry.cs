@@ -8,9 +8,9 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
-using Faolan.GameServer.Spawn;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs.GameServer;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

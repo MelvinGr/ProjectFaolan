@@ -6,7 +6,6 @@ using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.Spawn;
 using ProtoBuf;
 using System;
 using System.Buffers.Binary;

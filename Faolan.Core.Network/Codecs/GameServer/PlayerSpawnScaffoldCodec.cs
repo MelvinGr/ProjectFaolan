@@ -5,7 +5,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Spawn;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	public static class PlayerSpawnScaffoldCodec
 	{

@@ -1,7 +1,7 @@
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Builds the player-spawn ProtoCoreCharacterIIR from code + the character's DB fields. The message is a fixed
 	// render template (Strie's captured PlayerCharacterIirTemplate.bin, now constructed so the runtime ships no spawn

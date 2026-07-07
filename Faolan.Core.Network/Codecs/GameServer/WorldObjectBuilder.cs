@@ -6,7 +6,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Bridges a stored WorldObject row to a wire body (66AEDD50/F096251E/33A56FB0/6BD56736/1FD6412B), addressed to a
 	// live session handle. Sibling of NpcSpawnBuilder, but simpler: a world object has no CharacterIIR to splice, so

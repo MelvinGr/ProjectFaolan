@@ -2,7 +2,7 @@ using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.GameServer.Economy.Shop
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// The vendor trade-OPEN reply pair (#134), decoded from the NecroL80 sell_items_to_trader capture (frames
 	// 1188-1193): the client opens a vendor by sending a TalkToNpc BehaviorControlCenterIIR Interact at the

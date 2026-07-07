@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using Faolan.Core.Network.Spawn;
-using Faolan.GameServer.Spawn;
 using Xunit;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

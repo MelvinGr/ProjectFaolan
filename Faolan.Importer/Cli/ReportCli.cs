@@ -2,7 +2,6 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
-using Faolan.GameServer.Spawn;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;

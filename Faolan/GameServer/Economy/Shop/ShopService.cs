@@ -15,6 +15,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.Economy.Shop
 {

@@ -5,7 +5,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Spawn;
-using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using System;

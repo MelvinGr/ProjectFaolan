@@ -1,9 +1,9 @@
-using Faolan.GameServer.Spawn;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Importer.Extractors
 {

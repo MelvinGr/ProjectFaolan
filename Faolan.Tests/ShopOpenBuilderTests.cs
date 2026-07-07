@@ -2,6 +2,7 @@ using System;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy.Shop;
 using Xunit;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

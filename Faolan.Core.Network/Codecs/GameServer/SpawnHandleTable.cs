@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Per-session allocator that assigns a unique entity handle to each spawned entity (the player and each NPC)
 	// and remembers the mapping, so the same entity keeps a stable handle across the spawn, its 96C46740

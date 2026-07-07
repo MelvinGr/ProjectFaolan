@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Importer.Rdb
 {
