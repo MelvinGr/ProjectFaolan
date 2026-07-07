@@ -6,13 +6,13 @@ using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Economy.Tradepost;
-using Faolan.Core.Network.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

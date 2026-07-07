@@ -4,9 +4,9 @@ using System.IO;
 using Faolan.Core;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer;
-using Faolan.Core.Network.FullCharSnapshot;
 using Xunit;
 using Xunit.Abstractions;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 namespace Faolan.Tests
 {

@@ -10,7 +10,6 @@ using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Economy;
-using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Microsoft.Extensions.Logging;
 using System;
@@ -22,6 +21,7 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 namespace Faolan.GameServer.World
 {

@@ -2,7 +2,6 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
-using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
@@ -16,6 +15,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 namespace Faolan.Importer.Cli
 {

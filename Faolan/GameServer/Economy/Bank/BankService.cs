@@ -8,10 +8,10 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
-using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 namespace Faolan.GameServer.Economy.Bank
 {

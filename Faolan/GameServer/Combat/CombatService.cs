@@ -6,7 +6,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Spawn;
-using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using System;
@@ -14,6 +13,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 namespace Faolan.GameServer.Combat
 {

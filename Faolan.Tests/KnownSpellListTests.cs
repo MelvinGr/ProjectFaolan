@@ -3,10 +3,10 @@ using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.FullCharSnapshot;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 namespace Faolan.Tests
 {

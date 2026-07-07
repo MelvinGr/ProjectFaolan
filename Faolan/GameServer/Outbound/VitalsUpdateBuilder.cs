@@ -3,8 +3,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
-using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.GameServer.World;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

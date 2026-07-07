@@ -4,6 +4,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.FullCharSnapshot;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
