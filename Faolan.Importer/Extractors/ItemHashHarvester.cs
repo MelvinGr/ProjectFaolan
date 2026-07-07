@@ -2,7 +2,7 @@ using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.FullCharSnapshot;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Protobuf;
@@ -12,6 +12,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using Faolan.Core.Network.FullCharSnapshot;
 
 namespace Faolan.Importer.Extractors
 {

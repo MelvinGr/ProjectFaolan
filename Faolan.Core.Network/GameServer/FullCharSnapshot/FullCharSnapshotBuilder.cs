@@ -1,8 +1,9 @@
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.FullCharSnapshot;
+using Faolan.Core.Network.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Protobuf;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Network.FullCharSnapshot;
 
 namespace Faolan.Core.Network.GameServer.FullCharSnapshot
 {
