@@ -31,29 +31,38 @@ namespace Faolan.Core.Network.Packets
 
 		public static byte[] Build(uint instance, byte[] xml)
 		{
-			var content = new FaolanStream();
-			content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(instance).WriteByte(LeadFlag).WriteUInt16(xml.Length).WriteArray(xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord);
-
-			var body = content.ToArray();
-			var s = new FaolanStream();
-			s.WriteUInt32(body.Length);
-			s.WriteArray(body);
+			using var s = new FaolanStream();
+			new Message(instance, xml).Write(s);
 			return s.ToArray();
 		}
 
-		public static Parsed Parse(byte[] body)
-		{
-			var s = new FaolanStream(body);
-			s.ReadUInt32(); // len
-			s.ReadUInt32(); // subop (0xE0B51102)
-			s.ReadUInt32(); // 0xC350 marker
-			var instance = s.ReadUInt32();
-			s.ReadArray(1); // lead flag 0x00
-			var xmlLen = s.ReadUInt16();
-			var xml = s.ReadArray(xmlLen);
-			return new Parsed(instance, xml);
-		}
+		public static Message Parse(byte[] body) => Message.Read(new FaolanStream(body));
 
-		public sealed record Parsed(uint Instance, byte[] Xml);
+		// The decoded ChatTextIIR body as a self-serializing codec (ICodec): Write frames the whole
+		// [len][subop][marker][instance][lead][xmlLen][xml][trailer]; Read recovers the (instance, xml).
+		public sealed record Message(uint Instance, byte[] Xml) : ICodec<Message>
+		{
+			public void Write(FaolanStream s)
+			{
+				var content = new FaolanStream();
+				content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt16(Xml.Length).WriteArray(Xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord);
+
+				var body = content.ToArray();
+				s.WriteUInt32(body.Length);
+				s.WriteArray(body);
+			}
+
+			public static Message Read(FaolanStream s)
+			{
+				s.ReadUInt32(); // len
+				s.ReadUInt32(); // subop (0xE0B51102)
+				s.ReadUInt32(); // 0xC350 marker
+				var instance = s.ReadUInt32();
+				s.ReadArray(1); // lead flag 0x00
+				var xmlLen = s.ReadUInt16();
+				var xml = s.ReadArray(xmlLen);
+				return new Message(instance, xml);
+			}
+		}
 	}
 }
