@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Network;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {
@@ -15,7 +16,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// type 2 = spell, type 5 = feat/ability. Count word = (recordCount + 1) * 0x3F1 (the standard list-framing
 	// invariant). A fresh character's list is just its learned spells (type 2) - the 3 Normal Attacks do NOT appear
 	// here (Faolanx's list has no type-5 records), so this carries spells only.
-	public sealed class KnownSpellList
+	public sealed class KnownSpellList : ICodec<KnownSpellList>
 	{
 		public const byte FeatType = 5;
 		public const byte SpellType = 2;
@@ -29,6 +30,12 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public byte[] ToArray()
 		{
 			using var w = new FaolanStream();
+			Write(w);
+			return w.ToArray();
+		}
+
+		public void Write(FaolanStream w)
+		{
 			w.WriteUInt32(((uint)Records.Count + 1) * Frame);
 			foreach (var record in Records)
 			{
@@ -36,8 +43,29 @@ namespace Faolan.GameServer.FullCharSnapshot
 				w.WriteUInt32(Unbound);
 				w.WriteUInt32(record.Type); // big-endian => 00 00 00 <type>
 			}
+		}
 
-			return w.ToArray();
+		// Reads a known-list at the stream's current position (the ICodec entry). The span-based Parse below is kept for
+		// TryExtractFromSnapshot's zero-copy scan over a raw snapshot body.
+		public static KnownSpellList Read(FaolanStream r)
+		{
+			var count = r.ReadUInt32();
+			if (count == 0 || count % Frame != 0)
+				throw new InvalidOperationException($"known-list count 0x{count:X} is not a positive multiple of 0x{Frame:X}.");
+
+			var recordCount = (int)(count / Frame) - 1;
+			var records = new List<KnownSpellRecord>(recordCount);
+			for (var i = 0; i < recordCount; i++)
+			{
+				var id = r.ReadUInt32();
+				var unbound = r.ReadUInt32();
+				if (unbound != Unbound)
+					throw new InvalidOperationException($"known-list record {i} has slot word 0x{unbound:X}, expected 0x{Unbound:X}.");
+
+				records.Add(new KnownSpellRecord(id, (byte)r.ReadUInt32()));
+			}
+
+			return new KnownSpellList { Records = records };
 		}
 
 		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds)

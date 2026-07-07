@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,7 +23,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// markers/sub-refs are richer than QuestDefinition's single GoalId (so GENERATING needs a per-goal model, #186).
 	// This codec round-trips the region byte-exact (QuestObjectiveRegionTests) - the construct-don't-replay
 	// foundation, mirroring QuestcRegion's role for @0..609.
-	public sealed class QuestObjectiveRegion
+	public sealed class QuestObjectiveRegion : ICodec<QuestObjectiveRegion>
 	{
 		// The region's lead word is the goal-list FRAMING count = (goals + 1) * 0x3F1 (the same 0x3F1 list-framing
 		// multiplier as QuestcRegion/QuestIndexRegion). The beach quest's 2 goals make it 0xBD3, which was previously
@@ -38,10 +37,15 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public byte[] ToArray()
 		{
 			using var w = new FaolanStream();
+			Write(w);
+			return w.ToArray();
+		}
+
+		public void Write(FaolanStream w)
+		{
 			w.WriteUInt32(((uint)Goals.Count + 1) * Frame);
 			foreach (var goal in Goals)
 				goal.Write(w);
-			return w.ToArray();
 		}
 
 		// GENERATES the objective region from a quest's per-goal definitions (construct, don't replay - #186): each
@@ -97,22 +101,31 @@ namespace Faolan.GameServer.FullCharSnapshot
 		{
 			ArgumentNullException.ThrowIfNull(data);
 			using var r = new FaolanStream(data, false) { Position = checked((uint)offset) };
+			var region = Read(r);
+			consumed = checked((int)(r.Position - offset));
+			return region;
+		}
 
+		public static QuestObjectiveRegion Read(FaolanStream r)
+		{
 			var tag = r.ReadUInt32();
 			if (tag == 0 || tag % Frame != 0)
 				throw new InvalidOperationException($"@609 region: lead word 0x{tag:X} is not a multiple of 0x{Frame:X}");
 
 			var region = new QuestObjectiveRegion();
-			while (r.Position + 4 <= r.Length && PeekUInt32(data, r.Position) == GoalLead)
+			while (r.Position + 4 <= r.Length && Peek(r) == GoalLead)
 				region.Goals.Add(QuestObjectiveGoal.Read(r));
 
-			consumed = checked((int)(r.Position - offset));
 			return region;
 		}
 
-		private static uint PeekUInt32(byte[] data, uint position)
+		// Peeks the next big-endian word without advancing (goal records run until the first non-GoalLead word).
+		private static uint Peek(FaolanStream r)
 		{
-			return BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(checked((int)position), 4));
+			var p = r.Position;
+			var v = r.ReadUInt32();
+			r.Position = p;
+			return v;
 		}
 	}
 

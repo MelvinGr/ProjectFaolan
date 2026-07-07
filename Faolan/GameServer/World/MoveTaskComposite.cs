@@ -13,7 +13,7 @@ namespace Faolan.GameServer.World
     // the common forms from semantic params; this codec covers EVERY form (incl. the recursive ListMoveTask) so the
     // movement records can be CONSTRUCTED rather than replayed verbatim (#190/#234/#193). 4-byte fields are kept as
     // raw u32 bits so float values round-trip exactly.
-    public sealed class MoveTaskComposite
+    public sealed class MoveTaskComposite : ICodec<MoveTaskComposite>
     {
         public const uint SubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
         private const uint WireType = EntityClass.Character; // 0xC350
@@ -26,9 +26,15 @@ namespace Faolan.GameServer.World
 
         public byte[] Encode()
         {
-            var s = new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(WireType).WriteUInt32(Handle).WriteUInt16(0).WriteUInt32(FromX).WriteUInt32(FromY).WriteUInt32(FromZ);
-            Task.Write(s);
+            using var s = new FaolanStream();
+            Write(s);
             return s.ToArray();
+        }
+
+        public void Write(FaolanStream s)
+        {
+            s.WriteUInt32(SubOpcode).WriteUInt32(WireType).WriteUInt32(Handle).WriteUInt16(0).WriteUInt32(FromX).WriteUInt32(FromY).WriteUInt32(FromZ);
+            Task.Write(s);
         }
 
         // Parse the inner record (starting at the subop, the shape the MoveTaskCodec builders emit), throwing on any
@@ -37,7 +43,15 @@ namespace Faolan.GameServer.World
         {
             ArgumentNullException.ThrowIfNull(record);
             using var r = new FaolanStream(record, false);
+            var c = Read(r);
+            if (r.Position != record.Length)
+                throw new InvalidOperationException($"MoveTask parsed {r.Position} of {record.Length} bytes");
 
+            return c;
+        }
+
+        public static MoveTaskComposite Read(FaolanStream r)
+        {
             var subop = r.ReadUInt32();
             if (subop != SubOpcode)
                 throw new InvalidOperationException($"MoveTask subop 0x{subop:X} != 0x{SubOpcode:X}");
@@ -51,10 +65,6 @@ namespace Faolan.GameServer.World
             c.FromY = r.ReadUInt32();
             c.FromZ = r.ReadUInt32();
             c.Task = MoveTaskNode.Read(r);
-
-            if (r.Position != record.Length)
-                throw new InvalidOperationException($"MoveTask parsed {r.Position} of {record.Length} bytes");
-
             return c;
         }
     }

@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Network;
 using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.FullCharSnapshot
@@ -20,7 +20,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// Typed codec (Parse/ToArray round-trips byte-exact - QuestIndexRegionTests single-quest, BuildQuestPortionTests
 	// 2-quest) so FullCharSnapshotSubClass models it instead of the opaque blob (#186/#304). Build generates it from the held
 	// QuestDefinitions (their IndexMagic/IndexTableField/IndexGoalSteps/AreaId/IndexTrailerWord seeds).
-	public sealed class QuestIndexRegion
+	public sealed class QuestIndexRegion : ICodec<QuestIndexRegion>
 	{
 		public const uint IndexTag = 0x000003F1;
 		public const uint Sentinel = 0x000000F1;
@@ -45,6 +45,12 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public byte[] ToArray()
 		{
 			using var w = new FaolanStream();
+			Write(w);
+			return w.ToArray();
+		}
+
+		public void Write(FaolanStream w)
+		{
 			w.WriteUInt32(IndexTag);
 			w.WriteUInt32(Marker);
 			foreach (var id in QuestIds)
@@ -71,8 +77,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 				w.WriteUInt32(0);
 				w.WriteUInt32(b.ChainWord);
 			}
-
-			return w.ToArray();
 		}
 
 		// Generates the index region for the held quests (already ordered - primary first). Each quest contributes a
@@ -114,11 +118,20 @@ namespace Faolan.GameServer.FullCharSnapshot
 			return (csv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToList();
 		}
 
+		// Offset-bounded wrapper for parsing the index as an embedded sub-region: reads it at `offset` and asserts it
+		// lands exactly at `endOffset` (the access-window table start).
 		public static QuestIndexRegion Parse(byte[] data, int offset, int endOffset)
 		{
 			ArgumentNullException.ThrowIfNull(data);
 			using var r = new FaolanStream(data, false) { Position = checked((uint)offset) };
+			var region = Read(r);
+			if (r.Position != endOffset)
+				throw new InvalidOperationException($"Quest index: parsed to {r.Position}, expected {endOffset}");
+			return region;
+		}
 
+		public static QuestIndexRegion Read(FaolanStream r)
+		{
 			var tag = r.ReadUInt32();
 			if (tag != IndexTag)
 				throw new InvalidOperationException($"Quest index: tag 0x{tag:X} != 0x{IndexTag:X}");
@@ -126,7 +139,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			var marker = r.ReadUInt32();
 
 			var questIds = new List<uint>();
-			while (PeekUInt32(data, r.Position) >= MinQuestId)
+			while (Peek(r) >= MinQuestId)
 				questIds.Add(r.ReadUInt32());
 			var count = r.ReadUInt32();
 			if (count != questIds.Count)
@@ -171,9 +184,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 				});
 			}
 
-			if (r.Position != endOffset)
-				throw new InvalidOperationException($"Quest index: parsed to {r.Position}, expected {endOffset}");
-
 			return new QuestIndexRegion
 			{
 				Marker = marker,
@@ -182,9 +192,13 @@ namespace Faolan.GameServer.FullCharSnapshot
 			};
 		}
 
-		private static uint PeekUInt32(byte[] data, uint position)
+		// Peeks the next big-endian word without advancing (the questId list runs until the first sub-MinQuestId word).
+		private static uint Peek(FaolanStream r)
 		{
-			return BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(checked((int)position), 4));
+			var p = r.Position;
+			var v = r.ReadUInt32();
+			r.Position = p;
+			return v;
 		}
 	}
 }

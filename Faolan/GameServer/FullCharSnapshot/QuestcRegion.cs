@@ -34,7 +34,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// reader** (FindConst = 0 hits) — the hard limit of client-only RE. Production is unaffected: fresh chars (the
 	// only journals we generate) have empty objlists + empty progress. TODO(#186): parse/generate progressed
 	// journals once the WTHD fields are pinned (needs a server spec or a progressed-capture corpus).
-	public sealed class QuestcRegion
+	public sealed class QuestcRegion : ICodec<QuestcRegion>
 	{
 		public const uint Frame = 0x3F1; // 1009 - the list-count framing multiplier
 		public const uint Marker = 0x412;
@@ -46,11 +46,16 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public byte[] ToArray()
 		{
 			using var w = new FaolanStream();
+			Write(w);
+			return w.ToArray();
+		}
+
+		public void Write(FaolanStream w)
+		{
 			w.WriteUInt32(Version);
 			w.WriteUInt32(((uint)Records.Count + 1) * Frame);
 			foreach (var record in Records)
 				record.Write(w);
-			return w.ToArray();
 		}
 
 		public static QuestcRegion Parse(byte[] data)
@@ -64,7 +69,13 @@ namespace Faolan.GameServer.FullCharSnapshot
 		{
 			ArgumentNullException.ThrowIfNull(data);
 			using var r = new FaolanStream(data, false);
+			var region = Read(r);
+			consumed = checked((int)r.Position);
+			return region;
+		}
 
+		public static QuestcRegion Read(FaolanStream r)
+		{
 			var version = r.ReadUInt32();
 			if (version != Version)
 				throw new InvalidOperationException($"Quest_c region: version 0x{version:X} != 0x{Version:X}");
@@ -78,7 +89,6 @@ namespace Faolan.GameServer.FullCharSnapshot
 			var region = new QuestcRegion();
 			for (var i = 0; i < records; i++)
 				region.Records.Add(QuestcRecord.Read(r));
-			consumed = checked((int)r.Position);
 			return region;
 		}
 
