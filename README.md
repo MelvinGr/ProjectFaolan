@@ -2,7 +2,7 @@
 
 Project Faolan is a server-protocol emulator for the MMORPG *Age of Conan*, written in C# (.NET 10). It
 reimplements the game's network protocol — login, character creation, world entry, inventory, combat, chat,
-NPCs and the auction house — by mirroring real packet captures byte-for-byte, so a retail client can connect
+NPCs and the auction house — by mirroring real packet captures byte-for-byte, so a game client can connect
 to it and play.
 
 It is a **protocol-research and preservation project**, not a finished game server. Packet captures are the
@@ -17,7 +17,7 @@ Gitea issues on `melvin/projectfaolan`, grouped by `area:*` labels).
 ## Requirements
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/) (the whole solution targets `net10.0`)
-- A retail *Age of Conan* client, if you want to connect end-to-end (not included)
+- An *Age of Conan* game client, if you want to connect end-to-end (not included)
 
 ## Build
 
@@ -27,10 +27,11 @@ dotnet build ProjectFaolan.slnx
 
 ## Run the server
 
-The server reads `faolan.json` via a relative path, so it must run from `bin/Debug`:
+The server loads `faolan.json` and `faolan.db` from the current working directory, and both live at the repo
+root — so run it **from the repo root** (running from `bin/Debug` fails with "faolan.json not found"):
 
 ```sh
-cd Faolan/bin/Debug && dotnet Faolan.dll
+dotnet Faolan/bin/Debug/Faolan.dll
 ```
 
 It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the per-session PlayerAgent,
@@ -46,9 +47,9 @@ dotnet test Faolan.Tests
 dotnet test Faolan.Tests --filter GuildPacketTests        # a single class
 ```
 
-## Connect a retail client
+## Connect a game client
 
-`Faolan.ClientLauncher` launches the retail client unattended (it stands in for the patcher: computes the
+`Faolan.ClientLauncher` launches the game client unattended (it stands in for the patcher: computes the
 launch token, auto-logs-in, and can drive straight to the world):
 
 ```sh
@@ -71,11 +72,11 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 | Project                  | Purpose                                                                                                                                                                                |
 |--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Faolan/`                | The server host — runs every protocol listener as a hosted service.                                                                                                                    |
-| `Faolan.Core/`           | Shared networking, database, protobuf, crypto, and enums.                                                                                                                              |
+| `Faolan.Core/`           | Shared base types, protobuf, crypto, and enums, with the layered `Faolan.Core.Database`, `Faolan.Core.Network`, and `Faolan.Core.Rdb` projects on top.                                 |
 | `Faolan.Importer/`       | CLI that (re)builds `faolan.db` from packet captures + the client RDB.                                                                                                                 |
 | `Faolan.Mcp/`            | In-process MCP server exposing DB queries + live-session inspection to Claude.                                                                                                         |
-| `Faolan.ClientLauncher/` | Launches the retail client unattended (patcher stand-in).                                                                                                                              |
-| `Faolan.ContentMirror/`  | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
+| `Faolan.ClientLauncher/` | Launches the game client unattended (patcher stand-in).                                                                                                                                |
+| `Faolan.Web.Content/`    | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
 | `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
 | `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
 | `Faolan.Tests/`          | The unit/golden test suite.                                                                                                                                                            |
@@ -89,12 +90,3 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 - **`docs/`** — per-subsystem deep-dives (protocol decoding, reverse-engineering methodology, capture workflow);
   `docs/archive/` holds resolved plans and handoffs.
 - **`Faolan.Wireshark/README.md`** — building and using the dissector plugin.
-
-## How it works (in one paragraph)
-
-The client is handed each service's address in turn (`UniverseAgent → PlayerAgent → GameServer`); only port
-7010 is fixed. Packets are constructed explicitly from `PacketStream` builders rather than replayed as blobs,
-and each subsystem is proven byte-exact against a capture before it ships. Game content (items, NPCs, maps,
-world bursts) lives in the committed SQLite database, built from captures by the importer. The numeric protocol
-(opcodes, message names, conversation ids) was recovered by reverse-engineering the client. The deep-dive for
-all of this is in `CLAUDE.md` and `docs/`.
