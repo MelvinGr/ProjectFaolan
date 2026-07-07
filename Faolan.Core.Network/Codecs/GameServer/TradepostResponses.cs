@@ -12,7 +12,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Codecs;
 
-namespace Faolan.GameServer.Economy.Tradepost
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Server->client Tradepost responses. Endpoints/bodies validated byte-exact against the captures
 	// (docs/tradepost-protocol.md): the response Sender is the server's GameCharAgent endpoint, the Receiver is the
