@@ -7,7 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.GameServer.World
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Pure quest objective-tracking rules (docs/archive/quests-and-combat.md) - testable without the DB/network.
 	public static class QuestProgress

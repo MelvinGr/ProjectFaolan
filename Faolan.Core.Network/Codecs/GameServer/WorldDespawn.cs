@@ -4,7 +4,7 @@ using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.GameServer.World
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// The despawn / "entity left your view" packet - n3ToClientQuit (0x04B82B2D). DECODED 2026-06-11 from all 3271
 	// retail records (server->client only); see protocol_despawn_n3toclientquit. The 0x2000 IIR body is:

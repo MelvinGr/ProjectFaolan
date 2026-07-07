@@ -6,7 +6,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Faolan.GameServer.World
+namespace Faolan.Core.Network.Codecs.GameServer
 {
     // ScryScriptIIR (0xA36D3B74) — the Tortage destiny/tutorial STEP driver (the "QuestRewards" of the
     // opcode catalog is a misnomer; #91 / #149). Server→client it pushes a named scripted step the client's

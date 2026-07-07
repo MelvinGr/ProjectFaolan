@@ -9,6 +9,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

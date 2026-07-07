@@ -9,6 +9,7 @@ using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Xunit;
 using Xunit.Sdk;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

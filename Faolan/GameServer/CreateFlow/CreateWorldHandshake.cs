@@ -6,6 +6,7 @@ using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.CreateFlow
 {

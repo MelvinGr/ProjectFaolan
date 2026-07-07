@@ -7,6 +7,7 @@ using Faolan.Core.Network.Conan;
 using Faolan.GameServer.World;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Importer.Captures
 {

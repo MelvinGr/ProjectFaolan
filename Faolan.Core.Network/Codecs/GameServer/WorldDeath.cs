@@ -1,7 +1,7 @@
 using System.Numerics;
 using Faolan.Core;
 
-namespace Faolan.GameServer.World
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// SimpleCharKilledByUpdateIIR (0xB066AFC2) - the explicit "this entity died" trigger. A health=0 StatUpdate
 	// alone does NOT drive the client's death animation / dead (release-screen) state (docs/combat.md, #204/#214);

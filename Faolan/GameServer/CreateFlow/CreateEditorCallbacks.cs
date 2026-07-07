@@ -10,6 +10,7 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.CreateFlow
 {
