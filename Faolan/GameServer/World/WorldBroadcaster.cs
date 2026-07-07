@@ -162,7 +162,7 @@ namespace Faolan.GameServer.World
                     QuestTextSlot.RegionName,
                     QuestTextSlot.MapName
                 }
-                .Select(s => Record(def, s))
+                .Select(s => WorldBroadcastBodies.Record(def, s))
                 .ToArray();
             var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance,
                 def.QuestId,
@@ -174,8 +174,8 @@ namespace Faolan.GameServer.World
                 def.MapId,
                 def.MarkerX,
                 def.MarkerY,
-                Record(def, QuestTextSlot.Objective),
-                Record(def, QuestTextSlot.ObjectiveLocalized));
+                WorldBroadcastBodies.Record(def, QuestTextSlot.Objective),
+                WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
             return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
         }
@@ -743,7 +743,7 @@ namespace Faolan.GameServer.World
                 {
                     entity.PatrolWaypoints = patrol.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.PositionX, w.PositionY, w.PositionZ)).ToList();
                     entity.PatrolSpeed = patrol.Speed;
-                    entity.PatrolBody = ReaddressPatrol(patrol.Body, handle, entity.Position);
+                    entity.PatrolBody = WorldBroadcastBodies.ReaddressPatrol(patrol.Body, handle, entity.Position);
                     entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
                     entity.ArmPatrolCycle();
                 }
@@ -905,11 +905,11 @@ namespace Faolan.GameServer.World
             var first = definitions[0];
             var areaHeader = new[]
             {
-                Record(first, QuestTextSlot.AreaTitle),
-                Record(first, QuestTextSlot.MapName),
-                Record(first, QuestTextSlot.RegionName)
+                WorldBroadcastBodies.Record(first, QuestTextSlot.AreaTitle),
+                WorldBroadcastBodies.Record(first, QuestTextSlot.MapName),
+                WorldBroadcastBodies.Record(first, QuestTextSlot.RegionName)
             };
-            var entries = definitions.Select(d => new WorldQuest.JournalEntry(d.QuestId, Record(d, QuestTextSlot.Title), Record(d, QuestTextSlot.ListSubLine))).ToList();
+            var entries = definitions.Select(d => new WorldQuest.JournalEntry(d.QuestId, WorldBroadcastBodies.Record(d, QuestTextSlot.Title), WorldBroadcastBodies.Record(d, QuestTextSlot.ListSubLine))).ToList();
             var trailing = WorldQuest.BuildTrackedQuestPointer();
 
             var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
@@ -922,7 +922,7 @@ namespace Faolan.GameServer.World
         // player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
         public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
         {
-            var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds, Record(trackedDef, QuestTextSlot.AreaTitle));
+            var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds, WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
             return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
         }
 
@@ -1467,7 +1467,7 @@ namespace Faolan.GameServer.World
             if (!WorldObjectBuilder.BuildFromScratch(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
                 return null;
 
-            body = SpliceLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1
+            body = WorldBroadcastBodies.SpliceLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1
 
             var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
             bag.InstanceId = instanceId; // the bag lives in the same map COPY as whatever dropped it (#268)
@@ -1516,32 +1516,6 @@ namespace Faolan.GameServer.World
             return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
         }
 
-        // Re-address a captured MoveTask record to a live NPC: swap in its wire handle and set the from-position to its
-        // spawn (the render-gate requires the MoveTask's from to match the spawn the client was just sent). The captured
-        // form (speed/flags/list structure) is preserved verbatim - that is what makes the client walk the route.
-        private static byte[] ReaddressPatrol(byte[] capturedBody, uint handle, Vector3 from)
-        {
-            var task = MoveTaskComposite.Parse(capturedBody);
-            task.Handle = handle;
-            task.FromX = BitConverter.SingleToUInt32Bits(from.X);
-            task.FromY = BitConverter.SingleToUInt32Bits(from.Y);
-            task.FromZ = BitConverter.SingleToUInt32Bits(from.Z);
-            return task.Encode();
-        }
-
-        // A QuestTextRef -> on-wire text record (remoteformat/localized). Missing slots fall back to an empty
-        // remoteformat so the framing stays valid (the client just renders nothing for that slot).
-        private static byte[] Record(QuestDefinition def, QuestTextSlot slot)
-        {
-            var r = def.TextRefs.FirstOrDefault(t => t.Slot == slot);
-            if (r == null)
-                return WorldQuest.RemoteFormat(0, 0, "");
-
-            return r.IsLocalized
-                ? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText ?? "")
-                : WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText ?? "");
-        }
-
         // DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch
         // (same framing as the static create-editor marker burst).
         private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state)
@@ -1554,47 +1528,6 @@ namespace Faolan.GameServer.World
                 .WriteUInt32(npcHandle)
                 .WriteByte(state)
                 .SendAsync(client);
-        }
-
-        // Splices the bag's ACTUAL contents (cash + rolled items) into a loot-bag body built from the captured
-        // template, so the client shows them in the loot window. The client reads the item list from the
-        // LootBagFullUpdateIIR body it already has - there is NO separate contents packet (hoxxling gameplay capture:
-        // only DispatchOpenLootBag 0x2037 + the loot-ack 0x2038, no DispatchReplyLootForCharacter). Keeps the
-        // template's inventory ENVELOPE (id/size) and swaps only the items + cash, via the proven LootBagMessageCodec.
-        // Per-item ids are synthetic (display only - the grant is server-side from WorldEntity.LootItems). Returns the
-        // body unchanged if the contents blob can't be located (the window then just shows empty, as before). Takes the
-        // already-resolved buildable loot at EXPLICIT display positions so the display Pos == the LootItems index the
-        // single-drag take uses; the caller keeps the two in lockstep. A re-render after a partial take passes the
-        // remaining items at their ORIGINAL Pos (with gaps for looted slots), so the client's stable Pos stays valid.
-        private static byte[] SpliceLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<(uint Pos, Item Item)> entries)
-        {
-            if (body.Length <= 8 || !LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out var contentsStart))
-                return body;
-
-            contents.Cash = cash;
-            contents.Inventory.Items.Clear();
-            uint maxPos = 0;
-            foreach (var (pos, item) in entries)
-            {
-                var guid = ((ulong)handle << 16) | pos; // synthetic per-instance id (display only)
-                contents.Inventory.Items.Add(SnapshotItemBuilder.BuildListEntry(pos, guid, guid, 1, item, item.Hash));
-                maxPos = Math.Max(maxPos, pos);
-            }
-
-            // Fixed loot-bag capacity (the captured "Chest" bag carried MaxSize=10 regardless of item count, items at
-            // Pos 0..n-1). Sizing it to the exact item count truncated the window by one slot (the off-by-one that hid
-            // the last item + shifted the drag index); use the captured capacity, widened if a bag ever holds more.
-            contents.Inventory.MaxSize = entries.Count > 0
-                ? Math.Max(10u, maxPos + 1)
-                : 10u;
-
-            var newContents = LootBagMessageCodec.BuildContents(contents);
-            var newRecordLen = contentsStart + newContents.Length;
-            var result = new byte[8 + newRecordLen];
-            body.AsSpan(0, 8 + contentsStart).CopyTo(result); // [u32 len][u32 subOpcode][identity + kd-tree]
-            newContents.CopyTo(result.AsSpan(8 + contentsStart)); // the new [u32 len][ProtoLootBagIIR] tail
-            BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
-            return result;
         }
 
         // The components of a player's Move, forwarded verbatim to other viewers (only the receiver differs).

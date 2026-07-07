@@ -1,0 +1,71 @@
+using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+
+namespace Faolan.Core.Network.Codecs.GameServer
+{
+	// Pure wire-body transforms extracted from WorldBroadcaster (they take captured/DB inputs, no world state): the
+	// patrol re-address, a QuestTextRef -> on-wire record, and the loot-bag contents splice. The broadcaster keeps
+	// the interest/send orchestration; these are the byte construction it forwards.
+	public static class WorldBroadcastBodies
+	{
+		// Re-addresses a captured MoveTask patrol body to a live handle + from-position (byte-exact round-trip).
+		public static byte[] ReaddressPatrol(byte[] capturedBody, uint handle, Vector3 from)
+		{
+			var task = MoveTaskComposite.Parse(capturedBody);
+			task.Handle = handle;
+			task.FromX = BitConverter.SingleToUInt32Bits(from.X);
+			task.FromY = BitConverter.SingleToUInt32Bits(from.Y);
+			task.FromZ = BitConverter.SingleToUInt32Bits(from.Z);
+			return task.Encode();
+		}
+
+		// A QuestTextRef -> on-wire text record (remoteformat/localized). Missing slots fall back to an empty
+		// remoteformat so the framing stays valid (the client just renders nothing for that slot).
+		public static byte[] Record(QuestDefinition def, QuestTextSlot slot)
+		{
+			var r = def.TextRefs.FirstOrDefault(t => t.Slot == slot);
+			if (r == null)
+				return WorldQuest.RemoteFormat(0, 0, "");
+
+			return r.IsLocalized
+				? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText ?? "")
+				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText ?? "");
+		}
+
+		// Splices the bag's ACTUAL contents (cash + rolled items) into a loot-bag body built from the captured
+		// template, keeping the inventory ENVELOPE and swapping only items + cash via LootBagMessageCodec. Per-item
+		// ids are synthetic (display only). Returns the body unchanged if the contents blob can't be located.
+		public static byte[] SpliceLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<(uint Pos, Item Item)> entries)
+		{
+			if (body.Length <= 8 || !LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out var contentsStart))
+				return body;
+
+			contents.Cash = cash;
+			contents.Inventory.Items.Clear();
+			uint maxPos = 0;
+			foreach (var (pos, item) in entries)
+			{
+				var guid = ((ulong)handle << 16) | pos; // synthetic per-instance id (display only)
+				contents.Inventory.Items.Add(SnapshotItemBuilder.BuildListEntry(pos, guid, guid, 1, item, item.Hash));
+				maxPos = Math.Max(maxPos, pos);
+			}
+
+			contents.Inventory.MaxSize = entries.Count > 0
+				? Math.Max(10u, maxPos + 1)
+				: 10u;
+
+			var newContents = LootBagMessageCodec.BuildContents(contents);
+			var newRecordLen = contentsStart + newContents.Length;
+			var result = new byte[8 + newRecordLen];
+			body.AsSpan(0, 8 + contentsStart).CopyTo(result); // [u32 len][u32 subOpcode][identity + kd-tree]
+			newContents.CopyTo(result.AsSpan(8 + contentsStart)); // the new [u32 len][ProtoLootBagIIR] tail
+			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
+			return result;
+		}
+	}
+}
