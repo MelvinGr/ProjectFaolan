@@ -23,6 +23,7 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer
 {

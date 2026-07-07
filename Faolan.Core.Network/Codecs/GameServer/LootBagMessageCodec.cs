@@ -4,7 +4,7 @@ using System.IO;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Typed codec for the LootBagFullUpdateIIR (0xF096251E) CONTENTS message - the loot bag's cash + looter handles +
 	// item inventory (#187). The reader was decoded by vtable-xref (docs/iir-subclass-readers.md, FUN_007a3db0):

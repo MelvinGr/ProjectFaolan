@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.GameServer.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.Combat
 {

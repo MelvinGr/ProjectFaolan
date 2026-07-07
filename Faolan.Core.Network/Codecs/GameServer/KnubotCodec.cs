@@ -2,9 +2,8 @@ using System.Collections.Generic;
 using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
-using Faolan.GameServer.World;
 
-namespace Faolan.GameServer.Dialogue
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Construct-side codecs for the server->client Knubot conversation records (#188, docs/iir-readers-conversation-misc.md).
 	// The Knubot carrier nests BOTH conversation endpoints: the player is the IIR carrier handle (`instance`), and the

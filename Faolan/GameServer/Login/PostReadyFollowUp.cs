@@ -14,6 +14,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

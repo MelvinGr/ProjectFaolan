@@ -8,6 +8,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
+using Faolan.Core.Network.Codecs.GameServer;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer

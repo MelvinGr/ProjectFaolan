@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.Combat
 {

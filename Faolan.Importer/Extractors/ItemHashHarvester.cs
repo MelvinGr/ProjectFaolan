@@ -13,6 +13,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using Faolan.Core.Network.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Importer.Extractors
 {

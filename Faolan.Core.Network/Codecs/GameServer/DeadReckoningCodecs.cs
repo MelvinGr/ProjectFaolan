@@ -6,7 +6,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Codecs;
 
-namespace Faolan.GameServer.World
+namespace Faolan.Core.Network.Codecs.GameServer
 {
 	// Construct-side codecs for the dead-reckoning movement records (#190), decoded in docs/chardcmove-grammar.md.
 	// These are the per-tick movement broadcasts an entity streams; they complement MoveTaskCodec (the path/transform

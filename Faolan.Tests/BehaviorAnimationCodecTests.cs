@@ -1,6 +1,7 @@
 using System;
 using Faolan.GameServer.Combat;
 using Xunit;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

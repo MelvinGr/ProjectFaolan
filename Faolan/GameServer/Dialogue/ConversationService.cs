@@ -15,6 +15,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.GameServer.Dialogue
 {

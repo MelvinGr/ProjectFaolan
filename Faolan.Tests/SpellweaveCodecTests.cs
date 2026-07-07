@@ -2,6 +2,7 @@ using System;
 using Faolan.Core.Enums;
 using Faolan.GameServer.Combat;
 using Xunit;
+using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {
