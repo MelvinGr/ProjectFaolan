@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core;
 using Faolan.Core.Network.Packets;
 using Xunit;
 
@@ -33,6 +34,12 @@ namespace Faolan.Tests
 			var body = NewLevelIirCodec.Build(0x01316d8a, 2, deltas);
 
 			Assert.Equal(L1ToL2Ding, Convert.ToHexStringLower(body));
+
+			// ICodec round-trip: Read recovers level + the 6 deltas and rebuilds byte-for-byte.
+			var rt = NewLevelIirCodec.Message.Read(new FaolanStream(body));
+			Assert.Equal(2u, rt.NewLevel);
+			Assert.Equal(new uint[] { 168, 100, 340, 1, 8, 0 }, rt.Deltas);
+			Assert.Equal(body, rt.ToArray());
 		}
 	}
 }

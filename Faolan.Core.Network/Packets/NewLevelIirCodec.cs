@@ -31,24 +31,53 @@ namespace Faolan.Core.Network.Packets
 		// Full-control build (the golden test reproduces the captured deltas). `deltas` is padded/truncated to 6.
 		public static byte[] Build(uint instance, uint newLevel, ReadOnlySpan<uint> deltas)
 		{
-			var content = new FaolanStream();
-			content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(instance).WriteByte(LeadFlag).WriteUInt32(newLevel);
-			for (var i = 0; i < DeltaCount; i++)
-				content.WriteUInt32(i < deltas.Length
-					? deltas[i]
-					: 0u);
-
-			var body = content.ToArray();
-			var s = new FaolanStream();
-			s.WriteUInt32(body.Length);
-			s.WriteArray(body);
-			return s.ToArray();
+			var d = new uint[DeltaCount];
+			for (var i = 0; i < DeltaCount && i < deltas.Length; i++)
+				d[i] = deltas[i];
+			return new Message(instance, newLevel, d).ToArray();
 		}
 
 		// Live path: the new level with an empty (all-zero) delta summary - enough to fire the banner + effect.
-		public static byte[] Build(uint instance, uint newLevel)
+		public static byte[] Build(uint instance, uint newLevel) => Build(instance, newLevel, ReadOnlySpan<uint>.Empty);
+
+		// The NewLevelIIR_t body as a self-serializing codec (ICodec): Write frames the whole
+		// [len][subop][marker][instance][lead][newLevel][6 deltas]; Read recovers the fields. Deltas is always 6 words.
+		public sealed record Message(uint Instance, uint NewLevel, uint[] Deltas) : ICodec<Message>
 		{
-			return Build(instance, newLevel, ReadOnlySpan<uint>.Empty);
+			public byte[] ToArray()
+			{
+				using var s = new FaolanStream();
+				Write(s);
+				return s.ToArray();
+			}
+
+			public void Write(FaolanStream s)
+			{
+				var content = new FaolanStream();
+				content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt32(NewLevel);
+				for (var i = 0; i < DeltaCount; i++)
+					content.WriteUInt32(i < Deltas.Length
+						? Deltas[i]
+						: 0u);
+
+				var body = content.ToArray();
+				s.WriteUInt32(body.Length);
+				s.WriteArray(body);
+			}
+
+			public static Message Read(FaolanStream s)
+			{
+				s.ReadUInt32(); // len
+				s.ReadUInt32(); // subop (0x6D314743)
+				s.ReadUInt32(); // 0xC350 marker
+				var instance = s.ReadUInt32();
+				s.ReadArray(1); // lead flag 0x00
+				var newLevel = s.ReadUInt32();
+				var deltas = new uint[DeltaCount];
+				for (var i = 0; i < DeltaCount; i++)
+					deltas[i] = s.ReadUInt32();
+				return new Message(instance, newLevel, deltas);
+			}
 		}
 	}
 }

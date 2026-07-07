@@ -19,16 +19,39 @@ namespace Faolan.Core.Network.Packets
 		private const uint IirMarker = EntityClass.Character;
 		private const ushort AddFlag = 0x0001;
 
-		public static byte[] Build(uint instance, uint comboId)
-		{
-			var content = new FaolanStream();
-			content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(instance).WriteUInt16(AddFlag).WriteUInt32(comboId);
+		public static byte[] Build(uint instance, uint comboId) => new Message(instance, comboId).ToArray();
 
-			var body = content.ToArray();
-			var s = new FaolanStream();
-			s.WriteUInt32(body.Length);
-			s.WriteArray(body);
-			return s.ToArray();
+		// The ComboBookIIR body as a self-serializing codec (ICodec): Write frames the whole
+		// [len][subop][marker][instance][addFlag][comboId]; Read recovers the (instance, comboId).
+		public sealed record Message(uint Instance, uint ComboId) : ICodec<Message>
+		{
+			public byte[] ToArray()
+			{
+				using var s = new FaolanStream();
+				Write(s);
+				return s.ToArray();
+			}
+
+			public void Write(FaolanStream s)
+			{
+				var content = new FaolanStream();
+				content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId);
+
+				var body = content.ToArray();
+				s.WriteUInt32(body.Length);
+				s.WriteArray(body);
+			}
+
+			public static Message Read(FaolanStream s)
+			{
+				s.ReadUInt32(); // len
+				s.ReadUInt32(); // subop (0xA8BBEB7F)
+				s.ReadUInt32(); // 0xC350 marker
+				var instance = s.ReadUInt32();
+				s.ReadUInt16(); // add flag 0x0001
+				var comboId = s.ReadUInt32();
+				return new Message(instance, comboId);
+			}
 		}
 	}
 }
