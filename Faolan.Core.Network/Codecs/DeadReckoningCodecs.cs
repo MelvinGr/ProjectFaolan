@@ -130,13 +130,7 @@ namespace Faolan.Core.Network.Codecs
 			return r;
 		}
 
-		internal static byte[] WithLength(byte[] body)
-		{
-			var s = new FaolanStream();
-			s.WriteUInt32(body.Length);
-			s.WriteArray(body);
-			return s.ToArray();
-		}
+		internal static byte[] WithLength(byte[] body) => new FaolanStream().WriteArrayUInt32Length(body).ToArray();
 	}
 
 	// StopIIR_c (0xD751EBB4) - the move-stop record: final position + a 4-float facing/orientation (FUN_00a34700,

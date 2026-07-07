@@ -30,12 +30,8 @@ namespace Faolan.Core.Network.Codecs
 
 			public void Write(FaolanStream s)
 			{
-				var content = new FaolanStream();
-				content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId);
-
-				var body = content.ToArray();
-				s.WriteUInt32(body.Length);
-				s.WriteArray(body);
+				s.WriteArrayUInt32Length(content =>
+					content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId));
 			}
 
 			public static Message Read(FaolanStream s)

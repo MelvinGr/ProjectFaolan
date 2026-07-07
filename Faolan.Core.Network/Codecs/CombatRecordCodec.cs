@@ -26,8 +26,8 @@ namespace Faolan.Core.Network.Codecs
 
 			public void Write(FaolanStream s)
 			{
-				var body = new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Value).ToArray();
-				s.WriteUInt32(body.Length).WriteArray(body);
+				s.WriteArrayUInt32Length(body =>
+					body.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Value));
 			}
 
 			public static Message Read(FaolanStream s)
@@ -57,8 +57,8 @@ namespace Faolan.Core.Network.Codecs
 
 			public void Write(FaolanStream s)
 			{
-				var body = new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag).ToArray();
-				s.WriteUInt32(body.Length).WriteArray(body);
+				s.WriteArrayUInt32Length(body =>
+					body.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag));
 			}
 
 			public static Message Read(FaolanStream s)
@@ -92,7 +92,7 @@ namespace Faolan.Core.Network.Codecs
 
 			public void Write(FaolanStream s)
 			{
-				var body = new FaolanStream()
+				s.WriteArrayUInt32Length(body => body
 					.WriteUInt32(SubOpcode)
 					.WriteUInt32(IirMarker)
 					.WriteUInt32(Handle)
@@ -100,9 +100,7 @@ namespace Faolan.Core.Network.Codecs
 					.WriteByte(Flag)
 					.WriteUInt32(Marker)
 					.WriteUInt32(Target)
-					.WriteUInt32(Count)
-					.ToArray();
-				s.WriteUInt32(body.Length).WriteArray(body);
+					.WriteUInt32(Count));
 			}
 
 			public static Message Read(FaolanStream s)
@@ -145,11 +143,12 @@ namespace Faolan.Core.Network.Codecs
 
 			public void Write(FaolanStream s)
 			{
-				var c = new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env);
-				foreach (var w in Words)
-					c.WriteUInt32(w);
-				var body = c.ToArray();
-				s.WriteUInt32(body.Length).WriteArray(body);
+				s.WriteArrayUInt32Length(c =>
+				{
+					c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env);
+					foreach (var w in Words)
+						c.WriteUInt32(w);
+				});
 			}
 
 			public static Message Read(FaolanStream s)

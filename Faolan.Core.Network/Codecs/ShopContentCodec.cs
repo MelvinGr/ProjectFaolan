@@ -132,8 +132,7 @@ namespace Faolan.Core.Network.Codecs
 				s.WriteUInt32(ShopInstance);
 				s.WriteUInt32(CharacterWireType);
 				s.WriteUInt32(NpcHandle);
-				s.WriteUInt32((uint)proto.Length);
-				s.WriteArray(proto);
+				s.WriteArrayUInt32Length(proto);
 			}
 
 			public static ShopContent Read(FaolanStream s)

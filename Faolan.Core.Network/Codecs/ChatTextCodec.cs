@@ -42,12 +42,8 @@ namespace Faolan.Core.Network.Codecs
 
 			public void Write(FaolanStream s)
 			{
-				var content = new FaolanStream();
-				content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt16(Xml.Length).WriteArray(Xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord);
-
-				var body = content.ToArray();
-				s.WriteUInt32(body.Length);
-				s.WriteArray(body);
+				s.WriteArrayUInt32Length(content =>
+					content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt16(Xml.Length).WriteArray(Xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord));
 			}
 
 			public static Message Read(FaolanStream s)

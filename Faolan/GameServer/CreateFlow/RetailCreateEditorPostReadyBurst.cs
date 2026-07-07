@@ -51,8 +51,7 @@ namespace Faolan.GameServer.CreateFlow
 			var body = GameActionListCodec.BuildBody(id, dynel, 0u, actionTail);
 			return new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, agentSub), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteUInt32(body.Length)
-				.WriteArray(body)
+				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
 
