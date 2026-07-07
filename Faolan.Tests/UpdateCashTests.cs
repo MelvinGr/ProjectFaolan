@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using Faolan.Core;
 using Faolan.GameServer;
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 		public void UpdateCashBody_Matches_CapturedFirstCoinLoot()
 		{
 			var s = new FaolanStream();
-			GameServerListener.WriteUpdateCashBody(s, 2, UpdateCashReason.Gain);
+			UpdateCashBody.WriteUpdateCashBody(s, 2, UpdateCashReason.Gain);
 
 			Assert.Equal("000000000000000200000003", Convert.ToHexStringLower(s.ToArray()));
 		}
@@ -23,7 +24,7 @@ namespace Faolan.Tests
 		{
 			// The demol80 capture shows a DECREASED balance with reason 0 (a purchase): 0x2638 after 0x26E8.
 			var s = new FaolanStream();
-			GameServerListener.WriteUpdateCashBody(s, 0x2638, UpdateCashReason.Spend);
+			UpdateCashBody.WriteUpdateCashBody(s, 0x2638, UpdateCashReason.Spend);
 
 			Assert.Equal("000000000000263800000000", Convert.ToHexStringLower(s.ToArray()));
 		}

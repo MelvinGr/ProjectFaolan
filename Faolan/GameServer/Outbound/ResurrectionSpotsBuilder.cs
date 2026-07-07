@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Network.Codecs.GameServer;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -26,11 +27,8 @@ namespace Faolan.GameServer
 	// only ever carried ONE spot, so the multi-spot list framing is not pinned - we send one (the closest known point).
 	public partial class GameServerListener
 	{
-		private const uint ResSpotConstA = 0x0000C7A0;
-		private const uint ResSpotConstB = 0x0000000A;
 
 		// Capture-derived constants whose semantics aren't decoded yet (same in both captured deaths).
-		private const uint ResSpotsHeader = 0x000007E2;
 
 		// Sender is GameCharAgent at instance 0x59 (NB: NOT 0x58 like the add/remove-item LoginWorld201CSender).
 		private static readonly byte[] ResurrectionSpotsSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
@@ -40,26 +38,9 @@ namespace Faolan.GameServer
 		{
 			var ps = new PacketStream();
 			ps.WriteHeader(ResurrectionSpotsSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
-			WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
+			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
 			return ps.SendAsync(client);
 		}
 
-		internal static void WriteValidResurrectionSpotsBody(FaolanStream s, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
-		{
-			s.WriteVector3(deathPosition);
-			s.WriteUInt32(ResSpotsHeader);
-
-			foreach (var spot in spots)
-			{
-				s.WriteFloat(spot.PositionX).WriteFloat(spot.PositionY).WriteFloat(spot.PositionZ);
-				s.WriteUInt32(ResSpotConstA);
-				s.WriteUInt32(spot.MapId);
-				s.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0);
-				s.WriteUInt32(spot.Id); // the spawnPointId the client echoes back in RespawnMe
-				s.WriteUInt32(ResSpotConstB);
-			}
-
-			s.WriteByte(0x00);
-		}
 	}
 }

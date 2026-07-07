@@ -6,6 +6,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core.Network.Protobuf;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
@@ -148,20 +149,9 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchAddItem);
-			WriteAddItemBody(ps, containerType, charId, itemPos, SerializeInventoryEntry(entry), feedback);
+			AddItemBody.WriteAddItemBody(ps, containerType, charId, itemPos, AddItemBody.SerializeInventoryEntry(entry), feedback);
 			await ps.SendAsync(client);
 		}
 
-		internal static byte[] SerializeInventoryEntry(ProtoInventoryGameEntry entry)
-		{
-			using var ms = new MemoryStream();
-			Serializer.Serialize(ms, entry);
-			return ms.ToArray();
-		}
-
-		internal static void WriteAddItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, byte[] entry, uint feedback = 0)
-		{
-			s.WriteUInt32(containerType).WriteUInt32(charId).WriteUInt32(itemPos).WriteArrayUInt32Length(entry).WriteUInt32(feedback);
-		}
 	}
 }

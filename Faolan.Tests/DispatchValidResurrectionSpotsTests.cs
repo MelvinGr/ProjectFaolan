@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using System.Numerics;
 using Faolan.Core;
@@ -29,7 +30,7 @@ namespace Faolan.Tests
 			};
 
 			var s = new FaolanStream();
-			GameServerListener.WriteValidResurrectionSpotsBody(s, deathPosition, [spot]);
+			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(s, deathPosition, [spot]);
 
 			Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
 		}

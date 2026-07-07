@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -69,12 +70,12 @@ namespace Faolan.Tests
 						new SnapshotItemBuilder.ItemStat(23, (uint)RecordId),
 						new SnapshotItemBuilder.ItemStat(46, 7)
 					]);
-				var entryBytes = GameServerListener.SerializeInventoryEntry(entry);
+				var entryBytes = AddItemBody.SerializeInventoryEntry(entry);
 				Assert.Equal(CapturedEntry, Convert.ToHexStringLower(entryBytes));
 
 				// 2) The full method body framing around that entry.
 				var s = new FaolanStream();
-				GameServerListener.WriteAddItemBody(s, GameServerListener.InventoryContainerBackpack, CharId, ItemPos, entryBytes);
+				AddItemBody.WriteAddItemBody(s, GameServerListener.InventoryContainerBackpack, CharId, ItemPos, entryBytes);
 				Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
 			}
 			finally

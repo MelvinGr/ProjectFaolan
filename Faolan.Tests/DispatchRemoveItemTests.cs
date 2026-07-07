@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using Faolan.Core;
 using Faolan.GameServer;
@@ -21,7 +22,7 @@ namespace Faolan.Tests
 		public void RemoveItemBody_EncodesFields()
 		{
 			var s = new FaolanStream();
-			GameServerListener.WriteRemoveItemBody(s, GameServerListener.InventoryContainerBackpack, CharId, 5, 2);
+			RemoveItemBody.WriteRemoveItemBody(s, GameServerListener.InventoryContainerBackpack, CharId, 5, 2);
 			var body = s.ToArray();
 
 			Assert.Equal(16, body.Length);
@@ -36,7 +37,7 @@ namespace Faolan.Tests
 		public void RemoveItemBody_MatchesCapture()
 		{
 			var s = new FaolanStream();
-			GameServerListener.WriteRemoveItemBody(s, EquippedContainer, CharId, 0, 0);
+			RemoveItemBody.WriteRemoveItemBody(s, EquippedContainer, CharId, 0, 0);
 
 			Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
 		}

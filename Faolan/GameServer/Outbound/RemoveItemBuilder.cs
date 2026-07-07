@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
@@ -48,13 +49,9 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchRemoveItem);
-			WriteRemoveItemBody(ps, containerType, charId, itemPos, amountToRemove);
+			RemoveItemBody.WriteRemoveItemBody(ps, containerType, charId, itemPos, amountToRemove);
 			await ps.SendAsync(client);
 		}
 
-		internal static void WriteRemoveItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, uint amountToRemove)
-		{
-			s.WriteUInt32(containerType).WriteUInt32(charId).WriteUInt32(itemPos).WriteUInt32(amountToRemove);
-		}
 	}
 }
