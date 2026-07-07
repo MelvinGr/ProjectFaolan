@@ -90,3 +90,90 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 - **`docs/`** — per-subsystem deep-dives (protocol decoding, reverse-engineering methodology, capture workflow);
   `docs/archive/` holds resolved plans and handoffs.
 - **`Faolan.Wireshark/README.md`** — building and using the dissector plugin.
+
+## Feature status
+
+Where things stand, by subsystem. This is a research/preservation project, so "works" means *reproduced
+byte-for-byte against a retail capture and (usually) confirmed in-client* — not production-hardened. Open work
+is tracked as Gitea issues; the `#NNN` refs point there.
+
+**Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
+
+### Connection & session
+- ✅ Login / auth — Diffie–Hellman + TEA-CBC handshake (any password is accepted until the client is key-patched)
+- ✅ Service handoff — `UniverseAgent → PlayerAgent → GameServer`
+- ✅ Character roster, selection, and existing-character world entry
+- ✅ Character creation — the create-editor flow (appearance/morphs, race/sex gating, the Casilda tableau)
+- 🟡 Create→world intro cutscene — plays, and Kalanthes speaks (stock-phrase response decoded); some scene
+  actors are still verbatim capture bytes (blocked on clean per-type captures, #234 / #185)
+
+### World & simulation
+- ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
+- ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes
+- 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
+  client-side movement jitter (#272)
+- 🟡 Per-map playfield token — one consistent token works everywhere; the *authentic* per-instance id is
+  session-dynamic runtime state and not reproducible (#305)
+- 🟡 Playfield instancing — world keyed by `(mapId, instanceId)`; no per-map Solo instance yet (#268)
+
+### Combat
+- ✅ Melee attack FSM, weapon draw, damage, vitals; spell-cast FSM; threat / hate list
+- ✅ Death window + resurrect/respawn
+- ✅ Buff application, damage-over-time, and buff-expiry lifecycle (timers)
+- 🟡 Debuff icon-clear at 0 + non-health effect application — built, awaits in-client confirm (#274)
+- 🟡 Spell cooldowns — client-side semantics fully RE'd; the server-authored builder is capture-blocked (#271)
+- 🟡 Spellweaving (necromancer) — byte-exact builders; energy-bar drop still open (#141)
+- 🟡 Combat shields — server-side broadcast exists; the client guard-arc render is not yet decoded (#20)
+- ⬜ Directional combat + defensive shield arcs ("real combat", #20) · Fatalities (#140)
+
+### Character progression
+- ✅ Learned-spell grant on login; level-up spell / ability / combo grants; starting abilities & combos
+- 🟡 Combos persist across relog — fixed, awaits in-client confirm (#299)
+- 🟡 XP curve — provisional ramp; real thresholds only partially harvested (#297)
+- 🟡 Class spell/combo catalog data — sparse (#296) · abilities panel completeness — mount/travel/class-inherent
+  abilities are client-RDB-derived (#303) · a few spellbook entries render nameless (granted variant id, #300)
+- ⬜ Feat trees / talent system — the spell↔feat map is server-GDB-only, not in the RDB (#251, blocks #298)
+- ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144) ·
+  ranger tracking (#145)
+
+### Items & economy
+- ✅ Inventory (DB containers, equip, move, starting gear)
+- ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
+- 🟡 Shop-OPEN trigger — decoded flow implemented, awaits in-client confirm (#134)
+- 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — grammar decoded, one disambiguation left (#3)
+- 🟡 Data-driven item-use categorization — currently a per-id map (#207) · guild bank — bodies uncaptured (#132)
+- ⬜ Tradeskills: gathering nodes + crafting professions (#148) · worn-only "bag-poison" item rendering (#14)
+
+### Social & guilds
+- ✅ Chat — local say, channels, system, whisper (plus a live "Claude" MCP channel)
+- ✅ Guild create, invite/accept, tag, renown
+- 🟡 Guild-create no-relog window (`DispatchGuildCreated 0x2044`) (#306) · member kick/promote/demote fan-out (#104)
+- ⬜ Friends list + presence (#99, #100) · player↔player trade, quest sharing, team quests (#101)
+
+### Quests & dialogue
+- ✅ Quest state model (kill / loot / talk goals), journal, the Casilda Tortage intro chain (kill→loot→free→follow)
+- ✅ NPC conversations — Knubot stage machine, routed by NPC name
+- 🟡 Escort-arrival completion (#262) · turn-in / reward dialog content (#260) · Lua quest-VM live wiring
+- ⬜ Tortage day/night destiny phasing (#149)
+
+### Mounts & pets
+- ✅ Necromancer pets/minions — `.pet`, type-based spawn + follow
+- 🟡 Mounts — a mount is a player-cast summon spell; needs the cast FSM wired to the summon (#26)
+- ⬜ Mounted combat (#142)
+
+### Appearance & rendering (Faolan.Web)
+- ✅ 3D character/equipment viewer + armory; RDB mesh / texture / skeleton / animation extraction; morphs & auto-dress
+- 🟡 Authentic RDB animations play in the viewer — awaits a visual eyeball (#292) · body atlas gutter dilation
+  (#294) · MIXD detail/AO map into the material (#293) · animation mesh-stretch fix (#302)
+- 🟡 Client-side render bugs (our wire is correct): create-editor face tattoo (#240), min-height floating hair (#288)
+- 🟡 Polished localized appearance names (hair, …) — the LDB id→index map is EXE-gated (#291)
+- ⬜ RDB write-back: inline CDN resources + optional texture upscale/replace (#295, parked)
+
+### Massive / endgame (not started)
+- ⬜ Minigames & massive PvP (#146) · sieges / battlekeeps / guild cities (#147)
+
+### Tooling
+- ✅ Importer (captures + client RDB → `faolan.db`) · Wireshark dissector · unattended ClientLauncher ·
+  in-process MCP server · content-CDN mirror
+- 🟡 Automated in-client verification harness — `Faolan.ClientHook` injection built; the assertion layer is
+  partial (#195)
