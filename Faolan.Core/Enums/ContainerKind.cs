@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network.FullCharSnapshot
+namespace Faolan.Core.Enums
 {
     public enum ContainerKind : uint
     {

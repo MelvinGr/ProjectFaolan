@@ -1,9 +1,9 @@
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
@@ -11,8 +11,6 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using Faolan.Core.Network.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Importer.Extractors
 {

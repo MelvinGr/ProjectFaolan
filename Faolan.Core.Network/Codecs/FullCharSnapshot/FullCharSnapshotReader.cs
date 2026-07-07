@@ -1,10 +1,9 @@
-using Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Faolan.Core.Network.FullCharSnapshot;
 
 namespace Faolan.Core.Network.Codecs.GameServer.FullCharSnapshot
 {
