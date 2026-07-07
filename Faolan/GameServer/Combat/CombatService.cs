@@ -29,7 +29,6 @@ namespace Faolan.GameServer.Combat
     {
         // The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
         // (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
-        internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
 
         // Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
         // keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
@@ -60,25 +59,6 @@ namespace Faolan.GameServer.Combat
             _logger = logger;
             _announceAddSpecialAbility = announceAddSpecialAbility;
             _learnSpell = learnSpell;
-        }
-
-        // Builds the BCC behavior echo a VIEWER should receive to render this actor's swing/cast: the same plain
-        // echo-ack body the actor's own client gets (instance = the actor's handle, args + phase, request tail), which
-        // is exactly what retail relays to nearby players (other-players-visible capture: s2c BCC for other-player
-        // handles, structurally identical to the self-echo - NOT the targeted result-block ack). The caller broadcasts
-        // it via WorldBroadcaster.BroadcastBehaviorToViewers. Null for a malformed payload. Phase = the request's Mode
-        // (non-zero for real attacks/casts); 1 as a defensive fallback so we never touch the actor's ack counter here.
-        public byte[] BuildBehaviorRelayBody(INetworkClient actor, byte[] rawPayload, uint mode)
-        {
-            if (rawPayload.Length < 26)
-                return null;
-
-            var instance = actor.Session.Account.ClientInstance;
-            return BuildBehaviorEchoAckBody(rawPayload,
-                instance,
-                mode != 0
-                    ? mode
-                    : 1u);
         }
 
         // The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
@@ -129,7 +109,7 @@ namespace Faolan.GameServer.Combat
             var phase = mode != 0
                 ? mode
                 : (uint)(++client.Session.NormalAttackAckPhase);
-            return SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+            return SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, phase));
         }
 
         // The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
@@ -149,7 +129,7 @@ namespace Faolan.GameServer.Combat
             if (rawPayload.Length < 26)
                 return;
 
-            await SendWorldPacket(client, BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
+            await SendWorldPacket(client, BehaviorAckBody.BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
         }
 
         // The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -199,11 +179,11 @@ namespace Faolan.GameServer.Combat
             var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
             if (!hasEnemyTarget)
             {
-                await SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+                await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, phase));
                 return;
             }
 
-            var echoedArgs = InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
+            var echoedArgs = BehaviorAckBody.InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
             var level = client.Session.Character?.Level ?? 1;
             var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, level);
             var next = (ushort)(seq + 1);
@@ -303,7 +283,7 @@ namespace Faolan.GameServer.Combat
                 return;
 
             var instance = client.Session.Account.ClientInstance;
-            await SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, mode));
+            await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, mode));
 
             var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
             if (!hasEnemyTarget)
@@ -553,127 +533,6 @@ namespace Faolan.GameServer.Combat
 
             var player = GetOrAddPlayerVitals(client);
             await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
-        }
-
-        // Builds the generic BehaviorControlCenterIIR echo-ack body for an Interact request: retail acks every
-        // behavior request by echoing it with the sequence incremented and a field3 "phase" spliced into the args -
-        // and the phase value IS THE REQUEST'S OWN Mode (field 2), not a server counter (armed+unarmed combat
-        // capture 2026-06-12: every ack's 0x18 varint equals the request's 0x10 varint). The tail is echoed verbatim
-        // (or replaced by `tailOverride`) with 12 zero bytes appended - EXCEPT the vendor trade-open ack (#134),
-        // where retail echoes the tail bare (frame 1193 of the sell_items_to_trader capture ends at the request's
-        // 4-byte tail, no pad): pass padTail=false there. This is the complete ack for air swings; the result-block
-        // ack (SendNormalAttackResponse) is the targeted-hit variant.
-        internal static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null, bool padTail = true)
-        {
-            // rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
-            var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
-            var behaviorId = BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(18, 4));
-            var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
-            var echoedArgs = InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
-            var tail = tailOverride ?? rawPayload[(26 + argsLen)..];
-
-            using var s = new FaolanStream();
-            s
-                .WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
-                .WriteUInt32(0x0000C350u)
-                .WriteUInt32(instance)
-                .WriteUInt16(seq + 1)
-                .WriteUInt32(behaviorId)
-                .WriteUInt32(echoedArgs.Length)
-                .WriteArray(echoedArgs)
-                .WriteArray(tail);
-            if (padTail)
-                s.WriteArray(new byte[12]);
-            return s.ToArray();
-        }
-
-        // The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity
-        // block - the first 28 tail bytes ([0/srcSlot][destSlot][item][item][0][flags][0]) echoed, then the moved
-        // item's Data1..4 key quad twice + the null filler twice (equip), or the null filler six times (unequip).
-        // Byte-exact against the capture's frames 289/320/375 (BehaviorAckTests).
-        internal static byte[] BuildEquipMoveAckBody(byte[] rawPayload, uint instance, uint phase, Item item)
-        {
-            var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
-            var reqTail = rawPayload[(26 + argsLen)..];
-
-            using var tail = new FaolanStream();
-            tail.WriteArray(reqTail[..Math.Min(28, reqTail.Length)]);
-            if (item != null)
-            {
-                for (var i = 0; i < 2; i++)
-                    tail.WriteUInt32(item.Data1).WriteUInt32(item.Data2).WriteUInt32(item.Data3).WriteUInt32(item.Data4);
-
-                tail.WriteArray(NullIdentityFiller).WriteArray(NullIdentityFiller);
-            }
-            else
-            {
-                for (var i = 0; i < 6; i++)
-                    tail.WriteArray(NullIdentityFiller);
-            }
-
-            return BuildBehaviorEchoAckBody(rawPayload, instance, phase, tail.ToArray());
-        }
-
-        // Splices field3 (the behaviour "phase", tag 0x18 varint) into the request args right after field2, matching
-        // retail's BccAck echo. Protobuf is tag-addressed so position isn't strictly required, but this mirrors the
-        // capture's byte layout. If field2 is absent/malformed the phase is appended at the end.
-        internal static byte[] InsertBehaviorPhaseField(byte[] args, uint phase)
-        {
-            var phaseField = EncodeBehaviorPhase(phase);
-            var insertAt = Math.Min(OffsetAfterField(args, 2), args.Length);
-            var result = new byte[args.Length + phaseField.Length];
-            Array.Copy(args, 0, result, 0, insertAt);
-            phaseField.CopyTo(result, insertAt);
-            Array.Copy(args, insertAt, result, insertAt + phaseField.Length, args.Length - insertAt);
-            return result;
-        }
-
-        // field3 as protobuf: tag 0x18 (field 3, varint) + the base-128 varint of `value`.
-        private static byte[] EncodeBehaviorPhase(uint value)
-        {
-            var bytes = new List<byte> { 0x18 };
-            Varint.WriteVarint(bytes, value);
-            return bytes.ToArray();
-        }
-
-        // Byte offset just after `fieldNumber`'s value in a protobuf message (the message end if absent/malformed).
-        private static int OffsetAfterField(byte[] msg, int fieldNumber)
-        {
-            var i = 0;
-            while (i < msg.Length)
-            {
-                var tag = msg[i++];
-                var fn = tag >> 3;
-                var wt = tag & 7;
-                if (wt == 0)
-                {
-                    while (i < msg.Length && (msg[i] & 0x80) != 0)
-                        i++;
-                    i++;
-                }
-                else if (wt == 2)
-                {
-                    int len = 0, shift = 0;
-                    while (i < msg.Length)
-                    {
-                        var b = msg[i++];
-                        len |= (b & 0x7f) << shift;
-                        if ((b & 0x80) == 0)
-                            break;
-
-                        shift += 7;
-                    }
-
-                    i += len;
-                }
-                else
-                    return msg.Length; // unsupported wiretype -> append at end
-
-                if (fn == fieldNumber)
-                    return i;
-            }
-
-            return msg.Length;
         }
 
         // Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).

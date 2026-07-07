@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Combat;
@@ -31,7 +32,7 @@ namespace Faolan.Tests
 			var expected = Hex(
 				"642cd3d60000c350021663dd0004000000090000000c089bc80210051805280a3000000000000000001400005ace00005ace0000000000000001000000008b2978e3ae53830b0d5b7d662985a0fe8b2978e3ae53830b0d5b7d662985a0feb290805c29e627cab290805c29e627ca000000000000000000000000");
 
-			Assert.Equal(expected, CombatService.BuildEquipMoveAckBody(request, Instance, 5, Oar));
+			Assert.Equal(expected, BehaviorAckBody.BuildEquipMoveAckBody(request, Instance, 5, Oar));
 		}
 
 		[Fact]
@@ -42,7 +43,7 @@ namespace Faolan.Tests
 			var expected = Hex(
 				"642cd3d60000c350021663dd0004000000090000000c089bc80210011801280a3000000000000000000600005ace00005ace0000000000000001000000008b2978e3ae53830b0d5b7d662985a0fe8b2978e3ae53830b0d5b7d662985a0feb290805c29e627cab290805c29e627ca000000000000000000000000");
 
-			Assert.Equal(expected, CombatService.BuildEquipMoveAckBody(request, Instance, 1, Oar));
+			Assert.Equal(expected, BehaviorAckBody.BuildEquipMoveAckBody(request, Instance, 1, Oar));
 		}
 
 		[Fact]
@@ -51,7 +52,7 @@ namespace Faolan.Tests
 			var request = Hex("00000040642cd3d60000c350021663dd0003000000110000000e08c6d3061008280a300058326024000000000000000000000001000000000000000000000000000bbc46");
 			var expected = Hex("642cd3d60000c350021663dd0004000000110000001008c6d30610081808280a300058326024000000000000000000000001000000000000000000000000000bbc46000000000000000000000000");
 
-			Assert.Equal(expected, CombatService.BuildBehaviorEchoAckBody(request, Instance, 8));
+			Assert.Equal(expected, BehaviorAckBody.BuildBehaviorEchoAckBody(request, Instance, 8));
 		}
 
 		[Fact]
@@ -60,7 +61,7 @@ namespace Faolan.Tests
 			var request = Hex("00000040642cd3d60000c350021663dd0003000000110000000e08c0c7021009280a300058406040000000003e5f3b6500000001000000000000000000000000000bbc4b");
 			var expected = Hex("642cd3d60000c350021663dd0004000000110000001008c0c70210091809280a300058406040000000003e5f3b6500000001000000000000000000000000000bbc4b000000000000000000000000");
 
-			Assert.Equal(expected, CombatService.BuildBehaviorEchoAckBody(request, Instance, 9));
+			Assert.Equal(expected, BehaviorAckBody.BuildBehaviorEchoAckBody(request, Instance, 9));
 		}
 
 		[Fact]
@@ -71,7 +72,7 @@ namespace Faolan.Tests
 			var expected = Hex(
 				"642cd3d60000c350021663dd0004000000090000000c089ac80210021802280a300000000006000000000000000000000000000000000000000000000000b290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627ca000000000000000000000000");
 
-			Assert.Equal(expected, CombatService.BuildEquipMoveAckBody(request, Instance, 2, null));
+			Assert.Equal(expected, BehaviorAckBody.BuildEquipMoveAckBody(request, Instance, 2, null));
 		}
 
 		private static byte[] Hex(string s)

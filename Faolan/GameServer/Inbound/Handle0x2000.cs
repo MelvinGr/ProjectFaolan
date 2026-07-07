@@ -640,7 +640,7 @@ namespace Faolan.GameServer
                         // differs - other-players-visible capture). Limited to the world-visible combat behaviors.
                         if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell)
                         {
-                            var behaviorRelay = _combat.BuildBehaviorRelayBody(client, rawPayload, (uint)args.Mode);
+                            var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account.ClientInstance, rawPayload, (uint)args.Mode);
                             if (behaviorRelay != null)
                                 await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
                         }

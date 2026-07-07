@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			// Mode (2) spliced in, the 4-byte tail echoed bare - no zero pad.
 			var captured = Convert.FromHexString("642cd3d60000c35008006f31000400000016000000160898c80210021802280a3000520808d0860310adf3100000000a");
 
-			var built = CombatService.BuildBehaviorEchoAckBody(inbound, 0x08006F31, 2, padTail: false);
+			var built = BehaviorAckBody.BuildBehaviorEchoAckBody(inbound, 0x08006F31, 2, padTail: false);
 
 			Assert.Equal(captured, built);
 		}

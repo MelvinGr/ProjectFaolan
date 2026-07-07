@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
@@ -10,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.GameServer
 	//   1. a LookAtIIR/SelectDeselect (0x0D155695) "trade select" echo binding the player to the vendor handle
 	//      (frame 1189),
 	//   2. the BCC echo-ack of the interact - the standard behavior echo WITHOUT the combat ack's 12-zero pad
-	//      (frame 1193, first record; built via CombatService.BuildBehaviorEchoAckBody padTail: false),
+	//      (frame 1193, first record; built via BehaviorAckBody.BuildBehaviorEchoAckBody padTail: false),
 	//   3. DispatchShopData (0x2033) carrying the window content (frame 1193, second record).
 	// The window is gated on this conversation: a cold DispatchShopData push never pops it in-client (#134's
 	// premise, confirmed 2026-06-17). Byte-exact goldens: ShopOpenBuilderTests.

@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.GameServer;
 using System;
 using Faolan.GameServer.Combat;
 using Xunit;
@@ -17,7 +18,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void InsertBehaviorPhaseField_AfterField2_MatchesCapturedAck()
 		{
-			var spliced = CombatService.InsertBehaviorPhaseField(RequestArgs, 3);
+			var spliced = BehaviorAckBody.InsertBehaviorPhaseField(RequestArgs, 3);
 
 			Assert.Equal(AckArgs, spliced); // field3=3 inserted right after field2, rest unchanged
 		}
@@ -26,7 +27,7 @@ namespace Faolan.Tests
 		public void InsertBehaviorPhaseField_AppendsWhenNoField2()
 		{
 			var args = Convert.FromHexString("0801"); // only field1
-			var spliced = CombatService.InsertBehaviorPhaseField(args, 5);
+			var spliced = BehaviorAckBody.InsertBehaviorPhaseField(args, 5);
 
 			Assert.Equal("080118 05".Replace(" ", ""), Convert.ToHexString(spliced).ToLowerInvariant());
 		}
@@ -36,7 +37,7 @@ namespace Faolan.Tests
 		{
 			// args = field1(08 01) field2(10 01) field5(28 0a); phase 200 -> varint c8 01, inserted as 18 c8 01
 			// right after field2.
-			var spliced = CombatService.InsertBehaviorPhaseField(Convert.FromHexString("0801100128 0a".Replace(" ", "")), 200);
+			var spliced = BehaviorAckBody.InsertBehaviorPhaseField(Convert.FromHexString("0801100128 0a".Replace(" ", "")), 200);
 
 			Assert.Equal("08011001 18c801 280a".Replace(" ", ""), Convert.ToHexString(spliced).ToLowerInvariant());
 		}
