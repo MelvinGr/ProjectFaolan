@@ -40,6 +40,13 @@ namespace Faolan.Tests
 			var built = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
 
 			Assert.Equal(golden, built);
+
+			// ICodec round-trip: Read recovers the fields + payload and rebuilds byte-for-byte.
+			var rt = NpcSpellCastBuilder.NpcSpellCast.Read(new Faolan.Core.FaolanStream(built));
+			Assert.Equal(applyTo, rt.ApplyTo);
+			Assert.Equal(applyFrom, rt.ApplyFrom);
+			Assert.Equal(spellId, rt.SpellId);
+			Assert.Equal(built, rt.ToArray());
 		}
 
 		// #26: the mount RIDE buff (the ApplySpell that seats the player after the horse spawns) built from the

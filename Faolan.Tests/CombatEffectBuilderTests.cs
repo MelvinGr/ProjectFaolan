@@ -19,6 +19,11 @@ namespace Faolan.Tests
 			var built = CombatEffectBuilder.BuildDamageResult(0x01316D8A, 0x00002C56, 83, 2);
 
 			Assert.Equal(captured, built);
+
+			// ICodec round-trip.
+			var rt = CombatEffectBuilder.DamageResult.Read(new Faolan.Core.FaolanStream(built));
+			Assert.Equal(83u, rt.Damage);
+			Assert.Equal(built, rt.ToArray());
 		}
 
 		// StatDamageIIR (0xE9F24184), frame 6689: Rend (base 0x316449) cast by the trapper 0x00002C58 applies -8 to
@@ -31,6 +36,12 @@ namespace Faolan.Tests
 			var built = CombatEffectBuilder.BuildStatDamage(0x01316D8A, 0x2FFA, -8, 1, 0x00002C58, 1, 0x316449);
 
 			Assert.Equal(captured, built);
+
+			// ICodec round-trip: the signed delta survives.
+			var rt = CombatEffectBuilder.StatDamage.Read(new Faolan.Core.FaolanStream(built));
+			Assert.Equal(-8, rt.Delta);
+			Assert.Equal(0x316449u, rt.SpellBaseId);
+			Assert.Equal(built, rt.ToArray());
 		}
 	}
 }

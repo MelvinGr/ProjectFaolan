@@ -50,6 +50,10 @@ namespace Faolan.Tests
             var body = ShortcutBarBuilder.BuildBody(shortcuts);
 
             Assert.Equal(StrieBody, Convert.ToHexString(body).ToLowerInvariant());
+
+            // ICodec round-trip: Read recovers the per-slot records and rebuilds byte-for-byte.
+            var rt = ShortcutBarBuilder.ShortcutBar.Read(new Faolan.Core.FaolanStream(body));
+            Assert.Equal(body, rt.ToArray());
         }
 
         private static CharacterShortcut S(uint slot, uint type, uint id)

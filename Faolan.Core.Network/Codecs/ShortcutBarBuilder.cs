@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 
@@ -19,21 +20,55 @@ namespace Faolan.Core.Network.Codecs
 	{
 		private const uint ListFraming = 0x3F1;
 
-		public static byte[] BuildBody(IReadOnlyList<CharacterShortcut> shortcuts)
+		public static byte[] BuildBody(IReadOnlyList<CharacterShortcut> shortcuts) =>
+			new ShortcutBar([.. shortcuts.Select(sc => new ShortcutEntry(sc.Slot, sc.ShortcutType, sc.TargetId))]).ToArray();
+
+		// One 24-byte bar record: [u32 slot][u32 type][u32 id][u32 0 x3].
+		public sealed record ShortcutEntry(uint Slot, uint Type, uint Id);
+
+		// The ShortcutBarReply body as a self-serializing codec (ICodec): Write frames the 0x3F1-count header + the
+		// per-slot records; Read recovers the entries. BuildBody maps the CharacterShortcut DB rows to it.
+		public sealed record ShortcutBar(IReadOnlyList<ShortcutEntry> Entries) : ICodec<ShortcutBar>
 		{
-			using var s = new FaolanStream();
-			s.WriteUInt32(((uint)shortcuts.Count + 1) * ListFraming);
-			foreach (var sc in shortcuts)
+			public byte[] ToArray()
 			{
-				s.WriteUInt32(sc.Slot);
-				s.WriteUInt32(sc.ShortcutType);
-				s.WriteUInt32(sc.TargetId);
-				s.WriteUInt32(0);
-				s.WriteUInt32(0);
-				s.WriteUInt32(0);
+				using var s = new FaolanStream();
+				Write(s);
+				return s.ToArray();
 			}
 
-			return s.ToArray();
+			public void Write(FaolanStream s)
+			{
+				s.WriteUInt32(((uint)Entries.Count + 1) * ListFraming);
+				foreach (var e in Entries)
+				{
+					s.WriteUInt32(e.Slot);
+					s.WriteUInt32(e.Type);
+					s.WriteUInt32(e.Id);
+					s.WriteUInt32(0);
+					s.WriteUInt32(0);
+					s.WriteUInt32(0);
+				}
+			}
+
+			public static ShortcutBar Read(FaolanStream s)
+			{
+				var header = s.ReadUInt32();
+				var count = header / ListFraming - 1;
+				var entries = new List<ShortcutEntry>((int)count);
+				for (var i = 0u; i < count; i++)
+				{
+					var slot = s.ReadUInt32();
+					var type = s.ReadUInt32();
+					var id = s.ReadUInt32();
+					s.ReadUInt32();
+					s.ReadUInt32();
+					s.ReadUInt32();
+					entries.Add(new ShortcutEntry(slot, type, id));
+				}
+
+				return new ShortcutBar(entries);
+			}
 		}
 	}
 }
