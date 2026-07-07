@@ -188,3 +188,34 @@ is tracked as Gitea issues; the `#NNN` refs point there.
   in-process MCP server · content-CDN mirror
 - 🟡 Automated in-client verification harness — `Faolan.ClientHook` injection built; the assertion layer is
   partial (#195)
+
+## Network captures (the project's fuel)
+
+Packet captures — recordings of a client talking to the game servers — are the primary source of truth. The
+emulator mirrors that traffic byte-for-byte, so almost every subsystem is decoded from a capture first and only
+then rebuilt from structured data: `decode_*.py` dissector → byte-exact golden test → constructed builder. Where
+a capture and the emulator disagree, the emulator is wrong.
+
+This is also the **main bottleneck**. A large share of the 🟡/⬜ items above are blocked *not on code but on
+lacking a capture* of the specific interaction — the wire format cannot be reproduced without seeing it once.
+That is especially true of **server-authored** records (the server writes them, so they can't be recovered by
+reverse-engineering the client alone).
+
+**How a capture is used:** a `.pcapng` of a client↔server session is TCP-reassembled and dumped to the canonical
+`*.tshark.json` via `Captures/tshark_dump.sh`, which the importer and the Python dissectors read. Loopback
+captures against the local server (no root needed) and retail-session captures are both used. Full workflow in
+`CLAUDE.md`.
+
+**Captures that would directly unblock currently-blocked features:**
+- A **spell cast of a known-cooldown spell** → the `SetSpellRecastTime` GameAction (#271)
+- **Guild-bank** deposit/withdraw, and **guild** member kick/promote/demote + the create window (#132, #104, #306)
+- A **progressed quest journal** (non-empty objective/progress lists) → the opaque `WTHD` block (#304)
+- **Clean per-type** NPC/character captures (not bloated session logins) → retire the verbatim spawn scaffolds
+  (#185, and thereby #304 / #234)
+- A **necromancer pet summon in the open world** (#307), a **friend** add/remove + come-online (#99), a
+  **player↔player trade** (#101)
+- **Level-up** captures across more classes/levels → fill the combo/spell/XP tables (#296, #297)
+- A **dungeon run**, the **faction/reputation** UI, and an **item socket** action → the roadmap features
+  (#309, #310, #311)
+
+Contributing such captures is the single highest-leverage way to move the blocked items.
