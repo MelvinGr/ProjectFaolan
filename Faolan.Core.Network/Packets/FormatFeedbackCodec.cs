@@ -31,12 +31,7 @@ namespace Faolan.Core.Network.Packets
 		private const byte LeadFlag = 0x01;
 		private const uint IirMarker = EntityClass.Character;
 
-		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml)
-		{
-			using var s = new FaolanStream();
-			new Message(instance, typeFlags, footer, xml).Write(s);
-			return s.ToArray();
-		}
+		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml) => new Message(instance, typeFlags, footer, xml).ToArray();
 
 		public static Message Parse(byte[] body) => Message.Read(new FaolanStream(body));
 
@@ -44,6 +39,13 @@ namespace Faolan.Core.Network.Packets
 		// [len][subop][marker][instance][lead][reserved][typeFlags][xmlLen][xml][footer]; Read recovers the fields.
 		public sealed record Message(uint Instance, uint TypeFlags, uint Footer, byte[] Xml) : ICodec<Message>
 		{
+			public byte[] ToArray()
+			{
+				using var s = new FaolanStream();
+				Write(s);
+				return s.ToArray();
+			}
+
 			public void Write(FaolanStream s)
 			{
 				var content = new FaolanStream();

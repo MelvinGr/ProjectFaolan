@@ -41,6 +41,13 @@ namespace Faolan.GameServer.FullCharSnapshot
             }
         }
 
+        public byte[] ToArray()
+        {
+            using var s = new FaolanStream();
+            Write(s);
+            return s.ToArray();
+        }
+
         public void Write(FaolanStream w)
         {
             w.WriteUInt32(CountWord);

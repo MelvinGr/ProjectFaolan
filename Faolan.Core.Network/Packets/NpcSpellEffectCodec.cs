@@ -18,6 +18,7 @@ namespace Faolan.Core.Network.Packets
 
 		// ICodec seam over the fixed-offset 54-byte payload (ToBytes/Parse remain the byte-packed core).
 		public void Write(FaolanStream s) => s.WriteArray(ToBytes());
+		public byte[] ToArray() => ToBytes();
 		public static NpcSpellEffect Read(FaolanStream s) => Parse(s.ReadArray(Length));
 
 		public byte[] ToBytes()

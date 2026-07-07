@@ -128,6 +128,13 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
 		public ulong FieldF8 { get; init; } // @+0xf8 u64 (=15)
 
+		public byte[] ToArray()
+		{
+			using var s = new FaolanStream();
+			Write(s);
+			return s.ToArray();
+		}
+
 		public void Write(FaolanStream w)
 		{
 			w.WriteUInt32(QuestId); // listKey

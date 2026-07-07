@@ -29,12 +29,7 @@ namespace Faolan.Core.Network.Packets
 		private const uint IirMarker = EntityClass.Character;
 		private const uint TrailerWord = 0x40000001;
 
-		public static byte[] Build(uint instance, byte[] xml)
-		{
-			using var s = new FaolanStream();
-			new Message(instance, xml).Write(s);
-			return s.ToArray();
-		}
+		public static byte[] Build(uint instance, byte[] xml) => new Message(instance, xml).ToArray();
 
 		public static Message Parse(byte[] body) => Message.Read(new FaolanStream(body));
 
@@ -42,6 +37,13 @@ namespace Faolan.Core.Network.Packets
 		// [len][subop][marker][instance][lead][xmlLen][xml][trailer]; Read recovers the (instance, xml).
 		public sealed record Message(uint Instance, byte[] Xml) : ICodec<Message>
 		{
+			public byte[] ToArray()
+			{
+				using var s = new FaolanStream();
+				Write(s);
+				return s.ToArray();
+			}
+
 			public void Write(FaolanStream s)
 			{
 				var content = new FaolanStream();

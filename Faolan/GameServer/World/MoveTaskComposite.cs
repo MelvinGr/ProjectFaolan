@@ -31,6 +31,8 @@ namespace Faolan.GameServer.World
             return s.ToArray();
         }
 
+        public byte[] ToArray() => Encode();
+
         public void Write(FaolanStream s)
         {
             s.WriteUInt32(SubOpcode).WriteUInt32(WireType).WriteUInt32(Handle).WriteUInt16(0).WriteUInt32(FromX).WriteUInt32(FromY).WriteUInt32(FromZ);
@@ -111,6 +113,13 @@ namespace Faolan.GameServer.World
         public ushort PathPacked2 { get; set; }
         public ushort RotateTail { get; set; }
         private bool HasHeaderFloats => (HeaderFlags & 1) == 0;
+
+        public byte[] ToArray()
+        {
+            using var s = new FaolanStream();
+            Write(s);
+            return s.ToArray();
+        }
 
         public void Write(FaolanStream s)
         {

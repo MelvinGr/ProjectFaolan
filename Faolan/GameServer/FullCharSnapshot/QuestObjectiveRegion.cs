@@ -150,6 +150,13 @@ namespace Faolan.GameServer.FullCharSnapshot
 		public uint Zero2 { get; init; }
 		public uint[] Reserved { get; init; } = new uint[ReservedWords]; // 7 words, all 0 in the template
 
+		public byte[] ToArray()
+		{
+			using var s = new FaolanStream();
+			Write(s);
+			return s.ToArray();
+		}
+
 		public void Write(FaolanStream w)
 		{
 			w.WriteUInt32(Lead);
