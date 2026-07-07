@@ -1,38 +1,46 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.FullCharSnapshot
 {
 	// The QUEST INDEX region of the 0x737A6DF9 tails - the bytes between the @609 objective region (see
-	// QuestObjectiveRegion) and the access-window table. Two parts (decoded from the template, validated by the
-	// round-trip test):
-	//   A) the quest index:  [0x000003F1 tag][u32 marker=0x7E2][questId × count][u32 count][u32 sentinel=0xF1]
-	//   B) the goal-id table: [0x57365154 "W6QT"][u32 a=1][u32 b=7][u32 c=0][u32 n][ (goalId, 1..n) × n ] then a
-	//      fixed 5-word trailer ([questId][1][0][0][u32]).
-	// The (goalId, idx) pairs map the quest's objective/step ids to 1..n (the client's goal index). count == the
-	// number of indexed quests; n == the number of goal steps. Carried as a typed codec (Parse/ToArray round-trips
-	// byte-exact, QuestIndexRegionTests) so SnapshotTails models it instead of the opaque blob (#186). GENERATING it
-	// for arbitrary quests needs the per-quest goal-step ids + trailer word in the DB (a follow-up seed, like the
-	// per-goal model); the index/count/sentinel parts already follow from the character's quest list.
+	// QuestObjectiveRegion) and the access-window table. Two parts (decoded from the beach template + the 2-quest
+	// capture #255, validated byte-exact by the round-trip test):
+	//   A) the quest index:  [0x000003F1 tag][u32 marker=(count+1)*0x3F1][questId × count][u32 count][u32 sentinel=0xF1]
+	//   B) ONE goal-id BLOCK per held quest, in the same order as the index ids:
+	//        [u32 magic (the quest's goal-table NAME word: beach "W6QT" 0x57365154, Casilda 13479 0x52524C33)]
+	//        [u32 tf1][u32 tf2][u32 tf3][u32 n][ (goalId, 1..n) × n ]
+	//        [u32 trailerQuestId][1][0][0][u32 chainWord]
+	// The (goalId, idx) pairs map the quest's objective/step ids to the client's 1..n goal index. The block trailers
+	// CHAIN: each carries the NEXT held quest's AreaId, the last carries the primary (tracked) quest's IndexTrailerWord.
+	// Typed codec (Parse/ToArray round-trips byte-exact - QuestIndexRegionTests single-quest, BuildQuestPortionTests
+	// 2-quest) so SnapshotTails models it instead of the opaque blob (#186/#304). Build generates it from the held
+	// QuestDefinitions (their IndexMagic/IndexTableField/IndexGoalSteps/AreaId/IndexTrailerWord seeds).
 	public sealed class QuestIndexRegion
 	{
 		public const uint IndexTag = 0x000003F1;
 		public const uint Sentinel = 0x000000F1;
-		public const uint TableMagic = 0x57365154; // "W6QT"
 		private const uint MinQuestId = 0x1000;
-		public byte[] Trailer { get; init; } = [];
-		public List<uint> GoalIds { get; init; } = [];
-		public List<uint> QuestIds { get; init; } = [];
 
 		public uint Marker { get; init; } = 0x7E2;
+		public List<uint> QuestIds { get; init; } = [];
+		public List<Block> Blocks { get; init; } = [];
 
-		// The W6QT goal-id table's three lead words (1 / 7 / 0 in the template) + the goal-step ids (their index is the
-		// 1-based position) + the fixed trailer carried verbatim.
-		public uint TableField1 { get; init; }
-		public uint TableField2 { get; init; }
-		public uint TableField3 { get; init; }
+		// One held quest's goal-id table + chained trailer.
+		public sealed class Block
+		{
+			public uint Magic { get; init; } // the quest's goal-table name word (W6QT / Casilda / ...)
+			public uint TableField1 { get; init; }
+			public uint TableField2 { get; init; }
+			public uint TableField3 { get; init; }
+			public List<uint> GoalSteps { get; init; } = [];
+			public uint TrailerQuestId { get; init; }
+			public uint ChainWord { get; init; } // next held quest's AreaId, or the primary's IndexTrailerWord (last)
+		}
 
 		public byte[] ToArray()
 		{
@@ -41,45 +49,69 @@ namespace Faolan.GameServer.FullCharSnapshot
 			w.WriteUInt32(Marker);
 			foreach (var id in QuestIds)
 				w.WriteUInt32(id);
-			w.WriteUInt32(QuestIds.Count);
+			w.WriteUInt32((uint)QuestIds.Count);
 			w.WriteUInt32(Sentinel);
 
-			w.WriteUInt32(TableMagic);
-			w.WriteUInt32(TableField1);
-			w.WriteUInt32(TableField2);
-			w.WriteUInt32(TableField3);
-			w.WriteUInt32(GoalIds.Count);
-			for (var i = 0; i < GoalIds.Count; i++)
+			foreach (var b in Blocks)
 			{
-				w.WriteUInt32(GoalIds[i]);
-				w.WriteUInt32(i + 1);
+				w.WriteUInt32(b.Magic);
+				w.WriteUInt32(b.TableField1);
+				w.WriteUInt32(b.TableField2);
+				w.WriteUInt32(b.TableField3);
+				w.WriteUInt32((uint)b.GoalSteps.Count);
+				for (var i = 0; i < b.GoalSteps.Count; i++)
+				{
+					w.WriteUInt32(b.GoalSteps[i]);
+					w.WriteUInt32((uint)(i + 1));
+				}
+
+				w.WriteUInt32(b.TrailerQuestId);
+				w.WriteUInt32(1);
+				w.WriteUInt32(0);
+				w.WriteUInt32(0);
+				w.WriteUInt32(b.ChainWord);
 			}
 
-			w.WriteArray(Trailer);
 			return w.ToArray();
 		}
 
-		// GENERATES the index region from the indexed quest ids + the per-quest goal-step ids (+ the W6QT table's
-		// three lead words and the trailer word), synthesizing the constants (tag/sentinel/magic, the 1..n goal
-		// indices, the trailer's [1][0][0]). The MARKER is DERIVED from the quest count: it is the `0x3F1` list-framing
-		// word `0x3F1 * (count + 1)` (decoded across captures: 1 quest -> 0x7E2, 2 quests -> 0xBD3 - the same
-		// record-count invariant the client asserts), NOT a per-quest constant. The quest ids / count / sentinel follow
-		// from the character's quest list; the goal-step ids + trailer word are per-quest data (seeded). #186.
-		public static QuestIndexRegion Build(IReadOnlyList<uint> questIds, IReadOnlyList<uint> goalSteps, uint tableField1, uint tableField2, uint tableField3, uint trailerQuestId, uint trailerWord)
+		// Generates the index region for the held quests (already ordered - primary first). Each quest contributes a
+		// goal-id block from its seeded index fields; the block trailers chain to the next quest's AreaId, terminating
+		// on the primary's IndexTrailerWord. The marker/count/sentinel follow from the quest count. #186/#255/#304.
+		public static QuestIndexRegion Build(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary)
 		{
-			ArgumentNullException.ThrowIfNull(questIds);
-			ArgumentNullException.ThrowIfNull(goalSteps);
-			var trailer = new FaolanStream().WriteUInt32(trailerQuestId).WriteUInt32(1).WriteUInt32(0).WriteUInt32(0).WriteUInt32(trailerWord).ToArray();
+			ArgumentNullException.ThrowIfNull(ordered);
+			ArgumentNullException.ThrowIfNull(primary);
+
+			var blocks = new List<Block>(ordered.Count);
+			for (var i = 0; i < ordered.Count; i++)
+			{
+				var q = ordered[i];
+				blocks.Add(new Block
+				{
+					Magic = q.IndexMagic,
+					TableField1 = q.IndexTableField1,
+					TableField2 = q.IndexTableField2,
+					TableField3 = q.IndexTableField3,
+					GoalSteps = ParseGoalSteps(q.IndexGoalSteps),
+					TrailerQuestId = q.QuestId,
+					ChainWord = i + 1 < ordered.Count
+						? ordered[i + 1].AreaId
+						: primary.IndexTrailerWord
+				});
+			}
+
 			return new QuestIndexRegion
 			{
-				Marker = IndexTag * (uint)(questIds.Count + 1),
-				QuestIds = [.. questIds],
-				TableField1 = tableField1,
-				TableField2 = tableField2,
-				TableField3 = tableField3,
-				GoalIds = [.. goalSteps],
-				Trailer = trailer
+				Marker = IndexTag * (uint)(ordered.Count + 1),
+				QuestIds = ordered.Select(q => q.QuestId).ToList(),
+				Blocks = blocks
 			};
+		}
+
+		public static List<uint> ParseGoalSteps(string csv)
+		{
+			return (csv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToList();
 		}
 
 		public static QuestIndexRegion Parse(byte[] data, int offset, int endOffset)
@@ -104,33 +136,49 @@ namespace Faolan.GameServer.FullCharSnapshot
 			if (sentinel != Sentinel)
 				throw new InvalidOperationException($"Quest index: sentinel 0x{sentinel:X} != 0x{Sentinel:X}");
 
-			var magic = r.ReadUInt32();
-			if (magic != TableMagic)
-				throw new InvalidOperationException($"Quest index: table magic 0x{magic:X} != 0x{TableMagic:X}");
-
-			var f1 = r.ReadUInt32();
-			var f2 = r.ReadUInt32();
-			var f3 = r.ReadUInt32();
-			var n = r.ReadUInt32();
-			var goalIds = new List<uint>((int)n);
-			for (uint i = 0; i < n; i++)
+			var blocks = new List<Block>((int)count);
+			for (uint b = 0; b < count; b++)
 			{
-				goalIds.Add(r.ReadUInt32());
-				var idx = r.ReadUInt32();
-				if (idx != i + 1)
-					throw new InvalidOperationException($"Quest index: goal idx {idx} != {i + 1}");
+				var magic = r.ReadUInt32();
+				var f1 = r.ReadUInt32();
+				var f2 = r.ReadUInt32();
+				var f3 = r.ReadUInt32();
+				var n = r.ReadUInt32();
+				var goalSteps = new List<uint>((int)n);
+				for (uint i = 0; i < n; i++)
+				{
+					goalSteps.Add(r.ReadUInt32());
+					var idx = r.ReadUInt32();
+					if (idx != i + 1)
+						throw new InvalidOperationException($"Quest index: goal idx {idx} != {i + 1}");
+				}
+
+				var trailerQuestId = r.ReadUInt32();
+				r.ReadUInt32(); // 1
+				r.ReadUInt32(); // 0
+				r.ReadUInt32(); // 0
+				var chainWord = r.ReadUInt32();
+
+				blocks.Add(new Block
+				{
+					Magic = magic,
+					TableField1 = f1,
+					TableField2 = f2,
+					TableField3 = f3,
+					GoalSteps = goalSteps,
+					TrailerQuestId = trailerQuestId,
+					ChainWord = chainWord
+				});
 			}
 
-			var trailer = r.ReadArray((uint)(endOffset - r.Position));
+			if (r.Position != endOffset)
+				throw new InvalidOperationException($"Quest index: parsed to {r.Position}, expected {endOffset}");
+
 			return new QuestIndexRegion
 			{
 				Marker = marker,
 				QuestIds = questIds,
-				TableField1 = f1,
-				TableField2 = f2,
-				TableField3 = f3,
-				GoalIds = goalIds,
-				Trailer = trailer
+				Blocks = blocks
 			};
 		}
 

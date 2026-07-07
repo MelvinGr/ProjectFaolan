@@ -83,8 +83,7 @@ namespace Faolan.Tests
 
 			var quests = new QuestcRegion { Records = { QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) } };
 			var objectives = QuestObjectiveRegion.Build(def, instance);
-			var goalSteps = def.IndexGoalSteps.Split(',').Select(uint.Parse).ToArray();
-			var index = QuestIndexRegion.Build([def.QuestId], goalSteps, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3, def.QuestId, def.IndexTrailerWord);
+			var index = QuestIndexRegion.Build([def], def);
 
 			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
 

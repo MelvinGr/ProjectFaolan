@@ -169,39 +169,9 @@ namespace Faolan.GameServer.FullCharSnapshot
 				w.WriteArray(QuestObjectiveRegion.Build(q, instance).ToArray());
 			}
 
-			// Quest index: a shared header (tag, marker, ALL held questIds, count, sentinel) then ONE per-quest block
-			// (the quest's goal-id table: its magic name + tf1-3 + goal-steps + a trailer). The block trailers CHAIN -
-			// each links to the NEXT held quest's areaId; the last block carries the terminal word (the primary's
-			// IndexTrailerWord). Decoded byte-exact from the 2-quest capture (#255).
-			w.WriteUInt32(QuestIndexRegion.IndexTag);
-			w.WriteUInt32(((uint)ordered.Count + 1) * QuestcRegion.Frame);
-			foreach (var q in ordered)
-				w.WriteUInt32(q.QuestId);
-			w.WriteUInt32(ordered.Count);
-			w.WriteUInt32(QuestIndexRegion.Sentinel);
-			for (var i = 0; i < ordered.Count; i++)
-			{
-				var q = ordered[i];
-				w.WriteUInt32(q.IndexMagic);
-				w.WriteUInt32(q.IndexTableField1);
-				w.WriteUInt32(q.IndexTableField2);
-				w.WriteUInt32(q.IndexTableField3);
-				var steps = (q.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
-				w.WriteUInt32(steps.Length);
-				for (var s = 0; s < steps.Length; s++)
-				{
-					w.WriteUInt32(steps[s]);
-					w.WriteUInt32(s + 1);
-				}
-
-				w.WriteUInt32(q.QuestId);
-				w.WriteUInt32(1);
-				w.WriteUInt32(0);
-				w.WriteUInt32(0);
-				w.WriteUInt32(i + 1 < ordered.Count
-					? ordered[i + 1].AreaId
-					: primary.IndexTrailerWord);
-			}
+			// The quest index: all held questIds + one chained goal-id block per quest, owned by the primary
+			// (its trailer carries the terminal IndexTrailerWord). Modeled by the typed QuestIndexRegion codec.
+			w.WriteArray(QuestIndexRegion.Build(ordered, primary).ToArray());
 
 			return w.ToArray();
 
@@ -219,8 +189,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 			var quests = new QuestcRegion { Records = { QuestcRecord.BuildSingle(def, state, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) } };
 			var objectives = QuestObjectiveRegion.Build(def, instance);
-			var goalSteps = (def.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
-			var index = QuestIndexRegion.Build([def.QuestId], goalSteps, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3, def.QuestId, def.IndexTrailerWord);
+			var index = QuestIndexRegion.Build([def], def);
 
 			byte[] portion = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
 			if (portion.Length != QuestPortionLength)

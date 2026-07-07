@@ -22,8 +22,9 @@ namespace Faolan.Tests
 					10238u
 				},
 				region.QuestIds);
-			Assert.Equal(8, region.GoalIds.Count); // the eight goal-step ids (index 1..8)
-			Assert.Equal(10238u, region.GoalIds[0]);
+			Assert.Single(region.Blocks);
+			Assert.Equal(8, region.Blocks[0].GoalSteps.Count); // the eight goal-step ids (index 1..8)
+			Assert.Equal(10238u, region.Blocks[0].GoalSteps[0]);
 		}
 
 		[Fact]
