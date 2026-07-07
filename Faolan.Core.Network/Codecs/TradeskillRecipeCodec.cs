@@ -74,18 +74,13 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildReplyBody(IReadOnlyCollection<RecipeRecord> recipes)
 		{
 			ArgumentNullException.ThrowIfNull(recipes);
-			var body = new List<byte>(recipes.Count * 340 + 16)
-			{
-				0x00 // env
-			};
-			AddU32(body, Version);
-			body.Add(ListType);
-			AddU32(body, ((uint)recipes.Count + 1) * ListFrame);
+			var body = new FaolanStream()
+				.WriteByte(0x00) // env
+				.WriteUInt32(Version)
+				.WriteByte(ListType)
+				.WriteUInt32(((uint)recipes.Count + 1) * ListFrame);
 			foreach (var r in recipes)
-			{
-				AddU32(body, r.Id);
-				body.AddRange(r.Data);
-			}
+				body.WriteUInt32(r.Id).WriteArray(r.Data);
 
 			return body.ToArray();
 		}
@@ -130,7 +125,8 @@ namespace Faolan.Core.Network.Codecs
 			return new RecipeItemElement(role, position, itemId, flag, hash, d1, d2, d3, d4, trailing);
 		}
 
-		[Obsolete("Use FaolanStream")]
+		// Span-cursor u32 read (the read counterpart the whole parse path uses, matching ReadFramed/RecordLength);
+		// the parser walks a ReadOnlySpan with a ref cursor and fixed skips, not a FaolanStream.
 		private static uint Read(ReadOnlySpan<byte> data, ref int p)
 		{
 			var v = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(p, 4));
@@ -167,15 +163,6 @@ namespace Faolan.Core.Network.Codecs
 		{
 			var n = ReadFramed(body, ref p);
 			p += n * elementU32 * 4;
-		}
-
-		[Obsolete("Use FaolanStream")]
-		private static void AddU32(List<byte> to, uint value)
-		{
-			to.Add((byte)(value >> 24));
-			to.Add((byte)(value >> 16));
-			to.Add((byte)(value >> 8));
-			to.Add((byte)value);
 		}
 	}
 }

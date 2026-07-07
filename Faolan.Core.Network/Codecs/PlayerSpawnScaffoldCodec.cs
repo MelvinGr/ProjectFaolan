@@ -16,43 +16,32 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] Generate(PlayerSpawnScaffold s)
 		{
 			var post = GeneratePostIir(s);
-			var transformLen = 1 + 2 + s.Vec3.Length + 2 + s.Quat.Length + (s.Scale != null
-				? 5
-				: 0) + 1 + VarintLength(s.Playfield);
-			var total = 20 + transformLen + s.PreFrame.Length + 4 + s.CharacterIir.Length + post.Length;
 
-			var body = new byte[total];
-			var i = 0;
-			WriteU32(body, ref i, (uint)(total - 4));
-			WriteU32(body, ref i, SubOpcode);
-			WriteU32(body, ref i, s.Ack);
-			WriteU32(body, ref i, s.Handle);
-			WriteU32(body, ref i, s.FieldA);
-			body[i++] = 0x2C;
-			body[i++] = 0x0A;
-			body[i++] = (byte)s.Vec3.Length;
-			s.Vec3.CopyTo(body, i);
-			i += s.Vec3.Length;
-			body[i++] = 0x12;
-			body[i++] = (byte)s.Quat.Length;
-			s.Quat.CopyTo(body, i);
-			i += s.Quat.Length;
+			// Everything from SubOpcode onward; the leading u32 length prefix (= payload length) is added last.
+			var payload = new FaolanStream()
+				.WriteUInt32(SubOpcode)
+				.WriteUInt32(s.Ack)
+				.WriteUInt32(s.Handle)
+				.WriteUInt32(s.FieldA)
+				.WriteByte(0x2C)
+				.WriteByte(0x0A)
+				.WriteByte((byte)s.Vec3.Length)
+				.WriteArray(s.Vec3)
+				.WriteByte(0x12)
+				.WriteByte((byte)s.Quat.Length)
+				.WriteArray(s.Quat);
 			if (s.Scale != null)
-			{
-				body[i++] = 0x25;
-				s.Scale.CopyTo(body, i);
-				i += 4;
-			}
+				payload.WriteByte(0x25).WriteArray(s.Scale);
 
-			body[i++] = 0x18;
-			WriteVarint(body, ref i, s.Playfield);
-			s.PreFrame.CopyTo(body, i);
-			i += s.PreFrame.Length;
-			WriteU32(body, ref i, (uint)s.CharacterIir.Length);
-			s.CharacterIir.CopyTo(body, i);
-			i += s.CharacterIir.Length;
-			post.CopyTo(body, i);
-			return body;
+			payload
+				.WriteByte(0x18)
+				.WriteVarint(s.Playfield)
+				.WriteArray(s.PreFrame)
+				.WriteUInt32((uint)s.CharacterIir.Length)
+				.WriteArray(s.CharacterIir)
+				.WriteArray(post);
+
+			return new FaolanStream().WriteArrayUInt32Length(payload.ToArray()).ToArray();
 		}
 
 		public static bool TryParse(byte[] body, out PlayerSpawnScaffold scaffold, out string error)
@@ -75,49 +64,26 @@ namespace Faolan.Core.Network.Codecs
 		private static byte[] GeneratePostIir(PlayerSpawnScaffold s)
 		{
 			var count = s.Entries.Count;
-			var size = 8 + 8 + s.BuffRecords.Count * BuffRecordSize + 8 + (count > 0
-				? 4
-				: 0) + count * 14 + (count > 0
-				? (s.IdList.Count + 1) * 5
-				: 4) + 4 + s.EndPairs.Count * 8 + 4 + s.EndPairs2.Count * 8 + 4;
-			var b = new byte[size];
-			var i = 0;
-			WriteU32(b, ref i, 0);
-			WriteU32(b, ref i, 4);
-			WriteU32(b, ref i, 2);
-			WriteU32(b, ref i, Marker * ((uint)s.BuffRecords.Count + 1));
+			var b = new FaolanStream();
+			b.WriteUInt32(0).WriteUInt32(4).WriteUInt32(2).WriteUInt32(Marker * ((uint)s.BuffRecords.Count + 1));
 			foreach (var rec in s.BuffRecords)
-			{
-				rec.CopyTo(b, i);
-				i += BuffRecordSize;
-			}
+				b.WriteArray(rec);
 
-			WriteU32(b, ref i, (uint)count);
-			WriteU32(b, ref i, s.EntryTableX);
+			b.WriteUInt32((uint)count).WriteUInt32(s.EntryTableX);
 			if (count > 0)
-				WriteU32(b, ref i, 0x3F800000);
+				b.WriteUInt32(0x3F800000);
 			foreach (var entry in s.Entries)
-			{
-				WriteU32(b, ref i, entry.Index);
-				WriteU32(b, ref i, 0);
-				BinaryPrimitives.WriteUInt16BigEndian(b.AsSpan(i, 2), entry.Tag);
-				i += 2;
-				WriteU32(b, ref i, entry.Value);
-			}
+				b.WriteUInt32(entry.Index).WriteUInt32(0).WriteUInt16(entry.Tag).WriteUInt32(entry.Value);
 
 			if (count > 0)
 			{
 				foreach (var entry in s.IdList)
-				{
-					b[i++] = entry.Rank;
-					WriteU32(b, ref i, entry.Id);
-				}
+					b.WriteByte(entry.Rank).WriteUInt32(entry.Id);
 
-				b[i++] = 0;
-				WriteU32(b, ref i, Marker);
+				b.WriteByte(0).WriteUInt32(Marker);
 			}
 			else
-				WriteU32(b, ref i, Marker);
+				b.WriteUInt32(Marker);
 
 			foreach (var pairs in new[]
 			{
@@ -125,16 +91,13 @@ namespace Faolan.Core.Network.Codecs
 				s.EndPairs2
 			})
 			{
-				WriteU32(b, ref i, (uint)pairs.Count);
+				b.WriteUInt32((uint)pairs.Count);
 				foreach (var pair in pairs)
-				{
-					WriteU32(b, ref i, pair.Id);
-					WriteU32(b, ref i, (uint)pair.Value);
-				}
+					b.WriteUInt32(pair.Id).WriteUInt32((uint)pair.Value);
 			}
 
-			WriteU32(b, ref i, Marker);
-			return b;
+			b.WriteUInt32(Marker);
+			return b.ToArray();
 		}
 
 		private static PlayerSpawnScaffold Parse(byte[] body)
@@ -276,7 +239,8 @@ namespace Faolan.Core.Network.Codecs
 			}
 		}
 
-		[Obsolete("Use FaolanStream")]
+		// Cursor reads over the FA015807 body. The parse path is offset-addressed (it anchors the CharacterIIR by
+		// scan and references backward offsets), not a sequential FaolanStream read, so these stay byte-cursor based.
 		private static ulong ReadVarint(byte[] b, ref int i)
 		{
 			var v = 0UL;
@@ -292,40 +256,11 @@ namespace Faolan.Core.Network.Codecs
 			}
 		}
 
-		[Obsolete("Use FaolanStream")]
 		private static uint U32(byte[] b, ref int i)
 		{
 			var v = BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(i, 4));
 			i += 4;
 			return v;
-		}
-
-		[Obsolete("Use FaolanStream")]
-		private static int VarintLength(ulong v)
-		{
-			var n = 1;
-			while ((v >>= 7) != 0)
-				n++;
-			return n;
-		}
-
-		[Obsolete("Use FaolanStream")]
-		private static void WriteU32(byte[] b, ref int i, uint v)
-		{
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(i, 4), v);
-			i += 4;
-		}
-
-		[Obsolete("Use FaolanStream")]
-		private static void WriteVarint(byte[] b, ref int i, ulong v)
-		{
-			while (v >= 0x80)
-			{
-				b[i++] = (byte)(v | 0x80);
-				v >>= 7;
-			}
-
-			b[i++] = (byte)v;
 		}
 	}
 }

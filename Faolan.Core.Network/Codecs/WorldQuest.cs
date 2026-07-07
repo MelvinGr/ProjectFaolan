@@ -100,60 +100,60 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildQuestFullUpdate(uint playerHandle, uint questId, uint state, uint areaId, IReadOnlyList<byte[]> textRefs, uint goalId, ulong acceptTime, uint mapId, uint markerX, uint markerY,
 			byte[] objectiveText, byte[] objectiveLocalized)
 		{
-			var w = new List<byte>(512);
+			var w = new FaolanStream();
 			WriteHeader(w, QuestFullUpdateSubOpcode, playerHandle);
-			WriteU32(w, 0);
-			w.Add(0x01);
-			WriteU32(w, questId);
-			WriteU32(w, 1);
-			WriteU32(w, questId);
-			WriteU32(w, state);
-			WriteU32(w, 0);
-			WriteU32(w, 3);
-			WriteU32(w, 0x412);
+			w.WriteUInt32(0);
+			w.WriteByte(0x01);
+			w.WriteUInt32(questId);
+			w.WriteUInt32(1);
+			w.WriteUInt32(questId);
+			w.WriteUInt32(state);
+			w.WriteUInt32(0);
+			w.WriteUInt32(3);
+			w.WriteUInt32(0x412);
 			foreach (var rec in textRefs) // title, summary, areaTitle, region, map
-				w.AddRange(rec);
+				w.WriteArray(rec);
 			// Objective/stat run.
-			WriteU32(w, 1);
-			WriteU32(w, areaId);
-			WriteU32(w, questId);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0x50);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0x64);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0x7E2);
-			WriteU32(w, 1);
-			WriteU32(w, 0x0C);
-			WriteU32(w, playerHandle);
-			WriteU32(w, questId);
-			WriteU32(w, goalId);
-			WriteU32(w, 1);
-			WriteU32(w, goalId);
-			WriteU32(w, 1);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			WriteU64(w, acceptTime);
-			WriteU32(w, 0);
-			WriteU32(w, mapId);
-			WriteU32(w, markerX);
-			WriteU32(w, markerY);
-			WriteU32(w, 0);
-			WriteU32(w, 0);
-			w.Add(0x00); // trailing u16 before the objective record
-			w.Add(0x00);
-			w.AddRange(objectiveText);
-			w.AddRange(objectiveLocalized);
-			w.Add(0x00);
+			w.WriteUInt32(1);
+			w.WriteUInt32(areaId);
+			w.WriteUInt32(questId);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0x50);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0x64);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0x7E2);
+			w.WriteUInt32(1);
+			w.WriteUInt32(0x0C);
+			w.WriteUInt32(playerHandle);
+			w.WriteUInt32(questId);
+			w.WriteUInt32(goalId);
+			w.WriteUInt32(1);
+			w.WriteUInt32(goalId);
+			w.WriteUInt32(1);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteUInt64(acceptTime);
+			w.WriteUInt32(0);
+			w.WriteUInt32(mapId);
+			w.WriteUInt32(markerX);
+			w.WriteUInt32(markerY);
+			w.WriteUInt32(0);
+			w.WriteUInt32(0);
+			w.WriteByte(0x00); // trailing u16 before the objective record
+			w.WriteByte(0x00);
+			w.WriteArray(objectiveText);
+			w.WriteArray(objectiveLocalized);
+			w.WriteByte(0x00);
 			return w.ToArray();
 		}
 
@@ -197,25 +197,25 @@ namespace Faolan.Core.Network.Codecs
 		// no-track form; the server doesn't drive quest tracking).
 		public static byte[] BuildQuestJournal(uint playerHandle, uint areaId, IReadOnlyList<byte[]> areaHeader, IReadOnlyList<JournalEntry> entries, byte[] trailing)
 		{
-			var w = new List<byte>(256);
+			var w = new FaolanStream();
 			WriteHeader(w, QuestJournalSubOpcode, playerHandle);
-			w.Add(0x01);
-			WriteU32(w, areaId);
+			w.WriteByte(0x01);
+			w.WriteUInt32(areaId);
 			foreach (var rec in areaHeader)
-				w.AddRange(rec);
-			w.AddRange(Encoding.ASCII.GetBytes(RrlMagic));
-			WriteU32(w, 0);
-			WriteU32(w, (uint)entries.Count);
+				w.WriteArray(rec);
+			w.WriteArray(Encoding.ASCII.GetBytes(RrlMagic));
+			w.WriteUInt32(0);
+			w.WriteUInt32((uint)entries.Count);
 			for (var i = 0; i < entries.Count; i++)
 			{
-				WriteU32(w, (uint)(i + 1)); // 1-based index
-				WriteU32(w, entries[i].QuestId);
-				WriteU32(w, ChapterTag);
-				w.AddRange(entries[i].TitleRecord);
-				w.AddRange(entries[i].SubLineRecord);
+				w.WriteUInt32((uint)(i + 1)); // 1-based index
+				w.WriteUInt32(entries[i].QuestId);
+				w.WriteUInt32(ChapterTag);
+				w.WriteArray(entries[i].TitleRecord);
+				w.WriteArray(entries[i].SubLineRecord);
 			}
 
-			w.AddRange(trailing);
+			w.WriteArray(trailing);
 			return w.ToArray();
 		}
 
@@ -230,23 +230,23 @@ namespace Faolan.Core.Network.Codecs
 		//   [u32=1] [10 zero bytes]
 		public static byte[] BuildQuestLogList(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, byte[] areaTitleRecord)
 		{
-			var w = new List<byte>(64 + questIds.Count * 8 + areaTitleRecord.Length);
+			var w = new FaolanStream();
 			WriteHeader(w, QuestLogListSubOpcode, playerHandle);
-			w.Add(0x01);
-			WriteU32(w, 1);
-			WriteU32(w, areaId);
-			WriteU32(w, trackedQuestId);
-			WriteU32(w, (uint)questIds.Count);
+			w.WriteByte(0x01);
+			w.WriteUInt32(1);
+			w.WriteUInt32(areaId);
+			w.WriteUInt32(trackedQuestId);
+			w.WriteUInt32((uint)questIds.Count);
 			for (var i = 0; i < questIds.Count; i++)
 			{
-				WriteU32(w, (uint)(i + 1));
-				WriteU32(w, questIds[i]);
+				w.WriteUInt32((uint)(i + 1));
+				w.WriteUInt32(questIds[i]);
 			}
 
-			w.AddRange(areaTitleRecord);
-			WriteU32(w, 1);
+			w.WriteArray(areaTitleRecord);
+			w.WriteUInt32(1);
 			for (var i = 0; i < 10; i++)
-				w.Add(0x00);
+				w.WriteByte(0x00);
 			return w.ToArray();
 		}
 
@@ -257,12 +257,12 @@ namespace Faolan.Core.Network.Codecs
 		// fields instead of a hex blob. (Pinning the populated tracked form needs a track-a-quest capture; #193.)
 		public static byte[] BuildTrackedQuestPointer(uint trackedQuestId = 0)
 		{
-			var w = new List<byte>(20);
-			WriteU32(w, trackedQuestId);
-			WriteU32(w, ListFrame);
-			WriteU32(w, 0); // list A (empty)
-			WriteU32(w, ListFrame);
-			WriteU32(w, 0); // list B (empty)
+			var w = new FaolanStream();
+			w.WriteUInt32(trackedQuestId);
+			w.WriteUInt32(ListFrame);
+			w.WriteUInt32(0); // list A (empty)
+			w.WriteUInt32(ListFrame);
+			w.WriteUInt32(0); // list B (empty)
 			return w.ToArray();
 		}
 
@@ -344,27 +344,11 @@ namespace Faolan.Core.Network.Codecs
 			return b;
 		}
 
-		private static void WriteHeader(List<byte> w, uint subOpcode, uint playerHandle)
+		private static void WriteHeader(FaolanStream w, uint subOpcode, uint playerHandle)
 		{
-			WriteU32(w, subOpcode);
-			WriteU32(w, TypeTagAck);
-			WriteU32(w, playerHandle);
-		}
-
-		[Obsolete("Use FaolanStream")]
-		private static void WriteU32(List<byte> w, uint v)
-		{
-			w.Add((byte)(v >> 24));
-			w.Add((byte)(v >> 16));
-			w.Add((byte)(v >> 8));
-			w.Add((byte)v);
-		}
-
-		[Obsolete("Use FaolanStream")]
-		private static void WriteU64(List<byte> w, ulong v)
-		{
-			WriteU32(w, (uint)(v >> 32));
-			WriteU32(w, (uint)v);
+			w.WriteUInt32(subOpcode);
+			w.WriteUInt32(TypeTagAck);
+			w.WriteUInt32(playerHandle);
 		}
 
 		// One line in the journal list: the quest id plus its title (cat 50301) and list sub-line (cat 50303).
