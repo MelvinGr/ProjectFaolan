@@ -17,7 +17,7 @@ namespace Faolan.Core.Rdb.Assets
 			using var result = new SKBitmap(Unpremul(bw, bh));
 			using (var canvas = new SKCanvas(result))
 			{
-				canvas.DrawBitmap(baseBmp, 0, 0);
+				Blit(canvas, baseBmp, 0, 0);
 				foreach (var d in decals)
 				{
 					using var decalBmp = FromRgba(d.Rgba, d.W, d.H);
@@ -31,7 +31,7 @@ namespace Faolan.Core.Rdb.Assets
 					canvas.Save();
 					canvas.Translate(d.U * bw, d.V * bh);
 					canvas.RotateDegrees(d.RotationDeg);
-					canvas.DrawBitmap(decalBmp, new SKRect(0, 0, d.W, d.H), new SKRect(-drawW / 2, -drawH / 2, drawW / 2, drawH / 2), paint);
+					Blit(canvas, decalBmp, new SKRect(0, 0, d.W, d.H), new SKRect(-drawW / 2, -drawH / 2, drawW / 2, drawH / 2), paint);
 					canvas.Restore();
 				}
 			}
@@ -49,8 +49,8 @@ namespace Faolan.Core.Rdb.Assets
 			using var result = new SKBitmap(Unpremul(bw, bh));
 			using (var canvas = new SKCanvas(result))
 			{
-				canvas.DrawBitmap(baseBmp, 0, 0);
-				canvas.DrawBitmap(overBmp, new SKRect(0, 0, ow, oh), new SKRect(0, 0, bw, bh));
+				Blit(canvas, baseBmp, 0, 0);
+				Blit(canvas, overBmp, new SKRect(0, 0, ow, oh), new SKRect(0, 0, bw, bh));
 			}
 
 			ForceOpaque(result);
@@ -97,14 +97,14 @@ namespace Faolan.Core.Rdb.Assets
 				IsAntialias = true
 			})
 			{
-				canvas.DrawBitmap(baseBmp, 0, 0);
+				Blit(canvas, baseBmp, 0, 0);
 
 				var drawW = scaleFraction * bw;
 				var drawH = drawW * dh / dw;
 				canvas.Save();
 				canvas.Translate(u * bw, v * bh);
 				canvas.RotateDegrees(rotationDeg);
-				canvas.DrawBitmap(decalBmp, new SKRect(0, 0, dw, dh), new SKRect(-drawW / 2, -drawH / 2, drawW / 2, drawH / 2), paint);
+				Blit(canvas, decalBmp, new SKRect(0, 0, dw, dh), new SKRect(-drawW / 2, -drawH / 2, drawW / 2, drawH / 2), paint);
 				canvas.Restore();
 			}
 
@@ -142,7 +142,7 @@ namespace Faolan.Core.Rdb.Assets
 						0, 0, 0, 1, 0
 					])
 				})
-					canvas.DrawBitmap(bmp, 0, 0, paint);
+					Blit(canvas, bmp, 0, 0, paint);
 
 				return EncodeRaw(tinted);
 			}
@@ -168,6 +168,20 @@ namespace Faolan.Core.Rdb.Assets
 		private static SKImageInfo Unpremul(int w, int h)
 		{
 			return new SKImageInfo(w, h, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+		}
+
+		// SKCanvas.DrawBitmap is obsolete in SkiaSharp 4.x; the supported path is SKImage.FromBitmap + DrawImage.
+		// `default` sampling = nearest, matching the prior DrawBitmap behaviour (no FilterQuality was ever set).
+		private static void Blit(SKCanvas canvas, SKBitmap bmp, float x, float y, SKPaint paint = null)
+		{
+			using var img = SKImage.FromBitmap(bmp);
+			canvas.DrawImage(img, x, y, default, paint);
+		}
+
+		private static void Blit(SKCanvas canvas, SKBitmap bmp, SKRect source, SKRect dest, SKPaint paint = null)
+		{
+			using var img = SKImage.FromBitmap(bmp);
+			canvas.DrawImage(img, source, dest, default, paint);
 		}
 
 		// One decal to lay onto a base atlas: RGBA pixels at (U,V) in 0..1, drawn ScaleFraction of the atlas width wide,

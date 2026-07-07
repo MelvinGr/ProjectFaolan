@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
@@ -94,37 +93,37 @@ namespace Faolan.Core.Network.Codecs
 
 		public static CharDCMove Parse(byte[] body)
 		{
-			var s = new ReadCursor(body);
-			s.U32(); // len
-			if (s.U32() != SubOpcode)
+			var s = new FaolanStream(body);
+			s.ReadUInt32(); // len
+			if (s.ReadUInt32() != SubOpcode)
 				throw new InvalidOperationException("not a CharDCMoveIIR record");
 
-			s.U32(); // 0xC350 marker
+			s.ReadUInt32(); // 0xC350 marker
 			var r = new CharDCMove
 			{
-				Handle = s.U32(),
-				Env = s.Byte(),
-				Flag1 = s.Byte(),
-				Position = s.Vec3()
+				Handle = s.ReadUInt32(),
+				Env = s.ReadByte(),
+				Flag1 = s.ReadByte(),
+				Position = s.ReadVector3()
 			};
 			if (r.Bit4)
-				r.FacingX = s.Float();
+				r.FacingX = s.ReadFloat();
 			else
-				r.MoveVector = s.Vec3();
-			r.Param6 = s.Float();
-			r.Flag2 = s.Byte();
+				r.MoveVector = s.ReadVector3();
+			r.Param6 = s.ReadFloat();
+			r.Flag2 = s.ReadByte();
 			if (r.HasMoveBlock)
 			{
 				if (!r.Bit2)
-					r.Velocity = s.Vec3();
+					r.Velocity = s.ReadVector3();
 				if (!r.Bit3)
-					r.Acceleration = s.Vec3();
-				r.Param16 = s.Float();
+					r.Acceleration = s.ReadVector3();
+				r.Param16 = s.ReadFloat();
 				if (!r.Bit1)
-					r.Heading = s.Vec3();
-				r.Param19 = s.Float();
-				r.Bool1 = s.Byte();
-				r.Bool2 = s.Byte();
+					r.Heading = s.ReadVector3();
+				r.Param19 = s.ReadFloat();
+				r.Bool1 = s.ReadByte();
+				r.Bool2 = s.ReadByte();
 			}
 
 			return r;
@@ -149,13 +148,13 @@ namespace Faolan.Core.Network.Codecs
 
 		public static Parsed Parse(byte[] body)
 		{
-			var s = new ReadCursor(body);
-			s.U32();
-			s.U32();
-			s.U32(); // len, subop, marker
-			var handle = s.U32();
-			var env = s.Byte();
-			return new Parsed(handle, env, s.Vec3(), s.Float(), s.Float(), s.Float(), s.Float());
+			var s = new FaolanStream(body);
+			s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32(); // len, subop, marker
+			var handle = s.ReadUInt32();
+			var env = s.ReadByte();
+			return new Parsed(handle, env, s.ReadVector3(), s.ReadFloat(), s.ReadFloat(), s.ReadFloat(), s.ReadFloat());
 		}
 
 		public sealed record Parsed(uint Handle, byte Env, Vector3 Position, float R0, float R1, float R2, float R3);
@@ -187,55 +186,17 @@ namespace Faolan.Core.Network.Codecs
 
 		public static Parsed Parse(byte[] body)
 		{
-			var s = new ReadCursor(body);
-			s.U32();
-			s.U32();
-			s.U32();
-			var handle = s.U32();
-			var env = s.Byte();
-			var pos = s.Vec3();
-			var (r0, r1, r2, r3) = (s.Float(), s.Float(), s.Float(), s.Float());
-			return new Parsed(handle, env, pos, r0, r1, r2, r3, s.Byte());
+			var s = new FaolanStream(body);
+			s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
+			var handle = s.ReadUInt32();
+			var env = s.ReadByte();
+			var pos = s.ReadVector3();
+			var (r0, r1, r2, r3) = (s.ReadFloat(), s.ReadFloat(), s.ReadFloat(), s.ReadFloat());
+			return new Parsed(handle, env, pos, r0, r1, r2, r3, s.ReadByte());
 		}
 
 		public sealed record Parsed(uint Handle, byte Env, Vector3 Position, float R0, float R1, float R2, float R3, byte Flag);
-	}
-
-	// A tiny big-endian read cursor over a record body (the protocol is big-endian; floats are raw-body BE).
-	[Obsolete("Use FaolanStream")]
-	internal ref struct ReadCursor
-	{
-		private readonly ReadOnlySpan<byte> _b;
-		private int _i;
-
-		public ReadCursor(ReadOnlySpan<byte> b)
-		{
-			_b = b;
-			_i = 0;
-		}
-
-		public uint U32()
-		{
-			var v = BinaryPrimitives.ReadUInt32BigEndian(_b.Slice(_i));
-			_i += 4;
-			return v;
-		}
-
-		public float Float()
-		{
-			var v = BinaryPrimitives.ReadSingleBigEndian(_b.Slice(_i));
-			_i += 4;
-			return v;
-		}
-
-		public byte Byte()
-		{
-			return _b[_i++];
-		}
-
-		public Vector3 Vec3()
-		{
-			return new Vector3(Float(), Float(), Float());
-		}
 	}
 }
