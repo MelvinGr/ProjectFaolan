@@ -10,6 +10,11 @@ namespace Faolan.GameServer
 {
     public partial class GameServerListener
     {
+        // The 0x205A PerformSpecialAction body word that identifies the necro spellweave activate/deactivate toggle
+        // (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
+        // spellweaves.
+        private const uint SpellweaveToggleParam = 0xFC;
+
         // GameCharAgent dispatch: the 0x2002/0x2003 collision forms (bind/tutorial) + every per-character method
         // (loot / shop / respawn / shortcut / latency / ...). Routed here by receiver class from ReceivedPacket.
         private async Task HandleGameCharAgentPacket(INetworkClient client, ConanPacket packet)
@@ -294,12 +299,16 @@ namespace Faolan.GameServer
 
                 case GameCharAgentOpcodes.PerformSpecialAction:
                 {
-                    // The spellweave activate/deactivate TOGGLE (docs/combos.md): first press opens the trance, second
-                    // fires the accumulated weave. Body word is the toggle param (0xfc in the capture).
+                    // 0x205A PerformSpecialAction is a GENERIC action opcode multiplexed by its body word, NOT a
+                    // spellweave-only toggle: 0xFC = the necro spellweave activate/deactivate toggle (all 3 NecroL80
+                    // spellweave captures), 0xFF = open the Crafting -> Recipes book, 0x6C/0x6D/0x70/0xF0 = melee
+                    // combo inputs (Hoxxling/AssassinL23 combo captures). Only 0xFC drives the trance - blindly routing
+                    // every 0x205A to spellweave made opening the recipe book start a weave on a necro.
                     var counter = packet.Body.ReadUInt32();
 
                     Logger.LogInformation("0x205A (PerformSpecialAction) param={Counter:X4}", counter);
-                    await _spellweave.ToggleAsync(client, counter);
+                    if (counter == SpellweaveToggleParam)
+                        await _spellweave.ToggleAsync(client, counter);
 
                     break;
                 }
