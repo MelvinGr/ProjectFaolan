@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs
 	// (FA015807 character spawns) and WorldObjectBuilder (66AEDD50 dynels): both bodies are the IIR carrier payload
 	// [u32 len][u32 subOpcode][record], and the token lives at the `18 <varint>` that closes the 0x2C transform
 	// group. Session tokens are 4-byte LEB128 varints, so the rewrite is splice-free (no length field shifts).
-	[Obsolete("NO TEMPLATING")]
+	[Obsolete("Patches the live playfield token into a captured spawn body; build the spawn from scratch with the token as input instead (construct, don't patch). Blocked on typed-column world-object construction (#187).")]
 	public static class SpawnPlayfieldRewriter
 	{
 		// Overwrites the transform's playfield-instance varint in `carrierBody` (the [u32 len][u32 subOpcode][record]

@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs
 	public static class WorldBroadcastBodies
 	{
 		// Re-addresses a captured MoveTask patrol body to a live handle + from-position (byte-exact round-trip).
-		[Obsolete("NO TEMPLATING")]
+		[Obsolete("Re-addresses a captured MoveTask patrol body in place; build the patrol from scratch from waypoint data instead (construct, don't patch). Blocked on from-scratch patrol construction (#266).")]
 		public static byte[] ReaddressPatrol(byte[] capturedBody, uint handle, Vector3 from)
 		{
 			var task = MoveTaskComposite.Parse(capturedBody);

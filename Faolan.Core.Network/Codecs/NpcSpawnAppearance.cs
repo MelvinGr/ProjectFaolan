@@ -120,7 +120,7 @@ namespace Faolan.Core.Network.Codecs
 		// body-length field @0 (which tracks total body size 1:1, as in NpcSpawnScaffold.WithMinimalPostIir). This
 		// is the humanoid counterpart of WithMinimalPostIir: the from-DB appearance table instead of the captured
 		// blob. No-op (returns the body unchanged) if no CharacterIIR is found.
-		[Obsolete("NO TEMPLATING")]
+		[Obsolete("Splices an appearance post-IIR into a captured humanoid body; build the humanoid post-IIR from scratch instead (construct, don't patch). Blocked on humanoid post-IIR decode (#243).")]
 		public static byte[] WithAppearancePostIir(byte[] body, IReadOnlyList<NpcAppearanceMorph> morphs)
 		{
 			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
