@@ -42,37 +42,16 @@ namespace Faolan.Core.Network.Packets
 		// handle, so these are pure session-volatile display ids. Left null for the byte-exact golden replay tests.
 		public static byte[] Build(uint head, IEnumerable<TradepostListing> listings, Func<int, (uint Handle, uint ItemHandle)>? mintHandles = null)
 		{
-			var s = new FaolanStream();
-			s.WriteUInt32(head);
-
+			var rows = new List<ParsedRow>();
 			var index = 0;
 			foreach (var listing in listings)
 			{
-				var entry = BuildEntry(listing);
-				byte[] entryBytes;
-				using (var ms = new MemoryStream())
-				{
-					Serializer.Serialize(ms, entry);
-					entryBytes = ms.ToArray();
-				}
-
 				var (handle, itemHandle) = mintHandles?.Invoke(index) ?? (listing.Handle, listing.ItemHandle);
-
-				s
-					.WriteUInt64(listing.SaleId)
-					.WriteUInt32(handle)
-					.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(listing.SellerName ?? ""))
-					.WriteUInt64(listing.Price)
-					.WriteUInt32(listing.Quantity)
-					.WriteUInt32(listing.ItemId)
-					.WriteUInt64(listing.InstanceField)
-					.WriteUInt32(itemHandle)
-					.WriteArrayUInt32Length(entryBytes);
-
+				rows.Add(new ParsedRow(listing.SaleId, handle, listing.SellerName ?? "", listing.Price, listing.Quantity, listing.ItemId, listing.InstanceField, itemHandle, BuildEntry(listing)));
 				index++;
 			}
 
-			return s.ToArray();
+			return new ParsedResults(head, rows).ToArray();
 		}
 
 		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItemBuilder emits, with the
@@ -127,34 +106,70 @@ namespace Faolan.Core.Network.Packets
 
 		// Decodes a captured/served body back into structured rows (the entry boundary falls out of the u32 length
 		// prefix, so no prefix-sniffing is needed - unlike the Python dissector).
-		public static ParsedResults Parse(byte[] body)
-		{
-			var s = new FaolanStream(body);
-			var head = s.ReadUInt32();
-
-			var rows = new List<ParsedRow>();
-			while (s.Position + 4 <= s.Length)
-			{
-				var saleId = s.ReadUInt64();
-				var handle = s.ReadUInt32();
-				var seller = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
-				var price = s.ReadUInt64();
-				var qty = s.ReadUInt32();
-				var itemId = s.ReadUInt32();
-				var instanceField = s.ReadUInt64();
-				var itemHandle = s.ReadUInt32();
-				var entryBytes = s.ReadArrayUInt32Length();
-
-				using var ms = new MemoryStream(entryBytes);
-				var entry = Serializer.Deserialize<ProtoInventoryGameEntry>(ms);
-				rows.Add(new ParsedRow(saleId, handle, seller, price, qty, itemId, instanceField, itemHandle, entry));
-			}
-
-			return new ParsedResults(head, rows);
-		}
+		public static ParsedResults Parse(byte[] body) => ParsedResults.Read(new FaolanStream(body));
 
 		public sealed record ParsedRow(ulong SaleId, uint Handle, string Seller, ulong Price, uint Quantity, uint ItemId, ulong InstanceField, uint ItemHandle, ProtoInventoryGameEntry Entry);
 
-		public sealed record ParsedResults(uint Head, IReadOnlyList<ParsedRow> Rows);
+		// The decoded AH search grid as a self-serializing codec (ICodec): Write frames [head][row*] (each row's
+		// trailing ProtoInventoryGameEntry serialized length-prefixed); Read recovers the rows.
+		public sealed record ParsedResults(uint Head, IReadOnlyList<ParsedRow> Rows) : ICodec<ParsedResults>
+		{
+			public byte[] ToArray()
+			{
+				using var s = new FaolanStream();
+				Write(s);
+				return s.ToArray();
+			}
+
+			public void Write(FaolanStream s)
+			{
+				s.WriteUInt32(Head);
+				foreach (var row in Rows)
+				{
+					byte[] entryBytes;
+					using (var ms = new MemoryStream())
+					{
+						Serializer.Serialize(ms, row.Entry);
+						entryBytes = ms.ToArray();
+					}
+
+					s
+						.WriteUInt64(row.SaleId)
+						.WriteUInt32(row.Handle)
+						.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(row.Seller ?? ""))
+						.WriteUInt64(row.Price)
+						.WriteUInt32(row.Quantity)
+						.WriteUInt32(row.ItemId)
+						.WriteUInt64(row.InstanceField)
+						.WriteUInt32(row.ItemHandle)
+						.WriteArrayUInt32Length(entryBytes);
+				}
+			}
+
+			public static ParsedResults Read(FaolanStream s)
+			{
+				var head = s.ReadUInt32();
+
+				var rows = new List<ParsedRow>();
+				while (s.Position + 4 <= s.Length)
+				{
+					var saleId = s.ReadUInt64();
+					var handle = s.ReadUInt32();
+					var seller = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
+					var price = s.ReadUInt64();
+					var qty = s.ReadUInt32();
+					var itemId = s.ReadUInt32();
+					var instanceField = s.ReadUInt64();
+					var itemHandle = s.ReadUInt32();
+					var entryBytes = s.ReadArrayUInt32Length();
+
+					using var ms = new MemoryStream(entryBytes);
+					var entry = Serializer.Deserialize<ProtoInventoryGameEntry>(ms);
+					rows.Add(new ParsedRow(saleId, handle, seller, price, qty, itemId, instanceField, itemHandle, entry));
+				}
+
+				return new ParsedResults(head, rows);
+			}
+		}
 	}
 }
