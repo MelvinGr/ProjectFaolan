@@ -107,7 +107,7 @@ namespace Faolan.Tests
 			Assert.True(original.Length == produced.Length && firstDiff == -1, $"len orig={original.Length} produced={produced.Length} firstDiff={firstDiff}");
 		}
 
-		// The non-Strie path: substitute the instance (like RewriteBurstInstance) THEN parse->full-rebuild, and
+		// The non-Strie path: substitute the live instance into the snapshot THEN parse->full-rebuild, and
 		// compare to the substituted packet. If this diverges, the substitute+rebuild interaction is the stall.
 		[Fact]
 		public void BurstInventory_SubstitutedFullRebuild_IsByteIdentical()
