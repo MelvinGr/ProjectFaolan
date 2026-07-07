@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.CSPlayerAgent
 {
@@ -20,7 +21,7 @@ namespace Faolan.CSPlayerAgent
 	// total - it is the per-guild value ForRenown splices in); the rest are the captured guild's feat/city/cap
 	// values whose meanings the stripped binary doesn't name, so neutral structural names are kept. Caps like
 	// 0x01C9C380 (30,000,000, Group4[1]) and 0x3A1D51C0 (975,000,000, Counters64D) are constants, NOT renown.
-	public sealed class GuildRenownBlock
+	public sealed class GuildRenownBlock : ICodec<GuildRenownBlock>
 	{
 		public const int Length = 277;
 
@@ -62,9 +63,18 @@ namespace Faolan.CSPlayerAgent
 		public ulong[] RenownCounters { get; set; } = new ulong[6];
 
 		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
-		public byte[] Encode()
+		public byte[] Encode() => ToArray();
+
+		public byte[] ToArray()
 		{
-			var s = new FaolanStream().WriteByte(Flag);
+			using var s = new FaolanStream();
+			Write(s);
+			return s.ToArray();
+		}
+
+		public void Write(FaolanStream s)
+		{
+			s.WriteByte(Flag);
 			WriteList(s, StatIds);
 			s.WriteByte(BoolA).WriteByte(BoolB);
 			foreach (var v in Group1)
@@ -84,8 +94,11 @@ namespace Faolan.CSPlayerAgent
 			foreach (var v in Counters64C)
 				s.WriteUInt64(v);
 			s.WriteUInt32(Group5).WriteUInt64(Counters64D);
-			return s.ToArray();
 		}
+
+		// ICodec stream Read: the block is a fixed 277 bytes; delegate to the span-based Decode (the zero-copy entry
+		// point used when the block is a sub-region of the 0x203F guild-update body).
+		public static GuildRenownBlock Read(FaolanStream s) => Decode(s.ReadArray(Length));
 
 		// The captured "Sepulchra Invictus" block as structured fields (replaces the old hand-transcribed verbatim
 		// blob, which had dropped 3 bytes -> 274 not 277, misaligning the roster). Encode() reproduces the capture

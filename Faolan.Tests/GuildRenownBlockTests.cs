@@ -38,6 +38,9 @@ namespace Faolan.Tests
 
 			var block = GuildRenownBlock.Decode(golden);
 			Assert.Equal(golden, block.Encode());
+
+			// ICodec stream Read/ToArray round-trips too.
+			Assert.Equal(golden, GuildRenownBlock.Read(new Faolan.Core.FaolanStream(golden)).ToArray());
 		}
 
 		[Fact]
