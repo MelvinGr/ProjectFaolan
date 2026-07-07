@@ -2,9 +2,9 @@ using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.FullCharSnapshot;
 using Faolan.TestClient;
 using System.Security.Cryptography;
 
@@ -286,7 +286,7 @@ static bool TryDecodeSnapshot(ConanPacket packet)
         var root = FullCharSnapshotReader.ParseInventoryPacketBody(body).Root;
 
         Console.WriteLine("  >>> FullChar snapshot (0x737A6DF9) — decoded via FullCharSnapshotReader:");
-        foreach (FullCharSnapshotReader.ContainerKind kind in Enum.GetValues(typeof(FullCharSnapshotReader.ContainerKind)))
+        foreach (ContainerKind kind in Enum.GetValues(typeof(ContainerKind)))
         {
             var container = FullCharSnapshotReader.GetContainer(root, kind);
             var entries = FullCharSnapshotReader.GetContainerEntries(container).ToList();
