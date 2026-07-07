@@ -178,7 +178,8 @@ namespace Faolan.Core.Network.Codecs
 			return true;
 		}
 
-		[Obsolete("Use FaolanStream")]
+		// Bounded varint read over a span cursor: returns false on truncation instead of throwing (FaolanStream.ReadVarint
+		// throws), so the caller can bail gracefully mid-parse of an untrusted body.
 		private static bool TryReadVarint(ReadOnlySpan<byte> b, ref int i, out ulong value)
 		{
 			value = 0;

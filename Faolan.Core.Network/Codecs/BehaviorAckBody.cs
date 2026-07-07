@@ -1,9 +1,7 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Packets;
 
 namespace Faolan.Core.Network.Codecs
 {
@@ -93,12 +91,9 @@ namespace Faolan.Core.Network.Codecs
 		}
 
 		// field3 as protobuf: tag 0x18 (field 3, varint) + the base-128 varint of `value`.
-		[Obsolete("Use FaolanStream")]
 		private static byte[] EncodeBehaviorPhase(uint value)
 		{
-			var bytes = new List<byte> { 0x18 };
-			Varint.WriteVarint(bytes, value);
-			return bytes.ToArray();
+			return new FaolanStream().WriteByte(0x18).WriteVarint(value).ToArray();
 		}
 
 		// Byte offset just after `fieldNumber`'s value in a protobuf message (the message end if absent/malformed).

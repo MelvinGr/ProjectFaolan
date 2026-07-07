@@ -260,6 +260,16 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
+		// Little-endian float (protobuf fixed32) - the write counterpart to ReadUInt32LittleEndian, for the LE
+		// fixed32 transform floats, distinct from the big-endian WriteFloat the raw wire bodies use.
+		public FaolanStream WriteFloatLittleEndian(float value)
+		{
+			Span<byte> buffer = stackalloc byte[sizeof(float)];
+			BinaryPrimitives.WriteSingleLittleEndian(buffer, value);
+
+			return WriteArray(buffer);
+		}
+
 		public FaolanStream WriteQuaternion(Quaternion value)
 		{
 			WriteFloat(value.X);

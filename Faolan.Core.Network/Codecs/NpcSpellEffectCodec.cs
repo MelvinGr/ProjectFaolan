@@ -15,13 +15,12 @@ namespace Faolan.Core.Network.Codecs
 	{
 		public const int Length = 54;
 
-		// ICodec seam over the fixed-offset 54-byte payload (ToBytes/Parse remain the byte-packed core).
-		public void Write(FaolanStream s) => s.WriteArray(ToBytes());
-		public byte[] ToArray() => ToBytes();
+		// ICodec seam over the fixed-offset 54-byte payload (ToArray/Parse remain the byte-packed core - the payload
+		// is a sparse fixed-offset layout with every other byte a constant 0, which does not map to sequential writes).
+		public void Write(FaolanStream s) => s.WriteArray(ToArray());
 		public static NpcSpellEffect Read(FaolanStream s) => Parse(s.ReadArray(Length));
 
-		[Obsolete("Use FaolanStream")]
-		public byte[] ToBytes()
+		public byte[] ToArray()
 		{
 			var b = new byte[Length];
 			BinaryPrimitives.WriteUInt16BigEndian(b.AsSpan(10), Duration);

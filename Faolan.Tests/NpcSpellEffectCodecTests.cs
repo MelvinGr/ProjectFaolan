@@ -4,7 +4,7 @@ using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gate for the NpcSpell effect-payload codec (#304): Parse(captured) then ToBytes() reproduces the
+	// Byte-exact gate for the NpcSpell effect-payload codec (#304): Parse(captured) then ToArray() reproduces the
 	// captured 54-byte ApplySpell effect payload for every field shape seen in the captures. Samples cover a normal
 	// buff (Rend), a debuff (Rooted), the magnitude != rank case (Runed Flesh @29=14/@45=21) and a big-value cast.
 	public class NpcSpellEffectCodecTests
@@ -18,7 +18,7 @@ namespace Faolan.Tests
 			var captured = Convert.FromHexString(hex);
 			var effect = NpcSpellEffect.Parse(captured);
 
-			Assert.Equal(hex, Convert.ToHexString(effect.ToBytes()));
+			Assert.Equal(hex, Convert.ToHexString(effect.ToArray()));
 		}
 
 		[Fact]

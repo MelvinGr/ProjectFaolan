@@ -125,7 +125,7 @@ namespace Faolan.Core.Network.Codecs
 			return result;
 		}
 
-		[Obsolete("Use FaolanStream")]
+		[Obsolete("Splice/patch path - build the spawn packet from scratch instead (construct, don't patch)")]
 		private static void AddBigEndian(byte[] buffer, int offset, int delta)
 		{
 			var value = (uint)(BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4)) + delta);
