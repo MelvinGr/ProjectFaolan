@@ -15,6 +15,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Importer.Cli
 {

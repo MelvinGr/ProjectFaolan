@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.Spawn
 {

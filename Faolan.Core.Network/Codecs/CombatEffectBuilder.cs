@@ -2,7 +2,7 @@ using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.GameServer.Combat
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds the two combat-EFFECT IIR carrier contents decoded from the guardian combat capture
 	// (Blablabla_..._random-actions-combat): the floating damage number and the buff/debuff stat effect (#274).

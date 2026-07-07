@@ -6,6 +6,7 @@ using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.Tests
 {

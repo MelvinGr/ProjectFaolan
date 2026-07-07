@@ -13,6 +13,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Codecs;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
