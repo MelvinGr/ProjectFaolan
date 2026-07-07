@@ -434,18 +434,6 @@ namespace Faolan.GameServer.Dialogue
 			client.Session.ConversationAgentInstance = 0;
 		}
 
-		internal static byte[] BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
-		{
-			var body = new FaolanStream().WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle).WriteUInt32(EntityClass.Character).WriteUInt32(liveInstance).WriteArray(cameraParams ?? []).ToArray();
-
-			var ps = new PacketStream().WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, agentInstance),
-				ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, liveInstance),
-				(ushort)ConversationScreenDecoder.SetDialogueCamera);
-			ps.WriteArray(body);
-			ps.WriteLengthHash();
-			return ps.ToArray();
-		}
-
 		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen text comes from ScreensJson, the
 		// live player name/guild are regenerated in. Byte-identical to the Data-path construct for the same inputs
 		// (gated by ConversationStructuredScreenTests), so swapping the source doesn't change the wire output.
@@ -608,7 +596,7 @@ namespace Faolan.GameServer.Dialogue
 		// Byte-identical to the captured packet re-addressed (gated by the construct test).
 		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
 		{
-			return client.SendAsync(BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
+			return client.SendAsync(DialogueCameraBody.BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
 		}
 
 		// The packet's Knubot sub-opcode: the stored column when structured, else read from the raw Data.

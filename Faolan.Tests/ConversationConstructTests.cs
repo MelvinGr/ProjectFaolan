@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			var npc = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 4, 4));
 			var player = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 12, 4));
 
-			var rebuilt = ConversationService.BuildDialogueCameraPacket(cols.CameraAgentInstance!.Value, player, npc, cols.CameraParams);
+			var rebuilt = DialogueCameraBody.BuildDialogueCameraPacket(cols.CameraAgentInstance!.Value, player, npc, cols.CameraParams);
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(rebuilt));
 		}
 
