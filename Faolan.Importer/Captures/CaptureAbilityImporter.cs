@@ -27,7 +27,7 @@ namespace Faolan.Importer.Captures
     {
         private const uint ChangeClassSubOpcode = 0xA36D3B74; // client->server character-editor script callback
         private const uint ComboBookSubOpcode = 0xA8BBEB7F;
-        private const ushort AbilityGrantOpcode = 0x2052;
+        private const ushort AddSpecialAbilityOpcode = 0x2052;
         private const ushort IirCarrierOpcode = 0x2000; // ComboBookIIR rides the 0x2000 world-conversation carrier
 
         // The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
@@ -198,7 +198,7 @@ namespace Faolan.Importer.Captures
         {
             var grants = new Dictionary<uint, (uint Slot, uint D0, uint D1, uint D2, uint D3, uint D4)>();
             foreach (var packet in rawPackets)
-                TryReadAbilityGrant(packet, grants);
+                TryReadAddSpecialAbility(packet, grants);
 
             if (grants.Count == 0)
                 return (0, 0, 0);
@@ -361,12 +361,12 @@ namespace Faolan.Importer.Captures
         }
 
         // 0x2052 body (no length prefix): [slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]x2[1][0][u8].
-        private static void TryReadAbilityGrant(byte[] packetBytes, IDictionary<uint, (uint, uint, uint, uint, uint, uint)> grants)
+        private static void TryReadAddSpecialAbility(byte[] packetBytes, IDictionary<uint, (uint, uint, uint, uint, uint, uint)> grants)
         {
             try
             {
                 var packet = new ConanPacket(packetBytes);
-                if (packet.Opcode != AbilityGrantOpcode)
+                if (packet.Opcode != AddSpecialAbilityOpcode)
                     return;
 
                 var body = packet.Body.ReadRemainingArray();
@@ -473,7 +473,7 @@ namespace Faolan.Importer.Captures
                 }
                 else
                 {
-                    if (packet.Opcode != AbilityGrantOpcode || body.Length < 12)
+                    if (packet.Opcode != AddSpecialAbilityOpcode || body.Length < 12)
                         return;
 
                     id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)); // ability id (word 1)

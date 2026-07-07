@@ -94,7 +94,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 				values.Add(sheet[i].Value);
 			}
 
-			values.Add(((uint)sheetCount * 2 + 1) * StatPairList.Frame); // StatList#2 count = 0x24B45 for 74 pairs
+			values.Add(((uint)sheetCount * 2 + 1) * StatList.Frame); // StatList#2 count = 0x24B45 for 74 pairs
 			for (var copy = 0; copy < 2; copy++)
 			for (var i = displayedCount; i < sheet.Count; i++)
 			{
@@ -103,7 +103,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			}
 
 			var records = known?.Records ?? [];
-			values.Add(((uint)records.Count + 1) * StatPairList.Frame); // known-spell list count (0x3F1 when empty)
+			values.Add(((uint)records.Count + 1) * StatList.Frame); // known-spell list count (0x3F1 when empty)
 			foreach (var record in records)
 			{
 				values.Add(record.Id);
@@ -117,7 +117,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 			{
 				Marker0 = Marker, // the two preceding empty framed lists (List E / F)
 				Marker1 = Marker,
-				BlockType = ((uint)displayedCount + 1) * StatPairList.Frame, // StatList#1 count word = 0x46F2
+				BlockType = ((uint)displayedCount + 1) * StatList.Frame, // StatList#1 count word = 0x46F2
 				Values = values,
 				Trailer = [0x00],
 				// Non-null so HasKnownRepeatedStatTable is true and the caller's vitals patches (which write the +148
@@ -221,10 +221,10 @@ namespace Faolan.GameServer.FullCharSnapshot
 			list = null;
 			end = off;
 			var count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(off, 4));
-			if (count == 0 || count % StatPairList.Frame != 0)
+			if (count == 0 || count % StatList.Frame != 0)
 				return false;
 
-			var n = (int)(count / StatPairList.Frame) - 1;
+			var n = (int)(count / StatList.Frame) - 1;
 			if (off + 4 + n * 8 > body.Length)
 				return false;
 

@@ -18,7 +18,7 @@ namespace Faolan.GameServer
 		// Push a live single-item add into a container (backpack 0x68, bank 0x69, ...). See Outbound/AddItemBuilder.
 		Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0);
 
-		// Push the wallet update (absolute balance in TIN) to the client. See Outbound/MoneyUpdateSender.
-		Task SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason);
+		// Push the wallet update (absolute balance in TIN) to the client. See Outbound/UpdateCashSender.
+		Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason);
 	}
 }

@@ -7,7 +7,7 @@ namespace Faolan.Tests
 	// Locks the 0x2052 ability-grant body to the retail wire format. The expected bytes are the bodies (everything
 	// after the 16-bit opcode) of the strickenbla combat capture's ability grants - pkt#399 (Normal Attack Left,
 	// 769094) and pkt#401 (Normal Attack Front, 769099) - and the Ability fields are the matching faolan.db rows.
-	public class AbilityGrantTests
+	public class AddSpecialAbilityTests
 	{
 		[Theory,
 		 InlineData(769094u,
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			 3870783406u,
 			 1887832719u,
 			 "0000006a00041bd800041bd800000000000000014e353335789d4cc5bac997efe6b777ae70860a8f789d4cc5bac997efe6b777ae70860a8fb290805c29e627cab290805c29e627ca000000010000000001")]
-		public void BuildAbilityGrantBody_MatchesCapture(uint id, uint slot, uint data0, uint data1, uint data2, uint data3, uint data4, string expectedHex)
+		public void BuildAddSpecialAbilityBody_MatchesCapture(uint id, uint slot, uint data0, uint data1, uint data2, uint data3, uint data4, string expectedHex)
 		{
 			var ability = new Ability
 			{
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 				Data4 = data4
 			};
 
-			var body = GameServerListener.BuildAbilityGrantBody(ability);
+			var body = GameServerListener.BuildAddSpecialAbilityBody(ability);
 
 			Assert.Equal(expectedHex, ToHex(body));
 		}
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 		// "You have learned a new ability" for the whole starting kit on every login. The captures show this is the
 		// ONLY byte that differs between a create-flow grant (announce) and a login re-grant for the same ability.
 		[Fact]
-		public void BuildAbilityGrantBody_Silent_ClearsTheAnnounceByte()
+		public void BuildAddSpecialAbilityBody_Silent_ClearsTheAnnounceByte()
 		{
 			var ability = new Ability
 			{
@@ -72,8 +72,8 @@ namespace Faolan.Tests
 				Data4 = 3015939650u
 			};
 
-			var announced = ToHex(GameServerListener.BuildAbilityGrantBody(ability));
-			var silent = ToHex(GameServerListener.BuildAbilityGrantBody(ability, false));
+			var announced = ToHex(GameServerListener.BuildAddSpecialAbilityBody(ability));
+			var silent = ToHex(GameServerListener.BuildAddSpecialAbilityBody(ability, false));
 
 			Assert.EndsWith("0000000001", announced);
 			Assert.EndsWith("0000000000", silent);
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void TryParseAbilityGrantBody_RejectsMalformed()
+		public void TryParseAddSpecialAbilityBody_RejectsMalformed()
 		{
 			var ability = new Ability
 			{
@@ -94,21 +94,21 @@ namespace Faolan.Tests
 				Data3 = 4u,
 				Data4 = 5u
 			};
-			var body = GameServerListener.BuildAbilityGrantBody(ability);
+			var body = GameServerListener.BuildAddSpecialAbilityBody(ability);
 
-			Assert.False(GameServerListener.TryParseAbilityGrantBody(new byte[80], out _, out _)); // wrong length
+			Assert.False(GameServerListener.TryParseAddSpecialAbilityBody(new byte[80], out _, out _)); // wrong length
 			var corruptId = (byte[])body.Clone();
 			corruptId[8] ^= 0xFF; // break the duplicated Id (field index 2)
-			Assert.False(GameServerListener.TryParseAbilityGrantBody(corruptId, out _, out _));
+			Assert.False(GameServerListener.TryParseAddSpecialAbilityBody(corruptId, out _, out _));
 			var corruptConst = (byte[])body.Clone();
 			corruptConst[14 * 4] ^= 0xFF; // break the B290805C constant
-			Assert.False(GameServerListener.TryParseAbilityGrantBody(corruptConst, out _, out _));
+			Assert.False(GameServerListener.TryParseAddSpecialAbilityBody(corruptConst, out _, out _));
 		}
 
 		// Build -> Parse must recover the exact Ability fields and announce flag (the body duplicates Id and Data1..4,
 		// so the parser has structural invariants to check). Same capture rows as the build test.
 		[Theory, InlineData(769094u, 108u, 1263352118u, 3236668225u, 2153842419u, 314062142u, 3015939650u, true), InlineData(769099u, 112u, 1227967307u, 3443694845u, 1660108369u, 1296666148u, 2957995211u, false)]
-		public void TryParseAbilityGrantBody_RoundTripsBuild(uint id, uint slot, uint data0, uint data1, uint data2, uint data3, uint data4, bool announce)
+		public void TryParseAddSpecialAbilityBody_RoundTripsBuild(uint id, uint slot, uint data0, uint data1, uint data2, uint data3, uint data4, bool announce)
 		{
 			var original = new Ability
 			{
@@ -120,9 +120,9 @@ namespace Faolan.Tests
 				Data3 = data3,
 				Data4 = data4
 			};
-			var body = GameServerListener.BuildAbilityGrantBody(original, announce);
+			var body = GameServerListener.BuildAddSpecialAbilityBody(original, announce);
 
-			Assert.True(GameServerListener.TryParseAbilityGrantBody(body, out var parsed, out var parsedAnnounce));
+			Assert.True(GameServerListener.TryParseAddSpecialAbilityBody(body, out var parsed, out var parsedAnnounce));
 			Assert.Equal(announce, parsedAnnounce);
 			Assert.Equal(original.Id, parsed.Id);
 			Assert.Equal(original.Slot, parsed.Slot);

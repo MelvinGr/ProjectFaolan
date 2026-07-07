@@ -78,7 +78,7 @@ namespace Faolan.GameServer.World
 			{
 				character.Money += cash;
 				await _database.SetCharacterMoney(character.Id, character.Money);
-				await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+				await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 				_logger.LogInformation("Loot: {Player} looted {Cash} tin from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
 			}
 			else

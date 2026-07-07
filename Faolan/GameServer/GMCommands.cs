@@ -546,7 +546,7 @@ namespace Faolan.GameServer
 				// Level-gated ability unlocks, announced - same as the XP-driven ding (CombatService.PushLevelUp):
 				// retail grants e.g. Rest as an announced 0x2052 at the L1->L2 ding (#209/#73).
 				foreach (var ability in await Database.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, level))
-					await SendAbilityGrant(client, ability);
+					await SendAddSpecialAbility(client, ability);
 
 				// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level is in the crossed range,
 				// learned + persisted like .learnspell (so they ride every relog). Same as the XP-driven ding.

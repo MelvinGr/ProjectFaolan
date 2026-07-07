@@ -7,31 +7,31 @@ namespace Faolan.Tests
 	// Proves the recovered stat-block grammar: the FullChar snapshot's stat block is TWO 0x3F1-framed StatPair_t
 	// lists (docs/fullplayer-snapshot-reader.md regions 9-10), preceded by two empty framed lists and followed by a
 	// trailer. StatList#1 = 17 displayed stats (Level/XP/MaxXP/HP...), StatList#2 = 148 full-sheet stats. Parses the
-	// actual SubClassStatBlock bytes with StatPairList and re-serializes them byte-exact.
-	public class StatPairListTests
+	// actual SubClassStatBlock bytes with StatList and re-serializes them byte-exact.
+	public class StatListTests
 	{
 		[Fact]
 		public void Set_OverridesEveryOccurrence()
 		{
-			var list = new StatPairList { Pairs = [(0x36, 1), (0x1B, 9800), (0x36, 1)] };
+			var list = new StatList { Pairs = [(0x36, 1), (0x1B, 9800), (0x36, 1)] };
 			list.Set(0x36, 40);
 			Assert.Equal(40u, list.Get(0x36));
 			Assert.All(list.Pairs.FindAll(p => p.Id == 0x36), p => Assert.Equal(40u, p.Value));
 		}
 
 		[Fact]
-		public void StatBlock_ParsesAsTwoFramedStatPairLists_AndRoundTripsByteExact()
+		public void StatBlock_ParsesAsTwoFramedStatLists_AndRoundTripsByteExact()
 		{
 			var original = SubClassStatBlock.Serialize(SubClassStatBlock.CreateFreshBlock());
 
 			var r = new FaolanStream(original);
 			var emptyE = r.ReadUInt32(); // two empty framed lists (List E / F)
 			var emptyF = r.ReadUInt32();
-			var list1 = StatPairList.Read(r);
-			var list2 = StatPairList.Read(r);
+			var list1 = StatList.Read(r);
+			var list2 = StatList.Read(r);
 
-			Assert.Equal(StatPairList.Frame, emptyE); // 0x3F1 = empty list (0 records)
-			Assert.Equal(StatPairList.Frame, emptyF);
+			Assert.Equal(StatList.Frame, emptyE); // 0x3F1 = empty list (0 records)
+			Assert.Equal(StatList.Frame, emptyF);
 			Assert.Equal(17, list1.Pairs.Count); // displayed stats
 			Assert.Equal(148, list2.Pairs.Count); // full sheet
 			Assert.Equal(0x46F2u, list1.CountWord); // 18 * 0x3F1

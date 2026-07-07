@@ -20,7 +20,7 @@ namespace Faolan.GameServer
     {
         // Tradepost (auction house) + mail state-mutating ops, folded off the former TradepostService onto the
         // listener. HandleTradepostPacket (Inbound/HandleTradepost.cs) dispatches to these. They use Database /
-        // Logger and the listener's own SendMoneyUpdate / SendAddItem (its IEconomyOutbound impl) directly.
+        // Logger and the listener's own SendUpdateCash / SendAddItem (its IEconomyOutbound impl) directly.
 
         // Mail wire/DB constants (MailConstants.EndpointClass / FooterUnread / AttachmentTrailerWord / ExpirySeconds) live in
         // the shared Faolan.Core MailConstants so the server and the MCP economy tools agree on one source.
@@ -58,7 +58,7 @@ namespace Faolan.GameServer
 
             character.Money -= listing.Price;
             await Database.SetCharacterMoney(character.Id, character.Money);
-            await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+            await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
             var mail = await BuildPurchaseMail(character.Name, listing);
             await Database.CreateMail(mail);
@@ -278,7 +278,7 @@ namespace Faolan.GameServer
             // listing deposit / postage fee. Verified across the sell / send-mail / change-price / cancel captures
             // (necrol80 stays at 1,365,148 tin throughout), #182. Push the current balance (reason 0, as captured) so
             // the HUD stays in sync; no debit.
-            await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+            await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
             Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.",
                 character.Name,
@@ -365,7 +365,7 @@ namespace Faolan.GameServer
             // Retail pushes a 0x2005 wallet refresh after SendMail too - again with NO postage fee (the captured
             // balance is unchanged across the send-mail-with-attachment capture), #182. Push the current balance so
             // the HUD stays in sync (reflects any attached money debit elsewhere; the item attachment itself is free).
-            await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+            await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
             Logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
         }
@@ -464,7 +464,7 @@ namespace Faolan.GameServer
             var credited = mail.Money;
             character.Money += credited;
             await Database.SetCharacterMoney(character.Id, character.Money);
-            await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+            await SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
             await Database.SetMailMoney(mail.MailId, 0);
             mail.Money = 0;
             Logger.LogInformation("Tradepost mail: {Char} banked {Tin} tin from mail 0x{Mail:X16}.", character.Name, credited, mail.MailId);

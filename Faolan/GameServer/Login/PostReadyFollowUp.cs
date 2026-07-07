@@ -200,7 +200,7 @@ namespace Faolan.GameServer
 				// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
 				// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration.
 				if (client.Session.Character.Money > 0)
-					await SendMoneyUpdate(client, client.Session.Character.Money, MoneyUpdateReason.Spend);
+					await SendUpdateCash(client, client.Session.Character.Money, UpdateCashReason.Spend);
 
 				// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
 				// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry

@@ -36,10 +36,10 @@ namespace Faolan.GameServer.Combat
         // The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
         // it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
         // composition pattern prescribes (CLAUDE.md). Null-safe for tests that construct the service without it.
-        private readonly Func<INetworkClient, Ability, Task> _announceAbilityGrant;
+        private readonly Func<INetworkClient, Ability, Task> _announceAddSpecialAbility;
 
         // The listener's live spell-learn op (DispatchLearnSpell 0x200A), for the level-up spell unlocks (#209). Same
-        // narrow-seam pattern as _announceAbilityGrant. Null-safe for tests that construct the service without it.
+        // narrow-seam pattern as _announceAddSpecialAbility. Null-safe for tests that construct the service without it.
         private readonly Func<INetworkClient, uint, Task> _learnSpell;
         private readonly IDatabaseRepository _database;
         private readonly ILogger _logger;
@@ -49,14 +49,14 @@ namespace Faolan.GameServer.Combat
 
         // Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
         // seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
-        public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAbilityGrant = null,
+        public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAddSpecialAbility = null,
             Func<INetworkClient, uint, Task> learnSpell = null)
         {
             _sim = sim;
             _database = database;
             _questProgression = questProgression;
             _logger = logger;
-            _announceAbilityGrant = announceAbilityGrant;
+            _announceAddSpecialAbility = announceAddSpecialAbility;
             _learnSpell = learnSpell;
         }
 
@@ -501,10 +501,10 @@ namespace Faolan.GameServer.Combat
             // Stihetfv 685 - and in every L2+ char's login re-grant). The class<->ability map gives the per-class
             // unlock level, so the ding grants are the band newly crossed.
             var previousLevel = character.Level - levelsGained;
-            if (_announceAbilityGrant != null)
+            if (_announceAddSpecialAbility != null)
             {
                 foreach (var ability in await _database.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, character.Level))
-                    await _announceAbilityGrant(killer, ability);
+                    await _announceAddSpecialAbility(killer, ability);
             }
 
             // Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level falls in the newly-crossed

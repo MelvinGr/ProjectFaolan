@@ -94,7 +94,7 @@ namespace Faolan.GameServer.Economy.Shop
 
 			character.Money -= price;
 			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			_logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).",
 				character.Name,
@@ -147,7 +147,7 @@ namespace Faolan.GameServer.Economy.Shop
 			ps.WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceDispatchOpcodes.DispatchItemSoldToShop);
 			WriteItemSoldBody(ps, container, sellerId, slot);
 			await ps.SendAsync(client);
-			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 
 			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).",
 				character.Name,
@@ -174,7 +174,7 @@ namespace Faolan.GameServer.Economy.Shop
 				? character.Money - sale.PriceTin
 				: 0;
 			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).", character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
 		}

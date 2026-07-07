@@ -121,7 +121,7 @@ namespace Faolan.GameServer
             _persistence = new PlayerPersistenceService(database, logger, _simulation);
             _broadcaster = new WorldBroadcaster(_simulation, database, logger);
             _questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
-            _combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAbilityGrant(c, a), SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
+            _combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
             _spellweave = new SpellweaveService(logger,
                 (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
                 ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)

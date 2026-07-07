@@ -15,7 +15,7 @@ namespace Faolan.GameServer
 	// initial balance presumably rides the FullChar snapshot, location undecoded); we push on every change.
 	// The unit is TIN, the game's smallest coin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver =
 	// 1 gold) - verified in-client 2026-06-12: a balance of 100 displays as 1 copper.
-	public enum MoneyUpdateReason : uint
+	public enum UpdateCashReason : uint
 	{
 		Spend = 0, // also used for syncs that don't celebrate a gain
 		Unknown2 = 2, // seen once in the captures; semantics unknown
@@ -26,18 +26,18 @@ namespace Faolan.GameServer
 	{
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
 		// record stream (the retail money updates ride that conversation).
-		private async Task SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)
+		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
 		{
 			var ps = new PacketStream();
 			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchUpdateCash);
-			WriteMoneyUpdateBody(ps, balanceTin, reason);
+			WriteUpdateCashBody(ps, balanceTin, reason);
 			await ps.SendAsync(client);
 
 			Logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
 		}
 
-		// The 12-byte wire body; golden-tested against the captured first-coin-loot update (MoneyUpdateTests).
-		internal static void WriteMoneyUpdateBody(FaolanStream s, ulong balanceTin, MoneyUpdateReason reason)
+		// The 12-byte wire body; golden-tested against the captured first-coin-loot update (UpdateCashTests).
+		internal static void WriteUpdateCashBody(FaolanStream s, ulong balanceTin, UpdateCashReason reason)
 		{
 			s.WriteUInt64(balanceTin).WriteUInt32(reason);
 		}

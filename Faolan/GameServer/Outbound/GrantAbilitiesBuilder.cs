@@ -16,12 +16,12 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		internal const int AbilityGrantBodyLength = 81; // 20 u32 fields + the announce byte
+		internal const int AddSpecialAbilityBodyLength = 81; // 20 u32 fields + the announce byte
 
 		// The 0x2052 ability-grant body carries this same 16-byte pair twice, identical for every ability and across
 		// every grant burst in the strickenbla combat capture - a fixed category/owner word, not ability-specific.
-		private const uint AbilityGrantConstantA = 0xB290805C;
-		private const uint AbilityGrantConstantB = 0x29E627CA;
+		private const uint AddSpecialAbilityConstantA = 0xB290805C;
+		private const uint AddSpecialAbilityConstantB = 0x29E627CA;
 
 		// Ensures the character's LOADOUT on EVERY world entry (#74/#71), not just at creation:
 		//  (1) ALWAYS makes the class's spells + abilities KNOWN to the client (the client keeps no persistent kit),
@@ -146,9 +146,9 @@ namespace Faolan.GameServer
 			// Login is a SILENT re-grant: the abilities were already learned (in the create flow / on first learn), so
 			// the announce flag is cleared - otherwise the client pops "You have learned a new ability" for the whole
 			// kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
-			// 0x01, the per-login re-grants carry 0x00 (the ONLY differing byte; see BuildAbilityGrantBody).
+			// 0x01, the per-login re-grants carry 0x00 (the ONLY differing byte; see BuildAddSpecialAbilityBody).
 			foreach (var ability in abilities)
-				await SendAbilityGrant(client, ability, false);
+				await SendAddSpecialAbility(client, ability, false);
 
 			Logger.LogInformation("GrantCharacterAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
 		}
@@ -207,9 +207,9 @@ namespace Faolan.GameServer
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
 		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
 		// level-up), false for the silent per-login re-grant.
-		private Task SendAbilityGrant(INetworkClient client, Ability ability, bool announce = true)
+		private Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true)
 		{
-			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052).WriteArray(BuildAbilityGrantBody(ability, announce)).SendAsync(client);
+			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052).WriteArray(BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
 		}
 
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
@@ -223,11 +223,11 @@ namespace Faolan.GameServer
 			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchLearnSpell).WriteArray(BuildLearnSpellBody(spellId)).SendAsync(client);
 		}
 
-		// The 0x2052 body (everything after the opcode), byte-for-byte as retail (locked by AbilityGrantTests against
-		// the create-flow capture). See SendAbilityGrant for the field meaning. The final byte is the announce flag:
+		// The 0x2052 body (everything after the opcode), byte-for-byte as retail (locked by AddSpecialAbilityTests against
+		// the create-flow capture). See SendAddSpecialAbility for the field meaning. The final byte is the announce flag:
 		// 0x01 = "you learned a new ability" toast (first learn), 0x00 = silent re-grant (login) - the only byte that
 		// differs between the create-flow and per-login grants for the same ability across the captures.
-		internal static byte[] BuildAbilityGrantBody(Ability ability, bool announce = true)
+		internal static byte[] BuildAddSpecialAbilityBody(Ability ability, bool announce = true)
 		{
 			return new FaolanStream()
 				.WriteUInt32(ability.Slot)
@@ -244,10 +244,10 @@ namespace Faolan.GameServer
 				.WriteUInt32(ability.Data2)
 				.WriteUInt32(ability.Data3)
 				.WriteUInt32(ability.Data4)
-				.WriteUInt32(AbilityGrantConstantA)
-				.WriteUInt32(AbilityGrantConstantB)
-				.WriteUInt32(AbilityGrantConstantA)
-				.WriteUInt32(AbilityGrantConstantB)
+				.WriteUInt32(AddSpecialAbilityConstantA)
+				.WriteUInt32(AddSpecialAbilityConstantB)
+				.WriteUInt32(AddSpecialAbilityConstantA)
+				.WriteUInt32(AddSpecialAbilityConstantB)
 				.WriteUInt32(0x00000001)
 				.WriteUInt32(0x00000000)
 				.WriteByte(Convert.ToByte(announce))
@@ -261,15 +261,15 @@ namespace Faolan.GameServer
 			return new FaolanStream().WriteUInt32(spellId).ToArray();
 		}
 
-		// The inverse of BuildAbilityGrantBody: recovers the Ability (Slot/Id/Data0..4) and the announce flag from a
+		// The inverse of BuildAddSpecialAbilityBody: recovers the Ability (Slot/Id/Data0..4) and the announce flag from a
 		// 0x2052 body. Validates the fixed words (the duplicated Id, the 0/1 constants, the B290805C/29E627CA pair, the
-		// duplicated Data1..4) so a mis-shaped body is rejected rather than yielding garbage. Proven by AbilityGrantTests
+		// duplicated Data1..4) so a mis-shaped body is rejected rather than yielding garbage. Proven by AddSpecialAbilityTests
 		// round-trip against the strickenbla capture. Build- and parse-side share one grammar (TODO §refactor / #92).
-		internal static bool TryParseAbilityGrantBody(ReadOnlySpan<byte> body, out Ability ability, out bool announce)
+		internal static bool TryParseAddSpecialAbilityBody(ReadOnlySpan<byte> body, out Ability ability, out bool announce)
 		{
 			ability = new Ability();
 			announce = false;
-			if (body.Length != AbilityGrantBodyLength)
+			if (body.Length != AddSpecialAbilityBodyLength)
 				return false;
 
 			Span<uint> f = stackalloc uint[20];
@@ -289,7 +289,7 @@ namespace Faolan.GameServer
 				return false;
 			if (f[10] != data1 || f[11] != data2 || f[12] != data3 || f[13] != data4)
 				return false;
-			if (f[14] != AbilityGrantConstantA || f[15] != AbilityGrantConstantB || f[16] != AbilityGrantConstantA || f[17] != AbilityGrantConstantB)
+			if (f[14] != AddSpecialAbilityConstantA || f[15] != AddSpecialAbilityConstantB || f[16] != AddSpecialAbilityConstantA || f[17] != AddSpecialAbilityConstantB)
 				return false;
 			if (f[18] != 0x00000001 || f[19] != 0x00000000)
 				return false;

@@ -10,7 +10,7 @@ namespace Faolan.GameServer.FullCharSnapshot
 	// StatList#1 = the 17 DISPLAYED stats (Level 0x36 / XP 0x34 / MaxXP 0x15E / HP 0x1B / ...), StatList#2 = the 148
 	// full-sheet stats (what the old "repeated run" was). This is the real grammar behind the former opaque 338-value
 	// skeleton - so the sheet is authored as (statId, value) pairs from the character, not carried verbatim.
-	public sealed class StatPairList
+	public sealed class StatList
 	{
 		public const uint Frame = 0x3F1;
 
@@ -49,11 +49,11 @@ namespace Faolan.GameServer.FullCharSnapshot
 
 		// Reads a StatList at the stream's current position. Assumes a valid 0x3F1-framed count (caller has checked it
 		// is a stat list, not the empty-list markers).
-		public static StatPairList Read(FaolanStream r)
+		public static StatList Read(FaolanStream r)
 		{
 			var count = r.ReadUInt32();
 			var records = count / Frame - 1;
-			var list = new StatPairList();
+			var list = new StatList();
 			for (var i = 0u; i < records; i++)
 				list.Pairs.Add((r.ReadUInt32(), r.ReadUInt32()));
 			return list;
