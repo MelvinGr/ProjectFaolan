@@ -1,8 +1,10 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace Faolan.Core.Database.Tables
 {
 	// The type-level CharacterIIR stat CORE (#244), lifted off the captured `Data` blob into typed columns so an NPC
-	// spawn body can be CONSTRUCTED from the DB instead of spliced from a capture. An EF owned type (its columns live
-	// on the owner row - `Npc` for the template core). Property names mirror the protobuf field names in
+	// spawn body can be CONSTRUCTED from the DB instead of spliced from a capture. A 1:1 side table keyed to its `Npc`
+	// type (like Character <-> CharacterMaxStats). Property names mirror the protobuf field names in
 	// ProtoCoreCharacterIIR's Stats (CharacterStats) / npc_stats (NpcStats) / Bcc (CharacterBcc) sub-messages exactly,
 	// so NpcStatCoreCodec maps them by name with no per-field code. Nullable throughout: null = the proto field was NOT
 	// set (ShouldSerialize false), so it is omitted on the wire - this is what preserves byte-exactness.
@@ -11,8 +13,12 @@ namespace Faolan.Core.Database.Tables
 	// health/mana, scale, voice, ...) are overridden per-instance from NpcSpawn; transient runtime state (animation
 	// phase, BccState, current HP) is emitted canonical at spawn from the live tier (WorldEntity), never stored here.
 	// See docs/npc-three-tier-architecture.md.
+	[PrimaryKey(nameof(NpcId))]
 	public class NpcStatCore
 	{
+		public virtual Npc Npc { get; set; }
+		public uint NpcId { get; set; }
+
 		// --- CharacterStats (Stats) ---
 		public uint? Race { get; set; }
 		public uint? Sex { get; set; }
@@ -27,6 +33,14 @@ namespace Faolan.Core.Database.Tables
 		public uint? CarsGroup { get; set; }
 		public uint? OrientationMode { get; set; }
 		public uint? SoundScryScript { get; set; }
+		public uint? ClientScryScript { get; set; }
+		public uint? MountMesh { get; set; }
+		public uint? Skulk { get; set; }
+		public uint? MaxSkulk { get; set; }
+		public uint? TradeskillFlags { get; set; }
+		public uint? OocMovementMultiplier { get; set; }
+		public uint? RunSpeed { get; set; }
+		public uint? MaxRunSpeed { get; set; }
 		public uint? Bcc { get; set; }
 		public uint? BccState { get; set; }
 		public uint? BloodType { get; set; }
@@ -57,6 +71,8 @@ namespace Faolan.Core.Database.Tables
 		public uint? HearingSkill { get; set; }
 		public uint? SmellingSkill { get; set; }
 		public uint? SpawnAnimation { get; set; }
+		public uint? LosHeight { get; set; }
+		public uint? FactionId { get; set; }
 
 		// --- CharacterBcc (Bcc) ---
 		public uint? AnimActionId { get; set; }

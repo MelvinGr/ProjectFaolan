@@ -50,6 +50,7 @@ namespace Faolan.Core.Database
 		DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; }
 		DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; }
 		DbSet<NpcSpell> NpcSpells { get; }
+		DbSet<NpcStatCore> NpcStatCores { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<PatrolWaypoint> PatrolWaypoints { get; }
 		DbSet<Recipe> Recipes { get; }
@@ -111,6 +112,7 @@ namespace Faolan.Core.Database
 		public DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; set; }
 		public DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; set; }
 		public DbSet<NpcSpell> NpcSpells { get; set; }
+		public DbSet<NpcStatCore> NpcStatCores { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
 		public DbSet<Recipe> Recipes { get; set; }
@@ -263,9 +265,9 @@ namespace Faolan.Core.Database
 
 			modelBuilder.Entity<Npc>().HasMany(n => n.Spells).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.SetNull);
 
-			// The type-level stat core (#244) as an owned entity: its columns live on the Npcs row (prefixed
-			// StatCore_), lifted off the Data blob so a spawn body is constructed from typed storage, not spliced.
-			modelBuilder.Entity<Npc>().OwnsOne(n => n.StatCore);
+			// One-to-one Npc <-> NpcStatCore (#244), keyed by NpcId; the type-level stat core lifted off the Data blob
+			// so a spawn body is constructed from typed storage, not spliced. Cascades with the type.
+			modelBuilder.Entity<Npc>().HasOne(n => n.StatCore).WithOne(s => s.Npc).HasForeignKey<NpcStatCore>(s => s.NpcId).OnDelete(DeleteBehavior.Cascade);
 
 			// One patrol route per (map, spawn point) - keyed like the NpcSpawn it belongs to, so the live MoveTask
 			// builder joins them by position (#53). Its waypoints cascade-delete with the route.

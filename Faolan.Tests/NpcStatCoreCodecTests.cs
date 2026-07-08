@@ -39,9 +39,15 @@ namespace Faolan.Tests
 					if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 						continue;
 					parsed++;
-					mismatch += RoundTrip<ProtoCoreCharacterIIR.CharacterStats>(read.Message.Stats, ref checkedMsgs);
-					mismatch += RoundTrip<ProtoCoreCharacterIIR.NpcStats>(read.Message.npc_stats, ref checkedMsgs);
-					mismatch += RoundTrip<ProtoCoreCharacterIIR.CharacterBcc>(read.Message.Bcc, ref checkedMsgs);
+
+					// The importer->builder path: Lift(msg) -> NpcStatCore -> To*(core) must reproduce each stat-core
+					// sub-message byte-for-byte, so a spawn built from typed columns matches the capture.
+					// Only NPC cores carry all three sub-messages; the builder composes those. Non-NPC/edge rows with a
+					// null sub-message are skipped (the builder never composes one).
+					var core = NpcStatCoreCodec.Lift(read.Message);
+					if (read.Message.Stats != null) { checkedMsgs++; mismatch += Same(read.Message.Stats, NpcStatCoreCodec.ToStats(core)); }
+					if (read.Message.npc_stats != null) { checkedMsgs++; mismatch += Same(read.Message.npc_stats, NpcStatCoreCodec.ToNpcStats(core)); }
+					if (read.Message.Bcc != null) { checkedMsgs++; mismatch += Same(read.Message.Bcc, NpcStatCoreCodec.ToBcc(core)); }
 				}
 			}
 
@@ -49,13 +55,11 @@ namespace Faolan.Tests
 			Assert.Equal(0, mismatch);
 		}
 
-		private static int RoundTrip<T>(T original, ref int checkedMsgs) where T : class, new()
+		private static int Same<T>(T a, T b)
 		{
-			if (original == null)
+			if (a == null && b == null)
 				return 0;
-			checkedMsgs++;
-			var rebuilt = NpcStatCoreCodec.Compose<T>(NpcStatCoreCodec.Decompose(original));
-			return Ser(original).AsSpan().SequenceEqual(Ser(rebuilt)) ? 0 : 1;
+			return a != null && b != null && Ser(a).AsSpan().SequenceEqual(Ser(b)) ? 0 : 1;
 		}
 
 		private static byte[] Ser<T>(T msg)
