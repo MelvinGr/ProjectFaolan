@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Conan
 
 		// Typed header endpoints, read straight off the header stream (ProtoEndpoint.Read). Sender = RpcHeader.caller_id
 		// (field 1), Receiver = RpcHeader.endpoint_id (field 2); each carries Type (object-class id) + Instance (the
-		// addressed object). See ConanEndpoints. Echo them back with WriteHeader(receiver, sender, ...) for a reply.
+		// addressed object). See Endpoints. Echo them back with WriteHeader(receiver, sender, ...) for a reply.
 		public readonly ProtoEndpoint Sender;
 		public readonly ProtoEndpoint Receiver;
 

@@ -121,15 +121,15 @@ namespace Faolan.GameServer.CreateFlow
             // (a) The create-world handshake - the three records the verbatim scene burst opened with (the shared
             // Hello handshake at GameServerListener is skipped for isCreateWorldEntry, so send it here).
             await new PacketStream()
-                .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportDimesionID)
+                .WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportDimesionID)
                 .WriteArray(0x00, 0x01, 0x31)
                 .SendAsync(client);
             await new PacketStream()
-                .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportServerID)
+                .WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportServerID)
                 .WriteArray(0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03)
                 .SendAsync(client);
             await new PacketStream()
-                .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchAckAuthenticate)
+                .WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchAckAuthenticate)
                 .WriteArray(0x00, 0x00, 0x00, 0x01)
                 .SendAsync(client);
 
@@ -141,7 +141,7 @@ namespace Faolan.GameServer.CreateFlow
             // EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
             // by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
             await new PacketStream()
-                .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+                .WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
                 .WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x36B0)))
                 .SendAsync(client);
             await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
@@ -155,7 +155,7 @@ namespace Faolan.GameServer.CreateFlow
                     f6Field2: 7004418));
             await SendScry(client, ScryScript.BuildStartScriptGroup(id, 385910));
             await new PacketStream()
-                .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+                .WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
                 .WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00)
                 .SendAsync(client);
         }
@@ -221,7 +221,7 @@ namespace Faolan.GameServer.CreateFlow
         {
             var id = client.Session.Account.ClientInstance;
             return new PacketStream()
-                .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+                .WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
                 .WriteArrayUInt32Length(s => s.WriteArray(scry))
                 .SendAsync(client);
         }

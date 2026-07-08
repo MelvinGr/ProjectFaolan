@@ -582,7 +582,7 @@ namespace Faolan.GameServer.Dialogue
 		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
 		{
 			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, senderInstance), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, liveInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, senderInstance), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, liveInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(record)
 				.SendAsync(client);
 		}

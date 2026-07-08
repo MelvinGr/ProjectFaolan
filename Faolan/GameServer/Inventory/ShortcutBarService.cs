@@ -20,7 +20,7 @@ namespace Faolan.GameServer.World
 	// which routes to HandleAddShortcut only for the in-game case.
 	public sealed class ShortcutBarService
 	{
-		private static readonly byte[] ReplySender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58);
+		private static readonly byte[] ReplySender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
@@ -89,7 +89,7 @@ namespace Faolan.GameServer.World
 
 		private static byte[] Receiver(INetworkClient client)
 		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
+			return Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
 		}
 	}
 }

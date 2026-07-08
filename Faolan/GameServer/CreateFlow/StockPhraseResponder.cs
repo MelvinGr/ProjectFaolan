@@ -107,8 +107,8 @@ namespace Faolan.GameServer.CreateFlow
 			var id = client.Session.Account.ClientInstance;
 			await new PacketStream()
 				.WriteHeader(
-					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08),
-					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id),
+					Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08),
+					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
 					GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText)
 				.WriteArray(BuildReceivedStockPhraseBody(threadContext, textBytes))
 				.SendAsync(client);

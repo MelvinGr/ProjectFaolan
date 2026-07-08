@@ -224,8 +224,8 @@ namespace Faolan.GameServer.CreateFlow
 				return;
 
 			var id = client.Session.Account.ClientInstance;
-			var sender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x0C);
-			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id);
+			var sender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C);
+			var receiver = Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id);
 
 			var spells = await _database.GetStartingSpells(character.Level, character.Class);
 			foreach (var spellId in spells)

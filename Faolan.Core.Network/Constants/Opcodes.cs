@@ -788,7 +788,7 @@ namespace Faolan.Core.Network.Opcodes
         // TradepostAgent client->server methods (the AH + mail selector after the endpoints) - the complete
         // recovered TradepostAgent.client_to_server table (opcode = 0x2000 + position; alignment verified on
         // ItemSearch/BuyItem/Close). The method ids COLLIDE with ordinary GameServer opcodes, so tradepost packets
-        // route by RPC class id (ConanEndpoints.TradepostAgentType), never by opcode alone. Behaviour that differs
+        // route by RPC class id (Endpoints.TradepostAgentType), never by opcode alone. Behaviour that differs
         // from the name is noted per line (docs/tradepost-protocol.md).
         public enum TradepostAgentOpcodes : ushort
         {
@@ -1028,9 +1028,9 @@ namespace Faolan.Core.Network.Opcodes
             {
                 return receiverClass switch
                 {
-                    ConanEndpoints.GameAgentType => Name<GameAgentOpcodes>(opcode), // GameAgent
-                    ConanEndpoints.GameCharAgentType => Name<GameCharAgentOpcodes>(opcode), // GameCharAgent
-                    ConanEndpoints.GameCharAgentProjectType => Name<GameCharAgentProjectOpcodes>(opcode), // GameCharAgentProject
+                    Endpoints.GameAgentType => Name<GameAgentOpcodes>(opcode), // GameAgent
+                    Endpoints.GameCharAgentType => Name<GameCharAgentOpcodes>(opcode), // GameCharAgent
+                    Endpoints.GameCharAgentProjectType => Name<GameCharAgentProjectOpcodes>(opcode), // GameCharAgentProject
                     _ => "Unknown"
                 };
             }

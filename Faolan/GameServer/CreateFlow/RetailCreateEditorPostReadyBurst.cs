@@ -10,7 +10,7 @@ namespace Faolan.GameServer.CreateFlow
 {
 	public partial class CreateFlowService
 	{
-		private static readonly byte[] RetailCreateEditorPostReadyAckSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x59);
+		private static readonly byte[] RetailCreateEditorPostReadyAckSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x59);
 
 		private static uint GetRetailCreateEditorPostReadyAckStatus(uint requestId)
 		{
@@ -22,7 +22,7 @@ namespace Faolan.GameServer.CreateFlow
 		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
 		{
 			return new PacketStream()
-				.WriteHeader(RetailCreateEditorPostReadyAckSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(RetailCreateEditorPostReadyAckSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(requestId)
 				.WriteUInt32(GetRetailCreateEditorPostReadyAckStatus(requestId))
@@ -49,7 +49,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			var body = GameActionListCodec.BuildBody(id, dynel, 0u, actionTail);
 			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, agentSub), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, agentSub), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
@@ -66,11 +66,11 @@ namespace Faolan.GameServer.CreateFlow
 
 			var id = client.Session.Account.ClientInstance;
 			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots)
 				.WriteArray(0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0x07, 0xE2, 0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0xC7, 0x9E, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.CharInPlayIIR).WriteArray(CreateEditorRecordBuilder.BuildCharInPlayIir(id)))
 				.SendAsync(client);
 			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailA);

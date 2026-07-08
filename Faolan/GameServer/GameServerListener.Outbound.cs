@@ -411,7 +411,7 @@ namespace Faolan.GameServer
 		private static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
 		{
 			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), (ushort)0x201C)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), (ushort)0x201C)
 				.WriteArray(BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value))
 				.SendAsync(client);
 		}

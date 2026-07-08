@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Conan
 	// codebase used to hand-roll as byte[] literals. Building them through ProtoEndpoint makes a wrong type/instance
 	// (the create-editor receiver-mismatch bug) impossible by construction. The type ids below were recovered from
 	// the client schema and verified against 109k captured endpoints.
-	public static class ConanEndpoints
+	public static class Endpoints
 	{
 		public const uint CSPlayerAgentType = 0x6DD55614; // = hash("CSPlayerAgent")     (CsPlayerAgent reply endpoint)
 		public const uint CSPlayerInterfaceType = 0xBBD560C8; // = hash("CSPlayerInterface") (CsPlayerAgent reply caller)

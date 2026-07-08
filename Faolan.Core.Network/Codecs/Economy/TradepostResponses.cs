@@ -122,12 +122,12 @@ namespace Faolan.Core.Network.Codecs
 		{
 			var sender = new ProtoEndpoint
 			{
-				Type = ConanEndpoints.GameCharAgentType,
+				Type = Endpoints.GameCharAgentType,
 				Instance = GameCharAgentInstance
 			};
 			var receiver = new ProtoEndpoint
 			{
-				Type = ConanEndpoints.TradepostInterfaceType,
+				Type = Endpoints.TradepostInterfaceType,
 				Instance = interfaceInstance
 			};
 

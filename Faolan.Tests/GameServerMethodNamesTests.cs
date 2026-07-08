@@ -9,9 +9,9 @@ namespace Faolan.Tests
 	// logging (the listeners' default branch). Locks the class->catalog routing.
 	public class GameServerMethodNamesTests
 	{
-		[Theory, InlineData(ConanEndpoints.GameAgentType, (ushort)0x2002, "ChatVicinity"), InlineData(ConanEndpoints.GameCharAgentType, (ushort)0x2002, "RequestBindLocation"),
-		 InlineData(ConanEndpoints.GameCharAgentProjectType, (ushort)0x2002, "AcceptApprenticeTeacher"), InlineData(ConanEndpoints.GameCharAgentType, (ushort)0x2000, "RequestAggroStatus"),
-		 InlineData(ConanEndpoints.GameAgentType, (ushort)0x2003, "Authenticate2")]
+		[Theory, InlineData(Endpoints.GameAgentType, (ushort)0x2002, "ChatVicinity"), InlineData(Endpoints.GameCharAgentType, (ushort)0x2002, "RequestBindLocation"),
+		 InlineData(Endpoints.GameCharAgentProjectType, (ushort)0x2002, "AcceptApprenticeTeacher"), InlineData(Endpoints.GameCharAgentType, (ushort)0x2000, "RequestAggroStatus"),
+		 InlineData(Endpoints.GameAgentType, (ushort)0x2003, "Authenticate2")]
 		// Same opcode 0x2002, three different classes -> three different recovered names.
 		// GameAgent
 		// GameCharAgent
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, GameServerMethodNames.Resolve(receiverClass, opcode));
 		}
 
-		[Theory, InlineData(ConanEndpoints.GameCharAgentType, (ushort)0x2FFF), InlineData(0xDEADBEEF, (ushort)0x2000)]
+		[Theory, InlineData(Endpoints.GameCharAgentType, (ushort)0x2FFF), InlineData(0xDEADBEEF, (ushort)0x2000)]
 		// opcode out of the catalog
 		// class not multiplexed here
 		public void Resolve_UnknownPairs_ReturnUnknown(uint receiverClass, ushort opcode)

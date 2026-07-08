@@ -130,12 +130,12 @@ namespace Faolan.Tests
 
 		// Retail varies the GameAgent sender instance per conversation (0x07..0x5a in the captures); we preserve the
 		// captured packet's instance so the constructed framing matches retail byte-for-byte. ReadSenderInstance must
-		// recover exactly what the real endpoint encoder (ConanEndpoints) wrote.
+		// recover exactly what the real endpoint encoder (Endpoints) wrote.
 		[Theory, InlineData(0x08u), InlineData(0x0Eu), InlineData(0x5Au), InlineData(0x01316E71u)]
 		// a multi-byte varint instance, for good measure
 		public void ReadSenderInstance_RecoversTheEncodedGameAgentInstance(uint instance)
 		{
-			var sender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, instance);
+			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, instance);
 
 			// assemble a header the way PacketStream.WriteHeader does: [8 len+crc][u32 headerLen][0x0a][byteLen][sender]...
 			var packet = new byte[14 + sender.Length + 1];

@@ -40,7 +40,7 @@ namespace Faolan.GameServer.CreateFlow
 			{
 				0x0D,               0x13,               0xCE,               0x71,               0xB1,               0x10,               0x59
 			};
-			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
+			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
 
 			const uint W = EntityClass.Character; // EntityClass.Character (0xC350)
 

@@ -9,14 +9,14 @@ namespace Faolan.GameServer.CreateFlow
 	internal static class CreateEditorFraming
 	{
 		// Server->client conversation family for the creator 0x2000 traffic (GameAgent type, conversation id 0x0C).
-		internal static readonly byte[] MorphAckSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x0C);
+		internal static readonly byte[] MorphAckSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x0C);
 
 		// The create-editor 0x2000 receiver: the player object (GameInterfaceType) addressed to this session's
 		// client instance. Built as a typed ProtoEndpoint so the type+instance can't drift (the old hardcoded
-		// receiver baked in 0x021662C8; see ConanEndpoints / ProtoEndpointGoldenTests).
+		// receiver baked in 0x021662C8; see Endpoints / ProtoEndpointGoldenTests).
 		internal static byte[] Receiver(INetworkClient client)
 		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance);
+			return Endpoints.EndpointBytes(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
 		}
 	}
 }

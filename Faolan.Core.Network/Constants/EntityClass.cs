@@ -3,7 +3,7 @@ namespace Faolan.Core.Network.Constants
 	// In-world ENTITY object-class ids (the `type` half of an entity id `{type, instance}` = `ProtoID32` / the
 	// type field of a `ProtoEndpoint`). Every IIR record that targets an entity starts `[u32 type][u32 handle]`,
 	// where `type` is one of these and `handle` is the live instance. This is a SEPARATE id namespace from the RPC
-	// *conversation* class ids in `Faolan.Core.Network.Conan.ConanEndpoints` (those are BKDR-31 hashes like
+	// *conversation* class ids in `Faolan.Core.Network.Conan.Endpoints` (those are BKDR-31 hashes like
 	// 0xA9ECB95D = hash("GameCharAgent")); these object-class ids are a small ENUMERATED registry based at 50000.
 	//
 	// CHARACTER (0xC350 = 50000) is by far the most common - players, NPCs and creatures are all "Characters", which

@@ -246,8 +246,8 @@ namespace Faolan.GameServer.World
 			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
-					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
+					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
 					GameCharInterfaceDispatchOpcodes.DispatchCloseLootBag)
 				.WriteUInt32(WorldLoot.LootTypeTag)
 				.WriteUInt32(bag.Handle)
@@ -797,8 +797,8 @@ namespace Faolan.GameServer.World
 			// window). Decoded from the hoxxling gameplay capture (f1477): after this the client itself sends
 			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
 			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
-					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
+					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
 					GameCharInterfaceDispatchOpcodes.DispatchOpenLootBag)
 				.WriteUInt32(WorldLoot.LootTypeTag)
 				.WriteUInt32(bag.Handle)
@@ -1517,8 +1517,8 @@ namespace Faolan.GameServer.World
 		private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state)
 		{
 			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59),
-					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59),
+					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
 					GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(npcHandle)

@@ -217,8 +217,8 @@ namespace Faolan.GameServer.Economy
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
 			var ps = new PacketStream();
-			ps.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
-				ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
+				Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
 				GameCharInterfaceDispatchOpcodes.DispatchShopData);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);

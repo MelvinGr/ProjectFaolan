@@ -14,11 +14,11 @@ namespace Faolan.GameServer.World
 		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's; it's the client's
 		// default IIR PollStatus log). Reverted to 0x58 (the proven value).
-		public static readonly byte[] Sender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x58);
+		public static readonly byte[] Sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x58);
 
 		public static byte[] Receiver(INetworkClient client)
 		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance);
+			return Endpoints.EndpointBytes(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
 		}
 	}
 }

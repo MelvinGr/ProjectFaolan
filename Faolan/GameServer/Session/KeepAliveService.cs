@@ -16,8 +16,8 @@ namespace Faolan.GameServer.World
 	public sealed class KeepAliveService
 	{
 		// LatencyCheck rides the GameCharAgent conversation (sub-id 0x08); Ping rides GameAgent (sub-id 0x08).
-		private static readonly byte[] LatencySender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08);
-		private static readonly byte[] PingSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08);
+		private static readonly byte[] LatencySender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08);
+		private static readonly byte[] PingSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08);
 
 		// LatencyCheck (0x2085): reply body = [counter echoed][0x00000012][server tick]. The tick is a
 		// monotonically increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s interval, ms precision).
@@ -49,12 +49,12 @@ namespace Faolan.GameServer.World
 
 		private static byte[] GameCharInterfaceReceiver(INetworkClient client)
 		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
+			return Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
 		}
 
 		private static byte[] GameInterfaceReceiver(INetworkClient client)
 		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance);
+			return Endpoints.EndpointBytes(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
 		}
 	}
 }

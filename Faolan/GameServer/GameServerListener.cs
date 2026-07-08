@@ -139,23 +139,23 @@ namespace Faolan.GameServer
 			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Tokens), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft), (0x09, e => e.RingLeft), 			(0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist), (0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
 		];
 
-		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x58);
+		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x58);
 
 		// Existing-character post-ready conversations: retail uses sub-id 0x58 + the session character instance on
 		// every family (Strie login capture, idx 294+). The receiver is built per send as
-		// ConanEndpoints.EndpointBytes(<family type>, ClientInstance).
-		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58);
+		// Endpoints.EndpointBytes(<family type>, ClientInstance).
+		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
 
 		// The world-entry prompt rides the world-system conversation (0x13CE71B1/0x58) - byte-identical to
 		// WorldFraming.Sender, so fold to that single source of truth rather than re-spelling the literal.
 		private static readonly byte[] ExistingCharacterWorldEntryPromptSender = WorldFraming.Sender;
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
-		private static readonly byte[] LoginWorld201CSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58);
+		private static readonly byte[] LoginWorld201CSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
 		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32) in
 		// their Retail*Burst sender methods. The client instance is the character's real id: it is written into the
 		// body with WriteUInt32(id) and woven into the sender/receiver conversation id by building each endpoint
-		// through ConanEndpoints.EndpointBytes(type, id).
+		// through Endpoints.EndpointBytes(type, id).
 
 		// The retail login world-entry rides ONE conversation for everything (auth, MapChange, world objects, 		// player and NPC spawns, time): family prefix + sub-id 0x58 on the sender, and the receiver family
 		// prefix + the character instance as a varint. Confirmed from the Strie login capture. Keeping every
@@ -165,26 +165,26 @@ namespace Faolan.GameServer
 		private static readonly byte[] LoginWorldSender = WorldFraming.Sender;
 		private static readonly byte[] NewCharacterReadyForPlayScreenReceiver = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10];
 
-		private static readonly byte[] NewCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
+		private static readonly byte[] NewCharacterReadyForPlayScreenSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59);
 
 		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
 		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldFraming.Sender that
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
-		private static readonly byte[] PlayerDeathSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
+		private static readonly byte[] PlayerDeathSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 
 		private static readonly byte[] Receiver3 = [0x0d, 0x48, 0x76, 0x37, 0x28, 0x10, 0x84, 0x80, 0x80, 0x08];
 		// Capture-derived constants whose semantics aren't decoded yet (same in both captured deaths).
 
 		// Sender is GameCharAgent at instance 0x59 (NB: NOT 0x58 like the add/remove-item LoginWorld201CSender).
-		private static readonly byte[] ResurrectionSpotsSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
-		private static readonly byte[] RetailCreatePost205FSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
+		private static readonly byte[] ResurrectionSpotsSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59);
+		private static readonly byte[] RetailCreatePost205FSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 
 		// The trailing bytes of the 8-byte blob prefix after [flag][BE32 blobLen]: the captured beach field5, constant
 		// for the world-entry snapshot (the live splice path preserves these same bytes via SetSnapshotBlobLength).
 		private static readonly byte[] SnapshotPrefixField5 = [0x28, 0x81, 0x06];
 
-		private static readonly byte[] SprintBarSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x54);
+		private static readonly byte[] SprintBarSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x54);
 
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
@@ -447,18 +447,18 @@ namespace Faolan.GameServer
 			return packet.Receiver.Type switch
 			{
 				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
-				ConanEndpoints.TradepostAgentType => HandleTradepostPacket(client, packet),
+				Endpoints.TradepostAgentType => HandleTradepostPacket(client, packet),
 				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
 				// screen (without the reply the client retries forever + never opens chat). Existing-character world login
 				// only - the create-editor/create-world flows own this class during their own handshake and must not divert.
-				ConanEndpoints.GameCharAgentProjectType => !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession && client.Session.Character?.Name != null
+				Endpoints.GameCharAgentProjectType => !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession && client.Session.Character?.Name != null
 					? HandleGameCharAgentProject(client, packet)
 					: Task.CompletedTask,
 				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
 				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
-				ConanEndpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet),
+				Endpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet),
 				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
-				ConanEndpoints.GameAgentType => HandleGameAgentPacket(client, packet),
+				Endpoints.GameAgentType => HandleGameAgentPacket(client, packet),
 				_ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
 			};
 		}
