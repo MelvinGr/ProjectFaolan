@@ -678,7 +678,7 @@ namespace Faolan.Importer.Captures
 		// Upserts the Npc TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.
 		private static async Task<Dictionary<uint, Npc>> UpsertNpcTypes(DatabaseContext db, List<NpcSpawnEntry> entries)
 		{
-			var byTemplate = await db.Npcs.ToDictionaryAsync(n => n.TemplateId);
+			var byTemplate = await db.Npcs.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
 			foreach (var e in entries)
 			{
 				if (e.TemplateId == 0)
@@ -704,6 +704,15 @@ namespace Faolan.Importer.Captures
 					};
 					db.Npcs.Add(npc);
 					byTemplate[e.TemplateId] = npc;
+				}
+
+				// #244: lift the type-level CharacterIIR stat core from a representative capture (the first spawn of the
+				// type that decodes), so a spawn body can be constructed from typed columns instead of the Data blob.
+				if (npc.StatCore == null)
+				{
+					var body = WorldObjectBuilder.ExtractBody(e.Data);
+					if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+						npc.StatCore = NpcStatCoreCodec.Lift(read.Message);
 				}
 			}
 
