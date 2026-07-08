@@ -110,28 +110,8 @@ namespace Faolan.GameServer
 		// one. (There is no hand-built login/teleport path anymore.)
 		//private const uint DefaultWorldMapId = Map.TortageBeachId;
 
-		// Male (Sex 0): loincloth in the legs slot, no chest item.
-		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth
-
-		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
-		// hash), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
-		// Harvested from the create-flow captures (#220): every fresh beach character wears the Slave Manacles, and
-		// the rest of the slave outfit is sex-specific - males are bare-chested with a loincloth, females wear a gown
-		// + bottom (the exact garment COLOUR is randomised per character in retail, so one representative set is used
-		// per sex). Character.Sex 0 = male, 1 = female (the create-flow captures confirm this against the worn gear).
-		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12) - universal
-
-		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
-		// character, so pick a colour at random from the slave-gown set (all fully buildable - Hash + Data
-		// present, Type 101 - same as the Silver pair that was the sole representative before).
-		private static readonly (uint Gown, uint Bottom)[] StarterFemaleOutfits =
-		[
-			(324066, 324176), // Blue
-			(324140, 324168), // Purple
-			(324067, 324172), // Red
-			(324139, 324171), // Silver
-			(105844, 324175) // White
-		];
+		// Starter beach gear (StartingGear.MaleLegsItem / WristItem / FemaleOutfits / ClassWeapon) lives in
+		// Faolan.Core.Network.Constants/StartingGear.cs.
 
 		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
 		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =
@@ -192,24 +172,6 @@ namespace Faolan.GameServer
 		// on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
 		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new ConcurrentDictionary<uint, byte>();
 
-		// Per-class starting WEAPON (the main-hand-left slot, 0x06), harvested from the *create* captures (#220).
-		// Coverage is only the classes a create dump actually shows armed - the rest start unarmed until more create
-		// captures land. The Fleshy Club / Broken Oar / Broken Bottle seen elsewhere are NOT create-flow starters -
-		// they came from a level-2 char and login captures respectively, so they are deliberately excluded.
-		//
-		// #276/#286: re-harvested every per-class CREATE capture (slot 0x06 of the equipped container, via the
-		// ProtoAcgItem template1 fixed32; Captures/scripts decode). Result: the equipped container in the create
-		// flow carries ONLY the slave outfit (chest gown / leg bottom + wrist Slave Manacles) - NO class delivers a
-		// MainHandLeft weapon at create. The earlier Necromancer = Broken Bottle (3395744) was a mis-harvest from a
-		// LOGIN capture (Broken Bottle is absent from every create dump), and Melvin confirmed a Broken Bottle is
-		// wrong for a caster - so it is removed and casters now start unarmed, matching the create captures. Assassin
-		// is the one documented create-verified entry (Strie) and is kept.
-		private static readonly Dictionary<Class, uint> StarterClassWeapon = new Dictionary<Class, uint>
-		{
-			[Class.Assassin] = 3735601, // Marlin Spike
-			[Class.Necromancer] = 3395744, // Broken Bottle (0x33D0A0; necro create capture, BccIIR slot-6)
-			[Class.TempestOfSet] = 215711 // Broken Bottle (0x34A9F - the OTHER bottle; tempest create capture, BccIIR slot-6)
-		};
 
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
 

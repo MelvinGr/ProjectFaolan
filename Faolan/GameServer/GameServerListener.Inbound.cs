@@ -163,7 +163,7 @@ namespace Faolan.GameServer
 							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
 							// nearby players is the next step.
 							await new PacketStream()
-								.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+								.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 								.WriteArrayUInt32Length(s => s
 									.WriteUInt32(pbOpcode)
 									.WriteUInt32(dataobjdec)
@@ -568,7 +568,7 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
 										await CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, movedItem);
-										await Send0X201CEntry(client, LoginWorld201CSender, LoginWorld201CReceiver(client), 0x00000065, target, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
+										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
 									}
@@ -588,7 +588,7 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack with null identity + a 0x201C entry
 										// (prefix 0x68, state 0). Capture frames 320-321.
 										await CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, null);
-										await Send0X201CEntry(client, LoginWorld201CSender, LoginWorld201CReceiver(client), 0x00000068, 0, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
+										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
 									}
@@ -1051,7 +1051,7 @@ namespace Faolan.GameServer
 					var unk0 = packet.Body.ReadUInt32(); // 0xc350
 					var characterId = packet.Body.ReadUInt32();
 
-					if (IsRetailCreateEditorFlow(client))
+					if (client.Session.Character?.Name == null)
 					{
 						// Create-editor phase: retail sends no download in response to 0x205F - it just acks the
 						// client's polls and waits for CharInPlayIIR (which triggers the editor-launch burst).

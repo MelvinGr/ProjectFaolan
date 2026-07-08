@@ -168,7 +168,7 @@ namespace Faolan.GameServer
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
 
 			return new PacketStream()
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, [])))
 				.SendAsync(client);
 		}
@@ -182,7 +182,7 @@ namespace Faolan.GameServer
 		private Task SendLearnSpell(INetworkClient client, uint spellId)
 		{
 			return new PacketStream()
-				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchLearnSpell)
+				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchLearnSpell)
 				.WriteArray(AbilityGrantBody.BuildLearnSpellBody(spellId))
 				.SendAsync(client);
 		}
@@ -196,7 +196,7 @@ namespace Faolan.GameServer
 		private async Task SendMagicBuffIir(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] payload)
 		{
 			await new PacketStream()
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -248,7 +248,7 @@ namespace Faolan.GameServer
 		// level-up), false for the silent per-login re-grant.
 		private static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true)
 		{
-			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility).WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
+			return new PacketStream().WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility).WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute

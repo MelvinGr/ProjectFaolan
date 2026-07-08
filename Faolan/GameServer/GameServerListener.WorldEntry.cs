@@ -69,15 +69,15 @@ namespace Faolan.GameServer
 				// males add a loincloth (legs), females a gown (chest) + bottom (legs). See the Starter* constants.
 				var female = character.Sex == Sex.Female;
 				// Retail randomises the female slave-outfit colour per character (males always get the loincloth).
-				var femaleOutfit = StarterFemaleOutfits[Random.Shared.Next(StarterFemaleOutfits.Length)];
+				var femaleOutfit = StartingGear.FemaleOutfits[Random.Shared.Next(StartingGear.FemaleOutfits.Length)];
 				equipment = new CharacterEquipment
 				{
-					CharacterId = character.Id, 					Wrist = await Database.GetItem(StarterWristItem), 					Chest = female
+					CharacterId = character.Id, 					Wrist = await Database.GetItem(StartingGear.WristItem), 					Chest = female
 						? await Database.GetItem(femaleOutfit.Gown)
 						: null, 					Legs = await Database.GetItem(female
 						? femaleOutfit.Bottom
-						: StarterMaleLegsItem), 					// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
-					MainHandLeft = StarterClassWeapon.TryGetValue(character.Class, out var weaponId)
+						: StartingGear.MaleLegsItem), 					// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
+					MainHandLeft = StartingGear.ClassWeapon.TryGetValue(character.Class, out var weaponId)
 						? await Database.GetItem(weaponId)
 						: null
 				};
@@ -692,7 +692,7 @@ namespace Faolan.GameServer
 			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
 
 			await new PacketStream()
-				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(handle)
 				.WriteByte(status)
@@ -798,20 +798,6 @@ namespace Faolan.GameServer
 
 		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
 		// the character's real id now, so the unnamed-character state alone identifies the editor flow.
-		private static bool IsRetailCreateEditorFlow(INetworkClient client)
-		{
-			return client.Session.Character?.Name == null;
-		}
-
-		private static byte[] LoginWorld201CReceiver(INetworkClient client)
-		{
-			return client.Endpoint(Endpoints.GameCharInterfaceType);
-		}
-
-		private static byte[] LoginWorldReceiver(INetworkClient client)
-		{
-			return WorldFraming.Receiver(client);
-		}
 
 		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender, byte[] receiver)
 		{
@@ -824,7 +810,8 @@ namespace Faolan.GameServer
 
 			var packetData0 = new byte[]
 			{
-				0x00, 				0x00, 				0x00, 				0x54, 				0x00, 				0x00, 				0x00, 				0x01
+				0x00, 				0x00, 				0x00, 				0x54,
+				0x00, 				0x00, 				0x00, 				0x01
 			};
 
 			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportServerID).WriteArray(packetData0).SendAsync(client);
@@ -833,7 +820,7 @@ namespace Faolan.GameServer
 		private static async Task Send0X201C(INetworkClient client)
 		{
 			var sender = LoginWorld201CSender;
-			var receiver = LoginWorld201CReceiver(client);
+			var receiver = client.Endpoint(Endpoints.GameCharInterfaceType);
 			var ticketBase = 0x00160000u + ((uint)Environment.TickCount & 0xFFFF);
 
 			// Retail (Strie login) sends five channel registrations before the spawn burst: four with the

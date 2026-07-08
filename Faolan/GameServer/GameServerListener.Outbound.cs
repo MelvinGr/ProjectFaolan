@@ -204,7 +204,7 @@ namespace Faolan.GameServer
 		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchUpdateCash);
+			ps.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchUpdateCash);
 			UpdateCashBody.WriteUpdateCashBody(ps, balanceTin, reason);
 			await ps.SendAsync(client);
 
@@ -224,7 +224,7 @@ namespace Faolan.GameServer
 		{
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.GameTime);
@@ -269,7 +269,7 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.MapChange);
@@ -371,7 +371,7 @@ namespace Faolan.GameServer
 		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(bodyWithLenPrefix);
+			ps.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(bodyWithLenPrefix);
 			return ps.WriteLengthHash().ToArray();
 		}
 
@@ -401,7 +401,7 @@ namespace Faolan.GameServer
 			var charId = client.Session.Character.Id;
 
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchAddItem);
+			ps.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchAddItem);
 			AddItemBody.WriteAddItemBody(ps, containerType, charId, itemPos, AddItemBody.SerializeInventoryEntry(entry), feedback);
 			await ps.SendAsync(client);
 		}
@@ -435,7 +435,7 @@ namespace Faolan.GameServer
 			var charId = client.Session.Character.Id;
 
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchRemoveItem);
+			ps.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchRemoveItem);
 			RemoveItemBody.WriteRemoveItemBody(ps, containerType, charId, itemPos, amountToRemove);
 			await ps.SendAsync(client);
 		}
@@ -456,7 +456,7 @@ namespace Faolan.GameServer
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(ResurrectionSpotsSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
+			ps.WriteHeader(ResurrectionSpotsSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
 			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
 			return ps.SendAsync(client);
 		}
