@@ -81,10 +81,10 @@ from typed columns.
 - [x] `NpcStatCore` 1:1 side table (`NpcStatCores`, keyed by NpcId) + migration - the type-level core.
 - [x] Importer lifts the stat core: `UpsertNpcTypes` from a representative spawn, `CapturePetImporter` from
       `Npc.Data` for summon-only pets. `faolan.db` re-imported: 521/537 types (16 have no capture at all).
-- [ ] Add the missing INSTANCE-varying columns to `NpcSpawn` (`Life`/`Mana`/`MaxMana`/`Stamina`/`MaxStamina`/
-      `ApprenticeLevel`, `VoiceSet`, `GuildId`; `Health`/`Level`/`MonsterScale` already exist). Without these,
-      composing a spawn from the *type* core alone would give every instance the representative's level-scaled
-      stats - so the builder can't flip to columns until they land.
+- [x] Per-placement stat columns on `NpcSpawn` (`Life`/`Mana`/`MaxMana`/`Stamina`/`MaxStamina`/`ApprenticeLevel`/
+      `VoiceSet` non-null; `GuildId`/`HearingSkill`/`SightSkill` nullable) + importer populate. These override the
+      type core per placement (a spawn point carries its own level; the pools track it). Pools are ~91% `Health*100`
+      but deviate per creature, so stored (derivable later if a curve is decoded).
 - [ ] `NpcSpawnBuilder` composes `ProtoCoreCharacterIIR` from `row.Npc.StatCore` (type) + `row` (instance
       overrides) + canonical runtime init, instead of parsing `Data`. Equivalence-test columns == Data (fresh).
 - [ ] Retire `Data`, the splice path, and `SpawnPlayfieldRewriter` (token threaded at construction).
