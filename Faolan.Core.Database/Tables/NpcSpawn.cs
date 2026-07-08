@@ -41,15 +41,36 @@ namespace Faolan.Core.Database.Tables
 		public bool HasEquipment { get; set; }
 		public byte[] Data { get; set; }
 		public uint CapturedHandle { get; set; }
-		public uint HeadMesh { get; set; }
-
-		// Real per-NPC max health (player-facing) lifted from the spawn's CharacterStats.health - the combat HP vs the
-		// level-scaled placeholder. 0 = the spawn carried none.
-		public uint Health { get; set; }
-		public uint Level { get; set; }
 		public uint MapId { get; set; }
+
+		// Per-PLACEMENT stat values (#244), lifted from this spawn's capture, overriding the type-level Npc.StatCore
+		// when the spawn body is built. A spawn point carries its own LEVEL (the same template can be placed at a range
+		// of levels - e.g. Starved Watchdog L65-79), and the pools track that level. These are the spawn/MAX values,
+		// NOT per-instance runtime state (not current HP); AoC has no scale-to-player scaling.
+		//
+		// The pools are heavily but NOT cleanly redundant: Life == Health*100 (the on-wire x100 vitals scale) for ~91%
+		// of spawns and the five pools are usually all equal, but creatures deviate (Panther: Health 181 -> Life 18190,
+		// not 18100, and its mana/stamina pools differ from Life). So they can't be byte-exactly DERIVED from Health/
+		// Level with a formula - hence stored. TODO (#244 follow-up): if a per-creature curve is ever decoded, these
+		// could be derived and dropped. Level/VoiceSet/mesh are genuinely per-placement.
+		//
+		// Present on EVERY captured spawn (all 510 types), so non-nullable. Only GuildId/HearingSkill/SightSkill are
+		// sparse (set on a minority of types) and stay nullable = "unset on the wire, off the rebuilt body".
+		public uint HeadMesh { get; set; }
+		public uint Health { get; set; }
+		public uint Life { get; set; }
+		public uint Mana { get; set; }
+		public uint MaxMana { get; set; }
+		public uint Stamina { get; set; }
+		public uint MaxStamina { get; set; }
+		public uint Level { get; set; }
+		public uint ApprenticeLevel { get; set; }
 		public uint MonsterData { get; set; }
 		public uint MonsterScale { get; set; }
+		public uint VoiceSet { get; set; }
+		public uint? GuildId { get; set; }
+		public uint? HearingSkill { get; set; }
+		public uint? SightSkill { get; set; }
 
 		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
 		// on Npc now, reached via the Npc navigation. Nullable only for phantom rows with no resolvable type (none

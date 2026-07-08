@@ -411,6 +411,24 @@ namespace Faolan.Importer.Captures
 			row.HasEquipment = e.HasEquipment;
 			row.Health = e.Health;
 
+			// Per-placement stat pools (#244): lift the remaining level-scaled/per-placement values from this spawn's
+			// capture (via the same codec the type core uses), overriding the type StatCore when the body is built.
+			var placeBody = WorldObjectBuilder.ExtractBody(e.Data);
+			if (placeBody != null && PlayerSpawnReader.TryReadCharacterMessage(placeBody, out var placeRead))
+			{
+				var core = NpcStatCoreCodec.Lift(placeRead.Message);
+				row.Life = core.Life ?? 0;
+				row.Mana = core.Mana ?? 0;
+				row.MaxMana = core.MaxMana ?? 0;
+				row.Stamina = core.Stamina ?? 0;
+				row.MaxStamina = core.MaxStamina ?? 0;
+				row.ApprenticeLevel = core.ApprenticeLevel ?? 0;
+				row.VoiceSet = core.VoiceSet ?? 0;
+				row.GuildId = core.GuildId;
+				row.HearingSkill = core.HearingSkill;
+				row.SightSkill = core.SightSkill;
+			}
+
 			row.Morphs.Clear();
 			for (var i = 0; i < e.Morphs.Count; i++)
 			{
