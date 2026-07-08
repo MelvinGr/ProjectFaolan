@@ -1,10 +1,15 @@
 using System;
 using System.Buffers.Binary;
+using System.IO;
+using System.Linq;
 using System.Numerics;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
@@ -14,6 +19,56 @@ namespace Faolan.Tests
 	// clean-appearance humanoids - proving Data is no longer needed for the frame.
 	public class NpcSpawnFromScratchTests
 	{
+		private readonly ITestOutputHelper _out;
+		public NpcSpawnFromScratchTests(ITestOutputHelper o) => _out = o;
+
+		// Whole-DB coverage: how many shipped spawns assemble from scratch byte-exact vs. fall back to Data (the
+		// humanoid runtime-post-IIR #243 tail). The from-scratch build must match the freshSpawn oracle for every
+		// animal + clean-appearance humanoid; a mismatch is only allowed when the oracle's post-IIR isn't the clean
+		// appearance shape (TryDecodeAppearance false but the spawn IS a humanoid carrying equipment).
+		[Fact]
+		public void EverySpawn_BuildsFromScratch_OrIsRuntimePostIir()
+		{
+			var db = Path.Combine(FindRepoRoot(), "faolan.db");
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={db};Mode=ReadOnly").Options;
+			using var ctx = new DatabaseContext(options);
+			var rows = ctx.NpcSpawns
+				.Include(s => s.Npc).ThenInclude(n => n.StatCore)
+				.Include(s => s.Equipment).Include(s => s.Morphs)
+				.Where(s => s.Data != null && s.Npc != null && s.Npc.StatCore != null && s.Life > 0)
+				.AsNoTracking().ToList();
+
+			int total = 0, fromScratch = 0, runtimeTail = 0, bad = 0;
+			foreach (var row in rows)
+			{
+				var handle = row.CapturedHandle;
+				if (!NpcSpawnBuilder.TryBuild(row, handle, out var oracle, freshSpawn: true) || !PlayerSpawnReader.TryReadCharacterMessage(oracle, out var read))
+					continue;
+				total++;
+				var x = NpcStatCoreCodec.ReadIirHeaderWord(oracle);
+				if (x == null)
+				{
+					bad++;
+					continue;
+				}
+
+				var pos = new Vector3(ReadLE(oracle, SpawnPacketBuilder.PosXOffset), ReadLE(oracle, SpawnPacketBuilder.PosYOffset), ReadLE(oracle, SpawnPacketBuilder.PosZOffset));
+				var rot = new Quaternion(ReadLE(oracle, SpawnPacketBuilder.RotXOffset), ReadLE(oracle, SpawnPacketBuilder.RotYOffset), ReadLE(oracle, SpawnPacketBuilder.RotZOffset), ReadLE(oracle, SpawnPacketBuilder.RotWOffset));
+				var humanoid = NpcSpawnAppearanceCodec.TryDecodeAppearance(oracle, out var morphs);
+				var actual = NpcSpawnBuilder.BuildFromScratch(handle, x.Value, pos, rot, ReadPlayfieldToken(oracle), read.Message, humanoid, morphs);
+
+				if (oracle.AsSpan().SequenceEqual(actual))
+					fromScratch++;
+				else if (row.Equipment.Count > 0 && !humanoid) // humanoid with a non-appearance (runtime) post-IIR
+					runtimeTail++;
+				else
+					bad++;
+			}
+
+			_out.WriteLine($"spawns={total} fromScratch={fromScratch} runtimePostIirTail={runtimeTail} unexpected={bad}");
+			Assert.Equal(0, bad);
+		}
+
 		[Theory]
 		[InlineData("SpawnNpcCrocodile")] // animal (minimal post-IIR)
 		[InlineData("SpawnNpcCasilda")] // humanoid (appearance/morph post-IIR)
@@ -51,6 +106,14 @@ namespace Faolan.Tests
 		}
 
 		private static float ReadLE(byte[] b, int offset) => BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
+
+		private static string FindRepoRoot()
+		{
+			var d = new DirectoryInfo(Directory.GetCurrentDirectory());
+			while (d != null && !File.Exists(Path.Combine(d.FullName, "faolan.db")))
+				d = d.Parent;
+			return d?.FullName ?? throw new FileNotFoundException("faolan.db not found up-tree");
+		}
 
 		private static NpcSpawn RowFromCapturedBody(byte[] body)
 		{
