@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -47,7 +48,7 @@ namespace Faolan.Importer.Captures
 			{
 				// The pet creature TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
 				// resolves by name. Upsert so re-runs keep the type id stable.
-				var type = await db.Npcs.FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ?? await db.Npcs.FirstOrDefaultAsync(n => n.Name == e.Name);
+				var type = await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ?? await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.Name == e.Name);
 				if (type == null)
 				{
 					type = new Npc
@@ -64,6 +65,17 @@ namespace Faolan.Importer.Captures
 				type.Sex = e.Sex;
 				type.Data = e.Data;
 				type.Level = e.Level;
+
+				// #244: lift the stat core onto the TYPE from its capture, so a summoned pet builds from typed columns
+				// too. Pets have no NpcSpawn placement (they spawn into the live tier via TryBuildFromType), so this is
+				// the only place their StatCore gets lifted.
+				if (type.StatCore == null)
+				{
+					var body = WorldObjectBuilder.ExtractBody(e.Data);
+					if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+						type.StatCore = NpcStatCoreCodec.Lift(read.Message);
+				}
+
 				seeded++;
 			}
 
