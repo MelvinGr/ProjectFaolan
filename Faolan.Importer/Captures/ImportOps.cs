@@ -383,14 +383,7 @@ namespace Faolan.Importer.Captures
 					PopulateObject(existing, e);
 			}
 
-			var lifted = 0;
-			foreach (var row in await db.WorldObjects.ToListAsync())
-			{
-				if (SimpleDynelMessageCodec.TryLiftColumns(row))
-					lifted++;
-			}
-
-			Console.WriteLine($"World objects: identity columns lifted on {lifted} rows (#187).");
+			Console.WriteLine("World objects: identity columns + geometry tail lifted from the dump at import (#187).");
 
 			await db.SaveChangesAsync();
 		}
@@ -467,13 +460,13 @@ namespace Faolan.Importer.Captures
 			row.Name = e.Name;
 			row.ObjectId = e.ObjectId;
 			row.CapturedHandle = e.Handle;
-			row.Data = e.Data;
 			row.RotationX = e.RotX;
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
 
-			SimpleDynelMessageCodec.TryLiftColumns(row);
+			// Lift the identity columns + geometry tail from the dump body (the captured Data is no longer stored).
+			SimpleDynelMessageCodec.TryLiftColumns(row, WorldObjectBuilder.ExtractBody(e.Data));
 			return row;
 		}
 

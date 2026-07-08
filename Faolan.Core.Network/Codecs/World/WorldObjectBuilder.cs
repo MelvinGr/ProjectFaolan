@@ -85,58 +85,37 @@ namespace Faolan.Core.Network.Codecs
 				: string.Empty;
 		}
 
-		// As ReadIdentity(body), reading the identity from a stored row's OWN captured Data. Used to key the table
-		// rows the same way the burst bodies are keyed, so the two sides always agree regardless of lift status.
+		// The stored row's object identity - the lifted DisplayName column (was read from the captured Data; the blob
+		// is retired). Used to key the table rows the same way the burst bodies are keyed.
 		public static string ReadIdentity(WorldObject row)
 		{
-			var body = ExtractBody(row?.Data);
-			return body == null
-				? string.Empty
-				: ReadIdentity(body);
+			return row?.DisplayName ?? string.Empty;
 		}
 
-		public static bool TryBuild(WorldObject row, uint handle, out byte[] body)
+		// The wire typeTag (the 0x0000C8xx EntityClass ack in the object header) for a world-object CLASS. Class-stable
+		// (one distinct tag per SubOpcode across the whole capture set), so it is derived here rather than stored.
+		public static uint TypeTagForClass(uint subOpcode) => subOpcode switch
 		{
-			return TryBuild(row, handle, new Vector3(row?.PositionX ?? 0, row?.PositionY ?? 0, row?.PositionZ ?? 0), new Quaternion(row?.RotationX ?? 0, row?.RotationY ?? 0, row?.RotationZ ?? 0, row?.RotationW ?? 1), out body);
-		}
+			0x1FD6412Bu => 0x0000C87Du, // ClimbingDynel
+			0x33A56FB0u => 0x0000C748u, // ZoneLabel
+			0x66AEDD50u => 0x0000C878u, // SimpleDynel
+			0x6BD56736u => 0x0000C879u, // Destructible
+			0xF096251Eu => 0x0000C87Au, // Container
+			_ => 0x0000C878u
+		};
 
-		// As TryBuild, but rewrites the transform's playfield-instance varint to `playfieldInstance` (the live
-		// per-session world token). The row's stored Data carries whatever session it was captured in, so a
-		// from-scratch placement (no live body to inherit from, e.g. the create-editor scene props) must thread the
-		// current session token in. Session tokens are 4-byte LEB128 varints, so the rewrite is splice-free. Returns
-		// false if the build fails, the playfield can't be located, or the token isn't a 4-byte varint.
+		// Builds a world-object body from the row's TYPED COLUMNS + KdTreeTail (the retired Data blob is no longer read),
+		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
+		// Returns false when the row isn't lifted (no DisplayName / KdTreeTail).
 		public static bool TryBuild(WorldObject row, uint handle, uint playfieldInstance, out byte[] body)
 		{
-			return TryBuild(row, handle, out body) && SpawnPlayfieldRewriter.TryRewrite(body, playfieldInstance);
+			return BuildFromScratch(row, handle, row?.Position ?? default, row?.Rotation ?? Quaternion.Identity, TypeTagForClass(row?.SubOpcode ?? 0), playfieldInstance, out body);
 		}
 
-		// As TryBuild, but places the object at an EXPLICIT transform rather than the row's captured one - used to
-		// drop a templated object (e.g. a loot bag) at a runtime location like an NPC's death spot.
-		public static bool TryBuild(WorldObject row, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
+		// As TryBuild but with a placeholder playfield token (0) - for diagnostics / callers that re-stamp per recipient.
+		public static bool TryBuild(WorldObject row, uint handle, out byte[] body)
 		{
-			body = null;
-			var template = ExtractBody(row?.Data);
-			if (template == null || template.Length < SpawnPacketBuilder.RotWOffset + 4)
-				return false;
-
-			body = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);
-
-			// For an object whose identity has been lifted into columns (#187), CONSTRUCT the ProtoSimpleDynelIIR
-			// message from those columns and splice it over the carried-from-Data identity. EVERY world-object class
-			// (SimpleDynel/ClimbingDynel/ZoneLabel/Destructible/LootBag) carries the same identity message as its
-			// first blob, so this is gated on the lifted columns (DisplayName != null, set by the self-validating
-			// importer), not on the class. The body is the IIR carrier [u32 len][u32 subOpcode][record], so the codec
-			// operates on `body[8..]`; the per-class tail + transform stay template-carried (interim). Byte-identical.
-			if (body.Length > 8 && SimpleDynelMessageCodec.TryReplaceIdentityFromColumns(body.AsSpan(8), row, out var newRecord))
-			{
-				var combined = new byte[8 + newRecord.Length];
-				body.AsSpan(0, 8).CopyTo(combined);
-				newRecord.CopyTo(combined.AsSpan(8));
-				BinaryPrimitives.WriteUInt32BigEndian(combined.AsSpan(0, 4), (uint)(4 + newRecord.Length)); // carrier len = [subOpcode] + record
-				body = combined;
-			}
-
-			return true;
+			return TryBuild(row, handle, 0u, out body);
 		}
 
 		// Builds a body by splicing the DB row's object IDENTITY (the length-delimited message + the raw tail,
@@ -151,27 +130,18 @@ namespace Faolan.Core.Network.Codecs
 			if (!TryMessageOffset(liveBody, out var liveOffset))
 				return false;
 
-			// Lifted row (#187): CONSTRUCT the identity from columns + append the stored geometry tail - no Data
-			// slice read at all. Byte-identical to the verbatim splice (the columns reproduce the captured identity,
-			// the tail is stored verbatim), so the world-entry object is now fully DB-driven.
-			if (row is { DisplayName: not null, KdTreeTail: not null })
-			{
-				var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row));
-				body = new byte[liveOffset + identity.Length + row.KdTreeTail.Length];
-				liveBody[..liveOffset].CopyTo(body);
-				identity.CopyTo(body.AsSpan(liveOffset));
-				row.KdTreeTail.CopyTo(body.AsSpan(liveOffset + identity.Length));
-				return true;
-			}
-
-			// Fallback (un-lifted row): splice the row's identity + tail verbatim from its captured Data.
-			var template = ExtractBody(row?.Data);
-			if (template == null || !TryMessageOffset(template, out var rowOffset))
+			// CONSTRUCT the identity from the row's columns + append the stored geometry tail - the captured Data blob is
+			// retired. Byte-identical to the old verbatim splice (the columns reproduce the captured identity, the tail
+			// is stored verbatim), so the world-entry object is fully DB-driven. Returns false for an un-lifted row (no
+			// DisplayName / KdTreeTail) - it can no longer be built.
+			if (row is not { DisplayName: not null, KdTreeTail: not null })
 				return false;
 
-			body = new byte[liveOffset + (template.Length - rowOffset)];
+			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row));
+			body = new byte[liveOffset + identity.Length + row.KdTreeTail.Length];
 			liveBody[..liveOffset].CopyTo(body);
-			template.AsSpan(rowOffset).CopyTo(body.AsSpan(liveOffset));
+			identity.CopyTo(body.AsSpan(liveOffset));
+			row.KdTreeTail.CopyTo(body.AsSpan(liveOffset + identity.Length));
 			return true;
 		}
 

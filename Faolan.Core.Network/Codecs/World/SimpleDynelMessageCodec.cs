@@ -92,15 +92,14 @@ namespace Faolan.Core.Network.Codecs
 			return message;
 		}
 
-		// Lifts the identity columns from a row's OWN stored Data (the importer + backfill path). Self-validating:
-		// populates the typed columns only if the column-rebuild reproduces the record byte-exact, else leaves
-		// DisplayName null so the builder falls back to the verbatim slice (zero risk for any shape not fully
-		// modelled). Idempotent - safe to re-run over already-lifted rows. Returns true if the row was lifted.
-		public static bool TryLiftColumns(WorldObject row)
+		// Lifts the identity columns + geometry tail from the captured object `body` (the importer path; `body` is the
+		// FA015807-style object body extracted from the dump packet). Self-validating: populates the typed columns +
+		// KdTreeTail only if the column-rebuild reproduces the record byte-exact, else leaves DisplayName null (the row
+		// then can't build - zero risk for any shape not fully modelled). Idempotent. Returns true if the row was lifted.
+		public static bool TryLiftColumns(WorldObject row, byte[] body)
 		{
 			row.DisplayName = null;
 			row.KdTreeTail = null;
-			var body = WorldObjectBuilder.ExtractBody(row?.Data);
 			if (body is not { Length: > 8 } || !TryParse(body.AsSpan(8), out var message, out var messageStart, out var consumed))
 				return false;
 

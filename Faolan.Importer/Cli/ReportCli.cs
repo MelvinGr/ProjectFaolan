@@ -1021,7 +1021,7 @@ namespace Faolan.Importer.Cli
             {
                 var baseOk = WorldObjectBuilder.TryBuild(row, row.CapturedHandle, out var baseBody);
                 var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody, 0x01EA985Cu);
-                Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} datalen={row.Data?.Length} kd={row.KdTreeTail?.Length}");
+                Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} kd={row.KdTreeTail?.Length}");
                 if (baseOk)
                     Console.WriteLine("  BUILT: " + Convert.ToHexString(baseBody).ToLowerInvariant());
             }

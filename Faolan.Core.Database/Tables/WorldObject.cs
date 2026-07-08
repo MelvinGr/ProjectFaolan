@@ -10,10 +10,11 @@ namespace Faolan.Core.Database.Tables
 	// Keyed for dedup by (MapId, Position) - the stable spawn point; the handle is session-scoped. Imported from
 	// captures by Faolan.Importer (WorldObjectExtractor); built into a wire body by WorldObjectBuilder.
 	//
-	// `Data` is the still-raw captured packet (interim). The structured columns are lifted from the body: the
-	// SubOpcode (the object CLASS), the transform (position + rotation), and the object message's id + name
-	// (docs/archive/spawn-dissection-plan.md Phase 6). These share the FA015807 transform grammar but have NO pre-IIR
-	// block - the object message's length prefix follows the transform directly.
+	// The whole object body is CONSTRUCTED from typed columns (#187): the SubOpcode (object CLASS), the transform
+	// (position + rotation), the object message's id + name/DisplayName, and the geometry tail (KdTreeTail). These
+	// share the FA015807 transform grammar but have NO pre-IIR block - the object message's length prefix follows the
+	// transform directly. The captured raw `Data` packet has been RETIRED (like the NPC/pet blobs) - the importer
+	// lifts these columns from the dump body at import time and never persists it.
 	// Transform (PositionX/Y/Z + the RotationX/Y/Z/W quaternion + the Position/Rotation accessors) is inherited
 	// from Base3DEntity, shared with the player Character and the NPC spawns.
 	public class WorldObject : Base3DEntity
@@ -23,20 +24,12 @@ namespace Faolan.Core.Database.Tables
 
 		public bool IsClosed { get; set; } // proto field 12
 
-		// LEGACY verbatim captured packet. The world-entry render no longer replays it - it CONSTRUCTS the object
-		// from the typed columns (identity) + KdTreeTail (geometry) + the burst's live placement (#187,
-		// TryBuildOntoLivePlacement). Retained ONLY as: (a) the import source-of-truth the columns are derived from
-		// (per "captures are the primary truth source"), and (b) the runtime loot-bag-template / un-lifted fallback.
-		// Do NOT use for new render paths - build from the columns + KdTreeTail instead.
-		[Obsolete("Legacy verbatim packet; the render builds from the typed columns + KdTreeTail (#187). Kept only as the import source + runtime loot-bag/fallback.")]
-		public byte[] Data { get; set; }
-
 		// The bytes AFTER the identity message: the kd-tree / collision / bounds geometry (FUN_0080c620), per-object
-		// but session-INDEPENDENT (static decor geometry). Stored so the world-entry build constructs the whole
-		// object from the DB - identity (columns above) + this tail - instead of slicing it from the raw Data packet
-		// (#187). Null on un-lifted rows (those still use Data). The transform (pos/rot) is rebuilt from Base3DEntity's
-		// columns and the live playfield comes from the burst, so with this the row's Data is no longer read at render.
-		[Obsolete]
+		// but session-INDEPENDENT (static decor geometry, 406 distinct blobs). Lifted out of the captured packet into
+		// its own column so the world-entry build constructs the whole object from the DB - identity (columns above) +
+		// this tail (#187). This is the object's geometry TRUTH (not re-derivable), the counterpart of the NPC stat
+		// columns; the captured raw `Data` packet has been RETIRED. The transform (pos/rot) is rebuilt from
+		// Base3DEntity's columns and the live playfield token comes from the burst.
 		public byte[] KdTreeTail { get; set; }
 
 		[MaxLength(128)]

@@ -1114,7 +1114,7 @@ namespace Faolan.Core.Database
         public async Task<WorldObject[]> GetWorldObjects(uint mapId)
         {
             await using var ctx = await _contextFactory.CreateDbContextAsync();
-            return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.Data != null).ToArrayAsync();
+            return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.DisplayName != null).ToArrayAsync();
         }
 
         public async Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work)
