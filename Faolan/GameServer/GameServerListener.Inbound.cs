@@ -893,7 +893,7 @@ namespace Faolan.GameServer
 							? Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59)
 							: WorldFraming.Sender;
 						var authReceiver = isNewCharacter
-							? CreateEditorFraming.Receiver(client)
+							? CreateFlowService.Receiver(client)
 							: WorldFraming.Receiver(client);
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1

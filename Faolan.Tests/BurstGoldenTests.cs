@@ -48,13 +48,9 @@ namespace Faolan.Tests
 			return AssertBurstStable("CreationScriptBurst", CreateFlowService.SendRetailCreateEditorCreationScriptBurst);
 		}
 
-		[Fact]
-		public Task InitialBurst_IsByteStable()
-		{
-			// No DB passed: the dynel scene props fall back to their verbatim bytes, so the golden still locks the
-			// exact wire output. The DB-sourced substitution path is proven separately by CreateEditorSceneDynelTests.
-			return AssertBurstStable("InitialBurst", c => CreateFlowService.SendRetailCreateEditorInitialBurst(c));
-		}
+		// NOTE: the InitialBurst golden is asserted by CreateEditorSceneDynelTests.InitialBurst_WithDb_IsByteIdenticalToGolden
+		// instead - its galley scene-prop dynels are now SPAWNED FROM the DB (WorldObjectBuilder), so the burst needs a DB
+		// to reproduce the golden; a bare no-DB run here would omit them.
 
 		[Fact]
 		public Task WorldPrepBurst_IsByteStable()

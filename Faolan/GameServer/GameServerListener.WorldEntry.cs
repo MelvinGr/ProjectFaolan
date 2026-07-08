@@ -595,7 +595,7 @@ namespace Faolan.GameServer
 				TeleportCodec.BuildBegin(instance, destMapId), 				TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
 			})
 				await new PacketStream()
-					.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))
 					.SendAsync(client);
 		}
@@ -720,7 +720,7 @@ namespace Faolan.GameServer
 			var address = $"{realm.IpAddress}:{realm.Port}";
 
 			await new PacketStream()
-				.WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchRedirectToServer)
+				.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceDispatchOpcodes.DispatchRedirectToServer)
 				.WriteByte(0x00)
 				.WriteStringByteLength(address)
 				.SendAsync(client);

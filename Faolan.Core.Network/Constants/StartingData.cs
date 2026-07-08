@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Numerics;
 using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Constants
@@ -13,6 +14,7 @@ namespace Faolan.Core.Network.Constants
 	{
 		// The character-create editor playfield/map id (the scene props are WorldObjects rows on it).
 		public const uint EditorMapId = 4000;
+		public static readonly Vector3 EditorSpawnPosition = new Vector3(260.0f, 0.0f, 290.0f);
 
 		// Male (Sex 0): loincloth in the legs slot, no chest item.
 		public const uint StartingMaleLegsItem = 3805575; // Red Loincloth

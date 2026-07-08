@@ -55,9 +55,9 @@ namespace Faolan.Tests
 		}
 
 		// End-to-end: running the actual initial burst WITH a DB (the committed faolan.db) emits exactly the golden
-		// bytes - i.e. the live BuildSceneDynel substitution (identity match -> DB build -> byte-identical gate)
-		// reproduces InitialBurst.bin. Every prop is now DB-sourced (#222), so this locks the wired DB path, not just
-		// WorldObjectBuilder in isolation.
+		// bytes - i.e. the live scene-prop loop (EditorSceneDynelHandles -> WorldObjectBuilder build from the row keyed
+		// by captured handle) reproduces InitialBurst.bin. The dynels are SPAWNED FROM the DB, not verbatim, so this
+		// locks the wired DB path, not just WorldObjectBuilder in isolation.
 		[Fact]
 		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
 		{
