@@ -3,15 +3,15 @@
         <OutputType>Exe</OutputType>
     </PropertyGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="Faolan.Tests"/>
+	</ItemGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
         <ProjectReference Include="..\Faolan.Core.Network\Faolan.Core.Network.csproj"/>
         <!-- In-process MCP server (Claude tooling); call services.AddMcp(). -->
         <ProjectReference Include="..\Faolan.Mcp\Faolan.Mcp.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <InternalsVisibleTo Include="Faolan.Tests"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -28,4 +28,24 @@
         <PackageReference Include="MoonSharp" Version="2.0.0"/>
         <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9"/>
     </ItemGroup>
+
+	<ItemGroup>
+		<!-- The create-editor avatar's 0x737A6DF9 FullChar snapshot ("Bigboy") - 8001 bytes of opaque snapshot body,
+			 held out of line as a binary resource instead of a literal byte[] (loaded in CreateFlowService). -->
+		<EmbeddedResource Include="GameServer\CreateFlow\CreateEditorAvatarSnapshot.bin">
+			<LogicalName>Faolan.CreateEditorAvatarSnapshot.bin</LogicalName>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources.resx">
+		  <Generator>ResXFileCodeGenerator</Generator>
+		  <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="Resources.Designer.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>Resources.resx</DependentUpon>
+	  </Compile>
+	</ItemGroup>
 </Project>
