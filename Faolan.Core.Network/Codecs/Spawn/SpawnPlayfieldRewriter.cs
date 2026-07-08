@@ -8,7 +8,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// (FA015807 character spawns) and WorldObjectBuilder (66AEDD50 dynels): both bodies are the IIR carrier payload
 	// [u32 len][u32 subOpcode][record], and the token lives at the `18 <varint>` that closes the 0x2C transform
 	// group. Session tokens are 4-byte LEB128 varints, so the rewrite is splice-free (no length field shifts).
-	[Obsolete("Patches the live playfield token into a captured spawn body; build the spawn from scratch with the token as input instead (construct, don't patch). Blocked on typed-column world-object construction (#187).")]
+	// Spawn/object bodies are now built WHOLE from typed columns (#187/#244 done) with the token as a build input, so
+	// the ONLY remaining callers re-stamp a value that is inherently a SEND-TIME quantity: SendWorldSpawn stamps the
+	// entering player's LIVE playfield token per-recipient (not known until entry), and CreateEditorCharBuilder threads
+	// the session token into a self-reconstructed pedestal. The pure "construct" endgame is to rebuild the body from
+	// scratch per-send with the live token (needs the source row/handle carried on WorldEntity); until then this
+	// targeted 4-byte re-address is the seam. Kept (no longer [Obsolete]) - it's a required send-time op, not a splice.
 	public static class SpawnPlayfieldRewriter
 	{
 		// Overwrites the transform's playfield-instance varint in `carrierBody` (the [u32 len][u32 subOpcode][record]

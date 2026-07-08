@@ -753,9 +753,9 @@ namespace Faolan.GameServer.World
 				entity.Hostile = community > 0;
 
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
-				// it for nearby players (#244): built from typed columns with THIS zone's playfield token baked in (no
-				// post-hoc SpawnPlayfieldRewriter); the Data-splice fallback (runtime-post-IIR humanoids) still threads
-				// the token here too, so SendWorldSpawn never re-patches it.
+				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
+				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE
+				// token per-send (SpawnPlayfieldRewriter), since that token isn't known until the player enters.
 				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody))
 					entity.SpawnBody = spawnBody;
 
