@@ -148,6 +148,3 @@ are the standard test bootstrap for features whose retail trigger isn't wired ye
   and the referenced capture first.
 - Protocol knowledge lives in `docs/` (per-subsystem .md files + `docs/archive/` for resolved plans);
   update the relevant doc and the corresponding **Gitea issue** when a subsystem's status changes.
-
-Note: `AGENTS.md` predates parts of the current code; where it conflicts (lazy-loading proxies,
-test-project layout), this file and the code comments win.
