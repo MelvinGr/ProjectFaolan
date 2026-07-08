@@ -27,7 +27,9 @@ namespace Faolan.Tests
 
 			int rows = 0, parsed = 0, checkedMsgs = 0, mismatch = 0;
 
-			foreach (var table in new[] { "Npcs", "NpcSpawns" })
+			// NpcSpawn.Data was retired (#243/#244 - spawns build from typed columns); the type-level Npc.Data captured
+			// bodies remain (pets #307) and still exercise the stat-core codec round-trip.
+			foreach (var table in new[] { "Npcs" })
 			{
 				using var cmd = con.CreateCommand();
 				cmd.CommandText = $"SELECT Data FROM {table} WHERE Data IS NOT NULL";

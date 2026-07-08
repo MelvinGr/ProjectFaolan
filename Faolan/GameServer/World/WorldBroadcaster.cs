@@ -960,7 +960,9 @@ namespace Faolan.GameServer.World
 
 			var npc = await _database.GetNpcSpawnByName(npcName);
 			var handle = NextLootHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-			if (npc == null || !NpcSpawnBuilder.TryBuild(npc, handle, out var body, true))
+			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
+			// baked ones are just placeholders (the player's zone token here).
+			if (npc == null || !NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken, out var body))
 			{
 				_logger.LogInformation("Spawn: no spawnable '{Npc}' template found.", npcName);
 				return null;

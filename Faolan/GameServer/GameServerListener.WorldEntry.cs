@@ -225,6 +225,8 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// TODO: Remove client.Session.Character?.Name != null checks below
+
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
 			await SendPost205FOxf98E10B3Prompt(client);
 			Logger.LogInformation("Sent deferred 0xF98E10B3 prompt.");

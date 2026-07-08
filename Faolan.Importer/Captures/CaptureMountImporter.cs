@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs;
 using Faolan.GameServer.World;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -66,7 +67,7 @@ namespace Faolan.Importer.Captures
 			{
 				// The mount NPC TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
 				// resolves by name. Upsert so re-runs keep the type id stable.
-				var type = await db.Npcs.FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ?? await db.Npcs.FirstOrDefaultAsync(n => n.Name == e.Name);
+				var type = await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ?? await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.Name == e.Name);
 				if (type == null)
 				{
 					type = new Npc
@@ -86,26 +87,20 @@ namespace Faolan.Importer.Captures
 					type.Sex = e.Sex;
 				}
 
-				db.NpcSpawns.Add(new NpcSpawn
+				// Lift the type's stat core from the dump body so the mount builds wholly from columns (Data retired) -
+				// the same lift UpsertNpcTypes does for map NPCs, incl. the no-morph post-IIR recordCount (#243).
+				var body = WorldObjectBuilder.ExtractBody(e.Data);
+				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				{
-					MapId = MountMapId,
-					NpcId = type.Id,
-					Data = e.Data,
-					CapturedHandle = e.Handle,
-					PositionX = e.X,
-					PositionY = e.Y,
-					PositionZ = e.Z,
-					RotationX = e.RotX,
-					RotationY = e.RotY,
-					RotationZ = e.RotZ,
-					RotationW = e.RotW,
-					Level = e.Level,
-					Health = e.Health,
-					HeadMesh = e.HeadMesh,
-					MonsterData = e.MonsterData,
-					MonsterScale = e.MonsterScale,
-					HasEquipment = e.HasEquipment
-				});
+					type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
+					type.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
+					if (type.StatCore.MinimalPostIirRecordCount == null && NpcSpawnScaffold.TryReadNoMorphRecordCount(body, out var rc))
+						type.StatCore.MinimalPostIirRecordCount = rc;
+				}
+
+				var row = new NpcSpawn { MapId = MountMapId, NpcId = type.Id, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z };
+				ImportOps.Populate(row, e); // full column lift (pools/equipment/morphs), same as the map-NPC path
+				db.NpcSpawns.Add(row);
 				seeded++;
 			}
 

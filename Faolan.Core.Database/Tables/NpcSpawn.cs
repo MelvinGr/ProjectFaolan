@@ -6,14 +6,11 @@ namespace Faolan.Core.Database.Tables
 	// A captured NPC entity spawn (FA015807) on a map. Keyed for dedup by (MapId, Position) - the stable spawn
 	// point; the entity handle is session-scoped. Imported from captures by Faolan.Importer (NpcSpawnExtractor).
 	//
-	// `Data` is the captured FA015807 body. It is NO LONGER REPLAYED verbatim: NpcSpawnBuilder DECODES it and
-	// reconstructs the spawn field-by-field (#185) - the transform comes from the columns below, the scaffolds
-	// (pre-IIR/post-IIR) are generated from scratch, equipment from NpcSpawnEquipment, morphs from NpcSpawnMorph.
-	// So `Data` now serves only as the SOURCE for the CharacterIIR stat core (CharacterStats / NpcStats / Bcc)
-	// that hasn't been lifted into typed storage yet. A roster measurement (#185, 2026-06-18) showed that core is
-	// fully-typed protobuf with ~23 CharacterStats + ~9 NpcStats fields that vary, mostly TYPE-level (only 27
-	// distinct TemplateIds) - so its lift belongs with the Npc-type/NpcSpawn-instance split (#244), where the stat
-	// block is stored once per type as typed rows. `Data` is retired there, not here.
+	// The whole spawn body is now CONSTRUCTED from typed columns (#243/#244): the transform from the columns below,
+	// the pre-IIR/post-IIR scaffolds from scratch, the stat core from Npc.StatCore, equipment from NpcSpawnEquipment,
+	// morphs from NpcSpawnMorph, and a no-morph spawn's post-IIR recordCount from Npc.StatCore.MinimalPostIirRecordCount.
+	// The captured FA015807 `Data` blob has been RETIRED - every shipped spawn builds from columns (988/988), so the
+	// column was dropped; the importer lifts these rows from the dump body at import time (never persisting it).
 	// The structured columns below are LIFTED from the ProtoCoreCharacterIIR: NPC identity/appearance
 	// (TemplateId/Race/Sex/Level/HeadMesh/...). Transform (PositionX/Y/Z + RotationX/Y/Z/W + the Position/Rotation
 	// accessors) is inherited from Base3DEntity, shared with the player Character and the world objects.
@@ -39,7 +36,6 @@ namespace Faolan.Core.Database.Tables
 		public virtual Npc Npc { get; set; }
 
 		public bool HasEquipment { get; set; }
-		public byte[] Data { get; set; }
 		public uint CapturedHandle { get; set; }
 		public uint MapId { get; set; }
 

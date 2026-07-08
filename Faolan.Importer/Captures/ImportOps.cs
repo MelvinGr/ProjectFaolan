@@ -398,7 +398,6 @@ namespace Faolan.Importer.Captures
 		public static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
 		{
 			row.CapturedHandle = e.Handle;
-			row.Data = e.Data;
 			row.RotationX = e.RotX;
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
@@ -757,19 +756,6 @@ namespace Faolan.Importer.Captures
 				// #243: stamp the type's fresh minimal post-IIR recordCount from the dump-derived scan above.
 				if (npc.StatCore != null && minimalRcByTemplate.TryGetValue(e.TemplateId, out var minRc))
 					npc.StatCore.MinimalPostIirRecordCount = minRc;
-			}
-
-			// Fallback (#244): a type whose spawns were pruned (or that isn't in this capture set) but still has an
-			// existing NpcSpawn row carrying Data - lift its StatCore from that stored spawn (e.g. Villager 429).
-			foreach (var npc in byTemplate.Values.Where(n => (n.StatCore == null || n.StatCore.IirHeader == null) && n.Id != 0))
-			{
-				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(s => s.NpcId == npc.Id && s.Data != null);
-				var body = spawn == null ? null : WorldObjectBuilder.ExtractBody(spawn.Data);
-				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-				{
-					npc.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
-					npc.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
-				}
 			}
 
 			await db.SaveChangesAsync();

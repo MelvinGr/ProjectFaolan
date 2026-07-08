@@ -1,141 +1,58 @@
 using System;
 using System.Buffers.Binary;
-using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using Faolan.Core.Database;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
 using Faolan.Tests.Support;
-using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
 	// #244: NpcSpawnBuilder.BuildFromScratch assembles the whole FA015807 body with NO captured template (header +
-	// transform-with-token + pre-IIR + CoreChar header + message + post-IIR). It must be byte-identical to the
-	// freshSpawn TryBuild output (which regenerates the same scaffolds but off a template) for animals and
-	// clean-appearance humanoids - proving Data is no longer needed for the frame.
+	// transform-with-token + pre-IIR + CoreChar header + message + post-IIR). Driven from golden captures, decomposed
+	// into the same inputs the live path (TryBuildLive) feeds it: the built body must parse back and carry the expected
+	// post-IIR shape - the minimal form for an animal, the appearance/morph table for a humanoid.
 	public class NpcSpawnFromScratchTests
 	{
-		private readonly ITestOutputHelper _out;
-		public NpcSpawnFromScratchTests(ITestOutputHelper o) => _out = o;
-
-		// Whole-DB coverage: how many shipped spawns assemble from scratch byte-exact vs. fall back to Data (the
-		// humanoid runtime-post-IIR #243 tail). The from-scratch build must match the freshSpawn oracle for every
-		// animal + clean-appearance humanoid; a mismatch is only allowed when the oracle's post-IIR isn't the clean
-		// appearance shape (TryDecodeAppearance false but the spawn IS a humanoid carrying equipment).
 		[Fact]
-		public void EverySpawn_BuildsFromScratch_OrIsRuntimePostIir()
+		public void BuildFromScratch_Animal_ParsesAndCarriesMinimalPostIir()
 		{
-			var db = Path.Combine(FindRepoRoot(), "faolan.db");
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={db};Mode=ReadOnly").Options;
-			using var ctx = new DatabaseContext(options);
-			var rows = ctx.NpcSpawns
-				.Include(s => s.Npc).ThenInclude(n => n.StatCore)
-				.Include(s => s.Equipment).Include(s => s.Morphs)
-				.Where(s => s.Data != null && s.Npc != null && s.Npc.StatCore != null && s.Life > 0)
-				.AsNoTracking().ToList();
+			var golden = Golden.Bytes("SpawnNpcCrocodile");
+			var body = BuildFromGolden(golden, out var handle, out var morphs, minimalRc: NpcSpawnScaffold.MinimalRecordCount);
 
-			int total = 0, fromScratch = 0, runtimeTail = 0, canonicalRuntime = 0, bad = 0;
-			foreach (var row in rows)
-			{
-				var handle = row.CapturedHandle;
-				if (!NpcSpawnBuilder.TryBuild(row, handle, out var oracle, freshSpawn: true) || !PlayerSpawnReader.TryReadCharacterMessage(oracle, out var read))
-					continue;
-				total++;
-				var x = NpcStatCoreCodec.ReadIirHeaderWord(oracle);
-				if (x == null)
-				{
-					bad++;
-					continue;
-				}
-
-				var pos = new Vector3(ReadLE(oracle, SpawnPacketBuilder.PosXOffset), ReadLE(oracle, SpawnPacketBuilder.PosYOffset), ReadLE(oracle, SpawnPacketBuilder.PosZOffset));
-				var rot = new Quaternion(ReadLE(oracle, SpawnPacketBuilder.RotXOffset), ReadLE(oracle, SpawnPacketBuilder.RotYOffset), ReadLE(oracle, SpawnPacketBuilder.RotZOffset), ReadLE(oracle, SpawnPacketBuilder.RotWOffset));
-				var humanoid = NpcSpawnAppearanceCodec.TryDecodeAppearance(oracle, out var morphs);
-				// A no-morph spawn's fresh post-IIR is the minimal form; use the captured recordCount (1 animal / 2
-				// humanoid) so a no-morph humanoid reproduces byte-exact too (#243). Non-minimal oracles keep the default
-				// (they carry runtime state the from-scratch build deliberately drops, so they can't match anyway).
-				var minimalRc = NpcSpawnScaffold.TryReadMinimalRecordCount(oracle, out var rc) ? rc : NpcSpawnScaffold.MinimalRecordCount;
-				var message = NpcSpawnBuilder.BuildMessageFromColumns(row); // fully from DB columns/rows, no parsed Data
-				var actual = NpcSpawnBuilder.BuildFromScratch(handle, x.Value, pos, rot, ReadPlayfieldToken(oracle), message, morphs, minimalRc);
-
-				var m = read.Message;
-				var hasRuntimeMsg = m.DefensiveTarget != null || m.OffensiveTarget != null || m.LockedTo != null
-					|| m.ShouldSerializePetOwnerInstance() || m.ShouldSerializePetType();
-				if (oracle.AsSpan().SequenceEqual(actual))
-					fromScratch++;
-				else if (row.Equipment.Count > 0 && !humanoid) // humanoid with a non-appearance (runtime) post-IIR
-					runtimeTail++;
-				else if (hasRuntimeMsg) // the oracle kept a runtime target/pet field the canonical build drops
-					canonicalRuntime++;
-				else
-					bad++;
-			}
-
-			_out.WriteLine($"spawns={total} fromScratch={fromScratch} runtimePostIirTail={runtimeTail} canonicalRuntime={canonicalRuntime} unexpected={bad}");
-			Assert.Equal(0, bad);
+			Assert.Empty(morphs); // an animal carries no appearance table
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			Assert.Equal(handle, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.HandleOffset, 4)));
+			Assert.Equal(NpcSpawnScaffold.BuildMinimalPostIir(), body[(read.Offset + read.Length)..]);
 		}
 
-		// #243 tail: the no-morph HUMANOIDS ship the 41-byte minimal post-IIR but with recordCount=2 (vs the animal's
-		// 1). BuildMinimalPostIir(2) must reproduce them byte-exact - the from-scratch build for an equipped NPC that
-		// carries no appearance morphs.
 		[Fact]
-		public void NoMorphHumanoids_ReproduceWithMinimalRecordCount2()
+		public void BuildFromScratch_Humanoid_ParsesAndCarriesAppearanceTable()
 		{
-			var db = Path.Combine(FindRepoRoot(), "faolan.db");
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={db};Mode=ReadOnly").Options;
-			using var ctx = new DatabaseContext(options);
-			var datas = ctx.NpcSpawns.Where(s => s.Data != null && s.HasEquipment).Select(s => s.Data).AsNoTracking().ToList();
+			var golden = Golden.Bytes("SpawnNpcCasilda");
+			var body = BuildFromGolden(golden, out _, out var morphs, minimalRc: NpcSpawnScaffold.MinimalRecordCount);
 
-			var expected = NpcSpawnScaffold.BuildMinimalPostIir(NpcSpawnScaffold.MinimalHumanoidRecordCount);
-			var matched = 0;
-			foreach (var data in datas)
-			{
-				var body = WorldObjectBuilder.ExtractBody(data);
-				if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-					continue;
-				var post = body.AsSpan(read.Offset + read.Length);
-				// the minimal-humanoid form: exactly the 41-byte body, header recordCount==2.
-				if (post.Length != NpcSpawnScaffold.MinimalPostIirLength || BinaryPrimitives.ReadUInt32BigEndian(post.Slice(8, 4)) != NpcSpawnScaffold.MinimalHumanoidRecordCount)
-					continue;
-				Assert.Equal(expected, post.ToArray());
-				matched++;
-			}
-
-			_out.WriteLine($"no-morph humanoids reproduced byte-exact with BuildMinimalPostIir(2): {matched}");
-			Assert.True(matched > 100, $"expected ~148 minimal-humanoid spawns, got {matched}");
+			Assert.NotEmpty(morphs); // Casilda's appearance/morph table
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			// the post-IIR is the appearance table generated from the decoded morphs (not the minimal form)
+			Assert.Equal(NpcSpawnAppearanceCodec.BuildPostIir(morphs), body[(read.Offset + read.Length)..]);
+			// and the transform round-trips (position/rotation/token preserved through the build)
+			Assert.Equal(golden.AsSpan(SpawnPacketBuilder.PosXOffset, 4).ToArray(), body.AsSpan(SpawnPacketBuilder.PosXOffset, 4).ToArray());
+			Assert.Equal(ReadPlayfieldToken(golden), ReadPlayfieldToken(body));
 		}
 
-		[Theory]
-		[InlineData("SpawnNpcCrocodile")] // animal (minimal post-IIR)
-		[InlineData("SpawnNpcCasilda")] // humanoid (appearance/morph post-IIR)
-		public void BuildFromScratch_MatchesFreshSpawnBuild(string golden)
+		// Decompose a golden capture into the inputs BuildFromScratch takes (IIR header, transform, token, message,
+		// morphs) and reassemble from scratch - the same decomposition TryBuildLive performs off the DB columns.
+		private static byte[] BuildFromGolden(byte[] golden, out uint handle, out List<NpcAppearanceMorph> morphs, uint minimalRc)
 		{
-			var captured = Golden.Bytes(golden);
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
-
-			// The freshSpawn TryBuild output is the oracle: same regenerated scaffolds, but assembled off the template.
-			var row = RowFromCapturedBody(captured);
-			if (NpcSpawnAppearanceCodec.TryDecodeAppearance(captured, out var rowMorphs))
-				foreach (var m in rowMorphs)
-					row.Morphs.Add(new NpcSpawnMorph { Ordinal = row.Morphs.Count, MorphId = m.MorphId, Value = m.Value, Text = m.Text });
-			Assert.True(NpcSpawnBuilder.TryBuild(row, handle, out var expected, freshSpawn: true));
-
-			// Decompose the oracle into the inputs BuildFromScratch takes, then reassemble from scratch.
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(expected, out var read));
-			var x = NpcStatCoreCodec.ReadIirHeaderWord(expected)!.Value;
-			var position = new Vector3(ReadLE(expected, SpawnPacketBuilder.PosXOffset), ReadLE(expected, SpawnPacketBuilder.PosYOffset), ReadLE(expected, SpawnPacketBuilder.PosZOffset));
-			var rotation = new Quaternion(ReadLE(expected, SpawnPacketBuilder.RotXOffset), ReadLE(expected, SpawnPacketBuilder.RotYOffset), ReadLE(expected, SpawnPacketBuilder.RotZOffset), ReadLE(expected, SpawnPacketBuilder.RotWOffset));
-			var token = ReadPlayfieldToken(expected);
-			NpcSpawnAppearanceCodec.TryDecodeAppearance(expected, out var morphs);
-			var minimalRc = NpcSpawnScaffold.TryReadMinimalRecordCount(expected, out var rc) ? rc : NpcSpawnScaffold.MinimalRecordCount;
-
-			var actual = NpcSpawnBuilder.BuildFromScratch(handle, x, position, rotation, token, read.Message, morphs, minimalRc);
-
-			Assert.Equal(expected, actual);
+			handle = BinaryPrimitives.ReadUInt32BigEndian(golden.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(golden, out var read));
+			var x = NpcStatCoreCodec.ReadIirHeaderWord(golden)!.Value;
+			var pos = new Vector3(ReadLE(golden, SpawnPacketBuilder.PosXOffset), ReadLE(golden, SpawnPacketBuilder.PosYOffset), ReadLE(golden, SpawnPacketBuilder.PosZOffset));
+			var rot = new Quaternion(ReadLE(golden, SpawnPacketBuilder.RotXOffset), ReadLE(golden, SpawnPacketBuilder.RotYOffset), ReadLE(golden, SpawnPacketBuilder.RotZOffset), ReadLE(golden, SpawnPacketBuilder.RotWOffset));
+			NpcSpawnAppearanceCodec.TryDecodeAppearance(golden, out morphs);
+			return NpcSpawnBuilder.BuildFromScratch(handle, x, pos, rot, ReadPlayfieldToken(golden), read.Message, morphs, minimalRc);
 		}
 
 		// The playfield token: a 4-byte LEB128 varint at [0x18] right after the constructed transform (offset 60).
@@ -147,30 +64,5 @@ namespace Faolan.Tests
 		}
 
 		private static float ReadLE(byte[] b, int offset) => BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
-
-		private static string FindRepoRoot()
-		{
-			var d = new DirectoryInfo(Directory.GetCurrentDirectory());
-			while (d != null && !File.Exists(Path.Combine(d.FullName, "faolan.db")))
-				d = d.Parent;
-			return d?.FullName ?? throw new FileNotFoundException("faolan.db not found up-tree");
-		}
-
-		private static NpcSpawn RowFromCapturedBody(byte[] body)
-		{
-			var data = new byte[12 + body.Length]; // headerLen = 0
-			body.CopyTo(data, 12);
-			return new NpcSpawn
-			{
-				Data = data,
-				PositionX = ReadLE(body, SpawnPacketBuilder.PosXOffset),
-				PositionY = ReadLE(body, SpawnPacketBuilder.PosYOffset),
-				PositionZ = ReadLE(body, SpawnPacketBuilder.PosZOffset),
-				RotationX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
-				RotationY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
-				RotationZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
-				RotationW = ReadLE(body, SpawnPacketBuilder.RotWOffset)
-			};
-		}
 	}
 }

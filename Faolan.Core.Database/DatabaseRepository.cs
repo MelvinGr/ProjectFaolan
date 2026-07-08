@@ -843,14 +843,16 @@ namespace Faolan.Core.Database
                 .NpcSpawns
                 .Include(n => n.Npc)
                 .ThenInclude(t => t.Spells)
+                .Include(n => n.Npc)
+                .ThenInclude(t => t.StatCore) // the type stat core, so the spawn builds from columns (TryBuildLive)
                 .Include(n => n.Morphs)
                 .Include(n => n.Equipment)
-                .Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered && n.Data != null) // #244: name lives on the type
+                .Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered && n.Npc.StatCore != null) // #244: name lives on the type
                 .FirstOrDefaultAsync();
         }
 
-        // The captured NPC entity spawns for a map (FA015807 bodies in Data + the lifted identity/transform
-        // columns). The world-entry path builds each NPC's spawn from its row via NpcSpawnBuilder.
+        // The NPC entity spawns for a map (the lifted identity/transform/stat columns). The world-entry path builds
+        // each NPC's FA015807 body from its row via NpcSpawnBuilder.TryBuildLive - wholly from columns (#243/#244).
         public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId)
         {
             await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -862,7 +864,7 @@ namespace Faolan.Core.Database
                 .ThenInclude(t => t.Spells) // #244: the NPC type + its FK'd spells (replaces the name-string spell join)
                 .Include(n => n.Npc)
                 .ThenInclude(t => t.StatCore) // #244: the type stat core, so the spawn body builds from columns
-                .Where(n => n.MapId == mapId && n.Data != null)
+                .Where(n => n.MapId == mapId)
                 .ToArrayAsync();
         }
 
@@ -1306,6 +1308,7 @@ namespace Faolan.Core.Database
             return await ctx
                 .NpcSpawns
                 .Include(n => n.Npc)
+                .ThenInclude(t => t.StatCore) // so the Spawnable flag can check buildability (StatCore.IirHeader)
                 .Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower().Contains(lowered)) // #244: name lives on the type
                 .OrderBy(n => n.Npc.Name)
                 .ThenBy(n => n.MapId)

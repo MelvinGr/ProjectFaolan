@@ -108,7 +108,7 @@ namespace Faolan.Mcp.Tools
 						Y = n.PositionY,
 						Z = n.PositionZ
 					},
-					Spawnable = n.Data != null
+					Spawnable = n.Npc?.StatCore?.IirHeader != null // builds from columns via TryBuildLive
 				}));
 		}
 

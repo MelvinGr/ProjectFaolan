@@ -20,80 +20,10 @@ namespace Faolan.Core.Network.Codecs
 	// the unit the world-entry/interest path calls per NPC instead of replaying the MapWorldBurst blob.
 	public static class NpcSpawnBuilder
 	{
-		// Produces the FA015807 body for `row`, addressed to `handle`. Returns false if the row has no usable
-		// captured body (no Data / no decodable CharacterIIR). With `freshSpawn`, the transient
-		// NpcStats.SpawnAnimation is zeroed: it is the animation that was PLAYING when the NPC was captured, not a
-		// config value (retail's standing spawn of e.g. Casilda has 0; her row was captured mid-animation as 1).
-		// Replaying a non-zero one drives the client into a spawn-anim state the freshly-spawned entity has no
-		// reason to be in - on Casilda that left her entity present but undrawn. Default off keeps the byte-exact
-		// reproduction the goldens assert; the world-entry/interest spawn paths pass true.
-		public static bool TryBuild(NpcSpawn row, uint handle, out byte[] body, bool freshSpawn = false)
-		{
-			body = null;
-			var template = ExtractBody(row?.Data);
-			if (template == null || !PlayerSpawnReader.TryReadCharacterMessage(template, out var read))
-				return false;
-
-			if (freshSpawn && read.Message.npc_stats != null)
-				read.Message.npc_stats.SpawnAnimation = 0;
-
-			// #267: Casilda's chained look comes from her WORN EQUIPMENT, not the captured idle and not the
-			// decor_chain_hangingwoman world object (that renders fine - it's byte-identical to retail). At the post she
-			// wears 4 pieces incl. slot-18 tpl402981 (the chains); while following she wears 3. The importer now keeps her
-			// fullest loadout (BuildBurstTruthSpawns equipByName), and the captive BCC pose (SendCasildaPose) supplies the
-			// hanging animation. We leave her captured idle as-is. See [[casilda_184_not_spawn_swap]].
-
-			// Worn equipment from DB rows (#185): rebuild the CharacterIIR f23 list from NpcSpawnEquipment instead of
-			// the captured Data blob's. Only when the row has lifted equipment - else the parsed (Data) list stands,
-			// so a row predating the lift is unchanged. Byte-identical to the capture when the rows came from it.
-			if (row?.Equipment is { Count: > 0 })
-			{
-				read.Message.InventoryEntries.Clear();
-				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(row.Equipment))
-					read.Message.InventoryEntries.Add(entry);
-			}
-
-			// Stat core from typed columns (#244): when the type has a lifted StatCore, CONSTRUCT the CharacterIIR stat
-			// core (Stats/npc_stats/Bcc + CanFall/MovementMode) from Npc.StatCore + this placement's overrides instead
-			// of keeping the one parsed from Data. Byte-identical to the capture (NpcSpawnStatCoreTests), so the stat
-			// core is now DB-driven; Data still supplies the frame + name (retired in a later step).
-			ApplyStatCore(read.Message, row);
-
-			body = SpawnPacketBuilder.BuildSpawn(template, handle, row.Position, row.Rotation, read.Message);
-
-			// On a fresh spawn, reset the runtime-state scaffolds to their from-scratch form. The pre-IIR
-			// (transform/bounds) always resets to minimal. The post-IIR: ANIMALS get the minimal form; a HUMANOID's
-			// post-IIR is its APPEARANCE / morph table (Gitea #243) - generated from the row's NpcSpawnMorph rows
-			// (the from-DB lift, #185) when present, else the captured post-IIR is kept (the bald-fix fallback for a
-			// row imported before the morph lift). (Humanoid = carries worn equipment - the signal the tests key on.)
-			if (freshSpawn)
-			{
-				var humanoid = read.Message.InventoryEntries.Count > 0;
-				if (humanoid && row.Morphs is { Count: > 0 })
-				{
-					var morphs = row
-						.Morphs
-						.OrderBy(m => m.Ordinal)
-						.Select(m => new NpcAppearanceMorph
-						{
-							MorphId = m.MorphId,
-							Value = m.Value,
-							Text = m.Text ?? ""
-						})
-						.ToList();
-					body = NpcSpawnAppearanceCodec.WithAppearancePostIir(NpcSpawnScaffold.WithMinimalPreIir(body), morphs);
-				}
-				else
-					body = NpcSpawnScaffold.WithFreshScaffolds(body, humanoid);
-			}
-
-			return true;
-		}
-
 		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO
 		// world placement (#244/#307). This is what a summoned PET uses: the pet's creature type carries the lifted
 		// stat CORE (Npc.Data) and we place it at the summoner's position. Uses the parsed message's own
-		// equipment/morphs (the Data blob already bakes them in); freshSpawn resets the runtime scaffolds like TryBuild.
+		// equipment/morphs (the Data blob already bakes them in); freshSpawn resets the runtime scaffolds.
 		public static bool TryBuildFromType(Npc npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body, bool freshSpawn = true)
 		{
 			body = null;
@@ -121,9 +51,8 @@ namespace Faolan.Core.Network.Codecs
 		// NpcSpawnPreIir.BuildMinimal; the CoreChar header [41][X][msgLen] with X = the lifted IirHeader; the serialised
 		// CharacterIIR message; and the post-IIR: the appearance/morph table when `morphs` are given, else the minimal
 		// form with `minimalRecordCount` (the type-stable 1 or 2 - #243).
-		// Byte-identical to the freshSpawn TryBuild output for animals + clean-appearance humanoids + no-morph humanoids
-		// (verified in NpcSpawnFromScratchTests). Humanoids whose captured post-IIR carries runtime state (not a clean
-		// morph table) are NOT expressible here - the caller keeps their captured Data (the #243 residual tail).
+		// This is the sole NPC spawn-body path (the captured Data blob was retired): every shipped spawn is an animal,
+		// a clean-appearance humanoid, or a no-morph spawn expressible from columns (NpcSpawnFromScratchTests).
 		public static byte[] BuildFromScratch(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs, uint minimalRecordCount = NpcSpawnScaffold.MinimalRecordCount)
 		{
 			var msgBytes = message.ToProtobuf();
@@ -176,42 +105,35 @@ namespace Faolan.Core.Network.Codecs
 		];
 
 		// The LIVE spawn path (#244/#243): assemble the whole body from typed columns with `playfieldToken` baked into
-		// the transform - no captured Data, no SpawnPlayfieldRewriter - whenever the spawn is expressible from scratch:
+		// the transform - no captured Data, no SpawnPlayfieldRewriter. Every shipped spawn is expressible from scratch:
 		// an ANIMAL (no equipment -> minimal post-IIR), a humanoid whose APPEARANCE is lifted into morph rows (-> the
-		// appearance table), or a NO-MORPH HUMANOID whose type carries a known minimal recordCount (-> the minimal form
-		// with that count, #243). Otherwise fall back to the Data splice (the runtime-post-IIR residual tail, or an
-		// un-lifted row) and thread the token via the rewriter. Either way the returned body already carries the live
-		// token, so the caller never post-patches it.
+		// appearance table), or a NO-MORPH spawn whose type carries a known minimal recordCount (-> the minimal form
+		// with that count, #243). Returns false only for a row with no lifted type (no StatCore.IirHeader) or a no-morph
+		// spawn whose type recordCount was never derived - neither occurs in the shipped DB (988/988 build). The returned
+		// body already carries the live token, so the caller never post-patches it.
 		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body)
 		{
 			body = null;
-			if (row?.Npc?.StatCore?.IirHeader is { } x)
-			{
-				var morphs = row.Morphs
-					.OrderBy(m => m.Ordinal)
-					.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
-					.ToList();
-
-				// Animal or morph-humanoid: minimal record count is 1 (unused when morphs are present).
-				if (!row.HasEquipment || morphs.Count > 0)
-				{
-					body = BuildFromScratch(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs);
-					return true;
-				}
-
-				// No-morph humanoid: build the minimal form with the type's fresh record count (1 or 2) when known.
-				if (row.Npc.StatCore.MinimalPostIirRecordCount is { } minimalRecordCount)
-				{
-					body = BuildFromScratch(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs, minimalRecordCount);
-					return true;
-				}
-			}
-
-			if (!TryBuild(row, handle, out body, freshSpawn: true))
+			if (row?.Npc?.StatCore?.IirHeader is not { } x)
 				return false;
 
-			// Interim: a runtime-post-IIR humanoid can't build from scratch yet, so patch the live token in place.
-			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
+			var morphs = row.Morphs
+				.OrderBy(m => m.Ordinal)
+				.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
+				.ToList();
+
+			// Animal or morph-humanoid: minimal record count is 1 (unused when morphs are present).
+			if (!row.HasEquipment || morphs.Count > 0)
+			{
+				body = BuildFromScratch(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs);
+				return true;
+			}
+
+			// No-morph spawn: build the minimal form with the type's fresh record count (1 or 2) when known.
+			if (row.Npc.StatCore.MinimalPostIirRecordCount is not { } minimalRecordCount)
+				return false;
+
+			body = BuildFromScratch(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs, minimalRecordCount);
 			return true;
 		}
 
