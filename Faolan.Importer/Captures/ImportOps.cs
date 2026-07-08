@@ -718,19 +718,14 @@ namespace Faolan.Importer.Captures
 				{
 					if (!string.IsNullOrEmpty(e.Name))
 						npc.Name = e.Name;
-					npc.Community = e.Community;
-					npc.Race = e.Race; // type-level appearance (#287)
-					npc.Sex = e.Sex;
+					// Community/Race/Sex now live on StatCore (set below via Lift), not the retired Npc columns.
 				}
 				else
 				{
 					npc = new Npc
 					{
 						TemplateId = e.TemplateId,
-						Name = e.Name,
-						Community = e.Community,
-						Race = e.Race,
-						Sex = e.Sex
+						Name = e.Name
 					};
 					db.Npcs.Add(npc);
 					byTemplate[e.TemplateId] = npc;

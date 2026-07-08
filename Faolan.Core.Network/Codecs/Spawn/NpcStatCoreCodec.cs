@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
@@ -37,7 +38,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			if (s != null)
 			{
-				if (s.ShouldSerializeSex()) core.Sex = s.Sex;
+				if (s.ShouldSerializeSex()) core.Sex = (Sex)s.Sex;
 				if (s.ShouldSerializeSide()) core.Side = s.Side;
 				if (s.ShouldSerializeRace()) core.Race = s.Race;
 				if (s.ShouldSerializeMonsterScale()) core.MonsterScale = s.MonsterScale;
@@ -118,7 +119,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static ProtoCoreCharacterIIR.CharacterStats ToStats(NpcStatCore c)
 		{
 			var s = new ProtoCoreCharacterIIR.CharacterStats();
-			if (c.Sex.HasValue) s.Sex = c.Sex.Value;
+			if (c.Sex.HasValue) s.Sex = (uint)c.Sex.Value;
 			if (c.Side.HasValue) s.Side = c.Side.Value;
 			if (c.Race.HasValue) s.Race = c.Race.Value;
 			if (c.MonsterScale.HasValue) s.MonsterScale = c.MonsterScale.Value;

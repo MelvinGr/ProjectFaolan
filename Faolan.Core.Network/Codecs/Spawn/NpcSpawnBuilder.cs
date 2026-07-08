@@ -85,7 +85,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteUInt32(0) // fieldA
 				.WriteByte(0x2C).WriteByte(0x0A).WriteArrayByteLength(EncodeVec3(position))
 				.WriteByte(0x12).WriteArrayByteLength(EncodeQuat(rotation))
-				.WriteByte(0x18).WriteArray(EncodePlayfieldVarint(playfieldToken))
+				.WriteByte(0x18).WritePlayfieldToken(playfieldToken)
 				.WriteArray(preIir)
 				.WriteByte(0x41).WriteUInt32(iirHeader).WriteUInt32((uint)msgBytes.Length) // CoreChar header
 				.WriteArray(msgBytes)
@@ -111,14 +111,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			.WriteByte(0x25).WriteFloatLittleEndian(q.W)
 			.ToArray();
 
-		// The playfield token in the transform is a fixed-width 4-byte LEB128 varint (tokens are < 2^28).
-		private static byte[] EncodePlayfieldVarint(uint token) =>
-		[
-			(byte)((token & 0x7F) | 0x80),
-			(byte)(((token >> 7) & 0x7F) | 0x80),
-			(byte)(((token >> 14) & 0x7F) | 0x80),
-			(byte)((token >> 21) & 0x7F)
-		];
 
 		// The LIVE spawn path (#244/#243): assemble the whole body from typed columns with `playfieldToken` baked into
 		// the transform - no captured Data, no SpawnPlayfieldRewriter. Every shipped spawn is expressible from scratch:

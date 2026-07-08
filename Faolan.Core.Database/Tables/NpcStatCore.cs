@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Enums;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,8 +39,12 @@ namespace Faolan.Core.Database.Tables
 		public uint? MinimalPostIirRecordCount { get; set; }
 
 		// --- CharacterStats (Stats) ---
+		// Creature model-race code (0..98), a DIFFERENT domain from the 3-value player Race enum - stays raw uint.
 		public uint? Race { get; set; }
-		public uint? Sex { get; set; }
+
+		// The wire sex code, same enum as players (None=0 for genderless creatures, Male=2, Female=3).
+		[ConstrainToEnumValues]
+		public Sex? Sex { get; set; }
 		public uint? Side { get; set; }
 		public uint? Flags { get; set; }
 		public uint? HeadMesh { get; set; }

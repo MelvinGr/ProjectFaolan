@@ -36,24 +36,8 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string Name { get; set; }
 
-		// Faction/community (NpcStats.community): 0 = neutral/friendly, > 0 = a hostile faction.
-		[Obsolete("Use StatCore.Community")]
-		public uint Community { get; set; }
-
-		// Type-level level (drives the pet's max-health when spawned from the type). 0 = derive from Data / unknown.
-		[Obsolete("Use NpcSpawn.Level or StatCore.Level")]
-		public uint Level { get; set; }
-
-		// Deliberately raw uint, NOT the player Race/Sex enums, despite the names - a different domain: this is a
-		// CREATURE model-race code (observed 0..98, far beyond the 3 playable races Aquilonian/Cimmerian/Stygian), so
-		// the 3-value Race enum (and its [ConstrainToEnumValues] check) would reject most values. Don't "fix" the type.
-		[Obsolete("Use StatCore.Race")]
-		public uint Race { get; set; }
-
-		// Wire-encoded creature sex: 2 = MALE, 3 = FEMALE (= the Sex enum + 2), plus 0 for none. NOT the player Sex
-		// enum (0/1), so it stays uint - see the Race note above.
-		[Obsolete("Use StatCore.Sex")]
-		public uint Sex { get; set; }
+		// Community/Level/Race/Sex are type-level identity that now live on the 1:1 StatCore side table
+		// (StatCore.Community / .Level / .Race / .Sex) - the old duplicate Npc columns were retired.
 
 		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId). Unique - one Npc row per template.
 		public uint TemplateId { get; set; }

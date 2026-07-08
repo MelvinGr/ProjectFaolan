@@ -97,11 +97,11 @@ namespace Faolan.Mcp.Tools
 				: Serialize(spawns.Select(n => new
 				{
 					n.Id,
-					n.Npc?.Name, // #244: name/community live on the Npc type
+					n.Npc?.Name, // #244: name on the Npc type, community on its StatCore
 					n.MapId,
 					n.Level,
 					n.Health,
-					Community = n.Npc?.Community ?? 0,
+					Community = n.Npc?.StatCore?.Community ?? 0,
 					Position = new
 					{
 						X = n.PositionX,

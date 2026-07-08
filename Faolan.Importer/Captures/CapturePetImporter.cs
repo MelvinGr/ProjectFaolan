@@ -63,10 +63,6 @@ namespace Faolan.Importer.Captures
 					db.Npcs.Add(type);
 				}
 
-				type.Community = e.Community;
-				type.Race = e.Race;
-				type.Sex = e.Sex;
-				type.Level = e.Level;
 
 				// #307/#244: lift the whole spawn onto the TYPE from its capture so a summoned pet builds wholly from
 				// columns (no Data blob) - the stat core + no-morph recordCount, and, since a pet has no NpcSpawn

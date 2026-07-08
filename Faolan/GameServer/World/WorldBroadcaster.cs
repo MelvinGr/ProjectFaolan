@@ -701,7 +701,7 @@ namespace Faolan.GameServer.World
 					continue;
 
 				var npcName = npc.Npc.Name;
-				var community = npc.Npc.Community;
+				var community = npc.Npc.StatCore?.Community ?? 0;
 
 				// Faction mobs (Community > 0) are legitimately MANY of the same name spread across the map - dedup by
 				// (name, coarse cell): same-spot cross-session re-captures collapse, distinct mobs in different cells
@@ -982,7 +982,7 @@ namespace Faolan.GameServer.World
 
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.Npc?.Name ?? npcName, vitals);
 			entity.Level = npc.Level;
-			entity.Hostile = killable && npc.Npc?.Community > 0;
+			entity.Hostile = killable && npc.Npc?.StatCore?.Community > 0;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)
 
@@ -1023,12 +1023,13 @@ namespace Faolan.GameServer.World
 				return null;
 			}
 
-			var maxHealth = npcType.Level > 0
-				? CombatResolver.NpcMaxHealthForLevel(npcType.Level)
+			var level = npcType.StatCore?.Level ?? 0;
+			var maxHealth = level > 0
+				? CombatResolver.NpcMaxHealthForLevel(level)
 				: 1;
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals);
-			entity.Level = npcType.Level;
+			entity.Level = level;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true;
 

@@ -267,6 +267,18 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
+		// The spawn transform's playfield token: a FIXED-WIDTH 4-byte LEB128 varint (not a normal variable-length
+		// varint). The fixed width is deliberate - SpawnPlayfieldRewriter overwrites the token in place - so it always
+		// emits 4 bytes; tokens are < 2^28, so 4 bytes always suffice.
+		public FaolanStream WritePlayfieldToken(uint token)
+		{
+			return WriteArray(
+				(byte)((token & 0x7F) | 0x80),
+				(byte)(((token >> 7) & 0x7F) | 0x80),
+				(byte)(((token >> 14) & 0x7F) | 0x80),
+				(byte)((token >> 21) & 0x7F));
+		}
+
 		public FaolanStream WriteProtobufByteLength(IExtensible proto)
 		{
 			var body = proto.ToProtobuf();

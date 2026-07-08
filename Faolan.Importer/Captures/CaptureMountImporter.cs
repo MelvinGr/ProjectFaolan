@@ -60,10 +60,6 @@ namespace Faolan.Importer.Captures
 					db.Npcs.Add(type);
 				}
 
-				type.Community = e.Community;
-				type.Race = e.Race;
-				type.Sex = e.Sex;
-				type.Level = e.Level;
 
 				// Lift the whole spawn onto the TYPE (like pets): stat core + no-morph recordCount, and - since a mount
 				// has no NpcSpawn placement - its worn equipment + appearance morphs on the type (NpcEquipment/NpcMorph),

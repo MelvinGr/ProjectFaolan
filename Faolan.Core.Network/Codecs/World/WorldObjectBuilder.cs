@@ -39,7 +39,7 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteByte(0x12)
 				.WriteArrayByteLength(rotation.ToProtobuf())
 				.WriteByte(0x18)
-				.WriteArray(EncodePlayfieldVarint(playfieldToken))
+				.WritePlayfieldToken(playfieldToken)
 				.ToArray();
 
 			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row)); // [u32 len][record]
@@ -118,17 +118,5 @@ namespace Faolan.Core.Network.Codecs.World
 			return TryBuild(row, handle, 0u, out body);
 		}
 
-		// The playfield token in the transform is a 4-byte LEB128 varint (the fixed width SpawnPlayfieldRewriter
-		// assumes); tokens are < 2^28 so 4 bytes always suffice.
-		private static byte[] EncodePlayfieldVarint(uint token)
-		{
-			return
-			[
-				(byte)((token & 0x7F) | 0x80),
-				(byte)(((token >> 7) & 0x7F) | 0x80),
-				(byte)(((token >> 14) & 0x7F) | 0x80),
-				(byte)((token >> 21) & 0x7F)
-			];
-		}
 	}
 }
