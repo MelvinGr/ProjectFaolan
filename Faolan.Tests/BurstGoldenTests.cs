@@ -35,9 +35,9 @@ namespace Faolan.Tests
 			return AssertBurstStable("CreateWorldEntryBurst",
 				async c =>
 				{
-					await CreateFlowService.SendCreateWorldSceneBurst(c);
+					await RetailCreateWorldEntryBurst.SendCreateWorldSceneBurst(c);
 					for (var i = 0; i < 5; i++)
-						await CreateFlowService.SendNextCreateWorldChunk(c);
+						await RetailCreateWorldEntryBurst.SendNextCreateWorldChunk(c);
 				},
 				CreateWorldCapturedInstance);
 		}
