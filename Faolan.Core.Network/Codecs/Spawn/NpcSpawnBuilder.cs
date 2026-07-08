@@ -174,6 +174,32 @@ namespace Faolan.Core.Network.Codecs
 			(byte)((token >> 21) & 0x7F)
 		];
 
+		// The LIVE spawn path (#244): assemble the whole body from typed columns with `playfieldToken` baked into the
+		// transform when the spawn is a CLEAN case (an animal, or a humanoid whose appearance is lifted into morph
+		// rows) - no captured Data, no SpawnPlayfieldRewriter. Otherwise fall back to the Data splice (the humanoid
+		// runtime-post-IIR #243 tail, or an un-lifted row) and thread the token via the rewriter. Either way the
+		// returned body already carries the live token, so the caller never post-patches it.
+		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body)
+		{
+			body = null;
+			if (row?.Npc?.StatCore?.IirHeader is { } x && (!row.HasEquipment || row.Morphs is { Count: > 0 }))
+			{
+				var morphs = row.Morphs
+					.OrderBy(m => m.Ordinal)
+					.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
+					.ToList();
+				body = BuildFromScratch(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs.Count > 0, morphs);
+				return true;
+			}
+
+			if (!TryBuild(row, handle, out body, freshSpawn: true))
+				return false;
+#pragma warning disable CS0618 // interim: the #243-tail humanoids can't build from scratch yet, so patch the token
+			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
+#pragma warning restore CS0618
+			return true;
+		}
+
 		// Constructs the WHOLE ProtoCoreCharacterIIR message for a spawn from typed columns/rows (#244) - no captured
 		// Data: Name from the type, the stat core from StatCore + placement (ApplyStatCore), worn equipment from the
 		// NpcSpawnEquipment rows. Runtime/target fields are omitted (canonical fresh spawn). Feed this to

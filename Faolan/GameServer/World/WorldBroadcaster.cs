@@ -750,8 +750,10 @@ namespace Faolan.GameServer.World
 				entity.Hostile = community > 0;
 
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
-				// it for nearby players - built from the row by NpcSpawnBuilder, the same path the burst-replacement uses.
-				if (NpcSpawnBuilder.TryBuild(npc, handle, out var spawnBody, true))
+				// it for nearby players (#244): built from typed columns with THIS zone's playfield token baked in (no
+				// post-hoc SpawnPlayfieldRewriter); the Data-splice fallback (runtime-post-IIR humanoids) still threads
+				// the token here too, so SendWorldSpawn never re-patches it.
+				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody))
 					entity.SpawnBody = spawnBody;
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.Npc.Spells, loaded
@@ -1425,15 +1427,10 @@ namespace Faolan.GameServer.World
 				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
 			}
 
-			// Re-stamp the playfield-instance token to THIS session's live value. The spawn body carries the token from
-			// whatever capture session the row was built in (e.g. a Crocodile row captured on the beach carries
-			// 0x01EA985C), but the client only registers - and then polls (0x2020) - a spawn whose playfield instance
-			// matches the playfield it actually loaded at world entry (docs/mid-session-spawn-blocker.md part 3: the
-			// client looks the spawn's playfield up in its loaded-playfield map; a miss is dropped before it ever polls).
-			// The login burst renders only because it was replayed from the same session whose token IS the live one;
-			// mid-session/interest spawns reuse arbitrary rows, so without this they carry a stale token and never render.
-			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
-
+			// The playfield-instance token is baked into SpawnBody at construction (NpcSpawnBuilder.TryBuildLive with
+			// this zone's token) - both the from-columns build and the Data-splice fallback thread it there - so it's
+			// already the live value here; no SpawnPlayfieldRewriter re-stamp needed (#244). The client only registers
+			// and polls (0x2020) a spawn whose playfield matches the one it loaded (docs/mid-session-spawn-blocker.md).
 			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
 		}
 

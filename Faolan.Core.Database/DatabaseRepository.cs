@@ -860,6 +860,8 @@ namespace Faolan.Core.Database
                 .Include(n => n.Equipment)
                 .Include(n => n.Npc)
                 .ThenInclude(t => t.Spells) // #244: the NPC type + its FK'd spells (replaces the name-string spell join)
+                .Include(n => n.Npc)
+                .ThenInclude(t => t.StatCore) // #244: the type stat core, so the spawn body builds from columns
                 .Where(n => n.MapId == mapId && n.Data != null)
                 .ToArrayAsync();
         }
