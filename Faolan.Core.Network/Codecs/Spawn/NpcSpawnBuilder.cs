@@ -1,8 +1,11 @@
 using System;
 using System.Buffers.Binary;
 using System.Linq;
+using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.Core.Network.Codecs
@@ -111,6 +114,65 @@ namespace Faolan.Core.Network.Codecs
 
 			return true;
 		}
+
+		// Assembles a whole NPC FA015807 spawn body FROM SCRATCH (#244) - no captured template. The playfield token is
+		// written into the transform directly (no post-hoc SpawnPlayfieldRewriter), and every section has its own
+		// builder: header constants + handle; transform = [2C 0A <vec3 LE> 12 <quat LE> 18 <token varint>]; pre-IIR =
+		// NpcSpawnPreIir.BuildMinimal; the CoreChar header [41][X][msgLen] with X = the lifted IirHeader; the serialised
+		// CharacterIIR message; and the post-IIR (minimal for animals, the appearance/morph table for humanoids).
+		// Byte-identical to the freshSpawn TryBuild output for animals + clean-appearance humanoids (verified in
+		// NpcSpawnFromScratchTests). Humanoids whose captured post-IIR carries runtime state (not the clean morph
+		// table) are NOT expressible here - the caller keeps their captured Data (the #243 tail).
+		public static byte[] BuildFromScratch(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, bool humanoid, IReadOnlyList<NpcAppearanceMorph> morphs)
+		{
+			var msgBytes = message.ToProtobuf();
+			var preIir = NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal());
+			var postIir = humanoid && morphs is { Count: > 0 }
+				? NpcSpawnAppearanceCodec.BuildPostIir(morphs)
+				: NpcSpawnScaffold.BuildMinimalPostIir();
+
+			var body = new FaolanStream()
+				.WriteUInt32(0) // body length placeholder (set below)
+				.WriteUInt32(0xFA015807u) // subOpcode (SimpleCharFullUpdate)
+				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
+				.WriteUInt32(handle)
+				.WriteUInt32(0) // fieldA
+				.WriteByte(0x2C).WriteByte(0x0A).WriteArrayByteLength(EncodeVec3(position))
+				.WriteByte(0x12).WriteArrayByteLength(EncodeQuat(rotation))
+				.WriteByte(0x18).WriteArray(EncodePlayfieldVarint(playfieldToken))
+				.WriteArray(preIir)
+				.WriteByte(0x41).WriteUInt32(iirHeader).WriteUInt32((uint)msgBytes.Length) // CoreChar header
+				.WriteArray(msgBytes)
+				.WriteArray(postIir)
+				.ToArray();
+
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
+			return body;
+		}
+
+		// The transform vec3 = [0D x][15 y][1D z], each a little-endian fixed32 (15 bytes).
+		private static byte[] EncodeVec3(Vector3 v) => new FaolanStream()
+			.WriteByte(0x0D).WriteFloatLittleEndian(v.X)
+			.WriteByte(0x15).WriteFloatLittleEndian(v.Y)
+			.WriteByte(0x1D).WriteFloatLittleEndian(v.Z)
+			.ToArray();
+
+		// The transform quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
+		private static byte[] EncodeQuat(Quaternion q) => new FaolanStream()
+			.WriteByte(0x0D).WriteFloatLittleEndian(q.X)
+			.WriteByte(0x15).WriteFloatLittleEndian(q.Y)
+			.WriteByte(0x1D).WriteFloatLittleEndian(q.Z)
+			.WriteByte(0x25).WriteFloatLittleEndian(q.W)
+			.ToArray();
+
+		// The playfield token in the transform is a fixed-width 4-byte LEB128 varint (tokens are < 2^28).
+		private static byte[] EncodePlayfieldVarint(uint token) =>
+		[
+			(byte)((token & 0x7F) | 0x80),
+			(byte)(((token >> 7) & 0x7F) | 0x80),
+			(byte)(((token >> 14) & 0x7F) | 0x80),
+			(byte)((token >> 21) & 0x7F)
+		];
 
 		// Constructs the CharacterIIR stat core (#244) from the type-level Npc.StatCore + this placement's overrides,
 		// replacing whatever was parsed from Data. Type-level fields (senses defaults, flags, race, anim clips, ...)
