@@ -50,7 +50,7 @@ Captures/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshark.jso
 # TCP-reassembled, one record per packet, includes the compressed DL packets.
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
-# EF migrations (context lives in Faolan.Core, migrations in Faolan/Migrations)
+# EF migrations (context lives in Faolan.Core.Database, migrations in Faolan/Migrations)
 dotnet ef migrations add <Name> --project Faolan
 # GOTCHA: plain `database update` runs with CWD = Faolan/ and creates a stray Faolan/faolan.db.
 # Use the absolute connection override (or just start the server - DatabaseMigrator migrates at startup):
@@ -65,8 +65,13 @@ service as a hosted service: `UniverseAgentListener`, `PlayerAgentListener`, `Cs
 (guilds/teams/groupfinder), `AgentServerListener` (chat), `GameServerListener` (the world; one listener
 serves both the create-editor and world connections).
 
-**Projects:** `Faolan/` server host · `Faolan.Core/` shared networking/DB/protobuf/crypto ·
-`Faolan.Importer/` tshark-dump+RDB -> DB CLI · `Faolan.ClientLauncher/` unattended retail client ·
+**Projects:** the old monolithic `Faolan.Core` was split (#290) into layered projects. `Faolan/` server
+host · `Faolan.Core/` BASE shared types + crypto (the layer everything builds on) · `Faolan.Core.Database/`
+EF Core DB — `DatabaseContext`, `Tables/`, `DatabaseRepository` · `Faolan.Core.Network/` networking +
+protobuf + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World/`, …) + `Constants/Opcodes.cs`
+· `Faolan.Core.Rdb/` client RDB extraction · `Faolan.Importer/` tshark-dump+RDB -> DB CLI ·
+`Faolan.ClientLauncher/` unattended retail client · `Faolan.Mcp/` in-process MCP server (DB + live-session +
+GM-command tools) · `Faolan.Web/` + `Faolan.Web.Content/` Blazor armory/3D-viewer + GM tools + CDN proxy ·
 `Faolan.Tests/` the test suite · `Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib +
 RpcHeader endpoints + raw opcodes + handoff auto-follow (ground truth, TCP-reassembled; use
 `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces + Python dissectors.
@@ -76,7 +81,9 @@ the compressed GameServer downloads; the Wireshark plugin + `Captures/tshark_dum
 **Listeners** are partial classes split across many files — inspect all partials before changing
 behavior. `GameServerListener`'s partials are organized by role: `Inbound/` (opcode handlers, `Handle*`),
 `Outbound/` (packet builders, **behavior-named** e.g. `VitalsUpdateBuilder`/`GuildTagBuilder` — never
-opcode-named), `Gm/`, and the per-flow folders (`Login/`, `CreateFlow/`...). NB a partial-class file keeps
+opcode-named), and the per-flow/domain folders (`Login/`, `CreateFlow/`, `Combat/`, `Economy/`, `World/`,
+`Inventory/`, `Dialogue/`, `Quest/`, `Session/`, `Spawn/`, `Scripting/`); GM commands are the
+`GameServerListener.GmCommands.cs` partial. NB a partial-class file keeps
 `namespace Faolan.GameServer` regardless of its folder (the `// CheckNamespace` suppression), so its folder
 is organizational only.
 
@@ -95,13 +102,13 @@ services share the same cluster of ops, collapse them into one named interface t
 wire side). Do NOT pass the listener itself — that re-introduces the circular dependency the extraction
 removed. (See Gitea #200 for the remaining extraction backlog.)
 
-Listeners inherit `Server<TPacket,...>` (`Faolan.Core/Network/Server.cs`); per-connection state lives on
+Listeners inherit `Server<TPacket,...>` (`Faolan.Core.Network/Server.cs`); per-connection state lives on
 `INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IAgentServerDispatcher` for
 chat/system messages, `IGameServerDispatcher` for world actions), never direct references.
 
-**Database:** SQLite via EF Core, pooled `DbContextFactory`, short-lived per-unit-of-work contexts —
-lazy loading is deliberately NOT used; load navigations explicitly with `Include`. All access goes
-through `IDatabaseRepository`. `faolan.db` carries the game data (built by the importer, committed to
+**Database:** SQLite via EF Core (`Faolan.Core.Database`: `DatabaseContext` + `Tables/`), pooled
+`DbContextFactory`, short-lived per-unit-of-work contexts — lazy loading is deliberately NOT used; load
+navigations explicitly with `Include`. All access goes through `IDatabaseRepository`. `faolan.db` carries the game data (built by the importer, committed to
 git) and the server only migrates + reads/writes at save/load points. The sqlite3 CLI has foreign keys
 OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan child rows.
 
@@ -120,7 +127,7 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
   Both directions are recovered from the client (`docs/aoc-rpc-method-opcodes.md`, scripts in
   `Captures/ghidra/`): c2s order == `docs/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
   per-class dispatcher switches (the old "drift" was just extra no-arg dispatch methods the string catalog
-  missed). Full per-class catalogs are in `Faolan.Core/Network/Packets/Opcodes.cs`. 32-bit sub-opcodes
+  missed). Full per-class catalogs are in `Faolan.Core.Network/Constants/Opcodes.cs`. 32-bit sub-opcodes
   inside 0x2000 are BKDR-31 hashes of the client's IIR type names (`docs/aoc-opcode-ids.md`).
 - Session-volatile values (entity handles, shop ids, conversation ids) must never be persistence keys;
   the stable key is the NPC/vendor NAME (conversations, shops) or the character id.
@@ -130,9 +137,11 @@ Python dissector in `Captures/decode_*.py` that parses the relevant packets out 
 validates the grammar to the packet end, then a C# builder proven by a byte-exact golden test in
 `Faolan.Tests` against the captured bytes. Direction is "construct, don't replay": structured DB rows +
 builders replace verbatim blob replay subsystem by subsystem; remaining verbatim blobs are deliberate
-interims (marked as such) awaiting decode or in-client validation.
+interims (marked as such) awaiting decode or in-client validation. Worked example: NPC spawns build
+WHOLE from typed columns (the three-tier `Npc` type / `NpcSpawn` placement / live `WorldEntity` model —
+`docs/npc-three-tier-architecture.md`), `NpcSpawn.Data` reduced to a fallback for the un-decoded tail.
 
-**GM commands** (`Faolan/GameServer/GMCommands.cs`, account type >= GameMaster, typed as `.cmd` in chat)
+**GM commands** (`Faolan/GameServer/GameServerListener.GmCommands.cs`, account type >= GameMaster, typed as `.cmd` in chat)
 are the standard test bootstrap for features whose retail trigger isn't wired yet (`.ah`, `.shop`,
 `.guild create`, `.money`, `.teleport`, ...).
 

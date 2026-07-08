@@ -180,28 +180,31 @@ slicing the captured `Data` blob — the foundation for sourcing the scaffold fr
    **(Confirmed by the 2026-06-17 sweep: those large values ARE per-instance runtime handles/timers; they are 0
    on a fresh spawn, so the minimal build drops them — see "Resolution" above.)**
 
-## From-scratch `Data` retirement attempt (2026-06-18) — codec works, captures block it
-Built the full from-scratch FA015807 (no per-row `Data`): `SpawnPacketBuilder.BuildHeaderAndTransform` (the
-60-byte header+transform, `fieldA`=0 constant) + the stored pre-IIR region + the CharacterIIR reconstructed
-from the type name (`Npc`) + the stat-core sub-message blobs (`CharacterStats`/`NpcStats`/`CharacterBcc`,
-which round-trip byte-exact because protobuf-net tracks field presence) + `CanFall`/`MovementMode` + the
-equipment rows, then a generated post-IIR (morph table for humanoids, minimal for animals). **This reproduces
-the captured body byte-exact for the two clean goldens (Crocodile + Casilda), animal and humanoid.**
+## From-scratch `Data` retirement — DONE for 824/988 via typed columns (#244, 2026-07-08)
 
-It does NOT generalize to the captured roster, and the reason is the **captures themselves, not the codec**:
-a clean reseed (109 login-burst NPCs) reproduced only 28/109. Localizing showed the captured spawn bodies
-carry **per-session runtime bloat** — the same Crocodile *type* appears at 469 B (clean golden), 649 B, and
-733 B across captures (variable `count>0` pre-IIR sublists + extra post-IIR runtime records). The from-scratch
-build emits the **clean minimal form** (the 469 B one — exactly what the #185 minimal-scaffold design
-intentionally ships and what is in-client-verified), so byte-exact-vs-capture is the **wrong oracle** for the
-bloated rows, and there is **no clean per-type reference** to validate the 109 reconstructions except the two
-goldens. 33 humanoids also carry a non-morph post-IIR form that doesn't regenerate.
+The 2026-06-18 attempt (below, kept for context) concluded a byte-exact `Data` drop was "blocked by the
+captures." **That was the wrong framing** — the mistake was validating against a bloated CAPTURE. Building
+the CANONICAL fresh spawn from typed columns and emitting runtime state canonical from the live tier drops
+the bloat by design, and it generalizes:
 
-**Conclusion:** a byte-exact `Data`-column drop is not achievable against these bloated captures. The
-construct-don't-replay goal is already met (`Data` is decoded + reconstructed field-by-field, never replayed),
-so `Data` stays as the decoded source-of-truth interim. Revisiting the column drop needs **clean single-NPC
-captures per type** (like the two goldens) — a capture-collection effort, not a code change. The from-scratch
-builder + storage were implemented and reverted (proven on goldens; see #185).
+- The type-level stat core is lifted into `NpcStatCore` (1:1 side table, ~60 nullable proto-mirror columns +
+  the RE'd CoreChar header word `IirHeader`); per-placement overrides live on `NpcSpawn`.
+- `NpcSpawnBuilder.BuildMessageFromColumns` + `BuildFromScratch` assemble the whole body from the DB;
+  `NpcSpawnFromScratchTests` gates it: **824/988 spawns byte-exact from columns**, 9 canonically cleaner
+  (drop a captured runtime target), 155 the humanoid runtime-post-IIR tail (still `Data`).
+- Wired live via `NpcSpawnBuilder.TryBuildLive` in `WorldBroadcaster`. See
+  `docs/npc-three-tier-architecture.md` + `docs/handoff-2026-07-08-spawn-from-columns.md`.
+
+Remaining (#243): the ~155 tail = ~148 no-morph humanoids (`BuildMinimalPostIir(2)`, verified) + ~99
+runtime-bearing (morph table embedded after a runtime record — needs a lenient extractor) + 2 entry-runtime.
+
+<details><summary>Original 2026-06-18 attempt (superseded)</summary>
+
+Built the full from-scratch FA015807 (no per-row `Data`) reproducing the two clean goldens (Crocodile +
+Casilda) byte-exact, but a clean reseed (109 login-burst NPCs) reproduced only 28/109 because the captured
+bodies carry per-session runtime bloat (same Crocodile type at 469/649/733 B). Concluded — wrongly — that a
+byte-exact drop needed clean per-type captures. The typed-column path above is the actual answer.
+</details>
 
 ## Player spawn entry-table CLOSER is per-class (#250, 2026-06-19)
 

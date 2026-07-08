@@ -1433,9 +1433,7 @@ namespace Faolan.GameServer.World
 			// isn't known until the player actually enters (docs/mid-session-spawn-blocker.md part 3). Baking the
 			// load-time token shipped every NPC with a stale playfield, so the client silently dropped them all and
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
-#pragma warning disable CS0618 // interim: token threaded per-send until the live token is known at build time (#244)
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
-#pragma warning restore CS0618
 
 			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
 		}

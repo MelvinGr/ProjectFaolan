@@ -30,6 +30,7 @@ namespace Faolan.Core.Database.Tables
 		// SummonPetForPlayer builds the spawn from a creature's type at the player's position. Populated once per type
 		// (from a representative NpcSpawn.Data, or - for summon-only creatures like the Deathless Acolyte pet - imported
 		// straight from a pet-summon capture). Null for types not yet lifted (those still spawn via NpcSpawn.Data).
+		[Obsolete]
 		public byte[] Data { get; set; }
 
 		// The creature's display name (the stable join key conversations/shops/spells use).

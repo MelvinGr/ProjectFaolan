@@ -103,6 +103,7 @@ namespace Faolan.GameServer.World
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client - for a player,
 		// captured when they entered the world; for an NPC, built from its NpcSpawn row at load. Re-framed per recipient
 		// by the broadcaster (cross-player spawn, NPC respawn). Null until captured / for entities with no spawn.
+		[Obsolete]
 		public byte[] SpawnBody { get; set; }
 
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.

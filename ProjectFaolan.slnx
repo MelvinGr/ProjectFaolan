@@ -3,8 +3,6 @@
         <File Path=".dockerignore" />
         <File Path=".gitattributes" />
         <File Path=".gitignore" />
-        <File Path="AGENTS.md" />
-        <File Path="build.sh" />
         <File Path="CLAUDE.md" />
         <File Path="deleteBinObj.sh" />
         <File Path="Directory.Build.props" />

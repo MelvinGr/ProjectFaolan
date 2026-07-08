@@ -133,7 +133,7 @@ namespace Faolan.Core.Network.Codecs
 
 			var body = new FaolanStream()
 				.WriteUInt32(0) // body length placeholder (set below)
-				.WriteUInt32(0xFA015807u) // subOpcode (SimpleCharFullUpdate)
+				.WriteUInt32(0xFA015807u) // TODO: Add subOpcode (SimpleCharFullUpdate)
 				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // fieldA
@@ -194,9 +194,8 @@ namespace Faolan.Core.Network.Codecs
 
 			if (!TryBuild(row, handle, out body, freshSpawn: true))
 				return false;
-#pragma warning disable CS0618 // interim: the #243-tail humanoids can't build from scratch yet, so patch the token
+
 			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
-#pragma warning restore CS0618
 			return true;
 		}
 
