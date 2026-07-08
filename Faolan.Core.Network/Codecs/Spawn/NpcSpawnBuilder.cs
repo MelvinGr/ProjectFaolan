@@ -20,29 +20,47 @@ namespace Faolan.Core.Network.Codecs
 	// the unit the world-entry/interest path calls per NPC instead of replaying the MapWorldBurst blob.
 	public static class NpcSpawnBuilder
 	{
-		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO
-		// world placement (#244/#307). This is what a summoned PET uses: the pet's creature type carries the lifted
-		// stat CORE (Npc.Data) and we place it at the summoner's position. Uses the parsed message's own
-		// equipment/morphs (the Data blob already bakes them in); freshSpawn resets the runtime scaffolds.
-		public static bool TryBuildFromType(Npc npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body, bool freshSpawn = true)
+		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO world
+		// placement (#244/#307). This is what a summoned PET/MOUNT uses: the creature type carries the lifted stat core
+		// (Npc.StatCore), worn equipment (Npc.Equipment), appearance morphs (Npc.Morphs) and the no-morph recordCount,
+		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
+		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
+		// lifted stat core.
+		public static bool TryBuildFromType(Npc npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
 		{
 			body = null;
-			var template = ExtractBody(npc?.Data);
-			if (template == null || !PlayerSpawnReader.TryReadCharacterMessage(template, out var read))
+			if (npc?.StatCore?.IirHeader is not { } x)
 				return false;
 
-			if (freshSpawn && read.Message.npc_stats != null)
-				read.Message.npc_stats.SpawnAnimation = 0;
-
-			body = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
-
-			if (freshSpawn)
-			{
-				var humanoid = read.Message.InventoryEntries.Count > 0;
-				body = NpcSpawnScaffold.WithFreshScaffolds(body, humanoid);
-			}
-
+			var morphs = npc.Morphs
+				.OrderBy(m => m.Ordinal)
+				.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
+				.ToList();
+			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
+			body = BuildFromScratch(handle, x, position, rotation, 0, BuildMessageFromType(npc), morphs, minimalRc);
 			return true;
+		}
+
+		// Constructs the WHOLE ProtoCoreCharacterIIR for a creature TYPE (#307): Name + the stat core straight from
+		// Npc.StatCore (no per-placement overrides - a type has no placement) + worn equipment from Npc.Equipment.
+		public static ProtoCoreCharacterIIR BuildMessageFromType(Npc npc)
+		{
+			var core = npc.StatCore;
+			var msg = new ProtoCoreCharacterIIR
+			{
+				Name = npc.Name ?? "",
+				Stats = NpcStatCoreCodec.ToStats(core),
+				npc_stats = NpcStatCoreCodec.ToNpcStats(core),
+				Bcc = NpcStatCoreCodec.ToBcc(core)
+			};
+			if (core.CanFall.HasValue)
+				msg.CanFall = core.CanFall.Value;
+			if (core.MovementMode.HasValue)
+				msg.MovementMode = core.MovementMode.Value;
+			if (npc.Equipment is { Count: > 0 })
+				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(npc.Equipment))
+					msg.InventoryEntries.Add(entry);
+			return msg;
 		}
 
 		// Assembles a whole NPC FA015807 spawn body FROM SCRATCH (#244) - no captured template. The playfield token is
@@ -200,20 +218,6 @@ namespace Faolan.Core.Network.Codecs
 				msg.CanFall = core.CanFall.Value;
 			if (core.MovementMode.HasValue)
 				msg.MovementMode = core.MovementMode.Value;
-		}
-
-		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
-		// FA015807 body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
-		private static byte[] ExtractBody(byte[] data)
-		{
-			if (data == null || data.Length < 12)
-				return null;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= data.Length
-				? data[bodyStart..]
-				: null;
 		}
 	}
 }

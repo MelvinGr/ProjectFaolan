@@ -46,6 +46,8 @@ namespace Faolan.Core.Database
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<Npc> Npcs { get; }
+		DbSet<NpcEquipment> NpcEquipment { get; }
+		DbSet<NpcMorph> NpcMorphs { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; }
 		DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; }
@@ -108,6 +110,8 @@ namespace Faolan.Core.Database
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<Npc> Npcs { get; set; }
+		public DbSet<NpcEquipment> NpcEquipment { get; set; }
+		public DbSet<NpcMorph> NpcMorphs { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
 		public DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; set; }
 		public DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; set; }
@@ -264,6 +268,10 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Npc>().HasMany(n => n.Spawns).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.SetNull);
 
 			modelBuilder.Entity<Npc>().HasMany(n => n.Spells).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.SetNull);
+
+			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its Npc type.
+			modelBuilder.Entity<Npc>().HasMany(n => n.Equipment).WithOne(e => e.Npc).HasForeignKey(e => e.NpcId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Npc>().HasMany(n => n.Morphs).WithOne(m => m.Npc).HasForeignKey(m => m.NpcId).OnDelete(DeleteBehavior.Cascade);
 
 			// One-to-one Npc <-> NpcStatCore (#244), keyed by NpcId; the type-level stat core lifted off the Data blob
 			// so a spawn body is constructed from typed storage, not spliced. Cascades with the type.

@@ -206,7 +206,7 @@ namespace Faolan.Importer.Extractors
 			var equipment = new List<NpcSpawnEquipment>();
 			foreach (var entry in msg.InventoryEntries)
 			{
-				if (!NpcSpawnEquipmentBuilder.TryLift(entry, out var equipRow))
+				if (!NpcSpawnEquipmentBuilder.TryLift<NpcSpawnEquipment>(entry, out var equipRow))
 				{
 					equipment.Clear();
 					break;

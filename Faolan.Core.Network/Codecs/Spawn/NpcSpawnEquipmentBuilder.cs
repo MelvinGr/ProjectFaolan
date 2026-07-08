@@ -13,13 +13,14 @@ namespace Faolan.Core.Network.Codecs
 	// row stores just the quad + Template + Level + Hash and BuildEntries reproduces the wire item byte-for-byte.
 	public static class NpcSpawnEquipmentBuilder
 	{
-		// Rebuilds the InventoryEntries (ordered by slot) from the stored rows.
-		public static List<ProtoCoreCharacterIIR.InventoryEntry> BuildEntries(IEnumerable<NpcSpawnEquipment> rows)
+		// Rebuilds the InventoryEntries (ordered by slot) from the stored rows (per-placement NpcSpawnEquipment or
+		// per-type NpcEquipment - both INpcEquipment).
+		public static List<ProtoCoreCharacterIIR.InventoryEntry> BuildEntries(IEnumerable<INpcEquipment> rows)
 		{
 			return rows.OrderBy(r => r.Pos).Select(BuildEntry).ToList();
 		}
 
-		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(NpcSpawnEquipment row)
+		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(INpcEquipment row)
 		{
 			var key = new ProtoDecryptionKey
 			{
@@ -45,13 +46,13 @@ namespace Faolan.Core.Network.Codecs
 			};
 		}
 
-		// Lifts a captured InventoryEntry into a row, but ONLY if it matches the reproducible shape (the three keys
-		// identical, the two templates identical, no template3). Returns false for any entry outside that shape, so
-		// the importer can decline the whole NPC and leave its equipment to the Data blob rather than store something
-		// the builder would not reproduce byte-for-byte.
-		public static bool TryLift(ProtoCoreCharacterIIR.InventoryEntry entry, out NpcSpawnEquipment row)
+		// Lifts a captured InventoryEntry into a row (per-placement NpcSpawnEquipment or per-type NpcEquipment via the
+		// type param), but ONLY if it matches the reproducible shape (the three keys identical, the two templates
+		// identical, no template3). Returns false for any entry outside that shape, so the importer can decline the whole
+		// NPC rather than store something the builder would not reproduce byte-for-byte.
+		public static bool TryLift<T>(ProtoCoreCharacterIIR.InventoryEntry entry, out T row) where T : INpcEquipment, new()
 		{
-			row = null;
+			row = default;
 			var item = entry?.Item;
 			var k = item?.Key1;
 			if (k == null || item.Key2 == null || item.Key3 == null)
@@ -61,7 +62,7 @@ namespace Faolan.Core.Network.Codecs
 			if (item.Template1 != item.Template2 || item.ShouldSerializeTemplate3())
 				return false;
 
-			row = new NpcSpawnEquipment
+			row = new T
 			{
 				Pos = entry.Pos,
 				Key1 = k.Key1,
@@ -77,7 +78,7 @@ namespace Faolan.Core.Network.Codecs
 			// fields the row doesn't model - extra ProtoAcgItem fields, an absent level/hash, etc.).
 			if (!BuildEntry(row).ToProtobuf().SequenceEqual(entry.ToProtobuf()))
 			{
-				row = null;
+				row = default;
 				return false;
 			}
 

@@ -13,7 +13,7 @@ namespace Faolan.Importer.Captures
 {
 	// Harvests the summonable PET creatures (#307) out of the captures so a player-cast pet-summon spell renders.
 	// Unlike mounts (CaptureMountImporter, which parks a creature as an NpcSpawn PLACEMENT under a sentinel map), a
-	// pet is done the RIGHT way (#244): its captured FA015807 stat core is lifted onto the creature TYPE (Npc.Data),
+	// pet is done the RIGHT way (#244): its captured FA015807 stat core + equipment + morphs are lifted onto the creature TYPE,
 	// and the server spawns it FROM THE TYPE at the summoner's position (NpcSpawnBuilder.TryBuildFromType) - no world
 	// placement at all. Resolved at summon time by NAME (SummonPetForPlayer -> GetNpcByName), the name PetSummonCatalog
 	// maps each summon-spell id to. Isolated: only touches the Npc rows for the wanted pet creatures.
@@ -48,7 +48,10 @@ namespace Faolan.Importer.Captures
 			{
 				// The pet creature TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
 				// resolves by name. Upsert so re-runs keep the type id stable.
-				var type = await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ?? await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.Name == e.Name);
+				var type = await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs)
+					.FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0)
+					?? await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs)
+					.FirstOrDefaultAsync(n => n.Name == e.Name);
 				if (type == null)
 				{
 					type = new Npc
@@ -59,24 +62,39 @@ namespace Faolan.Importer.Captures
 					db.Npcs.Add(type);
 				}
 
-				// Lift the captured stat CORE onto the TYPE so the pet spawns from its type alone (#307).
 				type.Community = e.Community;
 				type.Race = e.Race;
 				type.Sex = e.Sex;
-				type.Data = e.Data;
 				type.Level = e.Level;
 
-				// #244: lift the stat core onto the TYPE from its capture, so a summoned pet builds from typed columns
-				// too. Pets have no NpcSpawn placement (they spawn into the live tier via TryBuildFromType), so this is
-				// the only place their StatCore gets lifted.
-				if (type.StatCore == null || type.StatCore.IirHeader == null)
+				// #307/#244: lift the whole spawn onto the TYPE from its capture so a summoned pet builds wholly from
+				// columns (no Data blob) - the stat core + no-morph recordCount, and, since a pet has no NpcSpawn
+				// placement, its worn equipment + appearance morphs on the type too (NpcEquipment/NpcMorph).
+				var body = WorldObjectBuilder.ExtractBody(e.Data);
+				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				{
-					var body = WorldObjectBuilder.ExtractBody(e.Data);
-					if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
+					type.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
+					if (type.StatCore.MinimalPostIirRecordCount == null && NpcSpawnScaffold.TryReadNoMorphRecordCount(body, out var rc))
+						type.StatCore.MinimalPostIirRecordCount = rc;
+
+					type.Equipment.Clear();
+					foreach (var entry in read.Message.InventoryEntries)
 					{
-						type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
-						type.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
+						if (!NpcSpawnEquipmentBuilder.TryLift<NpcEquipment>(entry, out var eq))
+						{
+							type.Equipment.Clear(); // decline all if any item isn't byte-reproducible
+							break;
+						}
+						type.Equipment.Add(eq);
 					}
+
+					type.Morphs.Clear();
+					var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var dm) ? dm
+						: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lm) ? lm
+						: new();
+					for (var i = 0; i < morphs.Count; i++)
+						type.Morphs.Add(new NpcMorph { Ordinal = i, MorphId = morphs[i].MorphId, Value = morphs[i].Value, Text = morphs[i].Text ?? "" });
 				}
 
 				seeded++;

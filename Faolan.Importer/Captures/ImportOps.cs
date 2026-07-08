@@ -108,7 +108,7 @@ namespace Faolan.Importer.Captures
 				Take(best.All.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), best.Routes);
 			}
 
-			// Pets are content of the creature TYPE (lifted onto Npc.Data by CapturePetImporter, spawned from the type
+			// Pets are content of the creature TYPE (lifted onto the type columns by CapturePetImporter, spawned from the type
 			// at summon time - #307/#244), NEVER world placements. A captured session's SUMMONED pets otherwise leak in
 			// here as permanent NpcSpawns and stand around forever where the player summoned them (the necro pet cluster
 			// on Old Tarantia). Drop the PetSummonCatalog creatures from the placement set.

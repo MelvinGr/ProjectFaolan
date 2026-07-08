@@ -821,14 +821,21 @@ namespace Faolan.Core.Database
             return await ctx.MorphTargets.Where(t => names.Contains(t.Name)).ToDictionaryAsync(t => t.Name);
         }
 
-        // The creature TYPE by name (for spawn-from-TYPE - a summoned pet #307/#244) - distinct from GetNpcSpawnByName,
-        // which returns a world PLACEMENT. Includes the type's caster Spells; the lifted stat core is Npc.Data. Null if
-        // no such type or it has no lifted Data (can't be spawned standalone yet).
+        // The creature TYPE by name (for spawn-from-TYPE - a summoned pet/mount #307/#244) - distinct from
+        // GetNpcSpawnByName, which returns a world PLACEMENT. Includes the type's caster Spells + everything
+        // TryBuildFromType needs to assemble the body from columns: the stat core, worn equipment, appearance morphs.
+        // Null if no such type or it has no lifted stat core (can't be spawned standalone).
         public async Task<Npc> GetNpcByName(string name)
         {
             await using var ctx = await _contextFactory.CreateDbContextAsync();
             var lowered = name.ToLowerInvariant();
-            return await ctx.Npcs.Include(t => t.Spells).Where(t => t.Name != null && t.Name.ToLower() == lowered && t.Data != null).FirstOrDefaultAsync();
+            return await ctx.Npcs
+                .Include(t => t.Spells)
+                .Include(t => t.StatCore)
+                .Include(t => t.Equipment)
+                .Include(t => t.Morphs)
+                .Where(t => t.Name != null && t.Name.ToLower() == lowered && t.StatCore != null)
+                .FirstOrDefaultAsync();
         }
 
         // The captured static world objects for a map (decor/containers/zones). The world-entry path builds each

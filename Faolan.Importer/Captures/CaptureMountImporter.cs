@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
-using Faolan.GameServer.World;
+using Faolan.GameServer.World; // MountCatalog (namespaced here despite its file living under Faolan.Core.Network)
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -12,17 +12,13 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Importer.Captures
 {
 	// Harvests the summonable MOUNT creatures (#27) out of the captures so a player-cast SummonMount renders. A mount
-	// is a normal FA015807 NPC entity ("Fading Black Horse", ...) that the server spawns at the player when they
-	// summon it; the only thing special about it is that it must NOT auto-spawn into the world like a map NPC. So the
-	// mount creatures are seeded under a dedicated never-loaded sentinel MAP (no player ever zones there, so the world
-	// tick never instantiates them) and resolved at summon time by NAME (SpawnMountForPlayer -> GetNpcSpawnByName),
-	// the same name the MountCatalog maps each mount id to. Isolated: touches only the Mounts map + its NpcSpawns.
+	// is a normal FA015807 NPC entity ("Fading Black Horse", ...) the server spawns at the player when they summon it;
+	// it must NOT auto-spawn into the world like a map NPC. Done the RIGHT way like pets (#307/#244): its captured
+	// stat core + worn equipment + appearance morphs are lifted onto the creature TYPE (no NpcSpawn placement), and the
+	// server spawns it FROM THE TYPE at the summoner's position (NpcSpawnBuilder.TryBuildFromType). Resolved at summon
+	// time by NAME (SpawnMountForPlayer -> GetNpcByName), the same name MountCatalog maps each mount id to.
 	public static class CaptureMountImporter
 	{
-		// A sentinel map id no real playfield uses, so the world simulation never loads (and never world-spawns) the
-		// mount creatures parked under it - they exist purely as summon templates resolved by name.
-		public const uint MountMapId = 0x4D4F554Eu; // 'MOUN'
-
 		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
 		{
 			// The creature names we actually need (the MountCatalog targets), lower-cased for matching.
@@ -47,48 +43,29 @@ namespace Faolan.Importer.Captures
 				return (0, 0);
 			}
 
-			// Ensure the sentinel Mounts map exists (NpcSpawn.MapId is an FK into Maps).
-			if (!await db.Maps.AnyAsync(m => m.Id == MountMapId))
-			{
-				db.Maps.Add(new Map
-				{
-					Id = MountMapId,
-					Name = "Mounts (summon templates)"
-				});
-			}
-
-			// Replace any prior mount rows so a re-run reseeds cleanly (isolated to the sentinel map).
-			var stale = await db.NpcSpawns.Where(n => n.MapId == MountMapId).ToListAsync();
-			db.NpcSpawns.RemoveRange(stale);
-			await db.SaveChangesAsync();
-
 			var seeded = 0;
-			foreach (var (name, e) in byName)
+			foreach (var (_, e) in byName)
 			{
-				// The mount NPC TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
+				// The mount creature TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
 				// resolves by name. Upsert so re-runs keep the type id stable.
-				var type = await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ?? await db.Npcs.Include(n => n.StatCore).FirstOrDefaultAsync(n => n.Name == e.Name);
+				var type = await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs)
+					.FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0)
+					?? await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs)
+					.FirstOrDefaultAsync(n => n.Name == e.Name);
 				if (type == null)
 				{
-					type = new Npc
-					{
-						TemplateId = e.TemplateId,
-						Name = e.Name,
-						Community = e.Community,
-						Race = e.Race,
-						Sex = e.Sex
-					};
+					type = new Npc { TemplateId = e.TemplateId, Name = e.Name };
 					db.Npcs.Add(type);
-					await db.SaveChangesAsync();
-				}
-				else
-				{
-					type.Race = e.Race; // type-level appearance (#287)
-					type.Sex = e.Sex;
 				}
 
-				// Lift the type's stat core from the dump body so the mount builds wholly from columns (Data retired) -
-				// the same lift UpsertNpcTypes does for map NPCs, incl. the no-morph post-IIR recordCount (#243).
+				type.Community = e.Community;
+				type.Race = e.Race;
+				type.Sex = e.Sex;
+				type.Level = e.Level;
+
+				// Lift the whole spawn onto the TYPE (like pets): stat core + no-morph recordCount, and - since a mount
+				// has no NpcSpawn placement - its worn equipment + appearance morphs on the type (NpcEquipment/NpcMorph),
+				// so TryBuildFromType assembles the body wholly from columns (Data retired).
 				var body = WorldObjectBuilder.ExtractBody(e.Data);
 				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				{
@@ -96,16 +73,31 @@ namespace Faolan.Importer.Captures
 					type.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
 					if (type.StatCore.MinimalPostIirRecordCount == null && NpcSpawnScaffold.TryReadNoMorphRecordCount(body, out var rc))
 						type.StatCore.MinimalPostIirRecordCount = rc;
+
+					type.Equipment.Clear();
+					foreach (var entry in read.Message.InventoryEntries)
+					{
+						if (!NpcSpawnEquipmentBuilder.TryLift<NpcEquipment>(entry, out var eq))
+						{
+							type.Equipment.Clear();
+							break;
+						}
+						type.Equipment.Add(eq);
+					}
+
+					type.Morphs.Clear();
+					var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var dm) ? dm
+						: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lm) ? lm
+						: new();
+					for (var i = 0; i < morphs.Count; i++)
+						type.Morphs.Add(new NpcMorph { Ordinal = i, MorphId = morphs[i].MorphId, Value = morphs[i].Value, Text = morphs[i].Text ?? "" });
 				}
 
-				var row = new NpcSpawn { MapId = MountMapId, NpcId = type.Id, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z };
-				ImportOps.Populate(row, e); // full column lift (pools/equipment/morphs), same as the map-NPC path
-				db.NpcSpawns.Add(row);
 				seeded++;
 			}
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("CaptureMountImporter: seeded {Seeded} mount creature(s) under map 0x{Map:X} ({Names}).", seeded, MountMapId, string.Join(", ", byName.Keys));
+			logger?.LogInformation("CaptureMountImporter: lifted {Seeded} mount creature type(s) ({Names}).", seeded, string.Join(", ", byName.Keys));
 			return (byName.Count, seeded);
 		}
 	}

@@ -1004,13 +1004,13 @@ namespace Faolan.GameServer.World
 		}
 
 		// Spawns a creature TYPE at the player as a PET (#307/#244) - the RIGHT model: no NpcSpawns world placement,
-		// the FA015807 is built from the type's lifted stat core (Npc.Data) via TryBuildFromType at the summoner's
-		// position, then streamed to nearby viewers. The PetIIR owner-assign + follow are done by the caller
-		// (SummonPetForPlayer). Returns null if the type carries no lifted Data (not yet imported/lifted).
+		// the FA015807 is assembled from the type's columns (StatCore + Equipment + Morphs) via TryBuildFromType at the
+		// summoner's position, then streamed to nearby viewers. The PetIIR owner-assign + follow are done by the caller
+		// (SummonPetForPlayer). Returns null if the type carries no lifted stat core (not yet imported/lifted).
 		public async Task<WorldEntity> SpawnPetForPlayer(INetworkClient client, Npc npcType)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || npcType?.Data == null)
+			if (player == null || npcType?.StatCore?.IirHeader == null)
 				return null;
 
 			var handle = NextLootHandle();

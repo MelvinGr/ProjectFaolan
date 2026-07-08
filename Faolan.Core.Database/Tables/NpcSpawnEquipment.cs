@@ -8,7 +8,7 @@ namespace Faolan.Core.Database.Tables
 	// follow the same shape the player builder emits - key1==key2==key3 (the 4-fixed32 GUID quad), template1==
 	// template2, no template3 - so the byte-exact set to store is the quad + Template + Level + Hash. Cascade-
 	// deletes with its NpcSpawn. Codec/build: NpcSpawnEquipmentBuilder.
-	public class NpcSpawnEquipment : BaseEntity
+	public class NpcSpawnEquipment : BaseEntity, INpcEquipment
 	{
 		[ForeignKey(nameof(NpcSpawnId))]
 		public virtual NpcSpawn NpcSpawn { get; set; }

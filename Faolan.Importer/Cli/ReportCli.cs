@@ -1,5 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Captures;
@@ -245,7 +246,7 @@ namespace Faolan.Importer.Cli
                     var slots = read
                         .Message
                         .InventoryEntries
-                        .Select(entry => NpcSpawnEquipmentBuilder.TryLift(entry, out var row)
+                        .Select(entry => NpcSpawnEquipmentBuilder.TryLift<NpcSpawnEquipment>(entry, out var row)
                             ? $"slot{row.Pos}=tpl{row.Template}[k={row.Key1},{row.Key2},{row.Key3},{row.Key4} lvl={row.Level} hash={row.Hash}]"
                             : "slot?=unliftable")
                         .ToList();

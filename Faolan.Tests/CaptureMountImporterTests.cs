@@ -36,10 +36,10 @@ namespace Faolan.Tests
 				Assert.True(seen >= 1, "expected at least one mount creature harvested from the capture");
 				Assert.True(seeded >= 1);
 
-				var mounts = await db.NpcSpawns.Include(n => n.Npc).ThenInclude(t => t.StatCore).Where(n => n.MapId == CaptureMountImporter.MountMapId).ToListAsync();
-
-				// The mount builds wholly from columns now (Data retired): its type carries a lifted stat core.
-				Assert.Contains(mounts, m => string.Equals(m.Npc!.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && m.Npc.StatCore?.IirHeader != null);
+				// Mounts are now TYPES (#307), not sentinel-map NpcSpawn placements: the creature builds wholly from
+				// columns via TryBuildFromType, so its type carries a lifted stat core (no Npc.Data blob).
+				var mountTypes = await db.Npcs.Include(t => t.StatCore).ToListAsync();
+				Assert.Contains(mountTypes, t => string.Equals(t.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && t.StatCore?.IirHeader != null);
 			}
 			finally
 			{

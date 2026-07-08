@@ -20,18 +20,17 @@ namespace Faolan.Core.Database.Tables
 		// The spells this NPC type casts (#232) - now FK'd to the type instead of joined by name string.
 		public virtual ICollection<NpcSpell> Spells { get; set; } = new List<NpcSpell>();
 
-		// The type-level CharacterIIR stat core (#244), lifted off `Data` into a 1:1 NpcStatCore side table (keyed by
-		// NpcId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.
+		// The type-level CharacterIIR stat core (#244), lifted off the captured body into a 1:1 NpcStatCore side table
+		// (keyed by NpcId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.
+		// This is what lets a SUMMON-ONLY creature (pet/mount, #307) build its spawn body from the type ALONE, with a
+		// caller-supplied transform and NO world placement (NpcSpawnBuilder.TryBuildFromType).
 		public virtual NpcStatCore StatCore { get; set; }
 
-		// The type-level CharacterIIR stat CORE source (CharacterStats / NpcStats / Bcc) - the SAME kind of captured
-		// FA015807 body NpcSpawn.Data holds, but lifted to the TYPE (#244) so a creature can be spawned from its type
-		// ALONE, with a caller-supplied transform and NO world placement. This is what a summoned PET needs (#307):
-		// SummonPetForPlayer builds the spawn from a creature's type at the player's position. Populated once per type
-		// (from a representative NpcSpawn.Data, or - for summon-only creatures like the Deathless Acolyte pet - imported
-		// straight from a pet-summon capture). Null for types not yet lifted (those still spawn via NpcSpawn.Data).
-		[Obsolete]
-		public byte[] Data { get; set; }
+		// The type-level worn equipment + appearance/morph table (#307), for a summon-only creature that has no NpcSpawn
+		// placement to carry them - the per-TYPE counterpart of NpcSpawnEquipment/NpcSpawnMorph. Empty for a plain map
+		// NPC type (its placements carry these). TryBuildFromType builds the spawn body from these + StatCore.
+		public virtual ICollection<NpcEquipment> Equipment { get; set; } = new List<NpcEquipment>();
+		public virtual ICollection<NpcMorph> Morphs { get; set; } = new List<NpcMorph>();
 
 		// The creature's display name (the stable join key conversations/shops/spells use).
 		[MaxLength(128)]
