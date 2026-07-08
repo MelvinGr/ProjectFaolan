@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
@@ -120,7 +121,7 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteUInt32(id)
 				.WriteArray(0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x17, 0x00, 0x17, 0x2B, 0x19)
 				.SendAsync(client);
-			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x00, 0x0360, 0x03)); // #189: was verbatim
+			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x00, 0x0360, 0x03)); // #189: was verbatim
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000012Cu));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00000708u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001770u));
@@ -187,7 +188,7 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteArray(0x00, 0x00, 0x04, 0xE6, 0x00, 0x4B, 0x3E, 0xC8, 0x00, 0x4B, 0x3E, 0xC8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x4C, 0x31, 0x44, 0x53, 0xB3, 0xAE, 0xE6, 0xAA, 0x50, 0x9C, 0xCD, 0x1E, 0xB4, 0xE9, 0xF4, 0xB4, 0x7E, 0xCF, 0xE7, 0xD2, 0xB3, 0xAE, 0xE6, 0xAA, 0x50, 0x9C, 0xCD, 0x1E, 0xB4, 0xE9, 0xF4, 0xB4, 0x7E, 0xCF, 0xE7, 0xD2, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01)
 				.SendAsync(client);
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
-			await Iir(GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x08)); // #189: was verbatim
+			await Iir(GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x08)); // #189: was verbatim
 			await Iir(GameServer0X2000Opcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
 			return;
 

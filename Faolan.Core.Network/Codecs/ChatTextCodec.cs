@@ -28,7 +28,6 @@ namespace Faolan.Core.Network.Codecs
 		// The 5-byte trailer after the XML (constant in the capture: 0x00 then u32 0x40000001). Carried verbatim
 		// until a second sample lets the two halves be field-named.
 		private const byte TrailerByte = 0x00;
-		private const uint IirMarker = EntityClass.Character;
 		private const uint TrailerWord = 0x40000001;
 
 		public static byte[] Build(uint instance, byte[] xml) => new Message(instance, xml).ToArray();
@@ -43,7 +42,7 @@ namespace Faolan.Core.Network.Codecs
 			public void Write(FaolanStream s)
 			{
 				s.WriteArrayUInt32Length(content =>
-					content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt16(Xml.Length).WriteArray(Xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord));
+					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt16(Xml.Length).WriteArray(Xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord));
 			}
 
 			public static Message Read(FaolanStream s)

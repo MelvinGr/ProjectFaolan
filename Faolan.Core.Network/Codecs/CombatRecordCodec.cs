@@ -15,7 +15,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class CombatShieldCodec
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint value, byte env = 0x00) => new Message(handle, env, value).ToArray();
 
@@ -27,7 +26,7 @@ namespace Faolan.Core.Network.Codecs
 			public void Write(FaolanStream s)
 			{
 				s.WriteArrayUInt32Length(body =>
-					body.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Value));
+					body.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Value));
 			}
 
 			public static Message Read(FaolanStream s)
@@ -46,7 +45,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class ThreatLevelCodec
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ThreatLevelIIR;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint threat, byte flag, byte env = 0x00) => new Message(handle, env, threat, flag).ToArray();
 
@@ -58,7 +56,7 @@ namespace Faolan.Core.Network.Codecs
 			public void Write(FaolanStream s)
 			{
 				s.WriteArrayUInt32Length(body =>
-					body.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag));
+					body.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag));
 			}
 
 			public static Message Read(FaolanStream s)
@@ -80,10 +78,9 @@ namespace Faolan.Core.Network.Codecs
 	public static class HateListCodec
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.HateListUpdateIIR;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint target, uint count = 1, byte flag = 0x00, byte env = 0x00) =>
-			new Message(handle, env, flag, IirMarker, target, count).ToArray();
+			new Message(handle, env, flag, EntityClass.Character, target, count).ToArray();
 
 		public static Message Parse(byte[] body) => Message.Read(new FaolanStream(body));
 
@@ -94,7 +91,7 @@ namespace Faolan.Core.Network.Codecs
 			{
 				s.WriteArrayUInt32Length(body => body
 					.WriteUInt32(SubOpcode)
-					.WriteUInt32(IirMarker)
+					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(Handle)
 					.WriteByte(Env)
 					.WriteByte(Flag)
@@ -126,7 +123,6 @@ namespace Faolan.Core.Network.Codecs
 	{
 		public const int WordCount = 17;
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.StatDamageIIR;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, uint[] words, byte env = 0x00)
 		{
@@ -145,7 +141,7 @@ namespace Faolan.Core.Network.Codecs
 			{
 				s.WriteArrayUInt32Length(c =>
 				{
-					c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Handle).WriteByte(Env);
+					c.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env);
 					foreach (var w in Words)
 						c.WriteUInt32(w);
 				});

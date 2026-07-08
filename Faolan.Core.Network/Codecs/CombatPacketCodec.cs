@@ -23,7 +23,6 @@ namespace Faolan.Core.Network.Codecs
         // args.SpellTarget.field1 - the constant 0xC350 (50000) that precedes the target handle in the swing args.
         private const uint SpellTargetTypeWord = 0x0000C350;
 
-        private const uint WireType = EntityClass.Character; // the C350 type word shared by the IIR record family
 
         // NPC animation acks are server-initiated, so the echoed sequence is the constant 0x0004 (not a client seq).
         private const ushort NpcAttackAckSeq = 0x0004;
@@ -33,10 +32,10 @@ namespace Faolan.Core.Network.Codecs
         {
             return new FaolanStream()
                 .WriteUInt32(GameServer0X2000Opcodes.DamageResultIIR)
-                .WriteUInt32(WireType)
+                .WriteUInt32(EntityClass.Character)
                 .WriteUInt32(attackerInstance)
                 .WriteByte(0x00)
-                .WriteUInt32(WireType)
+                .WriteUInt32(EntityClass.Character)
                 .WriteUInt32(targetHandle)
                 .WriteUInt32(damage)
                 .WriteUInt32(2)
@@ -48,7 +47,7 @@ namespace Faolan.Core.Network.Codecs
         // The EnergyIIR body - the actor's stamina after a swing (stamina-only in the captures).
         public static byte[] BuildEnergyBody(uint actorInstance, uint stamina)
         {
-            return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteUInt32(WireType).WriteUInt32(actorInstance).WriteByte(0x01).WriteUInt32(stamina).ToArray();
+            return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteUInt32(EntityClass.Character).WriteUInt32(actorInstance).WriteByte(0x01).WriteUInt32(stamina).ToArray();
         }
 
         // The NPC counter-attack ANIMATION ack: the "second BccAck with actor = target handle" (docs/combat.md, was
@@ -129,11 +128,11 @@ namespace Faolan.Core.Network.Codecs
                 return false;
             if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.DamageResultIIR)
                 return false;
-            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != WireType)
+            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
                 return false;
             if (body[12] != 0x00)
                 return false;
-            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4)) != WireType)
+            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4)) != EntityClass.Character)
                 return false;
             if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4)) != 2 || BinaryPrimitives.ReadUInt32BigEndian(body.Slice(29, 4)) != 0 || BinaryPrimitives.ReadUInt32BigEndian(body.Slice(33, 4)) != 0)
                 return false;
@@ -153,7 +152,7 @@ namespace Faolan.Core.Network.Codecs
                 return false;
             if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.EnergyIIR)
                 return false;
-            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != WireType)
+            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
                 return false;
             if (body[12] != 0x01)
                 return false;

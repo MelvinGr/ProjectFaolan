@@ -1,5 +1,6 @@
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs;
@@ -36,13 +37,13 @@ namespace Faolan.GameServer.CreateFlow
         private static Task StatIir(INetworkClient client, uint frame, uint handle, byte flag, uint statId, uint value) =>
             new PacketStream()
                 .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, frame), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-                .WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.StatIIR).WriteArray(CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, handle, flag, statId, value)))
+                .WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.StatIIR).WriteArray(CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, handle, flag, statId, value)))
                 .SendAsync(client);
 
         private static Task EnergyIir(INetworkClient client, uint frame, uint handle, byte flag, uint value) =>
             new PacketStream()
                 .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, frame), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-                .WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, handle, flag, value)))
+                .WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, handle, flag, value)))
                 .SendAsync(client);
 
         private static Task StatUpdateIir(INetworkClient client, uint frame, uint handle, (uint StatId, uint Value)[] stats) =>

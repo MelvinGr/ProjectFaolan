@@ -14,7 +14,6 @@ namespace Faolan.Core.Network.Codecs
 	// raw u32 bits so float values round-trip exactly.
 	public sealed class MoveTaskComposite : ICodec<MoveTaskComposite>
 	{
-		private const uint WireType = EntityClass.Character; // 0xC350
 		public MoveTaskNode Task { get; set; } = new MoveTaskNode();
 		public uint FromX { get; set; }
 		public uint FromY { get; set; }
@@ -26,7 +25,7 @@ namespace Faolan.Core.Network.Codecs
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(WireType).WriteUInt32(Handle).WriteUInt16(0).WriteUInt32(FromX).WriteUInt32(FromY).WriteUInt32(FromZ);
+			s.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteUInt16(0).WriteUInt32(FromX).WriteUInt32(FromY).WriteUInt32(FromZ);
 			Task.Write(s);
 		}
 

@@ -1,5 +1,6 @@
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using System;
@@ -141,7 +142,7 @@ namespace Faolan.GameServer.CreateFlow
             // by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
             await new PacketStream()
                 .WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-                .WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x36B0)))
+                .WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x36B0)))
                 .SendAsync(client);
             await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
             await SendScry(client,

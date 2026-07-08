@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Opcodes;
@@ -41,7 +42,7 @@ namespace Faolan.GameServer.CreateFlow
 			};
 			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
-			const uint W = CreateEditorRecordBuilder.CharacterWireType; // EntityClass.Character (0xC350)
+			const uint W = EntityClass.Character; // EntityClass.Character (0xC350)
 
 			// Initial vitals + behavior/action setup for the editor entities (handles 0x0009FF92..96).
 			await Iir(GameServer0X2000Opcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF92u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));

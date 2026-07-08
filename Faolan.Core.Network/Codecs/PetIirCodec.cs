@@ -15,7 +15,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class PetIirCodec
 	{
 		private const byte Env = 0x00;
-		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 
 		// (f1,f2,f3) kind triples observed in the capture.
 		public static readonly (uint F1, uint F2, uint F3) CombatKind = (0, 2, 2);
@@ -26,11 +25,11 @@ namespace Faolan.Core.Network.Codecs
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.PetIIR)
-				.WriteUInt32(Type)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(owner)
 				.WriteByte(Env)
 				.WriteUInt32(0) // mode 0 = assign
-				.WriteUInt32(Type)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(pet)
 				.WriteUInt32(kind.F1)
 				.WriteUInt32(kind.F2)
@@ -43,11 +42,11 @@ namespace Faolan.Core.Network.Codecs
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.PetIIR)
-				.WriteUInt32(Type)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(owner)
 				.WriteByte(Env)
 				.WriteUInt32(1) // mode 1 = remove/update
-				.WriteUInt32(Type)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(pet)
 				.ToArray();
 		}

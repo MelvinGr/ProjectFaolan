@@ -31,11 +31,10 @@ namespace Faolan.Core.Network.Codecs
 		// behaviorId 1, args {f1=TranceAction, f3=4, f5=8, f6=0, f11=1199}, trailer [0x27][1][0][0][0]. Without it the
 		// trance buffs render but the character stays idle. Action params are capture-derived (necro).
 		private const uint SpellweaveTranceAction = 42041;
-		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 
 		public static byte[] SpellweaveComponentAdd(uint caster, uint elementBaseId, bool complete)
 		{
-			var spellTarget = new FaolanStream().WriteByte(0x08).WriteVarint(Type).WriteByte(0x10).WriteVarint(caster).ToArray();
+			var spellTarget = new FaolanStream().WriteByte(0x08).WriteVarint(EntityClass.Character).WriteByte(0x10).WriteVarint(caster).ToArray();
 			var args = new FaolanStream()
 				.WriteByte(0x08)
 				.WriteVarint(SpellweaveAddAction)
@@ -93,7 +92,7 @@ namespace Faolan.Core.Network.Codecs
 		// The shared BCC framing primitive: header + behaviorId + length-prefixed args + the behavior-specific trailer.
 		private static byte[] Build(uint actor, ushort seq, uint behaviorId, byte[] args, byte[] trailer)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteUInt32(Type).WriteUInt32(actor).WriteUInt16(seq).WriteUInt32(behaviorId).WriteUInt32(args.Length).WriteArray(args).WriteArray(trailer).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteUInt32(EntityClass.Character).WriteUInt32(actor).WriteUInt16(seq).WriteUInt32(behaviorId).WriteUInt32(args.Length).WriteArray(args).WriteArray(trailer).ToArray();
 		}
 	}
 }

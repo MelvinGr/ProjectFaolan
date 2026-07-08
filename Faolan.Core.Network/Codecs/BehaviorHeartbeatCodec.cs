@@ -15,7 +15,6 @@ namespace Faolan.Core.Network.Codecs
 	{
 		public const uint SubOpcode = 0x642CD3D6;
 		private const uint IdleBehaviorId = 7;
-		private const uint Type = EntityClass.Character;
 
 		public static byte[] Build(uint actor, uint tick)
 		{
@@ -26,7 +25,7 @@ namespace Faolan.Core.Network.Codecs
 				.WriteArray(0x28, 0x18, 0x30, 0x00) // field 5 = 0x18, field 6 = 0
 				.ToArray();
 
-			return new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(Type).WriteUInt32(actor).WriteUInt16(0x0004).WriteUInt32(IdleBehaviorId).WriteUInt32(payload.Length).WriteArray(payload).ToArray();
+			return new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(actor).WriteUInt16(0x0004).WriteUInt32(IdleBehaviorId).WriteUInt32(payload.Length).WriteArray(payload).ToArray();
 		}
 	}
 }

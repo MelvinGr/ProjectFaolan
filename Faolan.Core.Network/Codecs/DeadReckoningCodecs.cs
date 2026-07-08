@@ -44,12 +44,11 @@ namespace Faolan.Core.Network.Codecs
 	public static class CharDCMoveCodec
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(CharDCMove r)
 		{
 			var c = new FaolanStream();
-			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(r.Handle).WriteByte(r.Env).WriteByte(r.Flag1).WriteVector3(r.Position);
+			c.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(r.Handle).WriteByte(r.Env).WriteByte(r.Flag1).WriteVector3(r.Position);
 			if (r.Bit4)
 				c.WriteFloat(r.FacingX);
 			else
@@ -137,12 +136,11 @@ namespace Faolan.Core.Network.Codecs
 	public static class StopCodec
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.StopIIR;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte env = 0x00)
 		{
 			var c = new FaolanStream();
-			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env).WriteVector3(position).WriteFloat(r0).WriteFloat(r1).WriteFloat(r2).WriteFloat(r3);
+			c.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(env).WriteVector3(position).WriteFloat(r0).WriteFloat(r1).WriteFloat(r2).WriteFloat(r3);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 
@@ -165,14 +163,13 @@ namespace Faolan.Core.Network.Codecs
 	public static class SetPosCodec
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.SetPosIIR;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte flag = 0x00, byte env = 0x00)
 		{
 			var c = new FaolanStream();
 			c
 				.WriteUInt32(SubOpcode)
-				.WriteUInt32(IirMarker)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(handle)
 				.WriteByte(env)
 				.WriteVector3(position)

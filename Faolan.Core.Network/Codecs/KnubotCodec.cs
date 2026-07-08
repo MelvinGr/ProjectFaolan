@@ -13,7 +13,6 @@ namespace Faolan.Core.Network.Codecs
 	// Big-endian; golden-tested byte-exact in KnubotCodecTests.
 	public static class KnubotCodec
 	{
-		private const uint IirMarker = EntityClass.Character;
 		private const ushort Version = 1;
 
 		// KnubotAnswerListIIR_c (0xF164A4A5) + KnubotCloseChatWindowIIR_c (0xC4AF39EB) share one grammar (verified
@@ -88,7 +87,7 @@ namespace Faolan.Core.Network.Codecs
 
 		private static FaolanStream Header(uint subOpcode, uint playerInstance, uint npcHandle, byte env)
 		{
-			return new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(IirMarker).WriteUInt32(playerInstance).WriteByte(env).WriteUInt16(Version).WriteUInt32(IirMarker).WriteUInt32(npcHandle);
+			return new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(playerInstance).WriteByte(env).WriteUInt16(Version).WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle);
 		}
 
 		// Reads the carrier marker + player instance, then the KnubotBase header (env, version, marker, npc handle).

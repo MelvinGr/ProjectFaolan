@@ -21,7 +21,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class ShopContentCodec
 	{
 		public const uint ShopEntryFlags = 0x200000;
-		private const uint CharacterWireType = EntityClass.Character;
 
 		// Builds the full 0x2033 body from rows. `resolveItem` maps a template id to its Items row (for the
 		// quad + hash); unresolvable slots are skipped (the importer harvests the wares into Items from
@@ -46,7 +45,7 @@ namespace Faolan.Core.Network.Codecs
 		// type + a content length that lands exactly on the body end.
 		public static bool LooksLikeShopData(ReadOnlySpan<byte> body)
 		{
-			return body.Length > 20 && BinaryPrimitives.ReadUInt32BigEndian(body) == Shop.WireType && BinaryPrimitives.ReadUInt32BigEndian(body[8..]) == CharacterWireType &&
+			return body.Length > 20 && BinaryPrimitives.ReadUInt32BigEndian(body) == Shop.WireType && BinaryPrimitives.ReadUInt32BigEndian(body[8..]) == EntityClass.Character &&
 				   BinaryPrimitives.ReadUInt32BigEndian(body[16..]) == body.Length - 20;
 		}
 
@@ -130,7 +129,7 @@ namespace Faolan.Core.Network.Codecs
 
 				s.WriteUInt32(Shop.WireType);
 				s.WriteUInt32(ShopInstance);
-				s.WriteUInt32(CharacterWireType);
+				s.WriteUInt32(EntityClass.Character);
 				s.WriteUInt32(NpcHandle);
 				s.WriteArrayUInt32Length(proto);
 			}

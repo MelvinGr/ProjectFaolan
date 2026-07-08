@@ -23,7 +23,6 @@ namespace Faolan.Core.Network.Codecs
 		public const uint ConstFour = 4;
 		public const uint Head = 0x000007E2;
 		public const ulong ConstOne = 1;
-		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
 
 		// Builds the GameActionList body for `dynelHandle`, delivered to `frameHandle`, carrying `actionTail` verbatim.
 		public static byte[] BuildBody(uint frameHandle, uint dynelHandle, uint field3, byte[] actionTail)
@@ -31,7 +30,7 @@ namespace Faolan.Core.Network.Codecs
 			ArgumentNullException.ThrowIfNull(actionTail);
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.GameActionListIIR)
-				.WriteUInt32(WireType)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(frameHandle)
 				.WriteByte(0x00)
 				.WriteUInt32(Head)

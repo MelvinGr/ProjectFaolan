@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Network.Constants;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -85,9 +86,9 @@ namespace Faolan.GameServer.CreateFlow
 			// SetDayTime: CONSTRUCTED from the captured day-time + wall-clock timestamp + rate (#189 item 3).
 			await Iir(GameServer0X2000Opcodes.GameTimeIIR, CreateEditorRecordBuilder.BuildGameTimeIir(0x0147_43EB_0000_0000UL, 0x01, 0x0001_9272_6A1D_3837UL));
 			// #189: constructed via BuildStatIir (was verbatim). flag=0 for 0x0F4266, then a flag=1 / value=0 run 0x0F4285..0x0F428C.
-			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x00, 0x0F4266, 0x00));
+			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x00, 0x0F4266, 0x00));
 			for (uint statId = 0x0F4285; statId <= 0x0F428C; statId++)
-				await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, statId, 0x00));
+				await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x01, statId, 0x00));
 			return;
 
 			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)

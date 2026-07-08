@@ -17,7 +17,6 @@ namespace Faolan.GameServer.World
 	// build it without depending on the listener type.
 	public static class VitalsPacket
 	{
-		private const uint VitalsMarker = EntityClass.Character;
 
 		// The bare 0x96B8DC59 IIR body (no RPC header / length prefix) for an entity's stat change - the bytes
 		// SendWorldIir frames per recipient when BROADCASTING a stat to nearby viewers (e.g. an NPC's combat-mode draw,
@@ -25,7 +24,7 @@ namespace Faolan.GameServer.World
 		public static byte[] BuildStatBlockBody(uint entityHandle, CharacterStatBlock stats)
 		{
 			using var s = new FaolanStream();
-			s.WriteUInt32(GameServer0X2000Opcodes.StatUpdateIIR).WriteUInt32(VitalsMarker).WriteUInt32(entityHandle).WriteUInt32(0x00000000);
+			s.WriteUInt32(GameServer0X2000Opcodes.StatUpdateIIR).WriteUInt32(EntityClass.Character).WriteUInt32(entityHandle).WriteUInt32(0x00000000);
 			stats.WriteTo(s);
 			return s.ToArray();
 		}
@@ -42,7 +41,7 @@ namespace Faolan.GameServer.World
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.StatUpdateIIR);
-					s.WriteUInt32(VitalsMarker);
+					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(handle);
 					s.WriteUInt32(0x00000000);
 					stats.WriteTo(s);
@@ -63,7 +62,7 @@ namespace Faolan.GameServer.World
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.StatUpdateIIR)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != VitalsMarker)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
 				return false;
 
 			entityHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));

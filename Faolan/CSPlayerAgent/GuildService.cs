@@ -32,7 +32,6 @@ namespace Faolan.CSPlayerAgent
 		private const byte CoreGuildStreamVersion = 0x03; // first body byte - CoreGuild_c streaming version (must be 3)
 		private const byte GuildGovernmentForm = 0x01; // byte after guildId - the form selecting the case 1->3 layout
 
-		private const uint CharacterWireType = EntityClass.Character;
 
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
@@ -373,7 +372,7 @@ namespace Faolan.CSPlayerAgent
 		private Task SendGuildMemberJoined(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Character member)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildMemberJoined).WriteUInt32(CharacterWireType).WriteUInt32(member.Id);
+			ps.WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildMemberJoined).WriteUInt32(EntityClass.Character).WriteUInt32(member.Id);
 			WriteGuildMemberRecord(ps, member);
 			return ps.SendAsync(client);
 		}
@@ -398,7 +397,7 @@ namespace Faolan.CSPlayerAgent
 		// accept/decline dialog. Byte-exact against the captured Kyloth->Hoxxling invite (GuildPacketTests).
 		internal static void WriteGuildInviteBody(FaolanStream s, Guild guild, uint inviteeId, string inviterName)
 		{
-			s.WriteUInt32(Guild.WireType).WriteUInt32(guild.Id).WriteString(guild.Name).WriteUInt32(CharacterWireType).WriteUInt32(inviteeId).WriteString(inviterName);
+			s.WriteUInt32(Guild.WireType).WriteUInt32(guild.Id).WriteString(guild.Name).WriteUInt32(EntityClass.Character).WriteUInt32(inviteeId).WriteString(inviterName);
 		}
 
 		// One member record of the roster/joined/update packets (75 bytes + name):

@@ -10,7 +10,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class WorldLoot
 	{
 		public const float DefaultFadeSeconds = 3.0f;
-		public const uint EntityTypeTag = EntityClass.Character; // the entity-frame typetag carried inside NewCurrentLooter
 
 		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
 
@@ -57,14 +56,14 @@ namespace Faolan.Core.Network.Codecs
 		// playfield (re)load.
 		public static byte[] BuildNewAllowedLooterBody(uint bagHandle, uint playerHandle)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.NewAllowedLooterIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityTypeTag).WriteUInt32(playerHandle).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.NewAllowedLooterIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityClass.Character).WriteUInt32(playerHandle).ToArray();
 		}
 
 		// "bag -> current looter = this player" (also used for NewAllowedLooter, same shape). 21 B:
 		// [subop][lootTypetag][bagHandle][0x00][entityTypetag][playerHandle].
 		public static byte[] BuildNewCurrentLooterBody(uint bagHandle, uint playerHandle)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.NewCurrentLooterIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityTypeTag).WriteUInt32(playerHandle).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.NewCurrentLooterIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityClass.Character).WriteUInt32(playerHandle).ToArray();
 		}
 
 		// Opens the loot WINDOW on the object (SimpleDynelVisualChange carrying the state string "Open"). 19 + len B:

@@ -26,14 +26,13 @@ namespace Faolan.Core.Network.Codecs
 		public const uint StaminaGauge = 0x37E68C; // "Spellweaving Cost" -> the yellow stamina bar
 		public const uint StaminaScale = 0x000F425C; // v@33 for the stamina gauge
 		private const uint GaugeMagnitude = 80;
-		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 
 		// One fire-burst stage (StatIIR 0xF98E10B3) emitted per stage on DEACTIVATE: the accumulated weave firing.
 		// Record: [op][0xC350][caster][u8 0x01][u32 fireId][u32 0x00007BD4]. Necro fire ids: 0x398/0x39B/0x39A/0x39D.
 		// The 0x7BD4 tail is constant across the captured burst.
 		public static byte[] BuildFireStage(uint caster, uint fireId)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.StatIIR).WriteUInt32(Type).WriteUInt32(caster).WriteByte(0x01).WriteUInt32(fireId).WriteUInt32(0x00007BD4).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.StatIIR).WriteUInt32(EntityClass.Character).WriteUInt32(caster).WriteByte(0x01).WriteUInt32(fireId).WriteUInt32(0x00007BD4).ToArray();
 		}
 
 		// The reactive element list (CombatReactiveIIR 0x54C02089): declares to the client which weave elements the
@@ -44,7 +43,7 @@ namespace Faolan.Core.Network.Codecs
 		// pass 0 for a consumed slot to reproduce that. tag 0x01 is a constant "list active" flag.
 		public static byte[] BuildReactiveList(uint caster, uint[] elementBaseIds)
 		{
-			var stream = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.CombatReactiveIIR).WriteUInt32(Type).WriteUInt32(caster).WriteUInt32(0).WriteByte(0x01);
+			var stream = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.CombatReactiveIIR).WriteUInt32(EntityClass.Character).WriteUInt32(caster).WriteUInt32(0).WriteByte(0x01);
 
 			foreach (var element in elementBaseIds)
 				stream.WriteUInt32(element);
@@ -56,7 +55,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.StatDamageIIR)
-				.WriteUInt32(Type)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(caster)
 				.WriteByte(0x00)
 				.WriteUInt32(token)
@@ -67,7 +66,7 @@ namespace Faolan.Core.Network.Codecs
 				.WriteUInt32(2) // mode
 				.WriteUInt32(delta) // signed drain since last tick
 				.WriteUInt32(0)
-				.WriteUInt32(Type)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(caster)
 				.WriteUInt32(1)
 				.WriteUInt32(0)

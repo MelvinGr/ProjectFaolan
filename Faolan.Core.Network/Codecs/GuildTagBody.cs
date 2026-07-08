@@ -14,13 +14,12 @@ namespace Faolan.Core.Network.Codecs
 	// (WriteHeader with the world endpoints) and the live send.
 	public sealed record GuildTagBody(uint CharacterId, string GuildName) : ICodec<GuildTagBody>
 	{
-		private const uint IirMarker = EntityClass.Character;
 
 
 		public void Write(FaolanStream s)
 		{
 			s.WriteUInt32(GameServer0X2000Opcodes.GuildUpdateIIR);
-			s.WriteUInt32(IirMarker);
+			s.WriteUInt32(EntityClass.Character);
 			s.WriteUInt32(CharacterId);
 			s.WriteUInt16(0);
 			s.WriteString(GuildName);
@@ -45,7 +44,7 @@ namespace Faolan.Core.Network.Codecs
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.GuildUpdateIIR)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != IirMarker)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
 				return false;
 
 			characterId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));

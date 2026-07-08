@@ -18,7 +18,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class ComboBookIirCodec
 	{
 		public const uint SubOpcode = 0xA8BBEB7F;
-		private const uint IirMarker = EntityClass.Character;
 		private const ushort AddFlag = 0x0001;
 
 		public static byte[] Build(uint instance, uint comboId) => new Message(instance, comboId).ToArray();
@@ -31,7 +30,7 @@ namespace Faolan.Core.Network.Codecs
 			public void Write(FaolanStream s)
 			{
 				s.WriteArrayUInt32Length(content =>
-					content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId));
+					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId));
 			}
 
 			public static Message Read(FaolanStream s)

@@ -16,7 +16,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class CreateEditorRecordBuilder
 	{
 		// The entity-class tag every per-character editor record carries (EntityClass.Character = 0xC350).
-		public const uint CharacterWireType = EntityClass.Character;
 
 		// BehaviorControlCenterIIR (0x642CD3D6), LONG form (116 bytes): the same 28-byte head as the short form
 		// above, plus an 88-byte behavior-state tail that binds the behavior to an EQUIPPED ITEM (the three records
@@ -42,7 +41,7 @@ namespace Faolan.Core.Network.Codecs
 		// BuildBehaviorControlCenterIirLong below.) Decoded by Captures/scripts/decode_create_iir_records.py + decode_behaviorcc.py.
 		// `form` is 0x0004 for the common registration; the rarer 0x0007 subtype adds protobuf field 4 (a varint,
 		// between phase and field5). Protobuf wire order: f1=behaviorId, [f2], f3=phase, [f4], f5, f6, [f11], [f12].
-		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint type = CharacterWireType, uint? field2 = null, uint? field4 = null,
+		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint type = EntityClass.Character, uint? field2 = null, uint? field4 = null,
 			uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = 0x0004)
 		{
 			var pb = new FaolanStream().WriteByte(0x08).WriteVarint(behaviorId);
@@ -66,7 +65,7 @@ namespace Faolan.Core.Network.Codecs
 		// The trailing 3 u32 (`trailingA/B/C`) are 0 in the WorldPrep equipment records but carry a small state pair
 		// (e.g. 0,1,1) in the create-world cutscene's mount/companion long form - so they're parameterized (default 0).
 		public static byte[] BuildBehaviorControlCenterIirLong(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag, byte[] transform,
-			uint type = CharacterWireType, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
+			uint type = EntityClass.Character, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
 		{
 			var tagBytes = Encoding.ASCII.GetBytes(tag);
 			if (tagBytes.Length != 4)
@@ -98,7 +97,7 @@ namespace Faolan.Core.Network.Codecs
 		// The create-editor WorldPrep burst streams one per granted id (the same ability/feat id space as the
 		// player-spawn scaffold's id list - e.g. 0x050E24). Decoded by Captures/scripts/decode_character_action.py and
 		// validated byte-exact against every record in the WorldPrep capture (CreateEditorRecordTests).
-		public static byte[] BuildCharacterActionIir(uint handle, uint actionId, uint type = CharacterWireType)
+		public static byte[] BuildCharacterActionIir(uint handle, uint actionId, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(0x1D).WriteArray(new byte[16]).WriteUInt32(actionId).WriteArray(new byte[8]).ToArray();
 		}
@@ -106,7 +105,7 @@ namespace Faolan.Core.Network.Codecs
 		// ComboBookIIR (0xA8BBEB7F): grants one combo/ability to the entity's combo book. 14 bytes:
 		//   [u32 type][u32 handle][u16 0x0001][u32 comboId]
 		// The WorldPrep burst streams one per combo id. Decoded by Captures/scripts/decode_create_iir_records.py.
-		public static byte[] BuildComboBookIir(uint handle, uint comboId, uint type = CharacterWireType)
+		public static byte[] BuildComboBookIir(uint handle, uint comboId, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(0x0001).WriteUInt32(comboId).ToArray();
 		}
@@ -115,7 +114,7 @@ namespace Faolan.Core.Network.Codecs
 		//   [u32 type][u32 handle][u8 flag]
 		// An EMPTY record - the client reader (FUN_0075a920) only resolves the SimpleChar for `handle` and logs; the
 		// carrier handle is the whole message (docs/iir-readers-combat-world.md). flag is the base IIR's, 0 in every capture.
-		public static byte[] BuildCharInPlayIir(uint handle, byte flag = 0, uint type = CharacterWireType)
+		public static byte[] BuildCharInPlayIir(uint handle, byte flag = 0, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).ToArray();
 		}
@@ -131,7 +130,7 @@ namespace Faolan.Core.Network.Codecs
 		//   [u32 type][u32 handle][u8 flag][u32 a][u32 b][u32 c][u8 d]
 		// The client reader (FUN_0079f8e0) reads [u32x3][u8] after the base IIR flag (docs/iir-readers-conversation-misc.md);
 		// the three words + trailing byte are an opaque numeric feedback payload, carried by value.
-		public static byte[] BuildFeedbackIir(uint handle, byte flag, uint a, uint b, uint c, byte d, uint type = CharacterWireType)
+		public static byte[] BuildFeedbackIir(uint handle, byte flag, uint a, uint b, uint c, byte d, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(a).WriteUInt32(b).WriteUInt32(c).WriteByte(d).ToArray();
 		}
@@ -194,7 +193,7 @@ namespace Faolan.Core.Network.Codecs
 		// regen family); the single `flag` byte belongs to the base IIR and is 0 in every capture. Decoded by
 		// Captures/scripts/decode_create_iir_records.py + Captures/ghidra/DumpRegenReader.java and validated byte-exact
 		// against 590 records across the login/gameplay/create captures (all type 0xC350, flag 0, three clean u32).
-		public static byte[] BuildRegenIir(uint handle, uint v1, uint v2, uint v3, byte flag = 0, uint type = CharacterWireType)
+		public static byte[] BuildRegenIir(uint handle, uint v1, uint v2, uint v3, byte flag = 0, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(v1).WriteUInt32(v2).WriteUInt32(v3).ToArray();
 		}
@@ -204,7 +203,7 @@ namespace Faolan.Core.Network.Codecs
 		// `blobLen` = 1 + name.Length (it counts the 0x2A tag + the name). The editor streams the chosen
 		// hair/texture resource refs ("hairmesh_207920", "texscript_183875") this way; `weight` is 1.0 in every
 		// capture and the small p/q trailing pair carries morph flags/index. Raw-body float = big-endian.
-		public static byte[] BuildSetMorphValueIir(uint handle, string name, float weight, byte p, uint q, uint type = CharacterWireType)
+		public static byte[] BuildSetMorphValueIir(uint handle, string name, float weight, byte p, uint q, uint type = EntityClass.Character)
 		{
 			var nameBytes = Encoding.UTF8.GetBytes(name);
 			return new FaolanStream()
@@ -232,7 +231,7 @@ namespace Faolan.Core.Network.Codecs
 		// StatUpdateIIR (0x96B8DC59): a batch of stat (statId, value) pairs set on an entity:
 		//   [u32 type][u32 handle][u32 0][u8 count][ count x ([u32 statId][u32 value]) ]
 		// The editor/world-prep streams it to seed a character's stat block (max health/mana/... + a few flags).
-		public static byte[] BuildStatUpdateIir(uint handle, (uint StatId, uint Value)[] stats, uint type = CharacterWireType)
+		public static byte[] BuildStatUpdateIir(uint handle, (uint StatId, uint Value)[] stats, uint type = EntityClass.Character)
 		{
 			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(stats.Length);
 			foreach (var (statId, value) in stats)

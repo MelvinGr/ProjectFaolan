@@ -75,7 +75,6 @@ namespace Faolan.Core.Network.Codecs
 		// (active/update) then state 4 (completed) - see the Stihetfv compeltefirstquest capture (13479 idx858/860).
 		public const uint StateActive = 2;
 		public const uint StateCompleted = 4;
-		public const uint TypeTagAck = EntityClass.Character;
 
 		// The fixed u64 the QuestFullUpdate carries at its `acceptTime` slot inside the snapshot tails (NOT a live
 		// timestamp - it is the same constant in the live grant packet and the in-progress login snapshot; decoded as
@@ -157,7 +156,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.QuestGoalIIR)
-				.WriteUInt32(TypeTagAck)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(playerHandle)
 				.WriteByte(0x01)
 				.WriteUInt32(questId)
@@ -173,7 +172,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.QuestIIR)
-				.WriteUInt32(TypeTagAck)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(playerHandle)
 				.WriteUInt32(0) // [12..16] = 0
 				.WriteByte(0x01)
@@ -286,7 +285,7 @@ namespace Faolan.Core.Network.Codecs
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestGoalIIR)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
 				return false;
 			if (body[12] != 0x01)
 				return false;
@@ -311,7 +310,7 @@ namespace Faolan.Core.Network.Codecs
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestIIR)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4)) != 0)
 				return false;
@@ -342,7 +341,7 @@ namespace Faolan.Core.Network.Codecs
 		private static void WriteHeader(FaolanStream w, uint subOpcode, uint playerHandle)
 		{
 			w.WriteUInt32(subOpcode);
-			w.WriteUInt32(TypeTagAck);
+			w.WriteUInt32(EntityClass.Character);
 			w.WriteUInt32(playerHandle);
 		}
 

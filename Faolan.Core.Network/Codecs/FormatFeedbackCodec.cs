@@ -31,7 +31,6 @@ namespace Faolan.Core.Network.Codecs
 		public const uint FifoBannerTypeFlags = 0x00000000;
 		public const uint SubOpcode = 0x8D5A8B6B;
 		private const byte LeadFlag = 0x01;
-		private const uint IirMarker = EntityClass.Character;
 
 		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml) => new Message(instance, typeFlags, footer, xml).ToArray();
 
@@ -45,7 +44,7 @@ namespace Faolan.Core.Network.Codecs
 			public void Write(FaolanStream s)
 			{
 				s.WriteArrayUInt32Length(content =>
-					content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt64(0ul).WriteUInt32(TypeFlags).WriteUInt16(Xml.Length).WriteArray(Xml).WriteUInt32(Footer));
+					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt64(0ul).WriteUInt32(TypeFlags).WriteUInt16(Xml.Length).WriteArray(Xml).WriteUInt32(Footer));
 			}
 
 			public static Message Read(FaolanStream s)

@@ -18,7 +18,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class MoveTaskBuilder
 	{
 		private const int BodyLength = 31;
-		private const uint Ack = EntityClass.Character;
 
 		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is
 		// what a moving NPC needs: a current position plus a list of waypoints it walks between at `speed`. The
@@ -43,7 +42,7 @@ namespace Faolan.Core.Network.Codecs
 			var stream = new FaolanStream()
 				.WriteUInt32(total - 4)
 				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
-				.WriteUInt32(Ack)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(handle)
 				.WriteUInt16(0) // prefix 00 00
 				.WriteVector3(currentPosition)
@@ -80,7 +79,7 @@ namespace Faolan.Core.Network.Codecs
 			return new FaolanStream()
 				.WriteUInt32(BodyLength - 4)
 				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
-				.WriteUInt32(Ack)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(handle)
 				.WriteUInt16(0) // prefix 00 00
 				.WriteVector3(position)

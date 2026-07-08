@@ -27,7 +27,6 @@ namespace Faolan.Core.Network.Codecs
 		public const int DeltaCount = 6;
 		public const uint SubOpcode = 0x6D314743;
 		private const byte LeadFlag = 0x00;
-		private const uint IirMarker = EntityClass.Character;
 
 		// Full-control build (the golden test reproduces the captured deltas). `deltas` is padded/truncated to 6.
 		public static byte[] Build(uint instance, uint newLevel, ReadOnlySpan<uint> deltas)
@@ -50,7 +49,7 @@ namespace Faolan.Core.Network.Codecs
 			{
 				s.WriteArrayUInt32Length(content =>
 				{
-					content.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt32(NewLevel);
+					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt32(NewLevel);
 					for (var i = 0; i < DeltaCount; i++)
 						content.WriteUInt32(i < Deltas.Length
 							? Deltas[i]

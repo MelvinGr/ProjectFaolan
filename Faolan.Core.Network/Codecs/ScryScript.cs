@@ -16,7 +16,6 @@ namespace Faolan.Core.Network.Codecs
     //   f6 = sub-message {f1=0, f2=0}.
     public static class ScryScript
     {
-        public const uint TypeTagAck = EntityClass.Character;
 
         // The no-token form: a StartScriptGroupOnClient (type 0) callback that runs a script group by id, with no
         // step-token/resources (f4/f5 omitted) - the post-morph "nudge" the create-world handshake sends. protobuf
@@ -34,7 +33,7 @@ namespace Faolan.Core.Network.Codecs
 
             return new FaolanStream()
                 .WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR)
-                .WriteUInt32(TypeTagAck)
+                .WriteUInt32(EntityClass.Character)
                 .WriteUInt32(playerHandle)
                 .WriteByte(0x00)
                 .WriteArrayUInt32Length(pb.ToArray())
@@ -60,7 +59,7 @@ namespace Faolan.Core.Network.Codecs
 
             return new FaolanStream()
                 .WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR)
-                .WriteUInt32(TypeTagAck)
+                .WriteUInt32(EntityClass.Character)
                 .WriteUInt32(playerHandle)
                 .WriteByte(0x00) // framing flag
                 .WriteArrayUInt32Length(pb.ToArray()) // u32 BE protobuf length + body
