@@ -1427,10 +1427,16 @@ namespace Faolan.GameServer.World
 				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
 			}
 
-			// The playfield-instance token is baked into SpawnBody at construction (NpcSpawnBuilder.TryBuildLive with
-			// this zone's token) - both the from-columns build and the Data-splice fallback thread it there - so it's
-			// already the live value here; no SpawnPlayfieldRewriter re-stamp needed (#244). The client only registers
-			// and polls (0x2020) a spawn whose playfield matches the one it loaded (docs/mid-session-spawn-blocker.md).
+			// Re-stamp the playfield-instance token to the LIVE value at send time. The token baked into SpawnBody at
+			// map-load (NpcSpawnBuilder.TryBuildLive) is the zone's DEFAULT token - but the client only registers, and
+			// then polls (0x2020), a spawn whose playfield matches the one IT loaded at world entry, and that live token
+			// isn't known until the player actually enters (docs/mid-session-spawn-blocker.md part 3). Baking the
+			// load-time token shipped every NPC with a stale playfield, so the client silently dropped them all and
+			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
+#pragma warning disable CS0618 // interim: token threaded per-send until the live token is known at build time (#244)
+			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
+#pragma warning restore CS0618
+
 			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
 		}
 

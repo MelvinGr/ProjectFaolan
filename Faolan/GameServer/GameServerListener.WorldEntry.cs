@@ -791,7 +791,10 @@ namespace Faolan.GameServer
 
 		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender, byte[] receiver)
 		{
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportDimesionID).WriteString(realmId.ToString()).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportDimesionID)
+				.WriteString(realmId.ToString())
+				.SendAsync(client);
 		}
 
 		private static Task ReportServerId(INetworkClient client, uint value, byte[] sender, byte[] receiver)

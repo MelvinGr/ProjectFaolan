@@ -894,9 +894,13 @@ namespace Faolan.GameServer
 					client.Session.IsCreateWorldSession = isCreateWorldEntry;
 					client.Session.IsCreateEditorConnection = isNewCharacter;
 
+					// Retail sends this auth trio (DimensionId 0x200b / ServerId 0x200c / AckAuthenticate 0x2001)
+					// byte-identically in BOTH the create-editor and the existing-login flow (verified against
+					// Barbarian-create vs -login) - so it is NOT the create-vs-login differentiator (that is purely the
+					// following 0x2000 burst content). Send it for both; only isCreateWorldEntry (the post-creation world
+					// connection) skips it - it carries its own auth in the verbatim burst.
 					if (!isCreateWorldEntry)
 					{
-						// New (unnamed) characters take the create-editor path; existing characters log in normally.
 						var authSender = isNewCharacter
 							? Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59)
 							: WorldFraming.Sender;
