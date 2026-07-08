@@ -82,6 +82,10 @@ namespace Faolan.Core.Database.Tables
 		public uint? MaxStamina { get; set; }
 
 		// --- NpcStats (npc_stats) ---
+		// This NPC's own faction MEMBERSHIP, NOT a player's reputation with it. Community: 0 = neutral/friendly,
+		// > 0 = a hostile faction (drives the red/green overhead name + aggro). FactionId (below) = the faction this
+		// NPC belongs to. The PLAYER's per-faction standings (the client Factions window) are NOT stored yet - see
+		// Gitea #315 (would need a CharacterFaction table + faction catalog).
 		public uint? Community { get; set; }
 		public uint? TemplateId { get; set; }
 		public uint? NpcType { get; set; }
@@ -95,6 +99,7 @@ namespace Faolan.Core.Database.Tables
 		public uint? SmellingSkill { get; set; }
 		public uint? SpawnAnimation { get; set; }
 		public uint? LosHeight { get; set; }
+		// The faction this NPC belongs to (membership). See the Community note above re: player reputation (#315).
 		public uint? FactionId { get; set; }
 
 		// --- CharacterBcc (Bcc) ---
