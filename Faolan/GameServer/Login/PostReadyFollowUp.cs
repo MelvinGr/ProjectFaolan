@@ -20,10 +20,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// Observed as a tiny post-ready follow-up packet in captures.
-		// This does not resemble inventory or bag contents; the current payload is just 0x0009.
-		private static readonly byte[] ExistingCharacterPostReady06Ec1255Tail = [0x00, 0x09];
-
 		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x58);
 
 		// Existing-character post-ready conversations: retail uses sub-id 0x58 + the session character instance on
@@ -305,44 +301,27 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 		}
 
-		private static Task AckAuthenticate(INetworkClient client, uint value, byte[] sender = null, byte[] receiver = null)
+		private static Task AckAuthenticate(INetworkClient client, uint value, byte[] sender, byte[] receiver )
 		{
-			var sender0 = sender ?? LoginWorldSender;
-			var receiver0 = receiver ?? LoginWorldReceiver(client);
-
-			return new PacketStream().WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchAckAuthenticate).WriteUInt32(value).SendAsync(client);
+			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchAckAuthenticate).WriteUInt32(value).SendAsync(client);
 		}
 
-		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender = null, byte[] receiver = null)
+		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender , byte[] receiver )
 		{
-			var sender0 = sender ?? LoginWorldSender;
-			var receiver0 = receiver ?? LoginWorldReceiver(client);
-
-			return new PacketStream().WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchReportDimesionID).WriteString(realmId.ToString()).SendAsync(client);
+			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportDimesionID).WriteString(realmId.ToString()).SendAsync(client);
 		}
 
-		private static Task ReportServerId(INetworkClient client, uint value, byte[] sender = null, byte[] receiver = null)
+		private static Task ReportServerId(INetworkClient client, uint value, byte[] sender , byte[] receiver )
 		{
-			var sender0 = sender ?? LoginWorldSender;
-			var receiver0 = receiver ?? LoginWorldReceiver(client);
+			//TODO: Use value?
+
 			var packetData0 = new byte[]
 			{
-				0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x00, 0x01
+				0x00, 0x00, 0x00, 0x54,
+				0x00, 0x00, 0x00, 0x01
 			};
 
-			return new PacketStream().WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchReportServerID).WriteArray(packetData0).SendAsync(client);
-		}
-
-		private static Task SendExistingCharacterPostReadyDataPacket(INetworkClient client, uint opcode, byte[] tail)
-		{
-			return new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(opcode)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(client.Session.Account.ClientInstance)
-					.WriteArray(SubstitutePostReadyInstance(tail, client.Session.Account.ClientInstance)))
-				.SendAsync(client);
+			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportServerID).WriteArray(packetData0).SendAsync(client);
 		}
 
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
@@ -382,31 +361,6 @@ namespace Faolan.GameServer
 					    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x46, 0xA8, 0xD8, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x42, 0x10, 0x54, 0xEB, 0x48, 0xD4, 0x3F, 0x80)*/
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0x59, 0x92, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x6C, 0xD7, 0x60, 0x32, 0xDC, 0x20, 0x3F, 0x80, 0x00, 0x00))
 				.SendAsync(client);
-		}
-
-		// The captured post-ready A36D tails embed the old session instance (0x01307874 = F4 F0 C1 09) as a
-		// nested protobuf varint. Replace it with the live instance (length-preserving for a 4-byte-varint id).
-		private static byte[] SubstitutePostReadyInstance(byte[] tail, uint instance)
-		{
-			var placeholder = new byte[]
-			{
-				0xF4, 0xF0, 0xC1, 0x09
-			};
-			var inst = new FaolanStream().WriteVarint(instance).ToArray();
-			if (inst.Length != placeholder.Length)
-				return tail;
-
-			var result = (byte[])tail.Clone();
-			for (var i = 0; i <= result.Length - placeholder.Length; i++)
-			{
-				if (result[i] == placeholder[0] && result[i + 1] == placeholder[1] && result[i + 2] == placeholder[2] && result[i + 3] == placeholder[3])
-				{
-					Array.Copy(inst, 0, result, i, inst.Length);
-					i += placeholder.Length - 1;
-				}
-			}
-
-			return result;
 		}
 	}
 }

@@ -3,6 +3,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Opcodes;
@@ -34,12 +35,14 @@ namespace Faolan.GameServer
 			// ReSharper disable once ConvertToConstant.Local - non-const so the gated records don't warn CS0162 unreachable
 			var EmitLegacyBeachNpcBurst = false;
 
-			// record -1: CoreClaimIIR (0x06EC1255). Retail (and our old raw-blob replay) sends this immediately
-			// before the CharInPlay record - it is the world-CLAIM signal that tells the client the playfield is
-			// fully claimed/loaded. WITHOUT it the world renders but the client never finishes "loading", so it
-			// never opens the CommunityServer (chat) connection - the channels-missing bug. It was lost when this
-			// post-ready stream was rebuilt as explicit sends; restore it here (byte-for-byte via the helper).
-			await SendExistingCharacterPostReadyDataPacket(client, 0x06EC1255, ExistingCharacterPostReady06Ec1255Tail);
+			await new PacketStream()
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(GameServer0X2000Opcodes.CoreClaimIIR)
+					.WriteUInt32(EntityClass.Character)
+					.WriteUInt32(client.Session.Account.ClientInstance)
+					.WriteArray(0x00, 0x09))
+				.SendAsync(client);
 
 			// record 0: 0x00002000, 17-byte body
 			await new PacketStream()
