@@ -85,7 +85,11 @@ from typed columns.
       `VoiceSet` non-null; `GuildId`/`HearingSkill`/`SightSkill` nullable) + importer populate. These override the
       type core per placement (a spawn point carries its own level; the pools track it). Pools are ~91% `Health*100`
       but deviate per creature, so stored (derivable later if a curve is decoded).
-- [ ] `NpcSpawnBuilder` composes `ProtoCoreCharacterIIR` from `row.Npc.StatCore` (type) + `row` (instance
-      overrides) + canonical runtime init, instead of parsing `Data`. Equivalence-test columns == Data (fresh).
+- [x] `NpcSpawnBuilder.ApplyStatCore` composes the CharacterIIR stat core from `row.Npc.StatCore` (type) +
+      `row` (placement overrides), with runtime anim/state canonical. Verified byte-exact for the type +
+      placement fields across all 980 populated spawns (`NpcSpawnStatCoreTests`). `Data` still supplies the
+      frame + name + equipment structure.
+- [ ] Build the spawn FRAME from scratch (header + transform + pre/post-IIR scaffold), like
+      `PlayerSpawnBuilder.BuildFromScratch`, so `Data` can be dropped entirely. This is the last verbatim piece.
 - [ ] Retire `Data`, the splice path, and `SpawnPlayfieldRewriter` (token threaded at construction).
 - [ ] Migrate the remaining `Npc.Community`/`Level` readers (now `[Obsolete]`) to `StatCore`.
