@@ -1,7 +1,7 @@
 using System.Text;
 using Faolan.Core.Network.Codecs;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds the AttributeChanged / Increased on-screen feedback - a FormatFeedbackIIR (0x8D5A8B6B) payload shown
 	// when a character's primary attribute rises: the VISIBLE half of a level-up (and of a quest attribute reward).

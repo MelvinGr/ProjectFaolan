@@ -1,9 +1,7 @@
 using System;
 using Faolan.Core.Network.Conan;
 
-namespace Faolan.Core.Network
-{
-    namespace Opcodes
+namespace Faolan.Core.Network.Opcodes
     {
         public enum AgentServerOpcodes : ushort
         {
@@ -1045,4 +1043,3 @@ namespace Faolan.Core.Network
             }
         }
     }
-}

@@ -1,5 +1,5 @@
 using System.Linq;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Codecs;
 using Xunit;
 
 namespace Faolan.Tests

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Builds the remoteformat XML body of the auction-house "you bought an item" mail
 	// (DispatchMailMessage, token TradePostGUI_MailItemBought). Decoded byte-exact from the necrol80

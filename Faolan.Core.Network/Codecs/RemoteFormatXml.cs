@@ -1,8 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Faolan.Core.Network.Packets
+namespace Faolan.Core.Network.Codecs
 {
 	// Byte-exact parse/build of a `remoteformat` dialogue screen (#188) so a Knubot screen can be GENERATED from
 	// structured fields instead of replaying captured XML. A screen is:
@@ -63,15 +64,12 @@ namespace Faolan.Core.Network.Packets
 		public static Screen WithLivePlayer(Screen s, string playerName, string guildName)
 		{
 			var pars = new List<Parameter>(s.Parameters.Count);
-			foreach (var p in s.Parameters)
+			pars.AddRange(s.Parameters.Select(p => p.Name switch
 			{
-				pars.Add(p.Name switch
-				{
-					"name"      => StringEntry("name", playerName, FlagsOf(p.InnerRaw)),
-					"guildname" => StringEntry("guildname", guildName, FlagsOf(p.InnerRaw)),
-					_           => p
-				});
-			}
+				"name"      => StringEntry("name", playerName, FlagsOf(p.InnerRaw)),
+				"guildname" => StringEntry("guildname", guildName, FlagsOf(p.InnerRaw)),
+				_           => p
+			}));
 
 			return s with { Parameters = pars };
 		}
