@@ -105,5 +105,13 @@ namespace Faolan
 			var host = builder.Build();
 			await host.RunAsync();
 		}
+
+		public static byte[] LoadEmbeddedResource(string name)
+		{
+			using var stream = typeof(Program).Assembly.GetManifestResourceStream(name) ?? throw new InvalidOperationException($"embedded resource '{name}' not found");
+			using var buffer = new MemoryStream();
+			stream.CopyTo(buffer);
+			return buffer.ToArray();
+		}
 	}
 }
