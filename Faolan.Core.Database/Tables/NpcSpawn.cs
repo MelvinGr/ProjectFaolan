@@ -71,6 +71,12 @@ namespace Faolan.Core.Database.Tables
 		public uint? GuildId { get; set; }
 		public uint? HearingSkill { get; set; }
 		public uint? SightSkill { get; set; }
+		public uint? SmellingSkill { get; set; }
+
+		// The WIRE CharacterStats.Health (×100), stored ONLY when it diverges from Life - which it almost never does
+		// (wire Health == wire Life for ~all creatures, both tracking the placement level). A few (e.g. Rocknose) fix
+		// wire Health to a distinct per-placement value; this captures it. Null = "wire Health == Life", use Life.
+		public uint? WireHealth { get; set; }
 
 		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
 		// on Npc now, reached via the Npc navigation. Nullable only for phantom rows with no resolvable type (none

@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.Core.Network.Codecs
 {
@@ -48,6 +49,12 @@ namespace Faolan.Core.Network.Codecs
 				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(row.Equipment))
 					read.Message.InventoryEntries.Add(entry);
 			}
+
+			// Stat core from typed columns (#244): when the type has a lifted StatCore, CONSTRUCT the CharacterIIR stat
+			// core (Stats/npc_stats/Bcc + CanFall/MovementMode) from Npc.StatCore + this placement's overrides instead
+			// of keeping the one parsed from Data. Byte-identical to the capture (NpcSpawnStatCoreTests), so the stat
+			// core is now DB-driven; Data still supplies the frame + name (retired in a later step).
+			ApplyStatCore(read.Message, row);
 
 			body = SpawnPacketBuilder.BuildSpawn(template, handle, row.Position, row.Rotation, read.Message);
 
@@ -103,6 +110,57 @@ namespace Faolan.Core.Network.Codecs
 			}
 
 			return true;
+		}
+
+		// Constructs the CharacterIIR stat core (#244) from the type-level Npc.StatCore + this placement's overrides,
+		// replacing whatever was parsed from Data. Type-level fields (senses defaults, flags, race, anim clips, ...)
+		// come from the StatCore; the per-placement values override from the NpcSpawn columns: the always-present pools
+		// (Health/Life/Mana/... + Level/scale/voice/mesh) are set unconditionally, and the sparse ones (GuildId +
+		// Hearing/SightSkill) are RESET off the type value first, then set only if this placement carried them - so a
+		// spawn that lacks one doesn't inherit the representative's. No-op when the type hasn't been lifted yet.
+		private static void ApplyStatCore(ProtoCoreCharacterIIR msg, NpcSpawn row)
+		{
+			if (row?.Npc?.StatCore is not { } core)
+				return;
+
+			var s = NpcStatCoreCodec.ToStats(core);
+			s.HeadMesh = row.HeadMesh;
+			// The wire CharacterStats.Health is the ×100 max-HP value, NOT NpcSpawn.Health (the player-facing DISPLAY
+			// value kept for gameplay). For ~all creatures wire Health == wire Life and tracks the per-placement level,
+			// so drive it from the lifted wire Life; the rare divergent per-placement value (Rocknose) is in WireHealth.
+			s.Health = row.WireHealth ?? row.Life;
+			s.Life = row.Life;
+			s.Mana = row.Mana;
+			s.MaxMana = row.MaxMana;
+			s.Stamina = row.Stamina;
+			s.MaxStamina = row.MaxStamina;
+			s.Level = row.Level;
+			s.ApprenticeLevel = row.ApprenticeLevel;
+			s.MonsterData = row.MonsterData;
+			s.MonsterScale = row.MonsterScale;
+			s.VoiceSet = row.VoiceSet;
+			s.ResetGuildId();
+			if (row.GuildId.HasValue)
+				s.GuildId = row.GuildId.Value;
+			msg.Stats = s;
+
+			var n = NpcStatCoreCodec.ToNpcStats(core);
+			n.ResetHearingSkill();
+			if (row.HearingSkill.HasValue)
+				n.HearingSkill = row.HearingSkill.Value;
+			n.ResetSightSkill();
+			if (row.SightSkill.HasValue)
+				n.SightSkill = row.SightSkill.Value;
+			n.ResetSmellingSkill();
+			if (row.SmellingSkill.HasValue)
+				n.SmellingSkill = row.SmellingSkill.Value;
+			msg.npc_stats = n;
+
+			msg.Bcc = NpcStatCoreCodec.ToBcc(core);
+			if (core.CanFall.HasValue)
+				msg.CanFall = core.CanFall.Value;
+			if (core.MovementMode.HasValue)
+				msg.MovementMode = core.MovementMode.Value;
 		}
 
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the

@@ -427,6 +427,8 @@ namespace Faolan.Importer.Captures
 				row.GuildId = core.GuildId;
 				row.HearingSkill = core.HearingSkill;
 				row.SightSkill = core.SightSkill;
+				row.SmellingSkill = core.SmellingSkill;
+				row.WireHealth = core.Health != core.Life ? core.Health : null; // only when wire Health diverges from Life
 			}
 
 			row.Morphs.Clear();
