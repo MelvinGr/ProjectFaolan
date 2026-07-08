@@ -29,7 +29,7 @@ namespace Faolan.Tests
 		{
 			// The verbatim 54-byte ride-buff payload from the mount capture (frame 520): duration@8 = 8_640_000 cs
 			// (24 h), spell base 0x31EB15 @22, magnitude 80, effect nonce 0x1560F9BB @50. Now CONSTRUCTED via
-			// SpellweaveCodec.BuildBuffData instead of a verbatim blob.
+			// SelfBuffCodec.BuildBuffDataLong instead of a verbatim blob.
 			byte[] captured =
 			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x83, 0xD6, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,

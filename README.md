@@ -101,7 +101,6 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 
 ### Connection & session
 - ✅ Login / auth — Diffie–Hellman + TEA-CBC handshake (any password is accepted until the client is key-patched)
-- ✅ Service handoff — `UniverseAgent → PlayerAgent → GameServer`
 - ✅ Character roster, selection, and existing-character world entry
 - ✅ Character creation — the create-editor flow (appearance/morphs, race/sex gating, the Casilda tableau)
 - 🟡 Create→world intro cutscene — plays, and Kalanthes speaks (stock-phrase response decoded); some scene
@@ -163,12 +162,8 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - ⬜ Mounted combat (#142)
 
 ### Appearance & rendering (Faolan.Web)
-- ✅ 3D character/equipment viewer + armory; RDB mesh / texture / skeleton / animation extraction; morphs & auto-dress
-- 🟡 Authentic RDB animations play in the viewer — awaits a visual eyeball (#292) · body atlas gutter dilation
-  (#294) · MIXD detail/AO map into the material (#293) · animation mesh-stretch fix (#302)
 - 🟡 Client-side render bugs (our wire is correct): create-editor face tattoo (#240), min-height floating hair (#288)
 - 🟡 Polished localized appearance names (hair, …) — the LDB id→index map is EXE-gated (#291)
-- ⬜ RDB write-back: inline CDN resources + optional texture upscale/replace (#295, parked)
 
 ### Group PvE content (not started)
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
@@ -186,8 +181,6 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 ### Tooling
 - ✅ Importer (captures + client RDB → `faolan.db`) · Wireshark dissector · unattended ClientLauncher ·
   in-process MCP server · content-CDN mirror
-- 🟡 Automated in-client verification harness — `Faolan.ClientHook` injection built; the assertion layer is
-  partial (#195)
 
 ## Network captures (the project's fuel)
 

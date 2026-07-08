@@ -94,17 +94,17 @@ namespace Faolan.GameServer
 		}
 
 		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
-		// 54-byte MagicBuffIIR blob (SpellweaveCodec.BuildBuffData) instead of the shared 50-byte default - the client
-		// rejects the default shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's real
-		// duration so the client counts it down and ApplySpell arms the matching expiry. The narrow seam the
-		// SpellweaveService uses for every buff it emits.
+		// 54-byte MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) instead of the shared 50-byte self-buff form -
+		// the client rejects the short shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's
+		// real duration so the client counts it down and SendMagicBuffIir arms the matching expiry. The narrow seam
+		// the SpellweaveService uses for every buff it emits.
 		private async Task ApplySpellweaveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
 		{
 			var spellBase = spellId >> 8;
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SpellweaveCodec.BuildBuffData(spellBase, durationCs, nonce));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
 		}
 
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)

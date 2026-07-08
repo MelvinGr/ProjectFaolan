@@ -75,11 +75,11 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
-		// The mount RIDE buff's 54-byte MagicBuffIIR payload, CONSTRUCTED from its base spell id + captured duration
-		// and nonce (byte-identical to the mount-capture frame 520, proven by MountCatalogTests).
+		// The mount RIDE buff's 54-byte MagicBuffIIR payload (the generic LONG form), CONSTRUCTED from its base spell
+		// id + captured duration and nonce (byte-identical to the mount-capture frame 520, proven by MountCatalogTests).
 		public static byte[] RideBuffPayload()
 		{
-			return SpellweaveCodec.BuildBuffData(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce);
+			return SelfBuffCodec.BuildBuffDataLong(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce);
 		}
 
 		private static Dictionary<uint, MountDef> BuildById()
