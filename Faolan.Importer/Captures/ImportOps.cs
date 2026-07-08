@@ -716,6 +716,16 @@ namespace Faolan.Importer.Captures
 				}
 			}
 
+			// Fallback (#244): a type whose spawns were pruned (or that isn't in this capture set) but still has an
+			// existing NpcSpawn row carrying Data - lift its StatCore from that stored spawn (e.g. Villager 429).
+			foreach (var npc in byTemplate.Values.Where(n => n.StatCore == null && n.Id != 0))
+			{
+				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(s => s.NpcId == npc.Id && s.Data != null);
+				var body = spawn == null ? null : WorldObjectBuilder.ExtractBody(spawn.Data);
+				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					npc.StatCore = NpcStatCoreCodec.Lift(read.Message);
+			}
+
 			await db.SaveChangesAsync();
 			return byTemplate;
 		}

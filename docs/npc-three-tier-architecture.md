@@ -76,11 +76,16 @@ Decoding all 1043 captured stat cores confirmed the lift can be byte-exact:
 Goal: retire `Npc.Data` / `NpcSpawn.Data` and the `SpawnPacketBuilder` splice; construct every NPC spawn
 from typed columns.
 
-- [ ] Add the type-level stat columns to `Npc`; add the missing instance-level columns to `NpcSpawn`
-      (`Health`/`Level`/`HeadMesh`/`MonsterData`/`MonsterScale` already exist, used for gameplay today).
-- [ ] Importer lifts the stat core from each type's `Data` into the columns.
-- [ ] `NpcSpawnBuilder` constructs `ProtoCoreCharacterIIR` from `row.Npc` (template) + `row` (instance) +
-      canonical runtime init, instead of parsing `Data`.
-- [ ] Re-import `faolan.db`; `NpcSpawnBuilderTests` + full suite stay byte-exact (equivalence: columns == Data
-      for the idle reference captures).
+- [x] `NpcStatCoreCodec` (explicit if-mapping, no reflection): Lift(msg) -> NpcStatCore and
+      ToStats/ToNpcStats/ToBcc back. Verified byte-exact across all 3097 captured sub-messages.
+- [x] `NpcStatCore` 1:1 side table (`NpcStatCores`, keyed by NpcId) + migration - the type-level core.
+- [x] Importer lifts the stat core: `UpsertNpcTypes` from a representative spawn, `CapturePetImporter` from
+      `Npc.Data` for summon-only pets. `faolan.db` re-imported: 521/537 types (16 have no capture at all).
+- [ ] Add the missing INSTANCE-varying columns to `NpcSpawn` (`Life`/`Mana`/`MaxMana`/`Stamina`/`MaxStamina`/
+      `ApprenticeLevel`, `VoiceSet`, `GuildId`; `Health`/`Level`/`MonsterScale` already exist). Without these,
+      composing a spawn from the *type* core alone would give every instance the representative's level-scaled
+      stats - so the builder can't flip to columns until they land.
+- [ ] `NpcSpawnBuilder` composes `ProtoCoreCharacterIIR` from `row.Npc.StatCore` (type) + `row` (instance
+      overrides) + canonical runtime init, instead of parsing `Data`. Equivalence-test columns == Data (fresh).
 - [ ] Retire `Data`, the splice path, and `SpawnPlayfieldRewriter` (token threaded at construction).
+- [ ] Migrate the remaining `Npc.Community`/`Level` readers (now `[Obsolete]`) to `StatCore`.
