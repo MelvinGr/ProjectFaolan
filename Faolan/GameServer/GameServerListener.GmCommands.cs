@@ -1,58 +1,45 @@
 using System;
+using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Spawn;
-using Faolan.GameServer.Combat;
-using Faolan.GameServer.Scripting;
-using Faolan.GameServer.World;
+using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Network.Spawn;
+using Faolan.GameServer.Combat;
+using Faolan.GameServer.CreateFlow;
+using Faolan.GameServer.Dialogue;
+using Faolan.GameServer.Economy.Bank;
+using Faolan.GameServer.Economy.Shop;
+using Faolan.GameServer.Inventory;
+using Faolan.GameServer.Scripting;
+using Faolan.GameServer.World;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	partial class GameServerListener
+	public partial class GameServerListener
 	{
-		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
-
-		// Shared pet-summon (#307, docs/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
-		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
-		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
-		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
-		internal async Task<WorldEntity> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
-		{
-			// The RIGHT model (#244/#307): spawn the pet from its creature TYPE (Npc.Data lifted stat core), no world
-			// placement. Fall back to the placement path only as a GM-test convenience (`.pet <any world NPC>`), so a
-			// creature that hasn't had its stat core lifted to the type yet can still be summoned as a follower.
-			var npcType = await Database.GetNpcByName(petTemplate);
-			var entity = npcType != null
-				? await _broadcaster.SpawnPetForPlayer(client, npcType)
-				: await _broadcaster.SpawnNpcForPlayer(client, petTemplate);
-			if (entity == null)
-				return null;
-
-			var owner = client.Session.Account.ClientInstance;
-			entity.OwnerHandle = owner;
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildAssign(owner,
-					entity.Handle,
-					combat
-						? PetIirCodec.CombatKind
-						: PetIirCodec.SocialKind)))
-				.SendAsync(client);
-
-			_broadcaster.SetNpcFollow(client, entity.Handle, true);
-			return entity;
-		}
 
 		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist
 		// a CharacterInventory row in the first free bag slot, then re-send the rebuilt 0x737A6DF9 inventory
@@ -74,8 +61,7 @@ namespace Faolan.GameServer
 			var item = await Database.GetItem(itemId);
 			if (item is not { Hash: not 0 })
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId,
-					item == null
+				await _agentServerDispatcher.SendSystemMessage(characterId, 					item == null
 						? $"No item with id {itemId}."
 						: $"Item {itemId} ('{item.Name}') has no hash - not snapshot-buildable.");
 				return;
@@ -124,8 +110,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (!await Database.SetAccountState(account.Id,
-				    ban
+			if (!await Database.SetAccountState(account.Id, 				    ban
 					    ? AccountState.Banned
 					    : AccountState.Active))
 			{
@@ -146,8 +131,7 @@ namespace Faolan.GameServer
 				}
 			}
 
-			await _agentServerDispatcher.SendSystemMessage(gmId,
-				ban
+			await _agentServerDispatcher.SendSystemMessage(gmId, 				ban
 					? $"Banned account '{account.UserName}'{(kicked > 0 ? $" and kicked {kicked} live session(s)" : "")}."
 					: $"Unbanned account '{account.UserName}'.");
 		}
@@ -176,18 +160,13 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var deleted = await Database.DeleteNpcSpawns(entity.MapId,
-				entity.Name,
-				entity.Hostile
+			var deleted = await Database.DeleteNpcSpawns(entity.MapId, 				entity.Name, 				entity.Hostile
 					? entity.SpawnPosition.X
-					: null,
-				entity.Hostile
+					: null, 				entity.Hostile
 					? entity.SpawnPosition.Y
-					: null,
-				entity.Hostile
+					: null, 				entity.Hostile
 					? entity.SpawnPosition.Z
-					: null,
-				10f);
+					: null, 				10f);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
 		}
 
@@ -205,8 +184,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Destination: an explicit point (bind/recall/coords) or the map's default spawn (the AlwaysKnown starter,
-			// else any respawn point - GetDefaultSpawn). A map with no points defined can't resolve a spawn, so refuse
+			// Destination: an explicit point (bind/recall/coords) or the map's default spawn (the AlwaysKnown starter, 			// else any respawn point - GetDefaultSpawn). A map with no points defined can't resolve a spawn, so refuse
 			// rather than dump the player at the origin. Persist BEFORE the handoff so the reconnect's world entry
 			// (existing-character Hello -> SendWorldEntry, which loads Character.MapId) lands at the right spot.
 			Vector3 position;
@@ -221,8 +199,7 @@ namespace Faolan.GameServer
 				var spawn = await Database.GetDefaultSpawn(map.Id);
 				if (spawn == null)
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId,
-						$"<span style=\"color: red;\">No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;.</span>");
+					await _agentServerDispatcher.SendSystemMessage(characterId, 						$"<span style=\"color: red;\">No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;.</span>");
 					return;
 				}
 
@@ -288,36 +265,42 @@ namespace Faolan.GameServer
 				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"Unknown command: '{command}' type .help for info");
 		}
 
+		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
+		// [u32 command]. Decoded commands (#307, docs/summon-pet-decode.md): 0x1F8 = dismiss, 0x1F6 = defend.
+		// Dismiss = retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. Other commands are logged for now
+		// (attack/follow/stay AI is a follow-up; a .pet-summoned minion already follows via SetNpcFollow).
+		private async Task HandlePetCommand(INetworkClient client, ConanPacket packet)
+		{
+			packet.Body.ReadUInt32(); // type 0xC350
+			var petHandle = packet.Body.ReadUInt32();
+			var command = packet.Body.ReadUInt32<PetCommand>();
+			var owner = client.Session.Account.ClientInstance;
+			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, command);
+
+			if (command == PetCommand.Dismiss)
+			{
+				await new PacketStream()
+					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildRemove(owner, petHandle)))
+					.SendAsync(client);
+
+				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
+				Logger.LogInformation(removed != null
+						? "Pet 0x{Pet:X8} dismissed (despawned)."
+						: "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", 					petHandle);
+			}
+		}
+
 		private void InitGmCommands()
 		{
 			_gmCommandsDict = new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
 			{
-				["save"] = (client, _) => SaveChanges(client.Session.Character.Id),
-				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
-				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id),
-				["teleport"] = TeleportCommand,
-				["position"] = (client, _) => PositionCommand(client),
-				["recall"] = (client, _) => RecallToBindCommand(client),
-				["setstat"] = SetStatCommand,
-				["setstatrange"] = SetStatRangeCommand,
-				["level"] = SetLevelCommand,
-				["godmode"] = (client, _) => ToggleGodModeCommand(client),
-				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
-				["delete"] = DeleteCommand,
-				["kill"] = KillCommand,
-				["additem"] = AddItemCommand,
-				["removeitem"] = RemoveItemCommand,
-				["syschat"] = (client, _) => SysChatCommand(client),
-				["lua"] = LuaCommand,
-				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
-				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
-				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
+				["save"] = (client, _) => SaveChanges(client.Session.Character.Id), 				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id), 				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id), 				["teleport"] = TeleportCommand, 				["position"] = (client, _) => PositionCommand(client), 				["recall"] = (client, _) => RecallToBindCommand(client), 				["setstat"] = SetStatCommand, 				["setstatrange"] = SetStatRangeCommand, 				["level"] = SetLevelCommand, 				["godmode"] = (client, _) => ToggleGodModeCommand(client), 				["invisible"] = (client, _) => ToggleInvisibleCommand(client), 				["delete"] = DeleteCommand, 				["kill"] = KillCommand, 				["additem"] = AddItemCommand, 				["removeitem"] = RemoveItemCommand, 				["syschat"] = (client, _) => SysChatCommand(client), 				["lua"] = LuaCommand, 				["ah"] = (client, _) => OpenAuctionHouseCommand(client), 				["ban"] = (client, arguments) => BanCommand(client, arguments, true), 				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
 			};
 		}
 
 		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the
-		// given handle, or self. An NPC runs the full combat death lifecycle (vitals push, despawn/corpse-loot, XP,
-		// kill-quest advance); self drops the player's vitals to 0 and the world tick respawns them at the nearest
+		// given handle, or self. An NPC runs the full combat death lifecycle (vitals push, despawn/corpse-loot, XP, 		// kill-quest advance); self drops the player's vitals to 0 and the world tick respawns them at the nearest
 		// resurrection point. No arg + nothing selected -> a system message rather than a no-op.
 		private async Task KillCommand(INetworkClient client, string arguments)
 		{
@@ -383,8 +366,7 @@ namespace Faolan.GameServer
 			foreach (var t in player.AddedTags)
 				await Database.AddCharacterTag(characterId, (uint)t);
 
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
+			await _agentServerDispatcher.SendSystemMessage(characterId, 				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
 		}
 
 		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger
@@ -425,8 +407,7 @@ namespace Faolan.GameServer
 			var entity = _simulation.PlayerWorldEntity(client);
 			var mapId = entity?.MapId ?? character.MapId;
 			var pos = entity?.Position ?? character.Position;
-			return _agentServerDispatcher.SendSystemMessage(character.Id,
-				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
+			return _agentServerDispatcher.SendSystemMessage(character.Id, 				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
 		}
 
 		// .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The real
@@ -464,34 +445,9 @@ namespace Faolan.GameServer
 			}
 
 			var removed = await RemoveItemFromBackpack(client, slot);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				removed
+			await _agentServerDispatcher.SendSystemMessage(characterId, 				removed
 					? $"Removed the item in bag slot {slot} (live DispatchRemoveItem)."
 					: $"No item in bag slot {slot}.");
-		}
-
-		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row,
-		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
-		private async Task<Map> ResolveMap(string arg)
-		{
-			if (uint.TryParse(arg, out var id))
-			{
-				var maps = await Database.GetMaps();
-				return maps.FirstOrDefault(m => m.Id == id);
-			}
-
-			var all = await Database.GetMaps();
-			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
-		}
-
-		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
-		// (docs/archive/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
-		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
-		// more live state - vitals, buffs, … - as those become persisted.)
-		private async Task SaveChanges(uint characterId)
-		{
-			var saved = await _persistence.FlushAllAsync();
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
 		}
 
 		private Task SendGmHelpText(uint characterId)
@@ -499,14 +455,7 @@ namespace Faolan.GameServer
 			return _agentServerDispatcher.SendSystemMessage(characterId, $"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}");
 		}
 
-		private async Task SendListAllMaps(uint characterId)
-		{
-			var maps = await Database.GetMaps();
-			await _agentServerDispatcher.SendSystemMessage(characterId, maps.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
-		}
-
-		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist,
-		// and push the Level stat + refreshed vitals so the change shows without a relog (the persisted level also
+		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist, 		// and push the Level stat + refreshed vitals so the change shows without a relog (the persisted level also
 		// rides the next login snapshot). Test-bootstrap convenience for level-gated features (e.g. #206 Totem of
 		// Origin's min-20). Mirrors .setstat/.vitals; the stat's wire scale is applied at send.
 		private async Task SetLevelCommand(INetworkClient client, string arguments)
@@ -538,8 +487,7 @@ namespace Faolan.GameServer
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
 			if (level > previousLevel)
 			{
-				// One NewLevelIIR ding per level gained first (fires the client's "reached level N" banner + effect),
-				// THEN the per-attribute AttributeChanged lines - retail's order (combat-levelup capture 9937->9939).
+				// One NewLevelIIR ding per level gained first (fires the client's "reached level N" banner + effect), 				// THEN the per-attribute AttributeChanged lines - retail's order (combat-levelup capture 9937->9939).
 				await SendLevelUpDings(client, previousLevel, level, character.Experience);
 				await SendLevelUpFeedback(client, level, (uint)(level - previousLevel));
 
@@ -548,8 +496,7 @@ namespace Faolan.GameServer
 				foreach (var ability in await Database.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, level))
 					await SendAddSpecialAbility(client, ability);
 
-				// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level is in the crossed range,
-				// learned + persisted like .learnspell (so they ride every relog). Same as the XP-driven ding.
+				// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level is in the crossed range, 				// learned + persisted like .learnspell (so they ride every relog). Same as the XP-driven ding.
 				foreach (var spellId in await Database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, level))
 				{
 					await SendLearnSpell(client, spellId);
@@ -601,8 +548,7 @@ namespace Faolan.GameServer
 			var arg = (arguments ?? string.Empty).Trim();
 			if (arg.Length == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId,
-					"Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map)  or  .teleport &lt;mapId | name&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;  (see .maps)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, 					"Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map)  or  .teleport &lt;mapId | name&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;  (see .maps)");
 				return;
 			}
 
@@ -651,8 +597,7 @@ namespace Faolan.GameServer
 		}
 
 		// .godmode  - toggle invincibility on yourself: hostile NPC swings land their animation but deal no damage.
-		// The toggle is persisted on the account (#279) and re-applied to the live WorldEntity on every world entry,
-		// so it survives relog AND map changes (a playfield change is a fresh world connection / entity). Self-target only.
+		// The toggle is persisted on the account (#279) and re-applied to the live WorldEntity on every world entry, 		// so it survives relog AND map changes (a playfield change is a fresh world connection / entity). Self-target only.
 		private async Task ToggleGodModeCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -666,8 +611,7 @@ namespace Faolan.GameServer
 			entity.GodMode = !entity.GodMode;
 			client.Session.Account.GmGodMode = entity.GodMode;
 			await Database.SaveAccount(client.Session.Account);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				entity.GodMode
+			await _agentServerDispatcher.SendSystemMessage(characterId, 				entity.GodMode
 					? "God mode <span style=\"color: lime;\">ON</span> - you take no damage."
 					: "God mode <span style=\"color: red;\">OFF</span>.");
 		}
@@ -688,8 +632,7 @@ namespace Faolan.GameServer
 			entity.Invisible = !entity.Invisible;
 			client.Session.Account.GmInvisible = entity.Invisible;
 			await Database.SaveAccount(client.Session.Account);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				entity.Invisible
+			await _agentServerDispatcher.SendSystemMessage(characterId, 				entity.Invisible
 					? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
 					: "Invisible <span style=\"color: red;\">OFF</span>.");
 		}
@@ -719,26 +662,19 @@ namespace Faolan.GameServer
 			return SendStatUpdate(client, block);
 		}
 
-		// Parses a wire handle from a GM-command argument: "0x"-prefixed hex or plain decimal. Returns false on a
-		// malformed/overflowing value.
-		private static bool TryParseHandle(string arg, out uint handle)
+		private static Task SetTimeOfDay(INetworkClient client)
 		{
-			handle = 0;
-			try
-			{
-				handle = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-					? Convert.ToUInt32(arg[2..], 16)
-					: uint.Parse(arg);
-				return true;
-			}
-			catch (FormatException)
-			{
-				return false;
-			}
-			catch (OverflowException)
-			{
-				return false;
-			}
+			var sender0 = LoginWorldSender;
+			var receiver0 = LoginWorldReceiver(client);
+
+			return new PacketStream()
+				.WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(GameServer0X2000Opcodes.GameTimeIIR)
+					/*.WriteArray(
+						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x46, 0xA8, 0xD8, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x42, 0x10, 0x54, 0xEB, 0x48, 0xD4, 0x3F, 0x80)*/
+					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0x59, 0x92, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x6C, 0xD7, 0x60, 0x32, 0xDC, 0x20, 0x3F, 0x80, 0x00, 0x00))
+				.SendAsync(client);
 		}
 
 		private delegate Task GmCommandDelegate(INetworkClient client, string arguments);

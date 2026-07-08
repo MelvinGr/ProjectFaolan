@@ -1,95 +1,49 @@
+using System;
+using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Numerics;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer;
+using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.GameServer;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.CreateFlow;
+using Faolan.GameServer.Dialogue;
+using Faolan.GameServer.Economy.Bank;
+using Faolan.GameServer.Economy.Shop;
+using Faolan.GameServer.Inventory;
+using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
-using Faolan.Core.Network.Opcodes;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
-// ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count)
-		{
-			return GrantItemToBackpack(client, itemTemplateId, count);
-		}
-
-		Task IEconomyOutbound.SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
-		{
-			return SendAddItem(client, containerType, itemPos, entry, feedback);
-		}
-
-		// --- IEconomyOutbound: the wallet + item-grant ops the economy/inventory services reach back to (forwarding
-		// to the private Outbound builders, which the listener also calls directly from loot/GM paths) ---------------
-		Task IEconomyOutbound.SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
-		{
-			return SendUpdateCash(client, balanceTin, reason);
-		}
-
-		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
-		{
-			return _broadcaster.BroadcastEntityFade(entity);
-		}
-
-		Task IWorldOutbound.BroadcastNpcAggro(WorldEntity npc, WorldEntity target)
-		{
-			return _broadcaster.BroadcastNpcAggro(npc, target);
-		}
-
-		Task IWorldOutbound.BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
-		{
-			return _broadcaster.BroadcastNpcCombatMode(npc, inCombat);
-		}
-
-		Task IWorldOutbound.BroadcastNpcMove(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcMove(npc);
-		}
-
-		Task IWorldOutbound.BroadcastNpcPatrol(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcPatrol(npc);
-		}
-
-		// --- IWorldOutbound: the wire side of the simulation tick (broadcaster builds packets; listener owns vitals
-		// send + the world-entry replay) -----------------------------------------------------------------------------
-		Task IWorldOutbound.BroadcastNpcRespawn(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcRespawn(npc);
-		}
-
-		Task IWorldOutbound.BroadcastNpcStop(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcStop(npc);
-		}
 
 		Task IWorldOutbound.ConvertCorpseToLoot(WorldEntity npc)
 		{
 			return _broadcaster.ConvertCorpseToLoot(npc);
-		}
-
-		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
-		{
-			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
-		}
-
-		Task IWorldOutbound.ReenterWorld(INetworkClient client)
-		{
-			return SendWorldEntry(client);
-		}
-
-		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
-		// payload. Routes the private SendBuffRemoval used by .cancelbuff so the world-tick expiry and the GM cancel
-		// share one builder.
-		Task IWorldOutbound.SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
-		{
-			return SendBuffRemoval(client, applyTo, applyFrom, appliedSpellId);
 		}
 
 		Task IWorldOutbound.SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)

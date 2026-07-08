@@ -1,11 +1,30 @@
+using System;
+using System.Buffers.Binary;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Numerics;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.GameServer;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
@@ -16,296 +35,522 @@ using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Concurrent;
-using System.Numerics;
-using System.Threading;
-using System.Threading.Tasks;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer
 {
-    public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound, IEconomyOutbound
-    {
-        // The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
-        // GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldFraming.Sender that
-        // normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
-        // the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
-        private static readonly byte[] PlayerDeathSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
+	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, IGameServerProvider
+	{
+		// SendPostReadyBurst (the post-0x2024 login record stream) is built as explicit PacketStream sends
+		// in PostReadyBurst.cs.
+		// Inventory container ID32 types seen in the captured DispatchAddItem inventoryID (these equal the ContainerKind
+		// numbers: 0x68 = 104 Bag, 0x71 = 113 Quest). The Casilda-chain captures (casilda_quest_first_stage /
+		// compeltefirstquest) deliver the quest key via a live add to 0x71 - the quest-items tab (#261).
+		internal const uint InventoryContainerBackpack = 0x68;
+		internal const uint InventoryContainerQuest = 0x71;
 
-        // Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
-        // consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
-        // retail changemap capture confirms it - the flag is normally armed by the client's 0x205F at full login), so
-        // we arm HasPendingPost205FFollowUp ourselves here. Without it the world burst lands but 0x2024 ReadyForPlay-
-        // Screen never fires and the client sits on the loading screen forever (the totem-recall hang, Gitea #28).
-        // Static for the same reason as PendingCreateWorldEntry: the old + reconnect connections are different sessions
-        // on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
-        private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new ConcurrentDictionary<uint, byte>();
+		private const int EnergyRegenPerTick = 600;
+		private const int EnergyTickMs = 1000;
 
-        // Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
-        // See Economy/Bank/BankService.cs.
-        private readonly BankService _bank;
+		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
+		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
+		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
+		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprint
 
-        // Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
-        // wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
-        private readonly CombatService _combat;
+		// A captured ChatTextIIR system line (demol80 randomActions #7564): a localized `CriteriaYou` remoteformat.
+		// Replayed verbatim (localized token ids + keys unchanged) with only the live session instance substituted, 		// so it is guaranteed byte-valid. Arbitrary LITERAL text would need a literal-text remoteformat template (or
+		// RDB string ids) - the same follow-up the FormatFeedback FIFO banner has.
+		private const string CriteriaSystemLineXml = "<remoteformat id=\"562\" category=\"100\" key=\"6segSK/UI?Kc`Tzg.tio\" knubot=\"0\"  >" +
+		                                             "<parameter value=\"7;&lt;localized token=&quot;CriteriaYou&quot; category=&quot;130&quot; flags=&quot;&quot; " +
+		                                             "key=&quot;^4L2&amp;#36;dU5AGjcTX_xJ[*Q&quot; &gt;\" /><parameter value=\"7;&lt;localized id=&quot;700&quot; " +
+		                                             "category=&quot;55200&quot; flags=&quot;&quot; key=&quot;MpRf.Cx.%^MGdFXT&amp;quot;9X(&quot; &gt;\" /></remoteformat>";
+		// Tradepost (auction house) + mail state-mutating ops, folded off the former TradepostService onto the
+		// listener. HandleTradepostPacket (Inbound/HandleTradepost.cs) dispatches to these. They use Database /
+		// Logger and the listener's own SendUpdateCash / SendAddItem (its IEconomyOutbound impl) directly.
 
-        // NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
-        // collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
-        private readonly ConversationService _conversation;
+		// Mail wire/DB constants (MailConstants.EndpointClass / FooterUnread / AttachmentTrailerWord / ExpirySeconds) live in
+		// the shared Faolan.Core MailConstants so the server and the MCP economy tools agree on one source.
 
-        // The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
-        // own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
-        // burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
-        private readonly CreateFlowService _createFlow;
+		// The bank "listed" overlay rides on the SAME item-stat ids as a listing entry (TradepostListingCodec.Stat*:
+		// 0=flags, 258=price, 265=timestamp), pushed as 0x201c stat updates on container 105. Only the flag VALUES
+		// below are bank-overlay-specific.
 
-        // Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
-        // handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
-        private readonly EquipmentService _equipment;
+		private const uint BankFlagListed = 0x401; // flags value while listed for sale
+		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
+		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
 
-        private readonly IAgentServerDispatcher _agentServerDispatcher;
-        private readonly IGameServerDispatcher _gameServerDispatcher;
+		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
+		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
+		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
 
-        // Dispatches a player using (right-clicking) a bag item by its kind (Totem of Origin -> recall, future
-        // consumables...). The RightClickItem Inbound handler delegates to it. See Inventory/ItemUseService.cs.
-        private readonly ItemUseService _itemUse;
+		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
+		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
+		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
+		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
+		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest / WorldQuest.BeachStarterQuestId.
+		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
 
-        // Loot-window flow (loot-all/single-drag/cash/close): orchestrates the broadcaster's bag state + the
-        // item-grant/wallet ports. The loot Inbound cases delegate to it. See World/LootService.cs.
-        private readonly LootService _loot;
+		// Receiver for the create-editor (clientInstance=0x021662C8) conversation family.
+		// The create-editor 0x2000 receiver is built per session from the character's real instance id -
+		// see CreateEditorReceiver(client) in GameServerListener. The editor/world bursts are constructed at
+		// send time (Burst + SendBurst in PacketBurstHelper) with the same instance written into the header and
+		// body, so auth replies and burst packets stay on one conversation.
 
-        // Connection keep-alive / latency replies (LatencyCheck 0x2085 -> Pong, Ping 0x2005 -> GameServerStats).
-        // See World/KeepAliveService.cs.
-        private readonly KeepAliveService _keepAlive;
+		// The per-application effect nonce a synthesized self-buff carries (the value the old verbatim Scythe-Shield
+		// blob used; the client does not validate it - #304).
+		private const uint DefaultSelfBuffEffectNonce = 0x14C5C912;
 
-        // The RDB Lua VM (conversation/quest scripting); stateless + reusable.
-        private readonly LuaScriptVm _luaVm = new LuaScriptVm();
+		// The snapshot record's TypeTag - the 0x0000C350 constant every 0x737A6DF9 carrier carries (= the IIR
+		// conversation tag, shared with the 0x201C handshake bodies).
+		private const uint SnapshotTypeTag = 0x0000C350;
 
-        // Player-state persistence (autosave loop + logout/teleport/.save flushes), composed off the listener (#200).
-        private readonly PlayerPersistenceService _persistence;
+		// The 0x205A PerformSpecialAction body word that identifies the necro spellweave activate/deactivate toggle
+		// (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
+		// spellweaves.
+		private const uint SpellweaveToggleParam = 0xFC;
 
-        // The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
-        private readonly QuestProgressionService _questProgression;
+		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
+		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
+		// one. (There is no hand-built login/teleport path anymore.)
+		//private const uint DefaultWorldMapId = Map.TortageBeachId;
 
-        // NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
-        // outbound ops are injected as seams (shared with other subsystems). See Economy/Shop/ShopService.cs.
-        private readonly ShopService _shop;
+		// Male (Sex 0): loincloth in the legs slot, no chest item.
+		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth
 
-        // The player action bar / hotbar persistence + login restore (#71). See World/ShortcutBarService.cs.
-        private readonly ShortcutBarService _shortcutBar;
+		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
+		// hash), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
+		// Harvested from the create-flow captures (#220): every fresh beach character wears the Slave Manacles, and
+		// the rest of the slave outfit is sex-specific - males are bare-chested with a loincloth, females wear a gown
+		// + bottom (the exact garment COLOUR is randomised per character in retail, so one representative set is used
+		// per sex). Character.Sex 0 = male, 1 = female (the create-flow captures confirm this against the worn gear).
+		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12) - universal
 
-        private readonly SpellweaveService _spellweave;
+		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
+		// character, so pick a colour at random from the slave-gown set (all fully buildable - Hash + Data
+		// present, Type 101 - same as the Silver pair that was the sole representative before).
+		private static readonly (uint Gown, uint Bottom)[] StarterFemaleOutfits =
+		[
+			(324066, 324176), // Blue
+			(324140, 324168), // Purple
+			(324067, 324172), // Red
+			(324139, 324171), // Silver
+			(105844, 324175) // White
+		];
 
-        // Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
-        // and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
-        // port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
-        private readonly WorldBroadcaster _broadcaster;
+		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
+		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =
+		[
+			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Tokens), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft), (0x09, e => e.RingLeft), 			(0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist), (0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
+		];
 
-        // The live world simulation: owns the world model, the connected players' authoritative entities, and the
-        // 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
-        // IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
-        private readonly WorldSimulation _simulation;
+		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x58);
 
-        // Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
-        // (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
-        // surfaces instead of being swallowed.
-        private CancellationTokenSource _loopCts;
+		// Existing-character post-ready conversations: retail uses sub-id 0x58 + the session character instance on
+		// every family (Strie login capture, idx 294+). The receiver is built per send as
+		// ConanEndpoints.EndpointBytes(<family type>, ClientInstance).
+		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58);
 
-        public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port,
-            logger, configuration, database, new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000Opcodes)))
-        {
-            _agentServerDispatcher = agentServerDispatcher;
-            _gameServerDispatcher = gameServerDispatcher;
-            _simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
-            _createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
-            _persistence = new PlayerPersistenceService(database, logger, _simulation);
-            _broadcaster = new WorldBroadcaster(_simulation, database, logger);
-            _questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
-            _combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
-            _spellweave = new SpellweaveService(logger,
-                (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
-                ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-                // reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body,
-                // the codec returns the bare record (PetIirCodec convention), so prefix it here.
-                (c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()),
-                SendBuffRemoval, // trance-buff end-twins on cancel/fire
-                SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
-                EnsureEnergyLoop); // start the persistent energy tracking/regen loop
-            _conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
-            _loot = new LootService(_broadcaster, this, database, _questProgression, logger);
-            _keepAlive = new KeepAliveService();
-            _shortcutBar = new ShortcutBarService(database, logger);
-            _equipment = new EquipmentService(database, logger);
-            _itemUse = new ItemUseService(database, RecallToBindCommand, logger);
-            _shop = new ShopService(database, logger, this);
-            _bank = new BankService(database, logger, this);
+		// The world-entry prompt rides the world-system conversation (0x13CE71B1/0x58) - byte-identical to
+		// WorldFraming.Sender, so fold to that single source of truth rather than re-spelling the literal.
+		private static readonly byte[] ExistingCharacterWorldEntryPromptSender = WorldFraming.Sender;
 
-            InitGmCommands();
-        }
+		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
+		private static readonly byte[] LoginWorld201CSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58);
+		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32) in
+		// their Retail*Burst sender methods. The client instance is the character's real id: it is written into the
+		// body with WriteUInt32(id) and woven into the sender/receiver conversation id by building each endpoint
+		// through ConanEndpoints.EndpointBytes(type, id).
 
-        public override Task StartAsync(CancellationToken cancellationToken)
-        {
-            _gameServerDispatcher.Register(this);
-            // Own lifetime token (linked to startup) so StopAsync can cancel the loops independently of any single
-            // connection. Tasks are stored so they can be awaited on shutdown.
-            _loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _persistence.Start(_loopCts.Token); // periodic crash-safety flush of the live world state
-            _simulation.Start(_loopCts.Token); // the simulation tick (regen, NPC AI, death/respawn, discovery)
-            return base.StartAsync(cancellationToken);
-        }
+		// The retail login world-entry rides ONE conversation for everything (auth, MapChange, world objects, 		// player and NPC spawns, time): family prefix + sub-id 0x58 on the sender, and the receiver family
+		// prefix + the character instance as a varint. Confirmed from the Strie login capture. Keeping every
+		// login packet on this single conversation is what lets the client tie the spawns to the loaded
+		// playfield and render them (the player avatar renders regardless, but NPCs do not). The bytes live on
+		// World.WorldFraming (the single source shared with the WorldBroadcaster); these delegate to it.
+		private static readonly byte[] LoginWorldSender = WorldFraming.Sender;
+		private static readonly byte[] NewCharacterReadyForPlayScreenReceiver = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10];
 
-        public override async Task StopAsync(CancellationToken cancellationToken)
-        {
-            _gameServerDispatcher.Unregister(this);
+		private static readonly byte[] NewCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
 
-            // Signal the background loops and await their (clean) exit so shutdown doesn't race a mid-tick save. The
-            // loops swallow their own OperationCanceledException, so WhenAll completes normally; bounded by the host's
-            // shutdown token either way.
-            if (_loopCts != null)
-                await _loopCts.CancelAsync();
-            await Task.WhenAll(_simulation.StopAsync(), _persistence.StopAsync());
-            _loopCts?.Dispose();
+		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
+		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldFraming.Sender that
+		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
+		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
+		private static readonly byte[] PlayerDeathSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
 
-            await base.StopAsync(cancellationToken);
-        }
+		private static readonly byte[] Receiver3 = [0x0d, 0x48, 0x76, 0x37, 0x28, 0x10, 0x84, 0x80, 0x80, 0x08];
+		// Capture-derived constants whose semantics aren't decoded yet (same in both captured deaths).
 
-        protected override async Task ClientDisconnected(INetworkClient client)
-        {
-            var entity = _simulation.PlayerWorldEntity(client);
-            if (entity != null)
-            {
-                // Tell everyone who could see this player that it left (n3ToClientQuit) BEFORE removing it from the
-                // zone, so ResolveRemove still sees the leaver's viewers - now awaited (ClientDisconnected is a Task),
-                // so the despawn deterministically lands before RemovePlayer instead of racing it.
-                await _broadcaster.BroadcastPlayerDespawn(entity);
-                _simulation.RemovePlayer(client, out _);
-                // Persist the player's final live state - movement isn't otherwise saved, so without this a logout
-                // loses where they were. EXCEPT on a teleport-out: DoTeleport already saved the destination, and this
-                // connection's entity still holds the stale pre-teleport position which would clobber it (#28).
-                if (!client.Session.IsTeleportingOut)
-                    await _persistence.SavePlayerState(client, entity);
-                else
-                    Logger.LogInformation("Teleport-out: skipping stale-position save for {Name} (0x{Handle:X8}); destination already persisted.", entity.Name, entity.Handle);
+		// Sender is GameCharAgent at instance 0x59 (NB: NOT 0x58 like the add/remove-item LoginWorld201CSender).
+		private static readonly byte[] ResurrectionSpotsSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
+		private static readonly byte[] RetailCreatePost205FSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
 
-                client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
-                Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
-            }
+		// The trailing bytes of the 8-byte blob prefix after [flag][BE32 blobLen]: the captured beach field5, constant
+		// for the world-entry snapshot (the live splice path preserves these same bytes via SetSnapshotBlobLength).
+		private static readonly byte[] SnapshotPrefixField5 = [0x28, 0x81, 0x06];
 
-            await base.ClientDisconnected(client);
-        }
+		private static readonly byte[] SprintBarSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x54);
 
-        protected override Task ReceivedPacket(INetworkClient client, ConanPacket packet)
-        {
-            // This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes,
-            // so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
-            // class route consumes the packet. See docs/protocol_gameserver_rpc_multiplexing.md + tradepost-protocol.md.
-            // The two sub-0x2014 opcodes 0x2002/0x2003 are the ONLY ones that also arrive on GameCharAgent (there they
-            // are RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
-            return packet.Receiver.Type switch
-            {
-                // Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
-                ConanEndpoints.TradepostAgentType => HandleTradepostPacket(client, packet),
+		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
+		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
+		// retail changemap capture confirms it - the flag is normally armed by the client's 0x205F at full login), so
+		// we arm HasPendingPost205FFollowUp ourselves here. Without it the world burst lands but 0x2024 ReadyForPlay-
+		// Screen never fires and the client sits on the loading screen forever (the totem-recall hang, Gitea #28).
+		// Static for the same reason as PendingCreateWorldEntry: the old + reconnect connections are different sessions
+		// on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
+		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new ConcurrentDictionary<uint, byte>();
 
-                // GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
-                // screen (without the reply the client retries forever + never opens chat). Existing-character world login
-                // only - the create-editor/create-world flows own this class during their own handshake and must not divert.
-                ConanEndpoints.GameCharAgentProjectType => !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession && client.Session.Character?.Name != null
-                    ? HandleGameCharAgentProject(client, packet)
-                    : Task.CompletedTask,
+		// Per-class starting WEAPON (the main-hand-left slot, 0x06), harvested from the *create* captures (#220).
+		// Coverage is only the classes a create dump actually shows armed - the rest start unarmed until more create
+		// captures land. The Fleshy Club / Broken Oar / Broken Bottle seen elsewhere are NOT create-flow starters -
+		// they came from a level-2 char and login captures respectively, so they are deliberately excluded.
+		//
+		// #276/#286: re-harvested every per-class CREATE capture (slot 0x06 of the equipped container, via the
+		// ProtoAcgItem template1 fixed32; Captures/scripts decode). Result: the equipped container in the create
+		// flow carries ONLY the slave outfit (chest gown / leg bottom + wrist Slave Manacles) - NO class delivers a
+		// MainHandLeft weapon at create. The earlier Necromancer = Broken Bottle (3395744) was a mis-harvest from a
+		// LOGIN capture (Broken Bottle is absent from every create dump), and Melvin confirmed a Broken Bottle is
+		// wrong for a caster - so it is removed and casters now start unarmed, matching the create captures. Assassin
+		// is the one documented create-verified entry (Strie) and is kept.
+		private static readonly Dictionary<Class, uint> StarterClassWeapon = new Dictionary<Class, uint>
+		{
+			[Class.Assassin] = 3735601, // Marlin Spike
+			[Class.Necromancer] = 3395744, // Broken Bottle (0x33D0A0; necro create capture, BccIIR slot-6)
+			[Class.TempestOfSet] = 215711 // Broken Bottle (0x34A9F - the OTHER bottle; tempest create capture, BccIIR slot-6)
+		};
 
-                // GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
-                // (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
-                ConanEndpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet),
+		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
 
-                // GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
-                ConanEndpoints.GameAgentType => HandleGameAgentPacket(client, packet),
+		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
+		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
+		private static int _spellweaveEffectSeq;
 
-                _ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
-            };
-        }
+		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
+		// See Economy/Bank/BankService.cs.
+		private readonly BankService _bank;
 
-        // GameCharAgent.RequestBindLocation (0x2002 on the GameCharAgent class): the client repeatedly polls its
-        // bind/home playfield (the Totem of Origin destination, #64); body = the player's ID32. Retail answers each
-        // with a 4-byte 0x2002 [u32 playfieldId] (verified 1:1 across 13 captures). Routed here by receiver class so
-        // it never collides with GameAgent.ChatVicinity, which shares opcode 0x2002.
-        // #197: after each recv batch drains, fire the create-editor post-morph trio deterministically (when the
-        // batch that carried Finish + the SetMorphValue burst is fully received) instead of the debounce timer.
-        // Guarded to the create-editor customization phase; a no-op for every other connection/batch.
-        protected override Task ReceivedBatchComplete(INetworkClient client)
-        {
-            if (client.Session.IsCreateEditorConnection)
-                return _createFlow.FlushPostMorphBurstOnBatchDrained(client);
+		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
+		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
+		private readonly CombatService _combat;
 
-            return Task.CompletedTask;
-        }
+		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
+		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
+		private readonly ConversationService _conversation;
 
-        private async Task HandleRequestBindLocation(INetworkClient client, ConanPacket packet)
-        {
-            // body = [u32 ID32 type][u32 requesterId]; tolerate a SHORT/empty poll (the client sends a bare-header
-            // variant) - the reply is derived from the character, not the body, and requesterId is only for the log.
-            // Reading past a short body threw EndOfStreamException, which propagated out of ReceivedPacket and CLOSED
-            // the connection (the client dropped at world entry).
-            uint requesterId = 0;
-            if (packet.Body.Length >= 8)
-            {
-                packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
-                requesterId = packet.Body.ReadUInt32();
-            }
+		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
+		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
+		// burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
+		private readonly CreateFlowService _createFlow;
 
-            // The bind playfield is the map of the character's persisted bind RespawnPoint (set by .bind / a
-            // wayfarer); an unbound character (or one whose point vanished) falls back to its current map.
-            var character = client.Session.Character;
-            var bindMapId = character?.MapId ?? Map.TortageBeachId;
-            if (character?.BindRespawnPointId is uint bindPointId)
-                bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
+		// Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
+		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
+		private readonly EquipmentService _equipment;
 
-            await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);
-            Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
-        }
+		private readonly IAgentServerDispatcher _agentServerDispatcher;
+		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-        // Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
-        // otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
-        // (docs/archive/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
-        // The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
-        // in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
-        // partials (broadcast, combat, GM) read it unchanged.
-        private WorldEntity PlayerWorldEntity(INetworkClient client)
-        {
-            return _simulation.PlayerWorldEntity(client);
-        }
+		// Dispatches a player using (right-clicking) a bag item by its kind (Totem of Origin -> recall, future
+		// consumables...). The RightClickItem Inbound handler delegates to it. See Inventory/ItemUseService.cs.
+		private readonly ItemUseService _itemUse;
 
-        // The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
-        // handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
-        private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
-        {
-            var instance = client.Session.Account.ClientInstance;
-            // Source the destination playfield token from the destination map's burst so the announce matches the token
-            // the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
-            var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
-            foreach (var body in new[]
-            {
-                TeleportCodec.BuildBegin(instance, destMapId),
-                TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
-            })
-                await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
-        }
+		// Connection keep-alive / latency replies (LatencyCheck 0x2085 -> Pong, Ping 0x2005 -> GameServerStats).
+		// See World/KeepAliveService.cs.
+		private readonly KeepAliveService _keepAlive;
 
-        private async Task SendWorldHandoff(INetworkClient client)
-        {
-            var realm = await Database.GetRealm(client.Session.Character.RealmId);
-            var address = $"{realm.IpAddress}:{realm.Port}";
+		// Loot-window flow (loot-all/single-drag/cash/close): orchestrates the broadcaster's bag state + the
+		// item-grant/wallet ports. The loot Inbound cases delegate to it. See World/LootService.cs.
+		private readonly LootService _loot;
 
-            await new PacketStream().WriteHeader(CreateEditorFraming.MorphAckSender, CreateEditorFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchRedirectToServer).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
+		// The RDB Lua VM (conversation/quest scripting); stateless + reusable.
+		private readonly LuaScriptVm _luaVm = new LuaScriptVm();
 
-            Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
-        }
+		// Player-state persistence (autosave loop + logout/teleport/.save flushes), composed off the listener (#200).
+		private readonly PlayerPersistenceService _persistence;
 
-        // The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
-        // the character's real id now, so the unnamed-character state alone identifies the editor flow.
-        private static bool IsRetailCreateEditorFlow(INetworkClient client)
-        {
-            return client.Session.Character?.Name == null;
-        }
-    }
+		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
+		private readonly QuestProgressionService _questProgression;
+
+		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
+		// outbound ops are injected as seams (shared with other subsystems). See Economy/Shop/ShopService.cs.
+		private readonly ShopService _shop;
+
+		// The player action bar / hotbar persistence + login restore (#71). See World/ShortcutBarService.cs.
+		private readonly ShortcutBarService _shortcutBar;
+
+		private readonly SpellweaveService _spellweave;
+
+		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
+		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
+		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
+		private readonly WorldBroadcaster _broadcaster;
+
+		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
+		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
+		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
+		private readonly WorldSimulation _simulation;
+
+		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
+		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
+		// surfaces instead of being swallowed.
+		private CancellationTokenSource _loopCts;
+
+		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, 			logger, 			configuration, 			database, 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000Opcodes)))
+		{
+			_agentServerDispatcher = agentServerDispatcher;
+			_gameServerDispatcher = gameServerDispatcher;
+			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
+			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
+			_persistence = new PlayerPersistenceService(database, logger, _simulation);
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
+			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
+			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
+			_spellweave = new SpellweaveService(logger, 				(c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg), 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
+				// reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), 				SendBuffRemoval, // trance-buff end-twins on cancel/fire
+				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
+				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
+			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
+			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
+			_keepAlive = new KeepAliveService();
+			_shortcutBar = new ShortcutBarService(database, logger);
+			_equipment = new EquipmentService(database, logger);
+			_itemUse = new ItemUseService(database, RecallToBindCommand, logger);
+			_shop = new ShopService(database, logger, this);
+			_bank = new BankService(database, logger, this);
+
+			InitGmCommands();
+		}
+
+		public bool DisconnectCharacter(uint characterId)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client == null)
+				return false;
+
+			client.Stop();
+			return true;
+		}
+
+		public CharacterLiveState GetCharacterLiveState(uint characterId)
+		{
+			var client = ClientForCharacter(characterId);
+			var entity = client == null
+				? null
+				: _simulation.PlayerWorldEntity(client);
+			if (entity == null)
+				return null;
+
+			var buffs = entity.ActiveBuffs.Keys.OrderBy(id => id).Select(id => $"0x{id:X8}").ToArray();
+			return new CharacterLiveState(characterId, entity.Name, entity.Handle, entity.MapId, entity.Position.X, entity.Position.Y, entity.Position.Z, entity.Vitals?.Health, entity.Vitals?.MaxHealth, buffs);
+		}
+
+		public IReadOnlyList<SessionInfo> GetSessions()
+		{
+			return NetworkClients
+				.Select(nc =>
+				{
+					var account = nc.Session?.Account;
+					var character = nc.Session?.Character;
+					return new SessionInfo(nc.IpAddress, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name, character?.Level);
+				})
+				.ToArray();
+		}
+
+		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
+		{
+			// Observer view: union every live instance (copy) of the map (#268), so the MCP tool sees all entities
+			// regardless of which copy they're in.
+			return _simulation
+				.World
+				.ZonesForMap(mapId)
+				.SelectMany(z => z.Entities)
+				.Select(e => new ZoneEntityInfo(e.Handle, e.Name, e.IsPlayer ? "player" : e.IsLoot ? "loot" : "npc", e.Level, e.Hostile, e.IsDead, e.Vitals?.Health, e.Vitals?.MaxHealth, e.Position.X, e.Position.Y, e.Position.Z))
+				.OrderBy(e => e.Handle)
+				.ToArray();
+		}
+
+		public async Task<bool> RunGmCommand(uint characterId, string commandText)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client == null)
+				return false;
+
+			// HandleGmCommand strips a single leading prefix char (".teleport" -> "teleport"), so ensure one is present.
+			if (commandText.Length == 0 || char.IsLetterOrDigit(commandText[0]))
+				commandText = "." + commandText;
+
+			await HandleGmCommand(client, commandText);
+			return true;
+		}
+
+		public override Task StartAsync(CancellationToken cancellationToken)
+		{
+			_gameServerDispatcher.Register(this);
+			// Own lifetime token (linked to startup) so StopAsync can cancel the loops independently of any single
+			// connection. Tasks are stored so they can be awaited on shutdown.
+			_loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			_persistence.Start(_loopCts.Token); // periodic crash-safety flush of the live world state
+			_simulation.Start(_loopCts.Token); // the simulation tick (regen, NPC AI, death/respawn, discovery)
+			return base.StartAsync(cancellationToken);
+		}
+
+		public override async Task StopAsync(CancellationToken cancellationToken)
+		{
+			_gameServerDispatcher.Unregister(this);
+
+			// Signal the background loops and await their (clean) exit so shutdown doesn't race a mid-tick save. The
+			// loops swallow their own OperationCanceledException, so WhenAll completes normally; bounded by the host's
+			// shutdown token either way.
+			if (_loopCts != null)
+				await _loopCts.CancelAsync();
+			await Task.WhenAll(_simulation.StopAsync(), _persistence.StopAsync());
+			_loopCts?.Dispose();
+
+			await base.StopAsync(cancellationToken);
+		}
+
+		protected override async Task ClientDisconnected(INetworkClient client)
+		{
+			var entity = _simulation.PlayerWorldEntity(client);
+			if (entity != null)
+			{
+				// Tell everyone who could see this player that it left (n3ToClientQuit) BEFORE removing it from the
+				// zone, so ResolveRemove still sees the leaver's viewers - now awaited (ClientDisconnected is a Task), 				// so the despawn deterministically lands before RemovePlayer instead of racing it.
+				await _broadcaster.BroadcastPlayerDespawn(entity);
+				_simulation.RemovePlayer(client, out _);
+				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
+				// loses where they were. EXCEPT on a teleport-out: DoTeleport already saved the destination, and this
+				// connection's entity still holds the stale pre-teleport position which would clobber it (#28).
+				if (!client.Session.IsTeleportingOut)
+					await _persistence.SavePlayerState(client, entity);
+				else
+					Logger.LogInformation("Teleport-out: skipping stale-position save for {Name} (0x{Handle:X8}); destination already persisted.", entity.Name, entity.Handle);
+
+				client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
+				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
+			}
+
+			await base.ClientDisconnected(client);
+		}
+
+		// GameCharAgent.RequestBindLocation (0x2002 on the GameCharAgent class): the client repeatedly polls its
+		// bind/home playfield (the Totem of Origin destination, #64); body = the player's ID32. Retail answers each
+		// with a 4-byte 0x2002 [u32 playfieldId] (verified 1:1 across 13 captures). Routed here by receiver class so
+		// it never collides with GameAgent.ChatVicinity, which shares opcode 0x2002.
+		// #197: after each recv batch drains, fire the create-editor post-morph trio deterministically (when the
+		// batch that carried Finish + the SetMorphValue burst is fully received) instead of the debounce timer.
+		// Guarded to the create-editor customization phase; a no-op for every other connection/batch.
+		protected override Task ReceivedBatchComplete(INetworkClient client)
+		{
+			if (client.Session.IsCreateEditorConnection)
+				return _createFlow.FlushPostMorphBurstOnBatchDrained(client);
+
+			return Task.CompletedTask;
+		}
+
+		protected override Task ReceivedPacket(INetworkClient client, ConanPacket packet)
+		{
+			// This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes, 			// so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
+			// class route consumes the packet. See docs/protocol_gameserver_rpc_multiplexing.md + tradepost-protocol.md.
+			// The two sub-0x2014 opcodes 0x2002/0x2003 are the ONLY ones that also arrive on GameCharAgent (there they
+			// are RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
+			return packet.Receiver.Type switch
+			{
+				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
+				ConanEndpoints.TradepostAgentType => HandleTradepostPacket(client, packet),
+				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
+				// screen (without the reply the client retries forever + never opens chat). Existing-character world login
+				// only - the create-editor/create-world flows own this class during their own handshake and must not divert.
+				ConanEndpoints.GameCharAgentProjectType => !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession && client.Session.Character?.Name != null
+					? HandleGameCharAgentProject(client, packet)
+					: Task.CompletedTask,
+				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
+				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
+				ConanEndpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet),
+				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
+				ConanEndpoints.GameAgentType => HandleGameAgentPacket(client, packet),
+				_ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
+			};
+		}
+
+		// The complete burst-less 0x737A6DF9 snapshot packet (DB containers + from-scratch tails).
+		// #255: the player's snapshot-eligible held quests + the primary (tracked) quest. The beach starter is the
+		// primary (always held + seeded). A held quest joins only if its definition is snapshot-eligible (Quest_c
+		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw; those fall to the live
+		// RestorePlayerQuests path.
+		private async Task<(List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character)
+		{
+			var quests = new List<QuestDefinition>();
+			if (character == null)
+				return (quests, null);
+
+			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
+			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
+			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
+			{
+				var def = await Database.GetQuestDefinition(cq.QuestId);
+				if (FullCharSnapshotSubClass.IsSnapshotEligible(def))
+					quests.Add(def);
+			}
+
+			// The tracked (primary) quest owns the snapshot's objective region + index terminal: the beach starter when
+			// held, else the first held quest (null only when the character holds none -> empty region).
+			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
+			return (quests, primary);
+		}
+
+		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
+		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
+		// (docs/archive/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
+		// The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
+		// in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
+		// partials (broadcast, combat, GM) read it unchanged.
+		private WorldEntity PlayerWorldEntity(INetworkClient client)
+		{
+			return _simulation.PlayerWorldEntity(client);
+		}
+
+		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
+		private async Task<Map> ResolveMap(string arg)
+		{
+			if (uint.TryParse(arg, out var id))
+			{
+				var maps = await Database.GetMaps();
+				return maps.FirstOrDefault(m => m.Id == id);
+			}
+
+			var all = await Database.GetMaps();
+			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+		}
+
+		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
+		// (docs/archive/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
+		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
+		// more live state - vitals, buffs, … - as those become persisted.)
+		private async Task SaveChanges(uint characterId)
+		{
+			var saved = await _persistence.FlushAllAsync();
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
+		}
+
+		// Parses a wire handle from a GM-command argument: "0x"-prefixed hex or plain decimal. Returns false on a
+		// malformed/overflowing value.
+		private static bool TryParseHandle(string arg, out uint handle)
+		{
+			handle = 0;
+			try
+			{
+				handle = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+					? Convert.ToUInt32(arg[2..], 16)
+					: uint.Parse(arg);
+				return true;
+			}
+			catch (FormatException)
+			{
+				return false;
+			}
+			catch (OverflowException)
+			{
+				return false;
+			}
+		}
+	}
 }
