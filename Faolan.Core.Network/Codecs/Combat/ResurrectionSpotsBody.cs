@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs
 
 			foreach (var spot in spots)
 			{
-				s.WriteFloat(spot.PositionX).WriteFloat(spot.PositionY).WriteFloat(spot.PositionZ);
+				s.WriteVector3(spot.Position);
 				s.WriteUInt32(ResSpotConstA);
 				s.WriteUInt32(spot.MapId);
 				s.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0);
@@ -30,6 +30,23 @@ namespace Faolan.Core.Network.Codecs
 			}
 
 			s.WriteByte(0x00);
+		}
+
+		// The CREATE-FLOW variant of the ValidResurrectionSpots body: the same shape as WriteValidResurrectionSpotsBody
+		// (both positions = the fresh char's spawn point, spawnPointId 0 = no anchor chosen yet) but with the create
+		// capture's own undecoded constants - ConstA 0xC79E (vs the login 0xC7A0) and a u16 0x64 tail (vs the login u32
+		// 0x0A). Distinct constants, so it can't call the login builder without changing the create-flow wire bytes.
+		public static void WriteCreateFlowValidResurrectionSpots(FaolanStream s, Vector3 spawnPosition)
+		{
+			s.WriteVector3(spawnPosition); // death position
+			s.WriteUInt32(ResSpotsHeader);
+			s.WriteVector3(spawnPosition); // spot position (= the spawn point)
+			s.WriteUInt32(0x0000C79Eu); // create-flow ConstA (login uses 0xC7A0)
+			s.WriteUInt32(Map.TortageBeachId); // spot map id (0xFAA = the beach)
+			s.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0);
+			s.WriteUInt32(0); // spawnPointId - 0 for a fresh char
+			s.WriteUInt16(0x0064); // create-flow ConstB (login uses u32 0x0A)
+			s.WriteByte(0x00); // trailing
 		}
 	}
 }

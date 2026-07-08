@@ -642,6 +642,7 @@ namespace Faolan.GameServer
 		private async Task SendReadyForPlayScreen(INetworkClient client)
 		{
 			var character = client.Session.Character;
+
 			var sender = character?.Name == null
 				? NewCharacterReadyForPlayScreenSender
 				: ExistingCharacterReadyForPlayScreenSender;
@@ -651,19 +652,12 @@ namespace Faolan.GameServer
 
 			if (character?.Name == null)
 			{
-				// New-character create flow (unchanged): pos1 twice + the create tail.
-				byte[] newTail =
-				[
-					0x00, 0x00, 0xC7, 0x9E, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00
-				];
-
-				await new PacketStream()
-					.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots)
-					.WriteVector3(character!.Position)
-					.WriteUInt32(0x000007E2)
-					.WriteVector3(character.Position)
-					.WriteArray(newTail)
-					.SendAsync(client);
+				// New-character create flow: the create-capture's ValidResurrectionSpots body - a sibling of the login
+				// WriteValidResurrectionSpotsBody with the create variant's own constants (see ResurrectionSpotsBody).
+				using var newPs = new PacketStream();
+				newPs.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
+				ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(newPs, character!.Position);
+				await newPs.SendAsync(client);
 				return;
 			}
 
