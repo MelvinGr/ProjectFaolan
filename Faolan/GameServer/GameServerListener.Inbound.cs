@@ -494,14 +494,16 @@ namespace Faolan.GameServer
 								// echo + DispatchShopData riding this conversation (sell_items_to_trader frames
 								// 1188-1193) - no knubot screens in between. Checked on the greeting click only
 								// (Field3 == 0, like the captured open).
-								if (npcHandle != 0 && args.Field3 == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var vendorNpcName))
+								// Only a NAMED shop VENDOR takes this path: SpawnedNpcNamesByHandle holds EVERY spawned NPC, so
+								// gate on an actual shop row existing for the name. A non-vendor (Casilda, a quest NPC, ...)
+								// falls through to normal conversation below - do NOT break here, or the greeting is swallowed
+								// and dialogue never opens. (A vendor whose shop simply isn't imported yet is indistinguishable
+								// from a non-vendor here - both yield a null shop - so it too falls through to conversation.)
+								if (npcHandle != 0 && args.Field3 == 0
+									&& client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var vendorNpcName)
+									&& await Database.GetShopByVendorName(vendorNpcName) is { } vendorShop)
 								{
-									var vendorShop = await Database.GetShopByVendorName(vendorNpcName);
-									if (vendorShop != null)
-										await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
-									else
-										await _agentServerDispatcher.SendSystemMessage(client.Session.Account!.ClientInstance, "Shop not yet imported");
-
+									await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
 									break;
 								}
 
