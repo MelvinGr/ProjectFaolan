@@ -173,9 +173,6 @@ namespace Faolan.GameServer
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
 		private static readonly byte[] PlayerDeathSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 
-		private static readonly byte[] Receiver3 = [0x0d, 0x48, 0x76, 0x37, 0x28, 0x10, 0x84, 0x80, 0x80, 0x08];
-		// Capture-derived constants whose semantics aren't decoded yet (same in both captured deaths).
-
 		// Sender is GameCharAgent at instance 0x59 (NB: NOT 0x58 like the add/remove-item LoginWorld201CSender).
 		private static readonly byte[] ResurrectionSpotsSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59);
 		private static readonly byte[] RetailCreatePost205FSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);

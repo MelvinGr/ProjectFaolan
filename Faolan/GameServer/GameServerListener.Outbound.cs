@@ -411,7 +411,7 @@ namespace Faolan.GameServer
 		private static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
 		{
 			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), (ushort)0x201C)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat)
 				.WriteArray(BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value))
 				.SendAsync(client);
 		}
@@ -424,7 +424,7 @@ namespace Faolan.GameServer
 			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.ASCII.GetBytes(xml));
 
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
+			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 		}
@@ -489,7 +489,7 @@ namespace Faolan.GameServer
 			var body = ChatTextCodec.Build(instance, Encoding.ASCII.GetBytes(xml));
 
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
+			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 		}
@@ -498,7 +498,7 @@ namespace Faolan.GameServer
 		private static Task SendWorldIir(INetworkClient client, byte[] body)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
+			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			return ps.SendAsync(client);
 		}

@@ -248,7 +248,7 @@ namespace Faolan.GameServer
 		// level-up), false for the silent per-login re-grant.
 		private static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true)
 		{
-			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052).WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
+			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility).WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute

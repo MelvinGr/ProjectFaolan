@@ -32,7 +32,6 @@ namespace Faolan.GameServer.Economy
 		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
 
 		private const uint BankMaxSize = 50; // captured bank capacity
-		private const ushort BankRegisterOpcode = 0x201C;
 		private readonly IDatabaseRepository _database;
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
@@ -66,7 +65,7 @@ namespace Faolan.GameServer.Economy
 			foreach (var entry in bank.Items)
 			{
 				var ps = new PacketStream();
-				ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), BankRegisterOpcode);
+				ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat);
 				WriteBankSlotRegistration(ps, charInstance, entry.Pos, recordId++);
 				await ps.SendAsync(client);
 			}
