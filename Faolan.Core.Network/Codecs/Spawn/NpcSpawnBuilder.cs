@@ -174,6 +174,20 @@ namespace Faolan.Core.Network.Codecs
 			(byte)((token >> 21) & 0x7F)
 		];
 
+		// Constructs the WHOLE ProtoCoreCharacterIIR message for a spawn from typed columns/rows (#244) - no captured
+		// Data: Name from the type, the stat core from StatCore + placement (ApplyStatCore), worn equipment from the
+		// NpcSpawnEquipment rows. Runtime/target fields are omitted (canonical fresh spawn). Feed this to
+		// BuildFromScratch to assemble the whole body from the DB.
+		public static ProtoCoreCharacterIIR BuildMessageFromColumns(NpcSpawn row)
+		{
+			var msg = new ProtoCoreCharacterIIR { Name = row.Npc?.Name ?? "" };
+			ApplyStatCore(msg, row);
+			if (row.Equipment is { Count: > 0 })
+				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(row.Equipment))
+					msg.InventoryEntries.Add(entry);
+			return msg;
+		}
+
 		// Constructs the CharacterIIR stat core (#244) from the type-level Npc.StatCore + this placement's overrides,
 		// replacing whatever was parsed from Data. Type-level fields (senses defaults, flags, race, anim clips, ...)
 		// come from the StatCore; the per-placement values override from the NpcSpawn columns: the always-present pools

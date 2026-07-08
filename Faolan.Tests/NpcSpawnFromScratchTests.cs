@@ -38,7 +38,7 @@ namespace Faolan.Tests
 				.Where(s => s.Data != null && s.Npc != null && s.Npc.StatCore != null && s.Life > 0)
 				.AsNoTracking().ToList();
 
-			int total = 0, fromScratch = 0, runtimeTail = 0, bad = 0;
+			int total = 0, fromScratch = 0, runtimeTail = 0, canonicalRuntime = 0, bad = 0;
 			foreach (var row in rows)
 			{
 				var handle = row.CapturedHandle;
@@ -55,17 +55,23 @@ namespace Faolan.Tests
 				var pos = new Vector3(ReadLE(oracle, SpawnPacketBuilder.PosXOffset), ReadLE(oracle, SpawnPacketBuilder.PosYOffset), ReadLE(oracle, SpawnPacketBuilder.PosZOffset));
 				var rot = new Quaternion(ReadLE(oracle, SpawnPacketBuilder.RotXOffset), ReadLE(oracle, SpawnPacketBuilder.RotYOffset), ReadLE(oracle, SpawnPacketBuilder.RotZOffset), ReadLE(oracle, SpawnPacketBuilder.RotWOffset));
 				var humanoid = NpcSpawnAppearanceCodec.TryDecodeAppearance(oracle, out var morphs);
-				var actual = NpcSpawnBuilder.BuildFromScratch(handle, x.Value, pos, rot, ReadPlayfieldToken(oracle), read.Message, humanoid, morphs);
+				var message = NpcSpawnBuilder.BuildMessageFromColumns(row); // fully from DB columns/rows, no parsed Data
+				var actual = NpcSpawnBuilder.BuildFromScratch(handle, x.Value, pos, rot, ReadPlayfieldToken(oracle), message, humanoid, morphs);
 
+				var m = read.Message;
+				var hasRuntimeMsg = m.DefensiveTarget != null || m.OffensiveTarget != null || m.LockedTo != null
+					|| m.ShouldSerializePetOwnerInstance() || m.ShouldSerializePetType();
 				if (oracle.AsSpan().SequenceEqual(actual))
 					fromScratch++;
 				else if (row.Equipment.Count > 0 && !humanoid) // humanoid with a non-appearance (runtime) post-IIR
 					runtimeTail++;
+				else if (hasRuntimeMsg) // the oracle kept a runtime target/pet field the canonical build drops
+					canonicalRuntime++;
 				else
 					bad++;
 			}
 
-			_out.WriteLine($"spawns={total} fromScratch={fromScratch} runtimePostIirTail={runtimeTail} unexpected={bad}");
+			_out.WriteLine($"spawns={total} fromScratch={fromScratch} runtimePostIirTail={runtimeTail} canonicalRuntime={canonicalRuntime} unexpected={bad}");
 			Assert.Equal(0, bad);
 		}
 
