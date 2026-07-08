@@ -9,6 +9,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 
 namespace Faolan.Importer.Captures
@@ -25,9 +26,9 @@ namespace Faolan.Importer.Captures
     // classes/levels present in the captures) - that is expected.
     public static class CaptureAbilityImporter
     {
-        private const uint ChangeClassSubOpcode = 0xA36D3B74; // client->server character-editor script callback
-        private const uint ComboBookSubOpcode = 0xA8BBEB7F;
-        private const ushort AddSpecialAbilityOpcode = 0x2052;
+        private const uint ChangeClassSubOpcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR; // client->server character-editor script callback
+        private const uint ComboBookSubOpcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
+        private const ushort AddSpecialAbilityOpcode = 0x2052; // TODO: Move to enum
         private const ushort IirCarrierOpcode = 0x2000; // ComboBookIIR rides the 0x2000 world-conversation carrier
 
         // The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
@@ -52,17 +53,6 @@ namespace Faolan.Importer.Captures
             ("BearShaman_", Class.BearShaman),
             ("Herald_", Class.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
 		];
-
-        // Abilities whose grant is LEVEL-gated, not part of the L1 create kit (#209/#73). Rest (269272) is absent
-        // from every create capture's login grants but arrives as an announced 0x2052 at the first ding (L1->L2:
-        // Blablabla frame 9937, Blablatest 1357, Stihetfv 685) and is in every L2+ char's login re-grant - so its
-        // unlock level is 2. The create-capture starter scan would otherwise misattribute it as a starting ability
-        // (the ding happens inside the create captures). GetStartingAbilities filters Level <= level, so a known
-        // level both keeps it out of the L1 kit and re-grants it on every L2+ login, matching all 30+ captures.
-        private static readonly Dictionary<uint, byte> KnownLevels = new Dictionary<uint, byte>
-        {
-            [269272] = 2 // Rest
-        };
 
         // The few human-readable names the old archive knows (the rest are client-side / unknown). Still the only
         // name source for these ability ids, so it is used at import time (not obsolete).

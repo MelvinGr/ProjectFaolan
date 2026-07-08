@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   [u32 comboId]      the combo id granted
 	public static class ComboBookIirCodec
 	{
-		public const uint SubOpcode = 0xA8BBEB7F;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
 		private const ushort AddFlag = 0x0001;
 
 		public static byte[] Build(uint instance, uint comboId) => new Message(instance, comboId).ToArray();

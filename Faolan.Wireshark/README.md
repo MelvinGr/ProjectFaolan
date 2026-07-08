@@ -7,14 +7,14 @@ Wireshark without the JSON dump + Python dissector pipeline.
 ## What it does
 
 - **Conan packet framing** on every connection: `[u32 BE length][u32 crc32][u32 BE hdrlen]
-  [RpcHeader][body]`, reassembled across TCP segments per direction.
+[RpcHeader][body]`, reassembled across TCP segments per direction.
 - **In-band compression transitions**: at a packet boundary a peer may emit a 9-byte header
   `[80 00 00 05][4 bytes][flag]`. Flag `00` switches the rest of that direction to one
   continuous zlib deflate stream (framing continues on the inflated bytes); flag `01` leaves
   it plaintext. Observed: GameServer s2c transitions at offset 0 with flag 00; the c2s side
   transitions mid-stream with flag 01.
-  *(Note: the C# `ConanMessageFramer` only detects the marker at receive-chunk starts; this
-  plugin handles it at any packet boundary.)*
+  _(Note: the C# `ConanMessageFramer` only detects the marker at receive-chunk starts; this
+  plugin handles it at any packet boundary.)_
 - **RpcHeader dissection**: sender/receiver `ProtoEndpoint`s (class id resolved to the 14
   recovered client class names - BKDR-31 hashes, see `docs/aoc-opcode-ids.md` - plus the
   instance), the 16-bit method opcode (shown raw), trailing header bytes, body. The two
@@ -39,16 +39,16 @@ Wireshark without the JSON dump + Python dissector pipeline.
 ## Build and install
 
 ```zsh
-cmake -S Faolan.Wireshark -B Faolan.Wireshark/build
-cmake --build Faolan.Wireshark/build -j
-cmake --build Faolan.Wireshark/build --target install-faolan-plugin   # -> ~/.local/lib/wireshark/plugins/<ver>/epan
+cmake -S Faolan.Wireshark -B Faolan.Wireshark/bin
+cmake --build Faolan.Wireshark/bin -j
+cmake --build Faolan.Wireshark/bin --target install-faolan-plugin   # -> ~/.local/lib/wireshark/plugins/<ver>/epan
 tshark -G plugins | grep -i faolan    # verify
 ```
 
 Standalone stream/framer tests (no Wireshark needed):
 
 ```zsh
-./Faolan.Wireshark/build/faolan_stream_tests
+./Faolan.Wireshark/bin/faolan_stream_tests
 ```
 
 ## Usage
@@ -72,7 +72,7 @@ preference.
 Useful fields:
 
 | field                                                             | meaning                                                         |
-|-------------------------------------------------------------------|-----------------------------------------------------------------|
+| ----------------------------------------------------------------- | --------------------------------------------------------------- |
 | `faolan.pkt.opcode`                                               | 16-bit method opcode (raw hex; method index 0x2000+position)    |
 | `faolan.pkt.sender_class` / `receiver_class`                      | ProtoEndpoint class id, resolved to class name                  |
 | `faolan.pkt.sender_instance` / `receiver_instance`                | character/zone instance                                         |
@@ -143,3 +143,4 @@ wireshark/plugin.c              plugin registration
   deliberately not embedded - opcodes display as raw hex.
 - A capture hole inside a compressed stream cannot be fully recovered (the deflate stream has
   no flush points); the plugin decompresses across the hole on a best-effort basis.
+

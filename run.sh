@@ -52,9 +52,14 @@ case "$command" in
             "$@"
         ;;
 
+    --clean)
+        shift
+        find . -path ./.git -prune -o -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
+        ;;
+
     *)
         echo "Unknown command: $command" >&2
-        echo "Usage: $0 [--faolan|--web|--cdn|--client|--client2|--claude] [extra args...]" >&2
+        echo "Usage: $0 [--faolan|--web|--cdn|--client|--client2|--claude|--clean] [extra args...]" >&2
         exit 1
         ;;
 esac

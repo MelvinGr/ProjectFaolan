@@ -57,15 +57,15 @@ namespace Faolan.GameServer
 				// males add a loincloth (legs), females a gown (chest) + bottom (legs). See the Starter* constants.
 				var female = character.Sex == Sex.Female;
 				// Retail randomises the female slave-outfit colour per character (males always get the loincloth).
-				var femaleOutfit = StartingGear.FemaleOutfits[Random.Shared.Next(StartingGear.FemaleOutfits.Length)];
+				var femaleOutfit = StartingData.StartingFemaleOutfits[Random.Shared.Next(StartingData.StartingFemaleOutfits.Length)];
 				equipment = new CharacterEquipment
 				{
-					CharacterId = character.Id, 					Wrist = await Database.GetItem(StartingGear.WristItem), 					Chest = female
+					CharacterId = character.Id, 					Wrist = await Database.GetItem(StartingData.StartingWristItem), 					Chest = female
 						? await Database.GetItem(femaleOutfit.Gown)
 						: null, 					Legs = await Database.GetItem(female
 						? femaleOutfit.Bottom
-						: StartingGear.MaleLegsItem), 					// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
-					MainHandLeft = StartingGear.ClassWeapon.TryGetValue(character.Class, out var weaponId)
+						: StartingData.StartingMaleLegsItem), 					// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
+					MainHandLeft = StartingData.StartingWeapon.TryGetValue(character.Class, out var weaponId)
 						? await Database.GetItem(weaponId)
 						: null
 				};

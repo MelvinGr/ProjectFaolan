@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Faolan.GameServer.CreateFlow;
 using Faolan.Tests.Support;
 using Xunit;
 using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
@@ -54,7 +53,7 @@ namespace Faolan.Tests
 		{
 			// No DB passed: the dynel scene props fall back to their verbatim bytes, so the golden still locks the
 			// exact wire output. The DB-sourced substitution path is proven separately by CreateEditorSceneDynelTests.
-			return AssertBurstStable("InitialBurst", c => RetailCreateEditorInitialBurst.SendRetailCreateEditorInitialBurst(c));
+			return AssertBurstStable("InitialBurst", c => CreateFlowService.SendRetailCreateEditorInitialBurst(c));
 		}
 
 		[Fact]
