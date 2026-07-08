@@ -660,7 +660,7 @@ namespace Faolan.GameServer
 
 		private static Task SetTimeOfDay(INetworkClient client)
 		{
-			var sender0 = LoginWorldSender;
+			var sender0 = WorldFraming.Sender;
 			var receiver0 = WorldFraming.Receiver(client);
 
 			return new PacketStream()

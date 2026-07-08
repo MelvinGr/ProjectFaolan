@@ -168,7 +168,7 @@ namespace Faolan.GameServer
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
 
 			return new PacketStream()
-				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, [])))
 				.SendAsync(client);
 		}
@@ -196,7 +196,7 @@ namespace Faolan.GameServer
 		private async Task SendMagicBuffIir(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] payload)
 		{
 			await new PacketStream()
-				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -228,7 +228,7 @@ namespace Faolan.GameServer
 		private Task SendSprintBar(INetworkClient client, uint energy)
 		{
 			return new PacketStream()
-				.WriteHeader(SprintBarSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType), GameCharInterfaceProjectDispatchOpcodes.DispatchUpdateSprintBar)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType), GameCharInterfaceProjectDispatchOpcodes.DispatchUpdateSprintBar)
 				.WriteUInt32(energy)
 				.WriteByte(0x01)
 				.SendAsync(client);

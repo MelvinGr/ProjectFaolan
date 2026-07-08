@@ -49,9 +49,7 @@ namespace Faolan.Core.Network.Codecs
 					read.Message.InventoryEntries.Add(entry);
 			}
 
-			var position = new Vector3(row.PositionX, row.PositionY, row.PositionZ);
-			var rotation = new Quaternion(row.RotationX, row.RotationY, row.RotationZ, row.RotationW);
-			body = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
+			body = SpawnPacketBuilder.BuildSpawn(template, handle, row.Position, row.Rotation, read.Message);
 
 			// On a fresh spawn, reset the runtime-state scaffolds to their from-scratch form. The pre-IIR
 			// (transform/bounds) always resets to minimal. The post-IIR: ANIMALS get the minimal form; a HUMANOID's

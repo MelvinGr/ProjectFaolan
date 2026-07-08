@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs
 		// (WorldObjectBuilderTests). This is how a loot bag is spawned with NO captured world-object row in the world
 		// (the loot system's bag definition is a baked constant - LootBagTemplate). Returns false if the row has no
 		// lifted columns (DisplayName) or no KdTreeTail.
-		public static bool BuildFromScratch(WorldObject row, uint handle, Vector3 position, Quaternion rotation, uint typeTag, uint playfieldToken, out byte[] body)
+		public static bool BuildFromScratch(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, out byte[] body)
 		{
 			body = null;
 			if (row?.DisplayName == null || row.KdTreeTail == null)
@@ -35,20 +35,9 @@ namespace Faolan.Core.Network.Codecs
 				.WriteUInt32(0) // fieldA
 				.WriteByte(0x2C)
 				.WriteByte(0x0A)
-				.WriteArrayByteLength(new ProtoVec3
-				{
-					X = position.X,
-					Y = position.Y,
-					Z = position.Z
-				}.ToProtobuf())
+				.WriteArrayByteLength(position.ToProtobuf())
 				.WriteByte(0x12)
-				.WriteArrayByteLength(new ProtoQuat
-				{
-					X = rotation.X,
-					Y = rotation.Y,
-					Z = rotation.Z,
-					W = rotation.W
-				}.ToProtobuf())
+				.WriteArrayByteLength(rotation.ToProtobuf())
 				.WriteByte(0x18)
 				.WriteArray(EncodePlayfieldVarint(playfieldToken))
 				.ToArray();

@@ -48,7 +48,7 @@ namespace Faolan.Core.Network.Codecs
 		// spliced in by SetCharacterMessage. The pre-IIR float block and the post-IIR scaffold are carried over
 		// from the template verbatim (still raw, per the player spawn). Byte-identical to the captured body when
 		// fed the template's own handle/transform + decoded IIR (the construction oracle).
-		public static byte[] BuildSpawn(byte[] template, uint handle, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR character)
+		public static byte[] BuildSpawn(byte[] template, uint handle, ProtoVec3 position, ProtoQuat rotation, ProtoCoreCharacterIIR character)
 		{
 			return SetCharacterMessage(BuildSpawnBody(template, handle, position, rotation), character);
 		}
@@ -59,7 +59,7 @@ namespace Faolan.Core.Network.Codecs
 		// are carried over from the base; only the handle and the transform are parameterized. Byte-identical to
 		// the captured body when fed the captured handle/position/rotation (SpawnPacketBuilderTests, against the
 		// SpawnStrieTemplate golden).
-		public static byte[] BuildSpawnBody(byte[] template, uint handle, Vector3 position, Quaternion rotation)
+		public static byte[] BuildSpawnBody(byte[] template, uint handle, ProtoVec3 position, ProtoQuat rotation)
 		{
 			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(0, 4));
 			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(4, 4));
@@ -74,20 +74,9 @@ namespace Faolan.Core.Network.Codecs
 				.WriteUInt32(fieldA)
 				.WriteByte(0x2C) // IIR group frame for the transform component
 				.WriteByte(0x0A)
-				.WriteArrayByteLength(new ProtoVec3
-				{
-					X = position.X,
-					Y = position.Y,
-					Z = position.Z
-				}.ToProtobuf())
+				.WriteArrayByteLength(position.ToProtobuf())
 				.WriteByte(0x12)
-				.WriteArrayByteLength(new ProtoQuat
-				{
-					X = rotation.X,
-					Y = rotation.Y,
-					Z = rotation.Z,
-					W = rotation.W
-				}.ToProtobuf())
+				.WriteArrayByteLength(rotation.ToProtobuf())
 				.WriteArray(template.AsSpan(TransformEndOffset))
 				.ToArray();
 		}

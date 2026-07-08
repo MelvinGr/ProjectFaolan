@@ -224,7 +224,7 @@ namespace Faolan.GameServer
 		{
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.GameTime);
@@ -269,7 +269,7 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.MapChange);
@@ -371,7 +371,7 @@ namespace Faolan.GameServer
 		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(bodyWithLenPrefix);
+			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(bodyWithLenPrefix);
 			return ps.WriteLengthHash().ToArray();
 		}
 
@@ -456,7 +456,7 @@ namespace Faolan.GameServer
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(ResurrectionSpotsSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
+			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
 			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
 			return ps.SendAsync(client);
 		}

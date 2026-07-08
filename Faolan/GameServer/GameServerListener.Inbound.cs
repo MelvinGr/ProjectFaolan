@@ -163,7 +163,7 @@ namespace Faolan.GameServer
 							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
 							// nearby players is the next step.
 							await new PacketStream()
-								.WriteHeader(LoginWorldSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+								.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 								.WriteArrayUInt32Length(s => s
 									.WriteUInt32(pbOpcode)
 									.WriteUInt32(dataobjdec)
@@ -898,7 +898,7 @@ namespace Faolan.GameServer
 					{
 						// New (unnamed) characters take the create-editor path; existing characters log in normally.
 						var authSender = isNewCharacter
-							? RetailCreatePost205FSender
+							? Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59)
 							: null;
 						var authReceiver = isNewCharacter
 							? CreateEditorFraming.Receiver(client)

@@ -9,9 +9,12 @@ namespace Faolan.Core.Network.Protobuf
 	// instance(varint)  (0x18 token(varint))? ].
 	public partial class ProtoEndpoint
 	{
-		private const byte TypeTag = 0x0D; // field 1, wire type 5 (fixed32)
-		private const byte InstanceTag = 0x10; // field 2, wire type 0 (varint)
-		private const byte TokenTag = 0x18; // field 3, wire type 0 (varint)
+		public enum FieldTags : byte
+		{
+			Type = 0x0D, // field 1, wire type 5 (fixed32)
+			Instance = 0x10, // field 2, wire type 0 (varint)
+			Token = 0x18 // field 3, wire type 0 (varint)
+		}
 
 		// Reads one length-delimited endpoint field (its outer tag + length, then the sub-message) from `stream`.
 		public static ProtoEndpoint Read(FaolanStream stream)
@@ -22,16 +25,16 @@ namespace Faolan.Core.Network.Protobuf
 			var endpoint = new ProtoEndpoint();
 			while (stream.Position < end)
 			{
-				var tag = stream.ReadByte();
+				var tag = (FieldTags)stream.ReadByte();
 				switch (tag)
 				{
-					case TypeTag:
+					case FieldTags.Type:
 						endpoint.Type = stream.ReadUInt32LittleEndian();
 						break;
-					case InstanceTag:
+					case FieldTags.Instance:
 						endpoint.Instance = (uint)stream.ReadVarint();
 						break;
-					case TokenTag:
+					case FieldTags.Token:
 						endpoint.Token = (uint)stream.ReadVarint();
 						break;
 					default:

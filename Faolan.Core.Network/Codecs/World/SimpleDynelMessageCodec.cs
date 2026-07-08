@@ -18,14 +18,14 @@ namespace Faolan.Core.Network.Codecs
 	public static class SimpleDynelMessageCodec
 	{
 		// SimpleDynelFullUpdateIIR sub-opcode (the object class that carries a ProtoSimpleDynelIIR identity).
-		public const uint SubOpcode = 0x66AEDD50;
+		public const uint SubOpcode = 0x66AEDD50; // TODO: Move to enum
 
 		// SimpleDynelVisualChangeIIR (0xE7F4F8F8): flips a SimpleDynel's visual/collision STATE. Retail sends it to the
 		// Casilda chain decor (this class) the instant she's freed on the beach, switching it to state 5 - which drops the
 		// chain's COLLISION = the "invisible wall" (#267; the hangingwoman mesh doesn't render for us, so the dynel reads
 		// as an invisible barrier). Decoded byte-exact from Hoxxling gameplay idx 2053 (21 B):
 		//   [subop 0xE7F4F8F8][typeTag 0xC878][u32 handle][u32 0][u8 state][u32 0]
-		public const uint VisualChangeSubOpcode = 0xE7F4F8F8;
+		public const uint VisualChangeSubOpcode = 0xE7F4F8F8; // TODO: Move to enum
 
 		public const uint VisualChangeTypeTag = 0x0000C878;
 
@@ -73,7 +73,7 @@ namespace Faolan.Core.Network.Codecs
 
 		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0
 		// on world dynels; the two nullable columns are emitted only when present, reproducing the captured field-set.
-		public static ProtoSimpleDynelIIR ToMessage(WorldObject row)
+		public static ProtoSimpleDynelIIR ToMessage(WorldObject row) // TODO: Maybe move to WorldObject?
 		{
 			var message = new ProtoSimpleDynelIIR
 			{

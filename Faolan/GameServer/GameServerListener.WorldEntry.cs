@@ -644,35 +644,35 @@ namespace Faolan.GameServer
 			var character = client.Session.Character;
 
 			var sender = character?.Name == null
-				? NewCharacterReadyForPlayScreenSender
-				: ExistingCharacterReadyForPlayScreenSender;
+				? Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59)
+				: Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
+
 			var receiver = character?.Name == null
-				? NewCharacterReadyForPlayScreenReceiver
+				? [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10]
 				: client.Endpoint(Endpoints.GameCharInterfaceType);
+
+			using var newPs = new PacketStream();
+			newPs.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
 
 			if (character?.Name == null)
 			{
 				// New-character create flow: the create-capture's ValidResurrectionSpots body - a sibling of the login
 				// WriteValidResurrectionSpotsBody with the create variant's own constants (see ResurrectionSpotsBody).
-				using var newPs = new PacketStream();
-				newPs.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
 				ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(newPs, character!.Position);
-				await newPs.SendAsync(client);
-				return;
+			}
+			else
+			{
+				// Existing-character login: this 0x2024 is byte-structurally GameCharInterface.DispatchValidResurrectionSpots
+				// (the death/release screen) - at login the client consumes it silently to set the resurrection anchor. Build
+				// the body via the shared WriteValidResurrectionSpotsBody from the character's actual resurrection point (the
+				// same closest-known/AlwaysKnown resolution SendDeathScreen does), so the anchor is per-character/per-map and
+				// advertises our REAL RespawnPoint.Id (the id RespawnMe echoes back) instead of the Strie capture's hardcoded
+				// beach point. Falls back to the universal Tortage Beach default when the map defines no point.
+				var spot = await ResolveLoginResurrectionSpot(character);
+				ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(newPs, character.Position, [spot]);
 			}
 
-			// Existing-character login: this 0x2024 is byte-structurally GameCharInterface.DispatchValidResurrectionSpots
-			// (the death/release screen) - at login the client consumes it silently to set the resurrection anchor. Build
-			// the body via the shared WriteValidResurrectionSpotsBody from the character's actual resurrection point (the
-			// same closest-known/AlwaysKnown resolution SendDeathScreen does), so the anchor is per-character/per-map and
-			// advertises our REAL RespawnPoint.Id (the id RespawnMe echoes back) instead of the Strie capture's hardcoded
-			// beach point. Falls back to the universal Tortage Beach default when the map defines no point.
-			var spot = await ResolveLoginResurrectionSpot(character);
-
-			using var ps = new PacketStream();
-			ps.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
-			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(ps, character.Position, [spot]);
-			await ps.SendAsync(client);
+			await newPs.SendAsync(client);
 		}
 
 		// Answers a client 0x2020 spawn poll with a 0x2008 SpawnCheck on the 201C conversation: body is
@@ -835,7 +835,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -849,7 +849,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FSpawnCheck(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterReadyForPlayScreenSender, 					client.Endpoint(Endpoints.GameCharInterfaceType), 					GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), 					client.Endpoint(Endpoints.GameCharInterfaceType), 					GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteByte(0)

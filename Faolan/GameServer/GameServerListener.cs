@@ -121,15 +121,6 @@ namespace Faolan.GameServer
 
 		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x58);
 
-		// Existing-character post-ready conversations: retail uses sub-id 0x58 + the session character instance on
-		// every family (Strie login capture, idx 294+). The receiver is built per send as
-		// Endpoints.EndpointBytes(<family type>, ClientInstance).
-		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
-
-		// The world-entry prompt rides the world-system conversation (0x13CE71B1/0x58) - byte-identical to
-		// WorldFraming.Sender, so fold to that single source of truth rather than re-spelling the literal.
-		private static readonly byte[] ExistingCharacterWorldEntryPromptSender = WorldFraming.Sender;
-
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
 		private static readonly byte[] LoginWorld201CSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
 		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32) in
@@ -142,10 +133,6 @@ namespace Faolan.GameServer
 		// login packet on this single conversation is what lets the client tie the spawns to the loaded
 		// playfield and render them (the player avatar renders regardless, but NPCs do not). The bytes live on
 		// World.WorldFraming (the single source shared with the WorldBroadcaster); these delegate to it.
-		private static readonly byte[] LoginWorldSender = WorldFraming.Sender;
-		private static readonly byte[] NewCharacterReadyForPlayScreenReceiver = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10];
-
-		private static readonly byte[] NewCharacterReadyForPlayScreenSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59);
 
 		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
 		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldFraming.Sender that
@@ -153,15 +140,9 @@ namespace Faolan.GameServer
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
 		private static readonly byte[] PlayerDeathSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 
-		// Sender is GameCharAgent at instance 0x59 (NB: NOT 0x58 like the add/remove-item LoginWorld201CSender).
-		private static readonly byte[] ResurrectionSpotsSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59);
-		private static readonly byte[] RetailCreatePost205FSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
-
 		// The trailing bytes of the 8-byte blob prefix after [flag][BE32 blobLen]: the captured beach field5, constant
 		// for the world-entry snapshot (the live splice path preserves these same bytes via SetSnapshotBlobLength).
 		private static readonly byte[] SnapshotPrefixField5 = [0x28, 0x81, 0x06];
-
-		private static readonly byte[] SprintBarSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x54);
 
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
