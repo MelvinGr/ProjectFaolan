@@ -152,28 +152,5 @@ namespace Faolan.Core.Network.Codecs
 			morphs = result;
 			return true;
 		}
-
-		// Replaces an FA015807 body's post-IIR with one built from the given morph rows, adjusting the inner
-		// body-length field @0 (which tracks total body size 1:1, as in NpcSpawnScaffold.WithMinimalPostIir). This
-		// is the humanoid counterpart of WithMinimalPostIir: the from-DB appearance table instead of the captured
-		// blob. No-op (returns the body unchanged) if no CharacterIIR is found.
-		[Obsolete("Splices an appearance post-IIR into a captured humanoid body; build the humanoid post-IIR from scratch instead (construct, don't patch). Blocked on humanoid post-IIR decode (#243).")]
-		public static byte[] WithAppearancePostIir(byte[] body, IReadOnlyList<NpcAppearanceMorph> morphs)
-		{
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-				return body;
-
-			var postStart = read.Offset + read.Length;
-			var built = BuildPostIir(morphs);
-
-			var result = new byte[postStart + built.Length];
-			Array.Copy(body, 0, result, 0, postStart);
-			built.CopyTo(result, postStart);
-
-			var delta = result.Length - body.Length;
-			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(result.AsSpan(0, 4));
-			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(bodyLength + delta));
-			return result;
-		}
 	}
 }

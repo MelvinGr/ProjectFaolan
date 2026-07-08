@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #244: NpcSpawnBuilder.BuildFromScratch assembles the whole FA015807 body with NO captured template (header +
+	// #244: NpcSpawnBuilder.BuildBody assembles the whole FA015807 body with NO captured template (header +
 	// transform-with-token + pre-IIR + CoreChar header + message + post-IIR). Driven from golden captures, decomposed
 	// into the same inputs the live path (TryBuildLive) feeds it: the built body must parse back and carry the expected
 	// post-IIR shape - the minimal form for an animal, the appearance/morph table for a humanoid.
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			Assert.Equal(ReadPlayfieldToken(golden), ReadPlayfieldToken(body));
 		}
 
-		// Decompose a golden capture into the inputs BuildFromScratch takes (IIR header, transform, token, message,
+		// Decompose a golden capture into the inputs BuildBody takes (IIR header, transform, token, message,
 		// morphs) and reassemble from scratch - the same decomposition TryBuildLive performs off the DB columns.
 		private static byte[] BuildFromGolden(byte[] golden, out uint handle, out List<NpcAppearanceMorph> morphs, uint minimalRc)
 		{
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 			var pos = new Vector3(ReadLE(golden, SpawnPacketBuilder.PosXOffset), ReadLE(golden, SpawnPacketBuilder.PosYOffset), ReadLE(golden, SpawnPacketBuilder.PosZOffset));
 			var rot = new Quaternion(ReadLE(golden, SpawnPacketBuilder.RotXOffset), ReadLE(golden, SpawnPacketBuilder.RotYOffset), ReadLE(golden, SpawnPacketBuilder.RotZOffset), ReadLE(golden, SpawnPacketBuilder.RotWOffset));
 			NpcSpawnAppearanceCodec.TryDecodeAppearance(golden, out morphs);
-			return NpcSpawnBuilder.BuildFromScratch(handle, x, pos, rot, ReadPlayfieldToken(golden), read.Message, morphs, minimalRc);
+			return NpcSpawnBuilder.BuildBody(handle, x, pos, rot, ReadPlayfieldToken(golden), read.Message, morphs, minimalRc);
 		}
 
 		// The playfield token: a 4-byte LEB128 varint at [0x18] right after the constructed transform (offset 60).

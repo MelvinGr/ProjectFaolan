@@ -38,7 +38,7 @@ namespace Faolan.Tests
 
 			Assert.True(LootBagTemplate.IsAvailable);
 			Assert.True(LootBagMessageCodec.TryParse(golden.AsSpan(8), out _, out var contentsStart));
-			Assert.True(WorldObjectBuilder.BuildFromScratch(LootBagTemplate.Create(), handle, pos, rot, typeTag, playfieldToken, out var body));
+			Assert.True(WorldObjectBuilder.BuildBody(LootBagTemplate.Create(), handle, pos, rot, typeTag, playfieldToken, out var body));
 
 			// Identity message + kd-tree geometry (everything up to the content blob) are byte-identical to the capture.
 			// (The carrier length at [0..4] and the content blob differ: the from-scratch bag carries a clean EMPTY

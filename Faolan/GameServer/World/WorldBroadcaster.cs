@@ -1217,7 +1217,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
-		// SCRATCH by WorldObjectBuilder.BuildFromScratch - map-independent, needs NO captured loot-bag WorldObject in
+		// SCRATCH by WorldObjectBuilder.BuildBody - map-independent, needs NO captured loot-bag WorldObject in
 		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
 		private static WorldObject GetLootTemplate()
 		{
@@ -1463,7 +1463,7 @@ namespace Faolan.GameServer.World
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
 			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
-			if (!WorldObjectBuilder.BuildFromScratch(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
+			if (!WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
 				return null;
 
 			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1

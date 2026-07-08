@@ -10,14 +10,12 @@ using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.Core.Network.Codecs
 {
-	// Bridges a stored NpcSpawn row to a wire FA015807 (SimpleCharFullUpdate) body, addressed to a live session
-	// handle. The transform (position/rotation) is driven by the row's structured columns; the pre-IIR float block
-	// + post-IIR scaffold are GENERATED from scratch (NpcSpawnScaffold), equipment from NpcSpawnEquipment rows and
-	// morphs from NpcSpawnMorph rows. The row's captured `Data` is no longer replayed - it is decoded only to source
-	// the CharacterIIR stat CORE (CharacterStats / NpcStats / Bcc) that isn't yet in typed storage; lifting that core
-	// (mostly TYPE-level, 27 templates) is deferred to the Npc-type split (#244), where `Data` retires.
-	// Byte-identical to the captured body when the row's columns match the capture (NpcSpawnBuilderTests); this is
-	// the unit the world-entry/interest path calls per NPC instead of replaying the MapWorldBurst blob.
+	// Builds a wire FA015807 (SimpleCharFullUpdate) NPC spawn body wholly from typed storage (#243/#244) - the
+	// captured `Data` blob is retired. From a placement (TryBuildLive off an NpcSpawn row) or a creature TYPE
+	// (TryBuildFromType off an Npc, for summoned pets/mounts): the transform from the row's columns, the CharacterIIR
+	// stat core from Npc.StatCore, worn equipment from the *Equipment rows, morphs from the *Morph rows, and the
+	// pre-IIR/post-IIR scaffolds GENERATED from scratch (BuildBody + NpcSpawnScaffold). This is the unit the
+	// world-entry/interest path calls per NPC.
 	public static class NpcSpawnBuilder
 	{
 		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO world
@@ -37,7 +35,7 @@ namespace Faolan.Core.Network.Codecs
 				.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
 				.ToList();
 			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
-			body = BuildFromScratch(handle, x, position, rotation, 0, BuildMessageFromType(npc), morphs, minimalRc);
+			body = BuildBody(handle, x, position, rotation, 0, BuildMessageFromType(npc), morphs, minimalRc);
 			return true;
 		}
 
@@ -71,7 +69,7 @@ namespace Faolan.Core.Network.Codecs
 		// form with `minimalRecordCount` (the type-stable 1 or 2 - #243).
 		// This is the sole NPC spawn-body path (the captured Data blob was retired): every shipped spawn is an animal,
 		// a clean-appearance humanoid, or a no-morph spawn expressible from columns (NpcSpawnFromScratchTests).
-		public static byte[] BuildFromScratch(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs, uint minimalRecordCount = NpcSpawnScaffold.MinimalRecordCount)
+		public static byte[] BuildBody(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs, uint minimalRecordCount = NpcSpawnScaffold.MinimalRecordCount)
 		{
 			var msgBytes = message.ToProtobuf();
 			var preIir = NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal());
@@ -143,7 +141,7 @@ namespace Faolan.Core.Network.Codecs
 			// Animal or morph-humanoid: minimal record count is 1 (unused when morphs are present).
 			if (!row.HasEquipment || morphs.Count > 0)
 			{
-				body = BuildFromScratch(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs);
+				body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs);
 				return true;
 			}
 
@@ -151,14 +149,14 @@ namespace Faolan.Core.Network.Codecs
 			if (row.Npc.StatCore.MinimalPostIirRecordCount is not { } minimalRecordCount)
 				return false;
 
-			body = BuildFromScratch(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs, minimalRecordCount);
+			body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs, minimalRecordCount);
 			return true;
 		}
 
 		// Constructs the WHOLE ProtoCoreCharacterIIR message for a spawn from typed columns/rows (#244) - no captured
 		// Data: Name from the type, the stat core from StatCore + placement (ApplyStatCore), worn equipment from the
 		// NpcSpawnEquipment rows. Runtime/target fields are omitted (canonical fresh spawn). Feed this to
-		// BuildFromScratch to assemble the whole body from the DB.
+		// BuildBody to assemble the whole body from the DB.
 		public static ProtoCoreCharacterIIR BuildMessageFromColumns(NpcSpawn row)
 		{
 			var msg = new ProtoCoreCharacterIIR { Name = row.Npc?.Name ?? "" };

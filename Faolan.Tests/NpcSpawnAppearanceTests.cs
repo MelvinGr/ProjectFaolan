@@ -94,15 +94,5 @@ namespace Faolan.Tests
 			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(Golden.Bytes(golden), out var morphs));
 			Assert.Empty(morphs);
 		}
-
-		// WithAppearancePostIir splices a from-rows appearance table back onto the body; fed the body's own decoded
-		// morphs it is a byte-identical no-op (the build-side oracle, same shape as the IIR splice).
-		[Fact]
-		public void WithAppearancePostIir_FedItsOwnMorphs_IsByteIdentical()
-		{
-			var body = Golden.Bytes("SpawnNpcCasilda");
-			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var morphs));
-			Assert.Equal(body, NpcSpawnAppearanceCodec.WithAppearancePostIir(body, morphs));
-		}
 	}
 }
