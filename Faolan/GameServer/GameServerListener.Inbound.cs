@@ -506,15 +506,10 @@ namespace Faolan.GameServer
 								if (args.Field3 != 0)
 									break;
 
-								// Last-resort fallback ONLY when the DB has no node for this NPC: the single hardcoded
-								// post-creation intro (conversation 12493). It is NPC-agnostic, so it shows the same text
-								// for every NPC - the DB path above is what routes the correct dialogue per NPC.
-								if (client.Session.IsCreateWorldSession && npcHandle != 0)
-									await _createFlow.SendNpcIntroConversation(client, npcHandle);
 								// Beach login with no captured node for this (Mode, Field3): close the chat window so the
 								// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
 								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
-								else if (client.Session.WorldEntered)
+								if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
 								{
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
 										? rn
