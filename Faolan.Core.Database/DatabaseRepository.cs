@@ -104,6 +104,9 @@ namespace Faolan.Core.Database
         Task<Spell> GetSpell(uint id);
         Task<Recipe[]> GetRecipes();
         Task<Spell[]> GetSpells();
+
+        // Cutscene stock-phrase subtitles keyed by the client's {stock_N} token -> the captured remoteformat payload.
+        Task<Dictionary<string, byte[]>> GetStockPhrases();
         Task<uint[]> GetStartingBarSpells(uint level, Class @class);
 
         Task<uint[]> GetStartingSpells(uint level, Class @class);
@@ -1024,6 +1027,12 @@ namespace Faolan.Core.Database
         {
             await using var ctx = await _contextFactory.CreateDbContextAsync();
             return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
+        }
+
+        public async Task<Dictionary<string, byte[]>> GetStockPhrases()
+        {
+            await using var ctx = await _contextFactory.CreateDbContextAsync();
+            return await ctx.StockPhrases.ToDictionaryAsync(p => p.Key, p => p.RemoteFormat);
         }
 
         // The spells to place on the DEFAULT action bar: ONE per spell family (the highest rank the character can use),

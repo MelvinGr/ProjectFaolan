@@ -65,6 +65,7 @@ namespace Faolan.Core.Database
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
 		DbSet<Spell> Spells { get; }
+		DbSet<StockPhrase> StockPhrases { get; }
 		DbSet<TradepostListing> TradepostListings { get; }
 		DbSet<WorldObject> WorldObjects { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
@@ -129,6 +130,7 @@ namespace Faolan.Core.Database
 		public DbSet<Shop> Shops { get; set; }
 		public DbSet<ShopItem> ShopItems { get; set; }
 		public DbSet<Spell> Spells { get; set; }
+		public DbSet<StockPhrase> StockPhrases { get; set; }
 		public DbSet<TradepostListing> TradepostListings { get; set; }
 		public DbSet<WorldObject> WorldObjects { get; set; }
 

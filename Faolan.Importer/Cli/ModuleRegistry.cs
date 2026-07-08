@@ -16,6 +16,7 @@ namespace Faolan.Importer.Cli
 		[
 			// --- capture modules ---
 			new ListingsModule(),
+			new StockPhrasesModule(),
 			new ItemsModule(),
 			new MapsModule(),
 			new SpellsModule(),

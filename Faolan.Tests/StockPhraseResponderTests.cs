@@ -1,4 +1,10 @@
 using System;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Faolan.Core.Database;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 using StockConversationService = Faolan.GameServer.Dialogue.StockConversationService;
 
@@ -6,9 +12,9 @@ namespace Faolan.Tests
 {
 	// #234 create-cutscene speech: the s2c ReceivedStockPhraseText (0x205D) reply to the client's
 	// PlayStockphraseAsSubtitle request. Golden-gated against the retail create capture
-	// (Blablabla_soldier-guardian_create_*): the built body must be byte-identical to the captured
-	// 0x205D bodies once the live threadCtx is echoed. Proves both the request parse and the response
-	// build reproduce retail exactly (only the per-session threadCtx differs).
+	// (Blablabla_soldier-guardian_create_*): each stock phrase now lives in the committed faolan.db (StockPhrases,
+	// harvested by the importer's stock-phrases module), and building its 0x205D body with the captured threadCtx
+	// must be byte-identical to the captured response. Proves the DB-sourced phrase + the build reproduce retail.
 	public class StockPhraseResponderTests
 	{
 		// (stockKey, capturedThreadCtx, capturedFullResponseBody) triples from the guardian create capture.
@@ -19,9 +25,10 @@ namespace Faolan.Tests
 		[InlineData("{stock_51}", 0x0000ab40u, "0000ab40006a3c72656d6f7465666f726d61742069643d2236313938222063617465676f72793d22353030303022206b65793d224b262333393b422a4c4b535a2a2925262339323b6d725e5e7766305e22206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e")]
 		[InlineData("{stock_52}", 0x0000cfbbu, "0000cfbb00623c72656d6f7465666f726d61742069643d2236313939222063617465676f72793d22353030303022206b65793d22212d7536322e2b4e45602860656e6671612d4d4822206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e")]
 		[InlineData("{stock_56}", 0x0000e243u, "0000e24300623c72656d6f7465666f726d61742069643d2236323030222063617465676f72793d22353030303022206b65793d226c3059454128335845626c6f7934486b7548464322206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e")]
-		public void ReceivedStockPhraseBody_MatchesCapture(string stockKey, uint threadCtx, string expectedHex)
+		public async Task ReceivedStockPhraseBody_MatchesCapture(string stockKey, uint threadCtx, string expectedHex)
 		{
-			Assert.True(StockConversationService.TryGetStockPhraseText(stockKey, out var text));
+			var phrases = await Repo().GetStockPhrases();
+			Assert.True(phrases.TryGetValue(stockKey, out var text), $"no StockPhrases row for {stockKey}");
 			var body = StockConversationService.BuildReceivedStockPhraseBody(threadCtx, text);
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 		}
@@ -35,6 +42,21 @@ namespace Faolan.Tests
 			Assert.True(StockConversationService.TryParsePlayStockphraseRequest(req, out var key, out var tc));
 			Assert.Equal("{stock_48}", key);
 			Assert.Equal(0x000077aau, tc);
+		}
+
+		private static DatabaseRepository Repo()
+		{
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath()};Mode=ReadOnly").Options;
+			return new DatabaseRepository(new Factory(options));
+		}
+
+		private static string DbPath([CallerFilePath] string thisFile = "") =>
+			Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "faolan.db");
+
+		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext() => new(options);
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default) => Task.FromResult(new DatabaseContext(options));
 		}
 	}
 }

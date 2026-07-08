@@ -238,7 +238,7 @@ namespace Faolan.GameServer
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
-			_stockConversation = new StockConversationService(logger);
+			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_keepAlive = new KeepAliveService();
 			_shortcutBar = new ShortcutBarService(database, logger);
