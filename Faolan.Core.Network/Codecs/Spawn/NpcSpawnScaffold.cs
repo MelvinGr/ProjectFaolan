@@ -88,6 +88,30 @@ namespace Faolan.Core.Network.Codecs
 			return true;
 		}
 
+		// The fresh post-IIR recordCount for a NO-MORPH spawn (#243): the type-stable header recordCount word (1 or 2).
+		// Unlike TryReadMinimalRecordCount (which only accepts the exact 41-byte minimal form), this ALSO reads it off a
+		// RUNTIME-BEARING no-morph capture - the recordCount word is stable per type across minimal and runtime captures
+		// (validated: 0/107 no-morph types carry >1 distinct value), and the runtime records are dropped on a fresh
+		// spawn, so BuildMinimalPostIir(recordCount) is the canonical fresh form. Returns false when the body carries a
+		// liftable morph table (an APPEARANCE type - it builds from morph rows, not the minimal form), when word0 isn't
+		// the constant 0, or when no CharacterIIR is present. This is what lets the ~24 runtime-bearing no-morph types
+		// (whose type has no minimal-form capture) derive their recordCount without a guess.
+		public static bool TryReadNoMorphRecordCount(byte[] body, out uint recordCount)
+		{
+			recordCount = 0;
+			if (NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out _) || NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out _))
+				return false; // an appearance type - builds from morph rows, not the minimal form
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return false;
+
+			var post = body.AsSpan(read.Offset + read.Length);
+			if (post.Length < 12 || BinaryPrimitives.ReadUInt32BigEndian(post) != HeaderWord0)
+				return false;
+
+			recordCount = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(8, 4));
+			return recordCount is MinimalRecordCount or MinimalHumanoidRecordCount;
+		}
+
 		// The fresh-spawn scaffold pass used by the live spawn path. Like WithMinimalScaffolds, but a HUMANOID
 		// keeps its captured post-IIR instead of collapsing to the 41-byte minimal form: a humanoid's post-IIR
 		// carries that NPC's APPEARANCE / morph table (the "*key=val" texscript string + [morphId][float] pairs -

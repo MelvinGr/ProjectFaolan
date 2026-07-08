@@ -701,17 +701,17 @@ namespace Faolan.Importer.Captures
 			var byTemplate = await db.Npcs.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
 
 			// #243: the fresh minimal post-IIR recordCount per type (the type-stable 1 or 2, not an animal/humanoid split),
-			// read from a minimal-form CAPTURE (the dump-file body, e.Data) - NOT the stored NpcSpawn.Data column, which
-			// is being retired. Type-stable (no type ships both counts); scans each template's dump entries for a
-			// genuine minimal-form body. Lets a no-morph humanoid build its post-IIR from scratch (BuildMinimalPostIir(rc))
-			// instead of the Data blob.
+			// read from a NO-MORPH CAPTURE (the dump-file body, e.Data) - NOT the stored NpcSpawn.Data column, which is
+			// being retired. The recordCount word is stable per type across minimal AND runtime-bearing captures, so this
+			// reads it off either shape (covering the runtime-bearing types that have no minimal-form capture). Lets a
+			// no-morph spawn build its post-IIR from scratch (BuildMinimalPostIir(rc)) instead of the Data blob.
 			var minimalRcByTemplate = new Dictionary<uint, uint>();
 			foreach (var e in entries)
 			{
 				if (e.TemplateId == 0 || minimalRcByTemplate.ContainsKey(e.TemplateId))
 					continue;
 				var b = WorldObjectBuilder.ExtractBody(e.Data);
-				if (b != null && NpcSpawnScaffold.TryReadMinimalRecordCount(b, out var rc))
+				if (b != null && NpcSpawnScaffold.TryReadNoMorphRecordCount(b, out var rc))
 					minimalRcByTemplate[e.TemplateId] = rc;
 			}
 

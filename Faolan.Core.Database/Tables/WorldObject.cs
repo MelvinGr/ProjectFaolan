@@ -36,6 +36,7 @@ namespace Faolan.Core.Database.Tables
 		// object from the DB - identity (columns above) + this tail - instead of slicing it from the raw Data packet
 		// (#187). Null on un-lifted rows (those still use Data). The transform (pos/rot) is rebuilt from Base3DEntity's
 		// columns and the live playfield comes from the burst, so with this the row's Data is no longer read at render.
+		[Obsolete]
 		public byte[] KdTreeTail { get; set; }
 
 		[MaxLength(128)]

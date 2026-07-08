@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core;
 using Faolan.Core.Network.Codecs;
 using Faolan.Tests.Support;
 using Xunit;
@@ -63,6 +64,42 @@ namespace Faolan.Tests
 			Assert.Equal(NpcSpawnScaffold.MinimalHumanoidRecordCount, rc);
 
 			Assert.False(NpcSpawnScaffold.TryReadMinimalRecordCount(Golden.Bytes("SpawnNpcCasilda"), out _));
+		}
+
+		// #243: TryReadNoMorphRecordCount reads the fresh recordCount off a no-morph body (minimal OR runtime-bearing)
+		// and declines an appearance-bearing body (which builds from morph rows). The animal minimal golden is rc==1;
+		// Casilda (a morph table) is declined.
+		[Fact]
+		public void TryReadNoMorphRecordCount_ReadsMinimal_DeclinesAppearance()
+		{
+			Assert.True(NpcSpawnScaffold.TryReadNoMorphRecordCount(Golden.Bytes("SpawnNpcCrocodile"), out var rc));
+			Assert.Equal(NpcSpawnScaffold.MinimalRecordCount, rc);
+
+			Assert.False(NpcSpawnScaffold.TryReadNoMorphRecordCount(Golden.Bytes("SpawnNpcCasilda"), out _));
+		}
+
+		// A RUNTIME-BEARING no-morph body (a large runtime record1, no morph table) still yields its header recordCount
+		// even though TryReadMinimalRecordCount (exact 41-byte form only) declines it - the key to the runtime tail.
+		[Fact]
+		public void TryReadNoMorphRecordCount_ReadsRuntimeBearingForm()
+		{
+			var animal = Golden.Bytes("SpawnNpcCrocodile");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(animal, out var read));
+			var postStart = read.Offset + read.Length;
+
+			// Synthesize a runtime-bearing no-morph post-IIR: [0][frl=40][rc=2] + a 40-byte runtime record + terminators.
+			var runtime = new byte[40];
+			new Random(2).NextBytes(runtime);
+			var terminator = new byte[] { 0x00,0x00,0x03,0xF1, 0x00,0x00,0x03,0xF1, 0,0,0,0,0,0,0,0, 0x00,0x00,0x03,0xF1 };
+			var post = new FaolanStream().WriteUInt32(0u).WriteUInt32((uint)runtime.Length).WriteUInt32(2u).WriteArray(runtime).WriteArray(terminator).ToArray();
+			var body = new byte[postStart + post.Length];
+			Array.Copy(animal, body, postStart);
+			post.CopyTo(body, postStart);
+			BinaryPrimitives.WriteUInt32BigEndian(body, (uint)(body.Length - 4));
+
+			Assert.False(NpcSpawnScaffold.TryReadMinimalRecordCount(body, out _)); // not the exact 41-byte form
+			Assert.True(NpcSpawnScaffold.TryReadNoMorphRecordCount(body, out var rc));
+			Assert.Equal(2u, rc);
 		}
 
 		[Fact]

@@ -259,8 +259,6 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
-		// Little-endian float (protobuf fixed32) - the write counterpart to ReadUInt32LittleEndian, for the LE
-		// fixed32 transform floats, distinct from the big-endian WriteFloat the raw wire bodies use.
 		public FaolanStream WriteFloatLittleEndian(float value)
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(float)];
@@ -338,7 +336,7 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
-		// A base-128 varint (protobuf LEB128) - the canonical Conan wire varint (Network.Conan.Varint).
+		// A base-128 varint (protobuf LEB128)
 		public FaolanStream WriteVarint(ulong value)
 		{
 			while (value >= 0x80)
