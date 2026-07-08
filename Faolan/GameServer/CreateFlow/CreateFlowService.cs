@@ -614,8 +614,13 @@ namespace Faolan.GameServer.CreateFlow
 			], instance);
 			await SendA36DCallback(client, "CharCreationFinished", "");
 
-			// Step 3: the world-prep / scene burst that lets the client proceed to enter-world (0x206E).
-			await SendWorldPrepBurst(client, _database);
+			// Step 3 (REMOVED): the world-prep grant burst (SendWorldPrepBurst) used to fire here - the guardian
+			// capture's hardcoded 0x2052 abilities / ComboBookIIR combos / SetItemStat / CharacterAction records.
+			// Proven redundant in-client (a created necro is fully functional without it): every grant is re-emitted
+			// class-driven by the SHARED world-entry loadout (EnsureCharacterLoadout: ClassAbilities + GetStartingBarSpells
+			// + GrantCharacterCombos), which the create flow reaches via SendBurstlessWorldEntry. The only WorldPrep-unique
+			// effect was the live create-session quickbar placement of the 3 basic attacks, which the shared bar-seed
+			// covers for a fresh char (verified: they appear on the quickbar after relog). Removed rather than folded.
 
 			// Step 3b: grant the class's starting SPELLS so the client places them on the starting bar. The
 			// world-prep burst hardcodes only the 0x2052 ABILITY grants; retail also sends the class spells as
@@ -1040,142 +1045,6 @@ namespace Faolan.GameServer.CreateFlow
 		// (receiver varint AB DA C5 09 -> C8 C5 D9 10, body instance 01 31 6D 2B -> 02 16 62 C8). Each packet
 		// is resent through PacketStream so its CRC/length are recomputed for the retargeted bytes.
 
-		internal static async Task SendWorldPrepBurst(INetworkClient client, IDatabaseRepository database)
-		{
-			var id = client.Session.Account.ClientInstance;
-			var sender = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x0C };
-			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
-
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232u, 7, 41413, 1, 24, 0));
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039233u, 7, 41413, 1, 24, 0));
-
-			await SendItemStat(client, id, 0x68, 0x00, 0x17, 0x00172B0Eu);
-			await SendItemStat(client, id, 0x68, 0x00, 0x08, 0xFFFFFFFFu);
-			await SendItemStat(client, id, 0x68, 0x00, 0x17, 0x00172B0Fu);
-
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddItem)
-				.WriteArray(0x00, 0x00, 0x00, 0x68)
-				.WriteUInt32(id)
-				.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x08, 0xC0, 0x92, 0xA5, 0xD9, 0xB1, 0xEC, 0x8A, 0xEC, 0x20, 0x12, 0x07, 0x08, 0x00, 0x10, 0x81, 0x80, 0x80, 0x20, 0x12, 0x08, 0x08, 0x08, 0x10, 0xFF,
-					0xFF, 0xFF, 0xFF, 0x0F, 0x12, 0x06, 0x08, 0x17, 0x10, 0x8F, 0xD6, 0x5C, 0x12, 0x04, 0x08, 0x2E, 0x10, 0x07, 0x1A, 0x53, 0x0A, 0x14, 0x0D, 0xFE, 0xC2, 0x7A, 0x03, 0x15, 0xBF, 0x46, 0xE0, 0x60, 0x1D, 0x28, 0x3D,
-					0x92, 0x84, 0x25, 0x52, 0xF2, 0xD0, 0xBA, 0x12, 0x14, 0x0D, 0xFE, 0xC2, 0x7A, 0x03, 0x15, 0xBF, 0x46, 0xE0, 0x60, 0x1D, 0x28, 0x3D, 0x92, 0x84, 0x25, 0x52, 0xF2, 0xD0, 0xBA, 0x1A, 0x14, 0x0D, 0xFE, 0xC2, 0x7A,
-					0x03, 0x15, 0xBF, 0x46, 0xE0, 0x60, 0x1D, 0x28, 0x3D, 0x92, 0x84, 0x25, 0x52, 0xF2, 0xD0, 0xBA, 0x25, 0x50, 0xF2, 0x04, 0x00, 0x2D, 0x50, 0xF2, 0x04, 0x00, 0x38, 0x01, 0x45, 0x31, 0x43, 0x50, 0x4F, 0x00, 0x00,
-					0x00, 0x00)
-				.SendAsync(client);
-
-			await SendItemStat(client, id, 0x68, 0x01, 0x17, 0x00172B10u);
-			await SendItemStat(client, id, 0x68, 0x01, 0x08, 0xFFFFFFFFu);
-			await SendItemStat(client, id, 0x68, 0x01, 0x17, 0x00172B11u);
-
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddItem)
-				.WriteArray(0x00, 0x00, 0x00, 0x68)
-				.WriteUInt32(id)
-				.WriteArray(0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x80, 0x08, 0xC1, 0x92, 0xA5, 0xD9, 0xB1, 0xEC, 0x8A, 0xEC, 0x20, 0x12, 0x07, 0x08, 0x00, 0x10, 0x81, 0x80, 0x80, 0x20, 0x12, 0x08, 0x08, 0x08, 0x10, 0xFF,
-					0xFF, 0xFF, 0xFF, 0x0F, 0x12, 0x06, 0x08, 0x17, 0x10, 0x91, 0xD6, 0x5C, 0x12, 0x04, 0x08, 0x2E, 0x10, 0x07, 0x1A, 0x53, 0x0A, 0x14, 0x0D, 0xE7, 0x0E, 0x53, 0x82, 0x15, 0x3F, 0x46, 0xC4, 0x11, 0x1D, 0xE4, 0x1C,
-					0xAB, 0x25, 0x25, 0x6F, 0xA0, 0xAB, 0xD1, 0x12, 0x14, 0x0D, 0xE7, 0x0E, 0x53, 0x82, 0x15, 0x3F, 0x46, 0xC4, 0x11, 0x1D, 0xE4, 0x1C, 0xAB, 0x25, 0x25, 0x6F, 0xA0, 0xAB, 0xD1, 0x1A, 0x14, 0x0D, 0xE7, 0x0E, 0x53,
-					0x82, 0x15, 0x3F, 0x46, 0xC4, 0x11, 0x1D, 0xE4, 0x1C, 0xAB, 0x25, 0x25, 0x6F, 0xA0, 0xAB, 0xD1, 0x25, 0xE2, 0xF1, 0x04, 0x00, 0x2D, 0xE2, 0xF1, 0x04, 0x00, 0x38, 0x01, 0x45, 0x39, 0x57, 0x39, 0x4D, 0x00, 0x00,
-					0x00, 0x00)
-				.SendAsync(client);
-
-			await SendItemStat(client, id, 0x68, 0x02, 0x17, 0x00172B12u);
-			await SendItemStat(client, id, 0x68, 0x02, 0x08, 0xFFFFFFFFu);
-			await SendItemStat(client, id, 0x68, 0x02, 0x17, 0x00172B13u);
-
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddItem)
-				.WriteArray(0x00, 0x00, 0x00, 0x68)
-				.WriteUInt32(id)
-				.WriteArray(0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x7D, 0x08, 0xC2, 0x92, 0xA5, 0xD9, 0xB1, 0xEC, 0x8A, 0xEC, 0x20, 0x12, 0x04, 0x08, 0x00, 0x10, 0x01, 0x12, 0x08, 0x08, 0x08, 0x10, 0xFF, 0xFF, 0xFF, 0xFF,
-					0x0F, 0x12, 0x06, 0x08, 0x17, 0x10, 0x93, 0xD6, 0x5C, 0x12, 0x04, 0x08, 0x2E, 0x10, 0x07, 0x1A, 0x53, 0x0A, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6, 0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25,
-					0xD2, 0xC7, 0xED, 0x8D, 0x12, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6, 0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25, 0xD2, 0xC7, 0xED, 0x8D, 0x1A, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6,
-					0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25, 0xD2, 0xC7, 0xED, 0x8D, 0x25, 0x15, 0x4B, 0x33, 0x00, 0x2D, 0x15, 0x4B, 0x33, 0x00, 0x38, 0x01, 0x45, 0x35, 0x50, 0x55, 0x43, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
-
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 1, 8, 0, 0, 0x10, 0x0004F250, "OPC1", [0x03, 0x7A, 0xC2, 0xFE, 0x60, 0xE0, 0x46, 0xBF, 0x84, 0x92, 0x3D, 0x28, 0xBA, 0xD0, 0xF2, 0x52]));
-
-			await SendItemStat(client, id, 0x65, 0x10, 0x17, 0x00172B15u);
-
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 2, 8, 0, 1, 0x05, 0x0004F1E2, "M9W9", [0x82, 0x53, 0x0E, 0xE7, 0x11, 0xC4, 0x46, 0x3F, 0x25, 0xAB, 0x1C, 0xE4, 0xD1, 0xAB, 0xA0, 0x6F]));
-
-			await SendItemStat(client, id, 0x65, 0x05, 0x17, 0x00172B17u);
-
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 3, 8, 0, 2, 0x12, 0x00334B15, "CUP5", [0xDD, 0x60, 0xBF, 0x99, 0x76, 0x09, 0x73, 0xF6, 0x79, 0x49, 0xED, 0xCA, 0x8D, 0xED, 0xC7, 0xD2]));
-
-			await SendItemStat(client, id, 0x65, 0x12, 0x17, 0x00172B19u);
-
-			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x00, 0x0360, 0x03)); // #189: was verbatim
-
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000012Cu));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00000708u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001770u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000017D4u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001838u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000189Cu));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000019C8u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001A90u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001AF4u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001BBCu));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001FA4u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Cu));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Du));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Eu));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000206Fu));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002070u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002071u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000020D0u));
-
-			await AddSpecialAbility(0x000BBC46u);
-			await AddSpecialAbility(0x000BBC47u);
-			await AddSpecialAbility(0x000BBC4Bu);
-			await AddSpecialAbility(0x00329B83u);
-			await AddSpecialAbility(0x003815C0u);
-			await AddSpecialAbility(0x0039E783u);
-
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003520u));
-
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416544u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416541u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416542u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416548u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165F1u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165EFu));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416546u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416545u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x004165F0u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416547u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416543u));
-			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416549u));
-
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003908u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0001E5F0u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DBC0u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DD50u));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000503FCu));
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000504C4u));
-
-			await AddSpecialAbility(0x004B3EC8u);
-
-			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
-
-			await Iir(GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x08)); // #189: was verbatim
-			await Iir(GameServer0X2000Opcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
-
-			return;
-
-			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)
-			{
-				return SendIir(client, sender, receiver, iir, body);
-			}
-
-			// The starting melee/utility abilities (#220), granted WHOLE from the Ability row (Slot/Id/Data0..4, the
-			// TEA key included) via the shared GameServerListener.SendAddSpecialAbility - the same grant login's
-			// GrantStartingAbilities uses, just on the create-editor conversation (GameCharAgent sub 0x0C).
-			async Task AddSpecialAbility(uint abilityId) =>
-				await GameServerListener.SendAddSpecialAbility(client, await database.GetAbility(abilityId), true, Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C));
-		}
-
 		// Consumes (removes) a pending create-world-entry marker for `clientInstance`, returning true if one was set.
 		// The listener's world Hello calls this to recognise the post-creation world connection (and skip the helper
 		// auth), then take the create-world entry path; consuming it means a later normal login doesn't re-trigger the intro.
@@ -1314,24 +1183,11 @@ namespace Faolan.GameServer.CreateFlow
 		// the still-opaque property-map action tail rides verbatim; the carrier length is computed from the body.
 		private static Task SendGameActionListRecord(INetworkClient client, byte agentSub, uint id, uint dynel, byte[] actionTail)
 		{
-			var body = GameActionListCodec.BuildBody(id, dynel, 0u, actionTail);
 			return new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, agentSub), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(body)
+				.WriteArrayUInt32Length(GameActionListCodec.BuildBody(id, dynel, 0u, actionTail))
 				.SendAsync(client);
 		}
-
-		// One DispatchSetItemStat record from the world-prep starting-gear setup: [u32 tag][u32 id][u32 slot][u32
-		// statId][u32 value]. `tag` (0x68 inventory / 0x65 equipment) + the handle values are capture-derived.
-		private static Task SendItemStat(INetworkClient client, uint id, uint tag, uint slot, uint statId, uint value) =>
-			new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat)
-				.WriteUInt32(tag)
-				.WriteUInt32(id)
-				.WriteUInt32(slot)
-				.WriteUInt32(statId)
-				.WriteUInt32(value)
-				.SendAsync(client);
 
 		// The create-flow send idiom: one 0x2000 record ([u32 len][u32 iir opcode][body]) delivered via DispatchPassBlob.
 		// Every editor/world-prep burst funnels its records through here instead of re-spelling the PacketStream chain.
