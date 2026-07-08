@@ -906,7 +906,7 @@ namespace Faolan.GameServer
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
-						await AckAuthenticate(client, 1, authSender, authReceiver);
+						await new PacketStream().WriteHeader(authSender, authReceiver, GameInterfaceDispatchOpcodes.DispatchAckAuthenticate).WriteUInt32(1).SendAsync(client);
 					}
 
 					client.Session.LastGameServer2020RequestId = null;

@@ -675,7 +675,7 @@ namespace Faolan.GameServer
 			// beach point. Falls back to the universal Tortage Beach default when the map defines no point.
 			var spot = await ResolveLoginResurrectionSpot(character);
 
-			var ps = new PacketStream();
+			using var ps = new PacketStream();
 			ps.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
 			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(ps, character.Position, [spot]);
 			await ps.SendAsync(client);
@@ -688,7 +688,8 @@ namespace Faolan.GameServer
 			// The 0x2020 poll reply (0x2008) doubles as the NPC quest marker. Compute it from the player's quest
 			// state for the polled handle (#241) instead of the old hardcoded 0x02-for-Casilda, which forced '!' on
 			// EVERY poll and overrode the state-driven marker (so it never cleared after accept). Non-giver /
-			// not-in-view -> 0x00 (still confirms the spawn). Capture-matched: poll reply was 0x02 before accept, 			// 0x00 after (Ranochar frames 125 -> 698).
+			// not-in-view -> 0x00 (still confirms the spawn). Capture-matched: poll reply was 0x02 before accept,
+			// 0x00 after (Ranochar frames 125 -> 698).
 			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
 
 			await new PacketStream()
@@ -741,11 +742,6 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
-		}
-
-		private static Task AckAuthenticate(INetworkClient client, uint value, byte[] sender, byte[] receiver)
-		{
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchAckAuthenticate).WriteUInt32(value).SendAsync(client);
 		}
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
@@ -806,20 +802,16 @@ namespace Faolan.GameServer
 
 		private static Task ReportServerId(INetworkClient client, uint value, byte[] sender, byte[] receiver)
 		{
-			//TODO: Use value?
-
-			var packetData0 = new byte[]
-			{
-				0x00, 				0x00, 				0x00, 				0x54,
-				0x00, 				0x00, 				0x00, 				0x01
-			};
-
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportServerID).WriteArray(packetData0).SendAsync(client);
+			// Body: [u32 0x54 (fixed header)][u32 value]. The create-flow auth handshake reports value 1.
+			return new PacketStream()
+				.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportServerID)
+				.WriteUInt32(0x54u)
+				.WriteUInt32(value)
+				.SendAsync(client);
 		}
 
 		private static async Task Send0X201C(INetworkClient client)
 		{
-			var sender = LoginWorld201CSender;
 			var receiver = client.Endpoint(Endpoints.GameCharInterfaceType);
 			var ticketBase = 0x00160000u + ((uint)Environment.TickCount & 0xFFFF);
 
@@ -827,11 +819,11 @@ namespace Faolan.GameServer
 			// 0x65 prefix and state ids {5, 6, 0x10, 0x12}, then a final 0x68 prefix with state 1. The old
 			// three-entry set (with a duplicated state 6 and missing 5/0x12/the 0x68 entry) left the client
 			// stuck before it ever started polling spawns (0x2020), so nothing rendered.
-			await Send0X201CEntry(client, sender, receiver, 0x00000065, 0x00000005, ticketBase);
-			await Send0X201CEntry(client, sender, receiver, 0x00000065, 0x00000006, ticketBase + 1);
-			await Send0X201CEntry(client, sender, receiver, 0x00000065, 0x00000010, ticketBase + 2);
-			await Send0X201CEntry(client, sender, receiver, 0x00000065, 0x00000012, ticketBase + 3);
-			await Send0X201CEntry(client, sender, receiver, 0x00000068, 0x00000001, ticketBase + 4);
+			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000005, ticketBase);
+			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000006, ticketBase + 1);
+			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000010, ticketBase + 2);
+			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000012, ticketBase + 3);
+			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000068, 0x00000001, ticketBase + 4);
 		}
 
 		private static Task Send0X201CEntry(INetworkClient client, byte[] sender, byte[] receiver, uint prefix, uint state, uint ticket)
