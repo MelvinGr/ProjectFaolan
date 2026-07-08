@@ -60,9 +60,6 @@ namespace Faolan.Core.Network.Codecs
 		// TODO: harvest this per quest into QuestDefinition; 3 is the captured value for Casilda's 13479 (and the only
 		// value observed for active quests so far - a different quest 0x..27 used 1).
 		public const uint FullUpdateStateActive = 3;
-		public const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR; // one quest's full detail
-		public const uint QuestGoalSubOpcode = (uint)GameServer0X2000Opcodes.QuestGoalIIR; // QuestGoalIIR_c - objective progress
-		public const uint QuestIirSubOpcode = (uint)GameServer0X2000Opcodes.QuestIIR; // QuestIIR_c - add/update/remove a quest in the journal
 
 		// --- Journal CONTENT packets (Captures/scripts/decode_quest.py, byte-exact golden tests) ----------
 		//
@@ -73,8 +70,6 @@ namespace Faolan.Core.Network.Codecs
 		// Builders emit from the subopcode onward; the 4-byte length prefix is added by the send layer
 		// (matching BuildQuestIir/BuildQuestGoal).
 
-		public const uint QuestJournalSubOpcode = (uint)GameServer0X2000Opcodes.QuestJournalIIR; // the J-panel quest list
-		public const uint QuestLogListSubOpcode = (uint)GameServer0X2000Opcodes.QuestLogListIIR; // the active-quest LIST that POPULATES the J-panel
 
 		// Quest state codes (from the capture). On completion retail sends QuestIIR twice for the quest: state 2
 		// (active/update) then state 4 (completed) - see the Stihetfv compeltefirstquest capture (13479 idx858/860).
@@ -101,7 +96,7 @@ namespace Faolan.Core.Network.Codecs
 			byte[] objectiveText, byte[] objectiveLocalized)
 		{
 			var w = new FaolanStream();
-			WriteHeader(w, QuestFullUpdateSubOpcode, playerHandle);
+			WriteHeader(w, (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, playerHandle);
 			w.WriteUInt32(0);
 			w.WriteByte(0x01);
 			w.WriteUInt32(questId);
@@ -161,7 +156,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildQuestGoal(uint playerHandle, uint questId, uint goalId, uint count)
 		{
 			return new FaolanStream()
-				.WriteUInt32(QuestGoalSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.QuestGoalIIR)
 				.WriteUInt32(TypeTagAck)
 				.WriteUInt32(playerHandle)
 				.WriteByte(0x01)
@@ -177,7 +172,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildQuestIir(uint playerHandle, uint questId, uint state)
 		{
 			return new FaolanStream()
-				.WriteUInt32(QuestIirSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.QuestIIR)
 				.WriteUInt32(TypeTagAck)
 				.WriteUInt32(playerHandle)
 				.WriteUInt32(0) // [12..16] = 0
@@ -198,7 +193,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildQuestJournal(uint playerHandle, uint areaId, IReadOnlyList<byte[]> areaHeader, IReadOnlyList<JournalEntry> entries, byte[] trailing)
 		{
 			var w = new FaolanStream();
-			WriteHeader(w, QuestJournalSubOpcode, playerHandle);
+			WriteHeader(w, (uint)GameServer0X2000Opcodes.QuestJournalIIR, playerHandle);
 			w.WriteByte(0x01);
 			w.WriteUInt32(areaId);
 			foreach (var rec in areaHeader)
@@ -231,7 +226,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildQuestLogList(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, byte[] areaTitleRecord)
 		{
 			var w = new FaolanStream();
-			WriteHeader(w, QuestLogListSubOpcode, playerHandle);
+			WriteHeader(w, (uint)GameServer0X2000Opcodes.QuestLogListIIR, playerHandle);
 			w.WriteByte(0x01);
 			w.WriteUInt32(1);
 			w.WriteUInt32(areaId);
@@ -289,7 +284,7 @@ namespace Faolan.Core.Network.Codecs
 			count = 0;
 			if (body.Length != 33)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != QuestGoalSubOpcode)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestGoalIIR)
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
 				return false;
@@ -314,7 +309,7 @@ namespace Faolan.Core.Network.Codecs
 			state = 0;
 			if (body.Length != 29)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != QuestIirSubOpcode)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestIIR)
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
 				return false;

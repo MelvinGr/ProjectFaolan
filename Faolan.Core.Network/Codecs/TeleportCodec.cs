@@ -15,8 +15,6 @@ namespace Faolan.Core.Network.Codecs
 	// the spawn position inside a length-prefixed blob (FUN_00cbf5d0). Every byte is reader-accounted (TeleportHandoffTests).
 	public static class TeleportCodec
 	{
-		public const uint IntendedTeleportSubOpcode = (uint)GameServer0X2000Opcodes.IntendedTeleportIIR; // 0x10D27BC0
-		public const uint N3TeleportSubOpcode = (uint)GameServer0X2000Opcodes.N3TeleportIIR; // 0x5A32F0D7
 		private const byte PlayfieldProxyVersion = 0x62; // 'b' - the PlayfieldProxy stream version (FUN_00a6a600)
 		private const uint PlayfieldClassWord = 0x0000C79C; // PlayfieldProxy u32[0] (constant in the captures)
 		private const uint PositionBlobTag = 0x00018704; // first word of the length-prefixed spawn-position blob
@@ -30,7 +28,7 @@ namespace Faolan.Core.Network.Codecs
 		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=01][PlayfieldProxy][u8 bool=0]
 		public static byte[] BuildBegin(uint clientInstance, uint destMapId)
 		{
-			var s = new FaolanStream().WriteUInt32(IntendedTeleportSubOpcode).WriteUInt32(ReceiverClass).WriteUInt32(clientInstance).WriteByte(0x01); // env
+			var s = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR).WriteUInt32(ReceiverClass).WriteUInt32(clientInstance).WriteByte(0x01); // env
 			WritePlayfieldProxy(s, destMapId, 0, 0, 0);
 			return s.WriteByte(0x00).ToArray(); // IntendedTeleportIIR trailing bool (-> obj+0x40)
 		}
@@ -54,7 +52,7 @@ namespace Faolan.Core.Network.Codecs
 			var positionBlob = new FaolanStream().WriteUInt32(PositionBlobTag).WriteVector3(position).WriteUInt32(destDescriptor).ToArray();
 
 			var s = new FaolanStream()
-				.WriteUInt32(N3TeleportSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR)
 				.WriteUInt32(ReceiverClass)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x00) // env
@@ -84,7 +82,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildReviveDestination(uint clientInstance, uint mapId, uint playerHandle, Vector3 position, float facingX, float facingZ)
 		{
 			return new FaolanStream()
-				.WriteUInt32(N3TeleportSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR)
 				.WriteUInt32(ReceiverClass)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x00) // env
@@ -125,7 +123,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildReviveTeleport(uint clientInstance, uint mapId, uint playerHandle, uint playfieldToken)
 		{
 			var s = new FaolanStream()
-				.WriteUInt32(IntendedTeleportSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR)
 				.WriteUInt32(ReceiverClass)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x01) // env

@@ -22,7 +22,6 @@ namespace Faolan.Core.Network.Codecs
 	{
 		public const uint ConstFour = 4;
 		public const uint Head = 0x000007E2;
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
 		public const ulong ConstOne = 1;
 		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
 
@@ -31,7 +30,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			ArgumentNullException.ThrowIfNull(actionTail);
 			return new FaolanStream()
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.GameActionListIIR)
 				.WriteUInt32(WireType)
 				.WriteUInt32(frameHandle)
 				.WriteByte(0x00)
@@ -52,8 +51,8 @@ namespace Faolan.Core.Network.Codecs
 			var r = new FaolanStream(body);
 
 			var subop = r.ReadUInt32();
-			if (subop != SubOpcode)
-				throw new InvalidOperationException($"GameActionList: subop 0x{subop:X} != 0x{SubOpcode:X}");
+			if (subop != (uint)GameServer0X2000Opcodes.GameActionListIIR)
+				throw new InvalidOperationException($"GameActionList: subop 0x{subop:X} != 0x{(uint)GameServer0X2000Opcodes.GameActionListIIR:X}");
 
 			r.ReadUInt32(); // 0xC350 type word
 			var frameHandle = r.ReadUInt32();

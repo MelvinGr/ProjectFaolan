@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Tests.Support;
+using Faolan.Core.Network.Opcodes;
 using Xunit;
 using Faolan.Core.Network.Codecs;
 
@@ -44,7 +45,7 @@ namespace Faolan.Tests
 			};
 			var built = MoveTaskBuilder.BuildPatrol(0x000900A1u, new Vector3(100f, 10f, 200f), waypoints, 4.5f);
 
-			Assert.Equal(MoveTaskBuilder.SubOpcode, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4, 4)));
+			Assert.Equal((uint)GameServer0X2000Opcodes.MoveTaskIIR, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4, 4)));
 			Assert.Equal(0x000900A1u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(12, 4)));
 			Assert.Equal((byte)0x04, built[30]); // patrol task type
 			Assert.Equal((byte)waypoints.Length, built[40]);
@@ -76,7 +77,7 @@ namespace Faolan.Tests
 			var built = MoveTaskBuilder.BuildStationary(0x000818D9u, new Vector3(461.22f, 162.71f, 664.95f));
 
 			Assert.Equal(31, built.Length);
-			Assert.Equal(MoveTaskBuilder.SubOpcode, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4, 4)));
+			Assert.Equal((uint)GameServer0X2000Opcodes.MoveTaskIIR, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4, 4)));
 			Assert.Equal(0x000818D9u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(12, 4)));
 			Assert.Equal(461.22f, BinaryPrimitives.ReadSingleBigEndian(built.AsSpan(18, 4)));
 			Assert.Equal((byte)0x06, built[30]);

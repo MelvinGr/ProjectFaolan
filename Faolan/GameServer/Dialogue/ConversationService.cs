@@ -26,16 +26,12 @@ namespace Faolan.GameServer.Dialogue
 	public sealed class ConversationService
 	{
 		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
-		private const uint KnubotAnswerListSubOpcode = (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR;
 
 		// The Knubot packets we CONSTRUCT from the typed codec (KnubotCodec) instead of replaying+substituting (#188):
 		// ALL FOUR record types - the spoken line (AppendText), the window-open, the answer list and the close. Their
 		// content (XML / options / value) is lifted from the captured record and rebuilt with the LIVE player/NPC
 		// endpoints - byte-identical to the substitution path (ConversationConstruct tests) but routed through the
 		// typed codec, the step toward sourcing the line content from RDB/Lua instead of the captured packet.
-		private const uint KnubotAppendTextSubOpcode = (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR;
-		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR;
-		private const uint KnubotOpenChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR;
 
 		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
 		// answer list (the remoteformat is id="0" with no options) - retail's "this NPC has nothing (more) to say"
@@ -293,7 +289,7 @@ namespace Faolan.GameServer.Dialogue
 			// instantly closes, can't accept). When the screen has a real AnswerList, drop the spurious close; a pure
 			// terminal screen (CloseChatWindow only) is kept.
 			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).ToList();
-			var hasAnswerList = orderedPackets.Any(p => SubOpcodeOf(p) == KnubotAnswerListSubOpcode);
+			var hasAnswerList = orderedPackets.Any(p => SubOpcodeOf(p) == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR);
 
 			// Remember the GameAgent instance this conversation's packets are sent from (retail varies it per
 			// conversation). SendConversationClose must reuse it - a close from a different instance (e.g. the old
@@ -313,11 +309,11 @@ namespace Faolan.GameServer.Dialogue
 			foreach (var p in orderedPackets)
 			{
 				var subOp = SubOpcodeOf(p);
-				if (hasAnswerList && subOp == KnubotCloseChatWindowSubOpcode)
+				if (hasAnswerList && subOp == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR)
 					continue; // skip the spurious close so the option list stays interactive
 
 				// Deliver the quest packets immediately BEFORE the screen's AnswerList, mirroring retail's order.
-				if (grantDef != null && !grantSent && subOp == KnubotAnswerListSubOpcode)
+				if (grantDef != null && !grantSent && subOp == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR)
 				{
 					await SendQuestGrantPackets(client, grantDef);
 					grantSent = true;
@@ -370,7 +366,7 @@ namespace Faolan.GameServer.Dialogue
 			// on the client. Recording it as the active position left the session "inside" a finished conversation,
 			// so the greeting the client fires right after re-opened it (#217). End instead - this arms the post-close
 			// guard (EndConversation) so that follow-up greeting is absorbed.
-			var isTerminalClose = !hasAnswerList && orderedPackets.Any(p => ConversationSubOpcode(p.Data) == KnubotCloseChatWindowSubOpcode);
+			var isTerminalClose = !hasAnswerList && orderedPackets.Any(p => ConversationSubOpcode(p.Data) == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR);
 			if (isTerminalClose)
 			{
 				client.Session.ConversationNpcHandle = clickedNpcHandle; // ensure the guard arms for THIS npc
@@ -444,9 +440,9 @@ namespace Faolan.GameServer.Dialogue
 				? []
 				: JsonSerializer.Deserialize<string[]>(p.ScreensJson) ?? [];
 
-			if (p.SubOpcode == KnubotOpenChatWindowSubOpcode)
+			if (p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR)
 				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
-			if (p.SubOpcode == KnubotAppendTextSubOpcode)
+			if (p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
 				return KnubotCodec.BuildAppendText(liveInstance, npcHandle, Screen(0), p.Field ?? 1, p.Flag ?? 1, env);
 
 			// AnswerList + CloseChatWindow: the string-list grammar.
@@ -513,7 +509,7 @@ namespace Faolan.GameServer.Dialogue
 			var carrier = capturedPacket.AsSpan(start).ToArray(); // [u32 len][sub][...]
 			var sub = BinaryPrimitives.ReadUInt32BigEndian(carrier.AsSpan(4, 4));
 
-			if (sub == KnubotAppendTextSubOpcode)
+			if (sub == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
 			{
 				var p = KnubotCodec.ParseAppendText(carrier);
 				var xml = WithLivePlayer(p.Xml, playerName, guildName);
@@ -521,7 +517,7 @@ namespace Faolan.GameServer.Dialogue
 				return true;
 			}
 
-			if (sub == KnubotOpenChatWindowSubOpcode)
+			if (sub == (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR)
 			{
 				var p = KnubotCodec.ParseOpenChatWindow(carrier);
 				record = KnubotCodec.BuildOpenChatWindow(liveInstance, clickedNpcHandle, p.Value, p.Env);
@@ -529,7 +525,7 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			// AnswerList + CloseChatWindow share the string-list grammar; rebuild re-addressed to the live endpoints.
-			if (sub == KnubotAnswerListSubOpcode || sub == KnubotCloseChatWindowSubOpcode)
+			if (sub == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR || sub == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR)
 			{
 				var p = KnubotCodec.ParseStringList(carrier);
 				var strings = p.Strings.Select(x => WithLivePlayer(x, playerName, guildName)).ToList();

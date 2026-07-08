@@ -16,7 +16,6 @@ namespace Faolan.Core.Network.Codecs
     //   f6 = sub-message {f1=0, f2=0}.
     public static class ScryScript
     {
-        public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR;
         public const uint TypeTagAck = EntityClass.Character;
 
         // The no-token form: a StartScriptGroupOnClient (type 0) callback that runs a script group by id, with no
@@ -34,7 +33,7 @@ namespace Faolan.Core.Network.Codecs
             WriteBytesField(pb, 6, f6.ToArray());
 
             return new FaolanStream()
-                .WriteUInt32(SubOpcode)
+                .WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR)
                 .WriteUInt32(TypeTagAck)
                 .WriteUInt32(playerHandle)
                 .WriteByte(0x00)
@@ -60,7 +59,7 @@ namespace Faolan.Core.Network.Codecs
             WriteBytesField(pb, 6, f6.ToArray());
 
             return new FaolanStream()
-                .WriteUInt32(SubOpcode)
+                .WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR)
                 .WriteUInt32(TypeTagAck)
                 .WriteUInt32(playerHandle)
                 .WriteByte(0x00) // framing flag

@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Opcodes;
 using Xunit;
 
 namespace Faolan.Tests
@@ -35,13 +36,13 @@ namespace Faolan.Tests
 		[Fact]
 		public void NewAllowedLooterReset_MatchesCapture()
 		{
-			Assert.Equal("1e2e01390000c87a000021fe000000000000000000", Convert.ToHexStringLower(WorldLoot.BuildLooterResetBody(WorldLoot.NewAllowedLooterSubOpcode, Bag)));
+			Assert.Equal("1e2e01390000c87a000021fe000000000000000000", Convert.ToHexStringLower(WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, Bag)));
 		}
 
 		[Fact]
 		public void NewCurrentLooterReset_MatchesCapture()
 		{
-			Assert.Equal("d06568c80000c87a000021fe000000000000000000", Convert.ToHexStringLower(WorldLoot.BuildLooterResetBody(WorldLoot.NewCurrentLooterSubOpcode, Bag)));
+			Assert.Equal("d06568c80000c87a000021fe000000000000000000", Convert.ToHexStringLower(WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, Bag)));
 		}
 	}
 }

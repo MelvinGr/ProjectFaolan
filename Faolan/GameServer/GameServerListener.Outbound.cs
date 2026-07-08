@@ -283,6 +283,7 @@ namespace Faolan.GameServer
 		// [u8 flag=0][u32 BE blobLen][field5]. blobLen = field5.Length + rootLength (the client reads EXACTLY blobLen
 		// bytes as the protobuf blob = field5 + root, then expects the 0x18 tails version). Identical BE32 model to
 		// SetSnapshotBlobLength, but built from scratch rather than patched onto a captured prefix.
+		[Obsolete("BUILD FROM SCRATCH")]
 		internal static byte[] BuildSnapshotPrefix(int rootLength)
 		{
 			ArgumentOutOfRangeException.ThrowIfNegative(rootLength);

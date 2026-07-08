@@ -14,7 +14,6 @@ namespace Faolan.Core.Network.Codecs
 	// raw u32 bits so float values round-trip exactly.
 	public sealed class MoveTaskComposite : ICodec<MoveTaskComposite>
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
 		private const uint WireType = EntityClass.Character; // 0xC350
 		public MoveTaskNode Task { get; set; } = new MoveTaskNode();
 		public uint FromX { get; set; }
@@ -27,7 +26,7 @@ namespace Faolan.Core.Network.Codecs
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteUInt32(SubOpcode).WriteUInt32(WireType).WriteUInt32(Handle).WriteUInt16(0).WriteUInt32(FromX).WriteUInt32(FromY).WriteUInt32(FromZ);
+			s.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(WireType).WriteUInt32(Handle).WriteUInt16(0).WriteUInt32(FromX).WriteUInt32(FromY).WriteUInt32(FromZ);
 			Task.Write(s);
 		}
 
@@ -47,8 +46,8 @@ namespace Faolan.Core.Network.Codecs
 		public static MoveTaskComposite Read(FaolanStream r)
 		{
 			var subop = r.ReadUInt32();
-			if (subop != SubOpcode)
-				throw new InvalidOperationException($"MoveTask subop 0x{subop:X} != 0x{SubOpcode:X}");
+			if (subop != (uint)GameServer0X2000Opcodes.MoveTaskIIR)
+				throw new InvalidOperationException($"MoveTask subop 0x{subop:X} != 0x{(uint)GameServer0X2000Opcodes.MoveTaskIIR:X}");
 
 			r.ReadUInt32(); // type 0xC350
 			var c = new MoveTaskComposite { Handle = r.ReadUInt32() };

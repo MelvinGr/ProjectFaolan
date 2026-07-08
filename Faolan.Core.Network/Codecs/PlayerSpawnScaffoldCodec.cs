@@ -10,7 +10,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class PlayerSpawnScaffoldCodec
 	{
 		public const uint Marker = 0x3F1;
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 		private const int BuffRecordSize = 60;
 
 		public static byte[] Generate(PlayerSpawnScaffold s)
@@ -19,7 +18,7 @@ namespace Faolan.Core.Network.Codecs
 
 			// Everything from SubOpcode onward; the leading u32 length prefix (= payload length) is added last.
 			var payload = new FaolanStream()
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
 				.WriteUInt32(s.Ack)
 				.WriteUInt32(s.Handle)
 				.WriteUInt32(s.FieldA)
@@ -104,7 +103,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			if (body == null || body.Length < 24)
 				throw new FormatException("body too short");
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != SubOpcode)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
 				throw new FormatException("not an FA015807 body");
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4)) != (uint)(body.Length - 4))
 				throw new FormatException("body length field mismatch");

@@ -16,8 +16,6 @@ namespace Faolan.Core.Network.Codecs
     {
         public const int DamageResultBodyLength = 37;
         public const int EnergyBodyLength = 17;
-        public const uint DamageResultSubOpcode = (uint)GameServer0X2000Opcodes.DamageResultIIR;
-        public const uint EnergySubOpcode = (uint)GameServer0X2000Opcodes.EnergyIIR;
 
         // The NormalAttack behaviorId carried by an attack BehaviorControlCenterIIR.
         private const uint NormalAttackBehaviorId = 0x0000000F;
@@ -34,7 +32,7 @@ namespace Faolan.Core.Network.Codecs
         public static byte[] BuildDamageResultBody(uint attackerInstance, uint targetHandle, uint damage)
         {
             return new FaolanStream()
-                .WriteUInt32(DamageResultSubOpcode)
+                .WriteUInt32(GameServer0X2000Opcodes.DamageResultIIR)
                 .WriteUInt32(WireType)
                 .WriteUInt32(attackerInstance)
                 .WriteByte(0x00)
@@ -50,7 +48,7 @@ namespace Faolan.Core.Network.Codecs
         // The EnergyIIR body - the actor's stamina after a swing (stamina-only in the captures).
         public static byte[] BuildEnergyBody(uint actorInstance, uint stamina)
         {
-            return new FaolanStream().WriteUInt32(EnergySubOpcode).WriteUInt32(WireType).WriteUInt32(actorInstance).WriteByte(0x01).WriteUInt32(stamina).ToArray();
+            return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteUInt32(WireType).WriteUInt32(actorInstance).WriteByte(0x01).WriteUInt32(stamina).ToArray();
         }
 
         // The NPC counter-attack ANIMATION ack: the "second BccAck with actor = target handle" (docs/combat.md, was
@@ -129,7 +127,7 @@ namespace Faolan.Core.Network.Codecs
             damage = 0;
             if (body.Length != DamageResultBodyLength)
                 return false;
-            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != DamageResultSubOpcode)
+            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.DamageResultIIR)
                 return false;
             if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != WireType)
                 return false;
@@ -153,7 +151,7 @@ namespace Faolan.Core.Network.Codecs
             stamina = 0;
             if (body.Length != EnergyBodyLength)
                 return false;
-            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != EnergySubOpcode)
+            if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.EnergyIIR)
                 return false;
             if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != WireType)
                 return false;

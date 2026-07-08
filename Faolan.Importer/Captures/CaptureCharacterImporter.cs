@@ -2,6 +2,7 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Spawn;
 using Faolan.Importer.Extractors;
@@ -83,7 +84,7 @@ namespace Faolan.Importer.Captures
                         continue;
                     }
 
-                    if (subop != PlayerSpawnScaffoldCodec.SubOpcode)
+                    if (subop != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
                         continue;
 
                     // Only PLAYER spawns parse with the scaffold codec (NPC FA015807 bodies have a different

@@ -17,7 +17,6 @@ namespace Faolan.Core.Network.Codecs
 	//   [u32 bodyLen=27][u32 0x96C46740][u32 ack=0xC350][u32 handle][00 00][vec3 pos (3x BE f32)][06]
 	public static class MoveTaskBuilder
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
 		private const int BodyLength = 31;
 		private const uint Ack = EntityClass.Character;
 
@@ -43,7 +42,7 @@ namespace Faolan.Core.Network.Codecs
 			var total = 16 + 2 + 12 + 10 + 1 + 12 * waypoints.Count + 17 + 12 + 2;
 			var stream = new FaolanStream()
 				.WriteUInt32(total - 4)
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
 				.WriteUInt32(Ack)
 				.WriteUInt32(handle)
 				.WriteUInt16(0) // prefix 00 00
@@ -80,7 +79,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			return new FaolanStream()
 				.WriteUInt32(BodyLength - 4)
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
 				.WriteUInt32(Ack)
 				.WriteUInt32(handle)
 				.WriteUInt16(0) // prefix 00 00

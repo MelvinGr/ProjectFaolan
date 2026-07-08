@@ -10,21 +10,15 @@ namespace Faolan.Core.Network.Codecs
 	public static class WorldLoot
 	{
 		public const float DefaultFadeSeconds = 3.0f;
-		public const uint BagConsumedVisualSubOpcode = (uint)GameServer0X2000Opcodes.UpdateSimpleDynelIIR; // 0x30536411
 		public const uint EntityTypeTag = EntityClass.Character; // the entity-frame typetag carried inside NewCurrentLooter
-		public const uint FadeSubOpcode = (uint)GameServer0X2000Opcodes.N3ToClientFadeIIR; // n3ToClientFadeIIR_t - graceful fade-out despawn
 
-		public const uint LootRemoveItemsSubOpcode = (uint)GameServer0X2000Opcodes.LootRemoveItemsIIR; // 0x70010162
 		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
-		public const uint NewAllowedLooterSubOpcode = (uint)GameServer0X2000Opcodes.NewAllowedLooterIIR; // 0x1E2E0139
-		public const uint NewCurrentLooterSubOpcode = (uint)GameServer0X2000Opcodes.NewCurrentLooterIIR; // NewCurrentLooterIIR_c
-		public const uint VisualChangeSubOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
 
 		// UpdateSimpleDynelIIR (0x30536411): the bag's visual update as it's consumed (sent right before the fade).
 		// 24 B: [subop][lootTypetag][bagHandle][00000000][00000000][01][00 01 01].
 		public static byte[] BuildBagConsumedVisualBody(uint bagHandle)
 		{
-			return new FaolanStream().WriteUInt32(BagConsumedVisualSubOpcode).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(0).WriteByte(0x01).WriteByte(0x00).WriteByte(0x01).WriteByte(0x01).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.UpdateSimpleDynelIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(0).WriteByte(0x01).WriteByte(0x00).WriteByte(0x01).WriteByte(0x01).ToArray();
 		}
 
 		// The graceful fade-out despawn (the loot-consumed / loot-expired variant of n3ToClientQuit). 17 B:
@@ -32,7 +26,7 @@ namespace Faolan.Core.Network.Codecs
 		// from n3ToClientQuit's 0x01 marker + u32 playfield token.
 		public static byte[] BuildFadeBody(uint typeTag, uint handle, float fadeSeconds)
 		{
-			return new FaolanStream().WriteUInt32(FadeSubOpcode).WriteUInt32(typeTag).WriteUInt32(handle).WriteByte(0x00).WriteFloat(fadeSeconds).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.N3ToClientFadeIIR).WriteUInt32(typeTag).WriteUInt32(handle).WriteByte(0x00).WriteFloat(fadeSeconds).ToArray();
 		}
 
 		// NewCurrentLooter / NewAllowedLooter RESET (looter -> none) once the bag is emptied. 21 B:
@@ -53,7 +47,7 @@ namespace Faolan.Core.Network.Codecs
 		// was left in the bag. The 0x000007E2 landmark is a fixed constant here.
 		public static byte[] BuildLootRemoveItemsBody(uint bagHandle, uint removedPos = 0)
 		{
-			return new FaolanStream().WriteUInt32(LootRemoveItemsSubOpcode).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(7).WriteByte(0xE2).WriteUInt32(removedPos).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.LootRemoveItemsIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(7).WriteByte(0xE2).WriteUInt32(removedPos).ToArray();
 		}
 
 		// "bag -> ALLOWED looter = this player" (NewAllowedLooterIIR), same shape as the current-looter body but the
@@ -63,14 +57,14 @@ namespace Faolan.Core.Network.Codecs
 		// playfield (re)load.
 		public static byte[] BuildNewAllowedLooterBody(uint bagHandle, uint playerHandle)
 		{
-			return new FaolanStream().WriteUInt32(NewAllowedLooterSubOpcode).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityTypeTag).WriteUInt32(playerHandle).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.NewAllowedLooterIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityTypeTag).WriteUInt32(playerHandle).ToArray();
 		}
 
 		// "bag -> current looter = this player" (also used for NewAllowedLooter, same shape). 21 B:
 		// [subop][lootTypetag][bagHandle][0x00][entityTypetag][playerHandle].
 		public static byte[] BuildNewCurrentLooterBody(uint bagHandle, uint playerHandle)
 		{
-			return new FaolanStream().WriteUInt32(NewCurrentLooterSubOpcode).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityTypeTag).WriteUInt32(playerHandle).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.NewCurrentLooterIIR).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteByte(0x00).WriteUInt32(EntityTypeTag).WriteUInt32(playerHandle).ToArray();
 		}
 
 		// Opens the loot WINDOW on the object (SimpleDynelVisualChange carrying the state string "Open"). 19 + len B:
@@ -79,7 +73,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			var text = Encoding.ASCII.GetBytes(state);
 			return new FaolanStream()
-				.WriteUInt32(VisualChangeSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR)
 				.WriteUInt32(typeTag)
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // [12..16] = 0

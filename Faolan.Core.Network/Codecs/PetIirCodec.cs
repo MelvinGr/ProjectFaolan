@@ -14,7 +14,6 @@ namespace Faolan.Core.Network.Codecs
 	//   the capture shows a COMBAT pet = (0,2,2) and a SOCIAL pet = (5,0,1).
 	public static class PetIirCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.PetIIR;
 		private const byte Env = 0x00;
 		private const uint Type = EntityClass.Character; // the shared 0xC350 type word
 
@@ -26,7 +25,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildAssign(uint owner, uint pet, (uint F1, uint F2, uint F3) kind)
 		{
 			return new FaolanStream()
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.PetIIR)
 				.WriteUInt32(Type)
 				.WriteUInt32(owner)
 				.WriteByte(Env)
@@ -43,7 +42,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildRemove(uint owner, uint pet)
 		{
 			return new FaolanStream()
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.PetIIR)
 				.WriteUInt32(Type)
 				.WriteUInt32(owner)
 				.WriteByte(Env)

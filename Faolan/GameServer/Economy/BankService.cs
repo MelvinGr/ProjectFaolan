@@ -31,7 +31,6 @@ namespace Faolan.GameServer.Economy
 	{
 		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
 
-		private const uint BankIirSubOpcode = (uint)GameServer0X2000Opcodes.BankIIR; // BankIIR_t
 		private const uint BankMaxSize = 50; // captured bank capacity
 		private const ushort BankRegisterOpcode = 0x201C;
 		private readonly IDatabaseRepository _database;
@@ -128,7 +127,7 @@ namespace Faolan.GameServer.Economy
 		// against the captured bank (BankStorageTests).
 		public static byte[] BuildBankIirRecord(uint charInstance, ProtoInventoryGame containerBlob)
 		{
-			return new FaolanStream().WriteUInt32(BankIirSubOpcode).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteArrayUInt32Length(containerBlob.ToProtobuf()).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BankIIR).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteArrayUInt32Length(containerBlob.ToProtobuf()).ToArray();
 		}
 
 		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]

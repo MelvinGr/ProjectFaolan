@@ -15,7 +15,6 @@ namespace Faolan.Core.Network.Codecs
 	public static class WorldDespawn
 	{
 		public const int BodyLength = 17; // [subop][typeTag][handle][marker][token] = 4+4+4+1+4
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR; // n3ToClientQuitIIR_t
 		public const uint TypeTagAck = EntityClass.Character; // the ack TypeTag shared by the IIR record family
 		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
 
@@ -27,7 +26,7 @@ namespace Faolan.Core.Network.Codecs
 		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` in playfield `token`.
 		public static byte[] BuildBody(uint handle, uint token)
 		{
-			return new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(TypeTagAck).WriteUInt32(handle).WriteByte(RecordMarker).WriteUInt32(token).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.N3ToClientQuitIIR).WriteUInt32(TypeTagAck).WriteUInt32(handle).WriteByte(RecordMarker).WriteUInt32(token).ToArray();
 		}
 
 		// Finds the playfield token in a 0x737A6DF9 snapshot body: the 4 bytes framed by 000000BF ... 0000040B
@@ -47,7 +46,7 @@ namespace Faolan.Core.Network.Codecs
 			token = 0;
 			if (body.Length != BodyLength)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != SubOpcode)
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR)
 				return false;
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
 				return false;

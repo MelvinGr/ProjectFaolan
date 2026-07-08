@@ -25,7 +25,6 @@ namespace Faolan.Core.Network.Codecs
 		public const byte ModePath = 0x01;
 		public const byte ModeStationary = 0x02;
 		public const int BodyLength = 57;
-		public const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
 		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
 
 		// mode-08: approach/face a target entity - [u16 0][from 3 floats][0x08][u32 0xC350 type][u32 targetHandle]
@@ -33,7 +32,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildApproachTargetBody(uint handle, Vector3 from, uint targetHandle)
 		{
 			return new FaolanStream()
-				.WriteUInt32(MoveTaskSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
@@ -51,7 +50,7 @@ namespace Faolan.Core.Network.Codecs
 		// simplest move; the dominant shape for the player's own position ticks. Validated 74/74.
 		public static byte[] BuildBarePositionBody(uint handle, Vector3 from)
 		{
-			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(WireType).WriteUInt32(handle).WriteUInt16(0).WriteVector3(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(WireType).WriteUInt32(handle).WriteUInt16(0).WriteVector3(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
 		}
 
 		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a
@@ -59,7 +58,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildBody(uint handle, Vector3 from, Vector3 to, Quaternion facing)
 		{
 			return new FaolanStream()
-				.WriteUInt32(MoveTaskSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
@@ -82,7 +81,7 @@ namespace Faolan.Core.Network.Codecs
 		public static byte[] BuildPathBody(uint handle, Vector3 from, IReadOnlyList<Vector3> waypoints, float pathLength)
 		{
 			var s = new FaolanStream()
-				.WriteUInt32(MoveTaskSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
@@ -126,7 +125,7 @@ namespace Faolan.Core.Network.Codecs
 		{
 			var pathLength = Vector3.Distance(from, to);
 			return new FaolanStream()
-				.WriteUInt32(MoveTaskSubOpcode)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)

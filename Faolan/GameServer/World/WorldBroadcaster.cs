@@ -46,7 +46,6 @@ namespace Faolan.GameServer.World
 		private const float PatrolWalkSpeed = 6f;
 
 		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
-		private const uint LootBagSubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR;
 
 		// The combat-mode stat value the captured beach melee mobs send at aggro (strickenbla capture, #218): the tick
 		// before each mob's first swing it pushes `CombatMode = 4`, which is what draws its weapon. (The player uses 1
@@ -253,8 +252,8 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WorldLoot.LootTypeTag)
 				.WriteUInt32(bag.Handle)
 				.SendAsync(client);
-			await SendWorldIir(client, WorldLoot.BuildLooterResetBody(WorldLoot.NewCurrentLooterSubOpcode, bag.Handle));
-			await SendWorldIir(client, WorldLoot.BuildLooterResetBody(WorldLoot.NewAllowedLooterSubOpcode, bag.Handle));
+			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
+			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
 			await SendWorldIir(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
 			await SendWorldIir(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
 
