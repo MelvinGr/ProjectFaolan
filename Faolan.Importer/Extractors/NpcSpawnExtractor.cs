@@ -252,6 +252,12 @@ namespace Faolan.Importer.Extractors
 			if (handle >= InstanceRangeStart)
 				return false; // the player's own spawn
 
+			// Another visible PLAYER's spawn (not the own player - a different account in view): it carries
+			// player_stats + no npc_stats, so it isn't an NPC. These were previously imported as phantom NpcSpawn
+			// rows with TemplateId 0 / no type (found via the CoreChar-header X RE, #244) - drop them here.
+			if (PlayerSpawnReader.TryReadCharacterMessage(body, out var pr) && pr.Message.player_stats != null)
+				return false;
+
 			var identity = LiftIdentity(body);
 			var name = !string.IsNullOrEmpty(identity.Name)
 				? identity.Name

@@ -728,22 +728,28 @@ namespace Faolan.Importer.Captures
 
 				// #244: lift the type-level CharacterIIR stat core from a representative capture (the first spawn of the
 				// type that decodes), so a spawn body can be constructed from typed columns instead of the Data blob.
-				if (npc.StatCore == null)
+				if (npc.StatCore == null || npc.StatCore.IirHeader == null)
 				{
 					var body = WorldObjectBuilder.ExtractBody(e.Data);
 					if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-						npc.StatCore = NpcStatCoreCodec.Lift(read.Message);
+					{
+						npc.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
+						npc.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
+					}
 				}
 			}
 
 			// Fallback (#244): a type whose spawns were pruned (or that isn't in this capture set) but still has an
 			// existing NpcSpawn row carrying Data - lift its StatCore from that stored spawn (e.g. Villager 429).
-			foreach (var npc in byTemplate.Values.Where(n => n.StatCore == null && n.Id != 0))
+			foreach (var npc in byTemplate.Values.Where(n => (n.StatCore == null || n.StatCore.IirHeader == null) && n.Id != 0))
 			{
 				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(s => s.NpcId == npc.Id && s.Data != null);
 				var body = spawn == null ? null : WorldObjectBuilder.ExtractBody(spawn.Data);
 				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-					npc.StatCore = NpcStatCoreCodec.Lift(read.Message);
+				{
+					npc.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
+					npc.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
+				}
 			}
 
 			await db.SaveChangesAsync();

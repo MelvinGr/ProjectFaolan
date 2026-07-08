@@ -69,11 +69,14 @@ namespace Faolan.Importer.Captures
 				// #244: lift the stat core onto the TYPE from its capture, so a summoned pet builds from typed columns
 				// too. Pets have no NpcSpawn placement (they spawn into the live tier via TryBuildFromType), so this is
 				// the only place their StatCore gets lifted.
-				if (type.StatCore == null)
+				if (type.StatCore == null || type.StatCore.IirHeader == null)
 				{
 					var body = WorldObjectBuilder.ExtractBody(e.Data);
 					if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-						type.StatCore = NpcStatCoreCodec.Lift(read.Message);
+					{
+						type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
+						type.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
+					}
 				}
 
 				seeded++;

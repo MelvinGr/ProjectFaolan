@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 
@@ -12,6 +14,19 @@ namespace Faolan.Core.Network.Codecs
 	// the wire, which is what keeps the rebuilt core byte-identical to the capture (verified in NpcStatCoreCodecTests).
 	public static class NpcStatCoreCodec
 	{
+		// Reads the CoreCharacter-IIR header word X from a captured FA015807 body (#244): the message is preceded by
+		// [u8 0x41 version][u32 X][u32 msgLen]; X is a type-stable field-presence/shape mask lifted so the header can
+		// be rebuilt from the DB. Returns null if the body has no CharacterIIR or the version byte isn't 0x41.
+		public static uint? ReadIirHeaderWord(byte[] body)
+		{
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return null;
+			var hdr = read.Offset - 9;
+			if (hdr < 0 || body[hdr] != 0x41)
+				return null;
+			return BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(hdr + 1, 4));
+		}
+
 		// Captured message -> typed columns (importer side). A column stays null unless the proto field was set.
 		public static NpcStatCore Lift(ProtoCoreCharacterIIR m)
 		{
