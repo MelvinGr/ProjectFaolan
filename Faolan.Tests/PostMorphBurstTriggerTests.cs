@@ -22,18 +22,18 @@ namespace Faolan.Tests
 			var client = new RecordingNetworkClient(Instance);
 
 			// Not armed yet (no Finish / no morph seen) -> a drained batch must NOT send the trio.
-			await service.FlushPostMorphBurstOnBatchDrained(client);
+			await CreateFlowService.FlushPostMorphBurstOnBatchDrained(client);
 			Assert.Empty(client.Sent);
 			Assert.False(client.Session.PostMorphBurstSent);
 
 			// Finish (or a morph) has been processed this batch -> the drain fires the trio (3 packets) once.
 			client.Session.MorphActivitySequence = 1;
-			await service.FlushPostMorphBurstOnBatchDrained(client);
+			await CreateFlowService.FlushPostMorphBurstOnBatchDrained(client);
 			Assert.Equal(3, client.Sent.Count); // StatIIR + StartScriptGroup + StatUpdate
 			Assert.True(client.Session.PostMorphBurstSent);
 
 			// Idempotent: a later drained batch (or the fallback timer) sends nothing more.
-			await service.FlushPostMorphBurstOnBatchDrained(client);
+			await CreateFlowService.FlushPostMorphBurstOnBatchDrained(client);
 			Assert.Equal(3, client.Sent.Count);
 		}
 	}

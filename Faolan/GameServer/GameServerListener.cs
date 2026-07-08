@@ -366,7 +366,7 @@ namespace Faolan.GameServer
 		protected override Task ReceivedBatchComplete(INetworkClient client)
 		{
 			if (client.Session.IsCreateEditorConnection)
-				return _createFlow.FlushPostMorphBurstOnBatchDrained(client);
+				return CreateFlowService.FlushPostMorphBurstOnBatchDrained(client);
 
 			return Task.CompletedTask;
 		}
