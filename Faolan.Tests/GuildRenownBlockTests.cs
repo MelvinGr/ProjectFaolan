@@ -1,5 +1,4 @@
 using Faolan.Core.Network.Codecs;
-using Faolan.CSPlayerAgent;
 using Faolan.Tests.Support;
 using Xunit;
 

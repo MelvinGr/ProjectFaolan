@@ -1,4 +1,4 @@
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 using Xunit;
 
 namespace Faolan.Tests

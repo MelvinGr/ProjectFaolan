@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// The editor-slider <-> spawn-morph mapping (cracked 2026-06-10 against the Hoxxling all-sliders create
 	// capture and confirmed on Dikketest/Strickenen):

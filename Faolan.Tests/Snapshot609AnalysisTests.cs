@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Quest;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

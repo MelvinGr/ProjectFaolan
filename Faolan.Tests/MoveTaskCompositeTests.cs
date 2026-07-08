@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Xunit;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.World;
 
 namespace Faolan.Tests
 {

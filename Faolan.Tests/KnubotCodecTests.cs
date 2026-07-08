@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Xunit;
 
 namespace Faolan.Tests

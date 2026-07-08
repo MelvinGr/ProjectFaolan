@@ -1,8 +1,7 @@
 using System;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Combat
 {
 	// Construct-side codecs for the server->client combat-state records (#216/#218, docs/iir-readers-combat-world.md):
 	// the damage result, the combat shield, the threat level and the hate-list update. These are the records the

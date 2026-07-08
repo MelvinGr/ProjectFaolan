@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// #244 stat-core lift: converts between a captured CharacterIIR's stat-core sub-messages
 	// (CharacterStats / NpcStats / CharacterBcc) and the typed NpcStatCore side table, so an NPC spawn body can be

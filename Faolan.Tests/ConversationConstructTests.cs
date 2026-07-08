@@ -1,9 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Constants;
 using Faolan.GameServer.Dialogue;
 using Xunit;
 

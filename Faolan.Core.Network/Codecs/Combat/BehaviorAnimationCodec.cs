@@ -1,7 +1,6 @@
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Combat
 {
 	// Server-originated BehaviorControlCenterIIR (0x642CD3D6) ANIMATIONS - the generic behavior channel that makes a
 	// client play an actor's animation/pose. The same channel carries combat swings/casts (CombatPacketCodec) and NPC

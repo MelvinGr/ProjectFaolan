@@ -1,4 +1,4 @@
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
 

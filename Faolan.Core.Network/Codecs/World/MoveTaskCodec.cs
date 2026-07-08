@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.World
 {
 	// The MoveTask transform packet (MoveTaskIIR 0x96C46740) - how the server tells clients where an entity is and which
 	// way it faces. The full recursive grammar is decoded (100% round-trip, docs/movetask-grammar.md); this codec builds

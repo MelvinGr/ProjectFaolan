@@ -1,9 +1,10 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.Quest;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World

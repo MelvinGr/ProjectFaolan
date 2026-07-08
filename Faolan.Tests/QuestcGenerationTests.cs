@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Tests
 {

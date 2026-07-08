@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

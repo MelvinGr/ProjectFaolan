@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.GameServer;
 using Faolan.Importer.Captures;

@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 
 namespace Faolan.Core
 {
-	public static class Statics
+	public static class Global
 	{
 #if DEBUG
 		public static bool IsDebug => true;
@@ -34,10 +33,10 @@ namespace Faolan.Core
 		// Current UTC unix time as the 32-bit seconds value the wire/DB use (mail/listing timestamps, launch token).
 		public static uint NowUnixTimeSeconds => (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-		static Statics()
+		static Global()
 		{
 			// The build metadata rides on the ENTRY assembly (Faolan.dll). It is absent under a test host or when
-			// loaded as a library, so degrade gracefully (don't throw) - accessing any Statics member, e.g.
+			// loaded as a library, so degrade gracefully (don't throw) - accessing any Global member, e.g.
 			// NowUnixTimeSeconds, must never depend on the build info being present.
 			var entryAssembly = Assembly.GetEntryAssembly();
 
@@ -68,14 +67,5 @@ namespace Faolan.Core
 			                "| " + BuildString.PadBoth(75) + " |\n" + //
 			                "-------------------------------------------------------------------------------\n";
 		}
-
-		public static readonly (Race race, ArchType archType, Class clas)[] RaceArchClassCombinations =
-		[
-			(Race.Aquilonian, ArchType.Priest, Class.PriestOfMitra), (Race.Aquilonian, ArchType.Soldier, Class.Conqueror), (Race.Aquilonian, ArchType.Soldier, Class.DarkTemplar),
-			(Race.Aquilonian, ArchType.Soldier, Class.Guardian), (Race.Aquilonian, ArchType.Rogue, Class.Barbarian), (Race.Aquilonian, ArchType.Rogue, Class.Ranger), (Race.Aquilonian, ArchType.Rogue, Class.Assassin),
-			(Race.Cimmerian, ArchType.Priest, Class.BearShaman), (Race.Cimmerian, ArchType.Soldier, Class.Conqueror), (Race.Cimmerian, ArchType.Soldier, Class.DarkTemplar), (Race.Cimmerian, ArchType.Soldier, Class.Guardian),
-			(Race.Cimmerian, ArchType.Rogue, Class.Barbarian), (Race.Cimmerian, ArchType.Rogue, Class.Ranger), (Race.Stygian, ArchType.Priest, Class.TempestOfSet), (Race.Stygian, ArchType.Rogue, Class.Ranger),
-			(Race.Stygian, ArchType.Rogue, Class.Assassin), (Race.Stygian, ArchType.Mage, Class.HeraldOfXotli), (Race.Stygian, ArchType.Mage, Class.Demonologist), (Race.Stygian, ArchType.Mage, Class.Necromancer)
-		];
 	}
 }

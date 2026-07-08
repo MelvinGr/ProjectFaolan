@@ -1,8 +1,7 @@
-using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Dialogue
 {
 	// The SetDialogueCamera (0x2015) packet that binds the dialogue camera to the NPC during a conversation (#188).
 	// Extracted from ConversationService so it builds without a live client: [RpcHeader: GameCharAgent(agentInstance)

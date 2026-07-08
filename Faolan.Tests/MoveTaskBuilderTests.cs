@@ -3,9 +3,9 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Tests.Support;
-using Faolan.Core.Network.Opcodes;
 using Xunit;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Tests
 {

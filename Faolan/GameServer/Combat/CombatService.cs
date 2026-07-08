@@ -5,10 +5,13 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 

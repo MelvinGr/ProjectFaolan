@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Spawn;
 
 namespace Faolan.Importer.Extractors
 {

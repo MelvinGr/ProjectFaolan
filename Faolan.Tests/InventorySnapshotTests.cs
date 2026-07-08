@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Crypt;
-using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Packets.Conan;
 using Xunit;
 
 namespace Faolan.Tests

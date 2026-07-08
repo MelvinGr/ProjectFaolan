@@ -1,10 +1,10 @@
 using System;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
-using Faolan.Core.Network.Opcodes;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.Core.Network.Conan
+namespace Faolan.Core.Network.Packets.Conan
 {
 	public sealed class ConanOutgoingPacketLogger : IPacketLogger
 	{

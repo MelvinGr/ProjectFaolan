@@ -1,6 +1,6 @@
 using System;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Rewrites the per-session PLAYFIELD INSTANCE varint inside a built spawn/object body so a from-scratch
 	// placement (no live body to inherit the token from - e.g. the create-editor scene) carries the current

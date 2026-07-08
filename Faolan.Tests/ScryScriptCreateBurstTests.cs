@@ -1,5 +1,5 @@
 using System;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Xunit;
 using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
 

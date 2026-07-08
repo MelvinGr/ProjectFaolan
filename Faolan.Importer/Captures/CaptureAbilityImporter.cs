@@ -2,7 +2,6 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
@@ -10,6 +9,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Packets.Conan;
 
 namespace Faolan.Importer.Captures
 {

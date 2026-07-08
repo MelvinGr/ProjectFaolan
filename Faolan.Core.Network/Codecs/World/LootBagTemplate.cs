@@ -1,7 +1,7 @@
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.World
 {
 	// The canonical "Bag of loot" definition, built ENTIRELY FROM SCRATCH (#193): the identity columns + the decoded
 	// kd-tree bounds (typed, BuildBounds) + a clean ProtoLootBagIIR scaffold (LootBagMessageCodec). No embedded asset

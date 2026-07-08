@@ -5,7 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Builds the worn-equipment InventoryEntries for a player's SimpleCharFullUpdate spawn from the character's
 	// CharacterEquipment. Each worn item becomes a ProtoCoreCharacterIIR.InventoryEntry { pos = the equip slot id,

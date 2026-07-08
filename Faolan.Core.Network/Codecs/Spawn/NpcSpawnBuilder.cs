@@ -1,14 +1,14 @@
 using System;
 using System.Buffers.Binary;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Builds a wire FA015807 (SimpleCharFullUpdate) NPC spawn body wholly from typed storage (#243/#244) - the
 	// captured `Data` blob is retired. From a placement (TryBuildLive off an NpcSpawn row) or a creature TYPE

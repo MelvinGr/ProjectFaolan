@@ -1,35 +1,23 @@
 using System;
-using System.Buffers.Binary;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core;
-using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.AgentServer;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.GameServer;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
-using Faolan.GameServer.Dialogue;
-using Faolan.GameServer.Inventory;
-using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -581,7 +569,7 @@ namespace Faolan.GameServer
 			// LIVE exactly as retail does: QuestLogList (J-panel) then QuestFullUpdate (detail). It was persisted at
 			// character creation, so it rides the snapshot on every later login. RestorePlayerQuests skips it (it's
 			// snapshot-eligible), so this is the only live delivery and there is no double-send.
-			if (isCreateEntry && character != null && beachDef != null)
+			if (isCreateEntry && character != null)
 			{
 				await WorldBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
 				await _broadcaster.SendQuestFullUpdate(client, beachDef);

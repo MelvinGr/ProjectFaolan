@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.World;
 
 namespace Faolan.Importer.Extractors
 {

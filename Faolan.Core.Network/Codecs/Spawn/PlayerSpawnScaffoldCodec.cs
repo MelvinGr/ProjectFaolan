@@ -2,9 +2,8 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	public static class PlayerSpawnScaffoldCodec
 	{

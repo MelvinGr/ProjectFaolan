@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat

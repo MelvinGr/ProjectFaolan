@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Combat
 {
 	// The 54-byte effect payload appended to an ApplySpell (0x6B87E316) NPC cast (see NpcSpellCastBuilder). Decoded by
 	// diffing all 21 distinct captured NpcSpell payloads (#304): byte-packed, big-endian, every other byte a constant 0.

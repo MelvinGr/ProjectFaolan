@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Server.AgentServer;
 
-namespace Faolan.Core.Network.GameServer
+namespace Faolan.Core.Network.Server.GameServer
 {
 	/// <summary>
 	///     Seam into a live GameServer listener, mirroring <see cref="IAgentServerProvider" /> but for the

@@ -1,5 +1,4 @@
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.Core.Network.Codecs
 {

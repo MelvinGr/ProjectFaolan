@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Dialogue
 {
     // Decodes a captured conversation packet's raw Conan Data into the structured Knubot-screen columns (#188), so
     // the importer can populate ConversationPacket.{SubOpcode,Env,Field,Flag,ScreensJson} and the runtime builds the

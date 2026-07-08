@@ -8,10 +8,11 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 

@@ -1,6 +1,6 @@
 using Faolan.Core.Network.Interfaces;
 
-namespace Faolan.Core.Network.AgentServer
+namespace Faolan.Core.Network.Packets.AgentServer
 {
 	public sealed class AgentServerPacketFactory : IPacketFactory<AgentServerPacket>
 	{

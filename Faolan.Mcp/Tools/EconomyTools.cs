@@ -9,7 +9,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.Server;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Mcp.Tools
@@ -60,7 +60,7 @@ namespace Faolan.Mcp.Tools
 				InstanceField = 0,
 				ItemHandle = 0,
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
-				Timestamp = Statics.NowUnixTimeSeconds,
+				Timestamp = Global.NowUnixTimeSeconds,
 				Data1 = item.Data1,
 				Data2 = item.Data2,
 				Data3 = item.Data3,
@@ -149,6 +149,8 @@ namespace Faolan.Mcp.Tools
 			if (recipient?.Name == null)
 				return $"No character with id {recipientCharacterId}.";
 
+			var now = Global.NowUnixTimeSeconds;
+
 			var mail = new Mail
 			{
 				MailId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
@@ -159,8 +161,8 @@ namespace Faolan.Mcp.Tools
 				BodyXml = body ?? "",
 				FooterWord = MailConstants.FooterUnread,
 				Money = moneyTin,
-				Timestamp1 = Statics.NowUnixTimeSeconds,
-				Timestamp2 = Statics.NowUnixTimeSeconds + MailConstants.ExpirySeconds
+				Timestamp1 = now,
+				Timestamp2 = now + MailConstants.ExpirySeconds
 			};
 
 			string itemNote = null;

@@ -9,10 +9,11 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.AgentServer;
-using Faolan.Core.Network.GameServer;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.AgentServer;
+using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -118,8 +119,8 @@ namespace Faolan.AgentServer
 								: $"Character{client.Session.Account.ClientInstance}"))
 						.SendAsync(client);
 
-					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Statics.BuildString));
-					await SendSystemMessage(client, Statics.BuildString.Replace("\n", "<br />"));
+					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
+					await SendSystemMessage(client, Global.BuildString.Replace("\n", "<br />"));
 
 					break;
 				}

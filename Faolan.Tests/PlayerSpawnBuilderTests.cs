@@ -4,7 +4,7 @@ using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;

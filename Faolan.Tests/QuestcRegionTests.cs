@@ -2,6 +2,7 @@ using System.IO;
 using Xunit;
 using Xunit.Abstractions;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Tests
 {

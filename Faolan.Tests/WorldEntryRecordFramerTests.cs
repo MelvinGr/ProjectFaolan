@@ -4,7 +4,7 @@ using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer;
 using Faolan.Tests.Support;
 using Xunit;

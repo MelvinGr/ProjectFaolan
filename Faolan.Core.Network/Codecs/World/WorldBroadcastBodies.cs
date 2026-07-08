@@ -5,8 +5,9 @@ using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Quest;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.World
 {
 	// Pure wire-body transforms extracted from WorldBroadcaster (they take captured/DB inputs, no world state): the
 	// patrol re-address, a QuestTextRef -> on-wire record, and the loot-bag contents splice. The broadcaster keeps

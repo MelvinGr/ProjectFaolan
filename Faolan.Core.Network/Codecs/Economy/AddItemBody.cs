@@ -2,7 +2,7 @@ using System.IO;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Economy
 {
 	// The DispatchAddItem (s2c 0x2020) body: an inventory ID32 + slot + the length-prefixed ProtoInventoryGameEntry
 	// (the same entry the FullChar snapshot carries) + a feedback flag. Extracted from the GameServerListener.AddItem

@@ -8,8 +8,8 @@ using Faolan.AgentServer;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.AgentServer;
-using Faolan.Core.Network.GameServer;
+using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.GameServer;
 using Faolan.CSPlayerAgent;
 using Faolan.GameServer;
 using Faolan.Helpers;
@@ -29,18 +29,18 @@ namespace Faolan
 		public static async Task Main(string[] args)
 		{
 			Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-			Console.WriteLine(Statics.StartupBanner);
+			Console.WriteLine(Global.StartupBanner);
 
 			var builder = Host.CreateApplicationBuilder(args);
 
-			if (Statics.IsDebug)
+			if (Global.IsDebug)
 				builder.Environment.EnvironmentName = "Development";
 
 			builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
 			builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"));
 			builder.Configuration.AddCommandLine(args);
 
-			builder.Logging.SetMinimumLevel(Statics.IsDebug
+			builder.Logging.SetMinimumLevel(Global.IsDebug
 				? LogLevel.Debug
 				: LogLevel.Information);
 			builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);

@@ -4,13 +4,12 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Economy
 {
 	// Server->client Tradepost responses. Endpoints/bodies validated byte-exact against the captures
 	// (docs/tradepost-protocol.md): the response Sender is the server's GameCharAgent endpoint, the Receiver is the

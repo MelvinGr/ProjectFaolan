@@ -4,10 +4,12 @@ using System.Collections.Generic;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 

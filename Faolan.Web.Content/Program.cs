@@ -129,7 +129,7 @@ namespace Faolan.Web.Content
 					storeDir
 				}));
 
-			//app.MapGet("launchernotes2.php", () => Results.Ok(Statics.StartupBanner));
+			//app.MapGet("launchernotes2.php", () => Results.Ok(Global.StartupBanner));
 
 			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store}", ip, port, storeDir);
 			app.Run();

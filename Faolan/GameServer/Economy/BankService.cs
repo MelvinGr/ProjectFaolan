@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -6,13 +5,11 @@ using Faolan.Core.Database;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using ProtoBuf;
 
 namespace Faolan.GameServer.Economy
 {

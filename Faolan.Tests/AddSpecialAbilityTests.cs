@@ -1,5 +1,5 @@
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
 using Xunit;
 
 namespace Faolan.Tests

@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.GameServer.Economy

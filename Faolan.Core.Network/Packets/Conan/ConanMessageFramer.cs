@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network.Interfaces;
 
-namespace Faolan.Core.Network.Conan
+namespace Faolan.Core.Network.Packets.Conan
 {
 	public sealed class ConanMessageFramer : IMessageFramer
 	{

@@ -3,8 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 

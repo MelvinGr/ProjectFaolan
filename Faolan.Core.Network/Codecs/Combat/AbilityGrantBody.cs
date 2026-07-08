@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Combat
 {
 	// The ability/spell grant bodies extracted from the GameServerListener.GrantAbilities partial: the
 	// DispatchAddSpecialAbility (0x2052) ability grant + DispatchLearnSpell (0x200A) spell grant. Pure body

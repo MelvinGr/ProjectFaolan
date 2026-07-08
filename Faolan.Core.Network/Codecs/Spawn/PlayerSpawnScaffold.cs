@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
     // The structured form of a player SimpleCharFullUpdate (FA015807) body: everything around the embedded
     // ProtoCoreCharacterIIR, per the validated grammar in docs/archive/player-spawn-generation-plan.md ("VALIDATED

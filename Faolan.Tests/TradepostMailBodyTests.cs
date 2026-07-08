@@ -1,7 +1,6 @@
 using System;
-using Faolan.Core.Network.Packets;
 using Xunit;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 
 namespace Faolan.Tests
 {

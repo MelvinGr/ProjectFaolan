@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Combat
 {
 	// The MagicBuffIIR (ApplySpell 0x6B87E316) DATA tail for a player buff - the bytes AFTER the ApplySpell header
 	// ([op][0xC350][applyTo][u16 0][spellId][0xC350][applyFrom]). Constructed field-by-field; it replaces the verbatim

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
 
-namespace Faolan.GameServer.World
+namespace Faolan.Core.Network.Constants
 {
 	// One summonable mount: the bar/feat id the client casts (SummonMount action `from`), the creature it spawns
 	// (an FA015807 NPC, matched by NAME against the harvested mount spawns - the stable key), and the summon SPELL

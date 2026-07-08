@@ -1,9 +1,9 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Combat
 {
 	// The BehaviorControlCenterIIR (BccAck) echo-ack bodies, extracted from CombatService so they build without a
 	// live client: retail acks a client behaviour request by echoing it back with field3 (the phase) spliced in and

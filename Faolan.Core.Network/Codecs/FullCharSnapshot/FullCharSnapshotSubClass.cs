@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {

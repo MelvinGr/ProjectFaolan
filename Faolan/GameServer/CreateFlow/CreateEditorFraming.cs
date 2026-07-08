@@ -1,5 +1,5 @@
 using Faolan.Core.Network;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.GameServer.CreateFlow
 {

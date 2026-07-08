@@ -4,7 +4,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Builds / lifts an NPC's worn-equipment InventoryEntries (the CharacterIIR f23 list) to and from
 	// NpcSpawnEquipment rows, so the equipment generates from the DB instead of the captured NpcSpawn.Data blob

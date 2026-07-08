@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.AgentServer;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Server.AgentServer;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer.World
+namespace Faolan.GameServer.Quest
 {
 	// The multi-stage quest-chain SUPERSESSION engine (Gitea #261). Each stage of a chain is its own quest id;
 	// completing a stage's goal supersedes it with the next via the exact captured wire sequence

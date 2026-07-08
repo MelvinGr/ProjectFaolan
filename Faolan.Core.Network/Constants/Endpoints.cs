@@ -1,7 +1,7 @@
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Conan
+namespace Faolan.Core.Network.Constants
 {
 	// A Conan packet header is the client's RpcHeader (recovered from AgeOfConan.exe). Its caller_id (field 1,
 	// our "sender") and endpoint_id (field 2, our "receiver") are each a ProtoEndpoint:

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Faolan.Core.Network.AgentServer
+namespace Faolan.Core.Network.Server.AgentServer
 {
 	public interface IAgentServerDispatcher : IAgentServerProvider
 	{

@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.World
 {
 	// Full recursive MoveTaskIIR (0x96C46740) model + codec: parse ANY captured MoveTask record and re-emit it
 	// byte-exact (round-trip proven over all 6225 captured records, MoveTaskCompositeTests). The grammar is decoded

@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Text
 {
 	// Byte-exact parse/build of a `remoteformat` dialogue screen (#188) so a Knubot screen can be GENERATED from
 	// structured fields instead of replaying captured XML. A screen is:

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace Faolan.Core.Network.AgentServer
+namespace Faolan.Core.Network.Server.AgentServer
 {
 	/// <summary>
 	///     One message on the Claude chat channel. <see cref="Sequence" /> is monotonic, for cursor-style polling.

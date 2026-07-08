@@ -3,8 +3,8 @@ using System.IO;
 using System.Linq;
 using Faolan.Importer.Captures;
 using Xunit;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Tests
 {

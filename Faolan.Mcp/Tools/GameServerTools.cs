@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Faolan.Core.Network.GameServer;
+using Faolan.Core.Network.Server.GameServer;
 using ModelContextProtocol.Server;
 
 namespace Faolan.Mcp.Tools

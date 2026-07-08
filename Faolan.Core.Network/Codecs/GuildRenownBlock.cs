@@ -1,9 +1,7 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
 
-namespace Faolan.CSPlayerAgent
+namespace Faolan.Core.Network.Codecs
 {
 	// Typed, byte-exact codec for the 277-byte renown/feat/city-stats block at the tail of the 0x203F
 	// GuildFullUpdate (Gitea #219). The block is the tail of the i_pcGuild argument read by

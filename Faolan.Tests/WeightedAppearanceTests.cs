@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Importer.Rdb;
 using Xunit;
 

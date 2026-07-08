@@ -7,7 +7,7 @@ using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer;
 using Xunit;

@@ -7,7 +7,7 @@ using System.Text.Json;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 using Xunit;
 using Xunit.Abstractions;

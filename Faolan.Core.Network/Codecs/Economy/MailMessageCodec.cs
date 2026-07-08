@@ -4,7 +4,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Economy
 {
 	// Parses/builds the DispatchMailMessage (S->C 0x2002) body - one in-game mail, optionally with the bought item
 	// appended as an attachment. Decoded byte-exact 2026-06-13 from the necrol80 buy_from_autionhouse_get_mail capture

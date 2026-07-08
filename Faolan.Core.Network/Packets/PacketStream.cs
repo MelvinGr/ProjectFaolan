@@ -62,24 +62,6 @@ namespace Faolan.Core.Network.Packets
 			return WriteHeader(sender.ToProtobuf(), receiver.ToProtobuf(), opcode, headerData);
 		}
 
-		public PacketStream WriteHeaderProto<T>(byte[] sender, byte[] receiver, T opcode, byte[] headerData = null) where T : struct
-		{
-			WriteUInt32(0); // Write empty length
-			WriteUInt32(0); // write empty crc32
-
-			WriteArrayUInt32Length(s =>
-			{
-				s.WriteArray(sender);
-				s.WriteArray(receiver);
-				s.WriteUInt16(Convert.ToUInt16(opcode));
-
-				if (headerData?.Length > 0)
-					s.WriteArray(headerData);
-			});
-
-			return this;
-		}
-
 		public PacketStream WriteLengthHash()
 		{
 			var oldPos = Position;

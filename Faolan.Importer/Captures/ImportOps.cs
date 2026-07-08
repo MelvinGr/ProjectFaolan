@@ -6,11 +6,13 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 
 namespace Faolan.Importer.Captures
 {

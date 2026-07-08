@@ -38,4 +38,16 @@ namespace Faolan.Core.Network.Constants
 			[Class.TempestOfSet] = 215711 // Broken Bottle (0x34A9F - the OTHER bottle; tempest create capture, BccIIR slot-6)
 		};
 	}
+
+	public static class Statics
+	{
+		public static readonly (Race race, ArchType archType, Class clas)[] RaceArchClassCombinations =
+		[
+			(Race.Aquilonian, ArchType.Priest, Class.PriestOfMitra), (Race.Aquilonian, ArchType.Soldier, Class.Conqueror), (Race.Aquilonian, ArchType.Soldier, Class.DarkTemplar),
+			(Race.Aquilonian, ArchType.Soldier, Class.Guardian), (Race.Aquilonian, ArchType.Rogue, Class.Barbarian), (Race.Aquilonian, ArchType.Rogue, Class.Ranger), (Race.Aquilonian, ArchType.Rogue, Class.Assassin),
+			(Race.Cimmerian, ArchType.Priest, Class.BearShaman), (Race.Cimmerian, ArchType.Soldier, Class.Conqueror), (Race.Cimmerian, ArchType.Soldier, Class.DarkTemplar), (Race.Cimmerian, ArchType.Soldier, Class.Guardian),
+			(Race.Cimmerian, ArchType.Rogue, Class.Barbarian), (Race.Cimmerian, ArchType.Rogue, Class.Ranger), (Race.Stygian, ArchType.Priest, Class.TempestOfSet), (Race.Stygian, ArchType.Rogue, Class.Ranger),
+			(Race.Stygian, ArchType.Rogue, Class.Assassin), (Race.Stygian, ArchType.Mage, Class.HeraldOfXotli), (Race.Stygian, ArchType.Mage, Class.Demonologist), (Race.Stygian, ArchType.Mage, Class.Necromancer)
+		];
+	}
 }

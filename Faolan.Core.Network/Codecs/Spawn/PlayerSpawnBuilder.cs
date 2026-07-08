@@ -1,10 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Builds a player's FA015807 spawn BODY from scratch - no captured template (#210, the player analog of #185).
 	// The whole body is assembled into a typed PlayerSpawnScaffold and serialised by PlayerSpawnScaffoldCodec.Generate:

@@ -10,7 +10,7 @@ using Faolan.Core.Network.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 
 namespace Faolan.Importer.Captures
 {

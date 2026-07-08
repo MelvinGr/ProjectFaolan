@@ -7,7 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network
 {

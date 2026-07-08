@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Faolan.Core.Network.GameServer
+namespace Faolan.Core.Network.Server.GameServer
 {
 	/// <summary>
 	///     One entity in a live map zone, as exposed to out-of-band tooling (the MCP list_zone_entities tool).

@@ -1,10 +1,10 @@
-using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
     // Maps the spawn scaffold between its wire form (PlayerSpawnScaffold) and the character's DB rows
     // (CharacterAttribute / CharacterSkill / CharacterScaffoldPair), so a player spawn can

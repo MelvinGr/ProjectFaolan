@@ -1,6 +1,6 @@
 using System;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protobuf;
 using Xunit;
 

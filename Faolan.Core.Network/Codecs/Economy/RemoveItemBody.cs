@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Economy
 {
 	// The DispatchRemoveItem (s2c 0x201F) body: [inventory ID32: containerType, charId][u32 itemPos][u32 amount].
 	// Extracted from the GameServerListener.RemoveItem partial; the listener keeps the framing + send. Golden:

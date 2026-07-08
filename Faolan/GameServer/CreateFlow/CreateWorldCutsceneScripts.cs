@@ -1,5 +1,4 @@
 using Faolan.Core.Network;
-using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
@@ -7,8 +6,9 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 
 namespace Faolan.GameServer.CreateFlow
 {

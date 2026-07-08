@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
 

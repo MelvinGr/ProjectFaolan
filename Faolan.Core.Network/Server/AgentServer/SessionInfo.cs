@@ -1,4 +1,4 @@
-namespace Faolan.Core.Network.AgentServer
+namespace Faolan.Core.Network.Server.AgentServer
 {
 	/// <summary>
 	///     Read-only snapshot of one connected client session, as surfaced to out-of-band

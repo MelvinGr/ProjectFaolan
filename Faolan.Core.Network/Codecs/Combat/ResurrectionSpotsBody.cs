@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Combat
 {
 	// The ValidResurrectionSpots body: [deathPos X,Y,Z][u32 header] then per spot
 	//   [spotPos X,Y,Z][u32 0xC7A0][u32 mapId][u32 0][u32 0][u32 0][u32 spawnPointId][u32 0x0A] then a trailing 0x00.

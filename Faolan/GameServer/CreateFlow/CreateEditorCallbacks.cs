@@ -6,8 +6,9 @@ using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Packets.Conan;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.CreateFlow

@@ -5,7 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.World
 {
 	// Typed codec for the SimpleDynelFullUpdateIIR (0x66AEDD50) identity MESSAGE - the first "construct, don't
 	// replay" step for world dynels (#187 / #57). The reader was decoded by VTABLE-xref (docs/iir-subclass-readers.md,

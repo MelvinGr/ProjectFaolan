@@ -1,6 +1,6 @@
 using System;
 using Faolan.Core;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.GameServer;
 using Xunit;
 

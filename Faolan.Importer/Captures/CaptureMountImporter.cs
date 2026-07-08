@@ -3,8 +3,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
-using Faolan.GameServer.World; // MountCatalog (namespaced here despite its file living under Faolan.Core.Network)
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
+// MountCatalog (namespaced here despite its file living under Faolan.Core.Network)
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

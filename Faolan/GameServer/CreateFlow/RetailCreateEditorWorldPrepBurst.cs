@@ -1,9 +1,7 @@
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Packets;
 
 namespace Faolan.GameServer.CreateFlow

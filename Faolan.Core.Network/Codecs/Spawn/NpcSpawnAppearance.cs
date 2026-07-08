@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// One entry in a HUMANOID NPC's FA015807 post-IIR APPEARANCE / morph table: a morph id, its float value, and
 	// an optional texscript string (e.g. the "*ii=-1;*bl=-1" colour ref carried on the id 0x10D entry). This is

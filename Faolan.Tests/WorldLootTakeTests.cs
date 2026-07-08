@@ -1,6 +1,6 @@
 using System;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Xunit;
 
 namespace Faolan.Tests

@@ -12,12 +12,15 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Quest;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
@@ -166,7 +169,7 @@ namespace Faolan.GameServer.World
 				def.AreaId,
 				refs,
 				def.GoalId,
-				Statics.NowUnixTimeSeconds,
+				Global.NowUnixTimeSeconds,
 				def.MapId,
 				def.MarkerX,
 				def.MarkerY,

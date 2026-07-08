@@ -1,8 +1,7 @@
 using System;
 using System.Text;
-using Faolan.Core.Network.Packets;
 using Xunit;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Text;
 
 namespace Faolan.Tests
 {

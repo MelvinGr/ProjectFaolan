@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Server.AgentServer;
 
-namespace Faolan.Core.Network.GameServer
+namespace Faolan.Core.Network.Server.GameServer
 {
 	public interface IGameServerDispatcher : IGameServerProvider
 	{

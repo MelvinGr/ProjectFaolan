@@ -5,7 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.World
 {
 	// Builds a stored WorldObject row into a wire body (66AEDD50/F096251E/33A56FB0/6BD56736/1FD6412B) wholly from
 	// typed columns (#187) - the captured `Data` blob is retired. Sibling of NpcSpawnBuilder, but simpler: a world

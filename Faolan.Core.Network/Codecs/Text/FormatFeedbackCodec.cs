@@ -1,6 +1,6 @@
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Text
 {
 	// Builds/parses the FormatFeedbackIIR (sub-opcode 0x8D5A8B6B) body - AoC's ON-SCREEN feedback / notification
 	// mechanism (NOT chat). The client renders the carried `remoteformat` string as on-screen text; with the

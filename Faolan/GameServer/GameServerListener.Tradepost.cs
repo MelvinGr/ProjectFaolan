@@ -1,42 +1,21 @@
 using System;
-using System.Buffers.Binary;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using System.Numerics;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.AgentServer;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.GameServer;
-using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.Combat;
-using Faolan.GameServer.CreateFlow;
-using Faolan.GameServer.Dialogue;
-using Faolan.GameServer.Inventory;
-using Faolan.GameServer.Scripting;
-using Faolan.GameServer.World;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-
 		// A unique wire MailId. The id is session/instance-volatile (like entity handles), so a random 64-bit value
 		// is fine; retry on the rare collision with an existing persisted mail.
 		private async Task<ulong> AllocateMailId()
@@ -70,7 +49,7 @@ namespace Faolan.GameServer
 		// delivers, only its name in the mail text degrades.
 		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
 		{
-			var now = Statics.NowUnixTimeSeconds;
+			var now = Global.NowUnixTimeSeconds;
 
 			var mail = new Mail
 			{
@@ -411,7 +390,7 @@ namespace Faolan.GameServer
 			// these three bank-slot stat updates (decoded from the capture, F376/F377): price, timestamp, and the
 			// listed flag. It only leaves the seller's bank when someone BUYS it (HandleTradepostBuy clears the cell).
 			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatPrice, (uint)price);
-			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, Statics.NowUnixTimeSeconds);
+			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, Global.NowUnixTimeSeconds);
 			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagListed);
 
 			// Retail pushes a 0x2005 wallet refresh after a listing - but the balance is UNCHANGED: there is NO
@@ -449,7 +428,7 @@ namespace Faolan.GameServer
 			var mail = new Mail
 			{
 				MailId = await AllocateMailId(), 				RecipientClass = MailConstants.EndpointClass, 				RecipientName = recipient.Name, 				SenderClass = MailConstants.EndpointClass, 				SenderName = character.Name, // a player mail, NOT a system mail (sender name is set)
-				BodyXml = bodyText, 				FooterWord = MailConstants.FooterUnread, 				Money = money, 				Timestamp1 = Statics.NowUnixTimeSeconds, 				Timestamp2 = Statics.NowUnixTimeSeconds + MailConstants.ExpirySeconds
+				BodyXml = bodyText, 				FooterWord = MailConstants.FooterUnread, 				Money = money, 				Timestamp1 = Global.NowUnixTimeSeconds, 				Timestamp2 = Global.NowUnixTimeSeconds + MailConstants.ExpirySeconds
 			};
 
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the

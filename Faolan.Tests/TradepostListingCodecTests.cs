@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Xunit;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Economy;
 
 namespace Faolan.Tests
 {

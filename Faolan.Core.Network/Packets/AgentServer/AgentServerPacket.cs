@@ -1,7 +1,6 @@
-using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.AgentServer
+namespace Faolan.Core.Network.Packets.AgentServer
 {
 	public class AgentServerPacket : Packet
 	{

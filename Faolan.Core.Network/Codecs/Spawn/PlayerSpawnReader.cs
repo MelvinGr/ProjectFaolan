@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Locates and decodes the ProtoCoreCharacterIIR (name / stats / player_stats / bcc / ... / inventory_entry) inside
 	// an arbitrary SimpleCharFullUpdate (FA015807) body - unlike SpawnPacketBuilder's fixed Strie-layout offsets,

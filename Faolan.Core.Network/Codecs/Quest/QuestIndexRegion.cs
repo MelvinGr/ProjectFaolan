@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Quest
 {
     // The QUEST INDEX region of the 0x737A6DF9 tails - the bytes between the @609 objective region (see
     // QuestObjectiveRegion) and the access-window table. Two parts (decoded from the beach template + the 2-quest

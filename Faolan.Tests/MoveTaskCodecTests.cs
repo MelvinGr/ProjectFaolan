@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Extensions;
 using Xunit;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.World;
 
 namespace Faolan.Tests
 {

@@ -1,5 +1,4 @@
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 using Xunit;
 
 namespace Faolan.Tests

@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Conan;
 
-namespace Faolan.GameServer.World
+namespace Faolan.GameServer.Session
 {
 	// The connection keep-alive / latency replies the client polls with in-world:
 	//   LatencyCheck (c2s 0x2085) -> Pong (0x2082): echo the counter + a server tick.

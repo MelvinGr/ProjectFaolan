@@ -1,9 +1,8 @@
 using System;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.Core.Network.Conan
+namespace Faolan.Core.Network.Packets.Conan
 {
 	public class ConanPacket : Packet
 	{

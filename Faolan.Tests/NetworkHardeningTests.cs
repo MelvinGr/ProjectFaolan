@@ -2,7 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using Faolan.Core;
-using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets.Conan;
 using Xunit;
 
 namespace Faolan.Tests

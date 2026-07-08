@@ -1,6 +1,6 @@
 using System;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.GameServer.Combat;
 using Xunit;
 

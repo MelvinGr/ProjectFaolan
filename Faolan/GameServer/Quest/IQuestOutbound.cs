@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Quest;
 
-namespace Faolan.GameServer.World
+namespace Faolan.GameServer.Quest
 {
 	// The narrow quest wire-send port the QuestProgressionService needs from the listener side (WorldBroadcaster
 	// implements it). Mirrors the IEconomyOutbound / IWorldOutbound pattern (CLAUDE.md "narrow port"): the supersession

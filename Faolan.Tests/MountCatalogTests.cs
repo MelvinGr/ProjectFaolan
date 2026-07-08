@@ -1,4 +1,4 @@
-using Faolan.GameServer.World;
+using Faolan.Core.Network.Constants;
 using Xunit;
 
 namespace Faolan.Tests

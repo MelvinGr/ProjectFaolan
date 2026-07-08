@@ -1,6 +1,6 @@
 using System;
 using System.Numerics;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;

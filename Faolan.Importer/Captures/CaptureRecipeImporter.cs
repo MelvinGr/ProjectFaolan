@@ -6,8 +6,8 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Captures
 {

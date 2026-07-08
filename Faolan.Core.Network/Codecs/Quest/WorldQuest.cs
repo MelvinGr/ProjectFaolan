@@ -4,9 +4,8 @@ using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Quest
 {
 	// Pure quest objective-tracking rules (docs/archive/quests-and-combat.md) - testable without the DB/network.
 	public static class QuestProgress

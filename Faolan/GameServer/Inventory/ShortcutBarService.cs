@@ -1,13 +1,13 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Packets;
-using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Conan;
+using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer.World
+namespace Faolan.GameServer.Inventory
 {
 	// The player's action bar / hotbar (#71). The client persists its bar as it drags shortcuts (AddShortcut
 	// 0x206E / RemoveShortcut / UpdateShortcut) into CharacterShortcut rows, and requests the saved bar at login

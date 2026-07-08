@@ -1,7 +1,6 @@
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.AgentServer;
 using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
 using System;
@@ -12,6 +11,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Server.AgentServer;
 
 namespace Faolan.GameServer.World
 {

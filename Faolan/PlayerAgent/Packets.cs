@@ -4,7 +4,7 @@ using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 
 namespace Faolan.PlayerAgent
@@ -91,14 +91,14 @@ namespace Faolan.PlayerAgent
 			aBuffer.WriteUInt32(0x00000014);
 			aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // 0x3bc035ec
 			aBuffer.WriteUInt32(0x000c0001);
-			aBuffer.WriteUInt32(Statics.Premium
+			aBuffer.WriteUInt32(Global.Premium
 				? 0x00018081
 				: 0x00018181); // subscribed flag byte: 0x80 premium / 0x81 free
 			aBuffer.WriteUInt32(0x00000015);
 			aBuffer.WriteUInt32(0x00000020);
-			aBuffer.WriteUInt32(Statics.Premium
-				? Statics.PremiumCharSlots
-				: Statics.FreeCharSlots); // unlocked character slots
+			aBuffer.WriteUInt32(Global.Premium
+				? Global.PremiumCharSlots
+				: Global.FreeCharSlots); // unlocked character slots
 			aBuffer.WriteUInt32(0x00000000);
 			aBuffer.WriteString("https://www.facebook.com/dialog/oauth?client_id=.....");
 			aBuffer.WriteUInt32(0x00000000);

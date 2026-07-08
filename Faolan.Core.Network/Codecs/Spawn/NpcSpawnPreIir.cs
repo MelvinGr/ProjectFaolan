@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Text;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Typed, mutable view of the NPC FA015807 (SimpleCharFullUpdate) PRE-IIR scaffold - the "last un-lifted part"
 	// of the from-DB NPC spawn (Gitea #185). The scaffold is the fixed read sequence

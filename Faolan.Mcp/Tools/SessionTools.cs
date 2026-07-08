@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Server.AgentServer;
 using ModelContextProtocol.Server;
 
 namespace Faolan.Mcp.Tools

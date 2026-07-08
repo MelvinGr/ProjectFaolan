@@ -1,6 +1,6 @@
 using System;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;

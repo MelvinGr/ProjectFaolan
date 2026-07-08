@@ -72,7 +72,7 @@ namespace Faolan.Web.Services
 			if (recipient == null)
 				return (false, $"No character named '{recipientName}'.");
 
-			var now = Statics.NowUnixTimeSeconds;
+			var now = Global.NowUnixTimeSeconds;
 			var mail = new Mail
 			{
 				MailId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
