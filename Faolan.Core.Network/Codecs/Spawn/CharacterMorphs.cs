@@ -58,10 +58,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return entries;
 		}
 
-		// Stores one editor SetMorphValue into the body: strips the face slot prefix ("33_NoseCrookedRight"),
-		// zigzag-decodes the raw value and writes the signed slider value to the matching column. Returns false
-		// for names not in the table (resource refs and unseen sliders - the caller logs those).
-		public static bool TryApply(CharacterBody body, string morphName, uint rawValue)
+		// Stores one editor SetMorphValue into the body: strips the face slot prefix ("33_NoseCrookedRight") and
+		// writes the signed slider value to the matching column. `value` is the ALREADY-DECODED field-3 int (the
+		// caller zigzag-decodes once at read). Returns false for names not in the table (resource refs / sliders
+		// not yet modelled - the caller logs those).
+		public static bool TryApply(CharacterBody body, string morphName, int value)
 		{
 			var name = morphName.Length > 3 && morphName[0] is >= '0' and <= '9' && morphName[1] is >= '0' and <= '9' && morphName[2] == '_'
 				? morphName[3..]
@@ -72,16 +73,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (!string.Equals(slider.Name, name, StringComparison.Ordinal))
 					continue;
 
-				slider.Set(body, ZigzagDecode(rawValue));
+				slider.Set(body, value);
 				return true;
 			}
 
 			return false;
-		}
-
-		private static int ZigzagDecode(uint v)
-		{
-			return (int)(v >> 1) ^ -(int)(v & 1);
 		}
 
 		private sealed record Slider(string Name, byte Type, byte SliderId, Func<CharacterBody, float> Get, Action<CharacterBody, float> Set);

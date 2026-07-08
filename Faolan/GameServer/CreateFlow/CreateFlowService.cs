@@ -8,6 +8,7 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
@@ -18,6 +19,7 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -133,59 +135,23 @@ namespace Faolan.GameServer.CreateFlow
 			var ack = packet.Body.ReadUInt32();
 			var clientInstance = packet.Body.ReadUInt32();
 			var reserved = packet.Body.ReadByte();
-			var pbLength = packet.Body.ReadUInt32();
-			var pbEnd = packet.Body.Position + pbLength;
+			var msg = packet.Body.ReadProtobufUInt32Length<ProtoScryScriptIIR>();
 
-			uint numericValue = 0;
-			uint scryType = 0; // ProtoScryScriptIIR field 2 = message type (2=ScriptMessage, 8=PlayOrSkipResultPlay, ...)
-			string token = null;
-			string valueString = null;
+			var value = msg.IntParameter; // decoded signed value (identity ids, morph slider, ...)
+			var rawValue = (uint)((value << 1) ^ (value >> 31)); // the raw wire varint (zigzag re-encode) for script echoes
 
-			while (packet.Body.Position < pbEnd)
-			{
-				var tag = packet.Body.ReadByte();
-				var field = tag >> 3;
-				var wireType = tag & 0x07;
-
-				switch (wireType)
-				{
-					case 0: // varint
-					{
-						var v = ReadProtobufVarint(packet.Body);
-						if (field == 2)
-							scryType = (uint)v;
-						else if (field == 3)
-							numericValue = (uint)v;
-						break;
-					}
-
-					case 2: // length-delimited (string / bytes)
-					{
-						var s = packet.Body.ReadStringByteLength();
-						if (field == 4)
-							token = s;
-						else if (field == 5)
-							valueString = s;
-						break;
-					}
-
-					default:
-					{
-						// Unexpected wire type; bail out to avoid desyncing the rest of the packet.
-						packet.Body.Position = pbEnd;
-						break;
-					}
-				}
-			}
+			var scryType = msg.type;
+			var token = msg.StringParameterOne;
+			var valueString = msg.StringParameterTwo;
 
 			var character = client.Session.Character;
-			_logger.LogInformation("Character-editor script callback: token={Token}, scryType={ScryType}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.", token, scryType,
-				numericValue, numericValue, valueString ?? "", clientInstance);
+			_logger.LogInformation("Character-editor script callback: token={Token}, scryType={ScryType}, value={Value} (0x{ValueHex:X}), string={String}, clientInstance={ClientInstance:X8}.", token, scryType,
+				value, value, valueString ?? "", clientInstance);
 
 			// #234: the beach cutscene's PlayOrSkipResultPlay (scryType 8) carries NO name token. On the create-world
 			// connection it's the cue to bind the cinematic actor - retail sends ThisIsKalanthes in RESPONSE to
 			// PlayResult (AFTER the player commits to playing the cutscene), not before. Route it explicitly.
-			if (token == null && scryType == 8 && IsCreateWorldConnection(client))
+			if (token == null && scryType == ProtoScryScriptIIR.Type.PlayOrSkipResultPlay && IsCreateWorldConnection(client))
 			{
 				await SendCreateCutsceneStep(client, "PlayResult", 0);
 				return;
@@ -201,13 +167,10 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					if (character != null)
 					{
-						// Sex IS the editor's usual 2x convention: 4 -> wire 2 = MALE, 6 -> wire 3 = FEMALE
-						// (anchored on Hoxxling, who is male: ChangeSex 4 + a chosen beardmesh; the earlier
-						// "6 = male" read was inverted).
-
-						character.Sex = numericValue == 4
-							? Sex.Male
-							: Sex.Female;
+						// Same 2x editor convention as race/class: the halved value is the wire sex-code 2=MALE / 3=FEMALE
+						// (anchored on Hoxxling, male: ChangeSex 4 -> 2). The Sex enum is Male=0/Female=1, so subtract the
+						// 2 base to land on the enum: (numericValue/2 - 2) => 4->0 Male, 6->1 Female. No magic ==.
+						character.Sex = (Sex)value;
 					}
 
 					break;
@@ -216,14 +179,14 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeRace":
 				{
 					if (character != null)
-						character.Race = (Race)(numericValue / 2);
+						character.Race = (Race)value;
 					break;
 				}
 
 				case "ChangeClass":
 				{
 					if (character != null)
-						character.Class = (Class)(numericValue / 2);
+						character.Class = (Class)value;
 					break;
 				}
 
@@ -231,7 +194,7 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					if (character != null)
 						EnsureBody(character)
-							.HeadMesh = numericValue;
+							.HeadMesh = (uint)value;
 
 					break;
 				}
@@ -240,7 +203,7 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					if (character != null)
 						EnsureBody(character)
-							.Size = (byte)numericValue;
+							.Size = (byte)value;
 
 					break;
 				}
@@ -249,7 +212,7 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					if (character != null)
 						EnsureBody(character)
-							.Voice = (byte)numericValue;
+							.Voice = (byte)value;
 
 					break;
 				}
@@ -316,8 +279,8 @@ namespace Faolan.GameServer.CreateFlow
 								RecordBodyResource(character, valueString);
 							else
 							{
-								if (!CharacterMorphs.TryApply(EnsureBody(character), valueString, numericValue))
-									_logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", valueString, numericValue);
+								if (!CharacterMorphs.TryApply(EnsureBody(character), valueString, value))
+									_logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", valueString, value);
 							}
 						}
 
@@ -335,7 +298,7 @@ namespace Faolan.GameServer.CreateFlow
 					// the editor interactive (the editor connection then drives itself; see the create flow).
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
 					{
-						await SendCreateCutsceneStep(client, token, numericValue);
+						await SendCreateCutsceneStep(client, token, rawValue);
 						break;
 					}
 
@@ -351,13 +314,13 @@ namespace Faolan.GameServer.CreateFlow
 				case "Move":
 				{
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
-						await SendCreateCutsceneStep(client, token, numericValue);
+						await SendCreateCutsceneStep(client, token, rawValue);
 					break;
 				}
 
 				default:
 				{
-					_logger.LogInformation("Character-editor: unhandled script callback token '{Token}' (numericValue={NumericValue}, value={Value}).", token, numericValue, valueString ?? "");
+					_logger.LogInformation("Character-editor: unhandled script callback token '{Token}' (value={Value}, string={String}).", token, value, valueString ?? "");
 					break;
 				}
 			}
@@ -1088,22 +1051,6 @@ namespace Faolan.GameServer.CreateFlow
 			return rows;
 		}
 
-		[Obsolete]
-		private static ulong ReadProtobufVarint(FaolanStream body)
-		{
-			ulong result = 0;
-			var shift = 0;
-			byte b;
-			do
-			{
-				b = body.ReadByte();
-				result |= (ulong)(b & 0x7F) << shift;
-				shift += 7;
-			}
-			while ((b & 0x80) != 0 && shift < 64);
-
-			return result;
-		}
 
 		// Appends the resource ref to the character's chosen-appearance list (deduplicated; the editor can
 		// resend the set when a creation session is resumed). Persisted with the character graph at name-commit.
@@ -1126,14 +1073,13 @@ namespace Faolan.GameServer.CreateFlow
 		// field6={0,0}} - the same wire shape the client uses for its own callbacks.
 		private static Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
-			var instance = client.Session.Account.ClientInstance;
 			return new PacketStream()
 				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR);
 					s.WriteUInt32(EntityClass.Character);
-					s.WriteUInt32(instance);
+					s.WriteUInt32(client.Session.Account.ClientInstance);
 					s.WriteByte(0x00);
 					s.WriteArrayUInt32Length(pb =>
 					{

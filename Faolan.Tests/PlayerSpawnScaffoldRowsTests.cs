@@ -122,7 +122,8 @@ namespace Faolan.Tests
 				("stomach", 14),
 				("thigh", 59)
 			})
-				Assert.True(CharacterMorphs.TryApply(character.Body, morph, raw));
+				// raw = Dikketest's captured wire values; decode as the read side does before storing.
+				Assert.True(CharacterMorphs.TryApply(character.Body, morph, (int)(raw >> 1) ^ -(int)(raw & 1)));
 
 			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
 			Assert.False(PlayerSpawnScaffoldRows.EnsureFreshRows(character)); // idempotent

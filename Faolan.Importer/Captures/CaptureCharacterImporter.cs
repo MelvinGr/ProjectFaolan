@@ -192,11 +192,8 @@ namespace Faolan.Importer.Captures
                 Level = (ushort)Math.Max(1, stats.Level),
                 Race = (Race)stats.Race,
                 Class = (Class)classId,
-                // The spawn's sex code is the Sex enum + 2: MALE=2 / FEMALE=3 (anchored on Hoxxling, male,
-                // wire 2 + a chosen beardmesh).
-                Sex = stats.Sex == 2
-                    ? Sex.Male
-                    : Sex.Female,
+                // The Sex enum IS the wire sex-code (MALE=2 / FEMALE=3), so the captured value maps directly.
+                Sex = (Sex)stats.Sex,
                 // The map active when the spawn was sent (MapChange tracking; the transform's "playfield"
                 // varint is a session instance id, NOT the map), else the char list's persisted map (when
                 // the Map row exists - FK), else the Tortage Beach fallback.
@@ -282,12 +279,12 @@ namespace Faolan.Importer.Captures
                 }
                 : CharacterMaxStats.CreateDefaults(character.Class, character.Level);
 
-            // The rendered looks, stored in CharacterBody's editor 2x units (the spawn rebuild halves them).
+            // The rendered looks, stored as the TRUE wire values (the spawn rebuild emits them as-is).
             character.Body = new CharacterBody
             {
-                HeadMesh = stats.HeadMesh * 2,
-                Voice = (byte)Math.Min(byte.MaxValue, stats.VoiceSet * 2),
-                Size = (byte)Math.Min(byte.MaxValue, stats.MonsterScale * 2)
+                HeadMesh = stats.HeadMesh,
+                Voice = (byte)Math.Min(byte.MaxValue, stats.VoiceSet),
+                Size = (byte)Math.Min(byte.MaxValue, stats.MonsterScale)
             };
 
             // First save assigns the DB-generated id; the scaffold rows and equipment bake the raw CharacterId,

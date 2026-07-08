@@ -45,7 +45,7 @@ namespace Faolan.Tests
 		{
 			var body = new CharacterBody();
 			foreach (var (morph, raw) in HoxxlingStream)
-				Assert.True(CharacterMorphs.TryApply(body, morph, raw), morph);
+				Assert.True(CharacterMorphs.TryApply(body, morph, Zz(raw)), morph); // Zz = the read-side zigzag decode
 
 			var entries = CharacterMorphs.BuildEntries(body, 7);
 
@@ -59,12 +59,12 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void TryApply_DecodesZigzag()
+		public void TryApply_StoresSignedSliderValue()
 		{
 			var body = new CharacterBody();
-			Assert.True(CharacterMorphs.TryApply(body, "arse", 31)); // zigzag 31 = -16
+			Assert.True(CharacterMorphs.TryApply(body, "arse", -16)); // decoded signed value stored as-is
 			Assert.Equal(-16f, body.Arse);
-			Assert.True(CharacterMorphs.TryApply(body, "arm", 200)); // zigzag 200 = +100
+			Assert.True(CharacterMorphs.TryApply(body, "arm", 100));
 			Assert.Equal(100f, body.Arm);
 		}
 
@@ -75,5 +75,9 @@ namespace Faolan.Tests
 			Assert.False(CharacterMorphs.TryApply(body, "*texscript_1136498", 2000));
 			Assert.False(CharacterMorphs.TryApply(body, "99_NotASlider", 10));
 		}
+
+		// The read-side zigzag decode (protobuf field 3 is ZigZag): the same transform CreateFlowService applies
+		// via the proto reader before calling TryApply. The stream data above is captured RAW varints.
+		private static int Zz(uint v) => (int)(v >> 1) ^ -(int)(v & 1);
 	}
 }

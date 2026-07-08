@@ -79,7 +79,7 @@ namespace Faolan.Tests
 				Assert.Equal(4000u, character.MapId);
 				// RealmId is required; the importer find-or-creates the server's realm (none seeded here).
 				Assert.Equal(await db.Realms.OrderBy(r => r.Id).Select(r => r.Id).FirstAsync(), character.RealmId);
-				Assert.Equal(2285694u, character.Body!.HeadMesh); // editor 2x units (wire 1142847)
+				Assert.Equal(1142847u, character.Body!.HeadMesh); // the TRUE wire value (editor sent 2285694 = 2x)
 				Assert.Equal(322.5f, character.PositionX); // the Tortage beach intro spawn (ProtoVec3 fields)
 				Assert.Equal(145.3113250732f, character.PositionY, 0.001f);
 				Assert.Equal(704.9000244141f, character.PositionZ, 0.001f);

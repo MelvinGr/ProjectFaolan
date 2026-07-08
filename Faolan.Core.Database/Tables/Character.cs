@@ -80,8 +80,10 @@ namespace Faolan.Core.Database.Tables
 		[ConstrainToEnumValues]
 		public Race Race { get; set; }
 
+		// Defaults to Male (2): the Sex enum has no 0 member (it's the wire code 2/3), so an unset value would fail
+		// the CHECK - a row created before the editor's ChangeSex (or in tests) still needs a valid sex.
 		[ConstrainToEnumValues]
-		public Sex Sex { get; set; }
+		public Sex Sex { get; set; } = Sex.Male;
 
 		[MaxLength(32)]
 		public string AuthChallenge { get; set; }

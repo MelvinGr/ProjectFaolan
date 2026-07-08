@@ -91,11 +91,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay captured.
 			if (message.Stats != null && (uint)character.Race != 0)
 			{
-				// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the spawn's sex
-				// code is the Sex enum + 2 (MALE=2 / FEMALE=3 - the editor's ChangeSex 4/6 halved, the same
-				// 2x convention as race/class; anchored on Hoxxling, who is male: editor 4 -> wire 2 and a
-				// chosen beardmesh).
-				message.Stats.Sex = (uint)character.Sex + 2;
+				// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the Sex enum now IS
+				// the wire sex-code (MALE=2 / FEMALE=3, uniform with NPC sex), so it's emitted directly - no offset.
+				message.Stats.Sex = (uint)character.Sex;
 				message.Stats.Race = (uint)character.Race;
 				message.Stats.Level = character.Level;
 
@@ -136,19 +134,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					message.CanFall = false;
 			}
 
-			// The rendered looks from the editor choices (CharacterBody). The editor reports head mesh /
-			// voice / size as 2x the wire value - the same convention as race/class - so: head_mesh =
-			// ChangeHeadMesh/2, voice_set = ChangeVoice/2, monster_scale = ChangeSize/2 (verified on all
-			// five create captures, e.g. dikketest 2285694 -> 1142847, voice 10 -> 5, size 194 -> 97).
-			// Unset values (no editor choice) keep the captured field.
+			// The rendered looks from the editor choices (CharacterBody). CharacterBody now stores the TRUE wire
+			// values (the editor's doubled ChangeHeadMesh/Voice/Size are zigzag-decoded to their real value on read),
+			// so they're emitted as-is (e.g. dikketest head_mesh 1142847, voice 5, size 97). Unset = keep captured.
 			if (message.Stats != null && character.Body != null)
 			{
 				if (character.Body.HeadMesh != 0)
-					message.Stats.HeadMesh = character.Body.HeadMesh / 2;
+					message.Stats.HeadMesh = character.Body.HeadMesh;
 				if (character.Body.Voice != 0)
-					message.Stats.VoiceSet = character.Body.Voice / 2u;
+					message.Stats.VoiceSet = character.Body.Voice;
 				if (character.Body.Size != 0)
-					message.Stats.MonsterScale = character.Body.Size / 2u;
+					message.Stats.MonsterScale = character.Body.Size;
 			}
 
 			// Replace the worn equipment with the character's own (when it has fully-buildable gear).
