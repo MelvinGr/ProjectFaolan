@@ -28,7 +28,7 @@ token baked at build is now just a placeholder; the live token is stamped when t
 exists. **Never re-bake it at load time** — see memory `spawn_playfield_token_per_send`.
 
 **How it was found / how to re-verify (loopback):** `dumpcap -i lo -f "tcp portrange 7000-7090" -w
-/tmp/x.pcapng` (background), start server, drive client, `Captures/tshark_dump.sh /tmp/x.pcapng`, then
+/tmp/x.pcapng` (background), start server, drive client, `Captures/scripts/tshark_dump.sh /tmp/x.pcapng`, then
 compare the **player's own** fa015807 spawn token to the **NPC** spawn tokens — they MUST be equal;
 confirm the client then sends `0x2020` and the server answers `0x2008`. The verification script is in
 the session transcript (extract token at body offset 60 = `0x18` tag + 4-byte LEB128). Post-fix wire:

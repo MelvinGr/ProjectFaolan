@@ -103,7 +103,7 @@
 > [[createworld_speech_needs_behaviorcc]].
 >
 > Tooling now in place for every test: a loopback capture runs to `/tmp/faolan_test.pcapng`; convert with
-> `Captures/tshark_dump.sh` and diff with `Captures/scripts/compare_create_cutscene.py <ours.tshark.json>`.
+> `Captures/scripts/tshark_dump.sh` and diff with `Captures/scripts/compare_create_cutscene.py <ours.tshark.json>`.
 > Code this session: `CreateFlow/CreateWorldCutsceneScripts.cs` + `Inbound/HandleCommandPacket.cs`.
 > **Everything below predates session 3b.**
 

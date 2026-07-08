@@ -169,7 +169,7 @@ LEFT (in rough priority):
 - Spellweaving: `NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving` (CLEAN ground truth for
   activate/adds/fire), `NecroL80_mage-necromancer_login_spellweave_cancel-weave-and-buff_spellweave-take-dot-when-
   stamina-empty-cancel-weave` (the DoT / Exhausted / energy-to-0 / cancel reference).
-- Convert a new pcapng: `Captures/tshark_dump.sh Captures/<file>.pcapng`.
+- Convert a new pcapng: `Captures/scripts/tshark_dump.sh Captures/<file>.pcapng`.
 
 ## 7. Key code files
 

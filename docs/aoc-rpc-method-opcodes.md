@@ -4,6 +4,12 @@ Ground-truth 16-bit RPC method ids, recovered by RE'ing the client. **`wire opco
 registration index`**, and the registration index is per-interface and contiguous from 0. The base is
 `0x2000` for every interface EXCEPT PlayerAgent/PlayerInterface (see the note at the end).
 
+> **Live on the wire (2026-07-08):** the Wireshark plugin resolves these names per packet
+> (`faolan.pkt.method`, COL_INFO `GameCharAgent TryLootItem`) via tables generated at build time from
+> the curated C# catalogs in `Faolan.Core.Network/Constants/Opcodes.cs` — that file, not this doc's
+> tables, is the canonical machine-readable form (`Faolan.Wireshark/scripts/gen_opcode_names.py`).
+> Regenerated `*.tshark.json` dumps carry the name as an additive `Method` key.
+
 Recovery method (reproducible — scripts in `Captures/ghidra/`):
 - **c2s (Agent/Proxy):** each `<Class>AgentProxy_t` constructor registers its methods in order via repeated
   `register(); setName("Method", len)` calls (decompiled from the `"...Proxy_t::called with a too low id!

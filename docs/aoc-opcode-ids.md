@@ -37,6 +37,12 @@ because in-world the client streams 0x2000 packets keyed by its own instance (e.
 
 ## 32-bit sub-opcodes inside 0x2000 (IIR / message type names)
 
+> **Live on the wire (2026-07-08):** the Wireshark plugin dissects the IIR id out of
+> GameAgent/GameInterface `0x2000` PassBlob bodies (`faolan.pkt.iir`, COL_INFO
+> `DispatchPassBlob:MoveTaskIIR`), names generated from the `GameServer0X2000Opcodes` catalog in
+> `Opcodes.cs`. Regenerated `*.tshark.json` dumps carry the id as an additive `Iir` key — decode
+> scripts no longer need to re-parse `BodyHex` for it.
+
 
 | sub-opcode | count | resolved name | servers |
 |---|---|---|---|
