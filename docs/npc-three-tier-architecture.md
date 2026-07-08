@@ -89,18 +89,19 @@ from typed columns.
       `row` (placement overrides), with runtime anim/state canonical. Verified byte-exact for the type +
       placement fields across all 980 populated spawns (`NpcSpawnStatCoreTests`). `Data` still supplies the
       frame + name + equipment structure.
-- [ ] Build the spawn FRAME from scratch (header + transform + pre-IIR + IIR + post-IIR) so `Data` can be
-      dropped. Most pieces have byte-exact builders: header = constants; transform = `2C 0A <vec3> 12 <quat>
-      18 <token varint>` (floats + token from typed values, `WorldObjectBuilder.EncodePlayfieldVarint`);
-      pre-IIR = `NpcSpawnPreIir.BuildMinimal`; IIR message = `ApplyStatCore`; ANIMAL post-IIR =
-      `BuildMinimalPostIir`; HUMANOID (clean) post-IIR = `NpcSpawnAppearanceCodec.BuildPostIir(morphs)`.
-      The CoreChar header `X` in `[u8 0x41][u32 X][u32 msgLen]` is now SOLVED - RE showed it's type-stable
-      (0/510 mixed), lifted into `NpcStatCore.IirHeader` (`ReadIirHeaderWord`), so the header is buildable.
-      The one residual is the **humanoid runtime post-IIR** (spawns whose post-IIR isn't the clean morph
-      table) - the #243 tail; those keep the captured `Data`. Animals + clean-appearance humanoids can be
-      assembled fully from scratch (all builders exist + `IirHeader`); wiring that + threading the token
-      retires `SpawnPlayfieldRewriter` and drops `Data` for them.
-- [ ] Thread the playfield token into the transform at construction (independent of the post-IIR) to retire
-      `SpawnPlayfieldRewriter` for the NPC spawn path.
-- [ ] Retire `Data` + the `SpawnPacketBuilder` splice (blocked on #243 for humanoids, per above).
+- [x] `NpcSpawnBuilder.BuildFromScratch` assembles the WHOLE body with no template: header constants;
+      transform `2C 0A <vec3> 12 <quat> 18 <token varint>` (token written in-place, no `SpawnPlayfieldRewriter`);
+      pre-IIR = `NpcSpawnPreIir.BuildMinimal`; CoreChar header `[41][X][msgLen]` with X = the lifted
+      `NpcStatCore.IirHeader` (RE: type-stable, `ReadIirHeaderWord`); ANIMAL post-IIR = `BuildMinimalPostIir`,
+      clean-HUMANOID post-IIR = `NpcSpawnAppearanceCodec.BuildPostIir(morphs)`.
+- [x] `NpcSpawnBuilder.BuildMessageFromColumns` builds the whole `ProtoCoreCharacterIIR` from the DB (Name +
+      `ApplyStatCore` + equipment rows). Whole-DB gate (`NpcSpawnFromScratchTests`): **824/988 build byte-exact
+      from columns**, 9 canonically cleaner (drop a captured runtime target), 155 the humanoid runtime-post-IIR
+      tail (keep `Data`).
+- [ ] WIRE it into the live path: at spawn build the body via `BuildMessageFromColumns` +
+      `BuildFromScratch(zoneToken)` for the clean cases (fall back to the `Data` splice for the 155
+      runtime-post-IIR humanoids), so `SpawnBody` carries the live token at construction and `SendWorldSpawn`
+      drops the `SpawnPlayfieldRewriter` token patch. Byte-neutral for the 824 (verified) - a low-risk
+      in-client smoke test. `Data` + the splice + `SpawnPlayfieldRewriter` then remain only on the #243 tail.
+- [ ] #243: decode the humanoid RUNTIME post-IIR so the last 155 can drop `Data` too.
 - [ ] Migrate the remaining `Npc.Community`/`Level` readers (now `[Obsolete]`) to `StatCore`.
