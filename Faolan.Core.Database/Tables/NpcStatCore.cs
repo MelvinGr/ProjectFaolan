@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -13,7 +14,7 @@ namespace Faolan.Core.Database.Tables
 	// health/mana, scale, voice, ...) are overridden per-instance from NpcSpawn; transient runtime state (animation
 	// phase, BccState, current HP) is emitted canonical at spawn from the live tier (WorldEntity), never stored here.
 	// See docs/npc-three-tier-architecture.md.
-	[PrimaryKey(nameof(NpcId))]
+	[PrimaryKey(nameof(NpcId)), NoReorder]
 	public class NpcStatCore
 	{
 		public virtual Npc Npc { get; set; }
