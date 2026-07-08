@@ -55,8 +55,12 @@ namespace Faolan.Tests
 				var pos = new Vector3(ReadLE(oracle, SpawnPacketBuilder.PosXOffset), ReadLE(oracle, SpawnPacketBuilder.PosYOffset), ReadLE(oracle, SpawnPacketBuilder.PosZOffset));
 				var rot = new Quaternion(ReadLE(oracle, SpawnPacketBuilder.RotXOffset), ReadLE(oracle, SpawnPacketBuilder.RotYOffset), ReadLE(oracle, SpawnPacketBuilder.RotZOffset), ReadLE(oracle, SpawnPacketBuilder.RotWOffset));
 				var humanoid = NpcSpawnAppearanceCodec.TryDecodeAppearance(oracle, out var morphs);
+				// A no-morph spawn's fresh post-IIR is the minimal form; use the captured recordCount (1 animal / 2
+				// humanoid) so a no-morph humanoid reproduces byte-exact too (#243). Non-minimal oracles keep the default
+				// (they carry runtime state the from-scratch build deliberately drops, so they can't match anyway).
+				var minimalRc = NpcSpawnScaffold.TryReadMinimalRecordCount(oracle, out var rc) ? rc : NpcSpawnScaffold.MinimalRecordCount;
 				var message = NpcSpawnBuilder.BuildMessageFromColumns(row); // fully from DB columns/rows, no parsed Data
-				var actual = NpcSpawnBuilder.BuildFromScratch(handle, x.Value, pos, rot, ReadPlayfieldToken(oracle), message, humanoid, morphs);
+				var actual = NpcSpawnBuilder.BuildFromScratch(handle, x.Value, pos, rot, ReadPlayfieldToken(oracle), message, morphs, minimalRc);
 
 				var m = read.Message;
 				var hasRuntimeMsg = m.DefensiveTarget != null || m.OffensiveTarget != null || m.LockedTo != null
@@ -126,9 +130,10 @@ namespace Faolan.Tests
 			var position = new Vector3(ReadLE(expected, SpawnPacketBuilder.PosXOffset), ReadLE(expected, SpawnPacketBuilder.PosYOffset), ReadLE(expected, SpawnPacketBuilder.PosZOffset));
 			var rotation = new Quaternion(ReadLE(expected, SpawnPacketBuilder.RotXOffset), ReadLE(expected, SpawnPacketBuilder.RotYOffset), ReadLE(expected, SpawnPacketBuilder.RotZOffset), ReadLE(expected, SpawnPacketBuilder.RotWOffset));
 			var token = ReadPlayfieldToken(expected);
-			var humanoid = NpcSpawnAppearanceCodec.TryDecodeAppearance(expected, out var morphs);
+			NpcSpawnAppearanceCodec.TryDecodeAppearance(expected, out var morphs);
+			var minimalRc = NpcSpawnScaffold.TryReadMinimalRecordCount(expected, out var rc) ? rc : NpcSpawnScaffold.MinimalRecordCount;
 
-			var actual = NpcSpawnBuilder.BuildFromScratch(handle, x, position, rotation, token, read.Message, humanoid, morphs);
+			var actual = NpcSpawnBuilder.BuildFromScratch(handle, x, position, rotation, token, read.Message, morphs, minimalRc);
 
 			Assert.Equal(expected, actual);
 		}

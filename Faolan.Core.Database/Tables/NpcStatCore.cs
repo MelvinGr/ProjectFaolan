@@ -28,6 +28,13 @@ namespace Faolan.Core.Database.Tables
 		// from-scratch spawn header can re-emit it without needing its full bit semantics decoded.
 		public uint? IirHeader { get; set; }
 
+		// The recordCount a NO-MORPH spawn of this type ships in its fresh minimal post-IIR (#243): 1 (the animal
+		// shape) or 2 (the humanoid shape). Type-stable (no type is seen with both); derived at import from a
+		// minimal-form capture. Lets a NO-MORPH humanoid build its post-IIR from scratch - BuildMinimalPostIir(rc) -
+		// instead of splicing the captured Data blob. Null for appearance-bearing types (they use their morph rows)
+		// and for types only ever seen in a runtime-bearing form (their fresh recordCount is unknown -> stay on Data).
+		public uint? MinimalPostIirRecordCount { get; set; }
+
 		// --- CharacterStats (Stats) ---
 		public uint? Race { get; set; }
 		public uint? Sex { get; set; }

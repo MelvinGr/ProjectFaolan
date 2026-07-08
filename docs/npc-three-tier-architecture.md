@@ -104,23 +104,29 @@ from typed columns.
       `ApplyStatCore` + equipment rows). Whole-DB gate (`NpcSpawnFromScratchTests`): **824/988 build byte-exact
       from columns**, 9 canonically cleaner (drop a captured runtime target), 155 the humanoid runtime-post-IIR
       tail (keep `Data`).
-- [ ] WIRE it into the live path: at spawn build the body via `BuildMessageFromColumns` +
-      `BuildFromScratch(zoneToken)` for the clean cases (fall back to the `Data` splice for the 155
-      runtime-post-IIR humanoids). Byte-neutral for the 824 (verified). NB `SendWorldSpawn` STILL re-stamps
-      the playfield token per-send (`SpawnPlayfieldRewriter`) - the token baked at build is only a
-      placeholder; the live token isn't known until the player enters (a 2026-07-08 regression baked the
-      load-time token + dropped the re-stamp, stalling world entry). `Data` + the splice remain only on the
-      #243 tail.
-- [ ] #243: decode the humanoid RUNTIME post-IIR so the last ~155 drop `Data` too. RE of the tail (of 847
-      equipped humanoids: 600 clean-appearance already build from scratch):
-      - **148 = no-morph humanoids**: a 41-byte post-IIR byte-identical to the ANIMAL minimal form except
-        `recordCount=2` (vs 1) and `count=0` (no morph entries). Build with a `recordCount`-parameterised
-        `BuildMinimalPostIir(2)`.
-      - **99 = runtime-bearing**: a large first record (movement/bounds float triples, `recordCount=1`,
-        `firstRecordLen` large) with the **morph table embedded after it** (`[count][morphId f32 0 0 strLen str]…`
-        + the shared 0x3F1 terminator). A canonical fresh spawn drops the runtime record and keeps the morphs, so
-        a lenient morph extractor (skip the runtime record, decode the trailing morph table) → `BuildPostIir(morphs)`.
-      - 2 = a morph ENTRY carries runtime in field2/field3 (decode later).
-      Both main shapes are recoverable; needs a per-spawn post-IIR-kind flag (appearance / minimal-humanoid /
-      runtime) lifted by the importer so `TryBuildLive` picks the builder without the captured `Data`.
+- [x] WIRE it into the live path: `TryBuildLive` builds the body via `BuildMessageFromColumns` +
+      `BuildFromScratch(zoneToken)` for every expressible case, falling back to the `Data` splice only for the
+      residual runtime-post-IIR tail. NB `SendWorldSpawn` STILL re-stamps the playfield token per-send
+      (`SpawnPlayfieldRewriter`) - the token baked at build is only a placeholder; the live token isn't known
+      until the player enters (a 2026-07-08 regression baked the load-time token + dropped the re-stamp,
+      stalling world entry).
+- [x] #243: **the live path now builds 964/988 shipped spawns from scratch (was 786); only 24 keep `Data`.**
+      Two RE'd humanoid post-IIR shapes are now constructed from columns:
+      - **no-morph humanoids**: a 41-byte post-IIR byte-identical to the ANIMAL minimal form except
+        `recordCount` (1 = animal shape, 2 = humanoid shape) and no morph entries. The count is TYPE-STABLE
+        (no type ships both), lifted by the importer from a minimal-form CAPTURE (the dump body, not the retiring
+        `NpcSpawn.Data`) into `NpcStatCore.MinimalPostIirRecordCount`; `BuildFromScratch` emits
+        `BuildMinimalPostIir(rc)` for them.
+      - **runtime-bearing-with-morphs**: a large first record (movement/bounds float triples) with the **morph
+        table embedded after it** at `12 + firstRecordLen` (`[count][morphId f32 0 0 strLen str]…` + the shared
+        0x3F1 terminator). `NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient` skips the runtime record and lifts
+        the trailing table → morph rows → `BuildPostIir(morphs)`. (In practice these types also have clean
+        captures, so the importer's morph backfill-by-name already covered most; the lenient decode makes the
+        buried-table instances self-sufficient.)
+      - Byte-exact whole-DB gate (`NpcSpawnFromScratchTests`): **945/988** reproduce their (possibly mid-session)
+        capture exactly; the 34+9 that don't are runtime-bearing captures the fresh build DELIBERATELY differs from
+        (it drops the accrued runtime state - "construct, don't replay").
+      - Residual `Data` tail = the ~24 runtime-bearing NO-morph humanoids whose type has no minimal-form capture
+        (fresh recordCount unknown) + the 2 entry-runtime spawns. In-client smoke test of a no-morph humanoid
+        (ensure it's not bald) still pending.
 - [ ] Migrate the remaining `Npc.Community`/`Level` readers (now `[Obsolete]`) to `StatCore`.

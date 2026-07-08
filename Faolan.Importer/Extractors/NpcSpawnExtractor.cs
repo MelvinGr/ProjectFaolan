@@ -263,10 +263,14 @@ namespace Faolan.Importer.Extractors
 				? identity.Name
 				: ExtractName(body);
 
-			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals.
+			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals. The clean shape
+			// decodes directly; a mid-session humanoid capture carries the SAME table behind a runtime record1, lifted
+			// by the lenient decode (#243) so those spawns get morph rows too (and build from scratch, not Data).
 			var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var decoded)
 				? decoded
-				: [];
+				: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lenient)
+					? lenient
+					: [];
 
 			entry = identity with
 			{

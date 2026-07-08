@@ -699,6 +699,22 @@ namespace Faolan.Importer.Captures
 		private static async Task<Dictionary<uint, Npc>> UpsertNpcTypes(DatabaseContext db, List<NpcSpawnEntry> entries)
 		{
 			var byTemplate = await db.Npcs.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
+
+			// #243: the fresh minimal post-IIR recordCount per type (1 = animal shape, 2 = no-morph humanoid shape),
+			// read from a minimal-form CAPTURE (the dump-file body, e.Data) - NOT the stored NpcSpawn.Data column, which
+			// is being retired. Type-stable (no type ships both counts); scans each template's dump entries for a
+			// genuine minimal-form body. Lets a no-morph humanoid build its post-IIR from scratch (BuildMinimalPostIir(rc))
+			// instead of the Data blob.
+			var minimalRcByTemplate = new Dictionary<uint, uint>();
+			foreach (var e in entries)
+			{
+				if (e.TemplateId == 0 || minimalRcByTemplate.ContainsKey(e.TemplateId))
+					continue;
+				var b = WorldObjectBuilder.ExtractBody(e.Data);
+				if (b != null && NpcSpawnScaffold.TryReadMinimalRecordCount(b, out var rc))
+					minimalRcByTemplate[e.TemplateId] = rc;
+			}
+
 			foreach (var e in entries)
 			{
 				if (e.TemplateId == 0)
@@ -737,6 +753,10 @@ namespace Faolan.Importer.Captures
 						npc.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
 					}
 				}
+
+				// #243: stamp the type's fresh minimal post-IIR recordCount from the dump-derived scan above.
+				if (npc.StatCore != null && minimalRcByTemplate.TryGetValue(e.TemplateId, out var minRc))
+					npc.StatCore.MinimalPostIirRecordCount = minRc;
 			}
 
 			// Fallback (#244): a type whose spawns were pruned (or that isn't in this capture set) but still has an

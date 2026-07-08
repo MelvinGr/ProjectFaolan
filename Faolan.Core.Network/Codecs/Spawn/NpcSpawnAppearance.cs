@@ -61,7 +61,9 @@ namespace Faolan.Core.Network.Codecs
 
 		// Decodes the appearance/morph table out of an FA015807 body's post-IIR. Returns false (morphs = empty) if
 		// the body has no CharacterIIR, or its post-IIR is not the clean humanoid appearance shape (animal minimal
-		// form, or a larger runtime-state form) - those are left to the minimal-scaffold path.
+		// form, or a larger runtime-state form) - those are left to the minimal-scaffold path. The clean shape has the
+		// empty 5-byte record1 (Record1) followed immediately by the morph table; use TryDecodeAppearanceLenient to
+		// also lift the table when it sits behind a larger RUNTIME record1 (a mid-session humanoid capture).
 		public static bool TryDecodeAppearance(byte[] body, out List<NpcAppearanceMorph> morphs)
 		{
 			morphs = [];
@@ -74,7 +76,42 @@ namespace Faolan.Core.Network.Codecs
 			if (!post.Slice(12, Record1.Length).SequenceEqual(Record1))
 				return false;
 
-			var o = 12 + Record1.Length;
+			return TryDecodeMorphTable(post, 12 + Record1.Length, out morphs);
+		}
+
+		// Lenient variant (#243): decodes the SAME morph table even when it is preceded by a large RUNTIME record1
+		// (movement/bounds state accrued mid-session), not the empty 5-byte record1 the clean shape has. RE of the
+		// humanoid tail: the table always sits at 12 + firstRecordLen (skip the header + the first record group) and
+		// ends at the shared terminator, regardless of recordCount. A FRESH spawn drops the runtime record1, so
+		// lifting just this table gives the canonical appearance (the clean-appearance captures of the same type carry
+		// an identical table). Returns false for the minimal/no-morph forms and any body whose trailing bytes are not
+		// a clean morph table ending exactly at the terminator. A clean-shape body decodes identically here
+		// (firstRecordLen == 5, record1 == Record1), so this is a strict superset of TryDecodeAppearance.
+		public static bool TryDecodeAppearanceLenient(byte[] body, out List<NpcAppearanceMorph> morphs)
+		{
+			morphs = [];
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return false;
+
+			var post = body.AsSpan(read.Offset + read.Length);
+			if (post.Length < 12 || BinaryPrimitives.ReadUInt32BigEndian(post) != HeaderWord0)
+				return false;
+
+			var firstRecordLen = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(4, 4));
+			var tableStart = 12L + firstRecordLen;
+			if (tableStart + 4 > post.Length)
+				return false;
+
+			return TryDecodeMorphTable(post, (int)tableStart, out morphs);
+		}
+
+		// Parses the morph table [u32 count][count x entry][terminator] starting at `o`, requiring it to end EXACTLY
+		// at the shared Terminator (post end) with every entry in the clean shape (field2/field3 == 0). This is the
+		// grammar shared by the strict and lenient decoders; the only difference is where the table starts (right
+		// after the empty record1 vs. after a runtime record1).
+		private static bool TryDecodeMorphTable(ReadOnlySpan<byte> post, int o, out List<NpcAppearanceMorph> morphs)
+		{
+			morphs = [];
 			var count = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(o, 4));
 			o += 4;
 			if (count is 0 or > 0x100)

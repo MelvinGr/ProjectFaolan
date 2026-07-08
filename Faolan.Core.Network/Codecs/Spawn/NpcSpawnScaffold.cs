@@ -63,6 +63,29 @@ namespace Faolan.Core.Network.Codecs
 			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(recordCount).WriteArray(MinimalBody).ToArray();
 		}
 
+		// True iff `body`'s post-IIR is EXACTLY the minimal no-morph form (the constant 41-byte body) - the fresh
+		// shape a no-morph NPC ships. `recordCount` is 1 (the animal shape) or 2 (the humanoid shape); a from-scratch
+		// build re-emits BuildMinimalPostIir(recordCount) for such a spawn (#243). Returns false for appearance-bearing
+		// post-IIRs (they carry a morph table) and runtime-bearing forms (larger than the minimal body) - those aren't
+		// the minimal shape, so their fresh recordCount isn't derivable from this capture.
+		public static bool TryReadMinimalRecordCount(byte[] body, out uint recordCount)
+		{
+			recordCount = 0;
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return false;
+
+			var post = body.AsSpan(read.Offset + read.Length);
+			if (post.Length != MinimalPostIirLength)
+				return false;
+
+			var rc = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(8, 4));
+			if (rc is not (MinimalRecordCount or MinimalHumanoidRecordCount) || !post.SequenceEqual(BuildMinimalPostIir(rc)))
+				return false;
+
+			recordCount = rc;
+			return true;
+		}
+
 		// The fresh-spawn scaffold pass used by the live spawn path. Like WithMinimalScaffolds, but a HUMANOID
 		// keeps its captured post-IIR instead of collapsing to the 41-byte minimal form: a humanoid's post-IIR
 		// carries that NPC's APPEARANCE / morph table (the "*key=val" texscript string + [morphId][float] pairs -

@@ -34,6 +34,37 @@ namespace Faolan.Tests
 			Assert.Equal(capturedPostIir, NpcSpawnScaffold.BuildMinimalPostIir());
 		}
 
+		// #243: TryReadMinimalRecordCount recognises the exact 41-byte minimal form and reports its recordCount - the
+		// signal that a no-morph spawn's fresh post-IIR is BuildMinimalPostIir(rc). The animal golden carries rc==1.
+		[Fact]
+		public void TryReadMinimalRecordCount_AnimalMinimalForm_ReturnsCount1()
+		{
+			Assert.True(NpcSpawnScaffold.TryReadMinimalRecordCount(Golden.Bytes("SpawnNpcCrocodile"), out var rc));
+			Assert.Equal(NpcSpawnScaffold.MinimalRecordCount, rc);
+		}
+
+		// A synthetic no-morph HUMANOID minimal form (recordCount==2) is recognised and reports 2; an appearance-bearing
+		// body (Casilda's morph table) is NOT the minimal form, so it is declined.
+		[Fact]
+		public void TryReadMinimalRecordCount_HumanoidMinimalForm_ReturnsCount2_AndDeclinesAppearance()
+		{
+			var animal = Golden.Bytes("SpawnNpcCrocodile");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(animal, out var read));
+			var postStart = read.Offset + read.Length;
+
+			// Rebuild the animal body with the humanoid minimal post-IIR (recordCount==2) and fixed body length.
+			var humanoidPost = NpcSpawnScaffold.BuildMinimalPostIir(NpcSpawnScaffold.MinimalHumanoidRecordCount);
+			var body = new byte[postStart + humanoidPost.Length];
+			Array.Copy(animal, body, postStart);
+			humanoidPost.CopyTo(body, postStart);
+			BinaryPrimitives.WriteUInt32BigEndian(body, (uint)(body.Length - 4));
+
+			Assert.True(NpcSpawnScaffold.TryReadMinimalRecordCount(body, out var rc));
+			Assert.Equal(NpcSpawnScaffold.MinimalHumanoidRecordCount, rc);
+
+			Assert.False(NpcSpawnScaffold.TryReadMinimalRecordCount(Golden.Bytes("SpawnNpcCasilda"), out _));
+		}
+
 		[Fact]
 		public void WithMinimalPostIir_OnAlreadyMinimalBody_IsAByteIdenticalNoOp()
 		{
