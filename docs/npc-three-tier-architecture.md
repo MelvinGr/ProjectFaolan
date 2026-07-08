@@ -90,10 +90,16 @@ from typed columns.
       placement fields across all 980 populated spawns (`NpcSpawnStatCoreTests`). `Data` still supplies the
       frame + name + equipment structure.
 - [ ] Build the spawn FRAME from scratch (header + transform + pre-IIR + IIR + post-IIR) so `Data` can be
-      dropped. The header/transform/pre-IIR/IIR and the ANIMAL post-IIR (minimal form) are all constructable;
-      the **HUMANOID post-IIR (appearance/morph table) is GATED ON #243** (its grammar beyond the morph table
-      isn't decoded - `WithAppearancePostIir` still splices it into the captured body). 876/1031 spawns are
-      humanoid, so full `Data` retirement waits on #243.
+      dropped. Most pieces have byte-exact builders: header = constants; transform = `2C 0A <vec3> 12 <quat>
+      18 <token varint>` (floats + token from typed values, `WorldObjectBuilder.EncodePlayfieldVarint`);
+      pre-IIR = `NpcSpawnPreIir.BuildMinimal`; IIR message = `ApplyStatCore`; ANIMAL post-IIR =
+      `BuildMinimalPostIir`; HUMANOID (clean) post-IIR = `NpcSpawnAppearanceCodec.BuildPostIir(morphs)`.
+      TWO residual un-decoded framing values block it, though:
+      - **CoreChar header `X`** in `[u8 0x41][u32 X][u32 msgLen]` before the message - NOT constant (animal
+        `0x00008203`, humanoid Casilda `0x08008203`; low `0x8203` fixed, a high bit toggles with equipment).
+        Carried from the template today; needs decoding (or lifting) before the header can be built.
+      - the **humanoid runtime post-IIR** (spawns whose post-IIR isn't the clean morph table) - the #243 tail.
+      Once those are pinned, the assembly is straightforward and retires `Data` + the splice.
 - [ ] Thread the playfield token into the transform at construction (independent of the post-IIR) to retire
       `SpawnPlayfieldRewriter` for the NPC spawn path.
 - [ ] Retire `Data` + the `SpawnPacketBuilder` splice (blocked on #243 for humanoids, per above).
