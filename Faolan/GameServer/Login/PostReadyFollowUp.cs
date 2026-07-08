@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -46,65 +45,51 @@ namespace Faolan.GameServer
 		// send time (Burst + SendBurst in PacketBurstHelper) with the same instance written into the header and
 		// body, so auth replies and burst packets stay on one conversation.
 
-		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] data = null)
+		// The per-application effect nonce a synthesized self-buff carries (the value the old verbatim Scythe-Shield
+		// blob used; the client does not validate it - #304).
+		private const uint DefaultSelfBuffEffectNonce = 0x14C5C912;
+
+		// Applies a self-buff (or an offensive MagicBuff cast) by CONSTRUCTING its 50-byte MagicBuffIIR payload from
+		// scratch (SelfBuffCodec): the spell's real BASE id (id >> 8, the (base<<8)|rank convention) + its RDB DURATION
+		// (Spell.DurationMs -> centiseconds at payload+8), so the client counts down the correct time AND the server
+		// expires it at the same instant (#274). Callers that need the 54-byte spellweave/ride shape build that payload
+		// themselves and call SendMagicBuffIir directly.
+		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
 		{
-			// Use as 'dummy' data (comes from Scythe Shield Rank 3 (3 hours, 20 min, 28ish sec))
-			var spellData = new byte[]
-			{
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x7E, 0x26, // 1277478
-				0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x38, 0x7E, // 145534
-				0x00, 0x00, 0x00, 0x50, // 80
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, // 80
-				0x00, 0x00, 0x00, 0x00, 0x14, 0xC5, 0xC9, 0x12 // 348506386
-			};
+			var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
+			var durationCs = (spell?.DurationMs ?? 0) / 10;
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffData(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
+		}
 
-			// The ApplySpell payload carries the buff DURATION at offset +8 (u32 BE) in CENTISECONDS (×10ms - calibrated
-			// in-client, see ActiveBuff.DurationMsFromPayload). For a REPLAYED payload (a captured mount/NPC/content
-			// blob passed in `data`) we read that duration straight from the bytes. For a SYNTHESIZED self-buff
-			// (data == null -> the default blob, whose +8 is a stale Scythe-Shield value) we look up the spell's real
-			// RDB duration (Spell.DurationMs, stored in ms) and STAMP it into +8 (back to centiseconds, /10) so the
-			// client counts down the correct time AND the server expires it at the same instant. The base spell id is
-			// the wire id minus its rank byte (id >> 8), matching the (base<<8)|rank buff-id convention. (#274)
-			uint durationMs;
-			if (data == null)
-			{
-				var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
-				durationMs = spell?.DurationMs ?? 0;
-				data = (byte[])spellData.Clone();
-				if (durationMs > 0 && data.Length >= 12)
-					BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(8, 4), durationMs / 10); // ms -> centiseconds for the wire
-			}
-			else
-				durationMs = ActiveBuff.DurationMsFromPayload(data);
-
+		// Sends the MagicBuffIIR (ApplySpell 0x6B87E316) carrier with an already-CONSTRUCTED payload and, for a SELF
+		// buff (applyTo == applyFrom), registers it so the server tracks it (.buffs / CancelBuff / tick expiry). The
+		// duration is read back from the payload (+8, centiseconds): a known duration (> 0) arms the tick to expire it
+		// and send the retail removal twin; 0 = no self-duration (lives until cancelled). Every ApplySpell send path
+		// funnels through here - the self-buff, the spellweave trance/component buffs, the mount ride buff and the
+		// BCC cast (#69/#274). Offensive casts (applyTo != applyFrom) are damage, handled by ResolveOffensiveCast.
+		private async Task SendMagicBuffIir(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] payload)
+		{
 			await new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
 					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(applyTo) //Apply to ?
+					.WriteUInt32(applyTo)
 					.WriteUInt16(0x0000)
-					.WriteUInt32(spellId) // SpellID
+					.WriteUInt32(spellId)
 					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(applyFrom) // apply from ?
-					.WriteArray(data))
+					.WriteUInt32(applyFrom)
+					.WriteArray(payload))
 				.SendAsync(client);
 
-			// Register a SELF-buff (applyTo == applyFrom) so the server tracks it (.buffs / CancelBuff / tick
-			// expiry). Centralized here so EVERY ApplySpell send path registers - the mount buff, .spelltest, the
-			// summon cast and the BCC cast path - not just the inbound cast handler (#69). Offensive casts
-			// (applyTo != applyFrom) are damage, not buffs, and are handled by ResolveOffensiveCast. A known duration
-			// (> 0) arms the tick to expire it + send the retail removal twin; 0 = no self-duration (lives until
-			// cancelled), e.g. an ability whose timed effect rides a separate EffectSpell record (#274).
 			if (applyTo == applyFrom)
 			{
+				var durationMs = ActiveBuff.DurationMsFromPayload(payload);
 				var entity = _simulation.PlayerWorldEntity(client);
 				if (entity != null && entity.Handle == applyTo)
-				{
 					entity.ActiveBuffs[spellId] = new ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, durationMs > 0
-							? durationMs / 1000.0
-							: null);
-				}
+						? durationMs / 1000.0
+						: null);
 			}
 		}
 
@@ -119,7 +104,7 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
-			await ApplySpell(client, applyTo, applyFrom, spellId, SpellweaveCodec.BuildBuffData(spellBase, durationCs, nonce));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SpellweaveCodec.BuildBuffData(spellBase, durationCs, nonce));
 		}
 
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)

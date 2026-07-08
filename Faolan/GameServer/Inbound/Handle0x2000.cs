@@ -336,7 +336,7 @@ namespace Faolan.GameServer
                                         }
 
                                         await Combat.CombatService.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
-                                        await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
+                                        await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
                                         var mountStats = new CharacterStatBlock
                                         {
                                             [CharacterStatId.Mount] = mount.RideStat,

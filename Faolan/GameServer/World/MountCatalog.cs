@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Network.Codecs;
 
 namespace Faolan.GameServer.World
 {
@@ -44,12 +45,11 @@ namespace Faolan.GameServer.World
 		// spawns the horse but never seats the player (proven in-client 2026-06-17).
 		public const uint RideSpell = 0x31EB1500u;
 
-		private static readonly byte[] RideBuffPayloadBytes =
-		[
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x83, 0xD6, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0xEB, 0x15, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x15, 0x60, 0xF9, 0xBB
-		];
+		// The captured ride-buff facts (the DB Spell row for 0x31EB15 is mislabelled, so these come from the mount
+		// capture, frame 520): a 24 h duration and the per-application effect nonce. The payload itself is the 54-byte
+		// MagicBuffIIR shape SpellweaveCodec builds (the client wants that shape here, not the 50-byte self-buff form).
+		private const uint RideBuffDurationCentiseconds = 8_640_000; // 24 h
+		private const uint RideBuffEffectNonce = 0x1560F9BBu;
 
 		public static readonly IReadOnlyList<MountDef> All =
 		[
@@ -59,10 +59,6 @@ namespace Faolan.GameServer.World
 
 		// The default mount the GM `.mount` command summons when given no argument (the in-client-observed Tortage mount).
 		public static MountDef Default => All[0];
-
-		// Frame 520's 54-byte ride-buff payload, verbatim (capture truth): +8 u32 BE = duration 8_640_000 cs = 24 h,
-		// the spell base 0x31EB15 rides at +23, and the trailing u32 is the per-cast counter (the only field #221
-		// observed differing between apply instances).
 
 		private static readonly Dictionary<uint, MountDef> ById = BuildById();
 		private static readonly Dictionary<string, MountDef> ByName = BuildByName();
@@ -79,11 +75,11 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
-		// A fresh copy per cast (ApplySpell treats caller-supplied data as replayed content; keep the captured
-		// original immutable).
+		// The mount RIDE buff's 54-byte MagicBuffIIR payload, CONSTRUCTED from its base spell id + captured duration
+		// and nonce (byte-identical to the mount-capture frame 520, proven by MountCatalogTests).
 		public static byte[] RideBuffPayload()
 		{
-			return (byte[])RideBuffPayloadBytes.Clone();
+			return SpellweaveCodec.BuildBuffData(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce);
 		}
 
 		private static Dictionary<uint, MountDef> BuildById()
