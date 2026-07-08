@@ -19,6 +19,10 @@ namespace Faolan.Core.Database.Tables
 		// The spells this NPC type casts (#232) - now FK'd to the type instead of joined by name string.
 		public virtual ICollection<NpcSpell> Spells { get; set; } = new List<NpcSpell>();
 
+		// The type-level CharacterIIR stat core (#244), lifted off `Data` into typed columns (owned entity - its
+		// columns live on the Npcs row, prefixed `StatCore_`). Null until lifted; see NpcStatCore + the three-tier doc.
+		public NpcStatCore StatCore { get; set; }
+
 		// The type-level CharacterIIR stat CORE source (CharacterStats / NpcStats / Bcc) - the SAME kind of captured
 		// FA015807 body NpcSpawn.Data holds, but lifted to the TYPE (#244) so a creature can be spawned from its type
 		// ALONE, with a caller-supplied transform and NO world placement. This is what a summoned PET needs (#307):

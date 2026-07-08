@@ -899,10 +899,10 @@ namespace Faolan.GameServer
 						// New (unnamed) characters take the create-editor path; existing characters log in normally.
 						var authSender = isNewCharacter
 							? Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59)
-							: null;
+							: WorldFraming.Sender;
 						var authReceiver = isNewCharacter
 							? CreateEditorFraming.Receiver(client)
-							: null;
+							: WorldFraming.Receiver(client);
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006

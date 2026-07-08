@@ -263,6 +263,10 @@ namespace Faolan.Core.Database
 
 			modelBuilder.Entity<Npc>().HasMany(n => n.Spells).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.SetNull);
 
+			// The type-level stat core (#244) as an owned entity: its columns live on the Npcs row (prefixed
+			// StatCore_), lifted off the Data blob so a spawn body is constructed from typed storage, not spliced.
+			modelBuilder.Entity<Npc>().OwnsOne(n => n.StatCore);
+
 			// One patrol route per (map, spawn point) - keyed like the NpcSpawn it belongs to, so the live MoveTask
 			// builder joins them by position (#53). Its waypoints cascade-delete with the route.
 			modelBuilder
