@@ -37,8 +37,13 @@ where an NPC captured mid-death would spawn dead). For an idle reference capture
 the captured values, so the byte output is unchanged; only mid-action captures differ.
 
 `NpcSpawnBuilder.TryBuild` (a placed spawn) and `TryBuildFromType` (a pet/summon with no `NpcSpawn` row)
-both build this way; the transform's playfield token is threaded in at construction (no post-hoc
-`SpawnPlayfieldRewriter` patch).
+both build this way. **The playfield token, however, must NOT be baked at build/load time** - the
+value written at construction is only a placeholder. The token the client accepts is the LIVE playfield
+token the entering player loaded, which does not exist until that player enters the world; a spawn
+carrying any other token is silently dropped by the client (it never even polls), so `SendWorldSpawn`
+**re-stamps the token per-send** via `SpawnPlayfieldRewriter` from the recipient's live zone token. A
+2026-07-08 regression baked the zone's default load-time token and dropped that re-stamp, which stalled
+every world entry (see the memory `spawn_playfield_token_per_send`).
 
 ## Type-level vs instance-level fields (the split)
 
@@ -90,7 +95,8 @@ from typed columns.
       placement fields across all 980 populated spawns (`NpcSpawnStatCoreTests`). `Data` still supplies the
       frame + name + equipment structure.
 - [x] `NpcSpawnBuilder.BuildFromScratch` assembles the WHOLE body with no template: header constants;
-      transform `2C 0A <vec3> 12 <quat> 18 <token varint>` (token written in-place, no `SpawnPlayfieldRewriter`);
+      transform `2C 0A <vec3> 12 <quat> 18 <token varint>` (token written in-place as a placeholder - the
+      live token is re-stamped per-send, see above);
       pre-IIR = `NpcSpawnPreIir.BuildMinimal`; CoreChar header `[41][X][msgLen]` with X = the lifted
       `NpcStatCore.IirHeader` (RE: type-stable, `ReadIirHeaderWord`); ANIMAL post-IIR = `BuildMinimalPostIir`,
       clean-HUMANOID post-IIR = `NpcSpawnAppearanceCodec.BuildPostIir(morphs)`.
@@ -100,9 +106,11 @@ from typed columns.
       tail (keep `Data`).
 - [ ] WIRE it into the live path: at spawn build the body via `BuildMessageFromColumns` +
       `BuildFromScratch(zoneToken)` for the clean cases (fall back to the `Data` splice for the 155
-      runtime-post-IIR humanoids), so `SpawnBody` carries the live token at construction and `SendWorldSpawn`
-      drops the `SpawnPlayfieldRewriter` token patch. Byte-neutral for the 824 (verified) - a low-risk
-      in-client smoke test. `Data` + the splice + `SpawnPlayfieldRewriter` then remain only on the #243 tail.
+      runtime-post-IIR humanoids). Byte-neutral for the 824 (verified). NB `SendWorldSpawn` STILL re-stamps
+      the playfield token per-send (`SpawnPlayfieldRewriter`) - the token baked at build is only a
+      placeholder; the live token isn't known until the player enters (a 2026-07-08 regression baked the
+      load-time token + dropped the re-stamp, stalling world entry). `Data` + the splice remain only on the
+      #243 tail.
 - [ ] #243: decode the humanoid RUNTIME post-IIR so the last ~155 drop `Data` too. RE of the tail (of 847
       equipped humanoids: 600 clean-appearance already build from scratch):
       - **148 = no-morph humanoids**: a 41-byte post-IIR byte-identical to the ANIMAL minimal form except
