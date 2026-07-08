@@ -61,6 +61,16 @@ table:
 Constant-everywhere fields (`Side`, `MovementMultiplier`, `Mount*`, the `*Blend` flags, `SpawnAnimation`
 which is zeroed on every fresh spawn) are hardcoded in the builder rather than stored.
 
+## Feasibility (verified)
+
+Decoding all 1043 captured stat cores confirmed the lift can be byte-exact:
+- **No protobuf extension/unknown fields** on the root IIR or any of `CharacterStats`/`NpcStats`/`CharacterBcc`
+  (max ext bytes = 0 everywhere), so a message reconstructed from typed columns re-serialises identically.
+- Root `ProtoCoreCharacterIIR` scalars beyond the sub-messages: `Name` (already lifted), `CanFall` +
+  `MovementMode` (set on every row), and `PetOwnerInstance`/`PetType`/`PetPoints` (pets only → runtime tier).
+- The runtime fields (`Anim*Id`/`Timer` phase, `BccState`, current HP) are emitted **canonical** at spawn, so
+  they are NOT stored; `AnimIdleId` (the creature's idle clip) is type-level and lives on `Npc`.
+
 ## Migration status (#244)
 
 Goal: retire `Npc.Data` / `NpcSpawn.Data` and the `SpawnPacketBuilder` splice; construct every NPC spawn
