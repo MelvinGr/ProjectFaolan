@@ -75,6 +75,36 @@ namespace Faolan.Tests
 			Assert.Equal(0, bad);
 		}
 
+		// #243 tail: the no-morph HUMANOIDS ship the 41-byte minimal post-IIR but with recordCount=2 (vs the animal's
+		// 1). BuildMinimalPostIir(2) must reproduce them byte-exact - the from-scratch build for an equipped NPC that
+		// carries no appearance morphs.
+		[Fact]
+		public void NoMorphHumanoids_ReproduceWithMinimalRecordCount2()
+		{
+			var db = Path.Combine(FindRepoRoot(), "faolan.db");
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={db};Mode=ReadOnly").Options;
+			using var ctx = new DatabaseContext(options);
+			var datas = ctx.NpcSpawns.Where(s => s.Data != null && s.HasEquipment).Select(s => s.Data).AsNoTracking().ToList();
+
+			var expected = NpcSpawnScaffold.BuildMinimalPostIir(NpcSpawnScaffold.MinimalHumanoidRecordCount);
+			var matched = 0;
+			foreach (var data in datas)
+			{
+				var body = WorldObjectBuilder.ExtractBody(data);
+				if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					continue;
+				var post = body.AsSpan(read.Offset + read.Length);
+				// the minimal-humanoid form: exactly the 41-byte body, header recordCount==2.
+				if (post.Length != NpcSpawnScaffold.MinimalPostIirLength || BinaryPrimitives.ReadUInt32BigEndian(post.Slice(8, 4)) != NpcSpawnScaffold.MinimalHumanoidRecordCount)
+					continue;
+				Assert.Equal(expected, post.ToArray());
+				matched++;
+			}
+
+			_out.WriteLine($"no-morph humanoids reproduced byte-exact with BuildMinimalPostIir(2): {matched}");
+			Assert.True(matched > 100, $"expected ~148 minimal-humanoid spawns, got {matched}");
+		}
+
 		[Theory]
 		[InlineData("SpawnNpcCrocodile")] // animal (minimal post-IIR)
 		[InlineData("SpawnNpcCasilda")] // humanoid (appearance/morph post-IIR)

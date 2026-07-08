@@ -39,8 +39,11 @@ namespace Faolan.Core.Network.Codecs
 		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
 		private const uint HeaderWord0 = 0;
 
-		// The single record group in the minimal form (recordCount == 1).
-		private const uint MinimalRecordCount = 1;
+		// The record-group count in the minimal form. ANIMALS ship recordCount == 1; a no-morph HUMANOID ships the
+		// byte-identical 41-byte body but with recordCount == 2 (RE of the #243 tail: 148 equipped NPCs carry exactly
+		// this - the minimal form with count == 2, no appearance entries). BuildMinimalPostIir(2) reproduces them.
+		public const uint MinimalRecordCount = 1;
+		public const uint MinimalHumanoidRecordCount = 2;
 
 		// The minimal record body + the shared 0x3F1 terminators (everything after the 12-byte header). Constant
 		// across all 23 NPCs that carry the minimal form (verified single distinct value, dissect_npc_spawn.py).
@@ -52,11 +55,12 @@ namespace Faolan.Core.Network.Codecs
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1 // end pairs, final 0x3F1 marker
 		];
 
-		// Builds the minimal post-IIR scaffold for a freshly-spawned NPC: [u32 0][u32 len-36][u32 1] + the
-		// constant terminator body. Byte-identical to the 23 minimal-form NPCs in the beach burst.
-		public static byte[] BuildMinimalPostIir()
+		// Builds the minimal post-IIR scaffold for a freshly-spawned NPC: [u32 0][u32 len-36][u32 recordCount] + the
+		// constant terminator body. recordCount defaults to 1 (the animal form, byte-identical to the 23 minimal-form
+		// NPCs in the beach burst); pass MinimalHumanoidRecordCount (2) for a no-morph humanoid (#243 tail).
+		public static byte[] BuildMinimalPostIir(uint recordCount = MinimalRecordCount)
 		{
-			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(MinimalRecordCount).WriteArray(MinimalBody).ToArray();
+			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(recordCount).WriteArray(MinimalBody).ToArray();
 		}
 
 		// The fresh-spawn scaffold pass used by the live spawn path. Like WithMinimalScaffolds, but a HUMANOID
