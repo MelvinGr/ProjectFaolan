@@ -17,7 +17,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.GameServer;
@@ -28,8 +27,6 @@ using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
-using Faolan.GameServer.Economy.Bank;
-using Faolan.GameServer.Economy.Shop;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
@@ -362,12 +359,12 @@ namespace Faolan.GameServer
 								Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", from, target, args);
 
 								// Every behavior gets an echo-ack (docs/combat.md rule 1); the item-use domain logic
-								// lives in ItemUseService. The used item is identified by its inventory location - from =
+								// lives in UseInventoryItem (GameServerListener.ItemUse.cs). The used item is identified by its inventory location - from =
 								// container (0x68 = backpack), target = slot - decoded from the use_totem_of_origin
 								// capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
 								// is the capture's "long loading screen").
 								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
-								await _itemUse.UseInventoryItem(client, (int)from, (int)target);
+								await UseInventoryItem(client, (int)from, (int)target);
 
 								break;
 							}

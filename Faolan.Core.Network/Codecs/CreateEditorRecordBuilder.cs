@@ -2,8 +2,7 @@ using System;
 using System.Text;
 using Faolan.Core.Network.Constants;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Constructive builders for the fixed-grammar IIR records the character-create EDITOR streams on its
 	// GameAgent->GameInterface 0x2000 conversation (issue #189). Decoded by Captures/scripts/decode_create_editor.py and

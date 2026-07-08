@@ -2,8 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.Core.Network.Codecs.GameServer
+namespace Faolan.Core.Network.Codecs
 {
 	// Reconstructs the character-create EDITOR scene-character records - the SimpleCharFullUpdateIIR (FA015807)
 	// spawns the initial burst streams for the editor pedestals (issue #189). They are ordinary entity spawns:

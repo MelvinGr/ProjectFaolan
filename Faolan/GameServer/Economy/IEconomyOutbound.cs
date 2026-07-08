@@ -3,8 +3,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Protobuf;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Economy
 {
 	// The narrow set of cross-cutting OUTBOUND ops the economy/inventory collaborator services (ShopService / BankService) need to reach back to on the world listener: the wallet update and the two
 	// live item grants. GameServerListener implements it (forwarding to its own Outbound builders), so those

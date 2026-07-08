@@ -5,7 +5,6 @@ using Faolan.Core.Network.Codecs;
 using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Abstractions;
-using Faolan.Core.Network.Codecs.GameServer;
 
 namespace Faolan.Tests
 {

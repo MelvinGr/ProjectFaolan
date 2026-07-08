@@ -28,7 +28,6 @@ using Microsoft.Extensions.Logging;
 // remoteformat for the requested {stock_N}. Table decoded from
 // Captures/Blablabla_soldier-guardian_create_*.json (0x205E req -> 0x205D resp pairs).
 
-// ReSharper disable once CheckNamespace
 namespace Faolan.GameServer.CreateFlow
 {
 	public partial class CreateFlowService

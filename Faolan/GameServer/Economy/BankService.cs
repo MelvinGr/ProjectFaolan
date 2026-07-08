@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Conan;
@@ -13,7 +14,7 @@ using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
-namespace Faolan.GameServer.Economy.Bank
+namespace Faolan.GameServer.Economy
 {
 	// Personal BANK storage (the separate storage opened at the trader/auctionhouse NPC). Decoded from
 	// NecroL80_mage-necromancer_login_Has-inventory-at-trader-bank (memory protocol_bank_storage): the bank
@@ -71,7 +72,7 @@ namespace Faolan.GameServer.Economy.Bank
 				await ps.SendAsync(client);
 			}
 
-			var record = BuildBankIirRecord(charInstance, SerializeContainer(bank));
+			var record = BuildBankIirRecord(charInstance, bank);
 			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
 
 			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
@@ -125,9 +126,9 @@ namespace Faolan.GameServer.Economy.Bank
 
 		// The BankIIR record (everything after the 0x2000 packet's u32 length prefix). Golden-tested byte-exact
 		// against the captured bank (BankStorageTests).
-		public static byte[] BuildBankIirRecord(uint charInstance, byte[] containerBlob)
+		public static byte[] BuildBankIirRecord(uint charInstance, ProtoInventoryGame containerBlob)
 		{
-			return new FaolanStream().WriteUInt32(BankIirSubOpcode).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteUInt32(containerBlob.Length).WriteArray(containerBlob).ToArray();
+			return new FaolanStream().WriteUInt32(BankIirSubOpcode).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteArrayUInt32Length(containerBlob.ToProtobuf()).ToArray();
 		}
 
 		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]
@@ -135,13 +136,6 @@ namespace Faolan.GameServer.Economy.Bank
 		public static void WriteBankSlotRegistration(FaolanStream s, uint charInstance, uint slot, ushort recordId)
 		{
 			s.WriteUInt32(FullCharSnapshotBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(0x17u).WriteUInt16(0x000F).WriteUInt16(recordId);
-		}
-
-		private static byte[] SerializeContainer(ProtoInventoryGame container)
-		{
-			using var ms = new MemoryStream();
-			Serializer.Serialize(ms, container);
-			return ms.ToArray();
 		}
 	}
 }

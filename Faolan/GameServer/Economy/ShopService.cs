@@ -8,14 +8,14 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.GameServer.Economy.Shop
+namespace Faolan.GameServer.Economy
 {
 	// NPC vendor / shop flow (TODO §9b), decoded from the necrol80 sell_items_to_trader capture:
 	//   DL 0x2033 DispatchShopData   [shop ID32 (type 0xC75B)][vendor NPC ID32][protobuf shop content]

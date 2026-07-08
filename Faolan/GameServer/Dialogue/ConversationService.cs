@@ -11,11 +11,11 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.GameServer.Dialogue
 {

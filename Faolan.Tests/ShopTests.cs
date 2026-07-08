@@ -1,6 +1,6 @@
 using System;
 using Faolan.Core;
-using Faolan.GameServer.Economy.Shop;
+using Faolan.GameServer.Economy;
 using Xunit;
 
 namespace Faolan.Tests

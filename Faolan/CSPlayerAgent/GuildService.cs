@@ -9,10 +9,10 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.GameServer;
-using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.CSPlayerAgent
 {

@@ -17,7 +17,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.GameServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.GameServer;
@@ -28,8 +27,7 @@ using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
-using Faolan.GameServer.Economy.Bank;
-using Faolan.GameServer.Economy.Shop;
+using Faolan.GameServer.Economy;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
@@ -247,10 +245,6 @@ namespace Faolan.GameServer
 		private readonly IAgentServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		// Dispatches a player using (right-clicking) a bag item by its kind (Totem of Origin -> recall, future
-		// consumables...). The RightClickItem Inbound handler delegates to it. See Inventory/ItemUseService.cs.
-		private readonly ItemUseService _itemUse;
-
 		// Connection keep-alive / latency replies (LatencyCheck 0x2085 -> Pong, Ping 0x2005 -> GameServerStats).
 		// See World/KeepAliveService.cs.
 		private readonly KeepAliveService _keepAlive;
@@ -312,7 +306,6 @@ namespace Faolan.GameServer
 			_keepAlive = new KeepAliveService();
 			_shortcutBar = new ShortcutBarService(database, logger);
 			_equipment = new EquipmentService(database, logger);
-			_itemUse = new ItemUseService(database, RecallToBindCommand, logger);
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
 

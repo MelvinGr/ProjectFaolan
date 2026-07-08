@@ -1,6 +1,8 @@
 using System;
 using Faolan.Core;
-using Faolan.GameServer.Economy.Bank;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Protobuf;
+using Faolan.GameServer.Economy;
 using Xunit;
 
 namespace Faolan.Tests
@@ -35,7 +37,8 @@ namespace Faolan.Tests
 		                                        "2012060817109e943c1204081a10011a530a140dd1386134150df9190f1d9f95d630257bd1ec2f12140dd1386134150df919" +
 		                                        "0f1d9f95d630257bd1ec2f1a140dd1386134150df9190f1d9f95d630257bd1ec2f259ef240002d9ef2400038014544563632" +
 		                                        "227a080d12760898bf88fccb8080ea2012070800108180802012060817109f943c1204081a10011a530a140d89a8ad121583" +
-		                                        "d4bebd1dc577e12825f1f3027a12140d89a8ad121583d4bebd1dc577e12825f1f3027a1a140d89a8ad121583d4bebd1dc577" + "e12825f1f3027a2559f340002d59f3400038014548413034";
+		                                        "d4bebd1dc577e12825f1f3027a12140d89a8ad121583d4bebd1dc577e12825f1f3027a1a140d89a8ad121583d4bebd1dc577" +
+		                                        "e12825f1f3027a2559f340002d59f3400038014548413034";
 
 		private const uint CharInstance = 0x0802E5D4;
 
@@ -48,7 +51,7 @@ namespace Faolan.Tests
 			// The blob (the ProtoInventoryGame) starts after recLen(4)+subop(4)+type(4)+instance(4)+flag(1)+blobLen(4)=21.
 			var blob = captured[21..];
 
-			var record = BankService.BuildBankIirRecord(CharInstance, blob);
+			var record = BankService.BuildBankIirRecord(CharInstance, blob.FromProtobuf<ProtoInventoryGame>());
 
 			// Re-add the 0x2000 packet length prefix the send path writes (WriteArrayUInt32Length).
 			var s = new FaolanStream();
