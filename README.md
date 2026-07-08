@@ -195,7 +195,7 @@ That is especially true of **server-authored** records (the server writes them, 
 reverse-engineering the client alone).
 
 **How a capture is used:** a `.pcapng` of a client↔server session is TCP-reassembled and dumped to the canonical
-`*.tshark.json` via `Captures/tshark_dump.sh`, which the importer and the Python dissectors read. Loopback
+`*.tshark.json` via `Captures/scripts/tshark_dump.sh`, which the importer and the Python dissectors read. Loopback
 captures against the local server (no root needed) and retail-session captures are both used. Full workflow in
 `CLAUDE.md`.
 

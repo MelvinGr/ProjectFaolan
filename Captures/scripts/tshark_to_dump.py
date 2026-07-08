@@ -12,7 +12,8 @@
 #
 # Not byte-identical to the Faolan.PacketAnalyzer schema, but carries the same essentials:
 # frame/time/endpoints/direction/opcode/endpoint classes/body. IsDownload uses the 7000-7999
-# server-port convention of the retail services.
+# server-port convention of the retail services. Method/Iir/Direction are the plugin's
+# resolved names (generated from Opcodes.cs) - additive keys, absent in older dumps.
 import json
 import sys
 
@@ -68,6 +69,9 @@ def reshape(frames):
                 "Source": {"IpAddress": src_ip, "Port": src_port},
                 "Destination": {"IpAddress": dst_ip, "Port": dst_port},
                 "Opcode": fields.get("faolan.pkt.opcode") or fields.get("faolan.chat.opcode"),
+                "Method": fields.get("faolan.pkt.method") or fields.get("faolan.chat.method"),
+                "Iir": fields.get("faolan.pkt.iir"),
+                "Direction": fields.get("faolan.pkt.direction") or fields.get("faolan.chat.direction"),
                 "SenderClass": fields.get("faolan.pkt.sender_class"),
                 "SenderInstance": fields.get("faolan.pkt.sender_instance"),
                 "ReceiverClass": fields.get("faolan.pkt.receiver_class"),

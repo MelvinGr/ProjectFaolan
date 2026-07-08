@@ -46,7 +46,7 @@ dotnet run --project Faolan.Importer -- --report burst-coverage       # read-onl
 # (The old C# Faolan.PacketAnalyzer + its --dump CLI were retired in #82 - tshark is the only source now.)
 cmake -S Faolan.Wireshark -B Faolan.Wireshark/build && cmake --build Faolan.Wireshark/build -j \
   && cmake --build Faolan.Wireshark/build --target install-faolan-plugin
-Captures/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshark.json the importer reads:
+Captures/scripts/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshark.json the importer reads:
 # TCP-reassembled, one record per packet, includes the compressed DL packets.
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
@@ -73,10 +73,10 @@ protobuf + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World/`
 `Faolan.ClientLauncher/` unattended retail client · `Faolan.Mcp/` in-process MCP server (DB + live-session +
 GM-command tools) · `Faolan.Web/` + `Faolan.Web.Content/` Blazor armory/3D-viewer + GM tools + CDN proxy ·
 `Faolan.Tests/` the test suite · `Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib +
-RpcHeader endpoints + raw opcodes + handoff auto-follow (ground truth, TCP-reassembled; use
+RpcHeader endpoints + named opcodes/IIR types (generated from `Opcodes.cs`) + handoff auto-follow (ground truth, TCP-reassembled; use
 `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces + Python dissectors.
 (The old C# `Faolan.PacketAnalyzer` GUI/CLI was retired in #82 - it had no TCP reassembly and dropped ~2/3 of
-the compressed GameServer downloads; the Wireshark plugin + `Captures/tshark_dump.sh` fully replace it.)
+the compressed GameServer downloads; the Wireshark plugin + `Captures/scripts/tshark_dump.sh` fully replace it.)
 
 **Listeners** are partial classes split across many files — inspect all partials before changing
 behavior. `GameServerListener`'s partials are organized by role: `Inbound/` (opcode handlers, `Handle*`),

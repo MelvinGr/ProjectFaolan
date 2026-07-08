@@ -11,8 +11,28 @@ option(INSTALL_PLUGIN_TO_PERSONAL_DIR "Install plugin to personal Wireshark plug
 
 find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 pkg_check_modules(WIRESHARK REQUIRED IMPORTED_TARGET wireshark)
+
+# Per-RPC-class method-name tables, generated from the server's curated C# opcode enums
+# (single source of truth - regenerated whenever Opcodes.cs changes).
+set(FAOLAN_OPCODES_CS "${CMAKE_CURRENT_SOURCE_DIR}/../Faolan.Core.Network/Constants/Opcodes.cs")
+set(FAOLAN_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(FAOLAN_OPCODE_NAMES_H "${FAOLAN_GENERATED_DIR}/faolan_opcode_names.h")
+
+add_custom_command(
+        OUTPUT "${FAOLAN_OPCODE_NAMES_H}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${FAOLAN_GENERATED_DIR}"
+        COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_opcode_names.py"
+        "${FAOLAN_OPCODES_CS}"
+        "${FAOLAN_OPCODE_NAMES_H}"
+        DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_opcode_names.py"
+        "${FAOLAN_OPCODES_CS}"
+        COMMENT "Generating RPC method-name tables from Opcodes.cs"
+)
 
 if (WIRESHARK_VERSION)
     string(REGEX MATCH "^[0-9]+\\.[0-9]+" WIRESHARK_PLUGIN_ABI "${WIRESHARK_VERSION}")
@@ -46,6 +66,7 @@ if (BUILD_WIRESHARK_PLUGIN)
             wireshark/packet-faolan-gameserver-zlib.c
             src/faolan_conan_stream.c
             src/faolan_conan_framer.c
+            "${FAOLAN_OPCODE_NAMES_H}"
     )
 
     set_target_properties(faolan_gs_zlib PROPERTIES
@@ -57,6 +78,7 @@ if (BUILD_WIRESHARK_PLUGIN)
             PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src"
             "${CMAKE_CURRENT_SOURCE_DIR}/wireshark"
+            "${FAOLAN_GENERATED_DIR}"
     )
 
     target_link_libraries(faolan_gs_zlib

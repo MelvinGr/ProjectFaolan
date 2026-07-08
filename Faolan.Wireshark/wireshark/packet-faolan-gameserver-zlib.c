@@ -39,6 +39,7 @@
 #include <zlib.h>
 
 #include "faolan_conan_stream.h"
+#include "faolan_opcode_names.h" /* generated from Opcodes.cs (see scripts/gen_opcode_names.py) */
 #include "packet-faolan-gameserver-zlib.h"
 
 static int proto_faolan = -1;
@@ -61,11 +62,16 @@ static int hf_faolan_pkt_sender_instance = -1;
 static int hf_faolan_pkt_receiver_class = -1;
 static int hf_faolan_pkt_receiver_instance = -1;
 static int hf_faolan_pkt_opcode = -1;
+static int hf_faolan_pkt_method = -1;
+static int hf_faolan_pkt_iir = -1;
+static int hf_faolan_pkt_direction = -1;
 static int hf_faolan_pkt_hdr_extra = -1;
 static int hf_faolan_pkt_body = -1;
 
 /* AgentServer chat packet fields */
 static int hf_faolan_chat_opcode = -1;
+static int hf_faolan_chat_method = -1;
+static int hf_faolan_chat_direction = -1;
 static int hf_faolan_chat_len = -1;
 static int hf_faolan_chat_body = -1;
 
@@ -103,6 +109,27 @@ static const value_string faolan_class_names[] = {
     {0xF2C2D5B5, "TradepostInterface"},
     {0, NULL}
 };
+
+/* The connection-level service pair whose 0x2000 (PassBlob/DispatchPassBlob) is the IIR
+   carrier: body = [u32 len][u32 IIR type id][record], len covering everything after itself.
+   Other classes' 0x2000 are ordinary first-slot methods (Authenticate, GetAllMails, ...). */
+#define FAOLAN_CLASS_GAMEAGENT 0xB171CE13u
+#define FAOLAN_CLASS_GAMEINTERFACE 0x6C67C147u
+#define FAOLAN_OPCODE_PASSBLOB 0x2000u
+
+/* Direction from the receiver endpoint: *Agent classes receive client->server calls,
+   *Interface classes server->client dispatches. Falls back to the conversation-initiator
+   heuristic (the client sends a followed connection's first bytes) for unknown classes. */
+static const char *packet_direction(uint32_t receiver_class, bool from_conv_initiator)
+{
+    const char *name = try_val_to_str(receiver_class, faolan_class_names);
+
+    if (name != NULL) {
+        return strstr(name, "Interface") != NULL ? "s2c" : "c2s";
+    }
+
+    return from_conv_initiator ? "c2s" : "s2c";
+}
 
 /* An out-of-order TCP segment parked until the sequence gap before it fills. */
 typedef struct faolan_stashed_seg
@@ -198,6 +225,22 @@ static const char *class_name(wmem_allocator_t *pool, uint32_t class_id)
 {
     const char *name = try_val_to_str(class_id, faolan_class_names);
     return name != NULL ? name : wmem_strdup_printf(pool, "0x%08x", class_id);
+}
+
+/* Resolves a (receiver class id, 16-bit opcode) pair to its recovered method name - the C
+   equivalent of the server's GameServerMethodNames.Resolve(). The GameServer connection
+   multiplexes several RPC class-pairs, so the SAME opcode means different methods per class;
+   the receiver endpoint's class picks the table. Tables are generated from the C# opcode
+   enums (faolan_opcode_names.h). Returns NULL when the pair has no recovered name. */
+static const char *method_name(uint32_t receiver_class, uint16_t opcode)
+{
+    for (size_t i = 0; i < array_length(faolan_class_method_tables); i++) {
+        if (faolan_class_method_tables[i].class_id == receiver_class) {
+            return try_val_to_str(opcode, faolan_class_method_tables[i].methods);
+        }
+    }
+
+    return NULL;
 }
 
 static uint64_t read_varint(tvbuff_t *tvb, uint32_t offset, uint32_t end, uint32_t *length)
@@ -296,7 +339,8 @@ static void dissect_conan_packet(
     proto_tree *tree,
     uint32_t offset,
     uint32_t len,
-    uint32_t index)
+    uint32_t index,
+    bool from_conv_initiator)
 {
     proto_item *pkt_item;
     proto_tree *pkt_tree = proto_tree_add_subtree_format(
@@ -394,25 +438,63 @@ static void dissect_conan_packet(
     }
 
     const uint16_t opcode = tvb_get_ntohs(tvb, pos);
-    proto_tree_add_item(pkt_tree, hf_faolan_pkt_opcode, tvb, pos, 2, ENC_BIG_ENDIAN);
+    proto_item *opcode_item = proto_tree_add_item(pkt_tree, hf_faolan_pkt_opcode, tvb, pos, 2, ENC_BIG_ENDIAN);
+
+    /* Method name resolved by (receiver class, opcode) - the receiver's method table names
+       the call; PlayerAgent/PlayerInterface only carry their behavior-verified subset (they
+       use 32-bit hash dispatch, not 0x2000+index), unresolved opcodes stay raw hex. */
+    const char *method = method_name(receiver_class, opcode);
+    if (method != NULL) {
+        proto_item_append_text(opcode_item, " (%s)", method);
+        proto_item *method_item = proto_tree_add_string(pkt_tree, hf_faolan_pkt_method, tvb, pos, 2, method);
+        proto_item_set_generated(method_item);
+    }
     pos += 2;
 
     if (pos < hdr_end) {
         proto_tree_add_item(pkt_tree, hf_faolan_pkt_hdr_extra, tvb, pos, hdr_end - pos, ENC_NA);
     }
 
+    const char *direction = packet_direction(receiver_class, from_conv_initiator);
+    proto_item *direction_item = proto_tree_add_string(pkt_tree, hf_faolan_pkt_direction, tvb, 0, 0, direction);
+    proto_item_set_generated(direction_item);
+
     const uint32_t body_len = end - hdr_end;
     if (body_len > 0) {
         proto_tree_add_item(pkt_tree, hf_faolan_pkt_body, tvb, hdr_end, body_len, ENC_NA);
     }
 
-    proto_item_append_text(pkt_item, ": %s -> %s opcode 0x%04x, body %u bytes",
+    /* IIR carrier: GameAgent/GameInterface 0x2000 (PassBlob) bodies are
+       [u32 len][u32 IIR type id][record] with len covering everything after itself; the id
+       is the BKDR-31 hash of the client's IIR C++ type name (docs/aoc-opcode-ids.md). */
+    const char *iir_name = NULL;
+    if (opcode == FAOLAN_OPCODE_PASSBLOB &&
+        (receiver_class == FAOLAN_CLASS_GAMEAGENT || receiver_class == FAOLAN_CLASS_GAMEINTERFACE) &&
+        body_len >= 8 &&
+        (uint64_t)tvb_get_ntohl(tvb, hdr_end) + 4 == body_len) {
+        const uint32_t iir_id = tvb_get_ntohl(tvb, hdr_end + 4);
+        proto_tree_add_item(pkt_tree, hf_faolan_pkt_iir, tvb, hdr_end + 4, 4, ENC_BIG_ENDIAN);
+        iir_name = try_val_to_str(iir_id, faolan_iir_names);
+        if (iir_name == NULL) {
+            iir_name = wmem_strdup_printf(pinfo->pool, "IIR 0x%08x", iir_id);
+        }
+    }
+
+    /* Call description: method name when recovered (plus the carried IIR type for PassBlob),
+       raw opcode hex otherwise. */
+    const char *call = method != NULL
+        ? (iir_name != NULL
+            ? wmem_strdup_printf(pinfo->pool, "%s:%s", method, iir_name)
+            : method)
+        : wmem_strdup_printf(pinfo->pool, "0x%04x", opcode);
+
+    proto_item_append_text(pkt_item, ": %s -> %s %s, body %u bytes",
         class_name(pinfo->pool, sender_class),
         class_name(pinfo->pool, receiver_class),
-        opcode, body_len);
+        call, body_len);
 
-    col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "%s 0x%04x",
-        class_name(pinfo->pool, receiver_class), opcode);
+    col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "%s %s",
+        class_name(pinfo->pool, receiver_class), call);
 }
 
 /* ---- Auto-follow: register advertised service ports ----
@@ -711,14 +793,17 @@ static void deliver_in_order(
     }
 }
 
-/* Dissects one AgentServer chat packet: [u16 opcode][u16 bodyLen][body]. */
+/* Dissects one AgentServer chat packet: [u16 opcode][u16 bodyLen][body]. Chat packets carry
+   no RpcHeader, so direction comes from the conversation initiator (the client opens the
+   connection and speaks first) and picks the per-direction opcode-name table. */
 static void dissect_chat_packet(
     tvbuff_t *tvb,
     packet_info *pinfo,
     proto_tree *tree,
     uint32_t offset,
     uint32_t len,
-    uint32_t index)
+    uint32_t index,
+    bool from_conv_initiator)
 {
     proto_item *pkt_item;
     proto_tree *pkt_tree = proto_tree_add_subtree_format(
@@ -731,15 +816,33 @@ static void dissect_chat_packet(
     }
 
     const uint16_t opcode = tvb_get_ntohs(tvb, offset);
-    proto_tree_add_item(pkt_tree, hf_faolan_chat_opcode, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_item *opcode_item = proto_tree_add_item(pkt_tree, hf_faolan_chat_opcode, tvb, offset, 2, ENC_BIG_ENDIAN);
+
+    const char *method = try_val_to_str(opcode,
+        from_conv_initiator ? faolan_chat_c2s_names : faolan_chat_s2c_names);
+    if (method != NULL) {
+        proto_item_append_text(opcode_item, " (%s)", method);
+        proto_item *method_item = proto_tree_add_string(pkt_tree, hf_faolan_chat_method, tvb, offset, 2, method);
+        proto_item_set_generated(method_item);
+    }
+
+    proto_item *direction_item = proto_tree_add_string(
+        pkt_tree, hf_faolan_chat_direction, tvb, 0, 0, from_conv_initiator ? "c2s" : "s2c");
+    proto_item_set_generated(direction_item);
+
     proto_tree_add_item(pkt_tree, hf_faolan_chat_len, tvb, offset + 2, 2, ENC_BIG_ENDIAN);
 
     if (len > 4) {
         proto_tree_add_item(pkt_tree, hf_faolan_chat_body, tvb, offset + 4, len - 4, ENC_NA);
     }
 
-    proto_item_append_text(pkt_item, ": opcode 0x%04x, body %u bytes", opcode, len - 4);
-    col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "Chat 0x%04x", opcode);
+    if (method != NULL) {
+        proto_item_append_text(pkt_item, ": %s (0x%04x), body %u bytes", method, opcode, len - 4);
+        col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "Chat %s", method);
+    } else {
+        proto_item_append_text(pkt_item, ": opcode 0x%04x, body %u bytes", opcode, len - 4);
+        col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "Chat 0x%04x", opcode);
+    }
 }
 
 static void process_first_pass(tvbuff_t *tvb, packet_info *pinfo, const struct tcpinfo *tcpinfo, faolan_frame_result_t *result)
@@ -932,15 +1035,23 @@ static int dissect_faolan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
         add_new_data_source(pinfo, packets_tvb,
             frame_result->is_chat ? "Faolan chat packets" : "Faolan Conan packets");
 
+        /* The conversation initiator sent this frame if its source port is endpoint a's (the
+           first-seen frame of a followed connection is the client's). Feeds the direction
+           field; Conan packets prefer the receiver class's Agent/Interface suffix. */
+        const faolan_conv_state_t *conv_state = get_or_create_conv_state(pinfo);
+        const bool from_conv_initiator = pinfo->srcport == conv_state->endpoint_a_port;
+
         for (uint32_t i = 0; i < frame_result->pkt_count; i++) {
             if (frame_result->is_chat) {
                 dissect_chat_packet(
                     packets_tvb, pinfo, faolan_tree,
-                    frame_result->pkt_offsets[i], frame_result->pkt_lens[i], i + 1);
+                    frame_result->pkt_offsets[i], frame_result->pkt_lens[i], i + 1,
+                    from_conv_initiator);
             } else {
                 dissect_conan_packet(
                     packets_tvb, pinfo, faolan_tree,
-                    frame_result->pkt_offsets[i], frame_result->pkt_lens[i], i + 1);
+                    frame_result->pkt_offsets[i], frame_result->pkt_lens[i], i + 1,
+                    from_conv_initiator);
             }
         }
     }
@@ -967,10 +1078,15 @@ void proto_register_faolan_gs_zlib(void)
         {&hf_faolan_pkt_receiver_class, {"Receiver Class", "faolan.pkt.receiver_class", FT_UINT32, BASE_HEX, VALS(faolan_class_names), 0x0, "RpcHeader endpoint_id ProtoEndpoint.type (BKDR-31 class-name hash)", HFILL}},
         {&hf_faolan_pkt_receiver_instance, {"Receiver Instance", "faolan.pkt.receiver_instance", FT_UINT64, BASE_HEX, NULL, 0x0, "RpcHeader endpoint_id ProtoEndpoint.instance (character/zone id)", HFILL}},
         {&hf_faolan_pkt_opcode, {"Opcode", "faolan.pkt.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "Method index (0x2000 + position) into the receiver class's RPC table", HFILL}},
+        {&hf_faolan_pkt_method, {"Method", "faolan.pkt.method", FT_STRING, BASE_NONE, NULL, 0x0, "Method name for (receiver class, opcode), from the C# Opcodes.cs catalogs", HFILL}},
+        {&hf_faolan_pkt_iir, {"IIR Type", "faolan.pkt.iir", FT_UINT32, BASE_HEX, VALS(faolan_iir_names), 0x0, "IIR type id carried in a PassBlob 0x2000 body (BKDR-31 hash of the client IIR class name)", HFILL}},
+        {&hf_faolan_pkt_direction, {"Direction", "faolan.pkt.direction", FT_STRING, BASE_NONE, NULL, 0x0, "c2s (receiver is an *Agent class) or s2c (receiver is an *Interface class)", HFILL}},
         {&hf_faolan_pkt_hdr_extra, {"Header Extra", "faolan.pkt.header_extra", FT_BYTES, BASE_NONE, NULL, 0x0, "Header bytes after the opcode", HFILL}},
         {&hf_faolan_pkt_body, {"Body", "faolan.pkt.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
 
         {&hf_faolan_chat_opcode, {"Chat Opcode", "faolan.chat.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "AgentServer chat opcode", HFILL}},
+        {&hf_faolan_chat_method, {"Chat Method", "faolan.chat.method", FT_STRING, BASE_NONE, NULL, 0x0, "Chat opcode name (per direction), from the C# AgentServer opcode enums", HFILL}},
+        {&hf_faolan_chat_direction, {"Chat Direction", "faolan.chat.direction", FT_STRING, BASE_NONE, NULL, 0x0, "c2s/s2c from the conversation initiator (the client connects and speaks first)", HFILL}},
         {&hf_faolan_chat_len, {"Chat Body Length", "faolan.chat.len", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}},
         {&hf_faolan_chat_body, {"Chat Body", "faolan.chat.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     };
