@@ -247,7 +247,7 @@ namespace Faolan.GameServer.World
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
-					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+					client.Endpoint(Endpoints.GameCharInterfaceType),
 					GameCharInterfaceDispatchOpcodes.DispatchCloseLootBag)
 				.WriteUInt32(WorldLoot.LootTypeTag)
 				.WriteUInt32(bag.Handle)
@@ -798,7 +798,7 @@ namespace Faolan.GameServer.World
 			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
-					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+					client.Endpoint(Endpoints.GameCharInterfaceType),
 					GameCharInterfaceDispatchOpcodes.DispatchOpenLootBag)
 				.WriteUInt32(WorldLoot.LootTypeTag)
 				.WriteUInt32(bag.Handle)
@@ -1518,7 +1518,7 @@ namespace Faolan.GameServer.World
 		{
 			return new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59),
-					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+					client.Endpoint(Endpoints.GameCharInterfaceType),
 					GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(npcHandle)

@@ -60,7 +60,7 @@ namespace Faolan.GameServer
 			var EmitLegacyBeachNpcBurst = false;
 
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.CoreClaimIIR).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Account.ClientInstance).WriteArray(0x00, 0x09))
 				.SendAsync(client);
 

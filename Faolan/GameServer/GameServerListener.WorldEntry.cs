@@ -647,7 +647,7 @@ namespace Faolan.GameServer
 				: ExistingCharacterReadyForPlayScreenSender;
 			var receiver = character?.Name == null
 				? NewCharacterReadyForPlayScreenReceiver
-				: Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
+				: client.Endpoint(Endpoints.GameCharInterfaceType);
 
 			if (character?.Name == null)
 			{
@@ -805,7 +805,7 @@ namespace Faolan.GameServer
 
 		private static byte[] LoginWorld201CReceiver(INetworkClient client)
 		{
-			return Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
+			return client.Endpoint(Endpoints.GameCharInterfaceType);
 		}
 
 		private static byte[] LoginWorldReceiver(INetworkClient client)
@@ -862,7 +862,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -876,7 +876,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FSpawnCheck(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterReadyForPlayScreenSender, 					Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), 					GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(ExistingCharacterReadyForPlayScreenSender, 					client.Endpoint(Endpoints.GameCharInterfaceType), 					GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteByte(0)

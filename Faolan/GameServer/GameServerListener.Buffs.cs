@@ -228,7 +228,7 @@ namespace Faolan.GameServer
 		private Task SendSprintBar(INetworkClient client, uint energy)
 		{
 			return new PacketStream()
-				.WriteHeader(SprintBarSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameCharInterfaceProjectDispatchOpcodes.DispatchUpdateSprintBar)
+				.WriteHeader(SprintBarSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType), GameCharInterfaceProjectDispatchOpcodes.DispatchUpdateSprintBar)
 				.WriteUInt32(energy)
 				.WriteByte(0x01)
 				.SendAsync(client);

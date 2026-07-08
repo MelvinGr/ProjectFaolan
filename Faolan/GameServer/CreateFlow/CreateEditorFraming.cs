@@ -16,7 +16,7 @@ namespace Faolan.GameServer.CreateFlow
 		// receiver baked in 0x021662C8; see Endpoints / ProtoEndpointGoldenTests).
 		internal static byte[] Receiver(INetworkClient client)
 		{
-			return Endpoints.EndpointBytes(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
+			return client.Endpoint(Endpoints.GameInterfaceType);
 		}
 	}
 }

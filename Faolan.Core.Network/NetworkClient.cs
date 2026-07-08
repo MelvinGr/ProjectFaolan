@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Conan;
 
 namespace Faolan.Core.Network
 {
@@ -238,5 +239,15 @@ namespace Faolan.Core.Network
                 Stop();
             }
         }
+    }
+
+    public static class ClientEndpointExtensions
+    {
+	    // The client's server->client INTERFACE endpoint bytes for `endpointType`, addressed to the session's
+	    // ClientInstance (e.g. client.Endpoint(Endpoints.GameCharInterfaceType)).
+	    public static byte[] Endpoint(this INetworkClient client, uint endpointType)
+	    {
+		    return Endpoints.EndpointBytes(endpointType, client.Session.Account.ClientInstance);
+	    }
     }
 }

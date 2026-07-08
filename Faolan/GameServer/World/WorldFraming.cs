@@ -18,7 +18,7 @@ namespace Faolan.GameServer.World
 
 		public static byte[] Receiver(INetworkClient client)
 		{
-			return Endpoints.EndpointBytes(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
+			return client.Endpoint(Endpoints.GameInterfaceType);
 		}
 	}
 }

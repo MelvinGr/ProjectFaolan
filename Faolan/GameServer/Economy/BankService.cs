@@ -66,7 +66,7 @@ namespace Faolan.GameServer.Economy
 			foreach (var entry in bank.Items)
 			{
 				var ps = new PacketStream();
-				ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), BankRegisterOpcode);
+				ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), BankRegisterOpcode);
 				WriteBankSlotRegistration(ps, charInstance, entry.Pos, recordId++);
 				await ps.SendAsync(client);
 			}

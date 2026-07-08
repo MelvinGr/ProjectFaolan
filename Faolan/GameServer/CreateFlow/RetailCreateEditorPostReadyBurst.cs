@@ -22,7 +22,7 @@ namespace Faolan.GameServer.CreateFlow
 		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
 		{
 			return new PacketStream()
-				.WriteHeader(RetailCreateEditorPostReadyAckSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(RetailCreateEditorPostReadyAckSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(requestId)
 				.WriteUInt32(GetRetailCreateEditorPostReadyAckStatus(requestId))

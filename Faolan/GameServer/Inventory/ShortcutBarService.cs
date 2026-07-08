@@ -42,7 +42,7 @@ namespace Faolan.GameServer.World
 
 			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
 			var ps = new PacketStream();
-			ps.WriteHeader(ReplySender, Receiver(client), GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply);
+			ps.WriteHeader(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply);
 			ps.WriteArray(ShortcutBarBuilder.BuildBody(shortcuts));
 			await ps.SendAsync(client);
 			_logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
@@ -85,11 +85,6 @@ namespace Faolan.GameServer.World
 
 			_logger.LogInformation("UpdateShortcut bar-page slot 0x{Slot:X4} flag={Flag} container=0x{Container:X} (#71; log-only).", slot, flag, container);
 			return Task.CompletedTask;
-		}
-
-		private static byte[] Receiver(INetworkClient client)
-		{
-			return Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
 		}
 	}
 }

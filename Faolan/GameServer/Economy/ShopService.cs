@@ -218,7 +218,7 @@ namespace Faolan.GameServer.Economy
 
 			var ps = new PacketStream();
 			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
-				Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+				client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceDispatchOpcodes.DispatchShopData);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
