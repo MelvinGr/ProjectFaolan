@@ -62,32 +62,9 @@ namespace Faolan.Core.Network.Codecs
 			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(recordCount).WriteArray(MinimalBody).ToArray();
 		}
 
-		// True iff `body`'s post-IIR is EXACTLY the minimal no-morph form (the constant 41-byte body) - the fresh
-		// shape a no-morph NPC ships. `recordCount` is the type-stable 1 or 2 (see MinimalRecordCount); a from-scratch
-		// build re-emits BuildMinimalPostIir(recordCount) for such a spawn (#243). Returns false for appearance-bearing
-		// post-IIRs (they carry a morph table) and runtime-bearing forms (larger than the minimal body) - those aren't
-		// the minimal shape, so their fresh recordCount isn't derivable from this capture.
-		public static bool TryReadMinimalRecordCount(byte[] body, out uint recordCount)
-		{
-			recordCount = 0;
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-				return false;
-
-			var post = body.AsSpan(read.Offset + read.Length);
-			if (post.Length != MinimalPostIirLength)
-				return false;
-
-			var rc = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(8, 4));
-			if (rc is not (MinimalRecordCount or MinimalHumanoidRecordCount) || !post.SequenceEqual(BuildMinimalPostIir(rc)))
-				return false;
-
-			recordCount = rc;
-			return true;
-		}
-
 		// The fresh post-IIR recordCount for a NO-MORPH spawn (#243): the type-stable header recordCount word (1 or 2).
-		// Unlike TryReadMinimalRecordCount (which only accepts the exact 41-byte minimal form), this ALSO reads it off a
-		// RUNTIME-BEARING no-morph capture - the recordCount word is stable per type across minimal and runtime captures
+		// Reads it off the exact 41-byte minimal form AND a larger RUNTIME-BEARING no-morph capture - the recordCount
+		// word is stable per type across minimal and runtime captures
 		// (validated: 0/107 no-morph types carry >1 distinct value), and the runtime records are dropped on a fresh
 		// spawn, so BuildMinimalPostIir(recordCount) is the canonical fresh form. Returns false when the body carries a
 		// liftable morph table (an APPEARANCE type - it builds from morph rows, not the minimal form), when word0 isn't

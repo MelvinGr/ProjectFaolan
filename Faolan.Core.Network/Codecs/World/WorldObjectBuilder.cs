@@ -118,33 +118,6 @@ namespace Faolan.Core.Network.Codecs
 			return TryBuild(row, handle, 0u, out body);
 		}
 
-		// Builds a body by splicing the DB row's object IDENTITY (the length-delimited message + the raw tail,
-		// everything after the transform) onto the LIVE placement (`liveBody`'s header + transform + playfield).
-		// The placement (handle / position / playfield = the per-session world id) stays live; only the object
-		// definition comes from the table. For the same object captured in another session this is byte-identical
-		// to `liveBody` (the identity is session-independent - only the handle + playfield vary), so it drives the
-		// object from the DB with zero render risk. Returns false if either body's transform can't be parsed.
-		public static bool TryBuildOntoLivePlacement(WorldObject row, ReadOnlySpan<byte> liveBody, out byte[] body)
-		{
-			body = null;
-			if (!TryMessageOffset(liveBody, out var liveOffset))
-				return false;
-
-			// CONSTRUCT the identity from the row's columns + append the stored geometry tail - the captured Data blob is
-			// retired. Byte-identical to the old verbatim splice (the columns reproduce the captured identity, the tail
-			// is stored verbatim), so the world-entry object is fully DB-driven. Returns false for an un-lifted row (no
-			// DisplayName / KdTreeTail) - it can no longer be built.
-			if (row is not { DisplayName: not null, KdTreeTail: not null })
-				return false;
-
-			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row));
-			body = new byte[liveOffset + identity.Length + row.KdTreeTail.Length];
-			liveBody[..liveOffset].CopyTo(body);
-			identity.CopyTo(body.AsSpan(liveOffset));
-			row.KdTreeTail.CopyTo(body.AsSpan(liveOffset + identity.Length));
-			return true;
-		}
-
 		// The playfield token in the transform is a 4-byte LEB128 varint (the fixed width SpawnPlayfieldRewriter
 		// assumes); tokens are < 2^28 so 4 bytes always suffice.
 		private static byte[] EncodePlayfieldVarint(uint token)
@@ -156,37 +129,6 @@ namespace Faolan.Core.Network.Codecs
 				(byte)(((token >> 14) & 0x7F) | 0x80),
 				(byte)((token >> 21) & 0x7F)
 			];
-		}
-
-		// Offset where the object message's u32 length prefix begins: just after the 0x2C transform group
-		// (0A vec3, 12 quat, optional 25 scale, 18 playfield-varint). No pre-IIR block, unlike entity spawns.
-		private static bool TryMessageOffset(ReadOnlySpan<byte> b, out int offset)
-		{
-			offset = 0;
-			var i = 20;
-			if (b.Length <= i || b[i] != 0x2C)
-				return false;
-
-			i++;
-			if (i + 1 >= b.Length || b[i] != 0x0A)
-				return false;
-
-			i += 2 + b[i + 1]; // 0A vec3
-			if (i + 1 >= b.Length || b[i] != 0x12)
-				return false;
-
-			i += 2 + b[i + 1]; // 12 quat
-			if (i < b.Length && b[i] == 0x25)
-				i += 5; // optional 25 scale
-			if (i >= b.Length || b[i] != 0x18)
-				return false;
-
-			i++;
-			while (i < b.Length && (b[i] & 0x80) != 0) // playfield varint
-				i++;
-			i++;
-			offset = i;
-			return i + 4 <= b.Length;
 		}
 	}
 }
