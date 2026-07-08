@@ -34,7 +34,7 @@ namespace Faolan.Importer.Rdb
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
 
-		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger logger = null)
+		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir);
 

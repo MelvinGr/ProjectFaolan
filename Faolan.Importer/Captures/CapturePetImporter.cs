@@ -18,7 +18,7 @@ namespace Faolan.Importer.Captures
 	// maps each summon-spell id to. Isolated: only touches the Npc rows for the wanted pet creatures.
 	public static class CapturePetImporter
 	{
-		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger logger = null)
+		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
 		{
 			// The pet creature names we need (the PetSummonCatalog targets), lower-cased for matching.
 			var wanted = PetSummonCatalog.All.Select(p => p.PetTemplate.ToLowerInvariant()).ToHashSet();

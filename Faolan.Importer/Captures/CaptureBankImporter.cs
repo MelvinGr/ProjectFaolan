@@ -25,7 +25,7 @@ namespace Faolan.Importer.Captures
 		private const uint BankIirSubOpcode = 0x0BA1C1CB;
 		private const ushort IirCarrierOpcode = 0x2000;
 
-		public static async Task<(int Characters, int Items)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		public static async Task<(int Characters, int Items)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var byCharacter = new Dictionary<uint, ProtoInventoryGame>();
 			foreach (var packet in rawPackets)

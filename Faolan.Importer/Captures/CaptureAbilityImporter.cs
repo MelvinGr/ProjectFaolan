@@ -82,7 +82,7 @@ namespace Faolan.Importer.Captures
         // abilities land at their high char levels -> naturally gated out of a fresh char). The data-driven replacement
         // for IsStartingAbility + the single Ability.Class - true multi-class (Spellweaving lands under every captured
         // caster class, not a wrong "generic"). The ability RDB template carries no class/level, so this is the source.
-        public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger logger = null)
+        public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger? logger = null)
         {
             var grants = await db
                 .CharacterAbilities
@@ -138,7 +138,7 @@ namespace Faolan.Importer.Captures
         // Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's class-name prefixes - the combo
         // analogue of DeriveClassAbilitiesAsync (which derives from grants; combos have none). Combo.Level supplies the
         // per-class unlock level. Idempotent.
-        public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger logger = null)
+        public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger? logger = null)
         {
             var combos = await db
                 .Combos
@@ -194,7 +194,7 @@ namespace Faolan.Importer.Captures
         // rawPackets = ALL captures. Catalogs every ability's Id + Slot/Data identity seen on the wire (the Data quad is
         // also its RDB 1000020 TEA key, so RdbAbilityImporter can name it). The class<->ability ACCESS and per-class
         // unlock LEVEL are NOT set here - they are derived from the per-character grants (DeriveClassAbilitiesAsync).
-        public static async Task<(int Seen, int Inserted, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+        public static async Task<(int Seen, int Inserted, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
         {
             var grants = new Dictionary<uint, (uint Slot, uint D0, uint D1, uint D2, uint D3, uint D4)>();
             foreach (var packet in rawPackets)
@@ -243,7 +243,7 @@ namespace Faolan.Importer.Captures
         // the grant's RpcHeader receiver instance (= character id) - the ability twin of CaptureSpellImporter's learned-
         // spell seeding. Abilities are NOT in the snapshot known-list, so this is the authoritative per-character set
         // (the action bar is only shortcuts). Only characters already in the DB are touched; idempotent.
-        public static async Task<(int Characters, int Inserted)> ImportCharacterAbilitiesAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+        public static async Task<(int Characters, int Inserted)> ImportCharacterAbilitiesAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
         {
             var byCharacter = new Dictionary<uint, HashSet<uint>>();
             foreach (var packet in rawPackets)
@@ -266,7 +266,7 @@ namespace Faolan.Importer.Captures
         // sub-opcode 0xA8BBEB7F), keyed by the RpcHeader receiver instance (= character id). Combos are class/level
         // content the client's combo book gains per level; a max-level imported character never dings, so this persisted
         // set is what GrantCharacterCombos re-emits on login. Only characters already in the DB are touched; idempotent.
-        public static async Task<(int Characters, int Inserted)> ImportCharacterCombosAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+        public static async Task<(int Characters, int Inserted)> ImportCharacterCombosAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
         {
             var byCharacter = new Dictionary<uint, HashSet<uint>>();
             foreach (var packet in rawPackets)

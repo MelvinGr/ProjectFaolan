@@ -31,7 +31,7 @@ namespace Faolan.Importer.Captures
         // follow the grants); any DispatchLearnSpell after it is in-session leveling, not a starter.
         private const ushort AddShortcutOpcode = 0x206E;
 
-        public static async Task<(int Seen, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+        public static async Task<(int Seen, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
         {
             var ids = new HashSet<uint>();
             foreach (var packet in rawPackets)
@@ -72,7 +72,7 @@ namespace Faolan.Importer.Captures
         // (Class 0); under exactly one it is class-specific. Upserts on (Class, SpellId), so it is safe to re-run. This
         // is pure membership (the spell's unlock LEVEL lives on Spells.Level); coverage is only the classes present in
         // the captures - a class-aware ellatha scrape fills the full per-level progression.
-        public static async Task<(int Spells, int Inserted)> ImportClassSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
+        public static async Task<(int Spells, int Inserted)> ImportClassSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
         {
             // spellId -> the distinct classes whose create capture granted it (null class = unattributed capture).
             var idToClasses = new Dictionary<uint, HashSet<uint>>();
@@ -157,7 +157,7 @@ namespace Faolan.Importer.Captures
         // captured class currently at level 1 is pushed above it. So a level-1 create yields EXACTLY the capture's
         // grant (necro = Ice Strike R1 + Frozen Hatred). Must run AFTER the ellatha/wiki level modules (it overrides
         // them). Idempotent; only classes whose create capture actually reached a grant are touched.
-        public static async Task<(int Pinned, int Bumped)> CorrectStarterLevelsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
+        public static async Task<(int Pinned, int Bumped)> CorrectStarterLevelsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
         {
             var startersByClass = new Dictionary<uint, HashSet<uint>>();
             foreach (var capture in createCaptures)
@@ -215,7 +215,7 @@ namespace Faolan.Importer.Captures
         // learned set on every world entry, so a capture's grants ARE that character's spellbook. Attributed to the
         // character via the grant's RpcHeader receiver instance (= character id). Only characters already in the DB
         // are touched (CaptureCharacterImporter materializes them first); idempotent (skips spells already recorded).
-        public static async Task<(int Characters, int Inserted)> ImportLearnedSpellsAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+        public static async Task<(int Characters, int Inserted)> ImportLearnedSpellsAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
         {
             var byCharacter = new Dictionary<uint, HashSet<uint>>();
             foreach (var packet in rawPackets)

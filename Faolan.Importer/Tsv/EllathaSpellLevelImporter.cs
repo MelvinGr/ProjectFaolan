@@ -18,7 +18,7 @@ namespace Faolan.Importer.Tsv
 	// RDB id-ranges), so every matching row gets the level. Idempotent.
 	public static class EllathaSpellLevelImporter
 	{
-		public static async Task<(int Rows, int Matched, int Updated)> ImportAsync(IDatabaseContext db, string tsvPath, ILogger logger = null)
+		public static async Task<(int Rows, int Matched, int Updated)> ImportAsync(IDatabaseContext db, string tsvPath, ILogger? logger = null)
 		{
 			if (!File.Exists(tsvPath))
 			{
@@ -68,7 +68,7 @@ namespace Faolan.Importer.Tsv
 		// spells) and already live in the Spells table under their EXACT name (no rank suffix), so match by name and
 		// set both columns on every id-variant. The combos list is the one source carrying cooldown (recast, seconds).
 		// A combo name appears once per archetype with the same stats, so de-dup by name. Idempotent.
-		public static async Task<(int Combos, int Matched, int Updated)> ImportCombosAsync(IDatabaseContext db, string tsvPath, ILogger logger = null)
+		public static async Task<(int Combos, int Matched, int Updated)> ImportCombosAsync(IDatabaseContext db, string tsvPath, ILogger? logger = null)
 		{
 			if (!File.Exists(tsvPath))
 			{

@@ -20,7 +20,7 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint ComboXmlType = 1010206;
 
-		public static async Task<(int Seen, int Imported)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger logger = null)
+		public static async Task<(int Seen, int Imported)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir);
 			var existing = await db.Combos.ToDictionaryAsync(c => c.Id);

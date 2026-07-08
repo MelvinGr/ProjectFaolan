@@ -18,7 +18,7 @@ namespace Faolan.Importer.Captures
 	// characters already in the DB are touched (CaptureCharacterImporter materializes them first).
 	public static class CaptureQuestImporter
 	{
-		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> wire state
 			var progressByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> goal count

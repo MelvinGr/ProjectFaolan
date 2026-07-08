@@ -58,7 +58,7 @@ namespace Faolan.Importer.Captures
 			return shops;
 		}
 
-		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<ShopEntry> shops, ILogger logger = null)
+		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<ShopEntry> shops, ILogger? logger = null)
 		{
 			var added = 0;
 			var updated = 0;

@@ -19,7 +19,7 @@ namespace Faolan.Importer.Captures
 	{
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 
-		public static async Task<int> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		public static async Task<int> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var found = new Dictionary<uint, (float X, float Y, float Z)>();
 			foreach (var packet in rawPackets)

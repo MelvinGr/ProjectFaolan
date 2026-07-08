@@ -27,7 +27,7 @@ namespace Faolan.Importer.Tsv
 		private static readonly Regex Disambiguator = new Regex(@"\s*\((spell|ability|combo|buff|debuff)\)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 		private static readonly Regex RankSuffix = new Regex(@"\s*\(Rank \d+\)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-		public static async Task<(int Rows, int Matched, int Inserted)> ImportAsync(IDatabaseContext db, string tsvPath, ILogger logger = null)
+		public static async Task<(int Rows, int Matched, int Inserted)> ImportAsync(IDatabaseContext db, string tsvPath, ILogger? logger = null)
 		{
 			if (!File.Exists(tsvPath))
 			{
@@ -138,7 +138,7 @@ namespace Faolan.Importer.Tsv
 		// wiki level is the BASE spell's attainable level, so it only sets the RANK-1 / unranked row (higher ranks carry
 		// their own level from ellatha) and ONLY where the level is currently 0 (never overwrites ellatha's per-rank
 		// data). Complements EllathaSpellLevelImporter for the spells ellatha's ranked list missed. Idempotent.
-		public static async Task<(int Rows, int Updated)> ImportLevelsAsync(IDatabaseContext db, string tsvPath, ILogger logger = null)
+		public static async Task<(int Rows, int Updated)> ImportLevelsAsync(IDatabaseContext db, string tsvPath, ILogger? logger = null)
 		{
 			if (!File.Exists(tsvPath))
 			{

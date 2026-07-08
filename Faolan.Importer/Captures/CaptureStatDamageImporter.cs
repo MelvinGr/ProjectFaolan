@@ -20,7 +20,7 @@ namespace Faolan.Importer.Captures
 	{
 		private const uint StatDamageSubOpcode = 0xE9F24184;
 
-		public static async Task<(int Spells, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		public static async Task<(int Spells, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			// spellId -> (delta -> count), (type -> count) so we pick the dominant reading.
 			var deltas = new Dictionary<uint, Dictionary<int, int>>();

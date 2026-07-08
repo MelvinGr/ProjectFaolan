@@ -19,7 +19,7 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint AbilityTemplateType = 1000020;
 
-		public static async Task<(int Decrypted, int NamesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger logger = null)
+		public static async Task<(int Decrypted, int NamesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir);
 			var abilities = await db.Abilities.ToListAsync();

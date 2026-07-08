@@ -22,7 +22,7 @@ namespace Faolan.Importer.Captures
 		// mount creatures parked under it - they exist purely as summon templates resolved by name.
 		public const uint MountMapId = 0x4D4F554Eu; // 'MOUN'
 
-		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger logger = null)
+		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
 		{
 			// The creature names we actually need (the MountCatalog targets), lower-cased for matching.
 			var wanted = MountCatalog.All.Select(m => m.CreatureName.ToLowerInvariant()).ToHashSet();

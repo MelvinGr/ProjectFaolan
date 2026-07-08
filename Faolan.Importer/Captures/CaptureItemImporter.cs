@@ -16,7 +16,7 @@ namespace Faolan.Importer.Captures
 	// reader - the Faolan.Importer tool feeds it AnalyzedPacket.Bytes; tests feed it capture .bin bytes.
 	public static class CaptureItemImporter
 	{
-		public static async Task<(int Total, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		public static async Task<(int Total, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var harvested = new Dictionary<uint, ItemHashHarvester.CapturedItem>();
 			var types = new Dictionary<uint, ItemType>();
