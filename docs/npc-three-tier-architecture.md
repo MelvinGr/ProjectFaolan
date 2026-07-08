@@ -103,5 +103,16 @@ from typed columns.
       runtime-post-IIR humanoids), so `SpawnBody` carries the live token at construction and `SendWorldSpawn`
       drops the `SpawnPlayfieldRewriter` token patch. Byte-neutral for the 824 (verified) - a low-risk
       in-client smoke test. `Data` + the splice + `SpawnPlayfieldRewriter` then remain only on the #243 tail.
-- [ ] #243: decode the humanoid RUNTIME post-IIR so the last 155 can drop `Data` too.
+- [ ] #243: decode the humanoid RUNTIME post-IIR so the last ~155 drop `Data` too. RE of the tail (of 847
+      equipped humanoids: 600 clean-appearance already build from scratch):
+      - **148 = no-morph humanoids**: a 41-byte post-IIR byte-identical to the ANIMAL minimal form except
+        `recordCount=2` (vs 1) and `count=0` (no morph entries). Build with a `recordCount`-parameterised
+        `BuildMinimalPostIir(2)`.
+      - **99 = runtime-bearing**: a large first record (movement/bounds float triples, `recordCount=1`,
+        `firstRecordLen` large) with the **morph table embedded after it** (`[count][morphId f32 0 0 strLen str]…`
+        + the shared 0x3F1 terminator). A canonical fresh spawn drops the runtime record and keeps the morphs, so
+        a lenient morph extractor (skip the runtime record, decode the trailing morph table) → `BuildPostIir(morphs)`.
+      - 2 = a morph ENTRY carries runtime in field2/field3 (decode later).
+      Both main shapes are recoverable; needs a per-spawn post-IIR-kind flag (appearance / minimal-humanoid /
+      runtime) lifted by the importer so `TryBuildLive` picks the builder without the captured `Data`.
 - [ ] Migrate the remaining `Npc.Community`/`Level` readers (now `[Obsolete]`) to `StatCore`.
