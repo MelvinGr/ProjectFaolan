@@ -89,7 +89,12 @@ from typed columns.
       `row` (placement overrides), with runtime anim/state canonical. Verified byte-exact for the type +
       placement fields across all 980 populated spawns (`NpcSpawnStatCoreTests`). `Data` still supplies the
       frame + name + equipment structure.
-- [ ] Build the spawn FRAME from scratch (header + transform + pre/post-IIR scaffold), like
-      `PlayerSpawnBuilder.BuildFromScratch`, so `Data` can be dropped entirely. This is the last verbatim piece.
-- [ ] Retire `Data`, the splice path, and `SpawnPlayfieldRewriter` (token threaded at construction).
+- [ ] Build the spawn FRAME from scratch (header + transform + pre-IIR + IIR + post-IIR) so `Data` can be
+      dropped. The header/transform/pre-IIR/IIR and the ANIMAL post-IIR (minimal form) are all constructable;
+      the **HUMANOID post-IIR (appearance/morph table) is GATED ON #243** (its grammar beyond the morph table
+      isn't decoded - `WithAppearancePostIir` still splices it into the captured body). 876/1031 spawns are
+      humanoid, so full `Data` retirement waits on #243.
+- [ ] Thread the playfield token into the transform at construction (independent of the post-IIR) to retire
+      `SpawnPlayfieldRewriter` for the NPC spawn path.
+- [ ] Retire `Data` + the `SpawnPacketBuilder` splice (blocked on #243 for humanoids, per above).
 - [ ] Migrate the remaining `Npc.Community`/`Level` readers (now `[Obsolete]`) to `StatCore`.
