@@ -71,7 +71,7 @@ namespace Faolan.Importer.Rdb
                         continue;
 
                     foreach (var m in morphs)
-                        rows.Add(Row(sex, race, "morph", m.Seq, m.Name, null, null, m.Min, m.Max));
+                        rows.Add(Row(sex, race, "morph", m.Seq, m.Name!, null, null, m.Min, m.Max)); // Name != null by the Where above
 
                     var h = raceEl.Element("height");
                     if (h != null)
@@ -131,7 +131,7 @@ namespace Faolan.Importer.Rdb
 
         // Adds one category's option elements (id "0" = the creator's none placeholder, skipped). colourAttr set ->
         // store the hex swatch; nameFn set -> resolve a friendly name from the resource.
-        private static void AddList(List<AppearanceChoice> rows, Sex sex, Race race, string category, IEnumerable<XElement> elems, string idAttr, string prefix, string colourAttr, Func<uint, string> nameFn)
+        private static void AddList(List<AppearanceChoice> rows, Sex sex, Race race, string category, IEnumerable<XElement> elems, string idAttr, string prefix, string? colourAttr, Func<uint, string?>? nameFn)
         {
             var seq = 0;
             foreach (var e in elems)
@@ -149,7 +149,7 @@ namespace Faolan.Importer.Rdb
         }
 
         // "female_aquilonian_generic_thick_1_head" -> "Generic Thick 1".
-        private static string? CleanHeadName(string raw)
+        private static string? CleanHeadName(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
                 return null;
@@ -176,7 +176,7 @@ namespace Faolan.Importer.Rdb
 
         // "Face (Tattoo) Cimmerian - The Mountain Cat (F)" -> "The Mountain Cat". Keeps the whole string if it has no
         // " - " segment.
-        private static string? CleanTexName(string raw)
+        private static string? CleanTexName(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
                 return null;
@@ -191,7 +191,7 @@ namespace Faolan.Importer.Rdb
                 : null;
         }
 
-        private static AppearanceChoice Row(Sex sex, Race race, string category, int seq, string value, string colour, string name, int min, int max)
+        private static AppearanceChoice Row(Sex sex, Race race, string category, int seq, string value, string? colour, string? name, int min, int max)
         {
             return new AppearanceChoice
             {
