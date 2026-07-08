@@ -3,7 +3,6 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Opcodes;
-using Faolan.Core.Network.Spawn;
 
 namespace Faolan.Core.Network.Codecs
 {

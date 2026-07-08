@@ -1,7 +1,7 @@
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Spawn;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Microsoft.EntityFrameworkCore;

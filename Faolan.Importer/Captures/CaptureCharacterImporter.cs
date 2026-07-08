@@ -4,7 +4,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Core.Network.Protobuf;
-using Faolan.Core.Network.Spawn;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using System;

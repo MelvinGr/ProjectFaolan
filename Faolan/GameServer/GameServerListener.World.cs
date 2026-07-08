@@ -22,7 +22,6 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
-using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;

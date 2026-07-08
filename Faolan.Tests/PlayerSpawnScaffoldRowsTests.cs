@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Spawn;
 using Xunit;
 
 namespace Faolan.Tests

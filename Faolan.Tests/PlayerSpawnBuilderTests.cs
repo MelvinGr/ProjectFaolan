@@ -6,7 +6,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Protobuf;
-using Faolan.Core.Network.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
 

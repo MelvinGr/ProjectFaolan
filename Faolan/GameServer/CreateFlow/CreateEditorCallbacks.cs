@@ -8,7 +8,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Spawn;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.CreateFlow

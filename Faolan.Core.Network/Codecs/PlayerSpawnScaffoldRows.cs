@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Faolan.Core.Network.Spawn
+namespace Faolan.Core.Network.Codecs
 {
     // Maps the spawn scaffold between its wire form (PlayerSpawnScaffold) and the character's DB rows
     // (CharacterAttribute / CharacterSkill / CharacterScaffoldPair), so a player spawn can
