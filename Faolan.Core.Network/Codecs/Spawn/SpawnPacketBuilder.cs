@@ -74,9 +74,9 @@ namespace Faolan.Core.Network.Codecs
 				.WriteUInt32(fieldA)
 				.WriteByte(0x2C) // IIR group frame for the transform component
 				.WriteByte(0x0A)
-				.WriteArrayByteLength(position.ToProtobuf())
+				.WriteProtobufByteLength(position)
 				.WriteByte(0x12)
-				.WriteArrayByteLength(rotation.ToProtobuf())
+				.WriteProtobufByteLength(rotation)
 				.WriteArray(template.AsSpan(TransformEndOffset))
 				.ToArray();
 		}

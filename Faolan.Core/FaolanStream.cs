@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using System.Text;
 using Faolan.Core.Extensions;
+using ProtoBuf;
 
 namespace Faolan.Core
 {
@@ -71,13 +72,13 @@ namespace Faolan.Core
 			return BinaryPrimitives.ReadSingleBigEndian(buffer);
 		}
 
-		public T ReadProtobufByteLength<T>()
+		public T ReadProtobufByteLength<T>() where T : IExtensible
 		{
 			var body = ReadArrayByteLength();
 			return body.FromProtobuf<T>();
 		}
 
-		public T ReadProtobufUInt32Length<T>()
+		public T ReadProtobufUInt32Length<T>() where T : IExtensible
 		{
 			var body = ReadArrayUInt32Length();
 			return body.FromProtobuf<T>();
@@ -129,14 +130,20 @@ namespace Faolan.Core
 			return (T)Enum.ToObject(typeof(T), ReadUInt32());
 		}
 
-		// Little-endian uint32 (protobuf fixed32) - the read counterpart to the LE floats/fixed32 fields, distinct
-		// from the big-endian ReadUInt32 the raw wire integers use.
 		public uint ReadUInt32LittleEndian()
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(uint)];
 			ReadExactly(buffer);
 
 			return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
+		}
+
+		public ulong ReadUInt64()
+		{
+			Span<byte> buffer = stackalloc byte[sizeof(ulong)];
+			ReadExactly(buffer);
+
+			return BinaryPrimitives.ReadUInt64BigEndian(buffer);
 		}
 
 		// A base-128 varint (protobuf LEB128) - the read counterpart to WriteVarint.
@@ -155,14 +162,6 @@ namespace Faolan.Core
 				if (shift > 63)
 					throw new InvalidDataException("Invalid protobuf varint (too long).");
 			}
-		}
-
-		public ulong ReadUInt64()
-		{
-			Span<byte> buffer = stackalloc byte[sizeof(ulong)];
-			ReadExactly(buffer);
-
-			return BinaryPrimitives.ReadUInt64BigEndian(buffer);
 		}
 
 		public Vector3 ReadVector3()
@@ -268,6 +267,18 @@ namespace Faolan.Core
 			BinaryPrimitives.WriteSingleLittleEndian(buffer, value);
 
 			return WriteArray(buffer);
+		}
+
+		public FaolanStream WriteProtobufByteLength(IExtensible proto)
+		{
+			var body = proto.ToProtobuf();
+			return WriteArrayByteLength(body);
+		}
+
+		public FaolanStream WriteProtobufUInt32Length(IExtensible proto)
+		{
+			var body = proto.ToProtobuf();
+			return WriteArrayUInt32Length(body);
 		}
 
 		public FaolanStream WriteQuaternion(Quaternion value)
