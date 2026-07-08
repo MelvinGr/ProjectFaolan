@@ -165,6 +165,10 @@ namespace Faolan.GameServer
 		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
 
+		// The cutscene stock-phrase subtitle channel (Kalanthes's beach lines): answers PlayStockphraseAsSubtitle
+		// (0x205E) with the captured remoteformat, distinct from the interactive _conversation. See Dialogue/StockConversationService.cs.
+		private readonly StockConversationService _stockConversation;
+
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
 		// burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
@@ -234,6 +238,7 @@ namespace Faolan.GameServer
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
+			_stockConversation = new StockConversationService(logger);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_keepAlive = new KeepAliveService();
 			_shortcutBar = new ShortcutBarService(database, logger);

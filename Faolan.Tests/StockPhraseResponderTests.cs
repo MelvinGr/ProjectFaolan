@@ -1,6 +1,6 @@
 using System;
 using Xunit;
-using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
+using StockConversationService = Faolan.GameServer.Dialogue.StockConversationService;
 
 namespace Faolan.Tests
 {
@@ -21,8 +21,8 @@ namespace Faolan.Tests
 		[InlineData("{stock_56}", 0x0000e243u, "0000e24300623c72656d6f7465666f726d61742069643d2236323030222063617465676f72793d22353030303022206b65793d226c3059454128335845626c6f7934486b7548464322206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e")]
 		public void ReceivedStockPhraseBody_MatchesCapture(string stockKey, uint threadCtx, string expectedHex)
 		{
-			Assert.True(CreateFlowService.TryGetStockPhraseText(stockKey, out var text));
-			var body = CreateFlowService.BuildReceivedStockPhraseBody(threadCtx, text);
+			Assert.True(StockConversationService.TryGetStockPhraseText(stockKey, out var text));
+			var body = StockConversationService.BuildReceivedStockPhraseBody(threadCtx, text);
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 		}
 
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 		{
 			// captured c2s 0x205E: npcId {0xC350,0x2C1C} + "{stock_48}" + threadCtx 0x000077AA
 			var req = Convert.FromHexString("0000c35000002c1c000a7b73746f636b5f34387d000077aa");
-			Assert.True(CreateFlowService.TryParsePlayStockphraseRequest(req, out var key, out var tc));
+			Assert.True(StockConversationService.TryParsePlayStockphraseRequest(req, out var key, out var tc));
 			Assert.Equal("{stock_48}", key);
 			Assert.Equal(0x000077aau, tc);
 		}

@@ -1,11 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
@@ -62,30 +60,6 @@ namespace Faolan.GameServer.CreateFlow
 		// mutated from different connection threads (add on one connection, consume on the reconnect). Value unused.
 		private static readonly ConcurrentDictionary<uint, byte> PendingCreateWorldEntry = new ConcurrentDictionary<uint, byte>();
 
-		// {stock_N} -> the exact captured remoteformat text bytes (hex to avoid transcribing the escaped
-		// entities: &amp; &#39; &#92; etc). Stable server content - identical in every create capture.
-		private static readonly Dictionary<string, byte[]> StockPhraseRemoteFormats = new Dictionary<string, byte[]>
-		{
-			// id=6195 key="gdVvZ+XDaiyqOA_OQ+_."
-			["{stock_48}"] = Convert.FromHexString(
-				"3c72656d6f7465666f726d61742069643d2236313935222063617465676f72793d22353030303022206b65793d22676456765a2b5844616979714f415f4f512b5f2e22206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e"),
-			// id=6196 key="Uj1v&amp;fwEoqN_lA8bnWOp"
-			["{stock_49}"] = Convert.FromHexString(
-				"3c72656d6f7465666f726d61742069643d2236313936222063617465676f72793d22353030303022206b65793d22556a317626616d703b6677456f714e5f6c4138626e574f7022206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e"),
-			// id=6197 key="O,AyOT)I7kT+ECrK(V.?"
-			["{stock_50}"] = Convert.FromHexString(
-				"3c72656d6f7465666f726d61742069643d2236313937222063617465676f72793d22353030303022206b65793d224f2c41794f542949376b542b4543724b28562e3f22206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e"),
-			// id=6198 key="K&#39;B*LKSZ*)%&#92;mr^^wf0^"
-			["{stock_51}"] = Convert.FromHexString(
-				"3c72656d6f7465666f726d61742069643d2236313938222063617465676f72793d22353030303022206b65793d224b262333393b422a4c4b535a2a2925262339323b6d725e5e7766305e22206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e"),
-			// id=6199 key="!-u62.+NE`(`enfqa-MH"
-			["{stock_52}"] = Convert.FromHexString(
-				"3c72656d6f7465666f726d61742069643d2236313939222063617465676f72793d22353030303022206b65793d22212d7536322e2b4e45602860656e6671612d4d4822206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e"),
-			// id=6200 key="l0YEA(3XEbloy4HkuHFC"
-			["{stock_56}"] = Convert.FromHexString(
-				"3c72656d6f7465666f726d61742069643d2236323030222063617465676f72793d22353030303022206b65793d226c3059454128335845626c6f7934486b7548464322206b6e75626f743d223338382220203e3c2f72656d6f7465666f726d61743e")
-		};
-
 		private static readonly Quaternion KalanthesIntroFacing = new Quaternion(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
 
 		// The 18 galley scene-prop dynels the create-editor initial burst streams, in retail send order. Each is a
@@ -122,14 +96,6 @@ namespace Faolan.GameServer.CreateFlow
 			_database = database;
 			_simulation = simulation;
 			_sendBurstlessWorldEntry = sendBurstlessWorldEntry;
-		}
-
-		// #197 deterministic trigger: the client sends Finish + its SetMorphValue batch in one burst; retail sends
-		// the post-morph trio once that recv batch is fully received. Called from the listener's batch-drained hook
-		// (ReceivedBatchComplete). No-op until Finish/a morph has been seen this session, and sends exactly once.
-		internal static Task FlushPostMorphBurstOnBatchDrained(INetworkClient client)
-		{
-			return TrySendPostMorphBurstOnce(client);
 		}
 
 		// Handles the client->server 0xA36D3B74 character-creation script callbacks.
@@ -234,10 +200,11 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeSex":
 				{
 					if (character != null)
+					{
 						// Sex IS the editor's usual 2x convention: 4 -> wire 2 = MALE, 6 -> wire 3 = FEMALE
 						// (anchored on Hoxxling, who is male: ChangeSex 4 + a chosen beardmesh; the earlier
 						// "6 = male" read was inverted).
-					{
+
 						character.Sex = numericValue == 4
 							? Sex.Male
 							: Sex.Female;
@@ -263,7 +230,8 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeHeadMesh":
 				{
 					if (character != null)
-						EnsureBody(character).HeadMesh = numericValue;
+						EnsureBody(character)
+							.HeadMesh = numericValue;
 
 					break;
 				}
@@ -271,7 +239,8 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeSize":
 				{
 					if (character != null)
-						EnsureBody(character).Size = (byte)numericValue;
+						EnsureBody(character)
+							.Size = (byte)numericValue;
 
 					break;
 				}
@@ -279,7 +248,8 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeVoice":
 				{
 					if (character != null)
-						EnsureBody(character).Voice = (byte)numericValue;
+						EnsureBody(character)
+							.Voice = (byte)numericValue;
 
 					break;
 				}
@@ -324,6 +294,12 @@ namespace Faolan.GameServer.CreateFlow
 					break;
 				}
 
+				// Applies one editor SetMorphValue callback to the character's body. The value is a ZIGZAG-encoded
+				// signed slider value; CharacterMorphs decodes it and stores the signed value in the matching
+				// CharacterBody column (the spawn morph float is that value / 1000 - see CharacterMorphs). Resource
+				// refs (*hairmesh/*beardmesh/*texscript - the chosen hair/colors/tattoos/scars) are recorded in
+				// editor send order; they become the spawn scaffold's weighted entries via MorphTarget. Sliders not
+				// yet seen in captures are logged and skipped.
 				case "SetMorphValue":
 				{
 					// The retail creator acks every non-empty morph with a 0xBADF5A4B packet that echoes the
@@ -335,7 +311,16 @@ namespace Faolan.GameServer.CreateFlow
 					if (!string.IsNullOrEmpty(valueString))
 					{
 						if (character != null)
-							ApplyMorph(character, valueString, numericValue);
+						{
+							if (valueString[0] == '*')
+								RecordBodyResource(character, valueString);
+							else
+							{
+								if (!CharacterMorphs.TryApply(EnsureBody(character), valueString, numericValue))
+									_logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", valueString, numericValue);
+							}
+						}
+
 						await SendMorphValueAck(client, valueString);
 					}
 
@@ -378,32 +363,120 @@ namespace Faolan.GameServer.CreateFlow
 			}
 		}
 
-		// Inbound handler for the client's stock-phrase request. Answers with the mapped remoteformat so the
-		// client-side subtitle command completes instead of timing out after 60 s (#234 speech). Unknown stock
-		// phrases (a cutscene we have no capture for) are logged and NOT answered here - surface the gap rather
-		// than feed the client a wrong line (a fabricated key would show garbled text).
-		[Obsolete("FROM SCRATCH")]
-		internal async Task HandlePlayStockphraseAsSubtitle(INetworkClient client, byte[] requestBody)
+		// The post-creation world entry: handshake + burst-less live-char world + cutscene start.
+		internal async Task SendCreateWorldWithCutscene(INetworkClient client)
 		{
-			if (!TryParsePlayStockphraseRequest(requestBody, out var stockKey, out var threadContext))
-			{
-				_logger.LogWarning("PlayStockphraseAsSubtitle: could not parse request body ({Len} bytes)", requestBody.Length);
-				return;
-			}
-
-			if (!StockPhraseRemoteFormats.TryGetValue(stockKey, out var textBytes))
-			{
-				_logger.LogWarning("PlayStockphraseAsSubtitle: no remoteformat for stock phrase {Key} (tc=0x{Tc:X8}) - client will time out; add it to StockPhraseRemoteFormats from a capture", stockKey, threadContext);
-				return;
-			}
-
 			var id = client.Session.Account.ClientInstance;
+
+			// (a) The create-world handshake - the three records the verbatim scene burst opened with (the shared
+			// Hello handshake at GameServerListener is skipped for isCreateWorldEntry, so send it here).
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText)
-				.WriteArray(BuildReceivedStockPhraseBody(threadContext, textBytes))
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportDimesionID)
+				.WriteArray(0x00, 0x01, 0x31)
+				.SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportServerID)
+				.WriteArray(0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03)
+				.SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchAckAuthenticate)
+				.WriteArray(0x00, 0x00, 0x00, 0x01)
 				.SendAsync(client);
 
-			_logger.LogInformation("PlayStockphraseAsSubtitle: answered {Key} (tc=0x{Tc:X8}) for client {Id} (#234 cutscene speech)", stockKey, threadContext, id);
+			// (b) The live-char world (constructed; same path existing-char logins use).
+			await _sendBurstlessWorldEntry(client, client.Session.Character.MapId);
+
+			// (c) Start the destiny cutscene (Scry scripts only - the begin marker, the scene-load character_creation
+			// step, and the two opening script groups). The per-callback steps follow via SendCreateCutsceneStep.
+			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
+			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
+			await SendIir(client, Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.EnergyIIR,
+				CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x36B0));
+			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
+			await SendScry(client,
+				ScryScript.BuildStep(id,
+					"<remoteformat token=\"playorskip(100)|onclientconnected(1)|character_creation Tortage Beach (server-side)\" category=\"50023\" key=\"*&#36;!0mcl&#36;Z!5Ii0UG!TV?\" knubot=\"0\"  ></remoteformat>", 6,
+					resources:
+					"1010003:3147889;1010003:3147890;1010003:3147891;1010003:3147892;1010003:3147893;1010003:3147894;1010003:137283;1010003:202270;1010003:210528;1010003:205370;1010003:3147896;1010003:3147895;1010003:3147897;1010003:3147898;1010003:3147899;1010003:3147900;1010003:208235;1010003:3203880;1010003:3203879;1010003:3203881;1010003:3203876;1010003:3203877;1010003:3203878",
+					f6Field1: 4617355, f6Field2: 7004418));
+			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 385910));
+			await new PacketStream()
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00)
+				.SendAsync(client);
+		}
+
+		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string name)
+		{
+			var character = client.Session.Character;
+			if (character == null || string.IsNullOrWhiteSpace(name))
+				return NameCommitResult.Invalid;
+
+			if (string.Equals(character.Name, name, StringComparison.Ordinal))
+				return NameCommitResult.Committed;
+
+			// Check the name is free BEFORE saving (Characters.Name is UNIQUE) so a taken name is rejected cleanly as
+			// NicknameTaken rather than blowing up the SaveCharacter unit of work. A row owned by THIS character doesn't
+			// count (idempotent re-name to the same value is handled above).
+			var existing = await _database.GetCharacterByName(name);
+			if (existing != null && existing.Id != character.Id)
+			{
+				_logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);
+				return NameCommitResult.Taken;
+			}
+
+			character.Name = name;
+			// The class is chosen before naming (the final editor step), so regenerate vitals from the now-known
+			// class/level - replacing the level-1 rogue baseline seeded at row allocation.
+			character.RegenerateMaxStats();
+			// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
+			await _database.SaveCharacter(character);
+
+			// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
+			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
+			// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
+			// NOT re-seeded on world entry, so a completed/removed quest never reappears.
+			await _database.SetCharacterQuest(character.Id, WorldQuest.BeachStarterQuestId, QuestState.Active);
+			_logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, WorldQuest.BeachStarterQuestId);
+			return NameCommitResult.Committed;
+		}
+
+		// Grants the character's class-starting spells during create as DispatchLearnSpell (0x200A) packets - the
+		// spell counterpart to the world-prep burst's hardcoded 0x2052 ability grants. The client bars each granted
+		// spell, so these MUST arrive before its 0x206E bar drags. The body is just the 4-byte spell id (retail
+		// f239). Melee classes resolve to an empty set (no starting spells).
+		private async Task GrantCreateStartingSpells(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var id = client.Session.Account.ClientInstance;
+			var sender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C);
+			var receiver = Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id);
+
+			var spells = await _database.GetStartingSpells(character.Level, character.Class);
+			foreach (var spellId in spells)
+				await new PacketStream()
+					.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchLearnSpell)
+					.WriteUInt32(spellId)
+					.SendAsync(client);
+
+			_logger.LogInformation("Create: granted {Count} starting spell(s) (0x200A) to '{Name}' (class={Class}) so the client bars them.", spells.Length, character.Name, character.Class);
+		}
+
+		// The live wire handle of the in-zone NPC named `npcName` (the cinematic actor to bind), or `fallback` when
+		// it isn't loaded. Used to re-address the cutscene's actor reference (ThisIsKalanthes f6) to OUR live entity.
+		private uint LiveNpcHandle(INetworkClient client, string npcName, uint fallback)
+		{
+			var player = _simulation.PlayerWorldEntity(client);
+			if (player == null)
+				return fallback;
+
+			var npc = _simulation
+				.World.ZoneForEntity(player)
+				.Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == npcName);
+			return npc?.Handle ?? fallback;
 		}
 
 		// Sends the post-morph trio once the morph stream goes quiet. After Finish the editor streams its
@@ -511,49 +584,6 @@ namespace Faolan.GameServer.CreateFlow
 			}
 		}
 
-		// The post-creation world entry: handshake + burst-less live-char world + cutscene start.
-		internal async Task SendCreateWorldWithCutscene(INetworkClient client)
-		{
-			var id = client.Session.Account.ClientInstance;
-
-			// (a) The create-world handshake - the three records the verbatim scene burst opened with (the shared
-			// Hello handshake at GameServerListener is skipped for isCreateWorldEntry, so send it here).
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportDimesionID)
-				.WriteArray(0x00, 0x01, 0x31)
-				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchReportServerID)
-				.WriteArray(0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03)
-				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchAckAuthenticate)
-				.WriteArray(0x00, 0x00, 0x00, 0x01)
-				.SendAsync(client);
-
-			// (b) The live-char world (constructed; same path existing-char logins use).
-			await _sendBurstlessWorldEntry(client, client.Session.Character.MapId);
-
-			// (c) Start the destiny cutscene (Scry scripts only - the begin marker, the scene-load character_creation
-			// step, and the two opening script groups). The per-callback steps follow via SendCreateCutsceneStep.
-			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
-			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
-			await SendIir(client, Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-				GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x36B0));
-			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
-			await SendScry(client,
-				ScryScript.BuildStep(id,
-					"<remoteformat token=\"playorskip(100)|onclientconnected(1)|character_creation Tortage Beach (server-side)\" category=\"50023\" key=\"*&#36;!0mcl&#36;Z!5Ii0UG!TV?\" knubot=\"0\"  ></remoteformat>", 6,
-					resources:
-					"1010003:3147889;1010003:3147890;1010003:3147891;1010003:3147892;1010003:3147893;1010003:3147894;1010003:137283;1010003:202270;1010003:210528;1010003:205370;1010003:3147896;1010003:3147895;1010003:3147897;1010003:3147898;1010003:3147899;1010003:3147900;1010003:208235;1010003:3203880;1010003:3203879;1010003:3203881;1010003:3203876;1010003:3203877;1010003:3203878",
-					f6Field1: 4617355, f6Field2: 7004418));
-			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 385910));
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
-		}
-
 		// Step 2: answer the client's TheNameIs callback so it knows the name was accepted and advances to
 		// enter-world. Sequence from dikketest (idx 359-363): 0xADCE0CDA (echoes the name) + an 0xA36D3B74
 		// "NicknameOk" callback (echoes the name) + 0xF508F4C1 (fixed) + an 0xA36D3B74 "CharCreationFinished".
@@ -598,103 +628,6 @@ namespace Faolan.GameServer.CreateFlow
 
 			// The client will now send 0x206E (enter world); answer it with the 0x2002 world handoff.
 			client.Session.AwaitingEnterWorld = true;
-		}
-
-		// Applies one editor SetMorphValue callback to the character's body. The value is a ZIGZAG-encoded
-		// signed slider value; CharacterMorphs decodes it and stores the signed value in the matching
-		// CharacterBody column (the spawn morph float is that value / 1000 - see CharacterMorphs). Resource
-		// refs (*hairmesh/*beardmesh/*texscript - the chosen hair/colors/tattoos/scars) are recorded in
-		// editor send order; they become the spawn scaffold's weighted entries via MorphTarget. Sliders not
-		// yet seen in captures are logged and skipped.
-		private void ApplyMorph(Character character, string morph, uint value)
-		{
-			if (morph[0] == '*')
-			{
-				RecordBodyResource(character, morph);
-				return;
-			}
-
-			if (!CharacterMorphs.TryApply(EnsureBody(character), morph, value))
-				_logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", morph, value);
-		}
-
-		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string name)
-		{
-			var character = client.Session.Character;
-			if (character == null || string.IsNullOrWhiteSpace(name))
-				return NameCommitResult.Invalid;
-
-			if (string.Equals(character.Name, name, StringComparison.Ordinal))
-				return NameCommitResult.Committed;
-
-			// Check the name is free BEFORE saving (Characters.Name is UNIQUE) so a taken name is rejected cleanly as
-			// NicknameTaken rather than blowing up the SaveCharacter unit of work. A row owned by THIS character doesn't
-			// count (idempotent re-name to the same value is handled above).
-			var existing = await _database.GetCharacterByName(name);
-			if (existing != null && existing.Id != character.Id)
-			{
-				_logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);
-				return NameCommitResult.Taken;
-			}
-
-			character.Name = name;
-			// The class is chosen before naming (the final editor step), so regenerate vitals from the now-known
-			// class/level - replacing the level-1 rogue baseline seeded at row allocation.
-			character.RegenerateMaxStats();
-			// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
-			await _database.SaveCharacter(character);
-
-			// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
-			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
-			// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
-			// NOT re-seeded on world entry, so a completed/removed quest never reappears.
-			await _database.SetCharacterQuest(character.Id, WorldQuest.BeachStarterQuestId, QuestState.Active);
-			_logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, WorldQuest.BeachStarterQuestId);
-			return NameCommitResult.Committed;
-		}
-
-		// Grants the character's class-starting spells during create as DispatchLearnSpell (0x200A) packets - the
-		// spell counterpart to the world-prep burst's hardcoded 0x2052 ability grants. The client bars each granted
-		// spell, so these MUST arrive before its 0x206E bar drags. The body is just the 4-byte spell id (retail
-		// f239). Melee classes resolve to an empty set (no starting spells).
-		private async Task GrantCreateStartingSpells(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			var id = client.Session.Account.ClientInstance;
-			var sender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C);
-			var receiver = Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id);
-
-			var spells = await _database.GetStartingSpells(character.Level, character.Class);
-			foreach (var spellId in spells)
-				await new PacketStream().WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchLearnSpell).WriteUInt32(spellId).SendAsync(client);
-
-			_logger.LogInformation("Create: granted {Count} starting spell(s) (0x200A) to '{Name}' (class={Class}) so the client bars them.", spells.Length, character.Name, character.Class);
-		}
-
-		// The live wire handle of the in-zone NPC named `npcName` (the cinematic actor to bind), or `fallback` when
-		// it isn't loaded. Used to re-address the cutscene's actor reference (ThisIsKalanthes f6) to OUR live entity.
-		private uint LiveNpcHandle(INetworkClient client, string npcName, uint fallback)
-		{
-			var player = _simulation.PlayerWorldEntity(client);
-			if (player == null)
-				return fallback;
-
-			var npc = _simulation.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == npcName);
-			return npc?.Handle ?? fallback;
-		}
-
-		private static async Task TrySendPostMorphBurstOnce(INetworkClient client)
-		{
-			// MorphActivitySequence > 0 means Finish (or a morph) has been processed - i.e. the customization is
-			// being committed. Guarded single-send so the batch-drain trigger and the fallback timer can't double it.
-			if (client.Session.MorphActivitySequence == 0 || client.Session.PostMorphBurstSent)
-				return;
-
-			client.Session.PostMorphBurstSent = true;
-			await SendPostMorphBurst(client);
 		}
 		// Verbatim replay of the retail create-editor INITIAL download from
 		// Captures/account-stricken998-character-create-no-worldenter.json (GameServer port 7030),
@@ -868,7 +801,10 @@ namespace Faolan.GameServer.CreateFlow
 
 			return;
 
-			Task Iir(GameServer0X2000Opcodes iir, params byte[] body) => SendIir(client, sender, receiver, iir, body);
+			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)
+			{
+				return SendIir(client, sender, receiver, iir, body);
+			}
 
 			// Emits a SimpleChar scene-pedestal record, RECONSTRUCTED from its own bytes (transform + identity
 			// rebuilt, pre-IIR scaffold carried, session playfield threaded - CreateEditorCharBuilder). The live
@@ -882,7 +818,11 @@ namespace Faolan.GameServer.CreateFlow
 			{
 				return new PacketStream()
 					.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(prefix).WriteUInt32(id).WriteArray(suffix))
+					.WriteArrayUInt32Length(s => s
+						.WriteUInt32(iir)
+						.WriteArray(prefix)
+						.WriteUInt32(id)
+						.WriteArray(suffix))
 					.SendAsync(client);
 			}
 		}
@@ -932,14 +872,12 @@ namespace Faolan.GameServer.CreateFlow
 			}
 		}
 
-		// Build the s2c ReceivedStockPhraseText (0x205D) body: [u32 threadCtx][u16 textLen][text].
-		internal static byte[] BuildReceivedStockPhraseBody(uint threadContext, byte[] textBytes)
+		// #197 deterministic trigger: the client sends Finish + its SetMorphValue batch in one burst; retail sends
+		// the post-morph trio once that recv batch is fully received. Called from the listener's batch-drained hook
+		// (ReceivedBatchComplete). No-op until Finish/a morph has been seen this session, and sends exactly once.
+		internal static Task FlushPostMorphBurstOnBatchDrained(INetworkClient client)
 		{
-			var body = new byte[4 + 2 + textBytes.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), threadContext);
-			BinaryPrimitives.WriteUInt16BigEndian(body.AsSpan(4, 2), (ushort)textBytes.Length);
-			textBytes.CopyTo(body.AsSpan(6));
-			return body;
+			return TrySendPostMorphBurstOnce(client);
 		}
 
 		// The create-editor 0x2000 receiver: the player object (GameInterfaceType) addressed to this session's
@@ -948,56 +886,6 @@ namespace Faolan.GameServer.CreateFlow
 		internal static byte[] Receiver(INetworkClient client)
 		{
 			return client.Endpoint(Endpoints.GameInterfaceType);
-		}
-
-		// The create-flow send idiom: one 0x2000 record ([u32 len][u32 iir opcode][body]) delivered via DispatchPassBlob.
-		// Every editor/world-prep burst funnels its records through here instead of re-spelling the PacketStream chain.
-		private static Task SendIir(INetworkClient client, byte[] sender, byte[] receiver, GameServer0X2000Opcodes iir, params byte[] body) =>
-			new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
-
-		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
-		//   subOpcode(0xBADF5A4B) ack(0xC350) clientInstance uint16(0) [byteLen morphValue] float byte(0) counter
-		// The float is a server-side default that is not present in the client's message: textures
-		// (values starting with '*') use 1.0, body morphs use -0.03 (the only two values seen in retail).
-		private static Task SendMorphValueAck(INetworkClient client, string morphValue)
-		{
-			var instance = client.Session.Account.ClientInstance;
-			var counter = client.Session.MorphAckCounter == 0
-				? client.Session.MorphAckCounter = 2
-				: ++client.Session.MorphAckCounter;
-			// IEEE-754 bits written big-endian (the editor reads these floats big-endian here, unlike
-			// FaolanStream.WriteFloat which is little-endian). 1.0f=0x3F800000 for textures (values starting
-			// with '*'), -0.03f=0xBCF5C28F for body morphs - the only two values retail uses.
-			var floatBits = morphValue.StartsWith("*", StringComparison.Ordinal)
-				? 0x3F800000u
-				: 0xBCF5C28Fu;
-
-			return new PacketStream()
-				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
-				{
-					s.WriteUInt32(GameServer0X2000Opcodes.SetMorphValueIIR);
-					s.WriteUInt32(EntityClass.Character);
-					s.WriteUInt32(instance);
-					s.WriteUInt16(0);
-					s.WriteStringByteLength(morphValue);
-					s.WriteUInt32(floatBits);
-					s.WriteByte(0);
-					s.WriteUInt32(counter);
-				})
-				.SendAsync(client);
-		}
-
-		// Reject a chosen name so the client re-prompts instead of dead-ending (no loading screen). Retail answers a
-		// bad TheNameIs with the same 0xA36D3B74 callback as NicknameOk but a different token: NicknameTaken (already in
-		// use, echoes the name) or NicknameInvalid (empty/unsaveable, empty value). Verbatim grammar from
-		// Captures/Stricken_soldier-guardian_create_random-actions (frames 151 taken / 158 invalid / 193 ok). The client
-		// then simply re-sends TheNameIs with a new name - no other packets are needed.
-		private static Task SendNicknameRejected(INetworkClient client, string name, bool taken)
-		{
-			return taken
-				? SendA36DCallback(client, "NicknameTaken", name)
-				: SendA36DCallback(client, "NicknameInvalid", "");
 		}
 
 		// Retail create-editor CHARACTER-CREATION SCRIPT burst from
@@ -1073,11 +961,20 @@ namespace Faolan.GameServer.CreateFlow
 
 			// One IIR packet: 0x2000 envelope -> [u32 length][u32 IIR-id][body]. The length is recomputed, so editing
 			// a body never desyncs it.
-			Task Iir(GameServer0X2000Opcodes iir, params byte[] body) => SendIir(client, sender, receiver, iir, body);
+			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)
+			{
+				return SendIir(client, sender, receiver, iir, body);
+			}
 
 			// Sends a fully-built IIR record (one that already begins with its sub-opcode, e.g. ScryScript.BuildStep);
 			// the length prefix is recomputed by WriteArrayUInt32Length.
-			Task IirRecord(byte[] record) => new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
+			Task IirRecord(byte[] record)
+			{
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteArrayUInt32Length(record)
+					.SendAsync(client);
+			}
 		}
 
 		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
@@ -1108,20 +1005,22 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteArray(0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0x07, 0xE2, 0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0xC7, 0x9E, 0x00,
 					0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00)
 				.SendAsync(client);
-			await SendIir(client, Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-				GameServer0X2000Opcodes.CharInPlayIIR, CreateEditorRecordBuilder.BuildCharInPlayIir(id));
+			await SendIir(client, Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.CharInPlayIIR,
+				CreateEditorRecordBuilder.BuildCharInPlayIir(id));
 
 			// The racial CHARACTER-TEMPLATE choice list the creation editor reads (Male/Female/StygianSlaver ->
 			// template ids 50000:65525x), delivered on two GameActionListIIR (0xF508F4C1) records for dynel 0xD00C.
 			// The two captured variants differ ONLY in the leading action-id word; the property-map action-tail
 			// grammar is still opaque (#190) so it rides verbatim, while the record HEADER is constructed via
 			// GameActionListCodec.BuildBody (construct-don't-replay - see SendGameActionListRecord).
-			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, [
+			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu,
+			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x39, 0xBF, 0x93, 0x00, 0x50, 0x4D, 0x61, 0x6C, 0x65, 0x54, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74, 0x65, 0x3D, 0x35, 0x30, 0x30, 0x30,
 				0x30, 0x3A, 0x36, 0x35, 0x35, 0x32, 0x35, 0x32, 0x3B, 0x46, 0x65, 0x6D, 0x61, 0x6C, 0x65, 0x54, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74, 0x65, 0x3D, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3A, 0x36, 0x35, 0x35, 0x32, 0x35,
 				0x33, 0x3B, 0x53, 0x74, 0x79, 0x67, 0x69, 0x61, 0x6E, 0x53, 0x6C, 0x61, 0x76, 0x65, 0x72, 0x3D, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3A, 0x36, 0x35, 0x35, 0x32, 0x35, 0x34, 0x00, 0x00, 0x00, 0x00, 0x00
 			]);
-			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, [
+			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu,
+			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x01, 0x9D, 0xD1, 0x00, 0x50, 0x4D, 0x61, 0x6C, 0x65, 0x54, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74, 0x65, 0x3D, 0x35, 0x30, 0x30, 0x30,
 				0x30, 0x3A, 0x36, 0x35, 0x35, 0x32, 0x35, 0x32, 0x3B, 0x46, 0x65, 0x6D, 0x61, 0x6C, 0x65, 0x54, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74, 0x65, 0x3D, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3A, 0x36, 0x35, 0x35, 0x32, 0x35,
 				0x33, 0x3B, 0x53, 0x74, 0x79, 0x67, 0x69, 0x61, 0x6E, 0x53, 0x6C, 0x61, 0x76, 0x65, 0x72, 0x3D, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3A, 0x36, 0x35, 0x35, 0x32, 0x35, 0x34, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -1341,7 +1240,10 @@ namespace Faolan.GameServer.CreateFlow
 			await Iir(GameServer0X2000Opcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
 			return;
 
-			Task Iir(GameServer0X2000Opcodes iir, params byte[] body) => SendIir(client, sender, receiver, iir, body);
+			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)
+			{
+				return SendIir(client, sender, receiver, iir, body);
+			}
 		}
 
 		// Consumes (removes) a pending create-world-entry marker for `clientInstance`, returning true if one was set.
@@ -1350,32 +1252,6 @@ namespace Faolan.GameServer.CreateFlow
 		internal static bool TryConsumePendingCreateWorldEntry(uint clientInstance)
 		{
 			return PendingCreateWorldEntry.TryRemove(clientInstance, out _);
-		}
-
-		// The stable remoteformat text for a {stock_N} phrase, or false if we have no capture of it.
-		internal static bool TryGetStockPhraseText(string stockKey, out byte[] textBytes)
-		{
-			return StockPhraseRemoteFormats.TryGetValue(stockKey, out textBytes);
-		}
-
-		// Parse a c2s PlayStockphraseAsSubtitle (0x205E) request:
-		//   [ProtoID npcId (u32 type, u32 instance)][String: u16 len + bytes "{stock_N}"][u32 threadCtx]
-		// Returns false if the body is malformed.
-		internal static bool TryParsePlayStockphraseRequest(ReadOnlySpan<byte> body, out string stockKey, out uint threadContext)
-		{
-			stockKey = null;
-			threadContext = 0;
-			if (body.Length < 8 + 2 + 4)
-				return false;
-
-			int strLen = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(8, 2));
-			var tcOffset = 10 + strLen;
-			if (tcOffset + 4 > body.Length)
-				return false;
-
-			stockKey = Encoding.Latin1.GetString(body.Slice(10, strLen));
-			threadContext = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(tcOffset, 4));
-			return true;
 		}
 
 		// Persists the chosen character name so the subsequent world-entry Hello (a fresh session that
@@ -1505,7 +1381,10 @@ namespace Faolan.GameServer.CreateFlow
 		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
 		private static Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
-			return new PacketStream().WriteHeader(MorphAckSender, Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(record)
+				.SendAsync(client);
 		}
 
 		// Emits a GameActionListIIR (0xF508F4C1) carrier for `dynel`, delivered to frame `id`. The fixed record
@@ -1520,11 +1399,71 @@ namespace Faolan.GameServer.CreateFlow
 				.SendAsync(client);
 		}
 
+		// The create-flow send idiom: one 0x2000 record ([u32 len][u32 iir opcode][body]) delivered via DispatchPassBlob.
+		// Every editor/world-prep burst funnels its records through here instead of re-spelling the PacketStream chain.
+		private static Task SendIir(INetworkClient client, byte[] sender, byte[] receiver, GameServer0X2000Opcodes iir, params byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(iir)
+					.WriteArray(body))
+				.SendAsync(client);
+		}
+
 		// Sends a constructed Kalanthes MoveTask on the world conversation (WorldFraming + IirCarrier - the same framing
 		// every rendered NPC move goes out on).
 		private static Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
+		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
+		//   subOpcode(0xBADF5A4B) ack(0xC350) clientInstance uint16(0) [byteLen morphValue] float byte(0) counter
+		// The float is a server-side default that is not present in the client's message: textures
+		// (values starting with '*') use 1.0, body morphs use -0.03 (the only two values seen in retail).
+		private static Task SendMorphValueAck(INetworkClient client, string morphValue)
+		{
+			var instance = client.Session.Account.ClientInstance;
+			var counter = client.Session.MorphAckCounter == 0
+				? client.Session.MorphAckCounter = 2
+				: ++client.Session.MorphAckCounter;
+			// IEEE-754 bits written big-endian (the editor reads these floats big-endian here, unlike
+			// FaolanStream.WriteFloat which is little-endian). 1.0f=0x3F800000 for textures (values starting
+			// with '*'), -0.03f=0xBCF5C28F for body morphs - the only two values retail uses.
+			var floatBits = morphValue.StartsWith("*", StringComparison.Ordinal)
+				? 0x3F800000u
+				: 0xBCF5C28Fu;
+
+			return new PacketStream()
+				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s =>
+				{
+					s.WriteUInt32(GameServer0X2000Opcodes.SetMorphValueIIR);
+					s.WriteUInt32(EntityClass.Character);
+					s.WriteUInt32(instance);
+					s.WriteUInt16(0);
+					s.WriteStringByteLength(morphValue);
+					s.WriteUInt32(floatBits);
+					s.WriteByte(0);
+					s.WriteUInt32(counter);
+				})
+				.SendAsync(client);
+		}
+
+		// Reject a chosen name so the client re-prompts instead of dead-ending (no loading screen). Retail answers a
+		// bad TheNameIs with the same 0xA36D3B74 callback as NicknameOk but a different token: NicknameTaken (already in
+		// use, echoes the name) or NicknameInvalid (empty/unsaveable, empty value). Verbatim grammar from
+		// Captures/Stricken_soldier-guardian_create_random-actions (frames 151 taken / 158 invalid / 193 ok). The client
+		// then simply re-sends TheNameIs with a new name - no other packets are needed.
+		private static Task SendNicknameRejected(INetworkClient client, string name, bool taken)
+		{
+			return taken
+				? SendA36DCallback(client, "NicknameTaken", name)
+				: SendA36DCallback(client, "NicknameInvalid", "");
 		}
 
 		// The fixed trio the server sends after the last morph; tails are verbatim from dikketest with the
@@ -1547,6 +1486,17 @@ namespace Faolan.GameServer.CreateFlow
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(scry))
 				.SendAsync(client);
+		}
+
+		private static async Task TrySendPostMorphBurstOnce(INetworkClient client)
+		{
+			// MorphActivitySequence > 0 means Finish (or a morph) has been processed - i.e. the customization is
+			// being committed. Guarded single-send so the batch-drain trigger and the fallback timer can't double it.
+			if (client.Session.MorphActivitySequence == 0 || client.Session.PostMorphBurstSent)
+				return;
+
+			client.Session.PostMorphBurstSent = true;
+			await SendPostMorphBurst(client);
 		}
 
 		// The outcome of committing a chosen name, mirroring the retail create-editor's NicknameOk / NicknameTaken /
