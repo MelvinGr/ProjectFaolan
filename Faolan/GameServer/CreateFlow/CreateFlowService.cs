@@ -1048,9 +1048,11 @@ namespace Faolan.GameServer.CreateFlow
 
 			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232u, 7, 41413, 1, 24, 0));
 			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039233u, 7, 41413, 1, 24, 0));
+
 			await SendItemStat(client, id, 0x68, 0x00, 0x17, 0x00172B0Eu);
 			await SendItemStat(client, id, 0x68, 0x00, 0x08, 0xFFFFFFFFu);
 			await SendItemStat(client, id, 0x68, 0x00, 0x17, 0x00172B0Fu);
+
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddItem)
 				.WriteArray(0x00, 0x00, 0x00, 0x68)
@@ -1061,9 +1063,11 @@ namespace Faolan.GameServer.CreateFlow
 					0x03, 0x15, 0xBF, 0x46, 0xE0, 0x60, 0x1D, 0x28, 0x3D, 0x92, 0x84, 0x25, 0x52, 0xF2, 0xD0, 0xBA, 0x25, 0x50, 0xF2, 0x04, 0x00, 0x2D, 0x50, 0xF2, 0x04, 0x00, 0x38, 0x01, 0x45, 0x31, 0x43, 0x50, 0x4F, 0x00, 0x00,
 					0x00, 0x00)
 				.SendAsync(client);
+
 			await SendItemStat(client, id, 0x68, 0x01, 0x17, 0x00172B10u);
 			await SendItemStat(client, id, 0x68, 0x01, 0x08, 0xFFFFFFFFu);
 			await SendItemStat(client, id, 0x68, 0x01, 0x17, 0x00172B11u);
+
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddItem)
 				.WriteArray(0x00, 0x00, 0x00, 0x68)
@@ -1074,9 +1078,11 @@ namespace Faolan.GameServer.CreateFlow
 					0x82, 0x15, 0x3F, 0x46, 0xC4, 0x11, 0x1D, 0xE4, 0x1C, 0xAB, 0x25, 0x25, 0x6F, 0xA0, 0xAB, 0xD1, 0x25, 0xE2, 0xF1, 0x04, 0x00, 0x2D, 0xE2, 0xF1, 0x04, 0x00, 0x38, 0x01, 0x45, 0x39, 0x57, 0x39, 0x4D, 0x00, 0x00,
 					0x00, 0x00)
 				.SendAsync(client);
+
 			await SendItemStat(client, id, 0x68, 0x02, 0x17, 0x00172B12u);
 			await SendItemStat(client, id, 0x68, 0x02, 0x08, 0xFFFFFFFFu);
 			await SendItemStat(client, id, 0x68, 0x02, 0x17, 0x00172B13u);
+
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchAddItem)
 				.WriteArray(0x00, 0x00, 0x00, 0x68)
@@ -1086,16 +1092,21 @@ namespace Faolan.GameServer.CreateFlow
 					0xD2, 0xC7, 0xED, 0x8D, 0x12, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6, 0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25, 0xD2, 0xC7, 0xED, 0x8D, 0x1A, 0x14, 0x0D, 0x99, 0xBF, 0x60, 0xDD, 0x15, 0xF6,
 					0x73, 0x09, 0x76, 0x1D, 0xCA, 0xED, 0x49, 0x79, 0x25, 0xD2, 0xC7, 0xED, 0x8D, 0x25, 0x15, 0x4B, 0x33, 0x00, 0x2D, 0x15, 0x4B, 0x33, 0x00, 0x38, 0x01, 0x45, 0x35, 0x50, 0x55, 0x43, 0x00, 0x00, 0x00, 0x00)
 				.SendAsync(client);
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR,
-				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 1, 8, 0, 0, 0x10, 0x0004F250, "OPC1", [0x03, 0x7A, 0xC2, 0xFE, 0x60, 0xE0, 0x46, 0xBF, 0x84, 0x92, 0x3D, 0x28, 0xBA, 0xD0, 0xF2, 0x52]));
+
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 1, 8, 0, 0, 0x10, 0x0004F250, "OPC1", [0x03, 0x7A, 0xC2, 0xFE, 0x60, 0xE0, 0x46, 0xBF, 0x84, 0x92, 0x3D, 0x28, 0xBA, 0xD0, 0xF2, 0x52]));
+
 			await SendItemStat(client, id, 0x65, 0x10, 0x17, 0x00172B15u);
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR,
-				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 2, 8, 0, 1, 0x05, 0x0004F1E2, "M9W9", [0x82, 0x53, 0x0E, 0xE7, 0x11, 0xC4, 0x46, 0x3F, 0x25, 0xAB, 0x1C, 0xE4, 0xD1, 0xAB, 0xA0, 0x6F]));
+
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 2, 8, 0, 1, 0x05, 0x0004F1E2, "M9W9", [0x82, 0x53, 0x0E, 0xE7, 0x11, 0xC4, 0x46, 0x3F, 0x25, 0xAB, 0x1C, 0xE4, 0xD1, 0xAB, 0xA0, 0x6F]));
+
 			await SendItemStat(client, id, 0x65, 0x05, 0x17, 0x00172B17u);
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR,
-				CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 3, 8, 0, 2, 0x12, 0x00334B15, "CUP5", [0xDD, 0x60, 0xBF, 0x99, 0x76, 0x09, 0x73, 0xF6, 0x79, 0x49, 0xED, 0xCA, 0x8D, 0xED, 0xC7, 0xD2]));
+
+			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(id, 9, 42011, 3, 8, 0, 2, 0x12, 0x00334B15, "CUP5", [0xDD, 0x60, 0xBF, 0x99, 0x76, 0x09, 0x73, 0xF6, 0x79, 0x49, 0xED, 0xCA, 0x8D, 0xED, 0xC7, 0xD2]));
+
 			await SendItemStat(client, id, 0x65, 0x12, 0x17, 0x00172B19u);
+
 			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x00, 0x0360, 0x03)); // #189: was verbatim
+
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000012Cu));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00000708u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001770u));
@@ -1114,13 +1125,16 @@ namespace Faolan.GameServer.CreateFlow
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002070u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00002071u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000020D0u));
+
 			await AddSpecialAbility(0x000BBC46u);
 			await AddSpecialAbility(0x000BBC47u);
 			await AddSpecialAbility(0x000BBC4Bu);
 			await AddSpecialAbility(0x00329B83u);
 			await AddSpecialAbility(0x003815C0u);
 			await AddSpecialAbility(0x0039E783u);
+
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003520u));
+
 			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416544u));
 			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416541u));
 			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416542u));
@@ -1133,16 +1147,21 @@ namespace Faolan.GameServer.CreateFlow
 			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416547u));
 			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416543u));
 			await Iir(GameServer0X2000Opcodes.ComboBookIIR, CreateEditorRecordBuilder.BuildComboBookIir(id, 0x00416549u));
+
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00003908u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0001E5F0u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DBC0u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0004DD50u));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000503FCu));
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x000504C4u));
+
 			await AddSpecialAbility(0x004B3EC8u);
+
 			await Iir(GameServer0X2000Opcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
+
 			await Iir(GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x08)); // #189: was verbatim
 			await Iir(GameServer0X2000Opcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
+
 			return;
 
 			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)

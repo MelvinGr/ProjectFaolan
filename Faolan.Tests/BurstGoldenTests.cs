@@ -2,8 +2,11 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Database;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
 
@@ -55,7 +58,9 @@ namespace Faolan.Tests
 		[Fact]
 		public Task WorldPrepBurst_IsByteStable()
 		{
-			return AssertBurstStable("WorldPrepBurst", CreateFlowService.SendWorldPrepBurst);
+			// Needs a DB: the starting-ability grants are now built from Ability rows (GetAbility) rather than verbatim,
+			// so the burst reproduces the golden only when the committed faolan.db supplies the 7 abilities.
+			return AssertBurstStable("WorldPrepBurst", c => CreateFlowService.SendWorldPrepBurst(c, Repo()));
 		}
 
 		private static async Task AssertBurstStable(string name, Func<RecordingNetworkClient, Task> run, uint instance = TestInstance)
@@ -80,6 +85,19 @@ namespace Faolan.Tests
 		private static string GoldenDir([CallerFilePath] string thisFile = "")
 		{
 			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
+		}
+
+		private static DatabaseRepository Repo([CallerFilePath] string thisFile = "")
+		{
+			var db = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "faolan.db");
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={db};Mode=ReadOnly").Options;
+			return new DatabaseRepository(new Factory(options));
+		}
+
+		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext() => new(options);
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default) => Task.FromResult(new DatabaseContext(options));
 		}
 	}
 }

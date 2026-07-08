@@ -226,9 +226,12 @@ namespace Faolan.GameServer
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
 		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
 		// level-up), false for the silent per-login re-grant.
-		private static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true)
+		// `sender` defaults to the login/world grant sender (GameCharAgent 0x58); the create-editor world-prep grant
+		// rides its own conversation (GameCharAgent 0x0C), so it passes that in - the only thing that differs between
+		// the two grant sites (the 81-byte body incl. the TEA key comes wholly from the Ability row either way).
+		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, byte[] sender = null)
 		{
-			return new PacketStream().WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility).WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
+			return new PacketStream().WriteHeader(sender ?? LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility).WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)).SendAsync(client);
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute
