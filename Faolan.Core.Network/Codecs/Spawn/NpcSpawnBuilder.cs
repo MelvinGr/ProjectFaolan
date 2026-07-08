@@ -120,7 +120,7 @@ namespace Faolan.Core.Network.Codecs
 		// builder: header constants + handle; transform = [2C 0A <vec3 LE> 12 <quat LE> 18 <token varint>]; pre-IIR =
 		// NpcSpawnPreIir.BuildMinimal; the CoreChar header [41][X][msgLen] with X = the lifted IirHeader; the serialised
 		// CharacterIIR message; and the post-IIR: the appearance/morph table when `morphs` are given, else the minimal
-		// form with `minimalRecordCount` (1 = the animal shape, 2 = the no-morph humanoid shape - #243).
+		// form with `minimalRecordCount` (the type-stable 1 or 2 - #243).
 		// Byte-identical to the freshSpawn TryBuild output for animals + clean-appearance humanoids + no-morph humanoids
 		// (verified in NpcSpawnFromScratchTests). Humanoids whose captured post-IIR carries runtime state (not a clean
 		// morph table) are NOT expressible here - the caller keeps their captured Data (the #243 residual tail).

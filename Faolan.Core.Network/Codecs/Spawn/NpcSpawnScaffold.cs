@@ -39,9 +39,11 @@ namespace Faolan.Core.Network.Codecs
 		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
 		private const uint HeaderWord0 = 0;
 
-		// The record-group count in the minimal form. ANIMALS ship recordCount == 1; a no-morph HUMANOID ships the
-		// byte-identical 41-byte body but with recordCount == 2 (RE of the #243 tail: 148 equipped NPCs carry exactly
-		// this - the minimal form with count == 2, no appearance entries). BuildMinimalPostIir(2) reproduces them.
+		// The record-group count in the minimal (no-morph) form: observed as 1 or 2. A TYPE-STABLE constant (no type
+		// ships both) whose meaning isn't decoded - NOT an animal-vs-humanoid split (both values carry people AND
+		// creatures; the names below are historical, from the beach-burst sample where the animals happened to be 1 and
+		// the no-morph humanoids 2). BuildMinimalPostIir(rc) reproduces either; the type's value is stored in
+		// NpcStatCore.MinimalPostIirRecordCount (#243).
 		public const uint MinimalRecordCount = 1;
 		public const uint MinimalHumanoidRecordCount = 2;
 
@@ -64,7 +66,7 @@ namespace Faolan.Core.Network.Codecs
 		}
 
 		// True iff `body`'s post-IIR is EXACTLY the minimal no-morph form (the constant 41-byte body) - the fresh
-		// shape a no-morph NPC ships. `recordCount` is 1 (the animal shape) or 2 (the humanoid shape); a from-scratch
+		// shape a no-morph NPC ships. `recordCount` is the type-stable 1 or 2 (see MinimalRecordCount); a from-scratch
 		// build re-emits BuildMinimalPostIir(recordCount) for such a spawn (#243). Returns false for appearance-bearing
 		// post-IIRs (they carry a morph table) and runtime-bearing forms (larger than the minimal body) - those aren't
 		// the minimal shape, so their fresh recordCount isn't derivable from this capture.

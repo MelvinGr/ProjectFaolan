@@ -700,7 +700,7 @@ namespace Faolan.Importer.Captures
 		{
 			var byTemplate = await db.Npcs.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
 
-			// #243: the fresh minimal post-IIR recordCount per type (1 = animal shape, 2 = no-morph humanoid shape),
+			// #243: the fresh minimal post-IIR recordCount per type (the type-stable 1 or 2, not an animal/humanoid split),
 			// read from a minimal-form CAPTURE (the dump-file body, e.Data) - NOT the stored NpcSpawn.Data column, which
 			// is being retired. Type-stable (no type ships both counts); scans each template's dump entries for a
 			// genuine minimal-form body. Lets a no-morph humanoid build its post-IIR from scratch (BuildMinimalPostIir(rc))

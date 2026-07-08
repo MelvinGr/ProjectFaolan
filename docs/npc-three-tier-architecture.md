@@ -111,12 +111,14 @@ from typed columns.
       until the player enters (a 2026-07-08 regression baked the load-time token + dropped the re-stamp,
       stalling world entry).
 - [x] #243: **the live path now builds 964/988 shipped spawns from scratch (was 786); only 24 keep `Data`.**
-      Two RE'd humanoid post-IIR shapes are now constructed from columns:
-      - **no-morph humanoids**: a 41-byte post-IIR byte-identical to the ANIMAL minimal form except
-        `recordCount` (1 = animal shape, 2 = humanoid shape) and no morph entries. The count is TYPE-STABLE
-        (no type ships both), lifted by the importer from a minimal-form CAPTURE (the dump body, not the retiring
+      Two RE'd post-IIR shapes are now constructed from columns:
+      - **no-morph NPCs**: the 41-byte minimal post-IIR with a `recordCount` of 1 or 2 and no morph entries. The
+        count is TYPE-STABLE (no type ships both) but its meaning is undecoded and is NOT an animal/humanoid split
+        (both values carry people AND creatures - Kalanthes/merchants are 1, Saddur/guards are 2, Wolf/Chicken are 2,
+        Cobra is 1). Lifted by the importer from a minimal-form CAPTURE (the dump body, not the retiring
         `NpcSpawn.Data`) into `NpcStatCore.MinimalPostIirRecordCount`; `BuildFromScratch` emits
-        `BuildMinimalPostIir(rc)` for them.
+        `BuildMinimalPostIir(rc)` for them. Verified in-client 2026-07-08: Kalanthes (rc=1) + Saddur (rc=2) render
+        with correct head/hair.
       - **runtime-bearing-with-morphs**: a large first record (movement/bounds float triples) with the **morph
         table embedded after it** at `12 + firstRecordLen` (`[count][morphId f32 0 0 strLen str]…` + the shared
         0x3F1 terminator). `NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient` skips the runtime record and lifts
