@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decode the ScryScript cutscene sequence (IIR 0xA36D3B74 = ScryScriptIIR_c) from a capture.
 
-ScryScriptIIR is one of the 3 protobuf IIRs that map to a wire sub-opcode (docs/re/opcode-re-plan.md Stage 5 #3).
+ScryScriptIIR is one of the 3 protobuf IIRs that map to a wire sub-opcode3)#3).
 The body is `ProtoScryScriptIIR` (Faolan.Core/Protobuf/aoc-client-protos.proto): a cutscene/scry script
 control message. The create-world intro (TODO #7) is a sequence of these: PreloadAssets (carries the RDB resource
 manifest the client must load!) -> PlayOrSkip -> StartScriptGroupOnClient -> ScriptMessage(ThisIsKalanthes/...).

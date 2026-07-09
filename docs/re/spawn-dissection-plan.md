@@ -1,5 +1,9 @@
 # Plan: dissect the verbatim world packets → load players & NPCs from the DB
 
+> **STATUS: COMPLETE — kept as the byte-level derivation reference, not open work.** The verified per-message
+> index + coverage are [`../protocol/gen/messages.md`](../protocol/gen/messages.md) and
+> [`../protocol/gen/coverage.md`](../protocol/gen/coverage.md).
+
 > ## ⭐ DISSECTION STATUS 2026-06-11 — the byte-level dissection is COMPLETE for every major world packet family.
 > Each captured world packet now parses into a typed model and rebuilds **byte-exact** (the gate for this whole
 > plan), verified by round-trip over the capture corpus:

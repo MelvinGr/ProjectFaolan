@@ -1,5 +1,9 @@
 # Plan: extract game data from the client RDB files
 
+> **STATUS: COMPLETE — kept as the derivation reference, not open work.** The live extraction pipeline is the
+> module-based importer ([`../tooling/importer-plan.md`](../tooling/importer-plan.md)); the recovered asset
+> formats are documented in this folder (`rdb-type-catalog.md`, `gear-rendering.md`, `skeleton-grammar.md`, …).
+
 ## Why
 
 Across this project the recurring wall is **"the client renders that from its local RDB, the server never sends

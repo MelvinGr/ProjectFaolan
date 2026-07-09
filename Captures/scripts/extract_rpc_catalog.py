@@ -81,7 +81,7 @@ tot_c2s = sum(len(v["client_to_server"]) for v in result.values())
 tot_s2c = sum(len(v["server_to_client"]) for v in result.values())
 out = []
 out.append("# AoC client RPC method catalog (extracted from AgeOfConan.exe)\n")
-out.append("Stage 1 of `docs/re/opcode-re-plan.md`. Recovered from the client's own log strings - method **names**,\n"
+out.append("Recovered from the client's own log strings - method **names**,\n"
            "**param names/types**, and **direction**. (Numeric ids: opcodes are framework-assigned - see\n"
            "`docs/re/aoc-opcode-ids.md`; the IIR/message + endpoint ids are BKDR-31 name hashes, decoded there.)\n")
 out.append(f"\n**{len(result)} interfaces, {tot_c2s} client->server (proxy) methods, {tot_s2c} server->client (dispatch) methods.**\n")

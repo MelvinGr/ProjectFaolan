@@ -396,7 +396,7 @@ namespace Faolan.ClientLauncher
 			}
 
 			// Patch the client's embedded DH pubkey (Funcom -> CELLAO) in memory so the server can validate the
-			// password (the in-launcher port of tools/patch_aoc_login_key.py). Runs alongside the client; needs
+			// password (LoginKeyPatcher). Runs alongside the client; needs
 			// ptrace permission (sudo if it can't); harmless if skipped.
 			if (patchLogin && !OperatingSystem.IsWindows())
 				Task.Run(() => LoginKeyPatcher.PatchWhenReady());

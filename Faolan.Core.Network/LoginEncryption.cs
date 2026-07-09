@@ -13,7 +13,7 @@ namespace Faolan.Core.Network
 	// AoC login crypto: Diffie-Hellman (prime N, g=5) key agreement + TEA-CBC. The client sends
 	// "<clientPub hex>-<TEA-CBC ciphertext hex>"; the low 128 bits of the DH shared secret are the TEA key. The
 	// server reproduces the secret with its OWN private key - which only works if the client used OUR public key
-	// (CELLAO_PUB), i.e. a patched/launched client (see docs/re/login-decryption-plan.md + tools/patch_aoc_login_key.py).
+	// (CELLAO_PUB), i.e. a patched/launched client (see docs/protocol/01-crypto.md + Faolan.ClientLauncher/LoginKeyPatcher.cs).
 	// An unpatched retail client uses Funcom's public key, so Decrypt returns garbage that fails the challenge check
 	// -> the caller falls back to accept-any. Algorithm validated by round-trip (docs plan, 2026-06-08).
 	public static class LoginEncryption
@@ -33,7 +33,7 @@ namespace Faolan.Core.Network
 		// 1024-bit safe prime + generator, baked into the client.
 
 		// Our (CellAO/Faolan) DH keypair. ServerPrivate stays server-side; ServerPublic is what gets patched into
-		// the client in place of Funcom's key (tools/patch_aoc_login_key.py / the FaolanLauncher).
+		// the client in place of Funcom's key (Faolan.ClientLauncher/LoginKeyPatcher.cs / the FaolanLauncher).
 		private static readonly BigInteger ServerPrivate = ParseHex("7ad852c6494f664e8df21446285ecd6f400cf20e1d872ee96136d7744887424b");
 
 		/// <summary>

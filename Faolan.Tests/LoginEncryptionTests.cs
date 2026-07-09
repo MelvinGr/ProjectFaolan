@@ -7,7 +7,7 @@ namespace Faolan.Tests
 {
 	// Self-contained round-trip for the AoC login crypto (DH g=5 over the 1024-bit prime + TEA-CBC). Simulates a
 	// PATCHED client (BuildClientLoginKey encrypts against our public key) and decrypts server-side with our private
-	// key - no game client needed. See docs/re/login-decryption-plan.md (work item 2).
+	// key - no game client needed. See docs/protocol/01-crypto.md.
 	public class LoginEncryptionTests
 	{
 		// A 32-byte client DH private (big-endian, unsigned). Arbitrary but fixed for determinism.

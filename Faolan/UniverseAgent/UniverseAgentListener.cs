@@ -55,7 +55,7 @@ namespace Faolan.UniverseAgent
 					var account = client.Session.Account;
 
 					// Decrypt the DH+TEA login block. This only succeeds for a PATCHED client (one using our DH
-					// public key - see tools/patch_aoc_login_key.py). When it decrypts and the challenge round-trips
+					// public key - see Faolan.ClientLauncher/LoginKeyPatcher.cs). When it decrypts and the challenge round-trips
 					// we enforce the real password; an unpatched client (block undecryptable to us, or a challenge
 					// mismatch) keeps the legacy accept-any behaviour, so turning this on never breaks login.
 					var credentials = LoginEncryption.Decrypt(loginKey);

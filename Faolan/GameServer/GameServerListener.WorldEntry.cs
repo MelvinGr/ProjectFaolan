@@ -620,7 +620,7 @@ namespace Faolan.GameServer
 		// login - the `Abilities` table, imported from the retail grants by CaptureAbilityImporter (3 Normal Attack
 		// directions + toggle-combat / switch-weapon / utility). Sent on the spawn conversation (same family as the
 		// 0x201c handshake), after the world has been built. (Class-specific SPELLS are a separate, not-yet-decoded
-		// grant - no capture exercises it; see TODO #3 / docs/re/opcode-re-plan.md.)
+		// grant - no capture exercises it; see TODO #3.)
 		private async Task GrantCharacterAbilities(INetworkClient client)
 		{
 			var character = client.Session.Character;

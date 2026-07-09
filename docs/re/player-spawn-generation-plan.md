@@ -1,5 +1,9 @@
 # Player spawn generation — COMPLETE (reference)
 
+> **STATUS: COMPLETE — kept as the byte-level derivation reference, not open work.** The verified per-message
+> index is [`../protocol/gen/messages.md`](../protocol/gen/messages.md) (`SimpleCharFullUpdateIIR`); the executable
+> spec is the codec (`PlayerSpawnScaffoldCodec`), golden-tested.
+
 Goal (chosen 2026-06-10, finished the same day over two sessions): generate the player's own
 `SimpleCharFullUpdate` (0xFA015807) spawn entirely from DB character data — name, race, sex, level, vitals,
 **full equipment rendering**, and the surrounding scaffold frame — so the server embeds no captured spawn bytes.

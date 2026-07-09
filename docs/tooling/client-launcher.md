@@ -5,7 +5,7 @@ automated, capture-backed integration testing. Proven end-to-end 2026-06-10 (log
 
 Pieces: **`Faolan.ClientLauncher`** (launches + drives the client), the **server** (`Faolan` project), **loopback
 packet capture** (`tshark`/`dumpcap` on `lo`), and the existing **analyzer/diff** tooling (`Captures/*.py`,
-`Faolan.PacketAnalyzer`). Related: [login-decryption-plan.md](../re/login-decryption-plan.md),
+`Faolan.PacketAnalyzer`). Related: [01-crypto.md](../protocol/01-crypto.md),
 README "Client launch flags".
 
 ---
@@ -100,10 +100,10 @@ after the client has read it rather than holding for the whole session.
 
 ## 4. Login password validation (optional)
 
-AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [login-decryption-plan.md](../re/login-decryption-plan.md)).
+AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [01-crypto.md](../protocol/01-crypto.md)).
 By default any password is accepted. To enforce the real password, the client must use **our** DH public key:
 
-- **`--patch-login`** (or `tools/patch_aoc_login_key.py`) overwrites the client's embedded Funcom DH pubkey with
+- **`--patch-login`** overwrites the client's embedded Funcom DH pubkey with
   CELLAO_PUB in `/proc/<pid>/mem` (copy-on-write — the game file is untouched). Needs ptrace permission.
 - Server side: `Faolan.Core/Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
@@ -172,5 +172,5 @@ create-world loopback-capture diff (its pinned next step needed exactly this rep
 - `Faolan.ClientLauncher/Program.cs`, `LoginKeyPatcher.cs` — the launcher.
 - `Faolan.Core/Crypt/ConanLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
 - `Faolan.Core/Network/LoginEncryption.cs` — server-side DH+TEA login decrypt.
-- `tools/patch_aoc_login_key.py` — standalone in-memory DH-key patcher (the launcher ports this).
+- `Faolan.ClientLauncher/LoginKeyPatcher.cs` — the in-memory DH-key patcher, invoked by `--patch-login`.
 - `launchClient.sh` — the Proton launch env the launcher mirrors.

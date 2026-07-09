@@ -95,7 +95,7 @@ for fn in sorted(glob.glob(os.path.join(CAPDIR, "*.tshark.json"))):
 # --- emit ---
 out = []
 out.append("# AoC wire-id decode (BKDR-31 name hash) - all servers\n")
-out.append("Stage 3 of `docs/re/opcode-re-plan.md`. The client id hash is **BKDR-31** (`h = h*31 + c`, Java's\n"
+out.append("The client id hash is **BKDR-31** (`h = h*31 + c`, Java's\n"
            "`String.hashCode`), cracked in Stage 2 (18/18 known anchors). Ids below are resolved by hashing every\n"
            "identifier in `AgeOfConan.exe` and matching. `[?]` = no exe string hashes to it (name not in binary, or\n"
            "a collision picked wrong); 16-bit RpcHeader opcodes are method indices, not hashes (see Stage 3b).\n")

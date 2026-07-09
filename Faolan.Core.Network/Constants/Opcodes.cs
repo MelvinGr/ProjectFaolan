@@ -603,7 +603,7 @@ namespace Faolan.Core.Network.Constants
 
 	// Every 32-bit sub-opcode carried inside a 0x2000 packet is an "IIR" (Incremental Information Replication)
 	// message id = the BKDR-31 hash of the client's IIR C++ type name (h = h*31 + c; == Java String.hashCode),
-	// recovered by RE'ing AgeOfConan.exe (docs/re/opcode-re-plan.md + docs/re/aoc-opcode-ids.md). Members are named
+	// recovered by RE'ing AgeOfConan.exe (docs/re/aoc-opcode-ids.md). Members are named
 	// after the real client type (with the _t/_c template suffix dropped); the comment gives the exact type and
 	// the occurrence count across all captures. This is the full catalog of every IIR id observed on the wire
 	// (server->client AND client->server - the id is the message type, direction-independent), even ones the
