@@ -161,7 +161,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("  or the `<Name>Iir` identifier somewhere in the server), but no byte-exact golden guards it yet.");
 			sb.AppendLine("- **V1** — no server code references it by opcode member or `<Name>Iir` identifier. Either genuinely");
 			sb.AppendLine("  undecoded, OR built by an inconsistently-named builder the scan can't attribute (the builder-naming");
-			sb.AppendLine("  cleanup that would collapse this ambiguity is tracked in Gitea).");
+			sb.AppendLine("  cleanup that would collapse this ambiguity is Gitea #317).");
 			sb.AppendLine();
 			sb.AppendLine("**Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit");
 			sb.AppendLine("opcode→handler map, so their per-body decode status is not auto-correlated here — only their");

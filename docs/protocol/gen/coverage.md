@@ -20,7 +20,7 @@ Every opcode is named (V1). That is NOT the same as its message body being decod
   or the `<Name>Iir` identifier somewhere in the server), but no byte-exact golden guards it yet.
 - **V1** — no server code references it by opcode member or `<Name>Iir` identifier. Either genuinely
   undecoded, OR built by an inconsistently-named builder the scan can't attribute (the builder-naming
-  cleanup that would collapse this ambiguity is tracked in Gitea).
+  cleanup that would collapse this ambiguity is Gitea #317).
 
 **Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit
 opcode→handler map, so their per-body decode status is not auto-correlated here — only their
