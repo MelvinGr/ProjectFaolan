@@ -12,7 +12,7 @@ it needs two connected clients. Pinned here until then. Memory: `protocol_agents
 |---|---|---|
 | **Channels** (~Global/~LFG/~Trial/~GlobalEnglish/~Playfield/~NewbieHelp/~Guild) | **AgentServer** (port `realm+...`) | `0x0041` |
 | **Local "say"** (the default chat box) | **GameServer** receives it, **AgentServer** delivers it | `0x2002` in → `0x0022` out |
-| (seen, not implemented) world/system chat | GameServer | `ChatTextIIR 0xE0B51102` (remoteformat XML) |
+| **World/system chat** (remoteformat XML) | GameServer | `ChatTextIIR 0xE0B51102` (out; `.syschat` GM cmd) |
 
 The AgentServer wire format is `[u16 opcode][u16 bodyLen][body]` (`AgentServerMessageFramer`).
 
@@ -42,7 +42,7 @@ The AgentServer wire format is `[u16 opcode][u16 bodyLen][body]` (`AgentServerMe
 A server-defined channel **"Claude"** (`04/0x00C1A0DE/flag 0x8044`, id far outside the retail range) is
 appended to the login subscription list. The whole bridge is gated on `"McpEnabled"` in `faolan.json`
 (default true): disabled = no MCP host, no channel subscription, no log capture. Player posts on it broadcast normally AND are recorded in the
-in-memory `ClaudeChannel` log (`Faolan.Core/Network/AgentServer/ClaudeChannel.cs`, ring of 500, monotonic
+in-memory `ClaudeChannel` log (`Faolan.Core.Network/Server/AgentServer/ClaudeChannel.cs`, ring of 500, monotonic
 sequence numbers). The MCP tools `read_claude_channel` (poll by `afterSequence`) and
 `send_claude_channel_message` bridge it to Claude; Claude's replies broadcast in-game as the synthetic
 sender `0xC1A0DE05`/"Claude" via the standard `0x0014`+`0x0041` relay pair. Log is not persisted across
@@ -61,8 +61,8 @@ restarts. In-client render of the channel is not yet verified (needs a live clie
 
 ## Not done / next (when revisited)
 
-> Tracked as Gitea issues (`area:aoc-systems` / `area:in-client`): in-client cross-player verification; world/system chat
-> (`ChatTextIIR`) → §8. The notes below are the technical context for those entries.
+> Tracked as Gitea issues (`area:aoc-systems` / `area:in-client`): in-client cross-player verification. The notes
+> below are the technical context for those entries. (World/system chat via `ChatTextIIR` now ships — see below.)
 
 - **In-client cross-player verification** (2+ clients): confirm a channel post reaches another player and a say is
   heard only within range.
@@ -79,8 +79,11 @@ offline target -> system message (uncaptured fallback). A tell to Claude's synth
 (`/tell Claude`, id learned from the channel's 0x0014) lands in the MCP bridge log as a private message.
 LIMIT: the client whispers by character ID it already knows (from a 0x0014 it has seen); whispering a name the
 client has never seen chat may involve a name-lookup exchange that is NOT in this capture.
-- **World/system chat via `ChatTextIIR` (0xE0B51102)** — a GameServer remoteformat-XML chat seen once in captures;
-  not implemented (the local-say `0x0022` path covers player say).
+- **World/system chat via `ChatTextIIR` (0xE0B51102)** — a GameServer remoteformat-XML chat line. Implemented (#103):
+  byte-exact `ChatTextCodec` (`Faolan.Core.Network/Codecs/Text/ChatTextCodec.cs`) proven by golden test
+  `ChatTextCodecTests.Build_FromParsedFields_MatchesCapture`, pushed via `SendWorldChat`; the `.syschat` GM command
+  sends the captured localized sample line. Remaining gap: an arbitrary-literal-text remoteformat template (the
+  `.syschat` bootstrap replays the captured line). The local-say `0x0022` path covers player say.
 - Tune `SayRangeUnits` if the in-client range feels off.
 
 ## The in-game Claude channel and the Claude Code channel bridge

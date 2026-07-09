@@ -22,7 +22,7 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
 1. **Every behavior request gets an echo-ack**: the request echoed with `seq+1` and **field3 spliced into
    the args, value = the request's own Mode** (NOT a server counter - the earlier "monotonic phase counter"
    read was Mode itself incrementing), tail echoed + 12 zero bytes appended
-   (`CombatService.BuildBehaviorEchoAckBody`).
+   (`BehaviorAckBody.BuildBehaviorEchoAckBody`).
 2. **Air swings (no target) get exactly that and nothing else** - armed and unarmed alike.
 3. **Targeted ARMED hits** additionally get the result-block ack variant (the 81-byte block with the
    damage slot and the `0x06 000000CB` constant - `SendNormalAttackResponse`), then `DamageResultIIR

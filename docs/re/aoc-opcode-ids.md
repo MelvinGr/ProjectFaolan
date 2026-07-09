@@ -562,7 +562,7 @@ by tabulating `(RpcHeader caller class, opcode)` across all capture JSONs (indep
 `SplitInventoryItem`, `ToggleVanityArmorFilter`, `AddShortcut`, `CloseLootBag`, `GameCharAgent.Ping`, the
 tradepost methods). On the multiplexed GameServer connection the dispatch key is `(class id, opcode)`; the
 small class tables top out early (TradepostAgent `0x2013`, project `0x200C`, GameAgent `0x200A`), so any value
-`>= 0x2014` is unambiguously GameCharAgent. Full per-class catalogs: `Faolan.Core/Network/Packets/Opcodes.cs`.
+`>= 0x2014` is unambiguously GameCharAgent. Full per-class catalogs: `Faolan.Core.Network/Constants/Opcodes.cs`.
 
 **s2c tables RESOLVED (2026-06-13, Ghidra):** the server→client "drift" is now fully explained and the true
 tables recovered from `AgeOfConan.exe`. The base is `0x2000` for every interface **except PlayerAgent/

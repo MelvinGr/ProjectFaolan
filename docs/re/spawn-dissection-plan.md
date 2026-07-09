@@ -4,6 +4,20 @@
 > index + coverage are [`../protocol/gen/messages.md`](../protocol/gen/messages.md) and
 > [`../protocol/gen/coverage.md`](../protocol/gen/coverage.md).
 
+> **NOTE (verified 2026-07): the opcode/IIR hex, byte offsets and field grammar in the body are accurate — that
+> is what this reference is for — but many *code/tool/path* references are 2026-06/07 snapshots that later
+> refactors (which this frozen doc predates) have moved or removed:** `SpawnPacketBuilder`/`SpawnHandleTable`
+> now live in `Faolan.Core.Network/Codecs/Spawn/` (not `Faolan/GameServer/Spawn/`); the `RetailLoginReplay`
+> class no longer exists — its `TryRebuildPlayerSpawnFromDb`/`ReplayMapWorldBurst`/`RewriteBurstInstance` logic
+> is now in `Faolan/GameServer/World/WorldBroadcaster.cs` + `GameServer/GameServerListener.WorldEntry.cs`, and
+> conversation replay in `GameServer/Dialogue/ConversationService.cs`; the create-editor `HandleCommandPacket`
+> handlers were folded into `CreateFlowService`; and `ArchiveDataImporter`, `ArchetypeHarvester`/
+> `ArchetypeHarvestRegenerator`, `Captures/scripts/extract_conversations.py`, the embedded `conversations-*.bin`/
+> `captured-items.tsv`, the `Faolan/GameServer/Packets/0x737A6DF9_Test/` tree and the whole
+> `Faolan.PacketAnalyzer[.Tests]` project are all gone (PacketAnalyzer retired in #82; item-identity harvest is
+> now `Faolan.Importer/Extractors/ItemHashHarvester.cs`; conversations are DB-driven via the `ConversationNode`
+> table). Trust the body for grammar, not for current symbol/file locations.
+
 > ## ⭐ DISSECTION STATUS 2026-06-11 — the byte-level dissection is COMPLETE for every major world packet family.
 > Each captured world packet now parses into a typed model and rebuilds **byte-exact** (the gate for this whole
 > plan), verified by round-trip over the capture corpus:
@@ -126,9 +140,9 @@ the existing `ProtoMessage` parser; the rest is differential.
 ## Tooling to build (Phase 0) — DONE
 
 Implemented: `Captures/scripts/dissect_spawn.py` (workbench: decodes handle/position/rotation/name per spawn, plus a
-`diff` mode); `Faolan/GameServer/Spawn/SpawnPacketBuilder.cs` (then template-based; the embedded
+`diff` mode); `Faolan.Core.Network/Codecs/Spawn/SpawnPacketBuilder.cs` (then template-based; the embedded
 `spawn-player-template.bin` has since been retired — spawns are generated, see the top banner);
-`Faolan/GameServer/Spawn/SpawnHandleTable.cs` (per-session unique/stable handle allocator, base 0x00090000);
+`Faolan.Core.Network/Codecs/Spawn/SpawnHandleTable.cs` (per-session unique/stable handle allocator, base 0x00090000);
 `SpawnPacketBuilderTests` byte-exact rebuild + `SpawnHandleTableTests` (the spawn tests now live in
 `Faolan.Tests/`). Phase 0 complete.
 

@@ -5,10 +5,10 @@ character's MaxHealth/attributes reflect worn gear and the regen bar can fill pa
 
 **Source.** The bonuses are NOT in our `Item` table or the old C++ `p_items` (both only carry name + the
 Data quad). They live in the **encrypted RDB item-template**, which we already TEA-decrypt (key = the item's
-Data1..4 quad; `RdbItemImporter`). Dump the decrypted templates with:
+`Key1..4` quad, stored as `Item.Key`; `RdbItemImporter`). Dump the decrypted templates with:
 
 ```
-dotnet run --project Faolan.Importer -- --skip-characters --rdb <RDB dir> --rdb-items --dump-templates <dir>
+dotnet run --project Faolan.Importer -- --only rdb-items --rdb <RDB dir> --dump-templates <dir>
 ```
 
 Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `Captures/scripts/decode_item_template.py`.
@@ -37,8 +37,8 @@ In practice only Str (178) and Dex (75) appear as the *primary* attribute.
    the amounts look too large to be raw attribute points (e.g. Con=30 on a Tortage bow), so the semantic
    (requirement? scaled? percentage?) is unconfirmed. **Needs a reference item with a known tooltip** to
    disambiguate before import.
-2. **Vital / HP gear bonuses — the actual bar-fill case.** NOT located. A raw scan found the HpMax (`0x1b`)
-   and StaminaMax (`0x1f9`) stat ids in some bodies, but on inspection those were coincidental field VALUES
+2. **Vital / HP gear bonuses — the actual bar-fill case.** NOT located. A raw scan found the HealthCurrent (`0x1b`)
+   and StaminaMax (`0x1f9`) stat ids in some bodies (HealthMax is actually `0x0001`), but on inspection those were coincidental field VALUES
    (e.g. field 286 = 505), not stat modifiers. The ring-`+HP` case that motivates #3 therefore can't be
    imported yet.
 

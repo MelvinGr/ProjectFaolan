@@ -35,7 +35,7 @@ These three are linted, not decorative: `ProtocolCitationTests` resolves each ag
 format's own proof — when first written they cited a test deleted with `SendWorldPrepBurst`, a capture whose
 name was literally `DemoL80_..._create-guild`, and a Ghidra script (`DumpRpcMethods.java`) that never existed.
 
-**The distinction that must never blur:** we can enumerate **100% of the 791 opcodes at V1** — they come from
+**The distinction that must never blur:** we can enumerate **100% of the 819 opcodes at V1** — they come from
 the client's method tables. But a *message body layout* only exists where a capture does. "The opcode exists"
 must never be presented as "the message is decoded." Today that difference is invisible in our docs.
 
@@ -48,9 +48,9 @@ must never be presented as "the message is decoded." Today that difference is in
 
 | File | Generated from | Content |
 |------|----------------|---------|
-| `gen/opcodes.md` | `Faolan.Core.Network/Constants/Opcodes.cs` | 17 interfaces × 791 entries, direction + class |
-| `gen/iir-types.md` | same | 74 32-bit sub-opcodes, each with its **BKDR-31 hash recomputed from the type name as proof** |
-| `gen/protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` | 56 messages, **with `ZigZag`/`Default` field flags surfaced** |
+| `gen/opcodes.md` | `Faolan.Core.Network/Constants/Opcodes.cs` | 17 interfaces × 819 entries, direction + class |
+| `gen/iir-types.md` | same | 75 32-bit sub-opcodes, 74 with their **BKDR-31 hash recomputed from the type name as proof** |
+| `gen/protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` | 60 messages, **with `ZigZag`/`Default` field flags surfaced** |
 | `gen/coverage.md` | the repo | the coverage matrix (below) |
 | `gen/messages.md` | the repo | per-message index: each IIR type → its codec + a cited golden (P5) |
 
@@ -68,7 +68,7 @@ methodology), not deleted. The generated `gen/opcodes.md` supersedes their *cata
 ## 3. The coverage matrix — how "every piece of info" becomes measurable
 
 For every opcode, generated from the repo: *has a codec? has a golden? has a dissector? highest verification
-level?* This converts the goal from a hope into a burndown — `X of 791 at V3, Y at V2, Z at V1-only, N unverified` —
+level?* This converts the goal from a hope into a burndown — `X of 819 at V3, Y at V2, Z at V1-only, N unverified` —
 and makes gaps **counted, not hand-waved**.
 
 It also drives the migration order (§6): document the V3 areas first, because those are provably correct.
@@ -90,7 +90,7 @@ Small in number, high in value — currently scattered across `CLAUDE.md` and ag
 
 ## 5. Per-message layouts — the long tail
 
-85 codecs. Skeleton generated from the codec + its golden; semantics hand-filled. **Ordered by verification
+40 codec classes. Skeleton generated from the codec + its golden; semantics hand-filled. **Ordered by verification
 level, V3 first.**
 
 ---
@@ -148,7 +148,7 @@ rather than guessed.
 ## 8. Phases
 
 - [x] **P0 — Runway.** Archive resolved handoffs; delete dead docs; create `protocol/` + `gen/`.
-- [x] **P1 — Generators.** `gen/opcodes.md` (819 entries), `gen/iir-types.md` (75, 73 BKDR-31-self-verified),
+- [x] **P1 — Generators.** `gen/opcodes.md` (819 entries), `gen/iir-types.md` (75, 74 BKDR-31-self-verified),
       `gen/protobuf.md` (60 msgs / 348 fields, zigzag + fixed32 surfaced), all from the COMPILED types by
       reflection, + the `ProtocolDocsTests` regeneration guard (proven to fail on a one-char drift).
 - [x] **P2 — Coverage matrix.** `gen/coverage.md`: 819 RPC opcodes (V1), 75 IIR types (48 V3 / 16 V2 / 11 V1).
@@ -181,5 +181,5 @@ rather than guessed.
       absorption candidates. Handoffs stayed with their category (both issues still open, so not archived).
 
 **Expectation to set now:** the finished reference contains *every piece of information we actually have, each
-tagged with how we know it, plus a complete and explicit list of what we do not.* Some of the 791 opcodes will
+tagged with how we know it, plus a complete and explicit list of what we do not.* Some of the 819 opcodes will
 never rise above V1 without new captures — the doc must say so **per opcode**, rather than leave a silent hole.

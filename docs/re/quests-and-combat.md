@@ -35,11 +35,11 @@ packet is the authoritative vitals broadcast; combat damage/heals land here as u
 **This also resolves the stat-block framing open question in `docs/subsystems/player-stats.md`: stat records are
 count-prefixed (a 1-byte count, then N × 8-byte records).** Confirmed lengths: count 1/3/6 → inner 25/41/65.
 
-**Implemented** (2026-06-08): `CharacterStatBlock` (`Faolan/GameServer/Packets/0x737A6DF9_Test/`) builds the
+**Implemented** (2026-06-08): `CharacterStatBlock` (`Faolan.Core.Network/Codecs/FullCharSnapshot/CharacterStatBlock.cs`) builds the
 count-prefixed record block (applies the ×100 vitals / ×10 attribute scale); `SendStatUpdate` / `SendVitals`
-(`Send0x2000_0x96B8DC59.cs`) write the full packet. `SendVitals(client)` sources Health/Stamina/Mana from the
+(`GameServerListener.Outbound.cs`, wire codec `Faolan.Core.Network/Codecs/World/StatUpdateCodec.cs`) write the full packet. `SendVitals(client)` sources Health/Stamina/Mana from the
 character's persisted **`CharacterMaxStats`** (now an active DbSet/table with a 1-1 cascade to Character,
-migration `AddCharacterMaxStats`), seeded on creation via `CharacterMaxStats.CreateDefaults(class, level)` —
+schema since squashed into the `InitialCreate` migration), seeded on creation via `CharacterMaxStats.CreateDefaults(class, level)` —
 rough class/level defaults anchored on assassinl23 (Assassin lvl 23 ≈ 1281/1143/73 vs sheet 1270/1148/74); legacy
 characters with no row fall back to computed defaults in-memory. The create-editor commits the chosen class
 before naming, so `CommitCharacterName` calls `Character.RegenerateMaxStats()` (updates the seeded row in place)

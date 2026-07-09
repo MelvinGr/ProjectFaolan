@@ -4,26 +4,29 @@ Recovered from `AgeOfConan.exe` via the vtable-xref method (`Captures/ghidra/Dum
 `DumpFullCharRecords.java`, slot 8 = `ReadSubClass`; see the agent memory `ghidra_vtable_xref_readers`).
 Goal (ACHIEVED for the tails, see Status): replace the captured `BeachTailsTemplate.bin` tails with a real,
 generated grammar so the `.bin` can be retired and the character's **class/progression** authored instead of
-inherited from Strie. `BeachTailsBuilder.BuildFromScratch` now reproduces the whole tails byte-for-byte from
-generated quest + a game-static access-window asset + the code stat skeleton; what remains is wiring it into
-the production world-entry + the in-client chat-connect check. See the memory
-`snapshot_tails_construction_scope`.
+inherited from Strie. `FullCharSnapshotSubClass.BuildFromScratch` reproduces the whole tails byte-for-byte from
+generated quest + a game-static access-window catalog + the code stat skeleton, and is now the LIVE production
+world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`, the burst-less entry #210 — the
+only world-entry path); the captured `BeachTailsTemplate.bin` survives only as the golden test oracle. See the
+memory `snapshot_tails_construction_scope`.
 
 ## Status & handover (2026-06-17, updated)
 
-**The WHOLE tails now build from scratch — no captured-tails template.** `BeachTailsBuilder.BuildFromScratch`
-assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`):
-- **quest portion** `@0..1292` — DB-generated (`BuildBeachQuestPortion`), wired into the production login
+**The WHOLE tails now build from scratch — no captured-tails template.** `FullCharSnapshotSubClass.BuildFromScratch`
+assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachSubClassFromScratchTests`):
+- **quest portion** `@0..1292` — DB-generated (`BuildQuestPortion`), wired into the production login
   snapshot (in-client verified 2026-06-16).
-- **access-window table** `@1292..7917` — carved out into its own game-static asset `AccessWindowTable.bin`
-  (the 172-entry `PFAccessWindow_` playfield catalog, identical for every character — reference data, not
-  generated).
-- **stat block** `@7917..end` — the code skeleton `TailsStatBlock.CreateFreshBlock` (313 fixed slots + ~14
-  character/map-derived, patched) serialized by `TailsStatBlock.Serialize`.
+- **access-window table** `@1292..7917` — carved out into the typed game-static catalog `AccessWindowCatalog`
+  (`Faolan.Core.Network/Constants/AccessWindowCatalog.cs`, #258; the 86-entry / 172 `PFAccessWindow_`-name
+  playfield catalog, identical for every character — reference data, not generated; the former
+  `AccessWindowTable.bin` blob is retired).
+- **stat block** `@7917..end` — the code skeleton `SubClassStatBlock.CreateFreshBlock` (313 fixed slots + ~14
+  character/map-derived, patched) serialized by `SubClassStatBlock.Serialize`.
 
 So the captured Strie tails are no longer needed to *author* a beach entry's tails. `BeachTailsTemplate.bin`
-now serves only as the golden test oracle; the remaining step is wiring `BuildFromScratch` into the burst-less
-world entry (#210) + an in-client chat-connect smoke test, after which the production FullChar tails are fully
+now serves only as the golden test oracle. **`BuildFromScratch` is now wired into the burst-less world entry
+(#210) — the ONLY world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`/
+`BuildBurstlessSnapshot`); the captured-burst tails are retired.** The production FullChar tails are fully
 generated. Branch `development`, all green (506 tests).
 
 **UPDATE 2026-06-19 — MULTI-QUEST journal generates byte-exact + WIRED LIVE (#255 closed, verified in-client; commit 431673c).**
@@ -38,44 +41,47 @@ Casilda 1 goal = `0x7E2`; the old `QuestObjectiveRegion.ChapterTag` const is now
 NAME word (beach `0x57365154` "W6QT", Casilda `0x52524C33" "RRL3") and the block trailers **CHAIN**: `linkWord` = the
 NEXT held quest's `AreaId`, the LAST block = the primary's `IndexTrailerWord`. **All record/objective/index scalars are
 PER-QUEST CONSTANTS** (byte-identical across a quest's active AND completed login captures — NOT progress-bearing; the
-beach record is the same fresh 601 B early or late). Builder: `BeachTailsBuilder.BuildQuestPortion(quests, primary,
+beach record is the same fresh 601 B early or late). Builder: `FullCharSnapshotSubClass.BuildQuestPortion(quests, primary,
 instance)` + a `BuildFromScratch(quests, primary, ...)` overload (beach-only delegates → byte-identical). New
 `QuestDefinition` cols: `SnapshotState`, `SnapshotField28`, `IndexMagic` (+migrations). A held quest joins the snapshot
-only if `BeachTailsBuilder.IsSnapshotEligible` (scalars + 5 header text refs seeded); others fall to the live
+only if `FullCharSnapshotSubClass.IsSnapshotEligible` (scalars + 5 header text refs seeded); others fall to the live
 `RestorePlayerQuests` path (no double-delivery). Golden: `BuildQuestPortionTests` reproduces the 2-quest region
 byte-for-byte. NB the 3 earlier in-client crashes were WRONG ASSEMBLY ORDER (records-then-objective + single-block
 index), NOT a progress/obj-list issue — the obj-lists are empty and the records are constants.
 
 DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Quest_c (`@0..609`)** — `QuestcRegion`/`QuestcRecord` codec (byte-exact round-trip), wired into
-  `SnapshotTails`, and `QuestcRecord.BuildSingle` GENERATES it from `faolan.db` (`QuestcGenerationTests`).
+  `FullCharSnapshotSubClass`, and `QuestcRecord.BuildSingle` GENERATES it from `faolan.db` (`QuestcGenerationTests`).
 - **`@609` objective region** — DECODED as a per-GOAL block (NOT a `BuildQuestFullUpdate` block — that was
   DISPROVEN: 559 B vs 869 B). Codec `QuestObjectiveRegion`/`QuestObjectiveGoal` (round-trip), wired into
-  `SnapshotTails`, and `QuestObjectiveGoal.BuildSingle` GENERATES it from the per-goal DB model.
+  `FullCharSnapshotSubClass`, and `QuestObjectiveGoal.BuildSingle` GENERATES it from the per-goal DB model.
 - **Quest INDEX (`@1168`)** — codec `QuestIndexRegion` (the `0x3F1` index + the `0x57365154` "W6QT" goal-id
-  table), wired into `SnapshotTails`, with a `Build` generator.
+  table), wired into `FullCharSnapshotSubClass`, with a `Build` generator.
 - **Per-goal `QuestDefinition` model** — `QuestGoalDefinition` table + the snapshot-generation columns
   (`SnapshotN/FieldEc/FieldF0/FieldF8`, `IndexMarker/TableField*/TrailerWord/GoalSteps`) + migration; seeded
   for the beach starter (importer `SeedBeachQuestGoals`). `BuildWholeQuestPortion_ReproducesBeachTails`
   proves `@0..1292` regenerates byte-exact with NO literals (only the per-character quest state).
-- **Production wiring (live, in-client verified 2026-06-16)** — `RetailLoginReplay` generates the quest portion
-  (`BeachTailsBuilder.BuildBeachQuestPortion`) and splices it over the captured tails' `@0..1292` unconditionally
-  (with a graceful fallback to the captured region on any failure); byte-identical for a fresh beach char. NB
-  `BeachTailsBuilder.Build`/`BuildFromScratch` are TEST-ONLY — production still uses the captured world-burst
-  tails for everything OUTSIDE the quest portion (the snapshot frame + stats), so retiring the burst entirely is
-  the #210 integration.
+- **Production wiring (live, in-client verified 2026-06-16 — INTERIM, since SUPERSEDED by #210)** — the (now
+  removed) `RetailLoginReplay` login-replay path generated the quest portion and spliced it over the captured
+  tails' `@0..1292` unconditionally (graceful fallback to the captured region on failure); byte-identical for a
+  fresh beach char. At that point `BuildFromScratch` was TEST-ONLY and production still shipped the captured
+  world-burst tails for everything OUTSIDE the quest portion. **That interim is retired: #210 landed, so
+  `FullCharSnapshotSubClass.BuildFromScratch` now builds the WHOLE tails and is the sole production path
+  (`GameServerListener.WorldEntry.cs`); there is no captured-burst splice anymore.**
 - **Stat block decoded** — `decode_statblock.py`: only 25 of 338 values vary across fresh chars (class/map/XP
-  + one session slot); the other 313 are a fixed skeleton, relocated to `TailsStatBlock`.
+  + one session slot); the other 313 are a fixed skeleton, relocated to `SubClassStatBlock`.
 
-DONE (2026-06-17): the **access-window table** (`[1292,7917)`, 172 `PFAccessWindow_` entries) was carved into
-its own game-static asset `AccessWindowTable.bin`, and the **stat skeleton** + its patches are assembled by
-`BeachTailsBuilder.BuildFromScratch` (serialized via `TailsStatBlock.Serialize`). Together with the generated
-quest portion, `BuildFromScratch` reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`).
+DONE (2026-06-17): the **access-window table** (`[1292,7917)`, 86 `PFAccessWindow_` entries / 172 name strings)
+was carved into the typed game-static catalog `AccessWindowCatalog` (#258; `AccessWindowTable.bin` retired), and
+the **stat skeleton** + its patches are assembled by `FullCharSnapshotSubClass.BuildFromScratch` (serialized via
+`SubClassStatBlock.Serialize`). Together with the generated quest portion, `BuildFromScratch` reproduces
+`BeachTailsTemplate.bin` byte-for-byte (`BeachSubClassFromScratchTests`).
 
-REMAINING (to fully retire the `.bin` from production — integration, NOT decode):
-1. Wire `BuildFromScratch` into the burst-less world entry (#210) so the player's own FullChar tails are
-   generated, not the burst's captured ones.
-2. **In-client chat-connect smoke test** — the acceptance gate for any byte-changing snapshot step.
+DONE (#210, since landed): both remaining integration steps below are complete —
+1. ✅ `BuildFromScratch` is wired into the burst-less world entry (#210); it is the ONLY world-entry path
+   (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`), so the player's own FullChar tails are
+   generated, not a captured burst's.
+2. **In-client chat-connect smoke test** — the standing acceptance gate for any byte-changing snapshot step.
 
 ## Multi-quest layout (2026-06-16) — toward authoring the player's full quest log
 
@@ -88,7 +94,7 @@ player's accepted quests on login from `CharacterQuests` (replacing the snapshot
 
 REMAINING to author multi-quest (the gating work, decode-first):
 1. **Decode the 2-quest `Quest_c` List A + `@609` objective region.** Pinpointed 2026-06-16: running the production
-   `SnapshotTails`/`QuestcRegion.Parse` on the `xxx-login` 2-quest tails THROWS `Quest_c record: listKey 3027 !=
+   `FullCharSnapshotSubClass`/`QuestcRegion.Parse` on the `xxx-login` 2-quest tails THROWS `Quest_c record: listKey 3027 !=
    questId 9` (3027 = `0xBD3` = the objective region's chapterTag). So after the two `Quest_c` records the parser runs
    into the `@609` objective region and reads its `0xBD3`/`[1][9]` as a third record's listKey - i.e. `QuestcRegion`'s
    List A model (validated only on the 1-quest beach, whose record's 4 objective sub-lists are EMPTY and consume
@@ -116,13 +122,13 @@ REMAINING to author multi-quest (the gating work, decode-first):
    record+objregion per quest. Disambiguating needs a **dynamic Ghidra trace** of `FUN_0091f5c0` (List A) +
    `FUN_00798c70`/`FUN_004d4c70`/`FUN_00922210` (Lists B/C/MainQuest) on the 2-quest tails to see which reader
    consumes @1065..1624. Then model the quest region as the real per-quest (record [+ objregion]) sequence in
-   `SnapshotTails`/`QuestcRegion` and regenerate from `CharacterQuests`.
+   `FullCharSnapshotSubClass`/`QuestcRegion` and regenerate from `CharacterQuests`.
 2. **Harvest 13479's snapshot scalars + goals** (`SnapshotN`/`FieldEc`/`FieldF0`/`FieldF8`, per-goal markers,
    `GoalSteps`, trailer word) into `QuestDefinition`/`QuestGoalDefinition` (seeded only for 10238 today).
-3. **Extend `BeachTailsBuilder.BuildBeachQuestPortion` → `BuildQuestPortion(IReadOnlyList<(def,state)>)`** — emit N
+3. **Extend `FullCharSnapshotSubClass.BuildQuestPortion` → `BuildQuestPortion(IReadOnlyList<(def,state)>)`** — emit N
    `Quest_c` records + the N-quest objective region + the N-id index; validate byte-exact against `xxx-login`'s
    2-quest region (golden test) before wiring.
-4. **Wire from `CharacterQuests`** via `SnapshotTails.Parse`→replace the 3 quest regions→`ToArray()` (variable
+4. **Wire from `CharacterQuests`** via `FullCharSnapshotSubClass.Deserialize`→replace the 3 quest regions→`ToArray()` (variable
    length; the access-window/stat regions follow) — drops the fixed `@0..1292` splice. Then in-client smoke test.
 
 ## Class id → reader
@@ -160,7 +166,7 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
 
 `CoreFullPlayerCharacterIIR::ReadSubClass` (`FUN_00797440`):
 
-1. `u32 version` — must == `0x18` (else `"...Wrong IIR_t version"`). This is `SnapshotTails.Header0`.
+1. `u32 version` — must == `0x18` (else `"...Wrong IIR_t version"`). This is `QuestcRegion.Version`.
 2. **List A — the quest journal** — `FUN_0091f5c0`: `0x3F1`-framed; `N-1` records of **`Quest_c`** (0x120-byte
    objects; the constructor `FUN_0091cf10` sets `Quest_c::vftable`), read by `FUN_0091df50` — see the per-record
    grammar below. **This is where the journal `<remoteformat>` XML lives** (the 5 header strings); it is the
@@ -211,12 +217,14 @@ Count `c = (recordCount + 1) * 0x3F1`. A *developed* char carries the class's wh
 = 108 records, RDB-catalog-derived, data-blocked); a **fresh** char carries only its learned spells (Faolanx
 necro = 2 records = its 2 create-spells `0x42CA77`/`0x125D9B`, count `0x0BD3`).
 
-In our beach tails (`BeachTailsTemplate.bin`) this list is **empty** at offset **`0x2425`** (count `0x03F1`),
-because the captured Strie was a fresh char with no spells — identified by the preceding landmark
-`00 00 00 00  00 00 02 90  00 00 00 00`. **This is why seeded spells vanish on relog and type-4 attacks don't
-place on the bar**: our snapshot never lists the character's own spells. The fix (insert the char's
-`CharacterSpells` as type-2 records into this region) is the focused follow-up in
-(#74).
+In the captured beach tails (`BeachTailsTemplate.bin`) this list is **empty** at offset **`0x2425`** (count
+`0x03F1`), because the captured Strie was a fresh char with no spells — identified by the preceding landmark
+`00 00 00 00  00 00 02 90  00 00 00 00`. That empty list is why seeded spells USED to vanish on relog and type-4
+attacks didn't place on the bar. **FIXED (#74):** the codec `KnownSpellList` (`FullCharSnapshotSubClass`'s
+folder) models this list, and `BuildFromScratch` builds the character's own learned spells into it — the live
+world entry loads `CharacterSpells` → `knownSpellIds` and passes them through (`GameServerListener.WorldEntry.cs`
+loads them at world entry; `KnownSpellList.FromSpellIds` emits the type-2 records inside the stat block), so the
+snapshot now lists the character's spells and they persist across relog + place on the bar.
 
 ## `Quest_c` per-record grammar (`FUN_0091df50`) — VALIDATED against `BeachTailsTemplate.bin`
 
@@ -284,9 +292,10 @@ model** (Gitea #186, remaining item 2).
 `WorldQuest.BuildQuestFullUpdate`" is **WRONG** for the beach starter. Empirically (`Snapshot609AnalysisTests`):
 `BuildQuestFullUpdate`'s content for 10238 is **869 B** and starts `[questId][1][questId][3][0][3][0x412]`,
 whereas the template's `@609` region is **559 B** starting `[0x0BD3][1][9][instance][questId][goalId]`. They
-differ at byte 2 — different grammars. `BuildSnapshotQuestBlock`/`SnapshotQuestInjector` (the
-`FAOLAN_SNAPSHOT_QUESTS` path) were validated against a *different* capture's 13479 block, not this region, so
-they do **not** reproduce the beach `@609`. Generation of the beach region is therefore **not** authored yet.
+differ at byte 2 — different grammars. (The now-removed `BuildSnapshotQuestBlock`/`SnapshotQuestInjector`
+`FAOLAN_SNAPSHOT_QUESTS` experiment was validated against a *different* capture's 13479 block, not this region,
+so it did **not** reproduce the beach `@609`.) The beach region IS now authored — by the dedicated codec
+`QuestObjectiveRegion.Build` (byte-exact, `QuestObjectiveRegionTests`), NOT by `BuildQuestFullUpdate`.
 
 **Reader (Ghidra) still partial.** Ruled out by byte layout: `QuestFullUpdateIIR::ReadSubClass` (= a `Quest_c`,
 no `ver==1·questId·…·0x412` header here), List B (`FUN_00922c90`, mis-frames on the 2nd ReadString),
@@ -298,7 +307,7 @@ grammar above is decoded — the blocker is the per-goal `QuestDefinition` model
 Validated by the dissector `Captures/scripts/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
 it consumes exactly to the objective-block boundary `@609`; `listKey == questId`). A C# codec
 `QuestcRegion`/`QuestcRecord` (Parse/ToArray + typed fields) round-trips the template's `@0–609` **byte-exact**
-(`QuestcRegionTests`) and is **wired into `SnapshotTails`** — it now models the tails' front region instead of
+(`QuestcRegionTests`) and is **wired into `FullCharSnapshotSubClass`** — it now models the tails' front region instead of
 the former opaque `Header0`/`Unknown*`/`RemoteFormat*` fields. The live snapshot is byte-identical (all 400
 tests pass, incl. `BeachSnapshotConstructionTests`). Generating DIFFERENT quests from a character's
 `CharacterQuests` is the next step (gated by an in-client chat-connect smoke test).
@@ -308,7 +317,8 @@ fieldF8)` assembles a record from a DB `QuestDefinition` (its 5 header text refs
 per-quest scalars not yet harvested into the definition (`N`, the `@0xf0`/`@0xf8` words). `QuestcGenerationTests`
 proves building the beach starter (10238) from `faolan.db` reproduces the template's `@0–609` byte-exact - the
 journal text is fully DB-sourced. Remaining for arbitrary quests: harvest `N`/`@0xf0`/`@0xf8` into
-`QuestDefinition`, and regenerate the `@609` objective block + index (already authored by `BuildQuestFullUpdate`).
+`QuestDefinition`, and regenerate the `@609` objective block + index (authored by `QuestObjectiveRegion.Build` +
+`QuestIndexRegion.Build`, NOT `BuildQuestFullUpdate`).
 
 So the human-readable journal text is entirely the **5 header strings**; the numeric objective records are
 unused for the beach starter (its objectives render from the strings). The raw wire emit is: `listKey` +
@@ -324,13 +334,13 @@ access-window table our heuristic finds by the `PFAccessWindow_` ASCII is one of
 `StatList_t`s (region 9–10). Every region is a `0x3F1`/plain-count list — **fully tractable**, same shape as
 the spawn/loot/movetask readers already regenerated.
 
-**EMPIRICAL DECOMPOSITION (#258, 2026-06-21).** `SnapshotTails.Deserialize` on the beach template now leaves
+**EMPIRICAL DECOMPOSITION (#258, 2026-06-21).** `FullCharSnapshotSubClass.Deserialize` on the beach template now leaves
 **ZERO opaque bytes** — `UnknownBefore = 0`, every byte falls into a typed region and `ToArray()` round-trips
 byte-exact: `Quests 609 + QuestObjectives 559 + QuestIndex 124 + AccessWindowEntries (86 entries, 6625 B) +
 PostAccessBlock (338 vals, 1365 B) = 9282`. So the beach tails are **fully decoded**; List B and the other
 "middle" lists are empty (count-only). The `PFAccessWindow_` strings our heuristic walks are NOT List B — they
 are a flat playfield-entry table (`u32 playfieldId, u8 section, u32 kind, u32, string name, …, childMode`) that
-`SnapshotTails` ALREADY parses into typed `PfAccessWindowEntry` records. It is **game-static**: beach and the
+`FullCharSnapshotSubClass` ALREADY parses into typed `PfAccessWindowEntry` records. It is **game-static**: beach and the
 developed NecroL80 snapshot both carry the SAME **172** `PFAccessWindow_` name strings — i.e. it is reference
 data, identical for every character, not per-character progression.
 
@@ -339,26 +349,35 @@ Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin
   template (above); a fresh single-quest record is authorable from `(questId, state, areaId, N, 5 text tokens)`.
 - **List B et al. — NO WORK NEEDED:** empirically empty (above); the from-scratch builder already omits them
   and stays byte-exact.
-- **Access-window table — decoded, not generated:** the only thing still shipped verbatim
-  (`AccessWindowTable.bin`). Since it is game-static (172-entry catalog) and already round-trips through the
-  typed `PfAccessWindowEntry` model, "retiring the `.bin`" is a mechanical refactor (emit the 86 typed entries
-  from a code/DB catalog) for the #193 construct-don't-replay purity goal — NOT a decode. No per-character
-  generation is required (it's identical for every char).
+- **Access-window table — DONE (#258):** the former verbatim `AccessWindowTable.bin` blob is retired. It is
+  game-static (86 typed entries / 172 `PFAccessWindow_` names) and round-trips through the typed
+  `PfAccessWindowEntry` model, so it now emits from the code catalog `AccessWindowCatalog`
+  (`Faolan.Core.Network/Constants/AccessWindowCatalog.cs`) via `SerializeAccessWindowEntries` — byte-identical to
+  the captured region, no per-character generation (identical for every char). This closes the #193
+  construct-don't-replay purity goal for the tails.
 
 Dumps: `/home/melvin/Development/Ghidra/Aoc/fullchar_reader.txt`, `/home/melvin/Development/Ghidra/Aoc/fullchar_records.txt` (regenerate with the two
 scripts above).
 
-## Per-character CLASS + stats are NOT regenerated yet (2026-06-17, #239/#4/#186)
-The beach snapshot is the captured **Strie** packet (an Assassin = **Rogue**); the login path patches level /
-current vitals / quest / containers but **not the class or class-derived stats**, so every character ships
-Strie's Rogue identity (sheet shows "Barbarian", Rogue weapon proficiency, wrong mana). Key decode facts (full
-writeup + retail Necro captures):
+## Per-character CLASS identity still open; class-derived stats now authored (2026-06-17, #239/#4/#186)
+Historically the beach snapshot was the captured **Strie** packet (an Assassin = **Rogue**) and the login path
+patched level / current vitals / quest / containers but **not the class or class-derived stats**, so every
+character shipped Strie's Rogue identity (sheet showed "Barbarian", Rogue weapon proficiency, wrong mana).
+Class-derived VITALS/mana are now authored from-scratch (see `ApplyClassVitals` below); the distinct class
+*identity* in the front protobuf root is the remaining open piece (#239). Key decode facts (full writeup +
+retail Necro captures):
 - HP **is** in the tails stat block (`[23]/[54]` ×100; retail Necro HP 89 = 8900).
-- **Mana is NOT** in the stat block — the client computes it from an **attribute** region (separate, TBD).
-- The **class label is in the FRONT protobuf root** (`ProtoFullCharacterIIR`), not the tails — find it by
-  parsing + diffing the Necro (Mage) vs Strie (Rogue) world-entry snapshots.
-- A tails-stat-block patch was tried and **reverted** (it didn't change the sheet and made the client drop
-  equipped gear). `decode_statblock.py`'s `[64]=mana` / `[78]=archetype` labels are wrong — corrected in that file.
+- **Mana IS** in the stat block after all (the earlier "mana not in the block" note was a search error, corrected
+  in `decode_statblock.py`): the DISPLAYED max mana lives at `[60]` = `[64]` (×100; verified across four
+  archetypes' retail LOGIN snapshots — Necro `[64]=24600`), with a ~6-lower secondary at `[62]`. The vitals are
+  now authored: `SubClassPostAccessBlock.ApplyClassVitals` writes HP/mana/stamina (displayed + base/secondary
+  slots, ×100, keeping the `+148` repeated copies in sync) from `CharacterMaxStats.SnapshotVitals()` (#4/#186).
+- The **class label is in the FRONT protobuf root** (`ProtoFullCharacterIIR`), not the tails; when a character's
+  REAL captured stat sheet is available `BuildFromScratch` ships that sheet (imported), otherwise the fresh
+  skeleton with per-class vitals patched. The distinct class *identity* in the root is still the open part (#239).
+- (The earlier standalone tails-stat-block patch was reverted; the correct approach is the sheet-level authoring
+  above. `decode_statblock.py`'s WRONG label was `[78]=archetype` — every archetype has `[78]=3`; `[64]=mana` is
+  CONFIRMED.)
 
 ## Inventory/bag carve-out (moved from Opcodes.cs 2026-07-06)
 

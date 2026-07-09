@@ -2,7 +2,8 @@
 
 The geometry blob a `MESHINDEXFILE` (type 1010030) points at via `<RenderMesh file="ID"/>`. This is the format the
 #275 feasibility ticket called the "hard blocker"; it is now **decoded and validated** (decode-first dissector:
-`Captures/scripts/decode_rendermesh.py`). The C# reader is the next step.
+`Captures/scripts/decode_rendermesh.py`) and ported to C# — `RenderMeshReader`
+(`Faolan.Core.Rdb/Assets/RenderMeshReader.cs`), which drives the `GlbWriter` → glTF pipeline into the Blazor viewer.
 
 ## Container
 
@@ -10,9 +11,11 @@ Decompressed (the normal `IOz1`+zlib unwrap via `RdbReader.ReadDecompressed`) th
 
 ```
 [12]   RDB-Id header     type u32 LE = 1010001, id u32, marker u32 = 1000003
-[4]    version/flags     u32 (0x00009003 seen)
+[4]    version/flags     u32 (0x00009003 for static props; skinned bodies use 0x00007000)
 [4]    texRefCount       u32 N
 [8*N]  texRefs           N × (type u32, id u32)   — the FCTX textures, same set as the manifest <Material>
+                         (skinned 0x7000 blobs instead store bare N × (id u32) with the type implied FCTX 1010004;
+                          `RenderMeshReader.ReadHeaderTextureRefs` disambiguates by testing the first word)
 [8]    0xFFFFFFFF × 2     null/terminator
 ...    material params    ASCII "g_Name=… g_ExporterVersion=NNN" block(s), NUL-terminated (may be absent)
 ...    geometry section(s) — one or more, see below
@@ -33,10 +36,11 @@ ANCHOR  FF 00 00 00 11 00 00 00        D3D-style decl-end sentinel (0xFF) + 0x11
 ```
 
 The bytes after the position (stride-12) are the packed vertex attributes — normal/tangent (packed bytes),
-vertex colour (BGRA u8×4), and UV(s) (half/packed). Decoding those is Phase 2 (needed for textured/lit render);
-positions + indices alone already give the silhouette. Just before the anchor sits the declaration element table
-(`[u16 offset][u16 size][u32 usage]` entries) which formally yields the stride+attribute layout — parse it for a
-fully general reader rather than anchoring.
+vertex colour (BGRA u8×4), and UV(s) (half/packed); positions + indices alone already give the silhouette.
+`RenderMeshReader` now parses the declaration element table that sits just before the anchor (walked backward as
+8-byte `D3DVERTEXELEMENT9` records: `[u16 stream][u16 offset][u8 type][u8 method][u8 usage][u8 usageIndex]`) rather
+than assuming a fixed stride, so it decodes NORMAL (UBYTE4N), TEXCOORD (FLOAT2 for props / SHORT2N for skinned
+bodies), and BLENDINDICES/BLENDWEIGHT skinning per element.
 
 ## Validation
 
@@ -47,8 +51,11 @@ box (flat decor with `min_y==max_y==0` was the initial oracle). Verified across 
 
 ## Notes / next
 
-- Multi-submesh meshes: iterate the anchor; concatenate with per-section vertex-index offsets (the dissector does).
+- Multi-submesh meshes: iterate the anchor; concatenate with per-section vertex-index offsets (both the dissector
+  and `RenderMeshReader.Read` do — it returns one `SubMesh` per section).
 - Some rendermeshes are CDN-only (`le.idx` file==0xFF) — fetch-by-hash (`RdbCdnCache`) like other on-demand resources.
-- Character body meshes add skinning (bone indices/weights in the vertex attrs) — Phase 2/3, needed to pose a player.
-- C# port: a `RenderMeshReader` beside `FctxConverter`, emitting positions+indices (then UVs/normals) → glTF for the
-  Blazor viewer.
+- Character body meshes add skinning (bone indices/weights in the vertex attrs) — now decoded: `RenderMeshReader`
+  emits per-vertex `BlendBones`/`BlendWeights` and binds each section to its `g_BoneN=` palette, and `RigSkinningTests`
+  covers it. Bone names resolve against `SkeletonReader`.
+- Shipped C# pipeline: `RenderMeshReader` (beside `FctxConverter` in `Faolan.Core.Rdb/Assets/`) → `SubMesh`
+  positions/normals/UVs/skinning → `GlbWriter.Build` → glTF/glb for the Blazor viewer.

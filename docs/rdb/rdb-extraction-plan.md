@@ -94,7 +94,7 @@ index and (b) lets us pull resources by **type id**.
 Prioritise by payoff/effort:
 1. **Localized strings / `remoteformat` text** — likely the easiest win and unblocks all dialogue/UI text.
 2. **Item/template definitions** — the big one for the importer (names + archetype + `Data1..4` for *every*
-   item, not just held ones). Validate by matching a known captured item (e.g. the health potion: f4/f5 template
+   item, not just held ones). Validate by matching a known captured item (e.g. the item Daggamalt: f4/f5 template
    180450, archetype `0x4847505A`) to its RDB record.
 3. **NPC/creature definitions** — for combat HP and spawn templates.
 4. **Spell/ability definitions** — names/params to enrich the id-only `Spell` rows.
@@ -181,7 +181,7 @@ Significant de-risking — the tool and format are identified:
 > maps, renames existing) — isolated, touches only `Maps`. Imported: 241 read, 226 created, 8 renamed (242 maps total).
 
   finding the item-template type id is an early task (sample types not in the enum; cross-ref the known captured
-  health-potion template 180450 / archetype `0x4847505A`).
+  Daggamalt template 180450 / archetype `0x4847505A`).
 - **v5/v7 index format** (from rdbreader.cpp): header = `magic(4) + version(u32) + hash1..hash4(4×u32) +
   recordCount(u32)`; then a section of `(type, idx)` u32 pairs; then a detail section per record:
   `unk0, offset, size, unk3..unk6` (v7) plus `unk7..unk10` (v5). **File resolution: the `.rdbdata` file number
@@ -262,7 +262,7 @@ the remaining wall is the KEY, which is a server secret, not unknown crypto.**
 ### FULLY CRACKED + validated (2026-06-08)
 The keys were never missing — **they're the per-item `ProtoDecryptionKey` the server sends in inventory, which we
 already capture and store as the item `Data1..Data4` quad** (mislabeled "item identity"). From the client's own
-protobuf (`docs/aoc-client-protos.proto`):
+protobuf (`Faolan.Core/Protobuf/aoc-client-protos.proto`):
 ```
 ProtoDecryptionKey { fixed32 key1; key2; key3; key4 }          // 4 LE u32 = the 128-bit TEA key
 ProtoAcgItem { ProtoDecryptionKey key1,key2,key3; fixed32 template1,template2,template3; uint32 level; fixed32 hash }
@@ -277,7 +277,7 @@ are `key1/key2/key3`; `tail.f4/f5` (= `Item.Id`) are `template1/template2`; `tai
 `(Data1,Data2,Data3,Data4)` as 4 LE u32 → truncate to `plainLen` → `IOz1` + `uncompressedSize` + zlib → inflate →
 item template (`12B RDB-Id hdr: type,id,marker=1000000` + binary fields).
 
-**Proof:** health-potion `type 1000020 id 180450`, key from `faolan.db Items.Data1..4` =
+**Proof:** the item Daggamalt `type 1000020 id 180450`, key from `faolan.db Items.Key1..4` =
 `807024719, 3628954689, 2634994156, 3227556839`, decrypts to a valid 329-byte template with header
 `type=1000020 id=180450 marker=1000000`. (Script: `/tmp/tea_decrypt.py`.)
 
@@ -290,7 +290,7 @@ vs the partial snapshot.
 - `RdbReader.ReadDecrypted(entry, teaKey)` — detects `RDBH`, TEA-ECB-decrypts, truncates to `plainLen`, unwraps
   the inner `IOz1`/zlib.
 - `RdbItemImporter` + `--rdb-items` (with optional `--dump-templates <dir>`): for every DB item with a key
-  (`Data1..4`), looks up RDB `1000020`/`1000620` id=Item.Id, decrypts, validates the RDB-Id header.
+  (`Key1..4`), looks up RDB `1000020`/`1000620` id=Item.Id, decrypts, validates the RDB-Id header.
   **Result on our DB: 387/388 keyed items decrypt + validate** (the 1 "miss" is a DB id that collides with a
   *plain* TESTITEM entry, correctly rejected). 
 - **Template string fields** are `tag 0x21 (u32) + len (u16) + flags (u16) + ASCII`. The length is a **u16**, not a
@@ -333,7 +333,7 @@ note above; do not read it as a u32.)
   the DB. The decrypt + `--dump-templates` infra preserves every template for that RE whenever it's picked up.
 - **Done into `Item`:** `Name` (143 filled). **Remaining:** level/stats once the struct field map is reversed.
 
-### Typed protobuf decoding (docs/aoc-client-protos.proto → C#)
+### Typed protobuf decoding (Faolan.Core/Protobuf/aoc-client-protos.proto → C#)
 The recovered schema is generated to **`Faolan.Core/Protobuf/AocProtocol.g.cs`** (protobuf-net, the
 project's existing protobuf runtime). Test `AocProtocolDecodeTests` decodes a **real captured** inventory entry
 (Slave Manacles) with the generated `ProtoInventoryGame.InventoryListEntry` and asserts the decoded
@@ -365,7 +365,7 @@ The `TDC2` text format is fully decoded (validated: dialogue in categories like 
 specific id on demand for dev, but we won't dump all ~hundreds-of-thousands of strings into `faolan.db`.
 
 **Items from RDB — INVESTIGATED, BLOCKED (encrypted). 2026-06-08.**
-Item-template type = **1000020** (98,048 entries; captured health-potion 180450 = record index 31805). Decisive
+Item-template type = **1000020** (98,048 entries; captured Daggamalt 180450 = record index 31805). Decisive
 cross-check against ground truth: of **191** DB buildable items, **190** are present in RDB(1000020), and **all
 190 are `RDBH`-wrapped** (0 plain), high-entropy (~7.0), no standard decompression (zlib/IOz1/raw) yields
 anything; **0 of the 190 contain the known item `Data1` quad value, and 0 contain the `Archetype` value.** The

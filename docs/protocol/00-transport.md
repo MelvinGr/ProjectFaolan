@@ -61,7 +61,7 @@ Two consequences that have each caused a real bug:
 
    An earlier reader treated the tag as "decompress from here" and dropped the rest of the receive buffer. When
    TCP coalesced the marker with the packets behind it, those packets were silently eaten — which is why the
-   post-ready `0x205f` ability grant intermittently arrived with an empty spellbar.
+   post-ready `0x205f` grant-arm packet intermittently arrived with an empty spellbar.
 
 2. **Inflating attacker-controlled input is bounded.** A deflate stream that expands without limit is dropped
    rather than inflated. [V3: NetworkHardeningTests.Framer_DecompressionBomb_IsDroppedNotInflatedToOom]

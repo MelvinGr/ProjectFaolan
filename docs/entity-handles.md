@@ -17,9 +17,11 @@ Rule (CLAUDE.md): **session-volatile handles must never be persistence keys.** P
 ## Players: handle == ClientInstance == Character.Id (on purpose)
 
 For a player these are one value. Login resolves the character *by* the client instance
-(`GetCharacterForAccount(accountId, clientInstance)`) and asserts `resolvedCharacter.Id == clientInstance`;
-`WorldSimulation.PlayerWorldEntity` seeds `WorldEntity.Handle = ClientInstance` (`WorldSimulation.cs:124`). DB
-character ids are the **real AoC ids** (e.g. `20016761` = `0x01313E79`, `134407637` = `0x08029D15`), not small
+(`GetCharacterForAccount(accountId, clientInstance)`) and for a normal (non-create-flow) login
+`resolvedCharacter.Id == clientInstance` (the mismatch case is only logged, for the create-flow temporary
+instance — `GameServerListener.Inbound.cs:852`); `WorldSimulation.RegisterPlayerInWorld` seeds
+`WorldEntity.Handle` from `ClientInstance` (`WorldSimulation.cs:105`). DB
+character ids are the **real AoC ids** (e.g. `20016753` = `0x01316E71`, `134407638` = `0x0802E5D6`), not small
 autoincrements, so the persistent id already sits in a client-tracked range. Retail unifies these too — the
 player's `FA015807` spawn handle, the combat `DamageResult`/vitals target, and the RPC endpoint instance are all
 the same `0x0802xxxx`-class value across the captures, and our player-spawn + combat goldens are byte-exact
@@ -32,7 +34,7 @@ client not binding the two, and diverges from the captures we mirror.
 ## NPCs / loot / dynels: session-allocated handles in the low tracked range
 
 These get runtime handles unrelated to any persistent id, and the **range matters**. Observed (from captures
-and `WorldBroadcaster.cs:43-51`):
+and `WorldBroadcaster.cs:80-88`):
 
 | entity | handle range |
 |---|---|
@@ -53,7 +55,7 @@ during the world-entry load — a load-vs-play gate, not a range problem. Full w
 
 ## Don't confuse with the playfield-instance token
 
-Separate namespace: each `Zone` mints a **playfield-instance token** (`WorldState.cs:28`, starts `0x00A00000`;
+Separate namespace: each `Zone` mints a **playfield-instance token** (`WorldState.cs:85`, starts `0x00A00000`;
 beach replay overrides it with the burst's own, e.g. `0x01ea985c`) that is stamped into every despawn so the
 client scopes the removal to the right playfield. It is *not* an entity handle. See memory
 `protocol_despawn_n3toclientquit`.

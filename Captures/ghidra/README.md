@@ -26,5 +26,7 @@ Run each post-script against the already-analyzed program (no re-analysis):
 4. Assemble case+name -> `s2c_tables.json` and the markdown doc (see the inline python in the handoff /
    git history, or regenerate from `disp_cases.json` + `handler_names.txt`).
 
-`disp_cases.json` / `s2c_tables.json` here are the committed outputs (so the tables are reproducible
-without re-running Ghidra).
+The intermediate outputs (`rpc_tables.txt`, `dispatch.txt`, `handler_names.txt`, `disp_cases.json`,
+`s2c_tables.json`) are written to the external Ghidra project dir (`/home/melvin/Development/Ghidra/Aoc`)
+and are NOT committed here — only these `.java` post-scripts are. The assembled ground-truth tables live
+in `docs/re/aoc-rpc-method-opcodes.md` (committed), so the result is available without re-running Ghidra.

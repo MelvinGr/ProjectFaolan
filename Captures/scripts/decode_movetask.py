@@ -26,7 +26,7 @@ Pinned leaf grammars:
   mode 10 SetPos      : [float x3][float x4]
   mode 11 GroundAlign : [u8 flag]
 
-Coverage: 6225/6225 captured MoveTask records (100%) round-trip byte-exact - the full recursive grammar.
+Coverage: 9468/9468 captured MoveTask records (100%) round-trip byte-exact - the full recursive grammar.
 """
 import json, struct, glob, sys
 from collections import Counter

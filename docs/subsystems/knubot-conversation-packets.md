@@ -2,7 +2,7 @@
 
 Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `Captures/ghidra/DumpIirReaders.java`).
 These are the NPC-dialogue packets served by `ConversationService.ServeScreen`. The **whole Knubot s2c set is
-now CONSTRUCTED** via `KnubotCodec` (`Faolan/GameServer/Dialogue/KnubotCodec.cs`) — `KnubotAppendText` (the
+now CONSTRUCTED** via `KnubotCodec` (`Faolan.Core.Network/Codecs/Dialogue/KnubotCodec.cs`) — `KnubotAppendText` (the
 spoken line), `KnubotOpenChatWindow`, `KnubotAnswerList` (the option buttons) and `KnubotCloseChatWindow`:
 `TryConstructKnubotRecord` lifts the remoteformat XML / options out of the captured record and rebuilds them
 re-addressed to the live player + clicked NPC, framed on the conversation endpoint (`GameAgent:<captured

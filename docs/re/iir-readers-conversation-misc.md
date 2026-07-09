@@ -69,12 +69,12 @@ exact reader framing (header + u16-length string).
 ## No-op / out-of-band readers
 
 - `MoveInventoryItemIIR_t` (`0x2A8A1B49`, `FUN_005b9230`) — `ReadSubClass` returns 0; the move is
-  carried out-of-band by the `ProtoMoveInventoryItem` message, not this IIR reader.
+  carried out-of-band by the `ProtoMoveInventoryItemIIR` message, not this IIR reader.
 
 ## Partially-mapped (sub-reader bodies, structure noted)
 
 - `SpellBookIIR_t` (`0x6BA10936`, `FUN_00795ba0`) — delegates the whole body to `FUN_0077af90`
-  (the spell-list reader); only 2 captured samples.
+  (the spell-list reader); only 1 captured sample.
 - `TemplateActionIIR_t` (`0x6C300937`, `FUN_007a0b00`) — `FUN_005d5150` sub-record then `[u32×6]`.
 - `KnubotStartTradeIIR_c` (`0x4B2A47BF`, `FUN_009a63a0`) — Knubot header + `[u64]` + a count-prefixed
   list of `TradeItem_c` (string + 4 u32 each); only 2 captured samples.

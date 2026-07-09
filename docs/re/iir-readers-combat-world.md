@@ -52,7 +52,7 @@ if (target_type != 0xC879)  →  [u32 ×6]   # the "full" form fields (0x2c,0x38
 ```
 
 The discriminator `target_type != 0xC879` is read from the linked entity, **not** the wire, so it's
-not self-describing — but **all 460 captured instances are the long form** (17 u32 = 68 B, total
+not self-describing — but **all 898 captured instances are the long form** (17 u32 = 68 B, total
 85 B), so the long layout is the one in practice.
 
 ### CombatReactiveIIR_c (`0x54C02089`, reader `FUN_0082c720`)
@@ -78,7 +78,7 @@ Self-describing mode word — wire-derivable, byte-exact:
 [u32 × N]                      # trailing scalars: Door/Climbing N=1, TombStone N=2, Destructible N=5
 ```
 
-The blob length-prefix and the trailing `N` u32s land byte-exact (175/175, 191/191, 175/175, 7/7);
+The blob length-prefix and the trailing `N` u32s land byte-exact (262/262, 614/614, 214/214, 7/7);
 the kd-tree region is the same shared reader already decoded for SimpleDynel.
 
 ## No-op / out-of-band readers
@@ -90,6 +90,6 @@ the kd-tree region is the same shared reader already decoded for SimpleDynel.
 ## Status
 
 Decoded + dissected (this doc + `decode_combat_world_iir.py`). Construct/implement (C# codecs +
-golden tests) belongs to the relevant subsystems: combat (#216/#218/combat.md) for
+golden tests) belongs to the relevant subsystems: combat (#216/#218/`../subsystems/combat.md`) for
 StatDamage/CombatShield/ChainKill/CombatReactive/ThreatLevel/HateList, and the simulation/world
 layer (#190/#187) for SetPos/CharInPlay + the dynel full-updates.

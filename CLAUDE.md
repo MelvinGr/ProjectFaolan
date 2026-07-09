@@ -78,11 +78,12 @@ RpcHeader endpoints + named opcodes/IIR types (generated from `Opcodes.cs`) + ha
 the compressed GameServer downloads; the Wireshark plugin + `Captures/scripts/tshark_dump.sh` fully replace it.)
 
 **Listeners** are partial classes split across many files — inspect all partials before changing
-behavior. `GameServerListener`'s partials are organized by role: `Inbound/` (opcode handlers, `Handle*`),
-`Outbound/` (packet builders, **behavior-named** e.g. `VitalsUpdateBuilder`/`GuildTagBuilder` — never
-opcode-named), and the per-flow/domain folders (`Login/`, `CreateFlow/`, `Combat/`, `Economy/`, `World/`,
-`Inventory/`, `Dialogue/`, `Quest/`, `Session/`, `Spawn/`, `Scripting/`); GM commands are the
-`GameServerListener.GmCommands.cs` partial. NB a partial-class file keeps
+behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` files named by role:
+`.Inbound` (opcode handlers, `Handle*`), `.Outbound` (packet builders/senders, **behavior-named** e.g.
+`SendVitals`/`SendAddItem` — never opcode-named), plus
+`.WorldEntry`/`.PostReadyBurst`/`.World`/`.Combat`/`.Buffs`/`.Tradepost`/`.ItemUse`; GM commands are the
+`.GmCommands` partial. Domain logic proper lives in composed service folders beside it (`Combat/`,
+`CreateFlow/`, `Dialogue/`, `Economy/`, `Inventory/`, `Quest/`, `Scripting/`, `Session/`, `World/`). NB a partial-class file keeps
 `namespace Faolan.GameServer` regardless of its folder (the `// CheckNamespace` suppression), so its folder
 is organizational only.
 
@@ -90,7 +91,8 @@ is organizational only.
 folder-namespaced service classes that take their deps by ctor and the client per call:
 `CombatService` (Combat/), `WorldBroadcaster` + `WorldSimulation` + `PlayerPersistenceService` (World/),
 `EquipmentService` (Inventory/), `ConversationService` (Dialogue/), and
-`ShopService`/`BankService`/`TradepostService` (Economy/). The
+`ShopService`/`BankService` (Economy/) — tradepost/AH + mail ops are folded onto the listener itself
+(`GameServerListener.Tradepost.cs`) but still reach the wire through the same `IEconomyOutbound` port. The
 listener holds them as `_combat`/`_shop`/... fields and forwards. When a service needs a cross-cutting
 OUTBOUND op that lives on the listener (e.g. the wallet update or the live item-grant, shared by several
 subsystems), reach it through a **narrow port the listener implements** rather than passing the whole
@@ -142,8 +144,8 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
   is what `docs/protocol/gen/coverage.md` reads to attribute each type to its builder.
 - Codecs with no opcode (sub-record helpers: `CharacterStatBlock`, `StatList`, `SnapshotItemBuilder`) declare
   nothing — that's fine and expected.
-- Files are one-type-per-file named after that type (plural `*Codecs.cs` for a cohesive group, e.g.
-  `DeadReckoningCodecs.cs`), filed under their domain folder.
+- Files are one-type-per-file named after that type (a tightly cohesive group may share one file, e.g.
+  `FullCharSnapshot/FullCharSnapshotSubClass.cs`), filed under their domain folder.
 
 **Capture workflow for protocol work:** decode first, implement second. Each decoded subsystem gets a
 Python dissector in `Captures/scripts/decode_*.py` that parses the relevant packets out of the capture JSONs and

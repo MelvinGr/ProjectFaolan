@@ -1,7 +1,9 @@
 # Skeleton + attractors (RDB types 1010002 / 1010200) — #275 Phase 3
 
 The bind-pose skeleton a skinned character mesh / animation system references. Decoded + validated against the
-71-bone player skeleton (id 14853): `Captures/scripts` proof + C# `SkeletonReader` (byte-exact, world positions match).
+71-bone player skeleton (id 14853) by the C# `SkeletonReader` (`Faolan.Core.Rdb/Assets/SkeletonReader.cs`) and the
+`--report rdb-skeleton` tool — byte-exact (the parse consumes the resource whole) and the composed world positions
+are anatomically correct. (Skeletons live in the client RDB, not the packet captures.)
 
 ## Skeleton — RDB type 1010002
 

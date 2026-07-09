@@ -153,11 +153,11 @@ but is irrelevant to the minimal build. The same reader primitives + `0x3F1` fra
 (#187, done) — see `Captures/ghidra/DumpIirReaders.java`.
 
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
-`NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan/GameServer/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
+`NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
 count==0 scaffold into a typed, mutable struct (`Version`, 6 `Flags`, 53 `Words`, the raw `Sublist`) and
 re-encode it **byte-exact**, anchored by `PlayerSpawnReader` (the embedded CoreCharacter `0x41` is a fixed
 9-byte header before the protobuf name; the scaffold is the fixed 223 bytes before it). The post-IIR header
-is likewise typed (`NpcSpawnPostIir`, in `NpcSpawnScaffold.cs`): `[u32 word0][u32 firstRecordLen][u32
+is likewise typed (`NpcSpawnPostIir`, in `NpcSpawnPostIir.cs`): `[u32 word0][u32 firstRecordLen][u32
 recordCount]` + raw records (the records are tick-derived session runtime state, kept raw). Round-trip gates:
 `NpcSpawnPreIirTests` (8 tests, both goldens). This makes the from-DB path own the grammar in code instead of
 slicing the captured `Data` blob — the foundation for sourcing the scaffold from DB / zeroing the buffer.
@@ -212,8 +212,11 @@ The fresh-character player-spawn scaffold's entry-table **closer** record (the f
 entry) is **per-class**, not a constant. Stamping one class's closer on another **crashes the client's
 CoreCharacter construction on relog** (in-client: a Necromancer carrying the Barbarian closer `0x56B6/0x12C`
 crashes the loading screen; its own `0x4301/0x190` loads). Fix (`PlayerSpawnScaffoldRows.FreshCloser(Class)`,
-commit 303fd9c): **value = archetype × 100** (Soldier 100 / Priest 200 / Rogue 300 / Mage 400, solid across
-the 8 captured classes); **tag** per-class & race-independent — 5 confirmed from create dumps (Barb `0x56B6`,
-Guardian `0x4ED4`, BearShaman `0x46F2`, HeraldOfXotli `0x46F2`, Necromancer `0x4301`); the other 7 classes
-reuse a same-archetype tag (FIXME: capture their create spawns to confirm). The skill IdList (incl. Necro's
-feat `85200`) was already faithful to the dumps and is NOT the crash cause.
+commit 303fd9c): **value = archetype × 100** (Soldier 100 / Priest 200 / Rogue 300 / Mage 400). The **tag**
+was first modelled as a per-class constant, but #269 (`parse_spawn_scaffold.py`, 117 player self-spawns,
+zero violations) settled it as fully DERIVED: **tag = (fresh feat/skill IdList length + 2) × 0x3F1** — a
+count marker the client uses to read the feat list, which is exactly why a mismatched one crashes. It is
+race-independent (same class → same fresh feat list → same count → same tag) and holds for feat counts from
+14 (Assassin → `0x3F10`) up to 47 (leveled chars); the old per-class hardcoded tags matched only because each
+class's feat-list length is fixed. The skill IdList (incl. Necro's feat `85200`) was already faithful to the
+dumps and is NOT the crash cause.

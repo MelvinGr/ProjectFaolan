@@ -25,7 +25,7 @@ fixed record. The capture taxonomy (`Captures/scripts/decode_gameactionlist.py`)
 
 ## Status (#190)
 
-- Header/list framing fully decoded + validated 570/570; `GameActionListCodec` round-trips the element bytes
+- Header/list framing fully decoded + validated 925/925; `GameActionListCodec` round-trips the element bytes
   verbatim (byte-exact).
 - Decoding to a CONSTRUCTIVE property-map codec needs the full **statKey → value-type table** (which keys are
   string / float / u32 / the `0xFF` terminator) — a large enumeration to harvest from `FUN_008985c0`. The

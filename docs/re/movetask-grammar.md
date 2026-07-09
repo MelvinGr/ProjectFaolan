@@ -87,10 +87,13 @@ validates the spline and reads nothing), so both PathMoveTask branches end with 
 ## Status (#53)
 
 - **Decode COMPLETE (2026-06-17)**: the full recursive grammar is pinned — `Captures/scripts/decode_movetask.py`
-  round-trips **6225/6225 captured MoveTask records (100%)** byte-exact. Scripts: `DumpMoveTaskList.java`,
+  round-trips **9468/9468 captured MoveTask records (100%)** byte-exact. Scripts: `DumpMoveTaskList.java`,
   `DumpMoveTaskLeafReaders.java`, `DumpPathHelpers.java`, `DumpMoveTaskTail.java`.
 - **Built byte-exact** (`MoveTaskCodec`, golden tests): mode 0 bare-position, mode 1 PathMoveTask
-  (`BuildPathBody` — the multi-waypoint path), mode 2 stationary (Rotate, the 61-B form), mode 8 approach-target.
-- **Remaining**: recursive `MoveTaskCodec` builders for the other leaves (Ballistic/Animated/Formation/List) as
-  they're needed, wiring `BuildPathBody` into the broadcaster, and a `PatrolPath` DB table that groups ordered
-  waypoints per path (today's `PatrolPaths` table is flat, ungrouped).
+  (`BuildPathBody` — the multi-waypoint path; `BuildWalkBody` — the 2-point walk segment), mode 2 stationary
+  (Rotate, the 61-B form), mode 8 approach-target. The full recursive form (incl. `ListMoveTask`) is covered by
+  `MoveTaskComposite` (parse + re-emit any record byte-exact — `MoveTaskCompositeTests`, all 9468 records).
+- **Remaining**: recursive typed `MoveTaskCodec` builders for the other leaves (Ballistic/Animated/Formation/List)
+  as they're needed. (The grouped `PatrolPath` + `PatrolWaypoint` DB tables — ordered `Waypoints` by `Ordinal` —
+  now exist; the broadcaster emits mode-1 path moves via `BuildWalkBody` for chase steps and re-addresses the
+  captured patrol body via `SendPatrol`.)

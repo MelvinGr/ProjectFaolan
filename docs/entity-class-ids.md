@@ -8,14 +8,14 @@ The protocol has **two** unrelated id systems — don't confuse them:
 
 1. **RPC conversation class ids** — the endpoint/conversation routing (`SenderClass`/`ReceiverClass`, the
    `ProtoEndpoint.type` of an `RpcHeader`). These are **BKDR-31 hashes of the client class name**: `0xA9ECB95D` =
-   hash("GameCharAgent"), `0xB171CE13` = GameAgent, `0x6C67C147` = GameInterface, … (`Faolan.Core/Network/Conan/
-   ConanEndpoints.cs`, `docs/re/aoc-opcode-ids.md`). Big, hash-shaped values.
+   hash("GameCharAgent"), `0xB171CE13` = GameAgent, `0x6C67C147` = GameInterface, … (`Faolan.Core.Network/
+   Constants/Endpoints.cs`, `docs/re/aoc-opcode-ids.md`). Big, hash-shaped values.
 
 2. **In-world entity object-class ids** — the subject of this doc. The `type` half of an **entity id**
    `{type, instance}` (= protobuf `ProtoID32`, and the `type` field of a `ProtoEndpoint` that points at a world
    entity). Every IIR record that targets an entity begins `[u32 type][u32 handle]`, where `type` is one of these
    and `handle` is the live per-session instance. These are a small **enumerated registry based at 50000** — NOT
-   hashes. Defined in `Faolan.Core/Network/EntityClass.cs`.
+   hashes. Defined in `Faolan.Core.Network/Constants/EntityClass.cs`.
 
 ## The ids
 
@@ -52,7 +52,7 @@ So the client itself treats `type == 50000` as "this id refers to a character." 
 ids were `{type=0, instance=0}` (empty / no-owner) — a real looter would be `{50000, handle}`.
 
 ## In code
-`Faolan.Core/Network/EntityClass.cs` — the canonical `EntityClass.Character` (+ the world-object classes). It
+`Faolan.Core.Network/Constants/EntityClass.cs` — the canonical `EntityClass.Character` (+ the world-object classes). It
 replaced ~a dozen ad-hoc local constants (`CharacterWireType`, `TypeTagAck`, `VitalsMarker`, `Ack`, `WireType`,
 `IirMarker`, `EntityTypeTag`, …) that all held `0x0000C350`. (Unrelated: `0x9C50` = 40016, which shows up inside
 the PlayfieldFIIR body, is a *different* value — not an entity class id; semantics TBD.)

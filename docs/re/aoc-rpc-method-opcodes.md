@@ -87,7 +87,7 @@ but its name is not recoverable from strings (catalog also missed it). These are
 ### TradepostInterface — 8 methods (catalog had 7; +1 inserted)
 ```
 0x2000  DispatchOpenTradepost
-0x2001  <no-arg>
+0x2001  DispatchClose        (inserted slot; name later recovered from the TradepostInterface dispatch RE)
 0x2002  DispatchMailMessage
 0x2003  DispatchSendMailResult
 0x2004  DispatchRetrieveMailResult

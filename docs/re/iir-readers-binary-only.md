@@ -6,6 +6,11 @@ captures** — so the readers are recovered authoritatively from the decompile (
 Treat the field counts as decompile-accurate and the framing as the standard
 `[len][sub][0xC350][handle][u8 env][reader]` (unverified env size for these specific types).
 
+> **Note (SHIPPED since batch 4):** two rows below have since surfaced in captures and are now
+> implemented byte-exact — `NewLevelIIR_t` (`NewLevelIirCodec`, golden `NewLevelIirCodecTests`) and
+> `MainQuestUpdateIIR_c`/`QuestLogListIIR` (`WorldQuest.BuildQuestLogList`, golden `QuestTests`). Their
+> rows carry an inline SHIPPED annotation; the rest remain binary-only.
+
 Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1 byte / 2 u16 /
 4 u32, byte-swapped per the `+0x1a` endian flag); `FUN_0048f840` = `ReadString` (length-prefixed);
 `FUN_005d5150` = a 0x40-byte sub-record reader; sub-readers noted inline.
@@ -14,7 +19,7 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 
 | sub | type | reader | body |
 |---|---|---|---|
-| `0x6D314743` | `NewLevelIIR_t` | `79bb60` | `[u32×7]` — new level + stat/derived deltas |
+| `0x6D314743` | `NewLevelIIR_t` | `79bb60` | `[u32×7]` — new level + stat/derived deltas. **SHIPPED:** now byte-exact vs the combat-levelup capture — `NewLevelIirCodec` / `NewLevelIirCodecTests` |
 | `0x45675F8F` | `GroundEffectIIR_t` | `7afb20` | `[u32×4]` |
 | `0x9CC129C5` | `QuestCooldownIIR` | `91cc00` | `[u32×3]` (quest id + cooldown window) |
 | `0x80138D7B` | `QuestRewardSelectionIIR_c` | `91c990` | `[u32×2]` |
@@ -59,7 +64,7 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 
 | sub | type | reader | structure |
 |---|---|---|---|
-| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32×3][u32 n]( [u32][u32] )×n [string][u32×3][u16]` |
+| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32×3][u32 n]( [u32][u32] )×n [string][u32×3][u16]` — **SHIPPED** as `QuestLogListIIR` (`BKDR-31("MainQuestUpdateIIR_c")==0x504B7924`): byte-exact wire in `WorldQuest.BuildQuestLogList`, golden `QuestTests`; the real grammar (see the codec) differs from this decompile sketch |
 | `0x8BB2799C` | `QuestRewardNotifyIIR_c` | `91b2d0` | `[u32][u32 n1]( reward(0x40) + [u32] )×n1 [u32 n2]( reward + [u32] )×n2 [u32×4]` |
 | `0xE9EB9694` | `LootSpecialLootUpdateIIR_c` | `7a5540` | `[u32 n]( [u32][u32][u32] )×n` |
 | `0xE6C3CCEF` | `ScriptTextIIR_t` | `933390` | `[string][u8 ver][u32][u32]` (ver>1 short-circuits) |
@@ -146,10 +151,12 @@ generated protobuf serialize/parse virtual, not the IIR stream reader.) Covered 
 
 ## Status
 
-Readers recovered (this doc). These are **not implemented or byte-validated** — the retail captures
-never exercise them, so they're low priority for the emulator until a feature needs one (groups,
-feats/skills, master-looter, PvP threat meter, quest rewards). When that happens, the grammar above
-is the starting point; capture or in-client validation is still required before shipping a builder.
+Readers recovered (this doc). These are **mostly not implemented or byte-validated** — the retail
+captures never exercise them, so they're low priority for the emulator until a feature needs one
+(groups, feats/skills, master-looter, PvP threat meter, quest rewards). (Exceptions: `NewLevelIIR_t`
+and `MainQuestUpdateIIR_c`/`QuestLogListIIR` have since surfaced in captures and shipped byte-exact —
+see their SHIPPED-annotated rows.) When a feature needs one of the rest, the grammar above is the
+starting point; capture or in-client validation is still required before shipping a builder.
 
 **Catalog closeout:** with this batch every one of the 141 IIR classes is accounted for — on-wire
 types byte-exact decoded, binary-only readers recovered, debug/editor readers recovered, and the

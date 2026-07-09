@@ -33,9 +33,11 @@ playfield** when `InitPath` ran — not a data/animation bug.
 
 ## Our flow already satisfies this
 
-- `RetailCreateEditorInitialBurst` sends MapChange → **4000** (`…0x00,0x0F,0xA0…`, line ~43) on the editor
-  connection, and `RetailCreateEditorCreationScriptBurst` sends the `NEW_character_creation Slave Galley`
-  playorskip on that same connection. So the editor IS on playfield 4000 with the drowning cutscene armed.
+- `SendRetailCreateEditorInitialBurst` (`CreateFlowService.cs`) sends MapChange → **4000**
+  (`0x0FA0`) on the editor connection — CONSTRUCTED via `CreateEditorRecordBuilder.BuildPlayfieldFiir` from
+  `StartingData.EditorMapId` (= 4000), not a verbatim blob — and `SendRetailCreateEditorCreationScriptBurst`
+  sends the `NEW_character_creation Slave Galley` playorskip on that same connection. So the editor IS on
+  playfield 4000 with the drowning cutscene armed.
 - The drowning cutscene is **client-autonomous**: in every capture the server sends NO packets between the
   `playorskip` and the client's `IntroDone` — the client plays the whole drowning sequence itself. Our
   verbatim editor burst (from `create-no-worldenter`) is byte-identical to the cutscene-played captures for

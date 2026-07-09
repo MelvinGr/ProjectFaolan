@@ -35,7 +35,7 @@ resolves the blend + a backlash roll on deactivate.
 - **Grant** — `GetClassCombos` is **rank-superseded** per family (`ComboFamilyKey`, the combo twin of the spell-bar
   family collapse): one combo per line at the highest qualifying rank (a lvl-24 HoX → Hell Strikes II, not I+II —
   matches the retail `0x2076` book). `GrantCharacterCombos` + the level-up dings emit it.
-- **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboInput.cs`) — normalises all 33 `Actions` tokens into the
+- **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboActionParser.cs`) — normalises all 33 `Actions` tokens into the
   `ComboInput` enum (4 quadrants + Up/Head/Thrust); returns false for the non-directional markers (spellweaving /
   reactive). Validated against all 130 distinct `Actions` (109 directional, 21 non-directional, 0 unknown).
 - **`ComboService`** — `GetPerformableCombosAsync` = the superseded, directional combos as

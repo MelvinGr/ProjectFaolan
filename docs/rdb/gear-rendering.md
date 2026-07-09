@@ -27,7 +27,7 @@ is under `items\armor\_sets\NNNN_<name>_<gender>`, and groups them by `(set numb
 ## Item → look mapping — OPEN (needs Ghidra)
 
 A character's *actual* equipped item (e.g. Silver Gown, item 324139) does **not** carry its mesh in a decodable
-field. The 1000020 item template (decrypt with `Item.Data1..4` TEA key via `--report item-template <itemId>`) has:
+field. The 1000020 item template (decrypt with the `Item.Key` TEA quad, columns Key1..Key4, via `--report item-template --report-arg <itemId>`) has:
 
 - a header region, then a property table of `[fieldId u32][value u32]` pairs (f148 = equip-slot bitmask:
   chest 0x20 / legs 0x10000 / hands 0x8000; f74 = value; f496/f499 = quality tier), then the display-name string
@@ -81,7 +81,7 @@ pick the get-by-id slot (two int args → blob/stream), or just break on the `01
 
 Offline RE narrowed the resolution exactly (no live client needed for these):
 
-- **Look-id is not a direct meshindex.** `--report rdb-id 13117` → meshindex 13117 is the Tortage building
+- **Look-id is not a direct meshindex.** `--report rdb-id --report-arg 13117` → meshindex 13117 is the Tortage building
   `tortage_addon_c30.max`. The known armour look-ids share no consistent RDB type (13117 → {1010030,
   0x4f696e, 0x8f696e}; 17153 → {1010001, 1010301, 1010302}; 18162 → nothing local). So `(look)→mesh` is a
   client-runtime computation, not an RDB id-of-fixed-type lookup.
