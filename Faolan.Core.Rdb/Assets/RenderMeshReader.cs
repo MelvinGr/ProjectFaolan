@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 namespace Faolan.Core.Rdb.Assets
 {
 	// Decodes the Age of Conan RDB RenderMesh geometry blob (type 1010001) - the geometry a MESHINDEXFILE points at.
-	// C# port of the validated dissector (Captures/scripts/decode_rendermesh.py, docs/rendermesh-grammar.md, #275).
+	// C# port of the validated dissector (Captures/scripts/decode_rendermesh.py, docs/rdb/rendermesh-grammar.md, #275).
 	//
 	// Each sub-mesh is a standard Direct3D9 vertex declaration (a list of D3DVERTEXELEMENT9 terminated by D3DDECL_END
 	// = bytes FF 00 00 00 11 00 00 00, where 0x11 = D3DDECLTYPE_UNUSED), immediately followed by [stride u32]

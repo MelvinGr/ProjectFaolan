@@ -57,7 +57,7 @@ index and (b) lets us pull resources by **type id**.
 - [ ] Tally entries by **type id** (count + total size per type). This reveals what's in there and how big.
 - [ ] Identify the type ids for the data we want by sampling a few blobs per type and looking for: readable
       strings (names/dialogue), the item `Data1..4`/archetype pattern we already know, NPC stat blocks, etc.
-- [ ] Map type id → meaning (build a legend, like `docs/capture-events.md` does for packets). Lean on AO/AoC
+- [ ] Map type id → meaning (build a legend, like `docs/tooling/capture-events.md` does for packets). Lean on AO/AoC
       community docs where they exist.
 
 > ## ⭐ CONVERSATIONS — SCOPED & PINNED (2026-06-11): RDB dialogue is a quest VM, not a table import. DEFERRED.

@@ -10,7 +10,7 @@ namespace Faolan.GameServer.Inventory
 	//
 	// Today this is a small explicit map. The scalable, data-driven source is the item's RDB ON-USE behavior (the
 	// on-use spell - heal/mana/xp for potions), which isn't decoded yet (same family as the stat-attribute decode,
-	// docs/item-template-stats.md). Bulk consumables (potions/food) should be classified by that effect once decoded
+	// docs/rdb/item-template-stats.md). Bulk consumables (potions/food) should be classified by that effect once decoded
 	// - keyed off a derived column or the SearchCategory - rather than by enumerating hundreds of template ids here.
 	[Obsolete("Should be replaced by a data-driven classification based on the item's ON-USE effect (once decoded).")]
 	public static class ItemUseClassifier

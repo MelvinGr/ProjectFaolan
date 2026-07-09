@@ -3,7 +3,7 @@
 Initial dissection (2026-06-08) of the quest and combat protocol, from
 `Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.json` (4878
 packets: create → combat → level-up → quest complete) and the necrol80 `accept_quest` capture. Builds on
-`docs/capture-events.md`. Sub-ops are GameServer `0x2000` body sub-opcodes (`[bodylen4][subop4]...`); handles
+`docs/tooling/capture-events.md`. Sub-ops are GameServer `0x2000` body sub-opcodes (`[bodylen4][subop4]...`); handles
 are 4-byte entity instances. Marker `0x0000C350` (50256) prefixes most gameplay bodies after the sub-op.
 
 ## Combat

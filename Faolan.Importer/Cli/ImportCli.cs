@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// Importer entry point (invoked from Program.Main). Parses paths + selection + mode, loads captures once,
-	// migrates, and hands a resolved plan to ImportRunner. See docs/importer-plan.md for the CLI spec.
+	// migrates, and hands a resolved plan to ImportRunner. See docs/tooling/importer-plan.md for the CLI spec.
 	public static class ImportCli
 	{
 		private const string RepoRoot = "/home/melvin/Development/C#/Project Faolan";

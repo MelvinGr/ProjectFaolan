@@ -30,7 +30,7 @@ dotnet run --project Faolan
 # Drive the retail client unattended against the local server (auto-login -> world)
 dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>
 
-# Rebuild DB content from captures. The importer is MODULE-BASED (docs/importer-plan.md): each subsystem
+# Rebuild DB content from captures. The importer is MODULE-BASED (docs/tooling/importer-plan.md): each subsystem
 # is a selectable module; `--dry-run` writes nothing (runs in a rolled-back txn, prints the per-table delta).
 dotnet run --project Faolan.Importer -- --skip characters     # idempotent EXCEPT characters; skip on a populated DB
 dotnet run --project Faolan.Importer -- --list                # catalog every module (+ which are opt-in)

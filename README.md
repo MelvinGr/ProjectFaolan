@@ -56,7 +56,7 @@ launch token, auto-logs-in, and can drive straight to the world):
 dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>
 ```
 
-See `docs/client-launcher.md` for the full flag set and the loopback-capture testing workflow.
+See `docs/tooling/client-launcher.md` for the full flag set and the loopback-capture testing workflow.
 
 ## Rebuild the game database
 

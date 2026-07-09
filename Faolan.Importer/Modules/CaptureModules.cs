@@ -11,7 +11,7 @@ namespace Faolan.Importer.Modules
 {
 	// The remaining capture-sourced modules. Each wraps an existing CaptureX importer / extractor + the shared
 	// ImportOps orchestration. (items/shops/characters live in their own files.) Modes are advertised; threading
-	// ctx.Mode into the underlying importer internals is the tracked follow-up (see docs/importer-plan.md
+	// ctx.Mode into the underlying importer internals is the tracked follow-up (see docs/tooling/importer-plan.md
 	// "Write modes") - except where the strategy lives in ImportOps (npcs/conversations overwrite).
 
 	// AH listings (TradepostListing) from the captured search results (0x2005).

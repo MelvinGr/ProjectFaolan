@@ -90,4 +90,4 @@ is clearest in the `0x96B8DC59` entity-vitals packet (`...<entityHandle><0000000
   `== generic_stats_size()` in `CoreCharacterFullUpdateIIR::ReadSubClass`; the array is built indirectly via
   vector growth, so enumerating its full id list needs the registration-call route, not a direct-write xref.)
 - Combat (HP changes mid-fight) should reuse this block — see the combat work in [[archive_cpp_reference]] and
-  `docs/capture-events.md`.
+  `docs/tooling/capture-events.md`.

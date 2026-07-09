@@ -5,7 +5,7 @@ automated, capture-backed integration testing. Proven end-to-end 2026-06-10 (log
 
 Pieces: **`Faolan.ClientLauncher`** (launches + drives the client), the **server** (`Faolan` project), **loopback
 packet capture** (`tshark`/`dumpcap` on `lo`), and the existing **analyzer/diff** tooling (`Captures/*.py`,
-`Faolan.PacketAnalyzer`). Related: [login-decryption-plan.md](login-decryption-plan.md),
+`Faolan.PacketAnalyzer`). Related: [login-decryption-plan.md](../archive/login-decryption-plan.md),
 README "Client launch flags".
 
 ---
@@ -45,7 +45,7 @@ character/playfield), `-clienthash`, `-key`, `-loginkey`, `-logindata`, `-statin
   **`autotest.txt`** (gated by `-nautotest`) = a LOGIN-AUTOMATION file (`Server`/`Login`/`Character` records,
   parsed in the LauncherWindow) — same job as `-username`/`-password`/`-charname`, via a file, NOT a test
   script (corrected 2026-06-15). The actual test-result channel is the `<testreportscriptcommand>` ScriptCommand
-  (RDB scriptgroups → the `Autotest` log line in `AgeOfConan.log`). Both decoded in **`docs/client-autotest.md`**
+  (RDB scriptgroups → the `Autotest` log line in `AgeOfConan.log`). Both decoded in **`docs/tooling/client-autotest.md`**
   (with the harness sketch for hands-free in-client asserts).
 
 ---
@@ -100,7 +100,7 @@ after the client has read it rather than holding for the whole session.
 
 ## 4. Login password validation (optional)
 
-AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [login-decryption-plan.md](login-decryption-plan.md)).
+AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [login-decryption-plan.md](../archive/login-decryption-plan.md)).
 By default any password is accepted. To enforce the real password, the client must use **our** DH public key:
 
 - **`--patch-login`** (or `tools/patch_aoc_login_key.py`) overwrites the client's embedded Funcom DH pubkey with

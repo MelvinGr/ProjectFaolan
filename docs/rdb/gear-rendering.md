@@ -36,7 +36,7 @@ field. The 1000020 item template (decrypt with `Item.Data1..4` TEA key via `--re
   steelsilk pieces have their own 17153 / 18162). That id resolves to **no** armour mesh through any RDB type
   (13117 is *coincidentally* a Tortage building meshindex), and 18162 isn't an RDB entry at all — so the
   look-id→mesh table is almost certainly **client-side code**, not in the RDB. Cracking it needs a Ghidra trace
-  of the equipment-appearance lookup (same shape as the body-morph live-gdb work in `docs/body-morph-re.md`).
+  of the equipment-appearance lookup (same shape as the body-morph live-gdb work in `docs/rdb/body-morph-re.md`).
 
 Until then the wardrobe lets you preview any set manually; auto-dressing a character in their own gear is blocked
 on this mapping.
@@ -58,7 +58,7 @@ lookup has no clean static anchor:
   WRITER (CDN-update rebuild). `MeshLoader.cpp` geometry-stream parsers at `FUN_00dd0970/dd1430/dd1670/dd1880`.
 - Equipment **attractor** strings exist (`PrimaryEquipVisualAttractor`, `SecondaryEquipVisualAttractor`,
   `SetVisualData()`), confirming held-item (weapon) mounts go through the ANIMSYS attractor path already documented
-  in `docs/skeleton-grammar.md`.
+  in `docs/rdb/skeleton-grammar.md`.
 
 **Recommended crack = live gdb (the method that solved the body morphs).** With the client logged in **in-world
 wearing the Silver Gown** (char Darkandskiny / item 324139, look id 13117, slot chest), breakpoint the RDB
@@ -67,7 +67,7 @@ that appears IS the gown's armour mesh — that directly gives `look 13117 + che
 decode needed. Repeat for the Silver Bottom (legs) and a steelsilk piece to confirm the `(look, slot)→mesh`
 relation. The console `ClientLauncher` does **not** render, so it won't trigger the mesh load — this needs the
 real client driven to the world (you at the keyboard, I attach gdb), same as the morph capture. gdb setup +
-Wine-signal passthrough: see `docs/body-morph-re.md` / memory [[gdb_live_client_debugging]].
+Wine-signal passthrough: see `docs/rdb/body-morph-re.md` / memory [[gdb_live_client_debugging]].
 
 **Resource-fetch breakpoint class identified:** `FUN_01070d60` is the **`LocalRDBSource_c` constructor** (builds the
 `fcVector_x<RDBIndex_s>` / `RDBLocation_s` / `Bundle` / `BundleGroup` vectors — the in-memory RDB index + data-file
