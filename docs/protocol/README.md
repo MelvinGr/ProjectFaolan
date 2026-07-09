@@ -26,6 +26,7 @@ Regenerated from the compiled types; a test fails if they drift. See [`gen/READM
 - [`gen/iir-types.md`](gen/iir-types.md) — the 32-bit IIR sub-opcodes, each with its BKDR-31 hash recomputed as proof
 - [`gen/protobuf.md`](gen/protobuf.md) — every protobuf message, per-field wire encoding (zigzag/fixed surfaced)
 - [`gen/coverage.md`](gen/coverage.md) — how much of the protocol is actually decoded (V3/V2/V1 burndown)
+- [`gen/messages.md`](gen/messages.md) — per-message index: each IIR type → its codec (the layout spec) + the golden test that proves it
 
 ## What we do NOT know
 

@@ -84,7 +84,7 @@ namespace Faolan.Core.Protobuf
 			var endpoint = new ProtoEndpoint();
 			while (stream.Position < end)
 			{
-				var tag = (FieldTags)stream.ReadByte();
+				var tag = stream.ReadByte<FieldTags>();
 				switch (tag)
 				{
 					case FieldTags.Type:

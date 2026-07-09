@@ -65,6 +65,11 @@ namespace Faolan.Core
 			return checked((byte)base.ReadByte());
 		}
 
+		public T ReadByte<T>() where T : Enum
+		{
+			return (T)Enum.ToObject(typeof(T), ReadByte());
+		}
+
 		public float ReadFloat()
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(float)];

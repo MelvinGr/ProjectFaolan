@@ -158,7 +158,12 @@ rather than guessed.
 - [x] **P4 — Layer pages** (§4), each fact tagged. `00-transport` … `05-identity` + `README.md` (index) +
       `gaps.md` (the V0 register, pulled forward from P6 so unproven facts have a home). Every tag resolves through
       the P3 linter — ~30 citations across the six pages, all V3/V2/V1 backed or listed in `gaps.md`.
-- [ ] **P5 — Per-message layouts** (§5), V3 first; absorb + delete the superseded docs as we go.
+- [~] **P5 — Per-message layouts** (§5), V3 first. **Skeleton landed:** generated `gen/messages.md` — one row per IIR
+      type with opcode, level, codec, and (V3) the golden test emitted as a live `[V3: …]` tag the citation
+      linter resolves (48/48 auto-cited citations pass). Attribution shares `CodecIndex` with `coverage.md` (proven
+      byte-identical after the extraction). The field-level layout lives in the linked codec source — the authoritative
+      spec — so the remaining hand-fill is lifting the highest-traffic layouts into tagged prose + absorbing the
+      scattered decode docs, incrementally.
 - [ ] **P6 — `gaps.md`.** Every V0 gets a Gitea issue.
 - [ ] **P7 — Regroup the residue** into `subsystems/` / `rdb/` / `tooling/`.
 
