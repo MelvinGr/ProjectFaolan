@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 {
 	// Parses/builds the DispatchMailMessage (S->C 0x2002) body - one in-game mail, optionally with the bought item
 	// appended as an attachment. Decoded byte-exact 2026-06-13 from the necrol80 buy_from_autionhouse_get_mail capture
-	// (629 B base #1604/#1611, 754 B with attachment #1607; docs/tradepost-protocol.md). Wire grammar (integers BE):
+	// (629 B base #1604/#1611, 754 B with attachment #1607; docs/subsystems/tradepost-protocol.md). Wire grammar (integers BE):
 	//   [mailId:u64]
 	//   [recipientClass:u32][nameLen:u16][recipient ascii]
 	//   [senderClass:u32][nameLen:u16][sender ascii]        # name EMPTY for an AH/system mail

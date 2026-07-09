@@ -6,7 +6,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Constructive builders for the fixed-grammar IIR records the character-create EDITOR streams on its
 	// GameAgent->GameInterface 0x2000 conversation (issue #189). Decoded by Captures/scripts/decode_create_editor.py and
-	// validated byte-exact against every create capture (docs/create-editor-bursts.md). These are the small,
+	// validated byte-exact against every create capture (docs/subsystems/create-editor-bursts.md). These are the small,
 	// fully-decoded records; the big entity full-updates (SimpleChar/SimpleDynel) reuse the existing spawn
 	// builders (ProtoVec3/ProtoQuat transform + the recovered embedded protobufs) rather than a bespoke decoder.
 	//
@@ -105,7 +105,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// CharInPlayIIR (0x864CFEF8): the "character is now in play" signal. 9 bytes:
 		//   [u32 type][u32 handle][u8 flag]
 		// An EMPTY record - the client reader (FUN_0075a920) only resolves the SimpleChar for `handle` and logs; the
-		// carrier handle is the whole message (docs/iir-readers-combat-world.md). flag is the base IIR's, 0 in every capture.
+		// carrier handle is the whole message (docs/re/iir-readers-combat-world.md). flag is the base IIR's, 0 in every capture.
 		public static byte[] BuildCharInPlayIir(uint handle, byte flag = 0, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).ToArray();
@@ -128,7 +128,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// FeedbackIIR (0xBA1FD222): a UI feedback signal. 22 bytes:
 		//   [u32 type][u32 handle][u8 flag][u32 a][u32 b][u32 c][u8 d]
-		// The client reader (FUN_0079f8e0) reads [u32x3][u8] after the base IIR flag (docs/iir-readers-conversation-misc.md);
+		// The client reader (FUN_0079f8e0) reads [u32x3][u8] after the base IIR flag (docs/re/iir-readers-conversation-misc.md);
 		// the three words + trailing byte are an opaque numeric feedback payload, carried by value.
 		public static byte[] BuildFeedbackIir(uint handle, byte flag, uint a, uint b, uint c, byte d, uint type = EntityClass.Character)
 		{
@@ -137,7 +137,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// GameTimeIIR (0x4F57DC08, "SetDayTime"): the in-game day-time + a wall-clock timestamp + the time rate.
 		// 29 bytes: [u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]. Decoded from the create captures
-		// (docs/create-editor-bursts.md); dayTime's low 32 bits are the fractional half (0 / 0x80000000), flag is a
+		// (docs/subsystems/create-editor-bursts.md); dayTime's low 32 bits are the fractional half (0 / 0x80000000), flag is a
 		// small phase byte (00/01/02), and the rate is the day-cycle speed (1.0 in every capture). Raw-body float =
 		// big-endian. Constructing it lets the server drive the sky/lighting time instead of replaying the capture.
 		public static byte[] BuildGameTimeIir(ulong dayTime, byte flag, ulong timestamp, float rate = 1.0f)
@@ -148,7 +148,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
 		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
 		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures
-		// (docs/create-editor-bursts.md). `count` (3/6), `nearClip`=15.0 + `farClip` (~12-14), the trailing `flags`
+		// (docs/subsystems/create-editor-bursts.md). `count` (3/6), `nearClip`=15.0 + `farClip` (~12-14), the trailing `flags`
 		// and `field58` (a u32 at [58:62] - 0 in some captures, 0x01000000 in others) are not yet semantically
 		// pinned, so they're passed through. Constructing this drives the map change from the Map row + the session
 		// token instead of replaying the captured MapChange.

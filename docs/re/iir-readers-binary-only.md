@@ -110,7 +110,7 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 `CoreFullPlayerCharacterIIR` (`797440` — a player full-update kin to `FullPlayerCharacterIIR`).
 
 > The `*StatIIR` trio (`FloatStatIIR`/`Int32StatIIR`/`StringStatIIR`) are the per-type stat-record
-> readers behind the count-prefixed stat blocks in [player-stats.md](player-stats.md): each is
+> readers behind the count-prefixed stat blocks in [player-stats.md](../subsystems/player-stats.md): each is
 > `[u32 statId][value]` where value is a u32 (float/int) or a length-prefixed string.
 
 ## Batch 6 — debug/editor classes + the `Proto*` protobuf types (catalog closeout)
@@ -135,7 +135,7 @@ These are dev/GM tooling, not normal gameplay traffic — recovered for complete
 
 The 17 `Proto*` catalog entries (and their nested submessages) are **protobuf message types**, fully
 specified by the recovered client schema at
-[`Faolan.Core/Protobuf/aoc-client-protos.proto`](../Faolan.Core/Protobuf/aoc-client-protos.proto)
+[`Faolan.Core/Protobuf/aoc-client-protos.proto`](../../Faolan.Core/Protobuf/aoc-client-protos.proto)
 — so they are "decoded" by the schema, not by a hand-rolled `ReadSubClass`. (Their vtable slot 8 is the
 generated protobuf serialize/parse virtual, not the IIR stream reader.) Covered there:
 

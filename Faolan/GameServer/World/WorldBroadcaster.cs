@@ -1310,7 +1310,7 @@ namespace Faolan.GameServer.World
 			// Re-stamp the playfield-instance token to the LIVE value at send time. The token baked into SpawnBody at
 			// map-load (NpcSpawnBuilder.TryBuildLive) is the zone's DEFAULT token - but the client only registers, and
 			// then polls (0x2020), a spawn whose playfield matches the one IT loaded at world entry, and that live token
-			// isn't known until the player actually enters (docs/mid-session-spawn-blocker.md part 3). Baking the
+			// isn't known until the player actually enters (docs/subsystems/mid-session-spawn-blocker.md part 3). Baking the
 			// load-time token shipped every NPC with a stale playfield, so the client silently dropped them all and
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);

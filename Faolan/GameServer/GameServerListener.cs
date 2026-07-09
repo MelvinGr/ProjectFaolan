@@ -238,7 +238,7 @@ namespace Faolan.GameServer
 				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
 			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-									 // reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+									 // reactive element list + fire burst (docs/subsystems/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
 				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
@@ -388,7 +388,7 @@ namespace Faolan.GameServer
 		protected override Task ReceivedPacket(INetworkClient client, ConanPacket packet)
 		{
 			// This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes, 			// so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
-			// class route consumes the packet. See CLAUDE.md (wire-protocol essentials) + docs/tradepost-protocol.md.
+			// class route consumes the packet. See CLAUDE.md (wire-protocol essentials) + docs/subsystems/tradepost-protocol.md.
 			// The two sub-0x2014 opcodes 0x2002/0x2003 are the ONLY ones that also arrive on GameCharAgent (there they
 			// are RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
 			return packet.Receiver.Type switch

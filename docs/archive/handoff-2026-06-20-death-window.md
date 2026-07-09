@@ -477,7 +477,7 @@ revived (HP ticking from mobs, stray XP). **Retail does NOT re-enter the world.*
 in-place sequence on the EXISTING entity:
 - **#4840 `0x642CD3D6` BehaviorControlCenterIIR (BccIIR)** on the player handle — the "resurrect confirm"
   behavior action; almost certainly the bcc_state 29→1 transition that CLOSES the window (grammar in
-  `docs/behaviorcontrolcenter-grammar.md`).
+  `docs/re/behaviorcontrolcenter-grammar.md`).
 - **#4845 `0x96B8DC59` vitals** — restore current health to full.
 - entity despawns (`0x04B82B2D`) for the old area, then **#4904 `0x10D27BC0` IntendedTeleportIIR** —
   teleport to the res point, then re-stream nearby NPCs (interest).
@@ -730,7 +730,7 @@ DEAD and came back in the dead state with the window. Decoded:
 
 1. **Diff the dead snapshot vs an alive snapshot.** Take `idx 55` of the login-while-dead capture and the
    FullPlayerChar snapshot from a normal (alive) login of the _same/similar_ char, and diff the typed-root +
-   tails (grammar in `docs/fullplayer-snapshot-reader.md`). Find the dead-state field (a flag and/or a
+   tails (grammar in `docs/re/fullplayer-snapshot-reader.md`). Find the dead-state field (a flag and/or a
    vitals/state value). Caveat: the `0x0000001b` health-stat search hits false positives in string regions
    (`PFAccess`…) — use the snapshot grammar, not a raw byte search.
 2. **Set that field in our snapshot builder** for a dead player (and clear it on respawn), so

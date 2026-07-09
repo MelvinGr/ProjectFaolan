@@ -65,5 +65,5 @@ Both bodies are built by the named `TeleportCodec` (was inline spliced templates
 DumpTeleportReaders.java` → `FUN_005bfce0` / `FUN_00a6a600` / `FUN_005d1ae0`, plus `FUN_00cbf5d0` for the
 position blob) and every dest byte is accounted for. Sibling lift under #219 — the **guild renown block** — is
 likewise a typed builder (`Faolan/CSPlayerAgent/GuildRenownBlock.cs`, `GuildRenownBlockTests`; full reader walk
-documented in `docs/guilds.md`). Remaining: in-client verification of the GM teleport path, and the semantic
+documented in `docs/subsystems/guilds.md`). Remaining: in-client verification of the GM teleport path, and the semantic
 meaning of `destDescriptor`.

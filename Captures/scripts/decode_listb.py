@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Probe the List B region of the 0x737A6DF9 FullChar snapshot TAILS (#258).
 
-Per the client reader (docs/fullplayer-snapshot-reader.md top-level grammar), after List A (Quest_c journal)
+Per the client reader (docs/re/fullplayer-snapshot-reader.md top-level grammar), after List A (Quest_c journal)
 comes List B (driver FUN_00798c70 -> per-record FUN_00922c90). The static order says List B is next after
 List A (@609 in the beach template) but the doc flags that @609 "fits none" of the statically-next readers, so
 this script tests the List B grammar directly against the bytes and reports where it lands.

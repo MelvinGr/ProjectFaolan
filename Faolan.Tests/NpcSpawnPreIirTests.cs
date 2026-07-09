@@ -7,7 +7,7 @@ namespace Faolan.Tests
 	// Locks the typed NPC pre-IIR / post-IIR scaffold codecs against real capture bodies. The pre-IIR scaffold is
 	// the "last un-lifted part" of the from-DB NPC spawn (Gitea #185): the fixed read sequence between the
 	// transform and the embedded CoreCharacterIIR (u8 version + 6 u8 + 53 u32 + a count==0 sublist,
-	// docs/fa015807-spawn-reader.md). These are the byte-exact round-trip gates - decoding a captured scaffold and
+	// docs/re/fa015807-spawn-reader.md). These are the byte-exact round-trip gates - decoding a captured scaffold and
 	// re-encoding it reproduces the bytes, so the from-DB path owns the grammar in code instead of slicing the blob.
 	public class NpcSpawnPreIirTests
 	{
@@ -74,7 +74,7 @@ namespace Faolan.Tests
 		}
 
 		// The pre-IIR scaffold CAN carry the NPC's RDB script-binding diagnostic string (the script-bound PvP
-		// festival NPCs in the login capture do, docs/fa015807-spawn-reader.md), but Crocodile and Casilda - both
+		// festival NPCs in the login capture do, docs/re/fa015807-spawn-reader.md), but Crocodile and Casilda - both
 		// confirmed to render in-client - carry NO script string: their 53 scaffold words are scalars / floats /
 		// session-volatile handles, not text, so DecodeScriptText recovers nothing. This is the evidence that an
 		// empty script buffer is a valid, rendering form (Gitea #185 construction route b).

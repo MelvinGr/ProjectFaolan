@@ -6,7 +6,7 @@ namespace Faolan.Tests
 	// Locks the DispatchOpenTradepost reply to the retail wire format. Expected = the full captured packet
 	// (account-faolan-character-necrol80 ... auctionhouse, pkt#935): sender GameCharAgent{0xA9ECB95D,0x59},
 	// receiver TradepostInterface{0xF2C2D5B5, inst=0x08006F31}, opcode 0x2000, body = the auctioneer access point
-	// (Tortage pos + 15.0 radius). See docs/tradepost-protocol.md + Captures/scripts/decode_tradepost.py.
+	// (Tortage pos + 15.0 radius). See docs/subsystems/tradepost-protocol.md + Captures/scripts/decode_tradepost.py.
 	public class TradepostResponseTests
 	{
 		[Fact]

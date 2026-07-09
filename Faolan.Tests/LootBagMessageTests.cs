@@ -8,7 +8,7 @@ namespace Faolan.Tests
 	// trailing ProtoLootBagIIR (cash + looter ids + item inventory) is lifted out of the loot-bag body and rebuilt
 	// BYTE-EXACT, and a from-scratch construction (BuildLootBag) reproduces the same bytes when fed the captured
 	// cash + inventory. Record captured from the "Chest [N7FU]" loot bag. Reader decoded by vtable-xref
-	// (docs/iir-subclass-readers.md); the contents protobuf round-trips losslessly through protobuf-net.
+	// (docs/re/iir-subclass-readers.md); the contents protobuf round-trips losslessly through protobuf-net.
 	public class LootBagMessageTests
 	{
 		// Full loot-bag IIR record (after the 0x2000 carrier prefix):

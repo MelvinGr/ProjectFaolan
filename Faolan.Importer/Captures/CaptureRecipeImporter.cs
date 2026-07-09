@@ -14,7 +14,7 @@ namespace Faolan.Importer.Captures
 {
 	// Imports the crafting recipe-book catalog from a captured TradeskillReplyIIR_c (0x9062D559) - the list the
 	// server sends when the client opens the Crafting -> Recipes window. Decoded + validated byte-exact in
-	// TradeskillRecipeCodec (see docs/tradeskill-recipes.md). Each record becomes a Recipe row keyed by its recipe
+	// TradeskillRecipeCodec (see docs/subsystems/tradeskill-recipes.md). Each record becomes a Recipe row keyed by its recipe
 	// id, carrying the verbatim record body so the book reproduces byte-for-byte on the wire.
 	public static class CaptureRecipeImporter
 	{

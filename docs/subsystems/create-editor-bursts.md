@@ -90,7 +90,7 @@ create-specific to decode, only builder wiring to do:
   `[u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate=1.0]`. Byte-exact.
 - **SetMorphValueIIR** (`0xBADF5A4B`), 36–37 bytes — `[type][handle]… "hairmesh_207920" … <float weight>`; the
   morph wiring itself is already covered by [[character_appearance_morphs_unused]].
-- **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/create-cutscene-camera-paths.md`.
+- **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/subsystems/create-cutscene-camera-paths.md`.
 
 ## 4. What's left (the #189 backlog)
 1. ~~Construct `SimpleCharFullUpdate` (editor scene characters)~~ **DONE** — `CreateEditorCharBuilder.Reconstruct`

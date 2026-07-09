@@ -47,7 +47,7 @@ namespace Faolan.Core.Database.Tables
 
 		// SimpleDynelFullUpdateIIR (0x66AEDD50) identity, lifted from the opaque Data slice into typed columns so the
 		// dynel's ProtoSimpleDynelIIR message is CONSTRUCTED from the DB rather than replayed (#187/#57; reader decoded
-		// in docs/iir-subclass-readers.md, codec SimpleDynelMessageCodec). Name (above) is proto field 2. The two
+		// in docs/re/iir-subclass-readers.md, codec SimpleDynelMessageCodec). Name (above) is proto field 2. The two
 		// nullable columns are absent on most dynels (3 captured field-shapes), so null = "field not present" - which
 		// keeps the rebuilt message byte-exact to the capture. Non-dynel object classes leave these null/default and
 		// keep using the Data slice. (Kdtree is always 0 on world dynels, emitted by the builder.)

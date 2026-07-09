@@ -52,7 +52,7 @@ forwarded as-is (capture confirmed).
 
 **Fix:** `Faolan/GameServer/Inbound/Handle0x2000.cs` Move case — the carrier's `movingType` u16 is
 `[u8 env][u8 flag1]`; mask off the env byte (`relayMovingType = movingType & 0x00FF`) and use it for BOTH
-the self-echo and `BroadcastPlayerMove`. (`docs/chardcmove-grammar.md` documents `env` as the 0x00/0x01
+the self-echo and `BroadcastPlayerMove`. (`docs/re/chardcmove-grammar.md` documents `env` as the 0x00/0x01
 envelope byte.)
 
 ---
@@ -93,7 +93,7 @@ Relay path:
   `[subop][DataObject][DataClientInstance][MovingType:u16][Position:vec3 BE][Rotation:vec3 BE][Tail]`,
   framed `WorldFraming.Sender` / `WorldFraming.Receiver(recipient)`.
 
-CharDCMove grammar + codec (already decoded, round-trip golden-tested): `docs/chardcmove-grammar.md`,
+CharDCMove grammar + codec (already decoded, round-trip golden-tested): `docs/re/chardcmove-grammar.md`,
 `Faolan/GameServer/World/DeadReckoningCodecs.cs` (`CharDCMoveCodec.Parse`/`Build`). The record is
 **variable**: `[u8 env][u8 flag1][pos:vec3]`, then `flag1` bit4 → 1 collapsed-facing float **or** a
 3-float move-vector, then `param6`, `flag2`, and a velocity/accel/heading block gated by flag1/flag2.
@@ -163,5 +163,5 @@ and reading `[+8]=handle`.
 - `Faolan/GameServer/Inbound/Handle0x2000.cs` — inbound Move case + self-echo + relay call.
 - `Faolan/GameServer/World/WorldBroadcaster.cs` — `BroadcastPlayerMove`, `SendWorldMove`, `MoveForward`.
 - `Faolan/GameServer/World/InterestManager.cs` — `ResolveMove` (section 2 = others' view of the mover).
-- `Faolan/GameServer/World/DeadReckoningCodecs.cs` + `docs/chardcmove-grammar.md` — the CharDCMove codec.
+- `Faolan/GameServer/World/DeadReckoningCodecs.cs` + `docs/re/chardcmove-grammar.md` — the CharDCMove codec.
 - Spawn/visibility + Solo isolation are done (#268); this ticket is the **move stream** only.

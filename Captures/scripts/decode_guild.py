@@ -2,7 +2,7 @@
 """Decode the guild RPC traffic on the CsPlayerAgent connection (port 7012) from a capture JSON.
 
 Method dispatch (decoded 2026-06-12): the 16-bit opcode after the RpcHeader is a METHOD INDEX
-(0x2000 + position) into the recovered RPC method tables (docs/aoc-client-rpc-methods.json):
+(0x2000 + position) into the recovered RPC method tables (docs/re/aoc-client-rpc-methods.json):
   client->server = CSPlayerAgent.client_to_server   (alignment verified: 0x201C = AcceptGuildInvitation
                                                      fired exactly once in the invite-accept capture)
   server->client = CSPlayerInterface.server_to_client, but the live build has UNNAMED EXTRA METHODS

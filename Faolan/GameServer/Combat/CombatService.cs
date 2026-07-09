@@ -337,7 +337,7 @@ namespace Faolan.GameServer.Combat
 				npcEntity.LastAttackerHandle = killer.Session.Account.ClientInstance;
 
 				// #204: the health=0 StatUpdate alone does NOT play the death animation (in-client verified) - the
-				// client needs the explicit SimpleCharKilledByUpdateIIR (0xB066AFC2) kill record (docs/combat.md,
+				// client needs the explicit SimpleCharKilledByUpdateIIR (0xB066AFC2) kill record (docs/subsystems/combat.md,
 				// decoded from AssassinL23_..._resurect). Send it right after the killing-blow vitals so the lingering
 				// corpse plays its death anim. Killer = the player who landed the blow.
 				await SendWorldPacket(killer, WorldDeath.BuildKilledBy(targetHandle, killer.Session.Account.ClientInstance));
@@ -463,7 +463,7 @@ namespace Faolan.GameServer.Combat
 			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
 		}
 
-		// The generic "every behavior gets an echo-ack" reply (docs/combat.md rule 1) for an Interact request with no
+		// The generic "every behavior gets an echo-ack" reply (docs/subsystems/combat.md rule 1) for an Interact request with no
 		// special result block - the air-swing path uses it, and so does a plain item-use (RightClickItem, e.g. the
 		// Totem of Origin #206). Phase = the request's Mode, or the legacy session counter when the caller didn't
 		// parse the args. No-op for a malformed (too-short) payload.
@@ -500,7 +500,7 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// Sends the NPC counter-attack ANIMATION ack to the player it hit: a BehaviorControlCenterIIR with actor = the
-		// NPC handle (the decoded "second BccAck", docs/combat.md), so the client plays the NPC's swing + the player's
+		// NPC handle (the decoded "second BccAck", docs/subsystems/combat.md), so the client plays the NPC's swing + the player's
 		// hit-react. Visual only - the authoritative HP move rides the world-tick StatUpdate, so the damage here is just
 		// the floating combat number. The animation/result params are capture-typical (not semantically decoded); the
 		// swingCounter increments per NPC swing to mirror the per-actor counter the capture carries.

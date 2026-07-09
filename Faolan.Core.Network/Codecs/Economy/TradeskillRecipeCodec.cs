@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// TradeskillRequestIIR_c (0x06B9CD94) when the Crafting -> Recipes window opens. Grammar recovered from
 	// AgeOfConan.exe (client readers FUN_007aab30 -> FUN_007abb30 -> per-record FUN_0077be70; the 4-byte reader is
 	// FUN_0048f900, big-endian) and validated byte-exact against NecroL80_..._open-crrafting-receipies frame 2926
-	// (603 recipes, 209309 bytes consumed exactly). See docs/tradeskill-recipes.md.
+	// (603 recipes, 209309 bytes consumed exactly). See docs/subsystems/tradeskill-recipes.md.
 	//
 	// Reply IIR body (after the [subop][0xC350][handle] carrier prefix):
 	//   [u8 env=0][u32 version=1][u8 type][u32 c]  then, when type==3, c is 0x3F1-framed (c=(recipes+1)*0x3F1):

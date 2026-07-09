@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact construct + round-trip for the dead-reckoning movement records (#190, docs/chardcmove-grammar.md):
+	// Byte-exact construct + round-trip for the dead-reckoning movement records (#190, docs/re/chardcmove-grammar.md):
 	// CharDCMoveIIR_t (0x4517AA81), StopIIR_c (0xD751EBB4), SetPosIIR_c (0x04B80B24). Oracles are captured bodies
 	// (full record incl. the 4-byte length prefix). Proves the codecs are a faithful inverse of the wire grammar
 	// (construct-don't-replay) across the flag-gated CharDCMove forms.

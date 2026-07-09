@@ -5,7 +5,7 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.World
 {
 	// The MoveTask transform packet (MoveTaskIIR 0x96C46740) - how the server tells clients where an entity is and which
-	// way it faces. The full recursive grammar is decoded (100% round-trip, docs/movetask-grammar.md); this codec builds
+	// way it faces. The full recursive grammar is decoded (100% round-trip, docs/re/movetask-grammar.md); this codec builds
 	// the forms we emit: the 61-byte "at-position-facing" form (the simplest + by far the most common, used by the player
 	// too), the bare-position + approach-target forms, and the multi-waypoint PathMoveTask (BuildPathBody). The 61-byte
 	// form's two positions are a FROM/TO segment - in the capture's stationary updates from==to; for a moving NPC we send
@@ -80,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 
 		// mode-01 PathMoveTask: the multi-waypoint patrol path - decoded from the captures + the client reader
-		// FUN_00a483b0 (docs/movetask-grammar.md, #53). Canonical shape (92/92 captured else-branch records): the
+		// FUN_00a483b0 (docs/re/movetask-grammar.md, #53). Canonical shape (92/92 captured else-branch records): the
 		// WaitMoveTask base header with flags=0x01 (bit0 set -> no duration/remaining floats) + the PathMoveTask
 		// F-flags=0x00 (no optional floats), then [u32 count][count x position] and a fixed 29-byte trailer
 		//   [0x00][f32 pathLength][12x 00][from x/y/z].

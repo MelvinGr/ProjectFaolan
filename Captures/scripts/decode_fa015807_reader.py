@@ -3,7 +3,7 @@
 pre-IIR scaffold) against captured spawn records (Gitea #185 / #54).
 
 The reader was decompiled from AgeOfConan.exe (Ghidra, FUN_01121c00 + helpers; see
-docs/fa015807-spawn-reader.md). Read primitives:
+docs/re/fa015807-spawn-reader.md). Read primitives:
   FUN_0048f900 = ReadU32 (4 bytes, byte-swapped to BE)   -> U32
   FUN_004e0390 = ReadByte (1 byte)                        -> U8
   FUN_01122b10 = a count-framed sub-list: first U32 = (count+1)*0x3F1, then count*{U32 + sub-object}

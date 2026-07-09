@@ -62,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; }
 
 		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
-		// the recovered FullPlayerCharacterIIR grammar (docs/fullplayer-snapshot-reader.md) instead of an opaque
+		// the recovered FullPlayerCharacterIIR grammar (docs/re/fullplayer-snapshot-reader.md) instead of an opaque
 		// header+string blob. Replaces the former Header0/Unknown*/RemoteFormat* fields, which were really the
 		// first Quest_c record's header + its 5 <remoteformat> strings.
 		public QuestcRegion Quests { get; init; } = new QuestcRegion();
@@ -72,7 +72,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public QuestIndexRegion? QuestIndex { get; init; }
 
 		// The @609 per-goal objective-detail region (chapterTag + per-goal records), modeled from the recovered
-		// grammar (QuestObjectiveRegion, docs/fullplayer-snapshot-reader.md) instead of riding in the opaque blob.
+		// grammar (QuestObjectiveRegion, docs/re/fullplayer-snapshot-reader.md) instead of riding in the opaque blob.
 		// Null when the tails carry no such region (no chapterTag at the boundary) - then it stays in UnknownBefore.
 		public QuestObjectiveRegion? QuestObjectives { get; init; }
 

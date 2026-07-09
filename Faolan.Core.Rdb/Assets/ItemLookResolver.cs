@@ -14,7 +14,7 @@ namespace Faolan.Core.Rdb.Assets
 	// garment, or a garment plus a shared base body); the caller filters by the character's sex via the mesh path.
 	//
 	// This is authoritative (the client reads the same template) and fully offline - no login cache / Preview.bin / live
-	// client is involved, so any character's real gear renders from faolan.db alone. See docs/gear-resolver-re-handoff.md.
+	// client is involved, so any character's real gear renders from faolan.db alone. See docs/re/gear-resolver-re-handoff.md.
 	public static class ItemLookResolver
 	{
 		// The field-id that tags a worn-mesh reference in the template's trailing sub-record.

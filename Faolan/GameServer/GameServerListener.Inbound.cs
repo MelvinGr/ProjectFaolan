@@ -52,7 +52,7 @@ namespace Faolan.GameServer
 			{
 				case GameServer0X2000Opcodes.CombatReactiveIIR:
 				{
-					// Spellweave ADD-COMPONENT (docs/combos.md). Each add is two packets: a 0x03-tagged carrier that
+					// Spellweave ADD-COMPONENT (docs/subsystems/combos.md). Each add is two packets: a 0x03-tagged carrier that
 					// carries the componentIndex, and a 0x02-tagged ack twin (no index). rawPayload =
 					// [u32 len][u32 sub][u32 senderType][u32 handle][u32 0][u8 tag][u32 componentIndex?].
 					if (rawPayload.Length >= 25 && rawPayload[20] == 0x03)
@@ -138,7 +138,7 @@ namespace Faolan.GameServer
 							var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
 							var liveRotation = moveEntity?.Rotation.ToVector3() ?? sessionCharacter.Rotation.ToVector3();
 
-							// The CharDCMove carrier's movingType u16 is [u8 env][u8 flag1] (docs/chardcmove-grammar.md):
+							// The CharDCMove carrier's movingType u16 is [u8 env][u8 flag1] (docs/re/chardcmove-grammar.md):
 							// the client streams its move with env=0x01 (the "I am the controlling client" flag); the
 							// server's echo + relay carry env=0x00. Retail strips it on both directions - verified
 							// byte-exact in the other-players-visible capture, where the c2s move and its s2c twin differ
@@ -243,7 +243,7 @@ namespace Faolan.GameServer
 
 					if (actionType == ActionType.SwitchWeaponsButton)
 					{
-						// #259: the toggle carries no extra data. Echo-ack the behavior (docs/combat.md rule 1) and toggle
+						// #259: the toggle carries no extra data. Echo-ack the behavior (docs/subsystems/combat.md rule 1) and toggle
 						// the player's combat stance, pushing the CombatMode stat so the client draws/sheathes the weapon -
 						// the player analogue of the NPC weapon-draw (#218). NEEDS in-client verification of the exact
 						// mechanism (stat push vs behavior-only) against a capture.
@@ -347,7 +347,7 @@ namespace Faolan.GameServer
 							{
 								Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", from, target, args);
 
-								// Every behavior gets an echo-ack (docs/combat.md rule 1); the item-use domain logic
+								// Every behavior gets an echo-ack (docs/subsystems/combat.md rule 1); the item-use domain logic
 								// lives in UseInventoryItem (GameServerListener.ItemUse.cs). The used item is identified by its inventory location - from =
 								// container (0x68 = backpack), target = slot - decoded from the use_totem_of_origin
 								// capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
@@ -416,7 +416,7 @@ namespace Faolan.GameServer
 
 									// #307: a PET-SUMMON spell spawns the pet (creature + PetIIR owner-assign + follow) instead
 									// of applying a target effect - this is what hooks pet summoning to real spell casts, not
-									// just the .pet GM command. Decoded from the necro-pet capture (docs/summon-pet-decode.md):
+									// just the .pet GM command. Decoded from the necro-pet capture (docs/subsystems/summon-pet-decode.md):
 									// cast (CastSpell) -> after the channel -> FA015807 pet spawn + PetIIR. PetSummonCatalog maps
 									// the summon spell id -> pet template + kind.
 									if (PetSummonCatalog.ForSpell(spellId) is { } petSummon)
@@ -598,7 +598,7 @@ namespace Faolan.GameServer
 								Logger.LogInformation($"UNKNOWN-{actionType.ToHex()}: {args}");
 
 								// Robustness (#236 channeled cast 0x15, #238 dodge hop): an un-decoded behavior must
-								// STILL get the generic behavior echo-ack (docs/combat.md rule 1), or the client stays
+								// STILL get the generic behavior echo-ack (docs/subsystems/combat.md rule 1), or the client stays
 								// stuck in the action's start state forever (cast bar never finishes / dodge never lands
 								// back to idle) and the player soft-locks until relog. Acking with the request's Mode
 								// returns control even when we don't yet model the action's effect.
@@ -746,7 +746,7 @@ namespace Faolan.GameServer
 				{
 					// The client opened the Crafting -> Recipes book and is asking for its recipe list. Answer with
 					// the TradeskillReplyIIR (0x9062D559) catalog from the DB so the book populates. See
-					// TradeskillRecipeCodec / docs/tradeskill-recipes.md.
+					// TradeskillRecipeCodec / docs/subsystems/tradeskill-recipes.md.
 					_ = packet.Body.ReadRemainingArray();
 					await SendCraftingRecipeBook(client);
 
@@ -1413,7 +1413,7 @@ namespace Faolan.GameServer
 				// reply to (#72). Body = [u16 state] (1 = on, 0 = off). Sprint drains the yellow ENERGY bar CLIENT-side
 				// (retail's server barely streams the bar during sprint - verified: 1 packet across a sprint-heavy
 				// capture). We don't reply or drive the bar; we only MIRROR the drain into the tracked session.Energy so
-				// spellweaving starts from the real current value and Exhausted can fire at 0 (docs/combos.md).
+				// spellweaving starts from the real current value and Exhausted can fire at 0 (docs/subsystems/combos.md).
 				if (opcode == 0x200C)
 				{
 					var state = packet.Body != null && packet.Body.Length - packet.Body.Position >= sizeof(ushort)

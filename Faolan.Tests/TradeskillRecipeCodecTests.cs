@@ -10,7 +10,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The crafting recipe-book list (TradeskillReplyIIR_c 0x9062D559) the server sends when the client opens the
-	// Recipes window. Grammar decoded from AgeOfConan.exe (docs/tradeskill-recipes.md) and gated byte-exact against
+	// Recipes window. Grammar decoded from AgeOfConan.exe (docs/subsystems/tradeskill-recipes.md) and gated byte-exact against
 	// NecroL80_..._open-crrafting-receipies frame 2926 (603 recipes): parsing the captured reply into Recipe records
 	// and rebuilding it via the codec must reproduce the wire body exactly.
 	public class TradeskillRecipeCodecTests

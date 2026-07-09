@@ -10,7 +10,7 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
 `[bodyLen u32][subop][0000C350][instance][seq u16 = 0003][behaviorId u32][argsLen u32][args][tail]`
 
 - `behaviorId` = the `ActionType`: **0x0F NormalAttack** (armed swing), **0x11 UnarmedAttack** (empty main
-  hand; behavior TypeIds 1089xx), 0x09 equip move (see `docs/inventory.md`), 0x2E weapon switch, 0x16 talk,
+  hand; behavior TypeIds 1089xx), 0x09 equip move (see `docs/subsystems/inventory.md`), 0x2E weapon switch, 0x16 talk,
   0x12 use object, etc.
 - args protobuf `{TypeId, Mode, Category, Field6, ...}` - **Mode is a monotonic per-session action
   counter** across ALL BCC interactions.
@@ -29,7 +29,7 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
    (0xFEC4158A)` + the target's vitals application + `EnergyIIR (0x40749B8A)` stamina.
 4. **Targeted UNARMED damage was not captured** (the capture's unarmed swings hit air); the server reuses
    the armed damage path as an extension - revisit if a targeted-unarmed capture lands.
-5. Equip moves (0x09) ack with the identity-block variant + a 0x201C record - `docs/inventory.md`.
+5. Equip moves (0x09) ack with the identity-block variant + a 0x201C record - `docs/subsystems/inventory.md`.
 
 The `B2 90 80 5C 29 E6 27 CA` 8-byte sequence is the standard null-identity filler wherever an item
 identity quad would go (behavior acks, the 0xF result block, 0x2052 grants).
@@ -125,7 +125,7 @@ verification.
 interpolation (a small teleport/snap) and a **walk** gait. Findings from the MoveTask grammar:
 - The task-type byte **@30** (offset incl. the 4-byte length prefix) is the form discriminator: `0x02` orient
   (the 61-byte form we send), `0x04` patrol/segment-list, `0x08` **follow-entity**. NB the FULL recursive grammar
-  + authoritative per-mode type names are now decoded (100%, #53) in `docs/movetask-grammar.md` (0x04 is the
+  + authoritative per-mode type names are now decoded (100%, #53) in `docs/re/movetask-grammar.md` (0x04 is the
   recursive `ListMoveTask`, 0x06 = `AnimatedMoveTask`); the labels here are combat-side shorthand.
 - `0x08` follow (the chasing mobs send it with id = the player handle) is **target/facing metadata, NOT a
   mover** - wiring it as the chase driver made NPCs face+attack in place without moving. The actual
@@ -163,7 +163,7 @@ On a ding (XP-driven or the GM `.level` set) retail sends, in order: a burst of 
 on-screen feedback lines — **one per primary attribute that rose** (the 5 category-615 ids 804/806/808/810/814) —
 then a `0x96B8DC59` vitals push with the new Health/Stamina/Mana maxima. There is **no** "You reached level N"
 banner in any capture, and the Level number is never pushed as a standalone `0x36` stat (the client tracks it from
-the snapshot/quest stream). The attribute lines are `FormatFeedbackIIR` payloads — see `docs/on-screen-feedback.md`
+the snapshot/quest stream). The attribute lines are `FormatFeedbackIIR` payloads — see `docs/subsystems/on-screen-feedback.md`
 and `AttributeChangedFeedback` (decode `Captures/scripts/decode_levelup_feedback.py`, golden `AttributeChangedFeedbackTests`).
 Wired into both paths: GM `.level` (`SetLevelCommand`) and `CombatService.PushLevelUp`. Which attributes rise / by
 how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-class growth tables exist in captures.

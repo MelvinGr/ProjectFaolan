@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Constants
 	}
 
 	// Client->server methods - the COMPLETE recovered CSPlayerAgent.client_to_server table. The 16-bit opcode
-	// is a METHOD INDEX (0x2000 + position) into docs/aoc-client-rpc-methods.json; alignment verified against
+	// is a METHOD INDEX (0x2000 + position) into docs/re/aoc-client-rpc-methods.json; alignment verified against
 	// the hoxxling guild capture (0x2000 Authenticate, 0x201C AcceptGuildInvitation fired exactly once on the
 	// accept, 0x201E/0x202F/0x2040/0x2041/0x2077 all behave as named). See Captures/scripts/decode_guild.py.
 	public enum CsPlayerAgentOpcodes : ushort
@@ -389,7 +389,7 @@ namespace Faolan.Core.Network.Constants
 	}
 
 	// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from
-	// --- docs/aoc-client-rpc-methods.json (opcode = 0x2000 + table position). Most are not handled yet;
+	// --- docs/re/aoc-client-rpc-methods.json (opcode = 0x2000 + table position). Most are not handled yet;
 	// --- they are here so future packets can be identified and routed by (class id, opcode).
 
 	// GameAgent (caller GameInterface) - the connection-level service: auth, ping, the PassBlob IIR carrier.
@@ -603,7 +603,7 @@ namespace Faolan.Core.Network.Constants
 
 	// Every 32-bit sub-opcode carried inside a 0x2000 packet is an "IIR" (Incremental Information Replication)
 	// message id = the BKDR-31 hash of the client's IIR C++ type name (h = h*31 + c; == Java String.hashCode),
-	// recovered by RE'ing AgeOfConan.exe (docs/archive/opcode-re-plan.md + docs/aoc-opcode-ids.md). Members are named
+	// recovered by RE'ing AgeOfConan.exe (docs/archive/opcode-re-plan.md + docs/re/aoc-opcode-ids.md). Members are named
 	// after the real client type (with the _t/_c template suffix dropped); the comment gives the exact type and
 	// the occurrence count across all captures. This is the full catalog of every IIR id observed on the wire
 	// (server->client AND client->server - the id is the message type, direction-independent), even ones the
@@ -687,7 +687,7 @@ namespace Faolan.Core.Network.Constants
 		N3ToClientQuitIIR = 0x04B82B2D, // n3ToClientQuitIIR_t  (x3249)
 
 		// FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization carve-out (nested 101/104/112/113
-		// container blocks, 83-byte item tails): the RE notes live in docs/fullplayer-snapshot-reader.md.
+		// container blocks, 83-byte item tails): the RE notes live in docs/re/fullplayer-snapshot-reader.md.
 	}
 
 	// PlayerAgent opcodes do NOT map onto the recovered PlayerAgent/PlayerInterface tables (25 methods, max
@@ -789,7 +789,7 @@ namespace Faolan.Core.Network.Constants
 	// recovered TradepostAgent.client_to_server table (opcode = 0x2000 + position; alignment verified on
 	// ItemSearch/BuyItem/Close). The method ids COLLIDE with ordinary GameServer opcodes, so tradepost packets
 	// route by RPC class id (Endpoints.TradepostAgentType), never by opcode alone. Behaviour that differs
-	// from the name is noted per line (docs/tradepost-protocol.md).
+	// from the name is noted per line (docs/subsystems/tradepost-protocol.md).
 	public enum TradepostAgentOpcodes : ushort
 	{
 		GetAllMails = 0x2000, // the mailbox poll

@@ -132,7 +132,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// Build a single quest-journal record from a QuestDefinition (its 5 header text refs + areaId) plus the
 		// per-quest scalars that are NOT yet harvested into QuestDefinition (the goal/line count `n` and the two
 		// undecoded words FieldF0/FieldF8 - carried from the capture per quest). The numeric objective lists are
-		// left empty (the objective TEXT rides in the strings; see docs/fullplayer-snapshot-reader.md). This is
+		// left empty (the objective TEXT rides in the strings; see docs/re/fullplayer-snapshot-reader.md). This is
 		// the construct-don't-replay generator for the quest region (#186), proven byte-exact for 10238 by
 		// QuestcGenerationTests.
 		public static QuestcRecord BuildSingle(QuestDefinition def, uint state, uint n, uint fieldEc, uint fieldF0, ulong fieldF8, uint field28 = 0)

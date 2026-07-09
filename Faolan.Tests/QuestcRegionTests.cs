@@ -9,7 +9,7 @@ namespace Faolan.Tests
 {
 	// Byte-exact round-trip of the Quest_c (List A) region at the start of the beach snapshot tails - the
 	// construct-don't-replay foundation for retiring BeachTailsTemplate.bin's quest journal (Gitea #186).
-	// Grammar: docs/fullplayer-snapshot-reader.md (recovered from FullPlayerCharacterIIR::ReadSubClass).
+	// Grammar: docs/re/fullplayer-snapshot-reader.md (recovered from FullPlayerCharacterIIR::ReadSubClass).
 	public class QuestcRegionTests
 	{
 		private const int RegionEnd = 609; // where Quest_c ends in the beach template (decode_questc.py)

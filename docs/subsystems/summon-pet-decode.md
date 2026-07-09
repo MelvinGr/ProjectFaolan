@@ -51,7 +51,7 @@ Interact, not a pet action and not an emote).
 - `0x1F8` = **dismiss** → server replies with `ApplySpell` + `n3ToClientQuit 0x04B82B2D` despawn of the pet.
 - (attack/follow/stay/aggressive/passive are the neighbouring `0x1Fx` codes — capture those next.)
 
-**Owner-binding — `PetIIR_c` (0x1F4CB0F7)** (opcode already named; reader in docs/iir-readers-conversation-misc.md
+**Owner-binding — `PetIIR_c` (0x1F4CB0F7)** (opcode already named; reader in docs/re/iir-readers-conversation-misc.md
 = `[u32 mode], mode∈{0,1}→[u32×2], mode==0→[u32×3]`). This is the packet that tells the client "this creature is
 YOUR pet". Sent right after the pet spawn: carrier `[sub][C350][ownerHandle=player][u8 env]` then the mode
 payload carrying the **pet handle** (+ extras for mode 0). Observed: mode-0 (len 41) on each summon

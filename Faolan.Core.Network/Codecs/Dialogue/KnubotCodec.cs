@@ -4,7 +4,7 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// Construct-side codecs for the server->client Knubot conversation records (#188, docs/iir-readers-conversation-misc.md).
+	// Construct-side codecs for the server->client Knubot conversation records (#188, docs/re/iir-readers-conversation-misc.md).
 	// The Knubot carrier nests BOTH conversation endpoints: the player is the IIR carrier handle (`instance`), and the
 	// KnubotBaseIIR_c header (FUN_009a7e00) carries the version + the NPC endpoint:
 	//   [u32 len][u32 sub][u32 0xC350][u32 playerInstance]

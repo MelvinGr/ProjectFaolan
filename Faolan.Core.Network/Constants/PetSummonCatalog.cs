@@ -6,7 +6,7 @@ namespace Faolan.Core.Network.Constants
 	// Maps a SUMMON-PET spell id (the id the client casts via ActionType.CastSpell) to the pet it produces — the
 	// pet counterpart of MountCatalog (#307). When a cast's spell id is in here, the server summons the pet
 	// (spawn the creature + PetIIR owner-assign + follow) exactly like the retail necro-pet flow
-	// (docs/summon-pet-decode.md). Spell ids + the (combat/social) kind are decoded from the chat-annotated capture.
+	// (docs/subsystems/summon-pet-decode.md). Spell ids + the (combat/social) kind are decoded from the chat-annotated capture.
 	// The PetTemplate is a creature TYPE name (Npc.Name) - spawned from the TYPE (columns: StatCore + Equipment + Morphs, #244/#307),
 	// NOT a world placement. The pet-creature types must be imported (Npc row + Data) for the summon to render.
 	public sealed record PetSummon(uint SummonSpellId, string PetTemplate, bool Combat)

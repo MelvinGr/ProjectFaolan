@@ -20,7 +20,7 @@ namespace Faolan.Core.Database.Tables
 		// version, fixed at 3 - see GuildService). The actual government-form byte sits after guildId and is fixed
 		// at 1 on the wire today, because GuildRenownBlock only encodes that form's body layout (the captured
 		// "Sepulchra Invictus" guild was form 1). This column is retained for a future real government-form feature
-		// and is not yet emitted. The client UI maps the value to a government label (#219, docs/guilds.md).
+		// and is not yet emitted. The client UI maps the value to a government label (#219, docs/subsystems/guilds.md).
 		public byte GovernmentForm { get; set; } = 1;
 
 		public DateTimeOffset CreationDate { get; set; }

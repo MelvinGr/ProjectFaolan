@@ -16,7 +16,7 @@ Wireshark without the JSON dump + Python dissector pipeline.
   _(Note: the C# `ConanMessageFramer` only detects the marker at receive-chunk starts; this
   plugin handles it at any packet boundary.)_
 - **RpcHeader dissection**: sender/receiver `ProtoEndpoint`s (class id resolved to the 14
-  recovered client class names - BKDR-31 hashes, see `docs/aoc-opcode-ids.md` - plus the
+  recovered client class names - BKDR-31 hashes, see `docs/re/aoc-opcode-ids.md` - plus the
   instance), the 16-bit method opcode, trailing header bytes, body. The two
   endpoints are dispatched by their protobuf tag (sender = field 1 / `0x0A`, receiver =
   field 2 / `0x12`) in **either order** - server->client replies swap them (receiver-first),

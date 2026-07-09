@@ -56,4 +56,4 @@ handle is reassigned per session.
 
 - [`03-iir-carrier.md`](03-iir-carrier.md) — where the typeTag and handle sit in a record.
 - [`01-crypto.md`](01-crypto.md) — the credentials the character id keys back to.
-- `docs/npc-three-tier-architecture.md` — how a Character-class entity is built from typed columns.
+- `docs/subsystems/npc-three-tier-architecture.md` — how a Character-class entity is built from typed columns.

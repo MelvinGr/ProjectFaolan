@@ -66,7 +66,7 @@
 > esp. one primary actor `0x2c4e` stepped through ~13 incrementing states (`18 01`→`18 0d`) and Kalanthes
 > (`0x2c1c`, idx 889). **We send ZERO BehaviorCC.** This is the long-flagged "verbatim residue: BehaviorCC" (#223)
 > / scene-actor gap (#185), now pinned as the exact speech blocker. Handle is at body[12:16] (re-addressable like
-> MoveTask); grammar in `docs/behaviorcontrolcenter-grammar.md` + `Captures/scripts/decode_behaviorcc.py`.
+> MoveTask); grammar in `docs/re/behaviorcontrolcenter-grammar.md` + `Captures/scripts/decode_behaviorcc.py`.
 >
 > **NEXT:** replay the cutscene's BehaviorControlCenter sequence re-addressed to our live handles, timed to the
 > callbacks. Open question: the BCCs target ~40 distinct captured scene-actor handles (`0x2c22`-`0x2c7c`); mapping
@@ -244,7 +244,7 @@ Steps (each in-client testable):
    and take the live `id`, so they re-address cleanly.
 3. **Kalanthes / scene actors** come from the constructed NPC set (interest-streamed beach NPCs), not verbatim —
    so they're the live session's. Cinematic actor-tagging (`TagCharacterForCinematicScriptCommand`, see
-   `docs/create-cutscene-camera-paths.md`) binds the cutscene to the live Kalanthes handle.
+   `docs/subsystems/create-cutscene-camera-paths.md`) binds the cutscene to the live Kalanthes handle.
 4. **Delete the self-reconnect.** Once the world is established on the cutscene connection, the client shouldn't
    need to drop+reconnect. If it still does, the post-create reconnect must arm the post-`0x205F` follow-up
    (`0x2024 ReadyForPlayScreen`) like the teleport-reentry path (`GameServerListener` ~line 507) so it doesn't hang.
@@ -255,7 +255,7 @@ Steps (each in-client testable):
   context where they render in retail, so fixing this also informs the existing-char chains issue (#267).
 - Editor (drowning, playfield 4000) cutscene is client-autonomous + already correct; this work is the WORLD
   (beach 4010 / Kalanthes) connection.
-- Camera-path/playfield theory is RESOLVED (`docs/create-cutscene-camera-paths.md`); not a blocker.
+- Camera-path/playfield theory is RESOLVED (`docs/subsystems/create-cutscene-camera-paths.md`); not a blocker.
 
 ## Status (updated 2026-06-22, in-client tested)
 
@@ -341,7 +341,7 @@ Decoded retail's world connection (`Blablabla_*` port 7020) AND our flow (`/tmp/
    (StartFixed3d / ApproachCasilda / the caging tableau) - my `SendCreateCutsceneStep` overlay owns the destiny
    flow. Keep any genuinely-needed post-ready bits (abilities). Gate in `FlushPendingPost205FFollowUp`/PostReadyBurst.
 2. Render Kalanthes (and the scene actors) for the cutscene (#185) + cinematic actor-tagging
-   (`TagCharacterForCinematicScriptCommand`, docs/create-cutscene-camera-paths.md) so the walk-up plays.
+   (`TagCharacterForCinematicScriptCommand`, docs/subsystems/create-cutscene-camera-paths.md) so the walk-up plays.
 
 In-client now: create → drowning → loading screen → wash ashore → BRIEF gameplay/GUI control → then the (conflicted,
 actorless) Kalanthes cutscene re-engages and sticks. Big progress; these two items finish it.

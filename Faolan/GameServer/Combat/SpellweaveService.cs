@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
 {
-	// The spellweaving state machine (docs/combos.md). Spellweaving is the caster analogue of the melee combo:
+	// The spellweaving state machine (docs/subsystems/combos.md). Spellweaving is the caster analogue of the melee combo:
 	// the player ACTIVATES the weave (entering a trance), ADDS components one at a time while in the trance, then
 	// DEACTIVATES to fire the accumulated blend. Decoded wire (Captures/decode_spellweave.py):
 	//   - activate/deactivate = c2s PerformSpecialAction (0x205A), a TOGGLE (body [u32 0x000000fc]);
@@ -22,7 +22,7 @@ namespace Faolan.GameServer.Combat
 	// via two narrow seams the listener passes in - `_applySpell` (the listener's ApplySpell self-buff helper) and
 	// `_sendIir` (wrap a record in the world-framed IIR carrier). The per-add element re-send (with the used element
 	// zeroed) + the meter drain-stream + the componentIndex -> stat/effect contribution table are not built yet (see
-	// docs/combos-spellweaving-handoff.md); the trance immobilisation is likewise a TODO.
+	// docs/subsystems/combos-spellweaving-handoff.md); the trance immobilisation is likewise a TODO.
 	public sealed class SpellweaveService
 	{
 		private const int DotDrainPerTick = 31_705;

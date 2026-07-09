@@ -1,9 +1,9 @@
 # What the RPC-opcode recovery unblocked — handoff (2026-06-13)
 
-The 16-bit RPC method tables are now fully recovered in **both directions** (`docs/aoc-rpc-method-opcodes.md`;
+The 16-bit RPC method tables are now fully recovered in **both directions** (`docs/re/aoc-rpc-method-opcodes.md`;
 scripts/outputs in `Captures/ghidra/`). `wire = 0x2000 + registration index`, base `0x2000` for every interface
 except PlayerAgent/PlayerInterface. Crucially, for every **named** s2c method we also already have the **wire
-field order** (param names) from `docs/aoc-client-rpc-methods.json` — so most of these are *buildable*, not just
+field order** (param names) from `docs/re/aoc-client-rpc-methods.json` — so most of these are *buildable*, not just
 identified. This handoff lists what that opens up, with the concrete opcode + body for each.
 
 **The standing rule still applies:** name + field order is necessary, not sufficient — each new builder must be
@@ -22,7 +22,7 @@ proven **byte-exact against a capture** (golden test in `Faolan.Tests`) before i
 - **§3 Loot item GRANT — DONE.** `TryLootAll (0x2043)` → `GrantItemToBackpack` (live DispatchAddItem) for each bag
   item; `TryLootCash (0x2045)` → wallet credit. Loot bags carry random items. ⚠️ Caveat: the loot **bag/corpse
   visual doesn't render** — that's the separate mid-session-spawn blocker (`[[protocol_midsession_spawn_blocked]]`
-  / `docs/mid-session-spawn-blocker.md`), NOT a loot-protocol problem; the grant path works via loot-all.
+  / `docs/subsystems/mid-session-spawn-blocker.md`), NOT a loot-protocol problem; the grant path works via loot-all.
 - **Suggested order steps 1 & 2 — DONE** (DispatchAddItem builder + loot grant). Steps 3 (vendor BUY) and 4
   (mail/AH) are still open.
 - **The full s2c Dispatch tables were added to `Opcodes.cs`** as enums (`GameCharInterfaceDispatchOpcodes` etc.,
@@ -118,7 +118,7 @@ implemented; they're now fully specified for whenever grouping/trading is picked
 
 ## 6. Mail (TradepostInterface) — both directions named
 
-`docs/tradepost-protocol.md` + `TradepostProtocol.InterfaceMethod` now carry the true 8-method s2c table
+`docs/subsystems/tradepost-protocol.md` + `TradepostProtocol.InterfaceMethod` now carry the true 8-method s2c table
 (DispatchMailMessage `0x2002`, DispatchSendMailResult `0x2003`, DispatchRetrieveMailResult `0x2004`,
 DispatchDeleteCanceledMail/Item `0x2006/0x2007`). With the c2s mail ops already named, the mail subsystem of §9
 (GetAllMails / SendMail / GetMailItems → DispatchMailMessage, attachment via DispatchAddItem) is fully specified.
@@ -128,7 +128,7 @@ DispatchDeleteCanceledMail/Item `0x2006/0x2007`). With the c2s mail ops already 
 ## 7. The `default`-branch "unknown (class, opcode)" log can now resolve names
 
 Every inbound `(receiver class, opcode)` and every outbound s2c opcode maps to a real method name in both
-directions (`docs/aoc-rpc-method-opcodes.md`). The TODO §4b "log unknown (class, method) combos" idea can print
+directions (`docs/re/aoc-rpc-method-opcodes.md`). The TODO §4b "log unknown (class, method) combos" idea can print
 the actual method name instead of a bare hex value — useful for triaging the named-but-unhandled client packets.
 
 ---
@@ -150,7 +150,7 @@ the actual method name instead of a bare hex value — useful for triaging the n
 - **PlayerInterface / PlayerAgent (login) stays behavior-derived.** Its dispatcher uses a 32-bit *hash* method id
   (binary-search tree, e.g. `0x5dc18991` = DispatchAuthenticateAck), not `0x2000 + index`, and the hash fn isn't
   plain BKDR-31/CRC32. Login already works, so this is low priority; the handler→name pairs in
-  `docs/aoc-rpc-method-opcodes.md` are known plaintext↔hash anchors if someone wants to crack it.
+  `docs/re/aoc-rpc-method-opcodes.md` are known plaintext↔hash anchors if someone wants to crack it.
 
 ## Suggested order of attack
 1. ✅ **DONE — DispatchAddItem (`0x2020`) builder + golden test** — the keystone for §1/§2/§3. Built, golden-tested

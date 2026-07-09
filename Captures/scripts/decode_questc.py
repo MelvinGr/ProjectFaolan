@@ -3,7 +3,7 @@
 
 This is the front of the long-opaque `UnknownBeforeAccessWindowTable` blob. Grammar recovered from the
 client reader `FullPlayerCharacterIIR::ReadSubClass` (FUN_0148c210 -> base FUN_00797440 -> List A driver
-FUN_0091f5c0 -> per-record FUN_0091df50); see docs/fullplayer-snapshot-reader.md and the memory
+FUN_0091f5c0 -> per-record FUN_0091df50); see docs/re/fullplayer-snapshot-reader.md and the memory
 `ghidra_vtable_xref_readers`. Stream primitives: FUN_0048f900=ReadU32 (BE), FUN_0048f840=ReadString
 ([u16 len][bytes]), FUN_0048f720=ReadU64, FUN_00cc0540=Read4xU32.
 

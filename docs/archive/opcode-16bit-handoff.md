@@ -1,7 +1,7 @@
 # 16-bit RPC method opcodes — Ghidra handoff (2026-06-13)
 
-> **RESOLVED 2026-06-13.** Tables recovered: `docs/aoc-rpc-method-opcodes.md`; summary in
-> `docs/aoc-opcode-ids.md` (Stage 3b); scripts/outputs in `Captures/ghidra/`. `wire = 0x2000 + registration
+> **RESOLVED 2026-06-13.** Tables recovered: `docs/re/aoc-rpc-method-opcodes.md`; summary in
+> `docs/re/aoc-opcode-ids.md` (Stage 3b); scripts/outputs in `Captures/ghidra/`. `wire = 0x2000 + registration
 > index`, base 0x2000 for all interfaces except PlayerAgent/PlayerInterface (32-bit hash dispatch — still
 > open). c2s order == the catalog (proven); s2c drift resolved via the dispatcher switches (the live build
 > inserts mostly-no-arg dispatch methods the string catalog missed). In-client anchors all match. This file
@@ -21,14 +21,14 @@ wire opcode = 0x2000 + (method's registration index within its interface)
 This yields the real numeric id ↔ method-name table for THIS client build — including the **server→client
 ("Dispatch") tables that DRIFT** (CLAUDE.md: we currently name s2c downloads by content because we never had
 the build's true order). Output: replace the invented/`[?]` names in
-`Faolan.Core/Network/Packets/Opcodes.cs` with the recovered ids, and extend `docs/aoc-opcode-ids.md`.
+`Faolan.Core/Network/Packets/Opcodes.cs` with the recovered ids, and extend `docs/re/aoc-opcode-ids.md`.
 
 ## What is ALREADY done — do NOT redo
 - **Method names + signatures** (Stage 1): 14 interfaces, 376 c2s (`*Proxy_t::<Method>` strings) + **401 s2c**
-  (`stream bad after '<field>'` strings) → `docs/aoc-client-rpc-methods.json` / `.md`. We already know WHAT every
+  (`stream bad after '<field>'` strings) → `docs/re/aoc-client-rpc-methods.json` / `.md`. We already know WHAT every
   method is and its field order; we only lack the numeric 16-bit id for each.
 - **32-bit sub-opcodes (IIR type ids) + endpoint ids** (Stage 2/3a): BKDR-31 hash of class names →
-  `docs/aoc-opcode-ids.md`. (`h=0; for c in name: h=(h*31+c)&0xFFFFFFFF`.)
+  `docs/re/aoc-opcode-ids.md`. (`h=0; for c in name: h=(h*31+c)&0xFFFFFFFF`.)
 - **A handful of 16-bit control opcodes hand-identified** from captures: `SpawnCheck 0x2008`,
   `ReadyForPlayScreen 0x2024`, `Pong 0x2009`, the `0x201C` handshake, `CreateCharacter 0x20DE`,
   `EnterWorld 0x20B6`. **Use these as anchors** to validate the recovered registration order.
@@ -67,7 +67,7 @@ the build's true order). Output: replace the invented/`[?]` names in
    index↔name pairing.
 3. **Validate against the anchors** before trusting it: in `GameCharInterface`/`GameInterface`, `CreateCharacter`
    must land on `0x20DE` and `EnterWorld` on `0x20B6`. If the ordinals match, dump all 14 interfaces.
-4. **Write the tables**: update `Opcodes.cs` (replace invented names with verified ids) and `docs/aoc-opcode-ids.md`;
+4. **Write the tables**: update `Opcodes.cs` (replace invented names with verified ids) and `docs/re/aoc-opcode-ids.md`;
    re-validate any opcode our server already emits/handles didn't change meaning.
 
 The 14 interfaces (Stage 1): `UniverseAgent/Interface`, `PlayerAgent/Interface`, `CSPlayerAgent/Interface`,
@@ -92,7 +92,7 @@ The 14 interfaces (Stage 1): `UniverseAgent/Interface`, `PlayerAgent/Interface`,
 ## Acceptance gate
 The recovered `GameInterface`/`GameCharInterface` ordinals reproduce the known anchors (`CreateCharacter 0x20DE`,
 `EnterWorld 0x20B6`, and any others we already use). Only then commit the full 14-interface tables to `Opcodes.cs`
-+ `docs/aoc-opcode-ids.md`. Keep the recovery script under `Captures/` (alongside `decode_opcode_ids.py`,
++ `docs/re/aoc-opcode-ids.md`. Keep the recovery script under `Captures/` (alongside `decode_opcode_ids.py`,
 `extract_rpc_catalog.py`) so it's reproducible.
 
 ## Paste-ready prompt
@@ -100,11 +100,11 @@ The recovered `GameInterface`/`GameCharInterface` ordinals reproduce the known a
 > parked Stage 3b gap (`docs/archive/opcode-re-plan.md`): the wire opcode `0x2000..0x20FF` = `0x2000 +` the
 > method's RPC registration index, which is assigned by registration ORDER (not a literal/hash/jump-table), so it
 > needs the Ghidra analysis already sitting at `/home/melvin/Development/Ghidra/Aoc` (reuse with `-process -noanalysis`; re-import
-> if `/tmp` was cleared). Names + signatures are already recovered (`docs/aoc-client-rpc-methods.json`, 376 c2s +
+> if `/tmp` was cleared). Names + signatures are already recovered (`docs/re/aoc-client-rpc-methods.json`, 376 c2s +
 > 401 s2c); you only need the numeric ids. Find each interface's method-registration site (anchor on the
 > `*Proxy_t::` / `DispatchMethod(` / `GameCharInterface` strings — note Ghidra didn't auto-create string xrefs, so
 > walk to the C-string start and pointer-search its LE32; see `DumpReadSubClass.java`), read the ordered register
 > calls / method-descriptor array, map handler→name, and VALIDATE against `CreateCharacter=0x20DE` /
 > `EnterWorld=0x20B6` before dumping all 14 interfaces. Then replace the invented names in `Opcodes.cs` and extend
-> `docs/aoc-opcode-ids.md`; this also unblocks the TradepostAgent (mail/auction) opcodes. Save the recovery script
+> `docs/re/aoc-opcode-ids.md`; this also unblocks the TradepostAgent (mail/auction) opcodes. Save the recovery script
 > under `Captures/`.

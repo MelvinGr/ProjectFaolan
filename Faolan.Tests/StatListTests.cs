@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Proves the recovered stat-block grammar: the FullChar snapshot's stat block is TWO 0x3F1-framed StatPair_t
-	// lists (docs/fullplayer-snapshot-reader.md regions 9-10), preceded by two empty framed lists and followed by a
+	// lists (docs/re/fullplayer-snapshot-reader.md regions 9-10), preceded by two empty framed lists and followed by a
 	// trailer. StatList#1 = 17 displayed stats (Level/XP/MaxXP/HP...), StatList#2 = 148 full-sheet stats. Parses the
 	// actual SubClassStatBlock bytes with StatList and re-serializes them byte-exact.
 	public class StatListTests

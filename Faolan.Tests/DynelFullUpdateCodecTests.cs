@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact round-trip for the dynel-family full-update records (#187, docs/iir-readers-combat-world.md):
+	// Byte-exact round-trip for the dynel-family full-update records (#187, docs/re/iir-readers-combat-world.md):
 	// Door (typeWord 0xC748) and TombStone (0xC87B). Oracles are captured bodies (full record incl. length prefix).
 	// Proves the codec splits the record into [header][env][length-prefixed identity blob][opaque geometry tail] and
 	// rebuilds it byte-exact - the same lift SimpleDynelMessageCodec does, extended to the door/destructible/

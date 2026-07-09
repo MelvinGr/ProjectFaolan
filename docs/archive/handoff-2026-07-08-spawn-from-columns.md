@@ -45,7 +45,7 @@ both (the differentiator is purely the following `0x2000` burst content).
 
 **Goal:** build the whole FA015807 NPC spawn body from typed DB columns, no captured `Data` splice.
 
-**Data model — the three tiers** (`docs/npc-three-tier-architecture.md`):
+**Data model — the three tiers** (`docs/subsystems/npc-three-tier-architecture.md`):
 - `Npc` — the type/template (DB). Carries `NpcStatCore` (1:1 side table) = the type-constant CharacterIIR
   stat core, lifted off `Data` into ~60 nullable proto-mirror columns + `IirHeader` (the CoreChar header
   word `X`, RE'd as a type-stable field-presence mask).
@@ -77,7 +77,7 @@ both (the differentiator is purely the following `0x2000` burst content).
 ## 2. #243 — the humanoid runtime post-IIR tail (ACTIVE — half-built)
 
 The 155 spawns still on `Data` are the ones whose post-IIR isn't the clean appearance shape. RE
-(`docs/npc-three-tier-architecture.md`, commit `cad8a151`) of 847 equipped humanoids:
+(`docs/subsystems/npc-three-tier-architecture.md`, commit `cad8a151`) of 847 equipped humanoids:
 
 | shape | count | status |
 |---|---|---|
@@ -146,4 +146,4 @@ spawns (and world objects / create-editor, which are separate).
 - `Faolan.Importer/Extractors/NpcSpawnExtractor.cs`, `Captures/ImportOps.cs`, `CapturePetImporter.cs`.
 - `Faolan/GameServer/World/WorldBroadcaster.cs` (`SendWorldSpawn` = the per-send token re-stamp).
 - Tests: `Faolan.Tests/NpcSpawnFromScratchTests.cs`, `NpcStatCoreCodecTests.cs`.
-- Docs: `docs/npc-three-tier-architecture.md`. Memory: `spawn_playfield_token_per_send`.
+- Docs: `docs/subsystems/npc-three-tier-architecture.md`. Memory: `spawn_playfield_token_per_send`.

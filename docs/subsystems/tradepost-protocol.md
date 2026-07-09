@@ -52,7 +52,7 @@ client-side proximity check, so the access position must be within 15 units of t
 | S→C | `0x2001` | DispatchClose | empty (no-arg; the catalog-missed insertion) |
 | S→C | `0x2006/0x2007` | DispatchDeleteCanceledMail / DispatchDeleteCanceledMailItem | — |
 
-(Full TradepostInterface table — 8 methods, recovered from the dispatcher switch — in `docs/aoc-rpc-method-opcodes.md`.)
+(Full TradepostInterface table — 8 methods, recovered from the dispatcher switch — in `docs/re/aoc-rpc-method-opcodes.md`.)
 
 ## TradepostItemSearch query (C→S `0x200D`, byte-exact)
 

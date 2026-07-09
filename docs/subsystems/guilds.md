@@ -8,13 +8,13 @@ Dissector + validation: `Captures/scripts/decode_guild.py`.
 
 All guild RPCs run on the **CsPlayerAgent** connection (port 7012). The 16-bit opcode after the
 RpcHeader is a **method index** (0x2000 + position) into the recovered RPC tables
-(`docs/aoc-client-rpc-methods.json`):
+(`docs/re/aoc-client-rpc-methods.json`):
 
 - client→server: `CSPlayerAgent.client_to_server` — alignment verified (0x201C = `AcceptGuildInvitation`
   fired exactly once on the accept; 0x201E/0x202F/0x2040/0x2041 all match their observed behavior).
 - server→client: `CSPlayerInterface.server_to_client` — true table recovered from the dispatcher switch
   (211 methods; the live build inserts mostly no-arg methods the string catalog missed). Full table:
-  `docs/aoc-rpc-method-opcodes.md`.
+  `docs/re/aoc-rpc-method-opcodes.md`.
 
 One GameServer packet participates: sub-opcode `0x2550C99A GuildUpdateIIR_c` sets the in-world guild
 tag: `[ID32 char][u16 0][s16 guildName]`. Retail sends it once on guild join; an empty name clears it.
@@ -45,7 +45,7 @@ At login while guilded, the server pushes `0x203F` immediately after the Authent
 ```
 
 - rank 0 = fresh member (Kyloth, who could invite, had 5). **The guild LEADER is rank 4** — proven by the
-  create-guild capture's member record (`docs/create-guild-decode.md`); the server previously guessed 6.
+  create-guild capture's member record (`docs/subsystems/create-guild-decode.md`); the server previously guessed 6.
   `Character.GuildLeaderRank = 4` (no rank-comparison logic depends on the value; it only hits the wire record).
 - playfield is 0 and lastSeen is set when offline; both flip when online
 - class values match our `Class` enum (0x2B Herald of Xotli, 0x29 Necromancer, …)
@@ -83,7 +83,7 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   seam injected into `GuildService`.
 - **Create (no relog):** `HandleCreateGuild` emits `DispatchGuildCreated` (0x2044) — retail's immediate create
   response, which opens the guild window without a relog — built byte-exact against the create-guild capture
-  (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`). See `docs/create-guild-decode.md` (#306). The
+  (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`). See `docs/subsystems/create-guild-decode.md` (#306). The
   login `0x203F` push still runs, so relog remains a fallback.
 - GM bootstrap: `.guild create <name>` (the capture-true CreateGuild RPC needs a registrar NPC window).
 

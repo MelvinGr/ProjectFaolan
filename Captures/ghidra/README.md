@@ -1,7 +1,7 @@
 # Ghidra RPC-opcode recovery (2026-06-13)
 
 Recovers the 16-bit RPC method opcodes (`0x2000..0x20FF`) from `AgeOfConan.exe`. Result + full tables:
-`docs/aoc-rpc-method-opcodes.md`; finding summary in `docs/aoc-opcode-ids.md` (Stage 3b).
+`docs/re/aoc-rpc-method-opcodes.md`; finding summary in `docs/re/aoc-opcode-ids.md` (Stage 3b).
 
 ## Reproduce
 Analyzed Ghidra project at `/home/melvin/Development/Ghidra/Aoc` (re-import if `/tmp` was cleared — exe is

@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact round-trip of the quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the
-	// @609 objective region and the access-window table. docs/fullplayer-snapshot-reader.md, #186.
+	// @609 objective region and the access-window table. docs/re/fullplayer-snapshot-reader.md, #186.
 	public class QuestIndexRegionTests
 	{
 		private const int RegionStart = 1168, RegionEnd = 1292; // index region / access-window table boundaries

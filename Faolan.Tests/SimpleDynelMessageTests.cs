@@ -9,7 +9,7 @@ namespace Faolan.Tests
 	// SimpleDynelFullUpdateIIR (0x66AEDD50) message is lifted out of the opaque Data slice into a typed
 	// ProtoSimpleDynelIIR and rebuilt BYTE-EXACT. Record captured from
 	// Hoxxling_mage-heraldofxotli_login (the "Acheronian Ruins" world dynel). Reader decoded by
-	// vtable-xref - docs/iir-subclass-readers.md; framing validated by Captures/scripts/decode_iir_subclass_readers.py.
+	// vtable-xref - docs/re/iir-subclass-readers.md; framing validated by Captures/scripts/decode_iir_subclass_readers.py.
 	public class SimpleDynelMessageTests
 	{
 		// The full SimpleDynel IIR record (the bytes after the 0x2000 carrier's [u32 len][u32 iirType] prefix):

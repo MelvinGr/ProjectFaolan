@@ -8,7 +8,7 @@ using ProtoBuf;
 namespace Faolan.Core.Network.Codecs.World
 {
 	// Typed codec for the LootBagFullUpdateIIR (0xF096251E) CONTENTS message - the loot bag's cash + looter handles +
-	// item inventory (#187). The reader was decoded by vtable-xref (docs/iir-subclass-readers.md, FUN_007a3db0):
+	// item inventory (#187). The reader was decoded by vtable-xref (docs/re/iir-subclass-readers.md, FUN_007a3db0):
 	// after the record header + transform, a loot bag is
 	//   [u32 len][ProtoSimpleDynelIIR identity][kd-tree/bounds struct][u32 len][ProtoLootBagIIR contents]
 	// i.e. the same identity head as a plain dynel (SimpleDynelMessageCodec) plus a SECOND length-prefixed blob -

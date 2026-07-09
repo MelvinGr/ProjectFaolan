@@ -1,6 +1,6 @@
 # Handoff — Combos & Spellweaving
 
-Detailed handoff for the AoC combo (melee) + spellweaving (caster) systems. Companion to `docs/combos.md`
+Detailed handoff for the AoC combo (melee) + spellweaving (caster) systems. Companion to `docs/subsystems/combos.md`
 (the design overview). This file is the "where we are / how to continue" for a fresh session.
 
 ## 0. Status at a glance

@@ -6,7 +6,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// of the from-DB NPC spawn (Gitea #185). The scaffold is the fixed read sequence
 	// SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00) runs after the transform and before the embedded
 	// CoreCharacterFullUpdateIIR: a u8 version (0x05), then 6 u8 + 53 u32 interleaved with one count-framed
-	// sublist (docs/fa015807-spawn-reader.md, recovered from Ghidra and validated over 4558 captured records).
+	// sublist (docs/re/fa015807-spawn-reader.md, recovered from Ghidra and validated over 4558 captured records).
 	//
 	// The 53 u32 are read in WIRE order but scattered into NON-CONTIGUOUS C++ struct fields 0x184..0x264; the
 	// inline char buffer over that region holds the NPC's RDB script-binding diagnostic string (ScriptGroup /

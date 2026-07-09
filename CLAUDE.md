@@ -119,11 +119,11 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
   intentional).
 - 16-bit RPC opcodes are **method indices**: `wire = 0x2000 + registration index`, per interface, base
   0x2000 for every interface except PlayerAgent/PlayerInterface (32-bit hash dispatch — login, still open).
-  Both directions are recovered from the client (`docs/aoc-rpc-method-opcodes.md`, scripts in
-  `Captures/ghidra/`): c2s order == `docs/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
+  Both directions are recovered from the client (`docs/re/aoc-rpc-method-opcodes.md`, scripts in
+  `Captures/ghidra/`): c2s order == `docs/re/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
   per-class dispatcher switches (the old "drift" was just extra no-arg dispatch methods the string catalog
   missed). Full per-class catalogs are in `Faolan.Core.Network/Constants/Opcodes.cs`. 32-bit sub-opcodes
-  inside 0x2000 are BKDR-31 hashes of the client's IIR type names (`docs/aoc-opcode-ids.md`).
+  inside 0x2000 are BKDR-31 hashes of the client's IIR type names (`docs/re/aoc-opcode-ids.md`).
 - Session-volatile values (entity handles, shop ids, conversation ids) must never be persistence keys;
   the stable key is the NPC/vendor NAME (conversations, shops) or the character id.
 
@@ -152,7 +152,7 @@ validates the grammar to the packet end, then a C# builder proven by a byte-exac
 builders replace verbatim blob replay subsystem by subsystem; remaining verbatim blobs are deliberate
 interims (marked as such) awaiting decode or in-client validation. Worked example: NPC spawns build
 WHOLE from typed columns (the three-tier `Npc` type / `NpcSpawn` placement / live `WorldEntity` model —
-`docs/npc-three-tier-architecture.md`); the captured `NpcSpawn.Data` blob is now **retired** — `TryBuildLive`
+`docs/subsystems/npc-three-tier-architecture.md`); the captured `NpcSpawn.Data` blob is now **retired** — `TryBuildLive`
 is the sole spawn-body path.
 
 **GM commands** (`Faolan/GameServer/GameServerListener.GmCommands.cs`, account type >= GameMaster, typed as `.cmd` in chat)

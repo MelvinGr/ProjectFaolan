@@ -4,7 +4,7 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Combat
 {
 	// SimpleCharKilledByUpdateIIR (0xB066AFC2) - the explicit "this entity died" trigger. A health=0 StatUpdate
-	// alone does NOT drive the client's death animation / dead (release-screen) state (docs/combat.md, #204/#214);
+	// alone does NOT drive the client's death animation / dead (release-screen) state (docs/subsystems/combat.md, #204/#214);
 	// the client only reacts when it also gets this kill record. Decoded from AssassinL23_..._resurect: the player-death
 	// sequence right before the 0x2024 release screen carries this for the dying handle.
 	//

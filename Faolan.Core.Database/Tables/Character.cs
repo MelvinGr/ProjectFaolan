@@ -60,7 +60,7 @@ namespace Faolan.Core.Database.Tables
 		// The spawn's IIR scaffold, structured so it can be generated instead of template-copied: the uniform
 		// entry table (Attributes), the feat/ability ID list (Skills), the two ending pair lists (ScaffoldPairs)
 		// (the pre-IIR frame + EntryTableX are reconstructed from Class at spawn time, not stored - they carry no
-		// character data). See docs/archive/player-spawn-generation-plan.md + docs/fa015807-spawn-reader.md.
+		// character data). See docs/archive/player-spawn-generation-plan.md + docs/re/fa015807-spawn-reader.md.
 		public virtual ICollection<CharacterAttribute> Attributes { get; set; }
 
 		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,

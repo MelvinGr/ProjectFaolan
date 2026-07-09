@@ -49,7 +49,7 @@ and `WorldBroadcaster.cs:43-51`):
 **Necessary but not sufficient.** Being in-range only makes a mid-session spawn *eligible*. Our pushed
 mid-session spawns still don't render because the client refuses to poll for entities it didn't learn about
 during the world-entry load — a load-vs-play gate, not a range problem. Full writeup:
-`docs/mid-session-spawn-blocker.md`, memory `protocol_midsession_spawn_blocked`.
+`docs/subsystems/mid-session-spawn-blocker.md`, memory `protocol_midsession_spawn_blocked`.
 
 ## Don't confuse with the playfield-instance token
 

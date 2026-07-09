@@ -4,7 +4,7 @@
 Context: the tails open with the Quest_c journal region (@0..609, decoded by decode_questc.py +
 the C# QuestcRegion codec). The bytes from @609 up to the quest INDEX (the 0x000003F1 tag) were
 PREVIOUSLY believed to be a "QuestFullUpdate-style block authored by WorldQuest.BuildQuestFullUpdate"
-(docs/fullplayer-snapshot-reader.md side-thread). That is WRONG for the beach starter: empirically
+(docs/re/fullplayer-snapshot-reader.md side-thread). That is WRONG for the beach starter: empirically
 BuildQuestFullUpdate's content for quest 10238 is 869 B and starts [questId][1][questId][3][0][3][0x412],
 whereas the template's @609 region is 559 B and starts [0x0BD3][1][9][instance][questId][goalId]. They
 differ at byte 2. (Proven by Faolan.Tests/Snapshot609Tests.)

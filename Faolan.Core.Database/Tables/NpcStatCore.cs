@@ -16,7 +16,7 @@ namespace Faolan.Core.Database.Tables
 	// This holds the TYPE core (constant across every spawn of a type). Fields that vary per placement (level-scaled
 	// health/mana, scale, voice, ...) are overridden per-instance from NpcSpawn; transient runtime state (animation
 	// phase, BccState, current HP) is emitted canonical at spawn from the live tier (WorldEntity), never stored here.
-	// See docs/npc-three-tier-architecture.md.
+	// See docs/subsystems/npc-three-tier-architecture.md.
 	[PrimaryKey(nameof(NpcId)), NoReorder]
 	public class NpcStatCore
 	{

@@ -61,7 +61,7 @@ So the chat (AgentServer) connection is never established. Chat connects only AF
 - `Faolan/GameServer/Packets/Packets.cs:111` — where `SendPostReadyBurst` is called.
 - `Faolan/AgentServer/AgentServerListener.cs` — the chat server (channel subs `0x003C`, chat `0x0041`, sender info
   `0x0014`, system `0x0023`, local say `0x0022`).
-- `docs/chat.md` (protocol), memories `protocol_agentserver_chat`, `protocol_chat_connection_regression`.
+- `docs/subsystems/chat.md` (protocol), memories `protocol_agentserver_chat`, `protocol_chat_connection_regression`.
 
 ## How to run / test
 - Server: `cd Faolan/bin/Debug && dotnet Faolan.dll` (cwd MUST be bin/Debug).

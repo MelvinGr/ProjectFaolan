@@ -98,7 +98,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				: note.Replace("|", "\\|").Trim();
 		}
 
-		// Candidate client type strings, in the shapes observed in the exe (docs/aoc-opcode-ids.md): the member name,
+		// Candidate client type strings, in the shapes observed in the exe (docs/re/aoc-opcode-ids.md): the member name,
 		// with/without a trailing "IIR", each ± "_c"/"_t", and with a leading "N3" lowercased to "n3".
 		private static bool TryRecoverName(string member, uint value, out string recovered)
 		{

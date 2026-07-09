@@ -6,7 +6,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the Knubot conversation records (#188,
-	// docs/iir-readers-conversation-misc.md): KnubotAppendText (the NPC dialogue line, a remoteformat XML payload)
+	// docs/re/iir-readers-conversation-misc.md): KnubotAppendText (the NPC dialogue line, a remoteformat XML payload)
 	// and KnubotOpenChatWindow. Oracles are captured bodies (full record incl. the 4-byte length prefix). Proves the
 	// nested-endpoint carrier (player = carrier handle, NPC in the KnubotBase header) reconstructs byte-exact.
 	public class KnubotCodecTests

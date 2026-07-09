@@ -12,7 +12,7 @@ using Faolan.Core.Protobuf;
 namespace Faolan.Core.Network.Codecs.Economy
 {
 	// Server->client Tradepost responses. Endpoints/bodies validated byte-exact against the captures
-	// (docs/tradepost-protocol.md): the response Sender is the server's GameCharAgent endpoint, the Receiver is the
+	// (docs/subsystems/tradepost-protocol.md): the response Sender is the server's GameCharAgent endpoint, the Receiver is the
 	// client's TradepostInterface (its instance is echoed from the inbound request, or the observed constant for a
 	// server-initiated open).
 	public static class TradepostResponses
@@ -39,7 +39,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		// A captured single-row DispatchTradepostSearchResults body (necrol80 auctionhouse pkt#1028: seller "Jocko",
 		// item 0x755D, price 1,000,000, qty 1, + the item's ProtoAcgItem). [head:u32][row]* per
-		// docs/tradepost-protocol.md. The LIVE search path is fully DB-driven (SendSearchResults -> TradepostListingCodec);
+		// docs/subsystems/tradepost-protocol.md. The LIVE search path is fully DB-driven (SendSearchResults -> TradepostListingCodec);
 		// this blob is now kept ONLY as the byte-exact golden-test oracle (BuildSearchResultsBytes / TradepostResponseTests),
 		// the same role CapturedAccessPointBody plays for the open packet - it is no longer sent at runtime.
 		private static readonly byte[] SearchResultsReplayBody = Convert.FromHexString("000007e220d82b60902c95450c0457f300054a6f636b6f00000000000f4240000000010000755d000000000000000015" +

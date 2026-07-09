@@ -193,7 +193,7 @@ the bloat by design, and it generalizes:
   `NpcSpawnFromScratchTests` gates it: **824/988 spawns byte-exact from columns**, 9 canonically cleaner
   (drop a captured runtime target), 155 the humanoid runtime-post-IIR tail (still `Data`).
 - Wired live via `NpcSpawnBuilder.TryBuildLive` in `WorldBroadcaster`. See
-  `docs/npc-three-tier-architecture.md` + `docs/archive/handoff-2026-07-08-spawn-from-columns.md`.
+  `docs/subsystems/npc-three-tier-architecture.md` + `docs/archive/handoff-2026-07-08-spawn-from-columns.md`.
 
 Remaining (#243): the ~155 tail = ~148 no-morph humanoids (`BuildMinimalPostIir(2)`, verified) + ~99
 runtime-bearing (morph table embedded after a runtime record — needs a lenient extractor) + 2 entry-runtime.

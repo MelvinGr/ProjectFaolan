@@ -62,8 +62,8 @@ The Knubot conversation carrier nests **both** endpoints: the player is the carr
 </remoteformat>
 ```
 
-i.e. the same dialogue content the higher-level [ConversationService](../Faolan/GameServer/Dialogue/)
-+ [knubot-conversation-packets.md](knubot-conversation-packets.md) already drive — this just pins the
+i.e. the same dialogue content the higher-level [ConversationService](../../Faolan/GameServer/Dialogue/)
++ [knubot-conversation-packets.md](../subsystems/knubot-conversation-packets.md) already drive — this just pins the
 exact reader framing (header + u16-length string).
 
 ## No-op / out-of-band readers

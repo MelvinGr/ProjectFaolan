@@ -24,7 +24,7 @@ Server broadcasts a cast. Layout (variable length, 26–80 bytes inner):
 
 ### `0x96B8DC59` — entity vitals update (the HP/damage packet)
 Carries an entity's current vitals as **count-prefixed stat records** — the same `[uint32 statId][uint32 value]`
-encoding as the `0x737A6DF9` snapshot (see [[protocol_float_endianness]] sibling doc `docs/player-stats.md`):
+encoding as the `0x737A6DF9` snapshot (see [[protocol_float_endianness]] sibling doc `docs/subsystems/player-stats.md`):
 ```
 96B8DC59 | 0000C350 | <entityHandle:4> | 00000000 | <count:1> | count × ( <statId:u32> <value:u32> )
 ```
@@ -32,7 +32,7 @@ Example: count=3 → `001B`(Health) `01F8`(Stamina) `01FA`(Mana), all `0x189C`=6
 Tracing entity `0x01316D8A` (the player) across the capture: Health 80 → 130 → 195 as they level up — i.e. this
 packet is the authoritative vitals broadcast; combat damage/heals land here as updated Health values.
 
-**This also resolves the stat-block framing open question in `docs/player-stats.md`: stat records are
+**This also resolves the stat-block framing open question in `docs/subsystems/player-stats.md`: stat records are
 count-prefixed (a 1-byte count, then N × 8-byte records).** Confirmed lengths: count 1/3/6 → inner 25/41/65.
 
 **Implemented** (2026-06-08): `CharacterStatBlock` (`Faolan/GameServer/Packets/0x737A6DF9_Test/`) builds the

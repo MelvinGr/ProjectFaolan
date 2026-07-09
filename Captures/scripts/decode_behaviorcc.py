@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Decode the create-burst BehaviorControlCenterIIR (0x642CD3D6) "registration" form (#234).
 
-Distinct from the COMBAT BccAck (the type-switch reader in docs/behaviorcontrolcenter-grammar.md): the
+Distinct from the COMBAT BccAck (the type-switch reader in docs/re/behaviorcontrolcenter-grammar.md): the
 create-world cutscene registers behaviors on scene entities with this fixed-shape record:
 
   [u32 C350][u32 handle][u16 form][u32 slot][u32 msgLen][protobuf][optional tail]

@@ -28,7 +28,7 @@ namespace Faolan.CSPlayerAgent
 		// guildId is the GOVERNMENT FORM, whose value selects the body layout. Form 1 (which falls through into the
 		// form-3 field block in the reader) is the layout GuildRenownBlock encodes, so both are fixed here. The old
 		// code wrote guild.GovernmentForm into the version slot - harmless only because it defaulted to 3, but a
-		// non-3 value would have tripped the client's "streaming version mismatch" assert (#219, docs/guilds.md).
+		// non-3 value would have tripped the client's "streaming version mismatch" assert (#219, docs/subsystems/guilds.md).
 		private const byte CoreGuildStreamVersion = 0x03; // first body byte - CoreGuild_c streaming version (must be 3)
 		private const byte GuildGovernmentForm = 0x01; // byte after guildId - the form selecting the case 1->3 layout
 
@@ -36,7 +36,7 @@ namespace Faolan.CSPlayerAgent
 		// header). Captured from DemoL80's create-guild flow - which is itself a FRESH guild being created, so these
 		// are the create-time defaults (the feat numbers 0xFC4/0x410/0x816/0xBEA are the default create values, not
 		// earned renown); only the 40-byte trailer holds capture-specific creation timestamps/ids (cosmetic). Emitted
-		// verbatim as a valid create-time block until it is decoded field-by-field (docs/create-guild-decode.md, #306).
+		// verbatim as a valid create-time block until it is decoded field-by-field (docs/subsystems/create-guild-decode.md, #306).
 		private static readonly byte[] GuildCreatedTail = Convert.FromHexString(
 			"00000003f100000000000000000000000000000000000000000000000000000fc4000004100000081600000bea000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000373131310007a12800000000064ab1780000000009d5d338000000000000000001a93458");
 
@@ -154,7 +154,7 @@ namespace Faolan.CSPlayerAgent
 				.SendAsync(client);
 		}
 
-		// 0x2021 CreateGuild. Body decoded from DemoL80_..._create-guild.pcapng (docs/create-guild-decode.md):
+		// 0x2021 CreateGuild. Body decoded from DemoL80_..._create-guild.pcapng (docs/subsystems/create-guild-decode.md):
 		//   [name s16][u8 form][u16 0]   e.g. `0006 "faolan" 06 0000`. The `form` is the government/guild-form the
 		// player picked in the registrar window (the blind impl used to drop it). NOTE: retail's IMMEDIATE reply is
 		// DispatchGuildCreated (0x2044) - a [creator member record][guild header][renown/trailer] packet that opens
@@ -169,7 +169,7 @@ namespace Faolan.CSPlayerAgent
 			var name = packet.Body.ReadString();
 			var form = packet.Body.Length - packet.Body.Position >= 1
 				? packet.Body.ReadByte()
-				: (byte)0; // guild-form (docs/create-guild-decode.md)
+				: (byte)0; // guild-form (docs/subsystems/create-guild-decode.md)
 			if (string.IsNullOrWhiteSpace(name) || character.GuildId != null)
 			{
 				_logger.LogWarning("CreateGuild rejected for {CharacterId:X8}: name \"{Name}\", already in guild: {InGuild}.", character.Id, name, character.GuildId != null);
@@ -405,7 +405,7 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO
 		// RELOG (vs the 0x203F GuildUpdate, which only takes effect on the next login). Body decoded byte-exact
-		// (docs/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte tail].
+		// (docs/subsystems/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte tail].
 		// The header is the 0x203F head EXCEPT the post-cash byte carries the request's guild FORM (0x203F hardcodes
 		// 0x03). The creator is online (they just made it); `playfield` is their current map/playfield token.
 		internal static void WriteGuildCreatedBody(FaolanStream s, Guild guild, Character creator, byte form, uint playfield)

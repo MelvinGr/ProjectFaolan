@@ -9,7 +9,7 @@ The protocol has **two** unrelated id systems — don't confuse them:
 1. **RPC conversation class ids** — the endpoint/conversation routing (`SenderClass`/`ReceiverClass`, the
    `ProtoEndpoint.type` of an `RpcHeader`). These are **BKDR-31 hashes of the client class name**: `0xA9ECB95D` =
    hash("GameCharAgent"), `0xB171CE13` = GameAgent, `0x6C67C147` = GameInterface, … (`Faolan.Core/Network/Conan/
-   ConanEndpoints.cs`, `docs/aoc-opcode-ids.md`). Big, hash-shaped values.
+   ConanEndpoints.cs`, `docs/re/aoc-opcode-ids.md`). Big, hash-shaped values.
 
 2. **In-world entity object-class ids** — the subject of this doc. The `type` half of an **entity id**
    `{type, instance}` (= protobuf `ProtoID32`, and the `type` field of a `ProtoEndpoint` that points at a world

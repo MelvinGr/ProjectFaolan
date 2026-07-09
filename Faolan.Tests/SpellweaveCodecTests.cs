@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct of the spellweaving activate-response + fire records vs the captured bytes in
-	// NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving (docs/combos.md,
+	// NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving (docs/subsystems/combos.md,
 	// Captures/decode_spellweave.py). caster = 0x0802E5D4 throughout; these are the record bytes AFTER the 0x2000
 	// carrier's u32 length prefix (the golden hex is the frame body with that prefix stripped).
 	public class SpellweaveCodecTests

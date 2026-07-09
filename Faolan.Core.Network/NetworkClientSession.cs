@@ -25,7 +25,7 @@ namespace Faolan.Core.Network
 		// entry, not on normal existing-character logins.
 		bool IsCreateWorldSession { get; set; }
 
-		// Spellweaving trance state (docs/combos.md): true between the activate and deactivate PerformSpecialAction
+		// Spellweaving trance state (docs/subsystems/combos.md): true between the activate and deactivate PerformSpecialAction
 		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
 		// trance is open, and is fired + cleared on deactivate.
 		bool IsSpellweaving { get; set; }

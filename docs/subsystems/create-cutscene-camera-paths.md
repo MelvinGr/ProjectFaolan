@@ -1,6 +1,6 @@
 # Create-flow intro cutscenes — camera-path / playfield mechanism (Ghidra, 2026-06-15)
 
-> Related: `docs/create-editor-bursts.md` decodes the create-editor `0x2000` IIR stream itself (framing +
+> Related: `docs/subsystems/create-editor-bursts.md` decodes the create-editor `0x2000` IIR stream itself (framing +
 > record grammars); this doc covers the cutscene/camera-path mechanism layered on top of it. Both feed #189.
 
 The post-create intro is **two separate cutscenes on two separate playfields**, each on its own

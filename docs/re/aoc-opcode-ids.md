@@ -556,7 +556,7 @@ because in-world the client streams 0x2000 packets keyed by its own instance (e.
 ## 16-bit RpcHeader opcodes per server (method indices - Stage 3b, NOT hashes)
 
 **RESOLVED (2026-06-12, guild work):** the opcode is `0x2000 + the method's position` in the recovered
-client→server RPC table (`docs/aoc-client-rpc-methods.json`) — registration order = table order. Anchored on
+client→server RPC table (`docs/re/aoc-client-rpc-methods.json`) — registration order = table order. Anchored on
 CSPlayerAgent `0x201C` = `AcceptGuildInvitation` (fired exactly once on the guild-accept click) and bulk-verified
 by tabulating `(RpcHeader caller class, opcode)` across all capture JSONs (independent semantic hits:
 `SplitInventoryItem`, `ToggleVanityArmorFilter`, `AddShortcut`, `CloseLootBag`, `GameCharAgent.Ping`, the
@@ -574,7 +574,7 @@ drift was caused by the live build inserting extra dispatch methods — mostly *
 decompiling each `<Class>InterfaceDispatch_t::DispatchMethod` (a `switch(index)`; case N → handler N, named by
 the handler's own `Dispatch_t::<Method>` string). True s2c sizes vs catalog: UniverseInterface 6 (=), GameInterface
 16 (+3), GameCharInterfaceProject 16 (+1), TradepostInterface 8 (+1), GameCharInterface **181 (+24)**,
-CSPlayerInterface **211 (+33)**. Full tables: **`docs/aoc-rpc-method-opcodes.md`**; recovery scripts:
+CSPlayerInterface **211 (+33)**. Full tables: **`docs/re/aoc-rpc-method-opcodes.md`**; recovery scripts:
 `Captures/ghidra/`. In-client-verified anchors all match: s2c GameCharInterface DispatchUpdateBindLocation=0x2002,
 **DispatchUpdateCash=0x2005**, DispatchShopData=0x2033, DispatchItemSoldToShop=0x2035, DispatchAddSpecialAbility
 =0x2052, DispatchPong=0x2082. NOTE corrections to old content-guesses: GameServer s2c `0x2009`=DispatchChangeItem

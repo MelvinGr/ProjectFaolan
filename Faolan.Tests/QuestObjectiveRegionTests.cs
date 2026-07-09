@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact round-trip of the @609 per-goal objective-detail region (decode_snapshot_609.py,
-	// docs/fullplayer-snapshot-reader.md). Proves QuestObjectiveRegion models the region losslessly - the
+	// docs/re/fullplayer-snapshot-reader.md). Proves QuestObjectiveRegion models the region losslessly - the
 	// construct-don't-replay foundation for retiring this part of BeachTailsTemplate.bin (Gitea #186), mirroring
 	// QuestcRegion for the @0..609 journal region.
 	public class QuestObjectiveRegionTests

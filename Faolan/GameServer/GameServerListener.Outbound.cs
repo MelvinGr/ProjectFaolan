@@ -163,7 +163,7 @@ namespace Faolan.GameServer
 		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
 		// from the Recipe catalog, so the Crafting -> Recipes window populates. The carrier is the standard world IIR
 		// framing (GameAgent 0x58 -> GameInterface <instance>), body = [subop][0xC350][handle][reply], byte-exact vs
-		// the capture (docs/tradeskill-recipes.md). Empty catalog -> an empty (count=0x3F1) list, which opens the book
+		// the capture (docs/subsystems/tradeskill-recipes.md). Empty catalog -> an empty (count=0x3F1) list, which opens the book
 		// cleanly with no recipes.
 		private async Task SendCraftingRecipeBook(INetworkClient client)
 		{

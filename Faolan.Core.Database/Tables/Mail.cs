@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// One in-game mail (the Tradepost agent carries mail alongside the auction house). Decoded byte-exact from the
-	// necrol80 buy_from_autionhouse_get_mail capture (docs/tradepost-protocol.md "Buy -> mail delivery"); the on-wire
+	// necrol80 buy_from_autionhouse_get_mail capture (docs/subsystems/tradepost-protocol.md "Buy -> mail delivery"); the on-wire
 	// DispatchMailMessage (S->C 0x2002) is built byte-exact by MailMessageCodec. An auction-house delivery is a
 	// SYSTEM mail: the recipient is the buyer, the sender NAME is empty. The bought item rides as an attachment
 	// (MailAttachment) fetched on demand. Keyed by MailId (the wire id the client's GetMailByID/GetMailItem target).

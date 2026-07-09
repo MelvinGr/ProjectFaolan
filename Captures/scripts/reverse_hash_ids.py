@@ -89,7 +89,7 @@ rows.sort(key=lambda r: -r[2])
 
 out = ["# Reverse-hashed body ids (BKDR-31) — Stage 5 #2\n",
        "32-bit ids found INSIDE packet bodies across all captures that BKDR-31-resolve to a real `AgeOfConan.exe`\n"
-       "identifier. Opcode/endpoint ids are excluded (covered in `docs/aoc-opcode-ids.md`). High-count rows are\n"
+       "identifier. Opcode/endpoint ids are excluded (covered in `docs/re/aoc-opcode-ids.md`). High-count rows are\n"
        "almost certainly real names; single-count rows may be hash collisions — treat as leads, confirm in context.\n",
        "\n| id | count | resolved name | seen in (proto/opcode) |\n|---|---|---|---|"]
 for v, nm, c, ctx in rows[:200]:

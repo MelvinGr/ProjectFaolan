@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Recursive MoveTaskIIR_c (0x96C46740) dissector - validates the wire grammar to the record end (#53).
 
-The MoveTask is a RECURSIVE composite (docs/movetask-grammar.md): the top record is
+The MoveTask is a RECURSIVE composite (docs/re/movetask-grammar.md): the top record is
   [u16 0][float x3 from][factory]
 and the factory (FUN_00a46800) is [u8 mode][type-specific fields], where ListMoveTask (mode 4) nests a
 count of further factories. Readers recovered from AgeOfConan.exe via Ghidra (Captures/ghidra/

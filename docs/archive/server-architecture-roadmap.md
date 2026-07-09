@@ -6,7 +6,7 @@
 > authoritative, ticking, in-memory world on top of the wire layer that already works.
 
 Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see also
-`world_packets_construct_not_replay`, `protocol_stats_and_combat`, `docs/chat.md`, `docs/archive/quests-and-combat.md`.
+`world_packets_construct_not_replay`, `protocol_stats_and_combat`, `docs/subsystems/chat.md`, `docs/archive/quests-and-combat.md`.
 
 > ## PROGRESS (2026-06-11) — the milestone-1 foundation is in (harness-verified; the in-client payoff is pending)
 > - **In-memory world model** ✓ `WorldEntity`/`Zone`/`WorldState`; players registered on entry, removed on
@@ -90,7 +90,7 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
   from tables vs still replayed.
 - **Combat scaffolding** — `CombatState` (in-memory vitals per handle), `CombatResolver` (provisional damage), NPC
   max HP now seeded from the spawn's `CharacterStats.health`.
-- **Chat** — AgentServer channels (`0x0041`) + proximity local say (`0x0022`). See `docs/chat.md`.
+- **Chat** — AgentServer channels (`0x0041`) + proximity local say (`0x0022`). See `docs/subsystems/chat.md`.
 - **Login/auth + the 5-connection handshake** (UniverseAgent/PlayerAgent/GameServer/AgentServer/CsPlayerAgent).
 
 ## The architectural gap (the core thing)

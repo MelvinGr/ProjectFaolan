@@ -172,7 +172,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			character.ScaffoldPairs = scaffold.EndPairs.Select(p => Pair(character.Id, 0, p)).Concat(scaffold.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
 			// The pre-IIR frame + EntryTableX are NOT extracted: they're not character data (the frame is a constant
 			// skeleton + the archetype/class island + the transient RDB script char buffer; EntryTableX is const 0xB7).
-			// TryApplyFrom reconstructs them from Character.Class - see FreshPreFrame + docs/fa015807-spawn-reader.md.
+			// TryApplyFrom reconstructs them from Character.Class - see FreshPreFrame + docs/re/fa015807-spawn-reader.md.
 		}
 
 		public static byte[] FreshPreFrame(Class @class)
@@ -297,7 +297,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
 		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
 		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
-		// docs/fa015807-spawn-reader.md (FUN_01121c00) + docs/archive/player-spawn-generation-plan.md.
+		// docs/re/fa015807-spawn-reader.md (FUN_01121c00) + docs/archive/player-spawn-generation-plan.md.
 		private static byte FrameArchetype(Class @class)
 		{
 			return @class switch

@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct of PetIIR_c (0x1F4CB0F7) — the pet owner-assign/remove — vs the captured records in
-	// NecroL80_..._casting-with-chat-notes.pcapng (#307, docs/summon-pet-decode.md). owner=0x0802E5D4 throughout.
+	// NecroL80_..._casting-with-chat-notes.pcapng (#307, docs/subsystems/summon-pet-decode.md). owner=0x0802E5D4 throughout.
 	public class PetIirCodecTests
 	{
 		[Fact]

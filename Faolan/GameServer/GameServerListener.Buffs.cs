@@ -41,7 +41,7 @@ namespace Faolan.GameServer
 				_ = RunEnergyMirror(client); // fire-and-forget; it logs its own exceptions
 		}
 
-		// Shared pet-summon (#307, docs/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
+		// Shared pet-summon (#307, docs/subsystems/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
 		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
 		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
 		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.

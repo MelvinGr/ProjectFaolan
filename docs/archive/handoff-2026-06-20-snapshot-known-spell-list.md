@@ -79,7 +79,7 @@ spellbook is the `@0x2425` one (the `[0566][0][0290][0]` landmark match is the d
    replace the empty `@0x2425` region with the generated one (variable length — everything after shifts; the
    tails are length-prefixed in the snapshot frame, so update the outer length too). Graceful fallback to the
    captured (empty) region on any failure, exactly like the quest splice.
-4. **Check the spellbook flag.** The doc (`docs/fullplayer-snapshot-reader.md`, region 11) notes a gate
+4. **Check the spellbook flag.** The doc (`docs/re/fullplayer-snapshot-reader.md`, region 11) notes a gate
    `*(this+0xe9) != 0` for `SpellBook_t`; the root protobuf already sets `f8 has_spellbook = const true`
    (`fullchar_generation`). Confirm whether the `@0x2425` list is gated by anything that must be flipped when
    it goes from 0 → N records (it's non-empty for Faolanx with the same root, so probably nothing — but verify).
@@ -104,7 +104,7 @@ Remove the interim grant-timing hacks added 2026-06-20 (they become redundant an
 Keep the `EnsureStartingLoadout` DB seed (CharacterSpells + the default bar rows) — that part is correct.
 
 ## Pointers
-- Grammar: `docs/fullplayer-snapshot-reader.md` (region list 1–12; the known-list is NOT region 11's
+- Grammar: `docs/re/fullplayer-snapshot-reader.md` (region list 1–12; the known-list is NOT region 11's
   stride-0x14 `SpellBook_t` — the learned ids appear only in this 12-byte typed list).
 - Per-class snapshot context: `docs/archive/handoff-2026-06-17-perclass-snapshot.md` (class/mana/stats are also
   Strie-inherited; same root issue, different regions).

@@ -253,7 +253,7 @@ namespace Faolan.GameServer
 		}
 
 		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
-		// [u32 command]. Decoded commands (#307, docs/summon-pet-decode.md): 0x1F8 = dismiss, 0x1F6 = defend.
+		// [u32 command]. Decoded commands (#307, docs/subsystems/summon-pet-decode.md): 0x1F8 = dismiss, 0x1F6 = defend.
 		// Dismiss = retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. Other commands are logged for now
 		// (attack/follow/stay AI is a follow-up; a .pet-summoned minion already follows via SetNpcFollow).
 		private async Task HandlePetCommand(INetworkClient client, ConanPacket packet)
@@ -540,7 +540,7 @@ namespace Faolan.GameServer
 		// because the client only loads a playfield's resources (camera paths, geometry, NPCs) during a fresh
 		// world entry - confirmed via Ghidra: camera paths are an RDB resource (e_RDB_CameraPaths, type 1000047)
 		// keyed by playfield id, loaded by CameraPathMap_c::LoadPlayfieldPaths only on the n3Camera init a fresh
-		// entry runs (see docs/create-cutscene-camera-paths.md). A soft in-place MapChange on the live connection
+		// entry runs (see docs/subsystems/create-cutscene-camera-paths.md). A soft in-place MapChange on the live connection
 		// does NOT trigger that reload, so the old playfield's resources stay loaded - that was the teleport bug.
 		//
 		// The handoff is the SAME packet (same 0xb171ce13 -> 0x6c67c147 conversation, byte-identical) the create

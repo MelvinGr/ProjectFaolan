@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
 	// A 0x3F1-framed StatList_t as the client reads it (CoreFullPlayerCharacterIIR reader, FUN_0139d450 -> the
-	// StatPair_t reader FUN_0139d210 = [u32 statId][u32 value]; docs/fullplayer-snapshot-reader.md regions 9-10).
+	// StatPair_t reader FUN_0139d210 = [u32 statId][u32 value]; docs/re/fullplayer-snapshot-reader.md regions 9-10).
 	// The list is framed by a single count word `c` where c % 0x3F1 == 0 && c > 0 and the record count is
 	// c / 0x3F1 - 1 (the client asserts "(nSize%1009)==0 && nSize>0"). The stat block is TWO of these back-to-back:
 	// StatList#1 = the 17 DISPLAYED stats (Level 0x36 / XP 0x34 / MaxXP 0x15E / HP 0x1B / ...), StatList#2 = the 148

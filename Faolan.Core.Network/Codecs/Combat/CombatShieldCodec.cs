@@ -2,7 +2,7 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// Construct-side codecs for the server->client combat-state records (#216/#218, docs/iir-readers-combat-world.md):
+	// Construct-side codecs for the server->client combat-state records (#216/#218, docs/re/iir-readers-combat-world.md):
 	// the damage result, the combat shield, the threat level and the hate-list update. These are the records the
 	// combat FSM broadcasts so onlookers see damage numbers, shields, and aggro. All share the IIR carrier
 	// `[u32 len][u32 sub][u32 0xC350][u32 handle][u8 env][reader]` and are big-endian. Golden tests in

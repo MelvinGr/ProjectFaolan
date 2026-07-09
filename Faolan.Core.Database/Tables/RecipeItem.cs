@@ -5,7 +5,7 @@ namespace Faolan.Core.Database.Tables
 {
 	// One ingredient (input) or result (output) item of a crafting Recipe - a queryable projection of the recipe
 	// record's KEY1 (ingredients) / listC (results) element lists (decoded in TradeskillRecipeCodec.ParseRecordItems,
-	// see docs/tradeskill-recipes.md). The recipe still ships byte-exact from Recipe.Data; these rows exist so
+	// see docs/subsystems/tradeskill-recipes.md). The recipe still ships byte-exact from Recipe.Data; these rows exist so
 	// recipes are queryable ("which recipes produce / consume item X"). Each carries the referenced item template
 	// id + its 16-byte TEA DecryptionKey (Data1..4) - the same key RequestRecipeInfo (0x2090) uses to fetch the
 	// item's details.

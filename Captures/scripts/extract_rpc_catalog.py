@@ -83,7 +83,7 @@ out = []
 out.append("# AoC client RPC method catalog (extracted from AgeOfConan.exe)\n")
 out.append("Stage 1 of `docs/archive/opcode-re-plan.md`. Recovered from the client's own log strings - method **names**,\n"
            "**param names/types**, and **direction**. (Numeric ids: opcodes are framework-assigned - see\n"
-           "`docs/aoc-opcode-ids.md`; the IIR/message + endpoint ids are BKDR-31 name hashes, decoded there.)\n")
+           "`docs/re/aoc-opcode-ids.md`; the IIR/message + endpoint ids are BKDR-31 name hashes, decoded there.)\n")
 out.append(f"\n**{len(result)} interfaces, {tot_c2s} client->server (proxy) methods, {tot_s2c} server->client (dispatch) methods.**\n")
 out.append("\n- **client->server** = `<Iface>AgentProxy_t::Method(...)`, signature is authoritative (typed params).\n"
            "- **server->client** = `<Iface>InterfaceDispatch_t::DispatchMethod()`; `fields` are the param NAMES in\n"

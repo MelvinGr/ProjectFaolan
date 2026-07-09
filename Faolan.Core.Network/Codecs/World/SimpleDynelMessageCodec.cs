@@ -9,7 +9,7 @@ using ProtoBuf;
 namespace Faolan.Core.Network.Codecs.World
 {
 	// Typed codec for the SimpleDynelFullUpdateIIR (0x66AEDD50) identity MESSAGE - the first "construct, don't
-	// replay" step for world dynels (#187 / #57). The reader was decoded by VTABLE-xref (docs/iir-subclass-readers.md,
+	// replay" step for world dynels (#187 / #57). The reader was decoded by VTABLE-xref (docs/re/iir-subclass-readers.md,
 	// FUN_007a2510 -> FUN_00cbfb80 ReadLengthPrefixedBlob): after the record header + the base-class transform, the
 	// dynel body is `[u32 BE blobLen][ProtoSimpleDynelIIR protobuf][kd-tree/bounds struct]`. This codec lifts that
 	// length-prefixed protobuf out of the opaque `Data` slice into the typed `ProtoSimpleDynelIIR` (name /

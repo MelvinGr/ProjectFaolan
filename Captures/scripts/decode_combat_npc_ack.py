@@ -2,7 +2,7 @@
 """Decode the NPC counter-attack ANIMATION ack (the "second BccAck with actor = target handle").
 
 Source: Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json
-(the player is repeatedly hit by NPCs while leveling). See docs/combat.md "Known gaps".
+(the player is repeatedly hit by NPCs while leveling). See docs/subsystems/combat.md "Known gaps".
 
 Finding: when an NPC swings at the player, retail sends a BehaviorControlCenterIIR (0x642CD3D6) ack that is
 structurally the SAME packet as the player's targeted-hit attack ack (SendNormalAttackResponse), but with the

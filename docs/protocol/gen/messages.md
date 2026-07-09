@@ -38,7 +38,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotAppendTextIIR` | `0x4A3D899A` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
-| V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootBagTemplate` | [V3: LootBagMessageTests.BuildContents_RoundTripsByteExact] |
+| V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootBagTemplate` | [V3: LootBagTemplateTests.BuildBounds_ReproducesTheCapturedKdTreeGeometry_ByteForByte] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_FromCapturedFields_IsByteIdentical] |
 | V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskBuilderTests.BuildPatrol_FromCapturedWaypoints_IsByteIdentical] |
@@ -69,10 +69,10 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `BankIIR` | `0x0BA1C1CB` | `BankService` *(inline)* |  |
 | V2 | `CharInPlayIIR` | `0x864CFEF8` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `CharacterActionIIR` | `0x6B6FD368` | `GameServerListener.Inbound` *(inline)* |  |
-| V2 | `CoreClaimIIR` | `0x06EC1255` | `GameServerListener.Inbound` *(inline)* |  |
+| V2 | `CoreClaimIIR` | `0x06EC1255` | `GameServerListener.PostReadyBurst` *(inline)* |  |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `GameServerListener.Outbound` *(inline)* |  |
-| V2 | `GameTimeIIR` | `0x4F57DC08` | `GameServerListener.GmCommands` *(inline)* |  |
+| V2 | `GameTimeIIR` | `0x4F57DC08` | `GameServerListener.Outbound` *(inline)* |  |
 | V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `GameServerListener.Inbound` *(inline)* |  |

@@ -4,7 +4,7 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// Construct-side codecs for the dead-reckoning movement records (#190), decoded in docs/chardcmove-grammar.md.
+	// Construct-side codecs for the dead-reckoning movement records (#190), decoded in docs/re/chardcmove-grammar.md.
 	// These are the per-tick movement broadcasts an entity streams; they complement MoveTaskCodec (the path/transform
 	// form). All three share the IIR carrier `[u32 len][u32 sub][u32 0xC350][u32 handle][u8 env][reader]` and are
 	// big-endian. Build/Parse operate on the full record (length prefix included), mirroring ChatTextCodec; round-trip

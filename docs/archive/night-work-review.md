@@ -36,7 +36,7 @@ Both are new GM commands. Server from `Faolan/bin/Debug` (`dotnet Faolan.dll`), 
      addressing — captured removes were all container 0x71 (equipped); `.removeitem` uses the backpack (0x68).
 
 2. **On-screen feedback overlay — `FormatFeedbackIIR` 0x8D5A8B6B** (`132d400`, §8). The top-of-screen FIFO banner
-   (NOT chat). → `docs/on-screen-feedback.md`.
+   (NOT chat). → `docs/subsystems/on-screen-feedback.md`.
    - **Test:** `.feedback`.
    - **Expect:** a banner pops at the **top/centre of the screen** (it replays the proven `GenericDisplayAreaName`
      zone-name banner, addressed to your live session).
@@ -52,7 +52,7 @@ Both are new GM commands. Server from `Faolan/bin/Debug` (`dotnet Faolan.dll`), 
 
 ## C. Decode / docs / TODO (no runtime risk)
 
-- **On-screen feedback fully decoded** → `docs/on-screen-feedback.md`, memory `protocol_onscreen_feedback`
+- **On-screen feedback fully decoded** → `docs/subsystems/on-screen-feedback.md`, memory `protocol_onscreen_feedback`
   (`FormatFeedbackIIR` grammar + the `showfifomessagefromserver` FIFO token family).
 - **New TODO items added** (your call on priority):
   - §2 — **Directional combat + defensive shields** ("Real Combat": directional swings + the target's dynamic

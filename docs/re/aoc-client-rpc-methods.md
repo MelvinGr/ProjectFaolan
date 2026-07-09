@@ -2,7 +2,7 @@
 
 Stage 1 of `docs/archive/opcode-re-plan.md`. Recovered from the client's own log strings - method **names**,
 **param names/types**, and **direction**. (Numeric ids: opcodes are framework-assigned - see
-`docs/aoc-opcode-ids.md`; the IIR/message + endpoint ids are BKDR-31 name hashes, decoded there.)
+`docs/re/aoc-opcode-ids.md`; the IIR/message + endpoint ids are BKDR-31 name hashes, decoded there.)
 
 
 **14 interfaces, 376 client->server (proxy) methods, 401 server->client (dispatch) methods.**

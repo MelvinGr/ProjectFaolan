@@ -6,7 +6,7 @@ namespace Faolan.Core.Database.Tables
 	// A crafting/tradeskill recipe, as served in the TradeskillReplyIIR_c (0x9062D559) recipe-book list the client
 	// requests when it opens the Crafting -> Recipes window (TradeskillRequestIIR_c 0x06B9CD94). Decoded from
 	// NecroL80_mage-necromancer_shops_open-crrafting-receipies (frame 2926, 603 recipes) - the list is a 0x3F1-framed
-	// vector of ClientTradeskillRecipe_c records; grammar + reader RE in docs/tradeskill-recipes.md
+	// vector of ClientTradeskillRecipe_c records; grammar + reader RE in docs/subsystems/tradeskill-recipes.md
 	// (client readers FUN_007aab30 -> FUN_007abb30 -> FUN_0077be70). Keyed by the record's list-key (the recipe id
 	// the loop maps by; == the RequestRecipeInfo levelId).
 	//

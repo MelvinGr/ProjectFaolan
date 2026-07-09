@@ -71,7 +71,7 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
 - **Activate / deactivate = a TOGGLE**: c2s method `0x205a`, body `[u32 0x000000fc]` (same value both times, like
   the mount toggle) — enter the trance (immobilise) on the first, fire + leave on the second.
 - **Add-component**: c2s `0x2000` carrier, IIR sub `0x54C02089` = **`CombatReactiveIIR_c`** (reader `FUN_0082c720`,
-  docs/iir-readers-combat-world.md) — the same family as the catalog's `*_Reactive`/`MagicCombo` Action markers.
+  docs/re/iir-readers-combat-world.md) — the same family as the catalog's `*_Reactive`/`MagicCombo` Action markers.
   Body `[u32 0][u8 0x03][u32 componentIndex]` (+ a `02`-tagged twin ack). `componentIndex` = 0/1/3 for the three
   spells → an index into the caster's weave elements, NOT the Spell catalog id (the spell id never appears on the
   wire — matching "extra stats/effect per input"). The adds are ~10-15s apart (the paced trance cadence).
@@ -93,7 +93,7 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
    c2s activation packet references the combo id before the swings. Then a per-player FSM that matches the swing
    inputs against `GetPerformableCombosAsync` and fires the finisher (the s2c `ApplySpell` effect near the cluster).
 2. **Spellweaving** is BUILT for the Necromancer and (except the energy bar) works in-client — see
-   `docs/combos-spellweaving-handoff.md` §5 and **Gitea #141** (`needs-testing`) for the full state, code map, and
+   `docs/subsystems/combos-spellweaving-handoff.md` §5 and **Gitea #141** (`needs-testing`) for the full state, code map, and
    the open items. Top open bug: the **energy bar drops straight to 0** on weave start (the `0x200E` stream/scale
    needs a frame-by-frame diff vs the capture). Also open: the `componentIndex`→effect table + backlash roll
    (undecoded), authoritative DoT death, trance immobilisation, and the other 3 caster profiles.

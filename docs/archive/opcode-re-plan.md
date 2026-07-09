@@ -53,7 +53,7 @@ The 32-bit and endpoint ids are the hash track (Stage 2/3a). The 16-bit opcodes 
 ## Stages
 
 ### Stage 1 — Name & signature catalog ✅ DONE (2026-06-09)
-Extracted by `Captures/scripts/extract_rpc_catalog.py <AgeOfConan.exe>` → **`docs/aoc-client-rpc-methods.md`** (+ `.json`).
+Extracted by `Captures/scripts/extract_rpc_catalog.py <AgeOfConan.exe>` → **`docs/re/aoc-client-rpc-methods.md`** (+ `.json`).
 **14 interfaces, 376 client→server (proxy) + 401 server→client (dispatch) methods.** The interfaces map 1:1 onto
 our services: `UniverseAgent/Interface`, `PlayerAgent/Interface`, `CSPlayerAgent/Interface`, `GameCharAgent/
 Interface` (the main game protocol, 169 c2s / 157 s2c), `GameAgent/Interface`, **`TradepostAgent/Interface`**
@@ -81,7 +81,7 @@ exact. No disassembly needed. Examples:
 
 ### Stage 3 — Build the id↔name tables
 - **3a (32-bit + endpoint ids):** ✅ DONE — `Captures/scripts/decode_opcode_ids.py <exe> <Captures>` →
-  **`docs/aoc-opcode-ids.md`**. Scans every capture across **all servers**, resolves all 14 endpoint type ids and
+  **`docs/re/aoc-opcode-ids.md`**. Scans every capture across **all servers**, resolves all 14 endpoint type ids and
   ~72 IIR sub-opcodes by hashing every exe identifier. Cross-validated against independently-known opcodes
   (`SetMorphValueIIR_c`=morph ack, `SetNameIIR_t`=name commit, `n3TeleportIIR_t`=teleport, the `Knubot*IIR`
   dialogue family). Leftover `[?]` are client instance ids / handles in `0x2000` bodies (e.g. `0x02165EFF`=Strie),
@@ -101,7 +101,7 @@ exact. No disassembly needed. Examples:
   binary). **Deprioritized**: the dominant `0x2000` channel (the whole IIR protocol) is fully decoded in 3a, and
   the remaining 16-bit *control* opcodes are a small set already hand-identified for the ones we use
   (`SpawnCheck` 0x2008, `ReadyForPlayScreen` 0x2024, `Pong` 0x2009, the `0x201C` handshake, …). The per-server
-  16-bit opcode inventory (counts, unnamed) is in `docs/aoc-opcode-ids.md` for when this is picked back up.
+  16-bit opcode inventory (counts, unnamed) is in `docs/re/aoc-opcode-ids.md` for when this is picked back up.
 
 ### Stage 4 — Integrate & validate ✅ DONE (2026-06-09)
 - Real client names integrated: `GameServer0X2000RespondsOpcodes` is now the full IIR catalog (71 real names +
@@ -122,7 +122,7 @@ and tied to an open TODO. Ranked by value.
 
 1. **Exact wire layout of every raw dispatch method (highest value).** ✅ DONE (2026-06-09). `stream bad after
    '<field>'` is the client's own parser emitting each field *in read order*; the catalog
-   (`docs/aoc-client-rpc-methods.md`, via `Captures/scripts/extract_rpc_catalog.py`) already lists every method's field
+   (`docs/re/aoc-client-rpc-methods.md`, via `Captures/scripts/extract_rpc_catalog.py`) already lists every method's field
    names in order + the typed client→server signatures, and now a **Hungarian-prefix → wire-type legend** (`i_c`=
    ID32 handle, `i_n`=int, `b`=bool, `i_v`=vector, plural/`...List`/`...Data`=collection), verified against the
    proxy sigs. Confirmed examples: `DispatchSetItemStat(i_cInventoryID, i_nItemPos, i_nStat, i_nValue)`,
@@ -139,7 +139,7 @@ and tied to an open TODO. Ranked by value.
      `token`, `category`, and `<parameter>` values are all human-readable; the only binary 32-bit words that
      reverse-hash to an exe name are the **already-known** ProtoEndpoint framing ids (`TradepostInterface`
      0xF2C2D5B5, `TradepostAgent` 0x3D744981, the Game* ids) + the `BehaviorControlCenterIIR_c` Interact opcode —
-     i.e. things already in `docs/aoc-opcode-ids.md`. No new hashed token ids exist in the bodies. (Also: only
+     i.e. things already in `docs/re/aoc-opcode-ids.md`. No new hashed token ids exist in the bodies. (Also: only
      ONE category-629 token — `TradePostGUI_MailItemBought` — appears across ALL captures, so the mail/auction
      *implementation* TODO is itself blocked on fresh captures of the listing/buy/sell flow; it's a feature, not RE.)
    - **`OverrideGameTweaks` disconnect — ✅ DONE (2026-06-09), and it turned out NOT to be a reverse-hash case.**
@@ -180,7 +180,7 @@ and tied to an open TODO. Ranked by value.
    labels): Health cur=`0x0001`/max=`0x001B`, Stamina cur=`0x01F9`/max=`0x01F8`, Mana cur=`0x01FB`/max=`0x01FA`.
    Fixed in `LegacyCharacterStatId` + `EntityVitals.ToVitalsBlock` (now emits both ids per vital — the old code
    sent the current value under the max id, so damaged entities reported `max == currentHP`). See
-   `docs/player-stats.md`. **Still open:** the **attributes** (`Strength`/`Constitution`/`Dexterity`/`Intelligence`/
+   `docs/subsystems/player-stats.md`. **Still open:** the **attributes** (`Strength`/`Constitution`/`Dexterity`/`Intelligence`/
    `Wisdom`) — probed earlier as NOT plain stat records (likely client-computed base+gear+buffs); recovering those
    would need the RDB stat DataTable or disasm of the enum registration.
 5. **Appearance morphs** — ⚠ BINARY ANGLE DEAD, partial fix landed (2026-06-09). The premise (recover the morph
@@ -203,7 +203,7 @@ and tied to an open TODO. Ranked by value.
    `invalid camera path` / unbound-Kalanthes failure is upstream, in the EDITOR (galley) phase (see TODO #7 pin;
    next step is a live create-world loopback pcap diff, which needs running the server+client, not static RE).
 7. **The Lua `GameInterface` API as a Rosetta stone** — ✅ EXE-SIDE CATALOG DONE (2026-06-09) →
-   **`docs/aoc-gameinterface-api.md`**. Extracted the 42 `GameInterface.*` UI module namespaces + 50+ classes
+   **`docs/re/aoc-gameinterface-api.md`**. Extracted the 42 `GameInterface.*` UI module namespaces + 50+ classes
    from `AgeOfConan.exe` and tied the gameplay ones to the server packets that drive them (`Game.Dynel`←spawns,
    `Game.TargetingInterface`←target frame, `ProgressBars`←vitals `0x96B8DC59`, `Game.BuffData`←ApplySpell/ability
    grant, `Game.Camera`/`ScryWidgets`←cutscene, `Fifo`←`ShowClientFIFO`, `Inventory`←snapshot, etc.). **The
@@ -230,7 +230,7 @@ Progress (2026-06-09): **the entire Stage-5 backlog (#1–#8) has now been worke
   captured face morphs. Rendering still blocked on a looks/`SetMorphValueIIR` broadcast (raw IIR layout).
 - **#6** cutscene/scry — ✅ fully decoded + server-side replay VERIFIED correct on both connections; the bug is in
   the editor (galley) phase, which needs a live loopback pcap diff (not static RE).
-- **#7** GameInterface UI catalog — ✅ exe-side catalog done (`docs/aoc-gameinterface-api.md`); method-level map is
+- **#7** GameInterface UI catalog — ✅ exe-side catalog done (`docs/re/aoc-gameinterface-api.md`); method-level map is
   in the RDB Lua scripts.
 - **#8** login/version constants — ✅ checked, no action (client-computed, client→server, login works).
 

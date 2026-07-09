@@ -4,7 +4,7 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// Construct-side codec for the dynel-family full-update records (#187, docs/iir-readers-combat-world.md):
+	// Construct-side codec for the dynel-family full-update records (#187, docs/re/iir-readers-combat-world.md):
 	// DoorFullUpdateIIR_c (0x33A56FB0), DestructibleFullUpdateIIR_c (0x6BD56736), ClimbingDynelFullUpdateIIR_c
 	// (0x1FD6412B) and TombStoneFullUpdateIIR_c (0x0D80E7C9). They share the SimpleDynel shape:
 	//   [u32 len][u32 sub][u32 typeWord][u32 handle][u8 env][u32 blobLen][transform blob][ geometry tail ]

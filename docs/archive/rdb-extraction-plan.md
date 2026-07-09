@@ -421,4 +421,4 @@ and close this out.
   emulator (same spirit as the existing `Archive/` C++ server data + the packet captures). Not redistributing
   client assets; only derived game-data rows land in the local DB.
 - Verification ground truth we already have: captured item identities, the lvl-23 character-sheet screenshots
-  (`docs/player-stats.md`), and the conversation nodes — use these to validate any RDB parser.
+  (`docs/subsystems/player-stats.md`), and the conversation nodes — use these to validate any RDB parser.

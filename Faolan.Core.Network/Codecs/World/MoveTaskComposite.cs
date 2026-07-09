@@ -5,7 +5,7 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	// Full recursive MoveTaskIIR (0x96C46740) model + codec: parse ANY captured MoveTask record and re-emit it
 	// byte-exact (round-trip proven over all 6225 captured records, MoveTaskCompositeTests). The grammar is decoded
-	// 100% (docs/movetask-grammar.md, #53): the record is [u16 0][from][factory], the factory is [u8 mode][fields],
+	// 100% (docs/re/movetask-grammar.md, #53): the record is [u16 0][from][factory], the factory is [u8 mode][fields],
 	// and ListMoveTask (mode 4) nests a count of further factories. The typed builders (MoveTaskCodec.Build*) emit
 	// the common forms from semantic params; this codec covers EVERY form (incl. the recursive ListMoveTask) so the
 	// movement records can be CONSTRUCTED rather than replayed verbatim (#190/#234/#193). 4-byte fields are kept as

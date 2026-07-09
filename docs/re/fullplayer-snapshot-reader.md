@@ -127,7 +127,7 @@ REMAINING to author multi-quest (the gating work, decode-first):
 
 ## Class id → reader
 
-`0x737A6DF9` == BKDR-31(`FullPlayerCharacterIIR`) (confirmed; `docs/aoc-opcode-ids.md` row 33).
+`0x737A6DF9` == BKDR-31(`FullPlayerCharacterIIR`) (confirmed; `docs/re/aoc-opcode-ids.md` row 33).
 
 | class | vtable | `ReadSubClass` (slot 8) |
 |---|---|---|

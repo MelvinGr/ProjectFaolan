@@ -2,7 +2,7 @@
 
 Status: **in progress** (#244 — lifting the stat core off the captured `Data` blob so NPC spawns are
 constructed from typed storage, not spliced from a capture). See also
-[world-packets construct-not-replay], `docs/mid-session-spawn-blocker.md`, and the simulation-layer roadmap.
+[world-packets construct-not-replay], `docs/subsystems/mid-session-spawn-blocker.md`, and the simulation-layer roadmap.
 
 ## The three tiers
 

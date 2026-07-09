@@ -4,7 +4,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 {
 	// PetIIR_c (0x1F4CB0F7) — the server packet that binds a summoned creature to its OWNER, i.e. tells the client
 	// "this creature is YOUR pet" (so the pet UI + QueuePetCommand 0x205b become active). Decoded byte-exact from
-	// NecroL80_..._casting-with-chat-notes.pcapng (docs/summon-pet-decode.md, frames 470/679/919 assign, 1167 remove).
+	// NecroL80_..._casting-with-chat-notes.pcapng (docs/subsystems/summon-pet-decode.md, frames 470/679/919 assign, 1167 remove).
 	//
 	// Record (the bytes after the 0x2000 carrier's u32 length prefix), all big-endian:
 	//   [subop 0x1F4CB0F7][u32 type=0xC350][u32 ownerHandle][u8 env=0] then the reader payload (PetIIR_c::ReadSubClass):

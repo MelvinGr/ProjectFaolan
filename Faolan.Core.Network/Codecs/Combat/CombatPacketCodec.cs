@@ -56,7 +56,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.EnergyIIR).WriteUInt32(EntityClass.Character).WriteUInt32(actorInstance).WriteByte(0x01).WriteUInt32(stamina).ToArray();
 		}
 
-		// The NPC counter-attack ANIMATION ack: the "second BccAck with actor = target handle" (docs/combat.md, was
+		// The NPC counter-attack ANIMATION ack: the "second BccAck with actor = target handle" (docs/subsystems/combat.md, was
 		// undecoded). Structurally the SAME BehaviorControlCenterIIR (0x642CD3D6) as the player's targeted-hit attack
 		// ack, but the roles are SWAPPED - top-level actor = the NPC, args.SpellTarget + the result-block target = the
 		// player it hit - and the args carry NO Mode field (the player-only distinguisher). Sending it makes the client

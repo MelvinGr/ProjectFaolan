@@ -4,7 +4,7 @@
 The readers for SimpleDynel / LootBag / MoveTask / GameActionList / BehaviorControlCenter lack the verbose
 "bad stream" assert that anchored the FA015807 decode, so they were found via the vtable instead: ReadSubClass
 is vtable slot 8 (proven against the known SimpleChar reader); reading slot 8 of each class's `::vftable` gives
-that class's reader (Captures/ghidra/DumpVtableReaders.java). Grammars in docs/iir-subclass-readers.md.
+that class's reader (Captures/ghidra/DumpVtableReaders.java). Grammars in docs/re/iir-subclass-readers.md.
 
 This validates the one with a clean, checkable framing from captures: SimpleDynelFullUpdateIIR (0x66AEDD50).
 Its ReadSubClass = ReadLengthPrefixedBlob (FUN_00cbfb80: [u32 len][bytes]) of the ProtoSimpleDynelIIR protobuf,

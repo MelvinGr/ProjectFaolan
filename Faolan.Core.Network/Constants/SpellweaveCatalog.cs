@@ -3,7 +3,7 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Constants
 {
-	// Per-class spellweaving profile: the data the activate-response needs to be built for a given caster (docs/combos.md).
+	// Per-class spellweaving profile: the data the activate-response needs to be built for a given caster (docs/subsystems/combos.md).
 	// The 4 pure casters weave; the necromancer set is capture-derived (NecroL80, decode_spellweave.py) and REAL - the
 	// weave-element ids resolve to actual necro spells (Arcane Renewal / Arcane Surge / Parasite Host / Death God /
 	// Death) and the three trance-buff ids resolve to Spellweaving / Spellweaving(1) / Arcane Drought in Spells. The

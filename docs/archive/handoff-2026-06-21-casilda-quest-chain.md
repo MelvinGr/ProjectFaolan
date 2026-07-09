@@ -138,5 +138,5 @@ supersede 13479→13563, not leave 13479 for a turn-in. Rework it as part of sta
   only piece NOT in this capture is the escort *arrival* completion (12407 → next); a short follow-up capture
   of reaching the city would close that. Stages 1–3 need no further capture.
 - Screenshots: `/home/melvin/Pictures/Screenshots/{kiled_tuut,free_casilda}.png`
-- Related: `docs/knubot-conversation-packets.md`; memories [[casilda_quest_chain_261]],
+- Related: `docs/subsystems/knubot-conversation-packets.md`; memories [[casilda_quest_chain_261]],
   [[quest_kill_goal_47]], [[protocol_quest_state]], [[protocol_loot_interaction]].

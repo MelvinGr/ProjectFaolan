@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the server->client combat-state records (#216/#218,
-	// docs/iir-readers-combat-world.md): CombatShield, ThreatLevel, HateListUpdate, StatDamage. Oracles are captured
+	// docs/re/iir-readers-combat-world.md): CombatShield, ThreatLevel, HateListUpdate, StatDamage. Oracles are captured
 	// bodies (full record incl. the 4-byte length prefix).
 	public class CombatRecordCodecTests
 	{

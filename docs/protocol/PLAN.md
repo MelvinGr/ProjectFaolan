@@ -168,7 +168,13 @@ rather than guessed.
       #318 (compression-marker bytes 4..7), #319 (RpcHeader trailing headerData), #320 (PlayerAgent 32-bit hash
       dispatch), #321 (ChatText trailer word); the FeedbackIIR/RegenIIR verbatim residue rides #223. Each gap links
       its issue, so an unknown lives on the backlog, not just in a doc.
-- [ ] **P7 — Regroup the residue** into `subsystems/` / `rdb/` / `tooling/`.
+- [x] **P7 — Regroup the residue.** The ~50 flat docs are now sorted into the converged tree: `rdb/` (7 client-asset
+      docs), `tooling/` (5 launcher/capture/importer docs), `subsystems/` (22 our-implementation docs), and `re/` (16
+      opcode-methodology + grammar/reader RE artifacts, joining the existing decompile dumps). All referrers repointed
+      (CLAUDE.md, README, ~30 code-comment pointers, cross-doc links); all markdown links resolve. Two findings: the
+      three opcode-catalog docs this plan marked "delete" are referenced from CODE as the RE-derivation source, so they
+      went to `re/`, not the trash; and `entity-class-ids.md` + `entity-handles.md` stay at the root as `05-identity.md`
+      absorption candidates. Handoffs stayed with their category (both issues still open, so not archived).
 
 **Expectation to set now:** the finished reference contains *every piece of information we actually have, each
 tagged with how we know it, plus a complete and explicit list of what we do not.* Some of the 791 opcodes will

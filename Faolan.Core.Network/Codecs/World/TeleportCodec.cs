@@ -5,7 +5,7 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	// The change-map / teleport prep records the retail server sends before the 0x2002 handoff (#219), decoded
 	// byte-for-byte from the changemap captures (frames 4200/4212 map 2010, 4417/4420 map 2000) against the IIR
-	// readers recovered in #233 (full reader walk in docs/teleport-changemap.md):
+	// readers recovered in #233 (full reader walk in docs/subsystems/teleport-changemap.md):
 	//   - IntendedTeleportIIR_c (0x10D27BC0, "begin teleport to map N")  -> reader FUN_005bfce0
 	//   - n3TeleportIIR_t       (0x5A32F0D7, "destination map + position") -> reader FUN_005d1ae0
 	// Both embed a PlayfieldProxy stream (FUN_00a6a600): `[u8 version='b'(0x62)][u32 x8][u8 bool]`, where u32[0] is
