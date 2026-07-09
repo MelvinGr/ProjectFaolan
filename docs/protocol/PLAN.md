@@ -26,10 +26,14 @@ Nothing goes in untagged. Every fact is one of:
 Citation format, inline, immediately after the claim:
 
 ```
-The playfield token sits at +28 after the 0x0000C79C marker. [V3: BurstGoldenTests.WorldPrepBurst_IsByteStable]
-Guild leader wire rank is 4.                                 [V2: DemoL80_..._create-guild.tshark.json frame 366]
-16-bit opcodes are method indices (0x2000 + registration).   [V1: Captures/ghidra/DumpRpcMethods.java]
+The create-world entry burst is byte-stable.               [V3: BurstGoldenTests.CreateWorldEntryBurst_IsByteStable]
+Guild leader wire rank is 4.                               [V2: DemoL80_mage-demonologist_login_create-guild.tshark.json frame 366]
+16-bit opcodes are method indices (0x2000 + registration). [V1: Captures/ghidra/DumpRpcTables.java]
 ```
+
+These three are linted, not decorative: `ProtocolCitationTests` resolves each against the repo. They are the
+format's own proof — when first written they cited a test deleted with `SendWorldPrepBurst`, a capture whose
+name was literally `DemoL80_..._create-guild`, and a Ghidra script (`DumpRpcMethods.java`) that never existed.
 
 **The distinction that must never blur:** we can enumerate **100% of the 791 opcodes at V1** — they come from
 the client's method tables. But a *message body layout* only exists where a capture does. "The opcode exists"
@@ -147,7 +151,10 @@ rather than guessed.
       Attribution is **exact**, not heuristic: every codec declares its `Opcode`/`HandledTypes` (#317), and
       `CodecConventionTests` forbids a bare opcode hex literal in `Codecs/`, so nothing can emit an IIR
       unattributed. The 11 V1s are genuinely undecoded. Migration order (P5) is driven by this — V3 areas first.
-- [ ] **P3 — Citation linter.** Then, and only then, prose can claim verification.
+- [x] **P3 — Citation linter.** `ProtocolCitationTests` resolves every tag in `docs/` (minus `archive/`) against the
+      repo: `[V3:]` → a real `[Fact]`/`[Theory]` method, `[V2:]` → a real file under `Captures/`, `[V1:]` → a real
+      path, `[V0:]` → an entry in `gaps.md`. Proven to fail on a bogus citation at each level. Prose can now claim
+      verification. (It caught its first three on day one — PLAN.md's own examples were all stale.)
 - [ ] **P4 — Layer pages** (§4), each fact tagged.
 - [ ] **P5 — Per-message layouts** (§5), V3 first; absorb + delete the superseded docs as we go.
 - [ ] **P6 — `gaps.md`.** Every V0 gets a Gitea issue.
