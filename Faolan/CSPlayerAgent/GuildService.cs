@@ -10,8 +10,8 @@ using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Server.GameServer;
+using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent

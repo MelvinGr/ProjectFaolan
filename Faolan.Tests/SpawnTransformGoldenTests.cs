@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using Xunit;
 
 namespace Faolan.Tests

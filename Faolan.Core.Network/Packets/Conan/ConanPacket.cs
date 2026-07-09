@@ -1,6 +1,6 @@
 using System;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Packets.Conan
 {

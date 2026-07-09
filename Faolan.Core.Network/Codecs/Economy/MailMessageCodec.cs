@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using ProtoBuf;
 
 namespace Faolan.Core.Network.Codecs.Economy

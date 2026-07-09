@@ -11,7 +11,7 @@
 // Items.Data1..4 quad) that unlock the RDBH item templates - see docs/rdb-extraction-plan.md.
 syntax = "proto2";
 package aoc;
-option csharp_namespace = "Faolan.Core.Network.Protobuf";
+option csharp_namespace = "Faolan.Core.Protobuf";
 
 // ===== Util.proto =====
 message ProtoEmptyMessage {

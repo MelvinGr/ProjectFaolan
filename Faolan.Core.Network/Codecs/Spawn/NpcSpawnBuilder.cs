@@ -6,7 +6,7 @@ using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {

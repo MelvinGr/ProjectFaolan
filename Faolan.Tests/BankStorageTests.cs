@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using Faolan.GameServer.Economy;
 using Xunit;
 

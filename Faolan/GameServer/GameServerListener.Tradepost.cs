@@ -9,7 +9,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer

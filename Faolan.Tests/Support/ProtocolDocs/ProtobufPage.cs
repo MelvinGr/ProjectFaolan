@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using ProtoBuf;
 
 namespace Faolan.Tests.Support.ProtocolDocs

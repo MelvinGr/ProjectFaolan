@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using ProtoBuf;
 
 namespace Faolan.Core.Network.Codecs.World

@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.GameServer.CreateFlow;
 using Xunit;
-using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
 
 namespace Faolan.Tests
 {

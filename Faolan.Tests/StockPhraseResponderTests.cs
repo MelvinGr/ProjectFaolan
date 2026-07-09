@@ -5,9 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
+using Faolan.GameServer.Dialogue;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using StockConversationService = Faolan.GameServer.Dialogue.StockConversationService;
 
 namespace Faolan.Tests
 {

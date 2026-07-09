@@ -7,7 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {

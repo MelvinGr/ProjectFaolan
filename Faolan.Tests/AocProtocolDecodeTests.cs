@@ -8,7 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;

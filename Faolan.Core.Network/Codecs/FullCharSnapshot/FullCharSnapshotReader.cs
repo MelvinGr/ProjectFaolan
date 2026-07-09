@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 using ProtoBuf;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot

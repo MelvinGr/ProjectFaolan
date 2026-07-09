@@ -6,7 +6,7 @@
 
 #region Designer generated code
 #pragma warning disable CS0612, CS0618, CS1591, CS3021, CS8981, IDE0079, IDE1006, RCS1036, RCS1057, RCS1085, RCS1192
-namespace Faolan.Core.Network.Protobuf
+namespace Faolan.Core.Protobuf
 {
 
     [global::ProtoBuf.ProtoContract()]
@@ -450,16 +450,16 @@ namespace Faolan.Core.Network.Protobuf
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         [global::ProtoBuf.ProtoMember(1, Name = @"caller_id", IsRequired = true)]
-        public ProtoEndpoint CallerId { get; set; }
+        public Core.Protobuf.ProtoEndpoint CallerId { get; set; }
 
         [global::ProtoBuf.ProtoMember(2, Name = @"endpoint_id", IsRequired = true)]
-        public ProtoEndpoint EndpointId { get; set; }
+        public Core.Protobuf.ProtoEndpoint EndpointId { get; set; }
 
         [global::ProtoBuf.ProtoMember(5, Name = @"routing_destination")]
-        public global::System.Collections.Generic.List<ProtoEndpoint> RoutingDestinations { get; } = new global::System.Collections.Generic.List<ProtoEndpoint>();
+        public global::System.Collections.Generic.List<Core.Protobuf.ProtoEndpoint> RoutingDestinations { get; } = new global::System.Collections.Generic.List<Core.Protobuf.ProtoEndpoint>();
 
         [global::ProtoBuf.ProtoMember(3, Name = @"full_routing_context")]
-        public global::System.Collections.Generic.List<ProtoEndpoint> FullRoutingContexts { get; } = new global::System.Collections.Generic.List<ProtoEndpoint>();
+        public global::System.Collections.Generic.List<Core.Protobuf.ProtoEndpoint> FullRoutingContexts { get; } = new global::System.Collections.Generic.List<Core.Protobuf.ProtoEndpoint>();
 
         [global::ProtoBuf.ProtoMember(4, Name = @"method_instance", IsRequired = true)]
         public uint MethodInstance { get; set; }
@@ -1160,10 +1160,10 @@ namespace Faolan.Core.Network.Protobuf
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         [global::ProtoBuf.ProtoMember(1, Name = @"position")]
-        public ProtoVec3 Position { get; set; }
+        public Core.Protobuf.ProtoVec3 Position { get; set; }
 
         [global::ProtoBuf.ProtoMember(2, Name = @"rotation")]
-        public ProtoQuat Rotation { get; set; }
+        public Core.Protobuf.ProtoQuat Rotation { get; set; }
 
         [global::ProtoBuf.ProtoMember(3, Name = @"playfield_instance")]
         public uint PlayfieldInstance
@@ -1608,7 +1608,7 @@ namespace Faolan.Core.Network.Protobuf
             private uint? __pbn__PlayfieldId;
 
             [global::ProtoBuf.ProtoMember(4, Name = @"pos")]
-            public ProtoVec3 Pos { get; set; }
+            public Core.Protobuf.ProtoVec3 Pos { get; set; }
 
         }
 

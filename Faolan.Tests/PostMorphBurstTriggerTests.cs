@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
+using Faolan.GameServer.CreateFlow;
 using Faolan.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
-using CreateFlowService = Faolan.GameServer.CreateFlow.CreateFlowService;
 
 namespace Faolan.Tests
 {

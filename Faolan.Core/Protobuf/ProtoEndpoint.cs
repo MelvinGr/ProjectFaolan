@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Faolan.Core.Network.Protobuf
+namespace Faolan.Core.Protobuf
 {
 	// Hand-rolled reader for the RpcHeader endpoint fields, the counterpart to ToProtobuf() (locked byte-exact by
 	// ProtoEndpointGoldenTests). ConanPacket reads the header's caller_id (field 1, tag 0x0A) then endpoint_id

@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using Stat = Faolan.Core.Enums.CharacterStatId;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
@@ -25,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// live zone's minted token (FullCharSnapshotSubClass passes it in), never a captured one. Replaying a stale token
 		// HIDES the entire in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04) and mis-scopes
 		// despawns. SkeletonValueOf (the beach 0x4FE428) is the fresh/fallback value when no live token is given.
-		public const uint PlayfieldTokenStatId = (uint)Stat.PlayfieldToken;
+		public const uint PlayfieldTokenStatId = (uint)CharacterStatId.PlayfieldToken;
 
 		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
 		public static int SheetSize => StatList1.Length + StatList2Half.Length;
@@ -36,28 +36,28 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// "repeated run"). Every value is a named (statId, value) - the character-derived stats (Level 0x36, XP 0x34,
 		// MaxXP 0x15E, HP 0x1B, mana, stamina) are overwritten from the character by the caller; the rest are the fresh
 		// baseline (armour/resists/... we do not model yet, so carried as their fixed defaults). No opaque blob.
-		private static readonly (Stat Id, uint Value)[] StatList1 =
+		private static readonly (CharacterStatId Id, uint Value)[] StatList1 =
 		[
-			(Stat.Unknown0, 0x0), (Stat.Unknown1, 0x0), (Stat.Unknown2, 0x0), (Stat.Unknown3, 0x0), (Stat.Unknown4, 0x1), (Stat.Unknown5, 0x0), (Stat.Unknown6, 0x2), (Stat.Unknown7, 0x2),
-			(Stat.PlayfieldToken, 0x4FE428), (Stat.Unknown9, 0x0), (Stat.HealthMax, 0x2328), (Stat.HealthCurrent, 0x2648), (Stat.Level, 0x1), (Stat.Exp, 0x0), (Stat.MaxExp, 0x64),
-			(Stat.Unknown10, 0x0), (Stat.Unknown11, 0x0)
+			(CharacterStatId.Unknown0, 0x0), (CharacterStatId.Unknown1, 0x0), (CharacterStatId.Unknown2, 0x0), (CharacterStatId.Unknown3, 0x0), (CharacterStatId.Unknown4, 0x1), (CharacterStatId.Unknown5, 0x0), (CharacterStatId.Unknown6, 0x2), (CharacterStatId.Unknown7, 0x2),
+			(CharacterStatId.PlayfieldToken, 0x4FE428), (CharacterStatId.Unknown9, 0x0), (CharacterStatId.HealthMax, 0x2328), (CharacterStatId.HealthCurrent, 0x2648), (CharacterStatId.Level, 0x1), (CharacterStatId.Exp, 0x0), (CharacterStatId.MaxExp, 0x64),
+			(CharacterStatId.Unknown10, 0x0), (CharacterStatId.Unknown11, 0x0)
 		];
 
 		// One half of StatList#2; the client carries it twice (base + current). Its last two slots (Unknown63 then
 		// KillingBlows) are the tail the known-spell list is built right after (CreateBlock).
-		private static readonly (Stat Id, uint Value)[] StatList2Half =
+		private static readonly (CharacterStatId Id, uint Value)[] StatList2Half =
 		[
-			(Stat.Unknown12, 0x0), (Stat.Unknown13, 0x0), (Stat.Unknown14, 0x0), (Stat.Unknown15, 0x0), (Stat.PvpMaxExp, 0xDAC), (Stat.Unknown16, 0x0), (Stat.Unknown17, 0x6F),
-			(Stat.Unknown18, 0x0), (Stat.Unknown19, 0x8), (Stat.HealthCurrent, 0x2648), (Stat.HealthMax, 0x2328), (Stat.Intelligence, 0xA), (Stat.ManaCurrent, 0x0), (Stat.ManaMax, 0x0),
-			(Stat.ManaCurrent, 0x0), (Stat.StaminaMax, 0x59D8), (Stat.StaminaCurrent, 0x5C30), (Stat.Strength, 0xA), (Stat.Unknown20, 0x0), (Stat.Unknown21, 0x0), (Stat.Unknown22, 0x0),
-			(Stat.Unknown23, 0x3), (Stat.MaxExp, 0x64), (Stat.Unknown10, 0x0), (Stat.Level, 0x1), (Stat.PvpLevel, 0x0), (Stat.PvpExp, 0x0), (Stat.Exp, 0x0), (Stat.Unknown24, 0x3E8),
-			(Stat.Unknown25, 0xBA), (Stat.Unknown26, 0x0), (Stat.Unknown27, 0x0), (Stat.Unknown28, 0x0), (Stat.Unknown29, 0x0), (Stat.Unknown30, 0x59EA506E), (Stat.Unknown31, 0x14),
-			(Stat.Unknown32, 0x0), (Stat.Unknown33, 0x0), (Stat.Unknown34, 0x0), (Stat.Unknown35, 0x0), (Stat.Unknown36, 0x0), (Stat.Unknown37, 0x0), (Stat.Unknown38, 0x0), (Stat.Unknown39, 0x0),
-			(Stat.Unknown40, 0x64), (Stat.Unknown41, 0x64), (Stat.Unknown42, 0x64), (Stat.Unknown43, 0x64), (Stat.Unknown44, 0x0), (Stat.Unknown45, 0x0), (Stat.Unknown46, 0x0),
-			(Stat.Unknown47, 0x0), (Stat.Unknown48, 0x0), (Stat.Unknown49, 0x0), (Stat.Unknown50, 0x0), (Stat.Unknown51, 0x0), (Stat.Unknown52, 0x0), (Stat.Unknown53, 0x0), (Stat.Unknown54, 0x0),
-			(Stat.Unknown55, 0x0), (Stat.Unknown56, 0x0), (Stat.CaptureSkullLose, 0x0), (Stat.Unknown57, 0x0), (Stat.CaptureSkullWin, 0x0), (Stat.Unknown58, 0x0), (Stat.AnnihilationLose, 0x0),
-			(Stat.Unknown59, 0x0), (Stat.AnnihilationWin, 0x0), (Stat.Unknown60, 0x0), (Stat.Unknown61, 0x0), (Stat.Unknown62, 0x0), (Stat.Death, 0x0), (Stat.Unknown63, 0x0),
-			(Stat.KillingBlows, 0x0)
+			(CharacterStatId.Unknown12, 0x0), (CharacterStatId.Unknown13, 0x0), (CharacterStatId.Unknown14, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC), (CharacterStatId.Unknown16, 0x0), (CharacterStatId.Unknown17, 0x6F),
+			(CharacterStatId.Unknown18, 0x0), (CharacterStatId.Unknown19, 0x8), (CharacterStatId.HealthCurrent, 0x2648), (CharacterStatId.HealthMax, 0x2328), (CharacterStatId.Intelligence, 0xA), (CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.ManaMax, 0x0),
+			(CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.StaminaMax, 0x59D8), (CharacterStatId.StaminaCurrent, 0x5C30), (CharacterStatId.Strength, 0xA), (CharacterStatId.Unknown20, 0x0), (CharacterStatId.Unknown21, 0x0), (CharacterStatId.Unknown22, 0x0),
+			(CharacterStatId.Unknown23, 0x3), (CharacterStatId.MaxExp, 0x64), (CharacterStatId.Unknown10, 0x0), (CharacterStatId.Level, 0x1), (CharacterStatId.PvpLevel, 0x0), (CharacterStatId.PvpExp, 0x0), (CharacterStatId.Exp, 0x0), (CharacterStatId.Unknown24, 0x3E8),
+			(CharacterStatId.Unknown25, 0xBA), (CharacterStatId.Unknown26, 0x0), (CharacterStatId.Unknown27, 0x0), (CharacterStatId.Unknown28, 0x0), (CharacterStatId.Unknown29, 0x0), (CharacterStatId.Unknown30, 0x59EA506E), (CharacterStatId.Unknown31, 0x14),
+			(CharacterStatId.Unknown32, 0x0), (CharacterStatId.Unknown33, 0x0), (CharacterStatId.Unknown34, 0x0), (CharacterStatId.Unknown35, 0x0), (CharacterStatId.Unknown36, 0x0), (CharacterStatId.Unknown37, 0x0), (CharacterStatId.Unknown38, 0x0), (CharacterStatId.Unknown39, 0x0),
+			(CharacterStatId.Unknown40, 0x64), (CharacterStatId.Unknown41, 0x64), (CharacterStatId.Unknown42, 0x64), (CharacterStatId.Unknown43, 0x64), (CharacterStatId.Unknown44, 0x0), (CharacterStatId.Unknown45, 0x0), (CharacterStatId.Unknown46, 0x0),
+			(CharacterStatId.Unknown47, 0x0), (CharacterStatId.Unknown48, 0x0), (CharacterStatId.Unknown49, 0x0), (CharacterStatId.Unknown50, 0x0), (CharacterStatId.Unknown51, 0x0), (CharacterStatId.Unknown52, 0x0), (CharacterStatId.Unknown53, 0x0), (CharacterStatId.Unknown54, 0x0),
+			(CharacterStatId.Unknown55, 0x0), (CharacterStatId.Unknown56, 0x0), (CharacterStatId.CaptureSkullLose, 0x0), (CharacterStatId.Unknown57, 0x0), (CharacterStatId.CaptureSkullWin, 0x0), (CharacterStatId.Unknown58, 0x0), (CharacterStatId.AnnihilationLose, 0x0),
+			(CharacterStatId.Unknown59, 0x0), (CharacterStatId.AnnihilationWin, 0x0), (CharacterStatId.Unknown60, 0x0), (CharacterStatId.Unknown61, 0x0), (CharacterStatId.Unknown62, 0x0), (CharacterStatId.Death, 0x0), (CharacterStatId.Unknown63, 0x0),
+			(CharacterStatId.KillingBlows, 0x0)
 		];
 
 		// The fixed words AFTER the known-spell list at the block tail (the known-list - its count word then the 12-byte

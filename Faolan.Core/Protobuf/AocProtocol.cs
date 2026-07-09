@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace Faolan.Core.Network.Protobuf
+namespace Faolan.Core.Protobuf
 {
 	public partial class ProtoVec3
 	{

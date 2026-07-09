@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Packets
 {
