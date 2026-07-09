@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -9,7 +10,7 @@ namespace Faolan.Tests
 	// byte-exact - so the stat region can be authored without BeachTailsTemplate.bin (#186, decode_statblock.py).
 	public class SubClassStatBlockTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
 		public void CreateFreshBlock_MatchesTheTemplateStatBlock()

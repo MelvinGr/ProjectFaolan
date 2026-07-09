@@ -9,13 +9,14 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
 	public class InventorySnapshotTests
 	{
-		private const string BigboyPath = "/home/melvin/Development/C#/Project Faolan/Captures/account-stricken997-character-Strie-login-randomActions-bigboy.bin";
-		private const string BurstInventoryPath = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+		private static readonly string BigboyPath = TestPaths.Asset("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
+		private static readonly string BurstInventoryPath = TestPaths.Asset("strie-login-inventory.bin");
 
 		// Reconstruct the FULL packet (header + body) the way BuildBeachInventoryPacket does and compare to the
 		// original - the inner-body round-trip passes, so if the no-op beach inventory stalls, the header/outer

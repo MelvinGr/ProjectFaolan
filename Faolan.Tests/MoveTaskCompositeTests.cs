@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using Xunit;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -15,7 +16,7 @@ namespace Faolan.Tests
 	// cutscene burst - can be constructed, not just replayed.
 	public class MoveTaskCompositeTests
 	{
-		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";
+		private static readonly string CapturesDir = TestPaths.CapturesDir;
 		private static readonly byte[] Sub = Convert.FromHexString("96c46740");
 
 		// A recursive ListMoveTask (mode 4) - the cutscene burst's dominant form - nests child factories; assert the

@@ -5,6 +5,7 @@ using Faolan.Importer.Captures;
 using Xunit;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -14,7 +15,7 @@ namespace Faolan.Tests
 	// and rebuilding it via the codec must reproduce the wire body exactly.
 	public class TradeskillRecipeCodecTests
 	{
-		private const string Capture = "/home/melvin/Development/C#/Project Faolan/Captures/NecroL80_mage-necromancer_shops_open-crrafting-receipies.tshark.json";
+		private static readonly string Capture = TestPaths.Capture("NecroL80_mage-necromancer_shops_open-crrafting-receipies.tshark.json");
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59];
 
 		[Fact]

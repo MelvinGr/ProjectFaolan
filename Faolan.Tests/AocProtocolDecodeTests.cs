@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -22,7 +23,7 @@ namespace Faolan.Tests
     // key that unlocks its RDBH item template. Ties capture -> typed protobuf -> decryption key together.
     public class AocProtocolDecodeTests
     {
-        private const string InventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+        private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
         private const uint Hash = 1129664565;
         private const uint SlaveManaclesId = 3361557;
         private const ulong Slot = 18;

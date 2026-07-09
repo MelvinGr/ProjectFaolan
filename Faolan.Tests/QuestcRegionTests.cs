@@ -3,6 +3,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -12,7 +13,7 @@ namespace Faolan.Tests
 	public class QuestcRegionTests
 	{
 		private const int RegionEnd = 609; // where Quest_c ends in the beach template (decode_questc.py)
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private readonly ITestOutputHelper _o;
 
 		public QuestcRegionTests(ITestOutputHelper o)

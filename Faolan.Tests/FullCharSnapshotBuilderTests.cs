@@ -6,6 +6,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -158,7 +159,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TailPatch_RoundTripsThroughTheTailsModel()
 		{
-			const string bigboy = "/home/melvin/Development/C#/Project Faolan/Captures/account-stricken997-character-Strie-login-randomActions-bigboy.bin";
+			var bigboy = TestPaths.Asset("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
 			if (!File.Exists(bigboy))
 				return;
 

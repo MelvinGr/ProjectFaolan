@@ -10,6 +10,7 @@ using Faolan.GameServer;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -30,7 +31,7 @@ namespace Faolan.Tests
 		private const string CapturedEntry = "08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e6341204082e10071a530a140d99bf60dd15" +
 		                                     "f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c7ed8d1a140d99bf60dd15f67309761dca" + "ed497925d2c7ed8d25154b33002d154b330038014535505543";
 
-		private const string InventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
 		private const uint CharId = 0x01316d8a;
 		private const uint ItemPos = 0;
 		private const uint SlaveManaclesId = 3361557;

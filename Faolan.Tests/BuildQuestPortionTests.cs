@@ -8,6 +8,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -17,8 +18,7 @@ namespace Faolan.Tests
 	// region, so driving it from CharacterQuests is safe to feed the client (which rejects a malformed region).
 	public class BuildQuestPortionTests
 	{
-		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
-		private const string GoldenPath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/QuestPortion2QuestGolden.bin";
+		private static readonly string DbPath = TestPaths.FaolanDb;
 		private const uint CaptureInstance = 0x021663DD; // Stihetfv's client instance (the goal records carry it)
 
 		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
@@ -53,7 +53,7 @@ namespace Faolan.Tests
 			Assert.NotNull(casilda);
 
 			var built = FullCharSnapshotSubClass.BuildQuestPortion([beach, casilda], beach, CaptureInstance);
-			var golden = File.ReadAllBytes(GoldenPath);
+			var golden = Golden.Bytes("QuestPortion2QuestGolden");
 
 			var diff = -1;
 			for (var i = 0; i < Math.Min(golden.Length, built.Length); i++)
@@ -76,7 +76,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task BuildSingle_Casilda13479_MatchesTheCapturedRecord_ByteForByte()
 		{
-			var golden = File.ReadAllBytes(GoldenPath);
+			var golden = Golden.Bytes("QuestPortion2QuestGolden");
 			// the 13479 record's signature in the region: [listKey=0x34A7][ver=1][questId=0x34A7]
 			var sig = new byte[]
 			{

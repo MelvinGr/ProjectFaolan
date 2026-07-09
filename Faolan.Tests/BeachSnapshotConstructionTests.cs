@@ -7,6 +7,7 @@ using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer;
 using Xunit;
 using Xunit.Abstractions;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -15,10 +16,10 @@ namespace Faolan.Tests
 	// proves a from-scratch prefix reproduces the capture; extracts the tails template asset.
 	public class BeachSnapshotConstructionTests
 	{
-		private const string Cap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+		private static readonly string Cap = TestPaths.Asset("strie-login-inventory.bin");
 
 		// Where the server-owned beach tails template asset lives in the source tree.
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private readonly ITestOutputHelper _o;
 
 		public BeachSnapshotConstructionTests(ITestOutputHelper o)

@@ -8,6 +8,7 @@ using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -17,8 +18,8 @@ namespace Faolan.Tests
 	// Proving this means the .bin is no longer needed to author a beach world-entry snapshot's tails.
 	public class BeachTailsFromScratchTests
 	{
-		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string DbPath = TestPaths.FaolanDb;
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x02165EFF;
 

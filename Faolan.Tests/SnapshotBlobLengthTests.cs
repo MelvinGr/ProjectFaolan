@@ -11,6 +11,7 @@ using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -22,16 +23,12 @@ namespace Faolan.Tests
 	// The old varint model (AdjustSnapshotPrefixRootLength) was byte-misaligned and corrupted this length on resize.
 	public class SnapshotBlobLengthTests
 	{
-		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";
 
 		// The captured prefix's BE32 at offset 1 already equals field5Len + rootLen (the client's blob length), and
 		// the byte immediately after that many blob bytes is the 0x18 version — proven across both beach captures.
 		[Theory, InlineData("strie-login-inventory.bin", 686), InlineData("account-stricken997-character-Strie-login-randomActions-bigboy.bin", 681)]
 		public void CapturedPrefix_EncodesBe32BlobLength(string bin, uint expectedBlobLen)
 		{
-			if (!File.Exists(Path.Combine(CapturesDir, bin)))
-				return;
-
 			var (prefix, rootLen, tails) = Split(bin);
 			var be32 = BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(1, 4));
 			Assert.Equal(expectedBlobLen, be32); // matches the byte-level capture
@@ -141,7 +138,7 @@ namespace Faolan.Tests
 
 		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
+			var packet = new ConanPacket(File.ReadAllBytes(TestPaths.Asset(bin)));
 			var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
 			s.ReadUInt32();
 			s.ReadUInt32();
@@ -153,7 +150,7 @@ namespace Faolan.Tests
 		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).
 		private static (byte[] Prefix, int RootLen, byte[] SubClass, uint Instance, byte[] Root) SplitFull(string bin)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
+			var packet = new ConanPacket(File.ReadAllBytes(TestPaths.Asset(bin)));
 			var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
 			s.ReadUInt32();
 			s.ReadUInt32();

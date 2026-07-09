@@ -1,6 +1,7 @@
 using System.IO;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -10,7 +11,7 @@ namespace Faolan.Tests
 	// so retiring the .bin changed nothing on the wire.
 	public class AccessWindowCatalogTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
 		public void Catalog_HasTheExpectedShape()

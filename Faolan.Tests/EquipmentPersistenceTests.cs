@@ -7,6 +7,7 @@ using Faolan.Core.Enums;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -22,7 +23,7 @@ namespace Faolan.Tests
 			{
 				const uint characterId = 35020544;
 				const uint royalSignet = 3735601; // a buildable item present in strie-login-inventory.bin
-				const string inventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+				var inventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
 
 				// Arrange: import items from a capture, seed a character + equipment (Wrist + FirstPosBag).
 				await using (var db = NewContext(dbPath))

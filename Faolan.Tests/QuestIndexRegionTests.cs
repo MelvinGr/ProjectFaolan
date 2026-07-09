@@ -2,6 +2,7 @@ using System.IO;
 using Xunit;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -10,7 +11,7 @@ namespace Faolan.Tests
 	public class QuestIndexRegionTests
 	{
 		private const int RegionStart = 1168, RegionEnd = 1292; // index region / access-window table boundaries
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
 		public void Parse_DecodesTheIndexAndGoalTable()

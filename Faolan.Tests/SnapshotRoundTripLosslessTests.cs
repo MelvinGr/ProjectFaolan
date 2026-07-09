@@ -8,6 +8,7 @@ using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 using Xunit;
 using Xunit.Abstractions;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -20,7 +21,6 @@ namespace Faolan.Tests
 	// it does not drop the per-container 0x18 subclass version byte (the suspect in docs/archive/db-container-handoff.md).
 	public class SnapshotRoundTripLosslessTests
 	{
-		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";
 		private readonly ITestOutputHelper _o;
 
 		public SnapshotRoundTripLosslessTests(ITestOutputHelper o)
@@ -31,9 +31,6 @@ namespace Faolan.Tests
 		[Theory, InlineData("strie-login-inventory.bin"), InlineData("account-stricken997-character-Strie-login-randomActions-bigboy.bin")]
 		public void TypedRoundTrip_NoEdit_IsByteLossless(string bin)
 		{
-			if (!File.Exists(Path.Combine(CapturesDir, bin)))
-				return;
-
 			var verbatim = SplitRoot(bin);
 			var typed = ((ReadOnlySpan<byte>)verbatim).FromProtobuf<ProtoFullCharacterIIR>();
 			var roundTripped = typed.ToProtobuf();
@@ -53,7 +50,7 @@ namespace Faolan.Tests
 
 		private static byte[] SplitRoot(string bin)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
+			var packet = new ConanPacket(File.ReadAllBytes(TestPaths.Asset(bin)));
 			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();

@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -16,8 +17,8 @@ namespace Faolan.Tests
 	// docs/archive/handoff-2026-06-20-snapshot-known-spell-list.md.
 	public class KnownSpellListTests
 	{
-		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string DbPath = TestPaths.FaolanDb;
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x02165EFF;
 

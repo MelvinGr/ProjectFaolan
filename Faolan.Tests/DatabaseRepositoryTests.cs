@@ -10,6 +10,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -217,7 +218,7 @@ namespace Faolan.Tests
 				const uint characterId = 35020544;
 				const uint bagItem = 3735601; // both present in strie-login-inventory.bin (buildable after import)
 				const uint slaveManacles = 3361557;
-				const string inventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+				var inventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
 
 				var (repo, factory) = NewRepo(dbPath);
 

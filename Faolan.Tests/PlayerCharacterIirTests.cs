@@ -4,6 +4,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Protobuf;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 	// character's own gear, so they are intentionally not reproduced. The .bin survives only as this golden oracle.
 	public class PlayerCharacterIirTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/PlayerCharacterIirTemplate.bin";
+		private static readonly string TemplatePath = TestPaths.Asset("PlayerCharacterIirTemplate.bin");
 
 		[Fact]
 		public void BuildBareTemplate_EqualsTheTemplate_ExceptWornGear()

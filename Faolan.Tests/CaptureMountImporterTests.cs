@@ -5,6 +5,7 @@ using Faolan.Core.Database;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 	// seed it under the never-loaded sentinel Mounts map, resolvable by name (the MountCatalog target).
 	public class CaptureMountImporterTests
 	{
-		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";
+		private static readonly string CapturesDir = TestPaths.CapturesDir;
 
 		[Fact]
 		public async Task Import_HarvestsTheFadingBlackHorse_UnderTheMountMap()

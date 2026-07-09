@@ -18,9 +18,9 @@ namespace Faolan.Tests
 	// override engine, which the live login path already exercises in-client).
 	public class WorldEntryRecordFramerTests
 	{
-		private const string PlayerSpawnCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-playerspawn.bin";
-		private const string SnapshotCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
-		private const string WorldObjectCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-worldobject.bin";
+		private static readonly string PlayerSpawnCap = TestPaths.Asset("strie-login-playerspawn.bin");
+		private static readonly string SnapshotCap = TestPaths.Asset("strie-login-inventory.bin");
+		private static readonly string WorldObjectCap = TestPaths.Asset("strie-login-worldobject.bin");
 		private const uint StriePlayerInstance = 0x02165EFF;
 
 		// The 8-byte blob prefix built from scratch equals the captured beach prefix (the BE32 blobLen model).

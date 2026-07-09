@@ -2,6 +2,7 @@ using System.IO;
 using System.Text;
 using Xunit;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -12,7 +13,7 @@ namespace Faolan.Tests
 	public class QuestObjectiveRegionTests
 	{
 		private const int RegionStart = 609, IndexTag = 1168; // Quest_c end / quest index (empirical)
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		private static byte[] Region => File.ReadAllBytes(TemplatePath)[RegionStart..IndexTag];
 

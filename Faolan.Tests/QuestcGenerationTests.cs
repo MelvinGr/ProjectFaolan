@@ -7,6 +7,7 @@ using Xunit;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -18,8 +19,8 @@ namespace Faolan.Tests
 	public class QuestcGenerationTests
 	{
 		private const int RegionEnd = 609;
-		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+		private static readonly string DbPath = TestPaths.FaolanDb;
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private const uint BeachStarterQuestId = 10238;
 
 		// The per-character quest STATE (1 = active); the only quest-portion value that isn't quest-definition data

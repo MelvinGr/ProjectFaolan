@@ -6,6 +6,7 @@ using System.IO;
 using System.Text.Json;
 using Xunit;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -22,7 +23,7 @@ namespace Faolan.Tests
 	// the captured dead snapshot really has HealthCurrent==0, and the builder can produce that dead shape.
 	public class DeathSnapshotTests
 	{
-		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";
+		private static readonly string CapturesDir = TestPaths.CapturesDir;
 		private const uint HealthCurrentStatId = 0x001B;
 		private const uint HealthMaxStatId = 0x0001;
 

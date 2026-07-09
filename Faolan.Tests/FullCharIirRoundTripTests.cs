@@ -11,6 +11,7 @@ using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 using Xunit;
 using Xunit.Abstractions;
+using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -21,7 +22,7 @@ namespace Faolan.Tests
 	// drops parts of compressed downloads) are skipped; a body that splits but does not round-trip fails.
 	public class FullCharIirRoundTripTests
 	{
-		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";
+		private static readonly string CapturesDir = TestPaths.CapturesDir;
 
 		private readonly ITestOutputHelper _output;
 
@@ -134,9 +135,7 @@ namespace Faolan.Tests
 				"strie-login-inventory.bin"
 			})
 			{
-				var path = Path.Combine(CapturesDir, bin);
-				if (!File.Exists(path))
-					continue;
+				var path = TestPaths.Asset(bin); // committed fixture - must exist (no silent skip)
 
 				var packet = new ConanPacket(File.ReadAllBytes(path));
 				yield return (bin, packet.Body.ReadArrayUInt32Length());
