@@ -34,6 +34,12 @@ namespace Faolan.Tests
 			AssertGenerated(ProtobufPage.RelativePath, ProtobufPage.Render());
 		}
 
+		[Fact]
+		public void CoveragePage_IsUpToDate()
+		{
+			AssertGenerated(CoveragePage.RelativePath, CoveragePage.Render());
+		}
+
 		// The BKDR-31 class-id guard is the same one the Wireshark generator applies; assert it independently so a
 		// renamed/typo'd RPC class fails HERE too (with a clear message) rather than only in the page diff.
 		[Fact]
