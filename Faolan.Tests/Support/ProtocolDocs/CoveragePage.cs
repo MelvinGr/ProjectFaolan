@@ -73,6 +73,34 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 			}
 
+			// "Built somewhere": a type is constructed/handled by ANY server code (not just Codecs/) - many IIR
+			// builders live inline in the listeners (GameServerListener.*, CreateFlowService, BankService, ...). A
+			// type counts as built if any server .cs references its opcode member OR its `<Name>Iir` identifier.
+			// This is what separates V2 (built, no golden) from V1 (nothing decodes it) accurately.
+			var builtSomewhere = new HashSet<string>(iirToCodecs.Keys);
+			var builtIn = new Dictionary<string, string>(); // type -> a representative file (basename) for the column
+			foreach (var dir in new[] { Path.Combine(repo, "Faolan"), Path.Combine(repo, "Faolan.Core.Network") })
+			foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
+			{
+				if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") ||
+				    file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
+				    file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") ||
+				    file.EndsWith("Opcodes.cs", StringComparison.Ordinal)) // the enum DEFINITION, not a use
+					continue;
+				var text = File.ReadAllText(file);
+				foreach (var iir in allIirNames)
+				{
+					if (builtSomewhere.Contains(iir)) continue;
+					var ident = iir[..^3] + "Iir";
+					if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal) ||
+					    Regex.IsMatch(text, Regex.Escape(ident) + @"(?![a-z0-9])"))
+					{
+						builtSomewhere.Add(iir);
+						builtIn[iir] = Path.GetFileNameWithoutExtension(file);
+					}
+				}
+			}
+
 			// codec class -> has a byte-exact test.
 			var testTexts = Directory.EnumerateFiles(testDir, "*.cs", SearchOption.AllDirectories)
 				.Select(File.ReadAllText).ToList();
@@ -93,8 +121,9 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			string Level(string iir)
 			{
-				if (!iirToCodecs.TryGetValue(iir, out var codecs)) return "V1";
-				return codecs.Any(c => codecGolden.GetValueOrDefault(c)) ? "V3" : "V2";
+				if (iirToCodecs.TryGetValue(iir, out var codecs) && codecs.Any(c => codecGolden.GetValueOrDefault(c)))
+					return "V3";
+				return builtSomewhere.Contains(iir) ? "V2" : "V1";
 			}
 
 			int v3 = 0, v2 = 0, v1 = 0;
@@ -120,7 +149,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("## Headline");
 			sb.AppendLine();
 			sb.AppendLine($"- **{rpcTotal}** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).");
-			sb.AppendLine($"- **{iirTypes.Count}** IIR carrier types: **{v3} V3** (byte-exact builder), **{v2} V2** (codec, no golden), **{v1} V1** (named only).");
+			sb.AppendLine($"- **{iirTypes.Count}** IIR carrier types: **{v3} V3** (byte-exact builder), **{v2} V2** (built, no golden), **{v1} V1** (no builder found).");
 			sb.AppendLine($"- **{codecGolden.Count}** codec classes, **{codecsWithGolden}** with a byte-exact test.");
 			sb.AppendLine($"- **{dissectors}** Python dissectors (`Captures/scripts/decode_*.py`).");
 			sb.AppendLine();
@@ -128,9 +157,11 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine();
 			sb.AppendLine("Every opcode is named (V1). That is NOT the same as its message body being decoded. A type is:");
 			sb.AppendLine("- **V3** — a builder reproduces captured bytes (a golden test pins it). Provably correct.");
-			sb.AppendLine("- **V2** — a codec constructs/parses it, but no byte-exact golden guards it yet.");
-			sb.AppendLine("- **V1** — the type id is known, but no codec references it (by opcode member or `<Name>Iir`");
-			sb.AppendLine("  identifier). Almost certainly not decoded; a build path under a wholly different name could be missed.");
+			sb.AppendLine("- **V2** — a codec OR an inline listener builder constructs/parses it (it references the opcode member");
+			sb.AppendLine("  or the `<Name>Iir` identifier somewhere in the server), but no byte-exact golden guards it yet.");
+			sb.AppendLine("- **V1** — no server code references it by opcode member or `<Name>Iir` identifier. Either genuinely");
+			sb.AppendLine("  undecoded, OR built by an inconsistently-named builder the scan can't attribute (the builder-naming");
+			sb.AppendLine("  cleanup that would collapse this ambiguity is tracked in Gitea).");
 			sb.AppendLine();
 			sb.AppendLine("**Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit");
 			sb.AppendLine("opcode→handler map, so their per-body decode status is not auto-correlated here — only their");
@@ -140,12 +171,18 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine();
 			sb.AppendLine("## IIR carrier types");
 			sb.AppendLine();
-			sb.AppendLine("| Level | IIR type | Codec(s) |");
+			sb.AppendLine("| Level | IIR type | Built by |");
 			sb.AppendLine("|-------|----------|----------|");
 			foreach (var (name, _) in iirTypes.OrderBy(x => Rank(Level(x.Name))).ThenBy(x => x.Name, StringComparer.Ordinal))
 			{
-				var codecs = iirToCodecs.TryGetValue(name, out var cs) ? string.Join(", ", cs.Select(c => $"`{c}`")) : "—";
-				sb.AppendLine($"| {Level(name)} | `{name}` | {codecs} |");
+				string builtBy;
+				if (iirToCodecs.TryGetValue(name, out var cs))
+					builtBy = string.Join(", ", cs.Select(c => $"`{c}`"));
+				else if (builtIn.TryGetValue(name, out var file))
+					builtBy = $"`{file}` *(inline)*";
+				else
+					builtBy = "—";
+				sb.AppendLine($"| {Level(name)} | `{name}` | {builtBy} |");
 			}
 			sb.AppendLine();
 			return sb.ToString();

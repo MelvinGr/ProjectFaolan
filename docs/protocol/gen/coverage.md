@@ -8,7 +8,7 @@
 ## Headline
 
 - **819** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **74** IIR carrier types: **43 V3** (byte-exact builder), **2 V2** (codec, no golden), **29 V1** (named only).
+- **74** IIR carrier types: **43 V3** (byte-exact builder), **13 V2** (built, no golden), **18 V1** (no builder found).
 - **103** codec classes, **85** with a byte-exact test.
 - **36** Python dissectors (`Captures/scripts/decode_*.py`).
 
@@ -16,9 +16,11 @@
 
 Every opcode is named (V1). That is NOT the same as its message body being decoded. A type is:
 - **V3** — a builder reproduces captured bytes (a golden test pins it). Provably correct.
-- **V2** — a codec constructs/parses it, but no byte-exact golden guards it yet.
-- **V1** — the type id is known, but no codec references it (by opcode member or `<Name>Iir`
-  identifier). Almost certainly not decoded; a build path under a wholly different name could be missed.
+- **V2** — a codec OR an inline listener builder constructs/parses it (it references the opcode member
+  or the `<Name>Iir` identifier somewhere in the server), but no byte-exact golden guards it yet.
+- **V1** — no server code references it by opcode member or `<Name>Iir` identifier. Either genuinely
+  undecoded, OR built by an inconsistently-named builder the scan can't attribute (the builder-naming
+  cleanup that would collapse this ambiguity is tracked in Gitea).
 
 **Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit
 opcode→handler map, so their per-body decode status is not auto-correlated here — only their
@@ -28,7 +30,7 @@ the margins, but never invents a golden that isn't there.
 
 ## IIR carrier types
 
-| Level | IIR type | Codec(s) |
+| Level | IIR type | Built by |
 |-------|----------|----------|
 | V3 | `BehaviorControlCenterIIR` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `CombatPacketCodec`, `CreateEditorRecordBuilder` |
 | V3 | `CharDCMoveIIR` | `CharDCMove`, `CharDCMoveCodec`, `SetPosCodec`, `StopCodec` |
@@ -73,34 +75,34 @@ the margins, but never invents a golden that isn't there.
 | V3 | `StopIIR` | `CharDCMove`, `CharDCMoveCodec`, `SetPosCodec`, `StopCodec` |
 | V3 | `ThreatLevelIIR` | `CombatShieldCodec`, `HateListCodec`, `StatDamageCodec`, `ThreatLevelCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
+| V2 | `BankIIR` | `BankService` *(inline)* |
+| V2 | `CoreClaimIIR` | `GameServerListener.PostReadyBurst` *(inline)* |
+| V2 | `DeleteItemIIR` | `GameServerListener.Inbound` *(inline)* |
+| V2 | `GuildUpdateIIR` | `GuildTagBody` *(inline)* |
+| V2 | `KnubotAnswerIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `LookAtIIR` | `ShopOpenBuilder` |
+| V2 | `MoveInventoryItemIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `N3ToClientQuitIIR` | `WorldDespawn` |
+| V2 | `PlayfieldFIIR` | `CreateFlowService` *(inline)* |
+| V2 | `SetNameIIR` | `CreateFlowService` *(inline)* |
+| V2 | `SimpleDynelFullUpdateIIR` | `CreateFlowService` *(inline)* |
+| V2 | `TradeskillReplyIIR` | `GameServerListener.Outbound` *(inline)* |
+| V2 | `TradeskillRequestIIR` | `GameServerListener.Inbound` *(inline)* |
 | V1 | `AreaFormulaIIR` | — |
-| V1 | `BankIIR` | — |
 | V1 | `ChainKillIIR` | — |
 | V1 | `ChatTextIIR` | — |
 | V1 | `ClimbingDynelFullUpdateIIR` | — |
-| V1 | `CoreClaimIIR` | — |
 | V1 | `CrimeIIR` | — |
-| V1 | `DeleteItemIIR` | — |
 | V1 | `DestructibleFullUpdateIIR` | — |
 | V1 | `DoorFullUpdateIIR` | — |
 | V1 | `FormatFeedbackIIR` | — |
 | V1 | `FullPlayerCharacterIIR` | — |
-| V1 | `GuildUpdateIIR` | — |
-| V1 | `KnubotAnswerIIR` | — |
 | V1 | `KnubotFinishTradeIIR` | — |
 | V1 | `KnubotStartTradeIIR` | — |
 | V1 | `LockedToChangedIIR` | — |
 | V1 | `LootBagFullUpdateIIR` | — |
-| V1 | `MoveInventoryItemIIR` | — |
-| V1 | `PlayfieldFIIR` | — |
-| V1 | `SetNameIIR` | — |
 | V1 | `SimpleCharKilledByUpdateIIR` | — |
-| V1 | `SimpleDynelFullUpdateIIR` | — |
 | V1 | `SpellBookIIR` | — |
 | V1 | `TemplateActionIIR` | — |
 | V1 | `TombStoneFullUpdateIIR` | — |
-| V1 | `TradeskillReplyIIR` | — |
-| V1 | `TradeskillRequestIIR` | — |
 | V1 | `UpdateInventoryIIR` | — |

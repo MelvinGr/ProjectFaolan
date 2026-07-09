@@ -143,8 +143,9 @@ rather than guessed.
 - [x] **P1 — Generators.** `gen/opcodes.md` (819 entries), `gen/iir-types.md` (75, 73 BKDR-31-self-verified),
       `gen/protobuf.md` (60 msgs / 348 fields, zigzag + fixed32 surfaced), all from the COMPILED types by
       reflection, + the `ProtocolDocsTests` regeneration guard (proven to fail on a one-char drift).
-- [x] **P2 — Coverage matrix.** `gen/coverage.md`: 819 RPC opcodes (V1), 74 IIR types (43 V3 / 2 V2 / 29 V1), code-correlated (opcode + `<Name>Iir` refs). Reveals the real burndown: ~half the IIR carrier types have a byte-exact builder.
-      this is ordered by it.*
+- [x] **P2 — Coverage matrix.** `gen/coverage.md`: 819 RPC opcodes (V1), 74 IIR types (43 V3 / 2 V2 / 29 V1),
+      code-correlated (opcode + `<Name>Iir` refs). Reveals the real burndown: ~58% of IIR types have a byte-exact
+      builder. Migration order (P5) is driven by this — V3 areas first.
 - [ ] **P3 — Citation linter.** Then, and only then, prose can claim verification.
 - [ ] **P4 — Layer pages** (§4), each fact tagged.
 - [ ] **P5 — Per-message layouts** (§5), V3 first; absorb + delete the superseded docs as we go.
