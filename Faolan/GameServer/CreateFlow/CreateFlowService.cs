@@ -193,8 +193,10 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeHeadMesh":
 				{
 					if (character != null)
-						EnsureBody(character)
-							.HeadMesh = (uint)value;
+					{
+						EnsureBody(character).HeadMesh = (uint)value;
+						await PersistLateBodyEdit(client);
+					}
 
 					break;
 				}
@@ -202,8 +204,10 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeSize":
 				{
 					if (character != null)
-						EnsureBody(character)
-							.Size = (byte)value;
+					{
+						EnsureBody(character).Size = (byte)value;
+						await PersistLateBodyEdit(client);
+					}
 
 					break;
 				}
@@ -211,8 +215,10 @@ namespace Faolan.GameServer.CreateFlow
 				case "ChangeVoice":
 				{
 					if (character != null)
-						EnsureBody(character)
-							.Voice = (byte)value;
+					{
+						EnsureBody(character).Voice = (byte)value;
+						await PersistLateBodyEdit(client);
+					}
 
 					break;
 				}
@@ -282,6 +288,8 @@ namespace Faolan.GameServer.CreateFlow
 								if (!CharacterMorphs.TryApply(EnsureBody(character), valueString, value))
 									_logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", valueString, value);
 							}
+
+							await PersistLateBodyEdit(client);
 						}
 
 						await SendMorphValueAck(client, valueString);
@@ -447,6 +455,19 @@ namespace Faolan.GameServer.CreateFlow
 		// varies, and if the body is left default the "thigh"/body morphs never arrive. Instead of keying off
 		// a specific morph, we debounce: Finish and every morph bump MorphActivitySequence; ~350ms after the
 		// last activity (so any morphs have arrived and been acked) we send the trio exactly once.
+		// #314: appearance edits (morph/resource/head/size/voice) mutate the in-memory character.Body, which is
+		// persisted once at name-commit (CommitCharacterName -> SaveCharacter). An edit that arrives AFTER the name is
+		// committed - the client streams SetMorphValue after Finish, and the naming can land first, or a morph rides a
+		// later TCP segment - would only touch the in-memory body and be LOST on the spawn (which reloads from the DB),
+		// showing wrong hair/mustache/size intermittently. Re-persist here so a late edit survives. No-op until named
+		// (the pre-name edits are flushed by the name-commit save), so the common path takes no extra write.
+		private async Task PersistLateBodyEdit(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character?.Name != null)
+				await _database.SaveCharacter(character);
+		}
+
 		private void SchedulePostMorphBurst(INetworkClient client)
 		{
 			if (client.Session.PostMorphBurstSent)
