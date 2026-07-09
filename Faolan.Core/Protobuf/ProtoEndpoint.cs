@@ -1,66 +1,7 @@
-using System;
 using System.IO;
-using System.Numerics;
 
 namespace Faolan.Core.Protobuf
 {
-	public partial class ProtoVec3
-	{
-		public ProtoVec3()
-		{
-		}
-
-		public ProtoVec3(float x, float y, float z)
-		{
-			X = x;
-			Y = y;
-			Z = z;
-		}
-
-		public static implicit operator ProtoVec3(Vector3 value)
-		{
-			return new ProtoVec3(value.X, value.Y, value.Z);
-		}
-
-		public static implicit operator Vector3(ProtoVec3 value)
-		{
-			return new Vector3(value.X, value.Y, value.Z);
-		}
-	}
-
-	public partial class ProtoQuat
-	{
-		public ProtoQuat()
-		{
-		}
-
-		public ProtoQuat(float x, float y, float z, float w)
-		{
-			X = x;
-			Y = y;
-			Z = z;
-			W = w;
-		}
-
-		public static implicit operator ProtoQuat(Quaternion value)
-		{
-			return new ProtoQuat(value.X, value.Y, value.Z, value.W);
-		}
-
-		public static implicit operator Quaternion(ProtoQuat value)
-		{
-			return new Quaternion(value.X, value.Y, value.Z, value.W);
-		}
-	}
-
-	public partial class ProtoDecryptionKey : ICloneable
-	{
-		public object Clone()
-		{
-			return new ProtoDecryptionKey { Key1 = Key1, Key2 = Key2, Key3 = Key3, Key4 = Key4 };
-		}
-	}
-
 	// Hand-rolled reader for the RpcHeader endpoint fields, the counterpart to ToProtobuf() (locked byte-exact by
 	// ProtoEndpointGoldenTests). ConanPacket reads the header's caller_id (field 1, tag 0x0A) then endpoint_id
 	// (field 2, tag 0x12) straight off the FaolanStream with this, instead of a generic protobuf tree walk +
