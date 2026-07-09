@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Faolan.Tests.Support
@@ -23,6 +24,15 @@ namespace Faolan.Tests.Support
 
 		// The committed game database at the repo root.
 		public static string FaolanDb => Path.Combine(RepoRoot(), "faolan.db");
+
+		// Any repo-relative path, e.g. Repo("docs", "protocol", "gen", "opcodes.md").
+		public static string Repo(params string[] parts)
+		{
+			var all = new string[parts.Length + 1];
+			all[0] = RepoRoot();
+			parts.CopyTo(all, 1);
+			return Path.Combine(all);
+		}
 
 		private static string TestProjectDir([CallerFilePath] string thisFile = "")
 			=> Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!; // Support/ -> Faolan.Tests/
