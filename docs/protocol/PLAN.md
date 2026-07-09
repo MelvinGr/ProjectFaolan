@@ -140,7 +140,9 @@ rather than guessed.
 ## 8. Phases
 
 - [x] **P0 — Runway.** Archive resolved handoffs; delete dead docs; create `protocol/` + `gen/`.
-- [ ] **P1 — Generators.** `gen/opcodes.md`, `gen/iir-types.md`, `gen/protobuf.md` + the regeneration test.
+- [x] **P1 — Generators.** `gen/opcodes.md` (819 entries), `gen/iir-types.md` (75, 73 BKDR-31-self-verified),
+      `gen/protobuf.md` (60 msgs / 348 fields, zigzag + fixed32 surfaced), all from the COMPILED types by
+      reflection, + the `ProtocolDocsTests` regeneration guard (proven to fail on a one-char drift).
 - [ ] **P2 — Coverage matrix.** `gen/coverage.md`. *This tells us the true size of the job — everything after
       this is ordered by it.*
 - [ ] **P3 — Citation linter.** Then, and only then, prose can claim verification.
