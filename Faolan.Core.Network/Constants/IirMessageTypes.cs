@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Constants
 		public const uint LootBagFullUpdate = 0xF096251E;
 
 		// Global records (handle 0) - server-generated.
-		public const uint MapChange = 0x5D85BFC7;
+		public const uint MapChange = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		public const uint MoveTask = 0x96C46740;
 
 		// World-entity records (handle == some other entity) - stored per map.

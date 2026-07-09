@@ -29,7 +29,7 @@ namespace Faolan.Importer.Captures
         private const string ImportAccountName = "captured";
         private const uint CharacterListOpcode = 0x20EF; // PlayerAgent SendCharacterList
         private const uint InventorySnapshotSubOpcode = 0x737A6DF9;
-        private const uint MapChangeSubOpcode = 0x5D85BFC7;
+        private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 
         private const uint Opcode2000 = 0x2000;
 

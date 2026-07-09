@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -25,7 +26,7 @@ namespace Faolan.Importer.Extractors
 	public static class PatrolPathExtractor
 	{
 		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles (a player isn't a patrol)
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
+		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint MoveTaskSubOpcode = 0x96C46740;
 		private const uint Opcode2000 = 0x2000;
 

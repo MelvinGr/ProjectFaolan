@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -28,7 +29,7 @@ namespace Faolan.Importer.Extractors
     // labels, 6BD56736 destructibles, 1FD6412B climbing dynels. Sibling of NpcSpawnExtractor; dedup key is (map, pos).
     public static class WorldObjectExtractor
     {
-        private const uint MapChangeSubOpcode = 0x5D85BFC7;
+        private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
         private const uint Opcode2000 = 0x2000;
 
         private static readonly HashSet<uint> ObjectSubOpcodes = [0x66AEDD50, 0xF096251E, 0x33A56FB0, 0x6BD56736, 0x1FD6412B];

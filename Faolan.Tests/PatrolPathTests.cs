@@ -6,6 +6,7 @@ using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Tests
 {
@@ -15,7 +16,7 @@ namespace Faolan.Tests
 	// locks; here it travels the full data path (capture -> rows -> wire) the live MoveTask build will use.
 	public class PatrolPathTests
 	{
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
+		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint MoveTaskSubOpcode = 0x96C46740;
 
 		[Fact]

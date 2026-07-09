@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -46,7 +47,7 @@ namespace Faolan.Importer.Extractors
 	public static class NpcSpawnExtractor
 	{
 		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles live in the instance range
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
+		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll login burst window
 		private const uint SpawnSubOpcode = 0xFA015807;

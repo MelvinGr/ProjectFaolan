@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -17,7 +18,7 @@ namespace Faolan.Importer.Extractors
 	public static class MapLootExtractor
 	{
 		private const uint LootBagSubOpcode = 0xF096251E;
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
+		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2000 = 0x2000;
 
 		public static List<MapLootPoolEntry> Extract(IReadOnlyList<CapturedPacket> packets)

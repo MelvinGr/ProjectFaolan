@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -17,7 +18,7 @@ namespace Faolan.Importer.Captures
 	// origin - so it is only used to seed brand-new map rows. Takes raw on-wire packet bytes (no pcap dependency).
 	public static class CaptureMapImporter
 	{
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
+		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 
 		public static async Task<int> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
