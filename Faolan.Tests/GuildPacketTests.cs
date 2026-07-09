@@ -38,6 +38,28 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedInviteBody, Convert.ToHexStringLower(s.ToArray()));
 		}
 
+		// #306: the 0x2044 DispatchGuildCreated body for a freshly created guild, byte-exact against the capture
+		// (DemoL80 creating "Faolan"): [creator member record][guild header (form byte = request's 0x06)][225-byte
+		// create-time tail]. Reproduces the whole 338-byte body from the guild + creator + form.
+		[Fact]
+		public void GuildCreatedBody_Matches_CapturedBytes()
+		{
+			var guild = new Guild { Id = 0x00086C47, Name = "Faolan", Cash = 0, Description = "", MessageOfTheDay = "" };
+			var demol80 = new Character
+			{
+				Id = 0x110099BD,
+				Name = "DemoL80",
+				GuildRank = Character.GuildLeaderRank, // 4 = leader
+				Level = 80,
+				Class = (Class)0x2C
+			};
+
+			var s = new FaolanStream();
+			GuildService.WriteGuildCreatedBody(s, guild, demol80, form: 0x06, playfield: 0x2B20);
+
+			Assert.Equal(Convert.ToHexStringLower(Support.Golden.Bytes("GuildCreated")), Convert.ToHexStringLower(s.ToArray()));
+		}
+
 		[Fact]
 		public void GuildMemberRecord_Matches_CapturedBytes()
 		{

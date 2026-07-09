@@ -32,6 +32,14 @@ namespace Faolan.CSPlayerAgent
 		private const byte CoreGuildStreamVersion = 0x03; // first body byte - CoreGuild_c streaming version (must be 3)
 		private const byte GuildGovernmentForm = 0x01; // byte after guildId - the form selecting the case 1->3 layout
 
+		// The 225-byte create-time renown/trailer block that closes DispatchGuildCreated (after the member record +
+		// header). Captured from DemoL80's create-guild flow - which is itself a FRESH guild being created, so these
+		// are the create-time defaults (the feat numbers 0xFC4/0x410/0x816/0xBEA are the default create values, not
+		// earned renown); only the 40-byte trailer holds capture-specific creation timestamps/ids (cosmetic). Emitted
+		// verbatim as a valid create-time block until it is decoded field-by-field (docs/create-guild-decode.md, #306).
+		private static readonly byte[] GuildCreatedTail = Convert.FromHexString(
+			"00000003f100000000000000000000000000000000000000000000000000000fc4000004100000081600000bea000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000373131310007a12800000000064ab1780000000009d5d338000000000000000001a93458");
+
 
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
@@ -182,7 +190,10 @@ namespace Faolan.CSPlayerAgent
 			character.GuildRank = Character.GuildLeaderRank;
 
 			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character} (form 0x{Form:X2}).", guild.Name, guild.Id, character.Name, form);
-			await SendGuildFullUpdate(client, packet.Receiver, packet.Sender, guild, character);
+			// Retail's immediate create response is 0x2044 DispatchGuildCreated (opens the window with NO relog), not
+			// the 0x203F full-update. If the client doesn't accept it the guild still shows on the next login (the
+			// re-auth 0x203F push), so this only ADDS the no-relog path.
+			await SendGuildCreated(client, packet.Receiver, packet.Sender, guild, character, form);
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
 
@@ -364,6 +375,35 @@ namespace Faolan.CSPlayerAgent
 			foreach (var member in guild.Members.Where(m => m.Id != self.Id && m.Name != null))
 				WriteGuildMemberRecord(ps, member);
 
+			await ps.SendAsync(client);
+		}
+
+		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO
+		// RELOG (vs the 0x203F GuildUpdate, which only takes effect on the next login). Body decoded byte-exact
+		// (docs/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte tail].
+		// The header is the 0x203F head EXCEPT the post-cash byte carries the request's guild FORM (0x203F hardcodes
+		// 0x03). The creator is online (they just made it); `playfield` is their current map/playfield token.
+		internal static void WriteGuildCreatedBody(FaolanStream s, Guild guild, Character creator, byte form, uint playfield)
+		{
+			WriteGuildMemberRecord(s, creator, online: true, playfield: playfield, lastSeen: 0);
+			s
+				.WriteByte(CoreGuildStreamVersion)
+				.WriteUInt32(guild.Id)
+				.WriteByte(GuildGovernmentForm)
+				.WriteUInt64(guild.Cash)
+				.WriteByte(form)
+				.WriteUInt32(0)
+				.WriteByte(0x00)
+				.WriteString(guild.Name)
+				.WriteString(guild.Description ?? "")
+				.WriteString(guild.MessageOfTheDay ?? "")
+				.WriteArray(GuildCreatedTail);
+		}
+
+		private async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
+		{
+			var ps = new PacketStream().WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildCreated);
+			WriteGuildCreatedBody(ps, guild, creator, form, creator.MapId);
 			await ps.SendAsync(client);
 		}
 
