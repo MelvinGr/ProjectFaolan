@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Text;
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Guild
 {
 	// The GuildUpdateIIR_c (0x2550C99A) body - sets the entity's in-world guild tag (the guild name under the player
 	// name). Retail sends exactly one when the player joins a guild; the wire layout is

@@ -8,6 +8,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Constants;

@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.World
 {
 	// GameActionListIIR_t (0xF508F4C1) - the per-dynel ACTION list (one of the three movement/AI records, #190).
 	// Server->client it pushes the action list bound to a dynel (NPC/object): emote loops ("idle2_emote"), the
