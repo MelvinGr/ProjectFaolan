@@ -71,7 +71,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			var classByEnum = EnumToClass.ToDictionary(x => x.Enum, x => x.Class);
 			var idByClass = ExpectedClassIds.ToDictionary(x => x.Class, x => x.Id);
-			var notes = SourceNotes();
+			var notes = OpcodesSource.AllNotes();
 
 			var enums = typeof(GameCharAgentOpcodes).Assembly
 				.GetTypes()
@@ -157,29 +157,5 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		}
 
 		private static string EscapeCell(string note) => string.IsNullOrEmpty(note) ? "" : note.Replace("|", "\\|").Trim();
-
-		// Best-effort: lift the trailing `// ...` comment on each enum member from Opcodes.cs, keyed by
-		// (enumName, memberName). Enrichment only - reflection already gave the authoritative name + value, so a
-		// missing or stale comment never affects correctness (the regeneration test still pins the whole page).
-		private static Dictionary<(string Enum, string Member), string> SourceNotes()
-		{
-			var map = new Dictionary<(string, string), string>();
-			var src = File.ReadAllText(TestPaths.Repo("Faolan.Core.Network", "Constants", "Opcodes.cs"));
-
-			string currentEnum = null;
-			var enumRe = new Regex(@"public enum (\w+)\s*:");
-			var memberRe = new Regex(@"^\s*(\w+)\s*=\s*0x[0-9A-Fa-f]+\s*,?\s*//\s*(.+?)\s*$");
-			foreach (var line in src.Split('\n'))
-			{
-				var em = enumRe.Match(line);
-				if (em.Success) { currentEnum = em.Groups[1].Value; continue; }
-				if (currentEnum == null) continue;
-				var mm = memberRe.Match(line);
-				if (mm.Success)
-					map[(currentEnum, mm.Groups[1].Value)] = mm.Groups[2].Value;
-			}
-
-			return map;
-		}
 	}
 }
