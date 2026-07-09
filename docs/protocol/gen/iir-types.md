@@ -70,7 +70,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x8A01E5A1` | `HateListUpdateIIR` ✓ | `HateListUpdateIIR` | HateListUpdateIIR  (x61) |
 | `0x8D5A8B6B` | `FormatFeedbackIIR_t` ✓ | `FormatFeedbackIIR` | FormatFeedbackIIR_t  (x68) |
 | `0x9062D559` | `TradeskillReplyIIR_c` ✓ | `TradeskillReplyIIR` | TradeskillReplyIIR_c - the recipe-book list (reply to TradeskillRequestIIR 0x06B9CD94) |
-| `0x96B8DC59` | `StatUpdateIIR_c` ✓ | `StatUpdateIIR` | StatUpdateIIR_c  (x1595) - entity vitals/stat update (combat HP/Stamina/Mana); see docs/archive/quests-and-combat.md |
+| `0x96B8DC59` | `StatUpdateIIR_c` ✓ | `StatUpdateIIR` | StatUpdateIIR_c  (x1595) - entity vitals/stat update (combat HP/Stamina/Mana); see docs/re/quests-and-combat.md |
 | `0x96C46740` | `MoveTaskIIR_c` ✓ | `MoveTaskIIR` | MoveTaskIIR_c  (x5564) - movement task (the float-heavy state block) |
 | `0x97E02314` | `QuestIIR_c` ✓ | `QuestIIR` | QuestIIR_c  (x34) - "DeleteQuest" |
 | `0xA36D3B74` | `ScryScriptIIR_c` ✓ | `ScryScriptIIR` | ScryScriptIIR_c  (x390) - cutscene/scry scripts + char-editor callbacks (IntroDone, TheNameIs, ...) |

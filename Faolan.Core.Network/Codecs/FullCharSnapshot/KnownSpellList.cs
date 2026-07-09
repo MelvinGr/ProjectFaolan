@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// The per-character KNOWN list carried inside the 0x737A6DF9 FullChar snapshot tails (the spellbook region): a
 	// 0x3F1-framed list of 12-byte records, one per spell/feat the character knows. Decoded byte-exact from the
 	// Faolanx (clean fresh necromancer) login snapshot - its list is exactly the 2 create-spells - and matches the
-	// empty list in the beach template (count 0x3F1, 0 records). See docs/archive/handoff-2026-06-20-snapshot-known-spell-list.md.
+	// empty list in the beach template (count 0x3F1, 0 records).
 	//
 	// Record (big-endian): [u32 id][u32 0xFFFFFFFF][u8 0x00 x3][u8 type]. The 0xFFFFFFFF is the (unbound) bar slot;
 	// type 2 = spell, type 5 = feat/ability. Count word = (recordCount + 1) * 0x3F1 (the standard list-framing

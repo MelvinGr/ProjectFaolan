@@ -3,7 +3,7 @@
 Status 2026-06-12: armed and unarmed swings work in-client; equip-state decides which protocol the client
 speaks. Commits `226b16f`, `a115c40`. Golden tests: `BehaviorAckTests` (byte-exact against
 `Captures/Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed.pcapng`). Wider combat-loop status (NPC
-aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, plus `docs/archive/quests-and-combat.md`.
+aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, plus `docs/re/quests-and-combat.md`.
 
 ## The Interact request (0x642CD3D6 upload)
 
@@ -72,7 +72,7 @@ player's own handle, or the client's ResurrectView goes into the 15s wave-respaw
 `WorldEntity.LastAttackerHandle`, commit 8a570b5) → revive (BccIIR 29→1 + vitals) → **relocate to the res point
 with no loading screen** via the revive `IntendedTeleport`(0x10D27BC0)+`n3Teleport`(0x5A32F0D7) carrying the
 position + the LIVE `Zone.PlayfieldToken` (`TeleportCodec.BuildReviveDestination`, `RelocateToRespawnPoint`,
-commit 763aeb0). Trail: agent memory `protocol_death_resurrect` / `docs/archive/handoff-2026-06-20-death-window.md`.
+commit 763aeb0). Trail: agent memory `protocol_death_resurrect`.
 (The corpse object `TombStoneFullUpdateIIR_c` 0x0D80E7C9 is decoded but not used — the corpse lingers as the dying
 creature, then a separate loot bag spawns, #246.)
 
@@ -135,7 +135,7 @@ interpolation (a small teleport/snap) and a **walk** gait. Findings from the Mov
   double-prefixes and the client drops the packet.
 - **Next candidate** for run gait + no snap: the `0x05` "pace" form (len 69) `[05][const 12][f32][vec3][vec3]`
   - a speed float + two positions (a linear move WITH speed). Drive the per-tick step from it instead of the
-  61-byte form. Full MoveTask grammar: `docs/archive/spawn-dissection-plan.md`.
+  61-byte form. Full MoveTask grammar: `docs/re/spawn-dissection-plan.md`.
 
 ## NPC weapon-draw / combat stance (#218, decoded 2026-06-16)
 

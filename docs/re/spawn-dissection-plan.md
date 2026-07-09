@@ -23,7 +23,7 @@
 > the pre-IIR/post-IIR scaffolds into rows. The sections below are the per-family dissection detail + history.
 
 > **2026-06-10: the PLAYER-SPAWN half of this plan is COMPLETE and documented in
-> `docs/archive/player-spawn-generation-plan.md`** — the player's FA015807 is fully generated from DB rows
+> `docs/re/player-spawn-generation-plan.md`** — the player's FA015807 is fully generated from DB rows
 > (identity/stats/equipment via `ProtoCoreCharacterIIR`, the scaffold frame via `PlayerSpawnScaffoldCodec` +
 > the CharacterAttribute/CharacterSkill/CharacterScaffoldPair/CharacterSpawnFrame rows);
 > `spawn-player-template.bin` and the `PlayerSpawnTemplate` constant are both gone. The morph-encoding
@@ -50,7 +50,7 @@
 
 So a non-Strie beach character now: renders the world+NPCs, spawns at its DB position with its DB name, and can
 open NPC dialogue. The then-remaining piece — appearance/equipment/scaffold, the bulk of the FA015807 body — was
-finished 2026-06-10 (see the banner at the top + docs/archive/player-spawn-generation-plan.md); only the morph
+finished 2026-06-10 (see the banner at the top + docs/re/player-spawn-generation-plan.md); only the morph
 slider→float mapping is still open.
 
 - **Transform now CONSTRUCTED** (2026-06): `SpawnPacketBuilder.BuildSpawnBody` builds the header + transform
@@ -71,7 +71,7 @@ slider→float mapping is still open.
 - **Field mapping RESOLVED + wired (2026-06-10)**: `race` (field 3) = the `Race` enum; `sex` (field 1) = the
   `Sex` enum + 2 (Male=2, Female=3); `life`/`health` are ×100 the player-facing `CharacterMaxStats` values.
   All driven from the DB in `TryRebuildPlayerSpawnFromDb` (Phase 3 DONE — the player spawn is fully DB-driven,
-  see docs/archive/player-spawn-generation-plan.md).
+  see docs/re/player-spawn-generation-plan.md).
 
 Next up:
 1. **Phase 4 — NPC spawns from `Npcs`/`NpcBodies`** (the builder already generalizes to NPC FA015807 bodies).
@@ -231,7 +231,7 @@ entries of the post-CharacterIIR scaffold entry table** (now `CharacterAttribute
 slider multiset {59×4, 14×2, 30×1} exactly; Hoxxling, who modified ALL sliders, has ~26 type-0x00 entries
 (face slider ids 0x02-0x24). Only the exact slider→float mapping remains (59 → −0.03, 14 → +0.007,
 30 → +0.015 for Dikketest — not a simple linear map). Full grammar + remaining work in
-docs/archive/player-spawn-generation-plan.md.
+docs/re/player-spawn-generation-plan.md.
 
 **Phase 3 — Appearance & orientation fidelity.**
 Dissect the morph/appearance region of `FA015807` and source it from `CharacterBodies` (populated from the

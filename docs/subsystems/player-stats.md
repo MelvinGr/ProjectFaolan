@@ -75,7 +75,7 @@ emits both ids per vital (the old code sent the *current* value under the *max* 
 
 The stat records are **count-prefixed**: a 1-byte record count, then N × 8-byte `[statId][value]` records. This
 is clearest in the `0x96B8DC59` entity-vitals packet (`...<entityHandle><00000000><count:1><records>`, see
-`docs/archive/quests-and-combat.md`); the same record encoding is embedded in the larger `0x737A6DF9` snapshot.
+`docs/re/quests-and-combat.md`); the same record encoding is embedded in the larger `0x737A6DF9` snapshot.
 
 ## Open follow-ups
 > Tracked as Gitea issues (see the `area:combat` / `area:aoc-systems` labels). The notes below are the technical context.

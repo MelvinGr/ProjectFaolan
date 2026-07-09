@@ -33,7 +33,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// with a fixed protobuf (behaviorId 41368) and an 8-byte tail [u32 3][u32 respawnPointId]. Capture-derived
 		// verbatim except the player handle + the chosen resurrection-point id. Retail follows it with a vitals
 		// restore (we ride PushVitals) and an IntendedTeleport to the point (deferred - the beach point is adjacent so
-		// we revive in place). docs/archive/handoff-2026-06-20-death-window.md.
+		// we revive in place).
 		private const uint BccIirOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR; // 0x642CD3D6
 
 		// The self-applied "you are dead" effect retail sends right after the 0x2024 release screen (ApplySpell

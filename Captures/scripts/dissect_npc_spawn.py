@@ -4,7 +4,7 @@
 Companion to parse_spawn_scaffold.py (which nailed the PLAYER spawn). NPC spawns share the exact same
 FA015807 grammar as the player; this tool splits an NPC body and decodes the part that carries NPC
 identity/appearance/stats - the ProtoCoreCharacterIIR - so it can be sourced from the Npcs tables and the
-`NpcSpawn.Data` blob retired (docs/archive/spawn-dissection-plan.md Phase 4 / world-packets-construct-not-replay).
+`NpcSpawn.Data` blob retired (docs/re/spawn-dissection-plan.md Phase 4 / world-packets-construct-not-replay).
 
 NPC body layout (offsets body-relative; the beach NPCs all share iirOff=297):
   [0:20]    header: bodyLen, subOp=FA015807, ack=0xC350, handle, fieldA

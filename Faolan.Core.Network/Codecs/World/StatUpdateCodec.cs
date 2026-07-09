@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	// The 0x96B8DC59 StatUpdateIIR body - the moment-to-moment counterpart of the big 0x737A6DF9 snapshot's stat
 	// block, pushed whenever an entity's stats/vitals change (combat, the regen tick, the world-entry replay, GM
-	// commands). Confirmed wire layout (docs/archive/quests-and-combat.md):
+	// commands). Confirmed wire layout (docs/re/quests-and-combat.md):
 	//   [subop 96B8DC59][0000C350][entityHandle:4][00000000:4][CharacterStatBlock]
 	// This is the pure IIR body only - no RPC header / length prefix. The host frames it per recipient
 	// (VitalsPacket for a single addressed send, SendWorldIir when broadcasting to nearby viewers). Proven

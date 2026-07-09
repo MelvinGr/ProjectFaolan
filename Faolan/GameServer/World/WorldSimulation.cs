@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// The live in-memory world (docs/archive/server-architecture-roadmap.md): owns the world model + the connected players'
+	// The live in-memory world (docs/server-architecture-roadmap.md): owns the world model + the connected players'
 	// authoritative transforms/vitals, and drives the 10 Hz simulation tick (NPC respawn/AI, vitals regen, player
 	// death/respawn, resurrection-point discovery). Extracted out of GameServerListener so the simulation's state +
 	// timing are no longer fused with the networking front-door; it reaches the wire through IWorldOutbound. Packet
@@ -168,7 +168,7 @@ namespace Faolan.GameServer.World
 			// flips bcc_state 29→1 (closes the release window), then a vitals update restores HP. Our old ReenterWorld
 			// re-ran the whole world entry, which (a) rebuilt the dead spawn when IsDead lingered and (b) corrupted the
 			// client into the sticky wave-respawn UI. We revive in place; honoring a FAR res point via IntendedTeleport
-			// (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot). docs/archive/handoff-2026-06-20-death-window.md.
+			// (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot).
 			await _output.SendRevive(client, entity.Handle, spawnPointId);
 			await _output.PushVitals(client, vitals);
 			_logger.LogInformation("Combat: {Player} resurrected (chosen spot {Spot}).", character.Name, point?.Name ?? $"0x{spawnPointId:X}");
@@ -506,7 +506,7 @@ namespace Faolan.GameServer.World
 			await RelocateToRespawnPoint(client, entity, character, target);
 		}
 
-		// The server game loop (docs/archive/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
+		// The server game loop (docs/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
 		// every tick with the REAL elapsed dt (NPC respawn/AI, player death timers) and runs rate-based systems (vitals
 		// regen) via a TickAccumulator at their own interval, dt-scaled. Wall-clock dt is measured so a late tick
 		// doesn't desync the rates. Cancelled on shutdown.

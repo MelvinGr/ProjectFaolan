@@ -3,7 +3,7 @@
 Status: **investigated & fully understood, not yet implemented.** Algorithm proven end-to-end with a
 round-trip test (2026-06-08). This doc has everything needed to implement real password validation later.
 
-Related memory: `login_encryption.md`. Sibling: `docs/archive/rdb-extraction-plan.md` (the RDB uses the *same* TEA cipher).
+Related memory: `login_encryption.md`. Sibling: `docs/rdb/rdb-extraction-plan.md` (the RDB uses the *same* TEA cipher).
 
 ---
 

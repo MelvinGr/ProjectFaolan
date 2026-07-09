@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Faolan.Core.Database.Tables
 {
 	// One Lua script from the client RDB LuaArchive (type 1010223) - the logic/branching behind conversations,
-	// quests, and scripted objects (docs/archive/rdb-extraction-plan.md, protocol_conversation_routing). Scripts are tiny and
+	// quests, and scripted objects (docs/rdb/rdb-extraction-plan.md, protocol_conversation_routing). Scripts are tiny and
 	// call a `player` API: HasTag(n) (condition), AddTag(n) (effect), SpawnItem/SolveGoal/CastSpell/GetIntStat/Count.
 	// Referenced by id from conversation/quest/object remoteformat scripts. Id = the RDB script id (not autoincrement).
 	public class LuaScript : BaseEntity

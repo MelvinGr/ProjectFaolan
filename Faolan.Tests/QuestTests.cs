@@ -13,7 +13,7 @@ using Xunit.Sdk;
 
 namespace Faolan.Tests
 {
-	// Quest state packets (docs/archive/quests-and-combat.md), byte-verified against the hoxxling-login-gameplay capture
+	// Quest state packets (docs/re/quests-and-combat.md), byte-verified against the hoxxling-login-gameplay capture
 	// (quest 0x34A7 = 13479, player 0x01316E71).
 	public class QuestTests
 	{

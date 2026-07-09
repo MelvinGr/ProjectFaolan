@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// transient session state and are deliberately not stored - a buffed captured spawn extracts to the same rows
 	// as its unbuffed form. Fresh characters get the fresh-character defaults below (extracted from the Dikketest
 	// create capture - a just-created character at world entry; the same role Strie's template played, but with a
-	// genuinely fresh scaffold). See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
+	// genuinely fresh scaffold). See docs/re/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
 		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new Dictionary<Class, uint[]>
@@ -79,7 +79,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// scripts: profession feat = class*100, always first/ascending). The four captured-at-L1 archetypes use
 		// their exact retail fresh list; the rest fall back to the profession feat + the base feats common to every
 		// captured fresh list. NOTE: the in-world *displayed class* is NOT derived from this feat tree - it reads
-		// player stat 0x43 (see PostReadyFollowUp / docs/archive/class-display-239.md, #239). The earlier "client derives the
+		// player stat 0x43 (see PostReadyFollowUp, #239). The earlier "client derives the
 		// profession from the feat tree" claim was DISPROVEN in-client (a spawn carrying feat 4100 still showed
 		// Barbarian); this list still matters for the actual feat/AA content, just not the class label.
 		private static readonly uint[] CommonFreshSkillIds = [6900, 8100, 8305, 8400, 13600, 14600, 328900, 331300];
@@ -297,7 +297,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
 		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
 		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
-		// docs/re/fa015807-spawn-reader.md (FUN_01121c00) + docs/archive/player-spawn-generation-plan.md.
+		// docs/re/fa015807-spawn-reader.md (FUN_01121c00) + docs/re/player-spawn-generation-plan.md.
 		private static byte FrameArchetype(Class @class)
 		{
 			return @class switch

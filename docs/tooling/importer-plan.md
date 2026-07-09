@@ -1,6 +1,6 @@
 # Faolan.Importer — Module-Based Import
 
-Status: **CURRENT** · Supersedes `docs/archive/faolan-importer-plan.md` (the original linear importer) and the
+Status: **CURRENT** · Supersedes the original linear importer plan and the
 old C++ `aocdatabase.sql` archive importer (deleted).
 
 `Faolan.Importer` rebuilds `faolan.db` from the capture sources (the DB is the single source of truth; the

@@ -39,13 +39,13 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootBagTemplate` | [V3: LootBagTemplateTests.BuildBounds_ReproducesTheCapturedKdTreeGeometry_ByteForByte] |
-| V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
+| V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_FromCapturedFields_IsByteIdentical] |
 | V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskBuilderTests.BuildPatrol_FromCapturedWaypoints_IsByteIdentical] |
 | V3 | `N3TeleportIIR` | `0x5A32F0D7` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
-| V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
-| V3 | `NewAllowedLooterIIR` | `0x1E2E0139` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
-| V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
+| V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `NewAllowedLooterIIR` | `0x1E2E0139` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `NewLevelIIR` | `0x6D314743` | `NewLevelIirCodec` | [V3: NewLevelIirCodecTests.Build_Convenience_CarriesLevelWithZeroDeltas] |
 | V3 | `PetIIR` | `0x1F4CB0F7` | `PetIirCodec` | [V3: PetIirCodecTests.BuildAssign_Combat_MatchesCapture] |
 | V3 | `QuestFullUpdateIIR` | `0x63268258` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
@@ -65,14 +65,14 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
 | V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
-| V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
+| V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `BankIIR` | `0x0BA1C1CB` | `BankService` *(inline)* |  |
 | V2 | `CharInPlayIIR` | `0x864CFEF8` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `CharacterActionIIR` | `0x6B6FD368` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `CoreClaimIIR` | `0x06EC1255` | `GameServerListener.PostReadyBurst` *(inline)* |  |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `GameServerListener.Outbound` *(inline)* |  |
-| V2 | `GameTimeIIR` | `0x4F57DC08` | `GameServerListener.Outbound` *(inline)* |  |
+| V2 | `GameTimeIIR` | `0x4F57DC08` | `GameServerListener.GmCommands` *(inline)* |  |
 | V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `GameServerListener.Inbound` *(inline)* |  |

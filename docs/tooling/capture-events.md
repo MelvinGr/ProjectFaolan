@@ -19,7 +19,7 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 | `F164A4A5` | `remoteformat` display XML (category 50001) - dialogue/UI text by id |
 | `642CD3D6` | Interact / action (TalkToNpc 0x16, MoveItem 42010/42011, "lootbag_open", ApplySpell-adjacent) |
 | `6B87E316` | ApplySpell (cast broadcast: caster + spellId + target + magnitude; spell id @ inner+13) |
-| `96B8DC59` | entity vitals update: `0000C350` + entityHandle + `00000000` + count(1) + N×(u32 statId,u32 value) — the combat HP/Stamina/Mana packet (see docs/archive/quests-and-combat.md) |
+| `96B8DC59` | entity vitals update: `0000C350` + entityHandle + `00000000` + count(1) + N×(u32 statId,u32 value) — the combat HP/Stamina/Mana packet (see docs/re/quests-and-combat.md) |
 | `4517AA81` | Move (position; floats big-endian) - dominant during gameplay |
 | `2008`/`2020`/`2076`/`2052` | spawn-poll handshake (client 2020 polls -> server 2008 SpawnCheck) |
 | `201C` | channel handshake (5 registrations) |

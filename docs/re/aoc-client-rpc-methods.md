@@ -1,6 +1,6 @@
 # AoC client RPC method catalog (extracted from AgeOfConan.exe)
 
-Stage 1 of `docs/archive/opcode-re-plan.md`. Recovered from the client's own log strings - method **names**,
+Stage 1 of `docs/re/opcode-re-plan.md`. Recovered from the client's own log strings - method **names**,
 **param names/types**, and **direction**. (Numeric ids: opcodes are framework-assigned - see
 `docs/re/aoc-opcode-ids.md`; the IIR/message + endpoint ids are BKDR-31 name hashes, decoded there.)
 

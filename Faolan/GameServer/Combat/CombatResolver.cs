@@ -2,7 +2,7 @@ namespace Faolan.GameServer.Combat
 {
 	/// <summary>
 	///     Provisional combat math. Spell/ability power, mitigation and the ApplySpell magnitude sign/scale aren't
-	///     decoded from captures yet (see docs/archive/quests-and-combat.md), so damage is a simple level-scaled value and
+	///     decoded from captures yet (see docs/re/quests-and-combat.md), so damage is a simple level-scaled value and
 	///     <paramref name="spellId" /> is accepted for future per-spell power but not yet used.
 	/// </summary>
 	public static class CombatResolver

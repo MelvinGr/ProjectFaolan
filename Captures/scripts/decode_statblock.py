@@ -14,7 +14,7 @@ FINDING (diff across 10 fresh L1 character login snapshots - Strie/combat/xxx/ca
     [21]/[56] HP base ; [23]/[54] current HP ; [64] current mana ; [66] stamina base ; [68] current stamina
 
   *** CORRECTION 2026-06-17c (VERIFIED across FOUR archetypes' retail LOGIN snapshots + character-sheet
-      screenshots; see the 4-way table in docs/archive/handoff-2026-06-17-perclass-snapshot.md) ***
+      screenshots; see the 4-way table) ***
   Use the LOGIN snapshot, NOT create: at create the vitals are unsettled (Guardian create HP 100.3/Stam 11.45
   vs login HP 130/Stam 178.5). Per-index the ONLY class-dependent slots are vitals + session + a Soldier-only
   armor-ish slot - NO class enum. Displayed-sheet vitals map (each x100, + a +148 repeat copy):

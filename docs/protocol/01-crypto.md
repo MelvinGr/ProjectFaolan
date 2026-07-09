@@ -41,7 +41,7 @@ The whole exchange is validated end-to-end against a reference Python implementa
 - Static-initializer order matters: `N`, `g`, `ServerPrivate` must initialize before anything calls `ModPow`, or
   it sees `N = 0` and throws. The public key is therefore computed per access, not via a field initializer.
 - Patch tooling: `tools/patch_aoc_login_key.py` and the launcher; background in
-  `docs/archive/login-decryption-plan.md`.
+  `docs/re/login-decryption-plan.md`.
 
 ## See also
 

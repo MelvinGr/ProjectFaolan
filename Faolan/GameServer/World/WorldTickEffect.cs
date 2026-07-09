@@ -1,6 +1,6 @@
 namespace Faolan.GameServer.World
 {
-	// A wire-visible result of a world tick (docs/archive/server-architecture-roadmap.md), returned by WorldState.Tick for the
+	// A wire-visible result of a world tick (docs/server-architecture-roadmap.md), returned by WorldState.Tick for the
 	// listener to broadcast. Keeps the model network-free: the tick mutates state and reports what happened; the
 	// listener turns each effect into the right packet(s).
 	public enum WorldTickEffectType

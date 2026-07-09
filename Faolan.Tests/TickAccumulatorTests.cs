@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The per-behaviour tick accumulator (docs/archive/server-architecture-roadmap.md): lets a behaviour run at its own
+	// The per-behaviour tick accumulator (docs/server-architecture-roadmap.md): lets a behaviour run at its own
 	// cadence on a faster base tick, reporting the actual elapsed time so it can dt-scale.
 	public class TickAccumulatorTests
 	{

@@ -169,6 +169,14 @@ are the standard test bootstrap for features whose retail trigger isn't wired ye
 - Don't "refactor away" magic packet constants or verbatim payloads unless the replacement is proven
   byte-for-byte against a capture. Wrong-looking values are often capture-derived; check the comment
   and the referenced capture first.
-- Protocol knowledge lives in `docs/` (per-subsystem .md files + `docs/archive/` for resolved plans and
-  superseded session handoffs — move `handoff-*.md` there once its work has landed, and fix the referrers);
-  update the relevant doc and the corresponding **Gitea issue** when a subsystem's status changes.
+- **`docs/` is organized by kind** (see [`docs/protocol/README.md`](docs/protocol/README.md) for the index):
+  - `docs/protocol/` — the **verified wire reference**: every fact carries a `[Vn: …]` verification tag a test
+    resolves, and `docs/protocol/gen/` is GENERATED from the code (opcodes, IIR types, protobuf, coverage,
+    per-message index) — never hand-edit those; regenerate with
+    `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
+  - `docs/subsystems/` — how OUR server implements a domain (combat, chat, guilds, inventory, economy, …).
+  - `docs/rdb/` — client asset formats · `docs/tooling/` — launcher/capture/importer · `docs/re/` — Ghidra
+    methodology + raw decode artifacts · `docs/archive/` — resolved plans / closed-issue handoffs.
+  Update the relevant doc and the corresponding **Gitea issue** when a subsystem's status changes. When you
+  add a `[Vn: …]` claim it must cite a real artifact (`ProtocolCitationTests` enforces it); when you change
+  `Opcodes.cs` the `gen/` pages must be regenerated in the same commit (`ProtocolDocsTests` enforces it).

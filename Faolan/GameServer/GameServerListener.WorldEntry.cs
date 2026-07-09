@@ -270,7 +270,7 @@ namespace Faolan.GameServer
 
 				// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
 				// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
-				// CLIENT-SIDE from the char data we already deliver (docs/archive/class-display-239.md). Verified in-client
+				// CLIENT-SIDE from the char data we already deliver. Verified in-client
 				// with the force-feed DISABLED on BOTH paths: an existing lvl80 login read stat 0x43 = Necromancer, // and a freshly-created char read stat 0x43 = HeraldOfXotli - both displayed correctly. The earlier
 				// interim predated the client-derivation working; no server-side class stat is needed.
 
@@ -620,7 +620,7 @@ namespace Faolan.GameServer
 		// login - the `Abilities` table, imported from the retail grants by CaptureAbilityImporter (3 Normal Attack
 		// directions + toggle-combat / switch-weapon / utility). Sent on the spawn conversation (same family as the
 		// 0x201c handshake), after the world has been built. (Class-specific SPELLS are a separate, not-yet-decoded
-		// grant - no capture exercises it; see TODO #3 / docs/archive/opcode-re-plan.md.)
+		// grant - no capture exercises it; see TODO #3 / docs/re/opcode-re-plan.md.)
 		private async Task GrantCharacterAbilities(INetworkClient client)
 		{
 			var character = client.Session.Character;

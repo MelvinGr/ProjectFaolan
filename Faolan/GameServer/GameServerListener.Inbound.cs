@@ -118,7 +118,7 @@ namespace Faolan.GameServer
 							var moveRotation = packet.Body.ReadVector3(); // not sure if this is correct
 							var datadat = packet.Body.ReadRemainingArray();
 
-							// The WorldEntity owns the live transform (docs/archive/server-architecture-roadmap.md); the
+							// The WorldEntity owns the live transform (docs/server-architecture-roadmap.md); the
 							// persisted Character is only the spawn seed (movement is never persisted live). Update the
 							// authoritative entity and broadcast from it; fall back to the Character only if the player
 							// isn't in the world model yet.
@@ -164,7 +164,7 @@ namespace Faolan.GameServer
 								.SendAsync(client);
 
 							// Interest-managed broadcast: spawn this player to newly-near players and forward the move
-							// to players who already see them (docs/archive/server-architecture-roadmap.md). No-op solo.
+							// to players who already see them (docs/server-architecture-roadmap.md). No-op solo.
 							await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, relayMovingType, livePosition, liveRotation, datadat);
 
 							break;
@@ -922,7 +922,7 @@ namespace Faolan.GameServer
 							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
 							clientInstance, client.Session.Character.Id, client.Session.Character.Name, spawnRows, client.Session.Character.PositionX, client.Session.Character.PositionY,
 							client.Session.Character.PositionZ, client.Session.Character.MapId);
-						// #234 reconstruct (docs/archive/handoff-2026-06-22-create-flow-reconstruct.md): the verbatim
+						// #234 reconstruct: the verbatim
 						// SendCreateWorldSceneBurst delivers the captured `hoxxling` world (wrong char) -> after the
 						// cutscene the client drops the connection and the reconnect hangs. Send the PROVEN burst-less
 						// live-char world + the destiny cutscene's Scry-script overlay instead (SendCreateWorldWithCutscene):

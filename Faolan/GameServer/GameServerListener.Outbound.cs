@@ -375,7 +375,7 @@ namespace Faolan.GameServer
 		// FullCharacterIIR root, then expects the 0x18 version. So blobLen = field5Len + rootLength, written as a
 		// 4-byte big-endian int at prefix offset 1. (This SUPERSEDES AdjustSnapshotPrefixRootLength, which adjusted
 		// a byte-misaligned protobuf-varint model and corrupted the real length on resize — see
-		// docs/archive/db-container-handoff.md / [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
+		// [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
 		// the 4 length bytes); the captured field5 bytes at prefix[5..] are preserved unchanged.
 		internal static byte[] SetSnapshotBlobLength(byte[] prefix, int rootLength)
 		{

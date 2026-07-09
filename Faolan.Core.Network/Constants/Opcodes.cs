@@ -603,7 +603,7 @@ namespace Faolan.Core.Network.Constants
 
 	// Every 32-bit sub-opcode carried inside a 0x2000 packet is an "IIR" (Incremental Information Replication)
 	// message id = the BKDR-31 hash of the client's IIR C++ type name (h = h*31 + c; == Java String.hashCode),
-	// recovered by RE'ing AgeOfConan.exe (docs/archive/opcode-re-plan.md + docs/re/aoc-opcode-ids.md). Members are named
+	// recovered by RE'ing AgeOfConan.exe (docs/re/opcode-re-plan.md + docs/re/aoc-opcode-ids.md). Members are named
 	// after the real client type (with the _t/_c template suffix dropped); the comment gives the exact type and
 	// the occurrence count across all captures. This is the full catalog of every IIR id observed on the wire
 	// (server->client AND client->server - the id is the message type, direction-independent), even ones the
@@ -675,7 +675,7 @@ namespace Faolan.Core.Network.Constants
 		SpellBookIIR = 0x6BA10936, // SpellBookIIR_t  (x1)
 		StatDamageIIR = 0xE9F24184, // StatDamageIIR_t  (x450)
 		StatIIR = 0xF98E10B3, // StatIIR_t  (x8167)
-		StatUpdateIIR = 0x96B8DC59, // StatUpdateIIR_c  (x1595) - entity vitals/stat update (combat HP/Stamina/Mana); see docs/archive/quests-and-combat.md
+		StatUpdateIIR = 0x96B8DC59, // StatUpdateIIR_c  (x1595) - entity vitals/stat update (combat HP/Stamina/Mana); see docs/re/quests-and-combat.md
 		StopIIR = 0xD751EBB4, // StopIIR_c  (x2097) - stop moving
 		TemplateActionIIR = 0x6C300937, // TemplateActionIIR_t  (x7)
 		ThreatLevelIIR = 0x1745EF6C, // ThreatLevelIIR_c  (x162)

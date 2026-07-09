@@ -3,7 +3,7 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// Pure quest objective-tracking rules (docs/archive/quests-and-combat.md) - testable without the DB/network.
+	// Pure quest objective-tracking rules (docs/re/quests-and-combat.md) - testable without the DB/network.
 	public static class QuestProgress
 	{
 		// True if a trigger of `triggerType` against `targetName` advances this quest's goal (#261): the quest is Active,

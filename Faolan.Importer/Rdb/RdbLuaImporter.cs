@@ -12,7 +12,7 @@ namespace Faolan.Importer.Rdb
 	// Imports the client RDB LuaArchive (type 1010223) into the LuaScripts table. The archive is a single record: a
 	// 12-byte RDB-Id header, then `08 <ver>` and a repeated `12 <len>{ 08 <scriptId> 10 <type> 1a <len> <luaSource> }`
 	// (protobuf-style). ~1992 tiny scripts (player:HasTag/AddTag/SpawnItem/SolveGoal/...). See
-	// docs/archive/rdb-extraction-plan.md, protocol_conversation_routing.
+	// docs/rdb/rdb-extraction-plan.md, protocol_conversation_routing.
 	public static class RdbLuaImporter
 	{
 		private const uint LuaArchiveType = 1010223;

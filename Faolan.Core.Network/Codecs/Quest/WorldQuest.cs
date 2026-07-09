@@ -6,7 +6,7 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// Quest state packets, decoded from captures (docs/archive/quests-and-combat.md). These build the 0x2000 IIR record
+	// Quest state packets, decoded from captures (docs/re/quests-and-combat.md). These build the 0x2000 IIR record
 	// bodies (after the u32 length prefix). Quest text (title/desc/journal) is NOT sent here - the client renders it
 	// from its RDB by quest id; the server only drives quest STATE + objective progress. The full accept/branch logic
 	// is the pinned RDB Lua quest VM.

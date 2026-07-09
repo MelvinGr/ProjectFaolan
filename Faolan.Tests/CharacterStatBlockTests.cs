@@ -9,7 +9,7 @@ namespace Faolan.Tests
 {
 	// The stat-record block is a 1-byte count followed by N × [uint32 statId BE][uint32 value BE], with vitals
 	// scaled ×100. Verified against a captured 0x96B8DC59 vitals packet (entity 0x0002324B, Health/Stamina/Mana
-	// all 63.00 -> raw 6300 = 0x189C). See docs/archive/quests-and-combat.md.
+	// all 63.00 -> raw 6300 = 0x189C). See docs/re/quests-and-combat.md.
 	public class CharacterStatBlockTests
 	{
 		[Fact]

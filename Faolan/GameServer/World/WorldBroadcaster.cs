@@ -26,7 +26,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.GameServer.World
 {
 	// Turns world-model events into wire packets: spawns/moves/despawns for interest management, NPC respawn/loot/mount
-	// renders, loot-window and quest-journal packets (docs/archive/server-architecture-roadmap.md). Extracted out of the
+	// renders, loot-window and quest-journal packets (docs/server-architecture-roadmap.md). Extracted out of the
 	// GameServer listener so packet CONSTRUCTION for world events is its own collaborator; it reads the world model via
 	// the WorldSimulation, loads templates from the DB, and frames every packet on the world conversation (WorldFraming:
 	// sender = world-system 0x58, receiver = the recipient's GameInterfaceType endpoint). The FA015807 body carries the

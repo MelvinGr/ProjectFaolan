@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// i.e. ProtoGameCodeDynelIIR), and splices the per-character ProtoCoreCharacterIIR (name/stats/equipment)
 	// over the captured one (SetCharacterMessage). The scaffold frame around the CharacterIIR is then
 	// regenerated from the character's DB rows by PlayerSpawnScaffoldCodec/PlayerSpawnScaffoldRows (the
-	// GENERATION side - see docs/archive/player-spawn-generation-plan.md). The body is the 0x2000 sub-content:
+	// GENERATION side - see docs/re/player-spawn-generation-plan.md). The body is the 0x2000 sub-content:
 	//   [u32 len][u32 0xFA015807][u32 0x0000C350][u32 handle][u32 fieldA] 0x2C 0x0A <pos> 0x12 <rot> ...
 	// The transform is always the same size, so BuildSpawnBody stays length-preserving; the outer Conan length
 	// + CRC are (re)computed by the caller / PacketStream.
@@ -24,7 +24,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// NOT a length: an early misread. The u32 @133 is a per-character VALUE island in the pre-IIR scaffold
 		// frame (Strie 0x322, Hoxxling 0x42B - his stays fixed while the body size varies; see the validated
-		// grammar in docs/archive/player-spawn-generation-plan.md). The splice methods below still delta-adjust it on
+		// grammar in docs/re/player-spawn-generation-plan.md). The splice methods below still delta-adjust it on
 		// resize - the client demonstrably tolerates that, and the rows-generated frame (PlayerSpawnScaffoldRows)
 		// overwrites it with the stored value anyway.
 		public const int NameOuterLengthOffset = 133;
@@ -82,7 +82,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// Replaces the ENTIRE ProtoCoreCharacterIIR component (name / stats / player_stats / bcc / ... /
 		// inventory_entry) with a re-encoded one. Works for ANY FA015807 body (player OR NPC - they share the
-		// grammar, see docs/archive/spawn-dissection-plan.md Phase 4): the CharacterIIR is located by its name signature
+		// grammar, see docs/re/spawn-dissection-plan.md Phase 4): the CharacterIIR is located by its name signature
 		// via PlayerSpawnReader (not the fixed Strie offset), and on resize the body length @0 and the IIR's own
 		// length prefix @(iirOff-4) are delta-adjusted. The Strie-shaped player layout additionally carries the
 		// @133 value island, adjusted only there (NPCs have no such outer length). This is how identity + equipment

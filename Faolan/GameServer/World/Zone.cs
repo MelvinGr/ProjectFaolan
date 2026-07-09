@@ -7,7 +7,7 @@ namespace Faolan.GameServer.World
 {
 	// One map's live entity registry: every player and NPC currently in that map, keyed by wire handle. Provides the
 	// spatial queries the broadcaster needs (who is near a point) so movement/spawns reach only nearby players -
-	// interest management (docs/archive/server-architecture-roadmap.md). Range scans are linear for now (correct + simple at
+	// interest management (docs/server-architecture-roadmap.md). Range scans are linear for now (correct + simple at
 	// beach scale); a uniform grid is the optimisation once entity counts grow.
 	public sealed class Zone
 	{

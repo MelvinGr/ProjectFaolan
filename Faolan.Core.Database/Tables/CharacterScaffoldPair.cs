@@ -4,7 +4,7 @@ namespace Faolan.Core.Database.Tables
 {
 	// One pair of the spawn scaffold's two ending [u32 id][s32 value] lists (ids are decades 10..110; only
 	// progressed captured characters have any - fresh characters have both lists empty). ListIndex selects the
-	// first (0) or second (1) wire list. See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
+	// first (0) or second (1) wire list. See docs/re/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	//
 	// ListIndex 0 IS the FACTION-REPUTATION block: PairId = faction id, Value = the signed standing (out of
 	// +/-50000) shown in the client's Factions window (proven in-client on the L80 necro NecroL80: PairId 10 =

@@ -14,8 +14,7 @@ namespace Faolan.Tests
 {
 	// #74/#71: the per-character KNOWN-SPELL list carried in the 0x737A6DF9 FullChar snapshot tails (the spellbook
 	// region). Ground truth = the Faolanx (clean fresh necromancer) login snapshot, whose list is exactly its 2
-	// create-spells (count 0x0BD3, records 0x42CA77 + 0x125D9B, both type 2). See
-	// docs/archive/handoff-2026-06-20-snapshot-known-spell-list.md.
+	// create-spells (count 0x0BD3, records 0x42CA77 + 0x125D9B, both type 2).
 	public class KnownSpellListTests
 	{
 		private const uint BeachStarterQuestId = 10238;

@@ -89,7 +89,7 @@ the margins, but never invents a golden that isn't there.
 | V2 | `CoreClaimIIR` | `GameServerListener.PostReadyBurst` *(inline)* |
 | V2 | `DeleteItemIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `FullPlayerCharacterIIR` | `GameServerListener.Outbound` *(inline)* |
-| V2 | `GameTimeIIR` | `GameServerListener.Outbound` *(inline)* |
+| V2 | `GameTimeIIR` | `GameServerListener.GmCommands` *(inline)* |
 | V2 | `KnubotAnswerIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `LookAtIIR` | `ShopOpenBuilder` |
 | V2 | `MoveInventoryItemIIR` | `GameServerListener.Inbound` *(inline)* |

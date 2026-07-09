@@ -5,7 +5,7 @@ automated, capture-backed integration testing. Proven end-to-end 2026-06-10 (log
 
 Pieces: **`Faolan.ClientLauncher`** (launches + drives the client), the **server** (`Faolan` project), **loopback
 packet capture** (`tshark`/`dumpcap` on `lo`), and the existing **analyzer/diff** tooling (`Captures/*.py`,
-`Faolan.PacketAnalyzer`). Related: [login-decryption-plan.md](../archive/login-decryption-plan.md),
+`Faolan.PacketAnalyzer`). Related: [login-decryption-plan.md](../re/login-decryption-plan.md),
 README "Client launch flags".
 
 ---
@@ -100,7 +100,7 @@ after the client has read it rather than holding for the whole session.
 
 ## 4. Login password validation (optional)
 
-AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [login-decryption-plan.md](../archive/login-decryption-plan.md)).
+AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [login-decryption-plan.md](../re/login-decryption-plan.md)).
 By default any password is accepted. To enforce the real password, the client must use **our** DH public key:
 
 - **`--patch-login`** (or `tools/patch_aoc_login_key.py`) overwrites the client's embedded Funcom DH pubkey with

@@ -3,7 +3,7 @@
 records in Gitea #190). Server->client it pushes the action list bound to a dynel (NPC/object): emote
 loops ("idle2_emote"), the creation-step template choices ("MaleTemplate=50000:19688;..."), and numeric
 action records (the 53/88-byte forms). It is NOT packet-construction so much as the SIMULATION layer's
-output (the per-zone world model decides which action a dynel runs); see docs/archive/server-architecture-roadmap.md.
+output (the per-zone world model decides which action a dynel runs); see docs/server-architecture-roadmap.md.
 
 Wire (GameServer 0x2000 IIR frame): [len4][subop F508F4C1][ack 0000C350][dynelHandle4] then the body:
 

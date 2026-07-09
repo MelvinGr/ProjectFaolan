@@ -15,7 +15,7 @@ namespace Faolan.Importer.Captures
 	// Harvests spell ids the character actually cast, from ApplySpell packets (0x2000 / 0x6B87E316; spell id at
 	// inner[12..16]) and catalogs any not already in the Spell table (id-only; names/params are client-side / from
 	// the archive `spelldata`). This is the thin capture-side spell signal - the full spellbook is class/level
-	// derived and not in the pcaps (see docs/archive/faolan-importer-plan.md). Takes raw on-wire packet bytes.
+	// derived and not in the pcaps (see docs/tooling/importer-plan.md). Takes raw on-wire packet bytes.
 	public static class CaptureSpellImporter
 	{
 		private const uint ApplySpellSubOpcode = 0x6B87E316;

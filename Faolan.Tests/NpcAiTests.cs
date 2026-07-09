@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// NPC aggro + attack AI on the tick (docs/archive/server-architecture-roadmap.md): a living NPC with a player in aggro
+	// NPC aggro + attack AI on the tick (docs/server-architecture-roadmap.md): a living NPC with a player in aggro
 	// range swings on a fixed cadence, emitting an NpcAttack effect for the listener to turn into a vitals hit.
 	public class NpcAiTests
 	{

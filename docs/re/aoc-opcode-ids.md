@@ -1,6 +1,6 @@
 # AoC wire-id decode (BKDR-31 name hash) - all servers
 
-Stage 3 of `docs/archive/opcode-re-plan.md`. The client id hash is **BKDR-31** (`h = h*31 + c`, Java's
+Stage 3 of `docs/re/opcode-re-plan.md`. The client id hash is **BKDR-31** (`h = h*31 + c`, Java's
 `String.hashCode`), cracked in Stage 2 (18/18 known anchors). Ids below are resolved by hashing every
 identifier in `AgeOfConan.exe` and matching. `[?]` = no exe string hashes to it (name not in binary, or
 a collision picked wrong); 16-bit RpcHeader opcodes are method indices, not hashes — **RESOLVED 2026-06-12**

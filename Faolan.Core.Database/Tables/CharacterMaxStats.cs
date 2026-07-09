@@ -21,7 +21,7 @@ namespace Faolan.Core.Database.Tables
 		// stamina base = displayed-6, HP base = displayed - a per-class L1 delta (Necro 9, Guardian 10, Assassin/
 		// BearShaman 8). Authoring the WHOLE per-class block (both the displayed AND base slots) keeps it internally
 		// consistent - patching only the displayed slot and leaving the base at the Strie template's Rogue value was the
-		// suspected #4 (wrong mana) / "gear vanished" inconsistency (docs/archive/handoff-2026-06-17-perclass-snapshot.md).
+		// suspected #4 (wrong mana) / "gear vanished" inconsistency.
 		// Returned in display units (the block scales ×100 at write time). #186/#4.
 		public (uint Hp, uint HpBase, uint Mana, uint ManaBase, uint Stamina, uint StaminaBase) SnapshotVitals(Class @class)
 		{
@@ -41,7 +41,7 @@ namespace Faolan.Core.Database.Tables
 
 		// Class/level vitals. The LEVEL-1 values are anchored to the retail character sheet (read off the live
 		// client 2026-06-17, cross-checked against the world-entry FullChar snapshot stat block - see
-		// docs/archive/handoff-2026-06-17-perclass-snapshot.md and #242): all 12 classes are now retail-anchored at L1 -
+		// #242): all 12 classes are now retail-anchored at L1 -
 		// Guardian 130/0/179, Conqueror 168/0/178, Dark Templar 128/281/178, Assassin 98/0/236, Barbarian
 		// 118/0/178, Ranger 133/0/213, Bear Shaman 108/171/178, Priest of Mitra 88/171/0, Tempest of Set 88/171/0,
 		// Necromancer 89/246/0, Demonologist 89/246/0, Herald of Xotli 89/246/121 (HP/Mana/Stamina). Which pools a

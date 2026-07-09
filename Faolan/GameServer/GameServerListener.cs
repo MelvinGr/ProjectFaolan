@@ -438,7 +438,7 @@ namespace Faolan.GameServer
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
 		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
-		// (docs/archive/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
+		// (docs/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
 		// The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
 		// in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
 		// partials (broadcast, combat, GM) read it unchanged.
@@ -462,7 +462,7 @@ namespace Faolan.GameServer
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
-		// (docs/archive/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
+		// (docs/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
 		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
 		// more live state - vitals, buffs, … - as those become persisted.)
 		private async Task SaveChanges(uint characterId)

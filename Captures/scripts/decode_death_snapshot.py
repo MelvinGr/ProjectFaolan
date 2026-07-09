@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pinpoint the DEAD-STATE field in the 0x737A6DF9 world-entry FullPlayerChar snapshot (#214).
 
-Context (docs/archive/handoff-2026-06-20-death-window.md): the in-client release/resurrect window is gated on a
+Context: the in-client release/resurrect window is gated on a
 client-side LOCAL-PLAYER dead-flag (DAT_0297d374->vtable[0x10]()). Live gdb proved our death PACKETS
 (SimpleCharKilledBy + ApplySpell + death-pose MoveTask + 0x2024) are byte-correct and the 0x2024 handler
 reaches its window-feed SUCCESS path - yet the window stays hidden because that flag is false. The retail

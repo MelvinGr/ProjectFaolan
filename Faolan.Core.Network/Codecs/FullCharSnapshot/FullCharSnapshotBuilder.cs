@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
 	// Builds the FullChar (0x737A6DF9) snapshot's four inventory containers entirely from the character's DB
 	// items - the generation counterpart of the older in-place entry swap. Layout facts from every captured
-	// snapshot (docs/archive/player-spawn-generation-plan.md "FullChar"):
+	// snapshot (docs/re/player-spawn-generation-plan.md "FullChar"):
 	//   - the root carries exactly 4 ProtoInventoryGame containers, kind order Equipped=101, Bag=104,
 	//     Resource=112, Quest=113; inventory_id = { type: kind, instance: the character's client instance };
 	//     max_size 1028/24/48/48 (24 = the starter bag; upgrades grow it) and disabled_slots_count 0/0/12/0

@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 	// to CharacterEquipment (the worn/visible slots). The FullChar inventory snapshot (0x737A6DF9) is built from these
 	// rows; worn items (which also drive the spawn's appearance) stay in CharacterEquipment. Replaces the opaque
 	// Bag/Quest/Resources serialized strings on CharacterEquipment with structured rows. See
-	// docs/archive/player-spawn-generation-plan.md.
+	// docs/re/player-spawn-generation-plan.md.
 	[PrimaryKey(nameof(CharacterId), nameof(Container), nameof(Slot))]
 	public class CharacterInventory
 	{

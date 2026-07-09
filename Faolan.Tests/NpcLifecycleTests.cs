@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// NPC death -> respawn lifecycle in the world model (docs/archive/server-architecture-roadmap.md): combat applies damage
+	// NPC death -> respawn lifecycle in the world model (docs/server-architecture-roadmap.md): combat applies damage
 	// to the NPC's world-entity vitals; on death the tick counts down a respawn delay and revives it at its spawn point.
 	public class NpcLifecycleTests
 	{

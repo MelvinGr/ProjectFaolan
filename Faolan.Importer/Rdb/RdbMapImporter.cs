@@ -13,7 +13,7 @@ namespace Faolan.Importer.Rdb
 	// <playfielddescriptiondata> carrying <playfield Name=".." ID=".."/>; the RDB record id == the playfield id ==
 	// our Map.Id (verified: 4010 Tortage Island, 2040 Castle of King Conan, 3000 Khemi, ...). v5-reachable records
 	// (file < 0xFF) are read now; the v6 content-addressed ones (file == 0xFF) are skipped until the v6 index is
-	// cracked (docs/archive/rdb-extraction-plan.md). Names fill/replace Map.Name; missing maps are created as reference rows
+	// cracked (docs/rdb/rdb-extraction-plan.md). Names fill/replace Map.Name; missing maps are created as reference rows
 	// (id + name only - no spawn transform / world burst, so they label the map without being enterable).
 	public static class RdbMapImporter
 	{

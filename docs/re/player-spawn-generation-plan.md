@@ -238,4 +238,4 @@ records — generate from server-side progression when those systems exist); bag
   geared character would reuse it as-is.
 
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture and
-docs/archive/spawn-dissection-plan.md for the wider (NPC/inventory/conversation) dissection history.
+docs/re/spawn-dissection-plan.md for the wider (NPC/inventory/conversation) dissection history.
