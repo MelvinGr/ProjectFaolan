@@ -15,7 +15,7 @@ verified in-client. Resolved since the 2026-06-21 status below:
   all closed.
 - **Remaining:** stage-4 escort ARRIVAL completion (reach city, complete 12407) — Gitea #262.
 
-See [[casilda_quest_chain_261]], [[casilda_destiny_scry_steps]], docs/archive/handoff-2026-06-21-beach-gate.md.
+See [[casilda_quest_chain_261]], [[casilda_destiny_scry_steps]].
 
 ## STATUS 2026-06-21 (chain engine + stages 1-3 wired)
 
