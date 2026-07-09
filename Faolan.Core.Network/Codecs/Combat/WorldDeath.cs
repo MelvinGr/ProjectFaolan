@@ -1,4 +1,5 @@
 using System.Numerics;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -13,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class WorldDeath
 	{
 		public const uint DeathEffectSpellId = 0x0009F000;
-		public const uint SimpleCharKilledBySubOpcode = 0xB066AFC2;
+		public const uint SimpleCharKilledBySubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR; // 0xB066AFC2
 		private const byte DeadMovementType = 0x06;
 
 		// The revive action retail sends on RespawnMe — a BehaviorControlCenterIIR (0x642CD3D6) on the player that
@@ -23,7 +24,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// verbatim except the player handle + the chosen resurrection-point id. Retail follows it with a vitals
 		// restore (we ride PushVitals) and an IntendedTeleport to the point (deferred - the beach point is adjacent so
 		// we revive in place). docs/archive/handoff-2026-06-20-death-window.md.
-		private const uint BccIirSubOpcode = 0x642CD3D6;
+		private const uint BccIirSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR; // 0x642CD3D6
 
 		// The self-applied "you are dead" effect retail sends right after the 0x2024 release screen (ApplySpell
 		// MagicBuff 0x6B87E316, spell 0x0009F000, applyTo == applyFrom == the dying player). SimpleCharKilledBy +
@@ -38,7 +39,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// speed payload - just [class][handle][u16 0][pos X,Y,Z big-endian][0x06] - at the death position. Normal
 		// movement is type 0x07 followed by a full waypoint list; 0x06 is the "stopped/incapacitated" dead state. The
 		// SimpleCharKilledBy + 0x2024 + death effect alone left the avatar standing and the release UI closed (#214).
-		private const uint MoveTaskSubOpcode = 0x96C46740;
+		private const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
 
 		// The in-session DEATH action retail sends to put the player into the dead state (bcc_state 29) - the inverse
 		// of BuildRevive. Decoded from the retail beach death (Stihetfv #1292, right after the death-effect ApplySpell):

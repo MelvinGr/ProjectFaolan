@@ -218,7 +218,7 @@ namespace Faolan.GameServer
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(IirMessageTypes.GameTime);
+					s.WriteUInt32(GameServer0X2000Opcodes.GameTimeIIR);
 					s.WriteUInt32(0x00000000); // TypeTag
 					s.WriteUInt32(0x00000000); // Handle (global)
 					s.WriteUInt32(0x01472BDD); // FieldA
@@ -263,7 +263,7 @@ namespace Faolan.GameServer
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(IirMessageTypes.MapChange);
+					s.WriteUInt32(GameServer0X2000Opcodes.PlayfieldFIIR);
 					s.WriteArray(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, 						character.PositionY, 						character.PositionZ, 						character.MapId, 						charInstance, 						count, 						playfieldToken, 						15.0f, 						BitConverter.UInt32BitsToSingle(0x40E3944Fu), 						flags, 						0x01000000u, 						fieldB));
 				});
 			return ps.WriteLengthHash().ToArray();
@@ -334,7 +334,7 @@ namespace Faolan.GameServer
 			using var body = new FaolanStream();
 			body.WriteArrayUInt32Length(s =>
 			{
-				s.WriteUInt32(IirMessageTypes.FullChar);
+				s.WriteUInt32(GameServer0X2000Opcodes.FullPlayerCharacterIIR);
 				s.WriteUInt32(SnapshotTypeTag);
 				s.WriteUInt32(instance);
 				s.WriteArray(prefix);

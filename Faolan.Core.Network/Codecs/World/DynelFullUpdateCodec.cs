@@ -1,3 +1,7 @@
+using System;
+using System.Linq;
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Core.Network.Codecs.World
 {
 	// Construct-side codec for the dynel-family full-update records (#187, docs/iir-readers-combat-world.md):
@@ -11,8 +15,21 @@ namespace Faolan.Core.Network.Codecs.World
 	// DynelFullUpdateCodecTests prove byte-exact reconstruction.
 	public static class DynelFullUpdateCodec
 	{
+		// The dynel-family IIR carrier types this codec constructs/parses - all share the SimpleDynel shape above.
+		// Named as opcode members (not just hex in the doc comment) so `grep GameServer0X2000Opcodes.DoorFullUpdateIIR`
+		// finds the emitter and the coverage matrix can attribute all four byte-exact types here (#317).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.DoorFullUpdateIIR,
+			GameServer0X2000Opcodes.DestructibleFullUpdateIIR,
+			GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR,
+			GameServer0X2000Opcodes.TombStoneFullUpdateIIR,
+		];
+
 		public static byte[] Build(uint subOpcode, uint typeWord, uint handle, byte env, byte[] identityBlob, byte[] geometryTail)
 		{
+			if (!HandledTypes.Any(t => (uint)t == subOpcode))
+				throw new ArgumentOutOfRangeException(nameof(subOpcode), $"0x{subOpcode:X8} is not a dynel-family full-update type (see HandledTypes)");
 			var c = new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(typeWord).WriteUInt32(handle).WriteByte(env).WriteArrayUInt32Length(identityBlob).WriteArray(geometryTail);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}

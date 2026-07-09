@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient()));
 
 			Assert.Equal(0x2000u, record.Opcode);
-			Assert.Equal(IirMessageTypes.GameTime, record.IirType);
+			Assert.Equal((uint)GameServer0X2000Opcodes.GameTimeIIR, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			Assert.Equal(0x01472BDDu, record.FieldA);
 			Assert.Equal(CapturedGameTimeBody, record.Body);
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 			var record = DecodeIir(GameServerListener.BuildMapChange(BeachClient(), null, WorldState.DefaultPlayfieldToken));
 
 			Assert.Equal(0x2000u, record.Opcode);
-			Assert.Equal(IirMessageTypes.MapChange, record.IirType);
+			Assert.Equal((uint)GameServer0X2000Opcodes.PlayfieldFIIR, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			Assert.Equal(0x0043A140u, record.FieldA);
 			Assert.Equal(CapturedMapChangeBody, record.Body);

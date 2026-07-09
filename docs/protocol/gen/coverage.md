@@ -8,7 +8,7 @@
 ## Headline
 
 - **819** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **74** IIR carrier types: **43 V3** (byte-exact builder), **13 V2** (built, no golden), **18 V1** (no builder found).
+- **74** IIR carrier types: **51 V3** (byte-exact builder), **14 V2** (built, no golden), **9 V1** (no builder found).
 - **103** codec classes, **85** with a byte-exact test.
 - **36** Python dissectors (`Captures/scripts/decode_*.py`).
 
@@ -32,16 +32,21 @@ the margins, but never invents a golden that isn't there.
 
 | Level | IIR type | Built by |
 |-------|----------|----------|
-| V3 | `BehaviorControlCenterIIR` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `CombatPacketCodec`, `CreateEditorRecordBuilder` |
+| V3 | `BehaviorControlCenterIIR` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `CombatPacketCodec`, `CreateEditorRecordBuilder`, `WorldDeath` |
 | V3 | `CharDCMoveIIR` | `CharDCMove`, `CharDCMoveCodec`, `SetPosCodec`, `StopCodec` |
 | V3 | `CharInPlayIIR` | `CreateEditorRecordBuilder` |
 | V3 | `CharacterActionIIR` | `CreateEditorRecordBuilder` |
+| V3 | `ChatTextIIR` | `ChatTextCodec` |
+| V3 | `ClimbingDynelFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `CombatReactiveIIR` | `SpellweaveCodec` |
 | V3 | `CombatShieldIIR` | `CombatShieldBuilder`, `CombatShieldCodec`, `HateListCodec`, `StatDamageCodec`, `ThreatLevelCodec` |
 | V3 | `ComboBookIIR` | `ComboBookIirCodec`, `CreateEditorRecordBuilder` |
 | V3 | `DamageResultIIR` | `CombatEffectBuilder`, `CombatPacketCodec` |
+| V3 | `DestructibleFullUpdateIIR` | `DynelFullUpdateCodec` |
+| V3 | `DoorFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `EnergyIIR` | `CombatPacketCodec`, `CreateEditorRecordBuilder` |
 | V3 | `FeedbackIIR` | `CreateEditorRecordBuilder` |
+| V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
 | V3 | `GameTimeIIR` | `CreateEditorRecordBuilder` |
 | V3 | `HateListUpdateIIR` | `CombatShieldCodec`, `HateListCodec`, `StatDamageCodec`, `ThreatLevelCodec` |
@@ -50,9 +55,10 @@ the margins, but never invents a golden that isn't there.
 | V3 | `KnubotAppendTextIIR` | `KnubotCodec` |
 | V3 | `KnubotCloseChatWindowIIR` | `KnubotCodec` |
 | V3 | `KnubotOpenChatWindowIIR` | `KnubotCodec` |
+| V3 | `LootBagFullUpdateIIR` | `LootBagMessageCodec` |
 | V3 | `LootRemoveItemsIIR` | `WorldLoot` |
 | V3 | `MagicBuffIIR` | `NpcSpellCastBuilder` |
-| V3 | `MoveTaskIIR` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `MoveTaskNode` |
+| V3 | `MoveTaskIIR` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `MoveTaskNode`, `WorldDeath` |
 | V3 | `N3TeleportIIR` | `TeleportCodec` |
 | V3 | `N3ToClientFadeIIR` | `WorldLoot` |
 | V3 | `NewAllowedLooterIIR` | `WorldLoot` |
@@ -68,41 +74,35 @@ the margins, but never invents a golden that isn't there.
 | V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetPosIIR` | `CharDCMove`, `CharDCMoveCodec`, `SetPosCodec`, `StopCodec` |
 | V3 | `SimpleCharFullUpdateIIR` | `PlayerSpawnScaffoldCodec` |
+| V3 | `SimpleCharKilledByUpdateIIR` | `WorldDeath` |
 | V3 | `SimpleDynelVisualChangeIIR` | `WorldLoot` |
 | V3 | `StatDamageIIR` | `CombatEffectBuilder`, `CombatShieldCodec`, `HateListCodec`, `SpellweaveCodec`, `StatDamageCodec`, `ThreatLevelCodec` |
 | V3 | `StatIIR` | `CreateEditorRecordBuilder`, `SpellweaveCodec` |
 | V3 | `StatUpdateIIR` | `CreateEditorRecordBuilder` |
 | V3 | `StopIIR` | `CharDCMove`, `CharDCMoveCodec`, `SetPosCodec`, `StopCodec` |
 | V3 | `ThreatLevelIIR` | `CombatShieldCodec`, `HateListCodec`, `StatDamageCodec`, `ThreatLevelCodec` |
+| V3 | `TombStoneFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
 | V2 | `BankIIR` | `BankService` *(inline)* |
 | V2 | `CoreClaimIIR` | `GameServerListener.PostReadyBurst` *(inline)* |
 | V2 | `DeleteItemIIR` | `GameServerListener.Inbound` *(inline)* |
+| V2 | `FullPlayerCharacterIIR` | `GameServerListener.Outbound` *(inline)* |
 | V2 | `GuildUpdateIIR` | `GuildTagBody` *(inline)* |
 | V2 | `KnubotAnswerIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `LookAtIIR` | `ShopOpenBuilder` |
 | V2 | `MoveInventoryItemIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `N3ToClientQuitIIR` | `WorldDespawn` |
-| V2 | `PlayfieldFIIR` | `CreateFlowService` *(inline)* |
+| V2 | `PlayfieldFIIR` | `GameServerListener.Outbound` *(inline)* |
 | V2 | `SetNameIIR` | `CreateFlowService` *(inline)* |
 | V2 | `SimpleDynelFullUpdateIIR` | `CreateFlowService` *(inline)* |
 | V2 | `TradeskillReplyIIR` | `GameServerListener.Outbound` *(inline)* |
 | V2 | `TradeskillRequestIIR` | `GameServerListener.Inbound` *(inline)* |
 | V1 | `AreaFormulaIIR` | — |
 | V1 | `ChainKillIIR` | — |
-| V1 | `ChatTextIIR` | — |
-| V1 | `ClimbingDynelFullUpdateIIR` | — |
 | V1 | `CrimeIIR` | — |
-| V1 | `DestructibleFullUpdateIIR` | — |
-| V1 | `DoorFullUpdateIIR` | — |
-| V1 | `FormatFeedbackIIR` | — |
-| V1 | `FullPlayerCharacterIIR` | — |
 | V1 | `KnubotFinishTradeIIR` | — |
 | V1 | `KnubotStartTradeIIR` | — |
 | V1 | `LockedToChangedIIR` | — |
-| V1 | `LootBagFullUpdateIIR` | — |
-| V1 | `SimpleCharKilledByUpdateIIR` | — |
 | V1 | `SpellBookIIR` | — |
 | V1 | `TemplateActionIIR` | — |
-| V1 | `TombStoneFullUpdateIIR` | — |
 | V1 | `UpdateInventoryIIR` | — |

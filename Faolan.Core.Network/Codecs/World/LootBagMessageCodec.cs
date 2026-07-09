@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
@@ -22,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class LootBagMessageCodec
 	{
 		// LootBagFullUpdateIIR sub-opcode.
-		public const uint SubOpcode = 0xF096251E;
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // 0xF096251E
 
 		// Serializes a typed ProtoLootBagIIR to the on-wire trailing blob: [u32 BE len][protobuf].
 		public static byte[] BuildContents(ProtoLootBagIIR contents)
