@@ -78,7 +78,7 @@ is clearest in the `0x96B8DC59` entity-vitals packet (`...<entityHandle><0000000
 `docs/archive/quests-and-combat.md`); the same record encoding is embedded in the larger `0x737A6DF9` snapshot.
 
 ## Open follow-ups
-> Tracked in `TODO.md` §2 (the single tracker). The notes below are the technical context.
+> Tracked as Gitea issues (see the `area:combat` / `area:aoc-systems` labels). The notes below are the technical context.
 
 - ✅ ~~Locate real Max-Health / Max-Mana / Max-Stamina ids~~ — DONE (current/max pair table above).
 - ✅ ~~Determine whether attributes are sent at all, or derived client-side~~ — **DONE (2026-06-15, #6):

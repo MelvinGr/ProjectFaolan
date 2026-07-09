@@ -4,7 +4,18 @@ RE notes for the **create-editor download stream** — the burst the GameServer 
 while it is in the character-creation editor (between the client's `0x205F` "ready" pokes). The goal of #189
 is to construct it from scratch like the login path instead of replaying `RetailCreateEditor*Burst.cs`
 verbatim. **Status: `InitialBurst` is fully constructed, and all structured `*IIR` types in
-`WorldPrepBurst`/`CreationScriptBurst` are decoded + built + wired** (see §4; #223 closed). The remaining
+`WorldPrepBurst`/`CreationScriptBurst` are decoded + built + wired** (see §4; #223 closed).
+
+> **`WorldPrepBurst` has since been REMOVED entirely** (`262cb0dc`). It replayed the guardian capture's
+> starting-kit grants (0x2052 abilities, `ComboBookIIR` combos, `SetItemStat`, `CharacterAction`/`Stat`/`Energy`
+> records) during creation — all proven redundant in-client: a created necromancer is fully functional without
+> it, because every grant is re-emitted class-driven by the SHARED world-entry loadout (`EnsureCharacterLoadout`:
+> `ClassAbilities` + `GetStartingBarSpells` + `GrantCharacterCombos`), which the create flow already reaches via
+> `SendBurstlessWorldEntry`. Its only unique effect was the live create-session quickbar placement of the 3 basic
+> attacks, which the shared bar-seed covers for a fresh character. The §4/§5 notes below describe the decode work
+> as it stood while the burst existed — kept as the record of what those record types are.
+
+The remaining
 verbatim bursts are the Knubot conversation (#188) and the intro-cutscene world-entry
 `RetailCreateWorldEntryBurst`, whose construction is now tracked separately under **#234** (its ScryScript +
 despawn + regen + BehaviorCC records — 146 in all — are already constructed; the FA015807 spawns + MoveTask/AI

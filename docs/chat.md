@@ -61,7 +61,7 @@ restarts. In-client render of the channel is not yet verified (needs a live clie
 
 ## Not done / next (when revisited)
 
-> Tracked in `TODO.md` (the single tracker): in-client cross-player verification → §2 backlog; world/system chat
+> Tracked as Gitea issues (`area:aoc-systems` / `area:in-client`): in-client cross-player verification; world/system chat
 > (`ChatTextIIR`) → §8. The notes below are the technical context for those entries.
 
 - **In-client cross-player verification** (2+ clients): confirm a channel post reaches another player and a say is

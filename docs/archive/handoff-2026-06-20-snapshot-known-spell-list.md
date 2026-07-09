@@ -106,7 +106,7 @@ Keep the `EnsureStartingLoadout` DB seed (CharacterSpells + the default bar rows
 ## Pointers
 - Grammar: `docs/fullplayer-snapshot-reader.md` (region list 1–12; the known-list is NOT region 11's
   stride-0x14 `SpellBook_t` — the learned ids appear only in this 12-byte typed list).
-- Per-class snapshot context: `docs/handoff-2026-06-17-perclass-snapshot.md` (class/mana/stats are also
+- Per-class snapshot context: `docs/archive/handoff-2026-06-17-perclass-snapshot.md` (class/mana/stats are also
   Strie-inherited; same root issue, different regions).
 - Memory: `snapshot_known_spell_list`, `protocol_spell_grant_learned`, `fullchar_generation`,
   `necro_snapshot_decode_state`.

@@ -44,9 +44,15 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
 
 ## Status
 
-- **Functional today:** the DB guild is created and shown via the login `0x203F` push (`.guild create` says
-  "Relog to load the guild window"). So create-guild *works*, just not the retail no-relog path.
-- **Implemented this session:** parse the request form byte (was dropped).
-- **Follow-up (needs the 225-byte tail decoded + a server-side trailer spec):** emit `DispatchGuildCreated`
-  (0x2044) immediately so the window opens without a relog, and fan out the `0x003c` guild-chat channel subs.
-  Header + member record are decoded byte-exact; only the renown/trailer tail remains. See #<guild-ticket>.
+- **Implemented (#306, `45905d5d`):** `HandleCreateGuild` now emits `DispatchGuildCreated` (0x2044) — the
+  retail no-relog create response — instead of only the `0x203F` full update. Built byte-exact against this
+  capture (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`, 338 bytes) by `WriteGuildCreatedBody`:
+  member record + header are CONSTRUCTED; the 225-byte tail is emitted verbatim as a valid create-time block
+  (this capture is itself a fresh guild, so its feat numbers are create-time defaults — only the 40-byte
+  trailer holds cosmetic capture timestamps). The login `0x203F` push still runs, so relog remains a fallback.
+- **The golden corrected a blind guess:** the guild LEADER's wire rank is **4** (this capture's member record),
+  not the 6 the server hardcoded. `Character.GuildLeaderRank` fixed — no rank-comparison logic depended on it.
+- Also parses the request's `form` byte (previously dropped).
+- **Remaining follow-ups:** decode the 225-byte tail field-by-field (so a guild's real renown/creation values are
+  constructed rather than templated), and fan out the `0x003c` guild + officer chat-CHANNEL subs (step 3 below)
+  so the guild chat tabs appear. Neither blocks the window opening. Needs an in-client no-relog confirmation.

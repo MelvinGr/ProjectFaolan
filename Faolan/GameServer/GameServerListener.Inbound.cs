@@ -913,7 +913,7 @@ namespace Faolan.GameServer
 						var spawnRows = await Database.SetCreationSpawn(client.Session.Character);
 						Logger.LogInformation(
 							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.", 							clientInstance, 							client.Session.Character.Id, 							client.Session.Character.Name, 							spawnRows, 							client.Session.Character.PositionX, 							client.Session.Character.PositionY, 							client.Session.Character.PositionZ, 							client.Session.Character.MapId);
-						// #234 reconstruct (docs/handoff-2026-06-22-create-flow-reconstruct.md): the verbatim
+						// #234 reconstruct (docs/archive/handoff-2026-06-22-create-flow-reconstruct.md): the verbatim
 						// SendCreateWorldSceneBurst delivers the captured `hoxxling` world (wrong char) -> after the
 						// cutscene the client drops the connection and the reconnect hangs. Send the PROVEN burst-less
 						// live-char world + the destiny cutscene's Scry-script overlay instead (SendCreateWorldWithCutscene):

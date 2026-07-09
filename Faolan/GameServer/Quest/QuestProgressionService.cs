@@ -23,7 +23,7 @@ namespace Faolan.GameServer.Quest
 	// SERVER trigger matches, so the three trigger owners - CombatService (kill), LootService (corpse-bag loot),
 	// ConversationService (talk) - all funnel through this one engine. The Tortage intro chain is
 	// 13479 (kill Tuut) -> 13563 (loot Tuut's bag) -> 13480 (talk Casilda) -> 12407 (escort) -> end.
-	// See docs/handoff-2026-06-21-casilda-quest-chain.md. Replaces the single-stage #47 turn-in for chained quests.
+	// See docs/archive/handoff-2026-06-21-casilda-quest-chain.md. Replaces the single-stage #47 turn-in for chained quests.
 	public sealed class QuestProgressionService
 	{
 		private readonly IAgentServerDispatcher _agents;

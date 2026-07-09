@@ -104,7 +104,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				// current-health, NOT from the 0x737A6DF9 snapshot (a different object) - which is why zeroing only
 				// the snapshot's HealthCurrent (#214 step 2) left the avatar standing. Verified against the retail
 				// login-while-dead capture (Stihetfv FA015807 #50): CharacterStats.health(f7)=0, life(f6)=19600 full,
-				// and can_fall(f20)=0 (alive=1). docs/handoff-2026-06-20-death-window.md.
+				// and can_fall(f20)=0 (alive=1). docs/archive/handoff-2026-06-20-death-window.md.
 				var maxStats = character.MaxStats;
 				if (maxStats != null)
 				{
@@ -124,7 +124,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				// (29) is the retail login-while-dead capture. Health=0 and the forced death animation are both
 				// COSMETIC (HP bar / lying-down pose - the avatar could still walk in-client #214); bcc_state is what
 				// locks the controller into the Dead substate and lets the resurrect window paint. Set it for a dead
-				// login (kept captured == alive 1 otherwise). docs/handoff-2026-06-20-death-window.md.
+				// login (kept captured == alive 1 otherwise). docs/archive/handoff-2026-06-20-death-window.md.
 				if (character.IsDead)
 					message.Stats.BccState = DeadBccState;
 
@@ -163,7 +163,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// the retail login-while-dead capture (Stihetfv FA015807 #50): anim_forced_id=41877, timer=1.0, blend=1.
 			// Force it for a dead login (left unset when alive). The id is the conqueror capture's value - if the dead
 			// POSE renders wrong on another class/skeleton but the WINDOW shows, the mechanism is confirmed and the id
-			// just needs a per-skeleton lookup. docs/handoff-2026-06-20-death-window.md.
+			// just needs a per-skeleton lookup. docs/archive/handoff-2026-06-20-death-window.md.
 			if (character.IsDead && message.Bcc != null)
 			{
 				message.Bcc.AnimForcedId = DeathForcedAnimId;

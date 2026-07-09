@@ -131,4 +131,10 @@ from typed columns.
       - Residual `Data` tail = the ~24 runtime-bearing NO-morph humanoids whose type has no minimal-form capture
         (fresh recordCount unknown) + the 2 entry-runtime spawns. In-client smoke test of a no-morph humanoid
         (ensure it's not bald) still pending.
-- [ ] Migrate the remaining `Npc.Community`/`Level` readers (now `[Obsolete]`) to `StatCore`.
+- [x] Migrate the remaining `Npc.Community`/`Level` readers to `StatCore`, then DROP the duplicate
+      `Npc.Community`/`Level`/`Race`/`Sex` columns (`6ca6061c`). Verified redundant first: 0 rows carried data
+      `StatCore` lacked. The last readers (`WorldBroadcaster` ×3, `Faolan.Mcp/DatabaseTools`) now read
+      `StatCore`, and the importer's duplicate writes (`ImportOps`, pet/mount importers) are gone. `Npc` is now
+      just `Id`/`Name`/`TemplateId` + its navigations. `NpcStatCore.Sex` is the `Sex` enum (wire code
+      `None=0`/`Male=2`/`Female=3`); `NpcStatCore.Race` stays a raw `uint` (creature model-race 0..98 — a
+      different domain from the 3-value player `Race` enum).

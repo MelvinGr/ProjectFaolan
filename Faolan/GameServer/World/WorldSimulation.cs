@@ -272,7 +272,7 @@ namespace Faolan.GameServer.World
             // flips bcc_state 29→1 (closes the release window), then a vitals update restores HP. Our old ReenterWorld
             // re-ran the whole world entry, which (a) rebuilt the dead spawn when IsDead lingered and (b) corrupted the
             // client into the sticky wave-respawn UI. We revive in place; honoring a FAR res point via IntendedTeleport
-            // (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot). docs/handoff-2026-06-20-death-window.md.
+            // (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot). docs/archive/handoff-2026-06-20-death-window.md.
             await _output.SendRevive(client, entity.Handle, spawnPointId);
             await _output.PushVitals(client, vitals);
             _logger.LogInformation("Combat: {Player} resurrected (chosen spot {Spot}).", character.Name, point?.Name ?? $"0x{spawnPointId:X}");

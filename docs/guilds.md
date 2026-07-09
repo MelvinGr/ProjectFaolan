@@ -44,7 +44,9 @@ At login while guilded, the server pushes `0x203F` immediately after the Authent
 [unknown u32][lastSeenUnix u32][48 bytes sparse renown/pvp counters]
 ```
 
-- rank 0 = fresh member (Kyloth, who could invite, had 5; we give the creator 6)
+- rank 0 = fresh member (Kyloth, who could invite, had 5). **The guild LEADER is rank 4** — proven by the
+  create-guild capture's member record (`docs/create-guild-decode.md`); the server previously guessed 6.
+  `Character.GuildLeaderRank = 4` (no rank-comparison logic depends on the value; it only hits the wire record).
 - playfield is 0 and lastSeen is set when offline; both flip when online
 - class values match our `Class` enum (0x2B Herald of Xotli, 0x29 Necromancer, …)
 - the level byte ticked 4→5 mid-capture when Hoxxling leveled
@@ -79,11 +81,15 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
 - In-world tag: `SendGuildTag` through the `IGameServerDispatcher` seam (live join/leave) and on the
   existing-character login path. The cross-connection member lookup is the `ClientForCharacter` Func
   seam injected into `GuildService`.
+- **Create (no relog):** `HandleCreateGuild` emits `DispatchGuildCreated` (0x2044) — retail's immediate create
+  response, which opens the guild window without a relog — built byte-exact against the create-guild capture
+  (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`). See `docs/create-guild-decode.md` (#306). The
+  login `0x203F` push still runs, so relog remains a fallback.
 - GM bootstrap: `.guild create <name>` (the capture-true CreateGuild RPC needs a registrar NPC window).
 
 ## Open items
 
-> Tracked in `TODO.md` §8 (the single tracker, "Guild protocol gaps"). The decode notes below are the context.
+> Tracked as Gitea issue **#104** ("Guild protocol gaps"). The decode notes below are the context.
 
 - Member-left / kick / promote / demote fan-out packets: no capture exercises them.
 - The 0x202D invite-reply-to-inviter and failure replies (bad name, on cooldown): opcodes not decoded.

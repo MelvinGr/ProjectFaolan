@@ -26,7 +26,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.GameServer.CreateFlow
 {
 	// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted out of the
-	// GameServerListener god-class (docs/handoff-2026-06-22-create-flow-reconstruct.md). The listener holds this as
+	// GameServerListener god-class (docs/archive/handoff-2026-06-22-create-flow-reconstruct.md). The listener holds this as
 	// _createFlow and forwards the inbound create-flow callbacks to it; the flow's outbound packet builders live on
 	// the other partials in this folder (CreateWorldHandshake / CreateWorldCutsceneScripts / RetailNpcConversationBurst
 	// / the Retail*Burst files). Verbatim/byte-exact burst builders stay `static` so the golden tests reach them

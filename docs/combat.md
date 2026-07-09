@@ -3,7 +3,7 @@
 Status 2026-06-12: armed and unarmed swings work in-client; equip-state decides which protocol the client
 speaks. Commits `226b16f`, `a115c40`. Golden tests: `BehaviorAckTests` (byte-exact against
 `Captures/Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed.pcapng`). Wider combat-loop status (NPC
-aggro/death/XP/loot) lives in TODO.md §Combat and `docs/archive/quests-and-combat.md`.
+aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, plus `docs/archive/quests-and-combat.md`.
 
 ## The Interact request (0x642CD3D6 upload)
 
@@ -227,6 +227,6 @@ left it):
   Club (a level-2 char) and Broken Oar (a login capture) are NOT create-flow starters and are excluded. In-client
   verification pending (needs-testing on #220).
 
-## Known gaps (TODO.md §Combat)
+## Known gaps (Gitea, `area:combat`)
 - HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
   (above, #204); a decoded death-state IIR is still open.

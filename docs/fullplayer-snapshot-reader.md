@@ -216,7 +216,7 @@ because the captured Strie was a fresh char with no spells — identified by the
 `00 00 00 00  00 00 02 90  00 00 00 00`. **This is why seeded spells vanish on relog and type-4 attacks don't
 place on the bar**: our snapshot never lists the character's own spells. The fix (insert the char's
 `CharacterSpells` as type-2 records into this region) is the focused follow-up in
-`docs/handoff-2026-06-20-snapshot-known-spell-list.md` (#74).
+`docs/archive/handoff-2026-06-20-snapshot-known-spell-list.md` (#74).
 
 ## `Quest_c` per-record grammar (`FUN_0091df50`) — VALIDATED against `BeachTailsTemplate.bin`
 
@@ -352,7 +352,7 @@ scripts above).
 The beach snapshot is the captured **Strie** packet (an Assassin = **Rogue**); the login path patches level /
 current vitals / quest / containers but **not the class or class-derived stats**, so every character ships
 Strie's Rogue identity (sheet shows "Barbarian", Rogue weapon proficiency, wrong mana). Key decode facts (full
-writeup + retail Necro captures in **`docs/handoff-2026-06-17-perclass-snapshot.md`**):
+writeup + retail Necro captures in **`docs/archive/handoff-2026-06-17-perclass-snapshot.md`**):
 - HP **is** in the tails stat block (`[23]/[54]` ×100; retail Necro HP 89 = 8900).
 - **Mana is NOT** in the stat block — the client computes it from an **attribute** region (separate, TBD).
 - The **class label is in the FRONT protobuf root** (`ProtoFullCharacterIIR`), not the tails — find it by

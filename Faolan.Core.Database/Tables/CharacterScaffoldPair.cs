@@ -9,8 +9,9 @@ namespace Faolan.Core.Database.Tables
 	// ListIndex 0 IS the FACTION-REPUTATION block: PairId = faction id, Value = the signed standing (out of
 	// +/-50000) shown in the client's Factions window (proven in-client on the L80 necro NecroL80: PairId 10 =
 	// Children of Yag-kosha -14375, 20 = Yellow Priests of Yun +14375, 60 = Scarlet Circle +25325, ...). So faction
-	// standings ride the FullChar snapshot as these pairs (imported from the capture); there is no separate faction
-	// table yet - a proper CharacterFaction model + faction catalog + standing changes from quests/kills is #315.
+	// standings ride the player's FA015807 SPAWN scaffold (PlayerSpawnScaffold.EndPairs -> PlayerSpawnBuilder),
+	// imported from the capture; there is no separate faction table yet - a proper CharacterFaction model + faction
+	// catalog + standing changes from quests/kills is #315.
 	public class CharacterScaffoldPair : BaseEntity
 	{
 		[ForeignKey(nameof(CharacterId))]
