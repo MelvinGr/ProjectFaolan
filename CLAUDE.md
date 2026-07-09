@@ -166,6 +166,17 @@ are the standard test bootstrap for features whose retail trigger isn't wired ye
 
 - Commit each verified milestone immediately (conventional style, e.g. `feat(economy): ...`);
   `faolan.db` rides along in the commit.
+- **When a task is done, close the loop before moving on** — a task isn't finished until the code, the tests,
+  and the *record* of it agree. Update whatever the change made stale:
+  - **Docs:** the relevant `docs/` page(s); if you changed `Opcodes.cs` or a codec, regenerate the `gen/` pages
+    (`FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`); repoint any doc/code pointer you
+    moved or deleted; add/verify `[Vn: …]` tags for new protocol claims.
+  - **Gitea issue** (`melvin/projectfaolan`): comment the outcome and **close** it when the work lands (or strip
+    `needs-testing` per its rule after an in-client check — pass OR fail); **create** an issue for any follow-up,
+    gap, or `[V0: …]` unknown you surfaced, so it lives on the backlog, not just in your head.
+  - **Agent memory:** if you learned something *non-obvious and durable* (a gotcha, a decision and its why, a
+    stable pointer), write or update a memory file so the next session starts with it — but don't record what
+    the code/git history already shows.
 - Don't "refactor away" magic packet constants or verbatim payloads unless the replacement is proven
   byte-for-byte against a capture. Wrong-looking values are often capture-derived; check the comment
   and the referenced capture first.
@@ -176,7 +187,6 @@ are the standard test bootstrap for features whose retail trigger isn't wired ye
     `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
   - `docs/subsystems/` — how OUR server implements a domain (combat, chat, guilds, inventory, economy, …).
   - `docs/rdb/` — client asset formats · `docs/tooling/` — launcher/capture/importer · `docs/re/` — Ghidra
-    methodology + raw decode artifacts · `docs/archive/` — resolved plans / closed-issue handoffs.
-  Update the relevant doc and the corresponding **Gitea issue** when a subsystem's status changes. When you
-  add a `[Vn: …]` claim it must cite a real artifact (`ProtocolCitationTests` enforces it); when you change
-  `Opcodes.cs` the `gen/` pages must be regenerated in the same commit (`ProtocolDocsTests` enforces it).
+    methodology + raw decode artifacts.
+  Two tests keep this honest: a `[Vn: …]` claim must cite a real artifact (`ProtocolCitationTests`), and a
+  change to `Opcodes.cs` must regenerate the `gen/` pages in the same commit (`ProtocolDocsTests`).

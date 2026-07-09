@@ -14,83 +14,6 @@ Gitea issues on `melvin/projectfaolan`, grouped by `area:*` labels).
 > preservation. *Age of Conan* is a trademark of Funcom; this project is not affiliated with or endorsed by
 > Funcom. No game client, assets, or copyrighted content are distributed here.
 
-## Requirements
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/) (the whole solution targets `net10.0`)
-- An *Age of Conan* game client, if you want to connect end-to-end (not included)
-
-## Build
-
-```sh
-dotnet build ProjectFaolan.slnx
-```
-
-## Run the server
-
-The server loads `faolan.json` and `faolan.db` from the current working directory, and both live at the repo
-root — so run it **from the repo root** (running from `bin/Debug` fails with "faolan.json not found"):
-
-```sh
-dotnet run --project Faolan
-```
-
-It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the per-session PlayerAgent,
-CsPlayerAgent, AgentServer and GameServer), migrates the database schema, and hosts an in-process MCP endpoint
-on `http://127.0.0.1:7099/mcp`.
-
-## Test
-
-The test suite uses byte-exact "golden" round-trips against captured packets as its acceptance gates:
-
-```sh
-dotnet test Faolan.Tests
-dotnet test Faolan.Tests --filter GuildPacketTests        # a single class
-```
-
-## Connect a game client
-
-`Faolan.ClientLauncher` launches the game client unattended (it stands in for the patcher: computes the
-launch token, auto-logs-in, and can drive straight to the world):
-
-```sh
-dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>
-```
-
-See `docs/tooling/client-launcher.md` for the full flag set and the loopback-capture testing workflow.
-
-## Rebuild the game database
-
-`faolan.db` (SQLite) is committed to the repo and is the single source of truth for game data; the server only
-migrates and reads it. To rebuild its content from the packet captures and client RDB:
-
-```sh
-dotnet run --project Faolan.Importer -- --skip characters    # module-based; --list to see modules, --dry-run to preview
-```
-
-## Project layout
-
-| Project                  | Purpose                                                                                                                                                                                |
-|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Faolan/`                | The server host — runs every protocol listener as a hosted service.                                                                                                                    |
-| `Faolan.Core/`           | Shared base types, protobuf, crypto, and enums, with the layered `Faolan.Core.Database`, `Faolan.Core.Network`, and `Faolan.Core.Rdb` projects on top.                                 |
-| `Faolan.Importer/`       | CLI that (re)builds `faolan.db` from packet captures + the client RDB.                                                                                                                 |
-| `Faolan.Mcp/`            | In-process MCP server exposing DB queries + live-session inspection to Claude.                                                                                                         |
-| `Faolan.ClientLauncher/` | Launches the game client unattended (patcher stand-in).                                                                                                                                |
-| `Faolan.Web.Content/`    | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
-| `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
-| `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
-| `Faolan.Tests/`          | The unit/golden test suite.                                                                                                                                                            |
-| `Captures/`              | Reference packet traces + Python dissectors used for protocol comparison.                                                                                                              |
-
-## Documentation
-
-- **`CLAUDE.md`** — architecture, build/run commands, the wire-protocol essentials, and working conventions
-  (the orientation guide for anyone, human or AI, working in the codebase).
-- **Gitea issues** (`melvin/projectfaolan`) — the tracker of open work, grouped by `area:*` labels.
-- **`docs/`** — per-subsystem deep-dives (protocol decoding, reverse-engineering methodology, capture workflow);
-  `docs/archive/` holds resolved plans and handoffs.
-- **`Faolan.Wireshark/README.md`** — building and using the dissector plugin.
-
 ## Feature status
 
 Where things stand, by subsystem. This is a research/preservation project, so "works" means *reproduced
@@ -165,10 +88,6 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - 🟡 Mounts — a mount is a player-cast summon spell; needs the cast FSM wired to the summon (#26)
 - ⬜ Mounted combat (#142)
 
-### Appearance & rendering (Faolan.Web)
-- 🟡 Client-side render bugs (our wire is correct): create-editor face tattoo (#240), min-height floating hair (#288)
-- 🟡 Polished localized appearance names (hair, …) — the LDB id→index map is EXE-gated (#291)
-
 ### Group PvE content (not started)
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
   scripting; #309)
@@ -185,8 +104,87 @@ is tracked as Gitea issues; the `#NNN` refs point there.
   building (#146)
 
 ### Tooling
-- ✅ Importer (captures + client RDB → `faolan.db`) · Wireshark dissector · unattended ClientLauncher ·
-  in-process MCP server · content-CDN mirror
+- ✅ Importer (captures + client RDB → `faolan.db`) 
+- ✅ Wireshark dissector 
+- ✅ Client Launcher ·
+- ✅ In-process MCP server 
+- ✅ Content-CDN mirror
+
+## Build
+
+```sh
+dotnet build ProjectFaolan.slnx
+```
+
+## Run the server
+
+The server loads `faolan.json` and `faolan.db` from the current working directory, and both live at the repo
+root — so run it **from the repo root** (running from `bin/Debug` fails with "faolan.json not found"):
+
+```sh
+dotnet run --project Faolan
+```
+
+It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the per-session PlayerAgent,
+CsPlayerAgent, AgentServer and GameServer), migrates the database schema, and hosts an in-process MCP endpoint
+on `http://127.0.0.1:7099/mcp`.
+
+## Test
+
+The test suite uses byte-exact "golden" round-trips against captured packets as its acceptance gates:
+
+```sh
+dotnet test Faolan.Tests
+dotnet test Faolan.Tests --filter GuildPacketTests        # a single class
+```
+
+## Connect a game client
+
+`Faolan.ClientLauncher` launches the game client unattended (it stands in for the patcher: computes the
+launch token, auto-logs-in, and can drive straight to the world):
+
+```sh
+dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>
+```
+
+See `docs/tooling/client-launcher.md` for the full flag set and the loopback-capture testing workflow.
+
+## Rebuild the game database
+
+`faolan.db` (SQLite) is committed to the repo and is the single source of truth for game data; the server only
+migrates and reads it. To rebuild its content from the packet captures and client RDB:
+
+```sh
+dotnet run --project Faolan.Importer -- --skip characters    # module-based; --list to see modules, --dry-run to preview
+```
+
+## Project layout
+
+| Project                  | Purpose                                                                                                                                                                                |
+|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Faolan/`                | The server host — runs every protocol listener as a hosted service.                                                                                                                    |
+| `Faolan.Core/`           | Shared base types, protobuf, crypto, and enums, with the layered `Faolan.Core.Database`, `Faolan.Core.Network`, and `Faolan.Core.Rdb` projects on top.                                 |
+| `Faolan.Importer/`       | CLI that (re)builds `faolan.db` from packet captures + the client RDB.                                                                                                                 |
+| `Faolan.Mcp/`            | In-process MCP server exposing DB queries + live-session inspection to Claude.                                                                                                         |
+| `Faolan.ClientLauncher/` | Launches the game client unattended (patcher stand-in).                                                                                                                                |
+| `Faolan.Web.Content/`    | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
+| `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
+| `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
+| `Faolan.Tests/`          | The unit/golden test suite.                                                                                                                                                            |
+| `Captures/`              | Reference packet traces + Python dissectors used for protocol comparison.                                                                                                              |
+
+## Documentation
+
+- **`CLAUDE.md`** — architecture, build/run commands, the wire-protocol essentials, and working conventions
+  (the orientation guide for anyone, human or AI, working in the codebase).
+- **Gitea issues** (`melvin/projectfaolan`) — the tracker of open work, grouped by `area:*` labels.
+- **[`docs/protocol/`](docs/protocol/README.md)** — the verified wire-protocol reference: framing, opcodes,
+  message layouts and encodings, where every stated fact carries a verification tag a test resolves and the
+  machine-derivable pages are generated from the code. Start at its `README.md`.
+- **`docs/`** — the rest of the deep-dives, by kind: `subsystems/` (how the server implements each domain),
+  `rdb/` (client asset formats), `tooling/` (launcher, capture workflow, importer), `re/` (reverse-engineering
+  methodology + raw decode artifacts).
+- **`Faolan.Wireshark/README.md`** — building and using the dissector plugin.
 
 ## Network captures (the project's fuel)
 
