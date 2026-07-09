@@ -366,7 +366,7 @@ namespace Faolan.GameServer.World
 				inCombat
 					? NpcCombatModeValue
 					: 0u);
-			var body = VitalsPacket.BuildStatBlockBody(npc.Handle, stats);
+			var body = StatUpdateCodec.BuildBody(npc.Handle, stats);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
@@ -455,7 +455,7 @@ namespace Faolan.GameServer.World
 				inCombat
 					? PlayerCombatModeValue
 					: 0u);
-			var body = VitalsPacket.BuildStatBlockBody(player.Handle, stats);
+			var body = StatUpdateCodec.BuildBody(player.Handle, stats);
 
 			await SendWorldIir(client, body); // the player's own view draws/sheathes its weapon
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))

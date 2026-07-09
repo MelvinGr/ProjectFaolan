@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.GameServer.World;
+using Faolan.Core.Network.Codecs.World;
 using Xunit;
 
 namespace Faolan.Tests
@@ -33,7 +33,7 @@ namespace Faolan.Tests
 			// is [96b8dc59][0000c350][handle][00000000][count=1][statId 0x14][value 4]. Decodes the empty-handed-swing
 			// fix (#218); see WorldBroadcaster.BroadcastNpcCombatMode.
 			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, 4);
-			var body = VitalsPacket.BuildStatBlockBody(0x00002C56u, stats);
+			var body = StatUpdateCodec.BuildBody(0x00002C56u, stats);
 
 			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", ToHex(body));
 		}
@@ -94,15 +94,15 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void VitalsPacket_StatUpdateBody_RejectsWrongSubOpcode()
+		public void StatUpdateCodec_Body_RejectsWrongSubOpcode()
 		{
 			var body = new byte[17];
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u);
-			Assert.False(VitalsPacket.TryParseStatUpdateBody(body, out _, out _));
+			Assert.False(StatUpdateCodec.TryParseBody(body, out _, out _));
 		}
 
 		[Fact]
-		public void VitalsPacket_StatUpdateBody_RoundTrips()
+		public void StatUpdateCodec_Body_RoundTrips()
 		{
 			// Reconstruct the 0x96B8DC59 IIR body (the bytes wrapped by WriteArrayUInt32Length) and parse it back.
 			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
@@ -116,7 +116,7 @@ namespace Faolan.Tests
 			// body[12..16] left zero (the constant padding word)
 			statBytes.CopyTo(body, 16);
 
-			Assert.True(VitalsPacket.TryParseStatUpdateBody(body, out var parsedHandle, out var parsedStats));
+			Assert.True(StatUpdateCodec.TryParseBody(body, out var parsedHandle, out var parsedStats));
 			Assert.Equal(handle, parsedHandle);
 			Assert.Equal(ToHex(statBytes), ToHex(parsedStats.ToArray()));
 		}

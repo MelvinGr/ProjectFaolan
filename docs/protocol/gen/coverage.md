@@ -9,7 +9,7 @@
 
 - **819** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
 - **74** IIR carrier types: **51 V3** (byte-exact builder), **14 V2** (built, no golden), **9 V1** (no builder found).
-- **103** codec classes, **85** with a byte-exact test.
+- **104** codec classes, **85** with a byte-exact test.
 - **36** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -78,7 +78,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `SimpleDynelVisualChangeIIR` | `WorldLoot` |
 | V3 | `StatDamageIIR` | `CombatEffectBuilder`, `CombatShieldCodec`, `HateListCodec`, `SpellweaveCodec`, `StatDamageCodec`, `ThreatLevelCodec` |
 | V3 | `StatIIR` | `CreateEditorRecordBuilder`, `SpellweaveCodec` |
-| V3 | `StatUpdateIIR` | `CreateEditorRecordBuilder` |
+| V3 | `StatUpdateIIR` | `CreateEditorRecordBuilder`, `StatUpdateCodec` |
 | V3 | `StopIIR` | `CharDCMove`, `CharDCMoveCodec`, `SetPosCodec`, `StopCodec` |
 | V3 | `ThreatLevelIIR` | `CombatShieldCodec`, `HateListCodec`, `StatDamageCodec`, `ThreatLevelCodec` |
 | V3 | `TombStoneFullUpdateIIR` | `DynelFullUpdateCodec` |
