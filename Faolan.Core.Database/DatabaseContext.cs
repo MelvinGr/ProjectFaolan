@@ -1,5 +1,6 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Attributes;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -55,12 +56,12 @@ namespace Faolan.Core.Database
 		DbSet<NpcStatCore> NpcStatCores { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<PatrolWaypoint> PatrolWaypoints { get; }
-		DbSet<Recipe> Recipes { get; }
-		DbSet<RecipeItem> RecipeItems { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
 		DbSet<Realm> Realms { get; }
+		DbSet<Recipe> Recipes { get; }
+		DbSet<RecipeItem> RecipeItems { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
@@ -120,12 +121,12 @@ namespace Faolan.Core.Database
 		public DbSet<NpcStatCore> NpcStatCores { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
-		public DbSet<Recipe> Recipes { get; set; }
-		public DbSet<RecipeItem> RecipeItems { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
 		public DbSet<Realm> Realms { get; set; }
+		public DbSet<Recipe> Recipes { get; set; }
+		public DbSet<RecipeItem> RecipeItems { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
 		public DbSet<Shop> Shops { get; set; }
 		public DbSet<ShopItem> ShopItems { get; set; }

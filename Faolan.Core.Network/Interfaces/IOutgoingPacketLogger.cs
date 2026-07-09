@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Interfaces
 
 	public sealed class NullPacketLogger : IPacketLogger
 	{
-		public static readonly NullPacketLogger Instance = new NullPacketLogger();
+		public static readonly NullPacketLogger Instance = new();
 
 		private NullPacketLogger()
 		{

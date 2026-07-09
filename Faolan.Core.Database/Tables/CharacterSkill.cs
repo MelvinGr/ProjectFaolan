@@ -10,15 +10,15 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(SkillId))]
 	public class CharacterSkill
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
-		// The per-id rank/slot byte (0 on fresh characters; geared captures carry values like 0x08/0x41-0x4B).
-		public byte Rank { get; set; }
-
-		public uint CharacterId { get; set; }
-
 		// The feat/ability id (wire order is ascending SkillId).
 		public uint SkillId { get; set; }
+
+		// The per-id rank/slot byte (0 on fresh characters; geared captures carry values like 0x08/0x41-0x4B).
+		public byte Rank { get; set; }
 	}
 }

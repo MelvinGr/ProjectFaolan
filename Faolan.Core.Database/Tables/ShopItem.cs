@@ -9,17 +9,17 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(ShopId), nameof(Pos), IsUnique = true)]
 	public class ShopItem : BaseEntity
 	{
+		// The RDB item template id (= Items.Id once harvested; deliberately no hard FK so a shop row survives a
+		// missing item - the builder skips unresolvable slots).
+		public uint ItemTemplateId { get; set; }
+
+		public uint ShopId { get; set; }
+
 		[ForeignKey(nameof(ShopId))]
 		public virtual Shop Shop { get; set; }
 
 		public uint Count { get; set; }
-
-		// The RDB item template id (= Items.Id once harvested; deliberately no hard FK so a shop row survives a
-		// missing item - the builder skips unresolvable slots).
-		public uint ItemTemplateId { get; set; }
 		public uint Pos { get; set; }
-
-		public uint ShopId { get; set; }
 
 		// The per-slot stat-356 value (replaces the bag's record-id stat 23; semantics unknown, varies per slot).
 		public uint Stat356 { get; set; }

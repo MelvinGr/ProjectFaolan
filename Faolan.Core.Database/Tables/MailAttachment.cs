@@ -10,6 +10,11 @@ namespace Faolan.Core.Database.Tables
 	// (#1607, 754 B vs the 629 B no-attachment base); MailMessageCodec builds it byte-exact.
 	public class MailAttachment : BaseEntity
 	{
+		// The item instance id, repeated as the entry's ProtoInventoryGameEntry.ItemId.
+		public ulong ItemInstanceId { get; set; }
+
+		public uint MailId { get; set; } // FK -> Mail.Id (the row key, not the wire MailId)
+
 		[ForeignKey(nameof(MailId))]
 		public virtual Mail Mail { get; set; }
 
@@ -20,7 +25,6 @@ namespace Faolan.Core.Database.Tables
 		public uint Data4 { get; set; }
 		public uint ItemHash { get; set; }
 		public uint ItemLevel { get; set; }
-		public uint MailId { get; set; } // FK -> Mail.Id (the row key, not the wire MailId)
 
 		public uint Quantity { get; set; } // entry stat 26
 		public uint Template { get; set; }
@@ -31,8 +35,5 @@ namespace Faolan.Core.Database.Tables
 		// 12 bytes after the entry in the capture: [u32 0x72][u32 0x08006F31][u32 0]. The 0x08006F31 word matches
 		// the recipient/sender endpoint class constant; semantics loose, kept verbatim per the magic-constant rule.
 		public uint TrailerWord { get; set; }
-
-		// The item instance id, repeated as the entry's ProtoInventoryGameEntry.ItemId.
-		public ulong ItemInstanceId { get; set; }
 	}
 }

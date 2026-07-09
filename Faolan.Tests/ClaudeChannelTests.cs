@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	// even though the server store kept the message.
 	public class ChannelBridgeBacklogTests
 	{
-		private static readonly DateTime Now = new DateTime(2026, 6, 16, 12, 0, 0, DateTimeKind.Utc);
+		private static readonly DateTime Now = new(2026, 6, 16, 12, 0, 0, DateTimeKind.Utc);
 		private static readonly TimeSpan Grace = TimeSpan.FromSeconds(120);
 
 		[Fact]
@@ -41,14 +41,7 @@ namespace Faolan.Tests
 		public void InitialCursor_ForwardsRecentPosts_SkipsOldBacklog()
 		{
 			// seq 1-3 are old (10+ min ago), seq 4-5 landed 30s before the bridge connected.
-			(ulong, DateTime)[] messages =
-			[
-				(1, Now.AddMinutes(-10)),
-				(2, Now.AddMinutes(-9)),
-				(3, Now.AddMinutes(-8)),
-				(4, Now.AddSeconds(-30)),
-				(5, Now.AddSeconds(-15))
-			];
+			(ulong, DateTime)[] messages = [(1, Now.AddMinutes(-10)), (2, Now.AddMinutes(-9)), (3, Now.AddMinutes(-8)), (4, Now.AddSeconds(-30)), (5, Now.AddSeconds(-15))];
 
 			// Floor is the newest OLD message (3); the loop forwards everything with Sequence > 3 (the recent 4, 5).
 			Assert.Equal(3UL, ChannelBridge.InitialCursor(messages, Now, Grace));

@@ -11,6 +11,7 @@ namespace Faolan.Importer.Extractors
 {
 	public sealed record NpcSpawnEntry(uint MapId, string Name, uint Handle, float X, float Y, float Z, byte[] Data)
 	{
+		public uint TemplateId { get; init; }
 		public bool HasEquipment { get; init; }
 		public float RotW { get; init; }
 		public float RotX { get; init; }
@@ -36,7 +37,6 @@ namespace Faolan.Importer.Extractors
 		public uint MonsterScale { get; init; }
 		public uint Race { get; init; }
 		public uint Sex { get; init; }
-		public uint TemplateId { get; init; }
 	}
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
@@ -200,7 +200,11 @@ namespace Faolan.Importer.Extractors
 
 			var msg = read.Message;
 			var stats = msg.Stats;
-			var wireHealth = stats == null ? 0 : stats.Health != 0 ? stats.Health : stats.Life;
+			var wireHealth = stats == null
+				? 0
+				: stats.Health != 0
+					? stats.Health
+					: stats.Life;
 
 			// Lift worn equipment (#185) - but only when EVERY item matches the reproducible ProtoAcgItem shape, so
 			// the builder reproduces the f23 list byte-for-byte; otherwise leave equipment to the Data blob (no rows).
@@ -231,7 +235,8 @@ namespace Faolan.Importer.Extractors
 				HasEquipment = msg.InventoryEntries.Count > 0,
 				Health = wireHealth >= 100
 					? wireHealth / 100
-					: 0, // ×100 scale; ignore absent/implausible
+					: 0,
+				// ×100 scale; ignore absent/implausible
 				Community = msg.npc_stats?.Community ?? 0
 			};
 		}

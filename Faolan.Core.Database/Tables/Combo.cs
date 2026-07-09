@@ -9,6 +9,13 @@ namespace Faolan.Core.Database.Tables
 	// ComboBookIIR grants and CharacterCombo stores). The catalog counterpart of Spell / Ability.
 	public class Combo : BaseEntity
 	{
+		// The feat this combo belongs to (XML `featid`) - links into the class feat tree (1000020), i.e. the class it
+		// is for. 0 when the XML omits it.
+		public uint FeatId { get; set; }
+		public uint GameActionId { get; set; } // XML `gameactionid`
+
+		public uint ParentId { get; set; } // combo-tree parent (XML `parentid`)
+
 		// The character level the combo unlocks at (XML `level`). This IS present here (unlike the ability templates).
 		public byte Level { get; set; }
 		public int Cooldown { get; set; } // seconds (XML `cooldown`)
@@ -27,12 +34,5 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(128)]
 		public string Name { get; set; }
-
-		// The feat this combo belongs to (XML `featid`) - links into the class feat tree (1000020), i.e. the class it
-		// is for. 0 when the XML omits it.
-		public uint FeatId { get; set; }
-		public uint GameActionId { get; set; } // XML `gameactionid`
-
-		public uint ParentId { get; set; } // combo-tree parent (XML `parentid`)
 	}
 }

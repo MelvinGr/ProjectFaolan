@@ -9,6 +9,8 @@ namespace Faolan.Core.Database.Tables
 	// scaffold's weighted entries); resolved to entry-table records via [[MorphTarget]] at world entry.
 	public class CharacterBodyResource : BaseEntity
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
@@ -18,7 +20,5 @@ namespace Faolan.Core.Database.Tables
 		// The resource ref as sent by the editor, e.g. "*texscript_1108153".
 		[MaxLength(128)]
 		public string Ref { get; set; }
-
-		public uint CharacterId { get; set; }
 	}
 }

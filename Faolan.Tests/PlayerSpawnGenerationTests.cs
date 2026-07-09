@@ -186,15 +186,12 @@ namespace Faolan.Tests
 
 			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
 
-			Assert.Equal(new[]
+			Assert.Equal(
+				new[]
 				{
-					((uint)CharacterEquipmentSlot.Tokens, 5u),
-					((uint)CharacterEquipmentSlot.MainWeapon, 1u),
-					((uint)CharacterEquipmentSlot.OffHandWeapon, 2u),
-					((uint)CharacterEquipmentSlot.RangedWeapon, 3u),
-					((uint)CharacterEquipmentSlot.Ammo, 4u)
-				},
-				entries.Select(e => (e.Pos, e.Item.Template1)).ToArray());
+					((uint)CharacterEquipmentSlot.Tokens, 5u), ((uint)CharacterEquipmentSlot.MainWeapon, 1u), ((uint)CharacterEquipmentSlot.OffHandWeapon, 2u),
+					((uint)CharacterEquipmentSlot.RangedWeapon, 3u), ((uint)CharacterEquipmentSlot.Ammo, 4u)
+				}, entries.Select(e => (e.Pos, e.Item.Template1)).ToArray());
 		}
 
 		// The dynamic reader locates the CharacterIIR in any spawn; on the Strie template it must agree with the fixed

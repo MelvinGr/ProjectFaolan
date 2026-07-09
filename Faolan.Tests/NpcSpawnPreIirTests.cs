@@ -70,14 +70,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(NpcSpawnPreIir.WordCount, scaffold.Words.Length);
 			Assert.Equal(NpcSpawnPreIir.ByteCount, scaffold.Flags.Length);
-			Assert.Equal(new byte[]
-				{
-					0x00,
-					0x00,
-					0x03,
-					0xF1
-				},
-				scaffold.Sublist); // count==0 framing word
+			Assert.Equal(new byte[] { 0x00, 0x00, 0x03, 0xF1 }, scaffold.Sublist); // count==0 framing word
 		}
 
 		// The pre-IIR scaffold CAN carry the NPC's RDB script-binding diagnostic string (the script-bound PvP

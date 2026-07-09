@@ -1,9 +1,9 @@
 using System.IO;
-using Xunit;
-using Xunit.Abstractions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {

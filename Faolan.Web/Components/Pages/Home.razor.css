@@ -1,40 +1,38 @@
 .landing {
-    max-width: 42rem;
-    margin: 14vh auto;
-    text-align: center;
-    padding: 0 1rem;
+	margin: 14vh auto;
+	max-width: 42rem;
+	padding: 0 1rem;
+	text-align: center;
 }
 
 .crest-logo {
-    width: 6rem;
-    height: 6rem;
-    margin: 0 auto 1.25rem;
-    display: block;
-    filter: drop-shadow(0 6px 22px #0009);
+	display: block;
+	filter: drop-shadow(0 6px 22px #0009);
+	height: 6rem;
+	margin: 0 auto 1.25rem;
+	width: 6rem;
 }
 
 .landing h1 {
-    font-size: 3rem;
-    letter-spacing: .06em;
-    margin: 0 0 .6rem;
-    text-shadow: 0 2px 18px #0008;
+	font-size: 3rem;
+	letter-spacing: .06em;
+	margin: 0 0 .6rem;
+	text-shadow: 0 2px 18px #0008;
 }
 
 .landing .tag {
-    color: var(--muted);
-    font-size: 1.1rem;
-    margin: 0 auto 2.25rem;
-    max-width: 32rem;
+	color: var(--muted);
+	font-size: 1.1rem;
+	margin: 0 auto 2.25rem;
+	max-width: 32rem;
 }
 
 .cta {
-    display: flex;
-    gap: .75rem;
-    justify-content: center;
-    flex-wrap: wrap;
-    align-items: center;
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: .75rem;
+	justify-content: center;
 }
 
-.cta form {
-    margin: 0;
-}
+.cta form { margin: 0; }

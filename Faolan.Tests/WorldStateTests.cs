@@ -21,12 +21,7 @@ namespace Faolan.Tests
 
 			var seen = zone.EntitiesInRange(new Vector3(0, 0, 0), 50f).Select(e => e.Handle).OrderBy(h => h).ToArray();
 
-			Assert.Equal(new uint[]
-				{
-					1,
-					4
-				},
-				seen); // self + near npc; the far npc is out of range
+			Assert.Equal(new uint[] { 1, 4 }, seen); // self + near npc; the far npc is out of range
 		}
 
 		[Fact]
@@ -61,22 +56,12 @@ namespace Faolan.Tests
 			var near = Player(2, 30, 0); // within 50
 			var far = Player(3, 200, 0); // outside 50
 			var npc = Npc(4, 5, 0); // close but not a player
-			foreach (var e in new[]
-			{
-				self,
-				near,
-				far,
-				npc
-			})
+			foreach (var e in new[] { self, near, far, npc })
 				zone.Add(e);
 
 			var seen = zone.PlayersInRange(self.Position, 50f, self.Handle).Select(e => e.Handle).OrderBy(h => h).ToArray();
 
-			Assert.Equal(new uint[]
-				{
-					2
-				},
-				seen); // only the near player; self excluded, far out of range, npc filtered
+			Assert.Equal(new uint[] { 2 }, seen); // only the near player; self excluded, far out of range, npc filtered
 		}
 
 		[Fact]
@@ -191,12 +176,18 @@ namespace Faolan.Tests
 
 		private static WorldEntity Npc(uint handle, float x, float z)
 		{
-			return new WorldEntity(handle, 0, false, $"N{handle}", null) { Position = new Vector3(x, 0, z) };
+			return new WorldEntity(handle, 0, false, $"N{handle}", null)
+			{
+				Position = new Vector3(x, 0, z)
+			};
 		}
 
 		private static WorldEntity Player(uint handle, float x, float z)
 		{
-			return new WorldEntity(handle, 0, true, $"P{handle}", null) { Position = new Vector3(x, 0, z) };
+			return new WorldEntity(handle, 0, true, $"P{handle}", null)
+			{
+				Position = new Vector3(x, 0, z)
+			};
 		}
 	}
 }

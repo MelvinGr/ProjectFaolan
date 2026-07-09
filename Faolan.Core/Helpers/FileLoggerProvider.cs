@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.Core
+namespace Faolan.Core.Helpers
 {
 	// builder.Logging.AddProvider(new FileLoggerProvider("logs/app.log"));
 	public sealed class FileLoggerProvider : ILoggerProvider
@@ -19,22 +19,27 @@ namespace Faolan.Core
 			// lock, which causes severe lag spikes under the in-world packet stream (hundreds of log lines/sec).
 			// Buffer the writes and flush on a timer instead - logs still appear within ~1s, without the per-line
 			// disk I/O on the hot path.
-			_streamWriter = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = false };
+			_streamWriter = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+			{
+				AutoFlush = false
+			};
 			_flushTimer = new Timer(_ =>
+			{
+				lock (FileLogger.Lock)
 				{
-					lock (FileLogger.Lock)
-						_streamWriter.Flush();
-				},
-				null,
-				TimeSpan.FromSeconds(1),
-				TimeSpan.FromSeconds(1));
+					_streamWriter.Flush();
+				}
+			}, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 		}
 
 		public void Dispose()
 		{
 			_flushTimer.Dispose();
 			lock (FileLogger.Lock)
+			{
 				_streamWriter.Flush();
+			}
+
 			_streamWriter.Dispose();
 		}
 
@@ -46,7 +51,7 @@ namespace Faolan.Core
 
 	public sealed class FileLogger : ILogger
 	{
-		internal static readonly Lock Lock = new Lock();
+		internal static readonly Lock Lock = new();
 		private readonly string _categoryName;
 		private readonly TextWriter _writer;
 

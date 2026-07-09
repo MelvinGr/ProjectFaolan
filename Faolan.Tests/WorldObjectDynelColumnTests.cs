@@ -21,8 +21,7 @@ namespace Faolan.Tests
 			using var con = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
-			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,KdTreeTail " +
-			                  "FROM WorldObjects WHERE DisplayName IS NOT NULL";
+			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,KdTreeTail " + "FROM WorldObjects WHERE DisplayName IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, noTail = 0, mismatch = 0;
 			while (r.Read())
@@ -35,14 +34,26 @@ namespace Faolan.Tests
 					DisplayName = r.GetString(1),
 					CarsGroup = (uint)r.GetInt64(2),
 					IsClosed = r.GetBoolean(3),
-					QuestItemEffect = r.IsDBNull(4) ? null : (uint)r.GetInt64(4),
-					TemplateItemId = r.IsDBNull(5) ? null : (uint)r.GetInt64(5),
+					QuestItemEffect = r.IsDBNull(4)
+						? null
+						: (uint)r.GetInt64(4),
+					TemplateItemId = r.IsDBNull(5)
+						? null
+						: (uint)r.GetInt64(5),
 					Kdtree = (uint)r.GetInt64(6),
-					WaypointType = r.IsDBNull(7) ? null : (uint)r.GetInt64(7),
-					KdTreeTail = r.IsDBNull(8) ? null : (byte[])r[8]
+					WaypointType = r.IsDBNull(7)
+						? null
+						: (uint)r.GetInt64(7),
+					KdTreeTail = r.IsDBNull(8)
+						? null
+						: (byte[])r[8]
 				};
 
-				if (row.KdTreeTail == null) { noTail++; continue; } // not fully buildable without the geometry tail
+				if (row.KdTreeTail == null)
+				{
+					noTail++;
+					continue;
+				} // not fully buildable without the geometry tail
 
 				// The identity message builds from columns without error (byte-exact reproduction is gated by
 				// WorldObjectBuilderTests against captured goldens); here we assert every lifted row is expressible.

@@ -21,25 +21,17 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Byte-exact against a captured NPC cast (NpcSpellCastBuilderTests / Golden NpcSpellCast.bin).
 	public static class NpcSpellCastBuilder
 	{
-		public static byte[] Build(uint applyTo, uint applyFrom, uint spellId, byte[] payload) => new NpcSpellCast(applyTo, applyFrom, spellId, payload ?? []).ToArray();
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
+
+		public static byte[] Build(uint applyTo, uint applyFrom, uint spellId, byte[] payload)
+		{
+			return new NpcSpellCast(applyTo, applyFrom, spellId, payload ?? []).ToArray();
+		}
 
 		// The ApplySpell NPC-cast carrier content as a self-serializing codec (ICodec): Write frames the fixed header
 		// then the opaque 54-byte effect payload; Read recovers (applyTo, applyFrom, spellId, payload).
 		public sealed record NpcSpellCast(uint ApplyTo, uint ApplyFrom, uint SpellId, byte[] Payload) : ICodec<NpcSpellCast>
 		{
-
-			public void Write(FaolanStream s)
-			{
-				s.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(ApplyTo)
-					.WriteUInt16(0)
-					.WriteUInt32(SpellId)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(ApplyFrom)
-					.WriteArray(Payload);
-			}
-
 			public static NpcSpellCast Read(FaolanStream s)
 			{
 				s.ReadUInt32(); // subop (MagicBuffIIR / ApplySpell)
@@ -51,6 +43,19 @@ namespace Faolan.Core.Network.Codecs.Combat
 				var applyFrom = s.ReadUInt32();
 				var payload = s.ReadRemainingArray();
 				return new NpcSpellCast(applyTo, applyFrom, spellId, payload);
+			}
+
+			public void Write(FaolanStream s)
+			{
+				s
+					.WriteUInt32(SubOpcode)
+					.WriteUInt32(EntityClass.Character)
+					.WriteUInt32(ApplyTo)
+					.WriteUInt16(0)
+					.WriteUInt32(SpellId)
+					.WriteUInt32(EntityClass.Character)
+					.WriteUInt32(ApplyFrom)
+					.WriteArray(Payload);
 			}
 		}
 	}

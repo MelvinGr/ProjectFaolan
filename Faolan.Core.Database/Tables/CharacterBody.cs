@@ -6,6 +6,8 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId))]
 	public class CharacterBody
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
@@ -42,7 +44,6 @@ namespace Faolan.Core.Database.Tables
 		public float NoseWidth { get; set; }
 		public float Stomach { get; set; }
 		public float Thigh { get; set; }
-		public uint CharacterId { get; set; }
 
 		public uint HeadMesh { get; set; }
 	}

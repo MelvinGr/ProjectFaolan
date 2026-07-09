@@ -1,5 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
@@ -22,7 +29,11 @@ namespace Faolan.Web.Services
 	// (server offline) so the page can distinguish "offline" from "online, nobody connected".
 	public sealed class LiveSessionService
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+		private static readonly JsonSerializerOptions JsonOptions = new()
+		{
+			PropertyNameCaseInsensitive = true
+		};
+
 		private readonly ILogger<LiveSessionService> _logger;
 		private readonly Uri _endpoint;
 
@@ -38,7 +49,10 @@ namespace Faolan.Web.Services
 		// server offline. Used to teleport one character to another.
 		public async Task<CharLive?> GetCharacterLiveAsync(uint characterId, CancellationToken ct = default)
 		{
-			var text = await CallAsync("get_character", new Dictionary<string, object?> { ["characterId"] = characterId }, ct);
+			var text = await CallAsync("get_character", new Dictionary<string, object?>
+			{
+				["characterId"] = characterId
+			}, ct);
 			if (text == null || !text.TrimStart().StartsWith('{'))
 				return null;
 
@@ -77,7 +91,10 @@ namespace Faolan.Web.Services
 		// when the zone isn't loaded this run.
 		public async Task<IReadOnlyList<ZoneEntity>?> GetZoneEntitiesAsync(uint mapId, CancellationToken ct = default)
 		{
-			var text = await CallAsync("list_zone_entities", new Dictionary<string, object?> { ["mapId"] = mapId }, ct);
+			var text = await CallAsync("list_zone_entities", new Dictionary<string, object?>
+			{
+				["mapId"] = mapId
+			}, ct);
 			if (text == null)
 				return null;
 			if (!text.TrimStart().StartsWith('['))
@@ -117,32 +134,31 @@ namespace Faolan.Web.Services
 		// Force-disconnect one connected character. Returns the tool's status text, or null if the server is offline.
 		public Task<string?> KickPlayerAsync(uint characterId, CancellationToken ct = default)
 		{
-			return CallAsync("kick_player", new Dictionary<string, object?> { ["characterId"] = characterId }, ct);
+			return CallAsync("kick_player", new Dictionary<string, object?>
+			{
+				["characterId"] = characterId
+			}, ct);
 		}
 
 		// Run a GM command for a connected character, exactly as if typed in chat (e.g. "heal", "kill", "level 80").
 		public Task<string?> RunGmCommandAsync(uint characterId, string command, CancellationToken ct = default)
 		{
-			return CallAsync("run_gm_command",
-				new Dictionary<string, object?>
-				{
-					["characterId"] = characterId,
-					["command"] = command
-				},
-				ct);
+			return CallAsync("run_gm_command", new Dictionary<string, object?>
+			{
+				["characterId"] = characterId,
+				["command"] = command
+			}, ct);
 		}
 
 		// Send an in-game system message (the yellow server text) to one connected character. Returns the tool's
 		// status text, or null if the server is unreachable.
 		public Task<string?> SendSystemMessageAsync(uint characterId, string message, CancellationToken ct = default)
 		{
-			return CallAsync("send_system_message",
-				new Dictionary<string, object?>
-				{
-					["characterId"] = characterId,
-					["message"] = message
-				},
-				ct);
+			return CallAsync("send_system_message", new Dictionary<string, object?>
+			{
+				["characterId"] = characterId,
+				["message"] = message
+			}, ct);
 		}
 
 		// Teleport a connected character to a destination, via the .teleport GM command (full map+coords form). Pass a
@@ -159,7 +175,7 @@ namespace Faolan.Web.Services
 			else if (mapId is { } mo)
 				cmd = $"teleport {mo}";
 			else
-				return Task.FromResult<string?>("Give a map and/or x y z.");
+				return Task.FromResult("Give a map and/or x y z.");
 
 			return RunGmCommandAsync(characterId, cmd, ct);
 		}

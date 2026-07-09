@@ -47,7 +47,9 @@ namespace Faolan.Core.Network.Server.AgentServer
 			get
 			{
 				lock (_lock)
+				{
 					return _nextSequence - 1;
+				}
 			}
 		}
 
@@ -68,7 +70,9 @@ namespace Faolan.Core.Network.Server.AgentServer
 		public IReadOnlyList<ClaudeChannelMessage> ReadSince(ulong afterSequence)
 		{
 			lock (_lock)
+			{
 				return _messages.Where(m => m.Sequence > afterSequence).ToArray();
+			}
 		}
 	}
 }

@@ -1,8 +1,8 @@
 using System;
-using Faolan.Core.Extensions;
 using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer;
@@ -18,10 +18,10 @@ namespace Faolan.Tests
 	// override engine, which the live login path already exercises in-client).
 	public class WorldEntryRecordFramerTests
 	{
+		private const uint StriePlayerInstance = 0x02165EFF;
 		private static readonly string PlayerSpawnCap = TestPaths.Asset("strie-login-playerspawn.bin");
 		private static readonly string SnapshotCap = TestPaths.Asset("strie-login-inventory.bin");
 		private static readonly string WorldObjectCap = TestPaths.Asset("strie-login-worldobject.bin");
-		private const uint StriePlayerInstance = 0x02165EFF;
 
 		// The 8-byte blob prefix built from scratch equals the captured beach prefix (the BE32 blobLen model).
 		[Fact]

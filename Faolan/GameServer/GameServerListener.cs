@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -50,9 +50,9 @@ namespace Faolan.GameServer
 		// Replayed verbatim (localized token ids + keys unchanged) with only the live session instance substituted, 		// so it is guaranteed byte-valid. Arbitrary LITERAL text would need a literal-text remoteformat template (or
 		// RDB string ids) - the same follow-up the FormatFeedback FIFO banner has.
 		private const string CriteriaSystemLineXml = "<remoteformat id=\"562\" category=\"100\" key=\"6segSK/UI?Kc`Tzg.tio\" knubot=\"0\"  >" +
-		                                             "<parameter value=\"7;&lt;localized token=&quot;CriteriaYou&quot; category=&quot;130&quot; flags=&quot;&quot; " +
-		                                             "key=&quot;^4L2&amp;#36;dU5AGjcTX_xJ[*Q&quot; &gt;\" /><parameter value=\"7;&lt;localized id=&quot;700&quot; " +
-		                                             "category=&quot;55200&quot; flags=&quot;&quot; key=&quot;MpRf.Cx.%^MGdFXT&amp;quot;9X(&quot; &gt;\" /></remoteformat>";
+													 "<parameter value=\"7;&lt;localized token=&quot;CriteriaYou&quot; category=&quot;130&quot; flags=&quot;&quot; " +
+													 "key=&quot;^4L2&amp;#36;dU5AGjcTX_xJ[*Q&quot; &gt;\" /><parameter value=\"7;&lt;localized id=&quot;700&quot; " +
+													 "category=&quot;55200&quot; flags=&quot;&quot; key=&quot;MpRf.Cx.%^MGdFXT&amp;quot;9X(&quot; &gt;\" /></remoteformat>";
 		// Tradepost (auction house) + mail state-mutating ops, folded off the former TradepostService onto the
 		// listener. HandleTradepostPacket (Inbound/HandleTradepost.cs) dispatches to these. They use Database /
 		// Logger and the listener's own SendUpdateCash / SendAddItem (its IEconomyOutbound impl) directly.
@@ -109,7 +109,9 @@ namespace Faolan.GameServer
 		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
 		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =
 		[
-			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Tokens), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft), (0x09, e => e.RingLeft), 			(0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist), (0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
+			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Tokens), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft),
+			(0x09, e => e.RingLeft), (0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist),
+			(0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
 		];
 
 		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x58);
@@ -146,7 +148,6 @@ namespace Faolan.GameServer
 		// on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
 		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new ConcurrentDictionary<uint, byte>();
 
-
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
 
 		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
@@ -164,10 +165,6 @@ namespace Faolan.GameServer
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
-
-		// The cutscene stock-phrase subtitle channel (Kalanthes's beach lines): answers PlayStockphraseAsSubtitle
-		// (0x205E) with the captured remoteformat, distinct from the interactive _conversation. See Dialogue/StockConversationService.cs.
-		private readonly StockConversationService _stockConversation;
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
@@ -207,6 +204,10 @@ namespace Faolan.GameServer
 
 		private readonly SpellweaveService _spellweave;
 
+		// The cutscene stock-phrase subtitle channel (Kalanthes's beach lines): answers PlayStockphraseAsSubtitle
+		// (0x205E) with the captured remoteformat, distinct from the interactive _conversation. See Dialogue/StockConversationService.cs.
+		private readonly StockConversationService _stockConversation;
+
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
@@ -222,7 +223,9 @@ namespace Faolan.GameServer
 		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts;
 
-		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, 			logger, 			configuration, 			database, 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000Opcodes)))
+		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher,
+			IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
+			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000Opcodes)))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -231,10 +234,12 @@ namespace Faolan.GameServer
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
-			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
-			_spellweave = new SpellweaveService(logger, 				(c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg), 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-				// reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
-				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), 				SendBuffRemoval, // trance-buff end-twins on cancel/fire
+			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
+				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
+			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
+				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
+									 // reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
@@ -269,7 +274,8 @@ namespace Faolan.GameServer
 				return null;
 
 			var buffs = entity.ActiveBuffs.Keys.OrderBy(id => id).Select(id => $"0x{id:X8}").ToArray();
-			return new CharacterLiveState(characterId, entity.Name, entity.Handle, entity.MapId, entity.Position.X, entity.Position.Y, entity.Position.Z, entity.Vitals?.Health, entity.Vitals?.MaxHealth, buffs);
+			return new CharacterLiveState(characterId, entity.Name, entity.Handle, entity.MapId, entity.Position.X, entity.Position.Y, entity.Position.Z, entity.Vitals?.Health,
+				entity.Vitals?.MaxHealth, buffs);
 		}
 
 		public IReadOnlyList<SessionInfo> GetSessions()
@@ -289,10 +295,13 @@ namespace Faolan.GameServer
 			// Observer view: union every live instance (copy) of the map (#268), so the MCP tool sees all entities
 			// regardless of which copy they're in.
 			return _simulation
-				.World
-				.ZonesForMap(mapId)
+				.World.ZonesForMap(mapId)
 				.SelectMany(z => z.Entities)
-				.Select(e => new ZoneEntityInfo(e.Handle, e.Name, e.IsPlayer ? "player" : e.IsLoot ? "loot" : "npc", e.Level, e.Hostile, e.IsDead, e.Vitals?.Health, e.Vitals?.MaxHealth, e.Position.X, e.Position.Y, e.Position.Z))
+				.Select(e => new ZoneEntityInfo(e.Handle, e.Name, e.IsPlayer
+					? "player"
+					: e.IsLoot
+						? "loot"
+						: "npc", e.Level, e.Hostile, e.IsDead, e.Vitals?.Health, e.Vitals?.MaxHealth, e.Position.X, e.Position.Y, e.Position.Z))
 				.OrderBy(e => e.Handle)
 				.ToArray();
 		}
@@ -448,7 +457,8 @@ namespace Faolan.GameServer
 			}
 
 			var all = await Database.GetMaps();
-			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ??
+				   all.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
@@ -482,5 +492,19 @@ namespace Faolan.GameServer
 				return false;
 			}
 		}
+	}
+
+	// The world-conversation framing shared by every world-entry / world-event packet: sender = the world-system
+	// conversation (family prefix + sub-id 0x58), receiver = the recipient's GameInterfaceType endpoint addressed to its
+	// client instance. Confirmed from the Strie login capture - keeping every world packet on this single conversation
+	// is what lets the client tie spawns to the loaded playfield and render them. Single source of truth, used by the
+	// WorldBroadcaster and by the listener's login/create-flow senders (which delegate here).
+	public static class WorldFraming
+	{
+		// Instance 0x58 from the Strie capture; retail's per-session value varies (hoxxling 0x08, randochar 0x0b).
+		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
+		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's; it's the client's
+		// default IIR PollStatus log). Reverted to 0x58 (the proven value).
+		public static readonly byte[] Sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x58);
 	}
 }

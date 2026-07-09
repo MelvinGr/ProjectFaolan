@@ -17,11 +17,7 @@ namespace Faolan.Tests
 		public void SkinnedGlb_RemapsPaletteByName_AndReproducesBindPose()
 		{
 			// 3-bone chain along +Y: root -> mid -> tip. Identity rotations, each child +1.0 in Y from its parent's local.
-			var skeleton = SkeletonReader.Read(SkeletonBlob([
-				("rig_root", [0, 0, 0, 1], [0, 0, 0], [1]),
-				("rig_mid", [0, 0, 0, 1], [0, 1, 0], [2]),
-				("rig_tip", [0, 0, 0, 1], [0, 1, 0], [])
-			]));
+			var skeleton = SkeletonReader.Read(SkeletonBlob([("rig_root", [0, 0, 0, 1], [0, 0, 0], [1]), ("rig_mid", [0, 0, 0, 1], [0, 1, 0], [2]), ("rig_tip", [0, 0, 0, 1], [0, 1, 0], [])]));
 			Assert.Equal(3, skeleton.Count);
 			Assert.Equal(2f, skeleton[2].WorldPosition.Y, 3); // tip world Y = 0+1+1
 
@@ -42,10 +38,9 @@ namespace Faolan.Tests
 			var skins = gltf.GetProperty("skins");
 			Assert.Equal(1, skins.GetArrayLength());
 			Assert.Equal(3, skins[0].GetProperty("joints").GetArrayLength());
-			Assert.Equal(0,
-				gltf.GetProperty("meshes")[0].GetProperty("primitives")[0].GetProperty("attributes").GetProperty("POSITION").GetInt32() >= 0
-					? 0
-					: -1);
+			Assert.Equal(0, gltf.GetProperty("meshes")[0].GetProperty("primitives")[0].GetProperty("attributes").GetProperty("POSITION").GetInt32() >= 0
+				? 0
+				: -1);
 
 			var prim = gltf.GetProperty("meshes")[0].GetProperty("primitives")[0].GetProperty("attributes");
 			var joints = ReadAccessorBytes(gltf, bin, prim.GetProperty("JOINTS_0").GetInt32());

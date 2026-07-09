@@ -14,7 +14,7 @@ namespace Faolan.Core.Rdb.Assets
 		// How close to the sampled background colour a pixel must be to count as gutter (per channel).
 		private const int BackgroundTolerance = 14;
 
-		private static readonly ConcurrentDictionary<long, byte[]> Cache = new ConcurrentDictionary<long, byte[]>();
+		private static readonly ConcurrentDictionary<long, byte[]> Cache = new();
 
 		// After the nearest-fill, smooth the gutter at growing scales so even the wide central gutter (the mirrored
 		// atlas's L/R divide) fills without a visible meeting-seam. Islands are re-pinned after every pass.

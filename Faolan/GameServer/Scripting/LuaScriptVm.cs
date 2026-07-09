@@ -140,10 +140,6 @@ namespace Faolan.GameServer.Scripting
 			return _p.HasTag(tagId);
 		}
 
-		public static void OpenSiteInBrowser(string url)
-		{
-		}
-
 		public void SolveGoal(int goalId)
 		{
 			_p.SolveGoal(goalId);
@@ -152,6 +148,10 @@ namespace Faolan.GameServer.Scripting
 		public void SpawnItem(int resourceHash, int count)
 		{
 			_p.SpawnItem(resourceHash, count);
+		}
+
+		public static void OpenSiteInBrowser(string url)
+		{
 		}
 
 		public static void TriggerGetEffect(int effectId)

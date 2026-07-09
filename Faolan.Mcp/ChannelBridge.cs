@@ -76,17 +76,21 @@ namespace Faolan.Mcp
 					// listener for it and injects our events into the running session. The value must be a
 					// JsonElement - the SDK's source-generated serializer cannot serialize a plain
 					// Dictionary<string, object> boxed as object (initialize fails with a -32603).
-					Experimental = new Dictionary<string, object> { ["claude/channel"] = JsonSerializer.Deserialize<JsonElement>("{}") }
+					Experimental = new Dictionary<string, object>
+					{
+						["claude/channel"] = JsonSerializer.Deserialize<JsonElement>("{}")
+					}
 				},
-				ServerInstructions = "In-game Age of Conan chat from the Faolan server's \"Claude\" channel arrives as " + "<channel source=\"faolan-chat\" sender=\"...\" sender_id=\"...\" mode=\"whisper|channel\">. These are " +
+				ServerInstructions = "In-game Age of Conan chat from the Faolan server's \"Claude\" channel arrives as " +
+				                     "<channel source=\"faolan-chat\" sender=\"...\" sender_id=\"...\" mode=\"whisper|channel\">. These are " +
 				                     "players talking to you in-game. Reply with the faolan-chat reply tool (plain text, chat-length) in the " +
 				                     "SAME mode you were addressed in: when mode=\"whisper\" the player told you privately, so pass the event's " +
 				                     "sender_id as whisper_to to whisper back; when mode=\"channel\" they posted on the public channel, so OMIT " +
-				                     "whisper_to to broadcast your reply on the channel. The same log is also readable via the faolan MCP " + "server's read_claude_channel tool (its ViaWhisper field is the same mode flag)."
+				                     "whisper_to to broadcast your reply on the channel. The same log is also readable via the faolan MCP " +
+				                     "server's read_claude_channel tool (its ViaWhisper field is the same mode flag)."
 			};
 			options.ToolCollection ??= [];
-			options.ToolCollection.Add(McpServerTool.Create(Reply,
-			new McpServerToolCreateOptions
+			options.ToolCollection.Add(McpServerTool.Create(Reply, new McpServerToolCreateOptions
 			{
 				Name = "reply",
 				Description = "Reply in-game as \"Claude\": pass whisper_to (the channel event's sender_id) for a private whisper to that player, omit it to broadcast on the Claude channel."
@@ -154,7 +158,10 @@ namespace Faolan.Mcp
 				try
 				{
 					var client = await GameServer(cancellationToken);
-					var read = ParseChannelRead(ResultText(await client.CallToolAsync("read_claude_channel", new Dictionary<string, object> { ["afterSequence"] = cursor ?? 0 }, cancellationToken: cancellationToken)));
+					var read = ParseChannelRead(ResultText(await client.CallToolAsync("read_claude_channel", new Dictionary<string, object>
+					{
+						["afterSequence"] = cursor ?? 0
+					}, cancellationToken: cancellationToken)));
 
 					if (read.Latest < (cursor ?? 0))
 					{
@@ -179,23 +186,21 @@ namespace Faolan.Mcp
 
 					foreach (var message in read.Messages.Where(m => !m.FromClaude && m.Sequence > cursor.Value))
 					{
-						await server.SendNotificationAsync(ChannelNotificationMethod,
-							new ChannelEvent
+						await server.SendNotificationAsync(ChannelNotificationMethod, new ChannelEvent
+						{
+							Content = message.Message ?? "",
+							Meta = new Dictionary<string, string>
 							{
-								Content = message.Message ?? "",
-								Meta = new Dictionary<string, string>
-								{
-									["sender"] = message.SenderName ?? "",
-									["sender_id"] = message.SenderId.ToString(),
-									["sequence"] = message.Sequence.ToString(),
-									// The inbound mode, so Claude replies in kind: "whisper" (a private /tell to Claude)
-									// or "channel" (a public post). #97.
-									["mode"] = message.ViaWhisper
-										? "whisper"
-										: "channel"
-								}
-							},
-							cancellationToken: cancellationToken);
+								["sender"] = message.SenderName ?? "",
+								["sender_id"] = message.SenderId.ToString(),
+								["sequence"] = message.Sequence.ToString(),
+								// The inbound mode, so Claude replies in kind: "whisper" (a private /tell to Claude)
+								// or "channel" (a public post). #97.
+								["mode"] = message.ViaWhisper
+									? "whisper"
+									: "channel"
+							}
+						}, cancellationToken: cancellationToken);
 					}
 
 					cursor = Math.Max(cursor.Value, read.Latest);
@@ -238,24 +243,26 @@ namespace Faolan.Mcp
 		{
 			var client = await GameServer(CancellationToken.None);
 			var result = uint.TryParse(whisperTo, out var characterId)
-				? await client.CallToolAsync("send_claude_whisper",
-					new Dictionary<string, object>
-					{
-						["characterId"] = characterId,
-						["message"] = text
-					})
-				: await client.CallToolAsync("send_claude_channel_message", new Dictionary<string, object> { ["message"] = text });
+				? await client.CallToolAsync("send_claude_whisper", new Dictionary<string, object>
+				{
+					["characterId"] = characterId,
+					["message"] = text
+				})
+				: await client.CallToolAsync("send_claude_channel_message", new Dictionary<string, object>
+				{
+					["message"] = text
+				});
 			return ResultText(result) ?? "sent";
 		}
 
 		private sealed class ChannelMessage
 		{
+			public uint SenderId { get; set; }
 			public bool FromClaude { get; set; }
 			public bool ViaWhisper { get; set; }
 			public DateTime TimestampUtc { get; set; }
 			public string Message { get; set; }
 			public string SenderName { get; set; }
-			public uint SenderId { get; set; }
 			public ulong Sequence { get; set; }
 		}
 

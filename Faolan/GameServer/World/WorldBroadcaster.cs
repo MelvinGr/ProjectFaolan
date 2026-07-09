@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -106,7 +106,8 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return;
 
-			var chain = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o => o.SubOpcode == SimpleDynelMessageCodec.SubOpcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
+			var chain = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o =>
+				o.SubOpcode == SimpleDynelMessageCodec.SubOpcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
 			if (chain == null)
 				return;
 
@@ -153,37 +154,23 @@ namespace Faolan.GameServer.World
 		// its seeded definition. acceptTime is the per-character "accepted at" stamp (display/sort field).
 		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint state = WorldQuest.FullUpdateStateActive)
 		{
-			var refs = new[]
-				{
-					QuestTextSlot.Title,
-					QuestTextSlot.Summary,
-					QuestTextSlot.AreaTitle,
-					QuestTextSlot.RegionName,
-					QuestTextSlot.MapName
-				}
+			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
 				.Select(s => WorldBroadcastBodies.Record(def, s))
 				.ToArray();
-			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance,
-				def.QuestId,
-				state,
-				def.AreaId,
-				refs,
-				def.GoalId,
-				Global.NowUnixTimeSeconds,
-				def.MapId,
-				def.MarkerX,
-				def.MarkerY,
-				WorldBroadcastBodies.Record(def, QuestTextSlot.Objective),
-				WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
+			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, state, def.AreaId, refs, def.GoalId, Global.NowUnixTimeSeconds, def.MapId, def.MarkerX,
+				def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
 		}
 
 		// Sends a QuestGoal (objective progress) to the player.
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestGoal(client.Session.Account.ClientInstance, questId, goalId, count)))
 				.SendAsync(client);
 		}
@@ -192,7 +179,7 @@ namespace Faolan.GameServer.World
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestIir(client.Session.Account.ClientInstance, questId, state)))
 				.SendAsync(client);
 		}
@@ -217,12 +204,9 @@ namespace Faolan.GameServer.World
 			npc.FollowTargetHandle = follow
 				? playerHandle
 				: 0;
-			_logger.LogInformation("Follow: {Name} {State} player 0x{Player:X8} (by name).",
-				npcName,
-				follow
-					? "now follows"
-					: "stopped following",
-				playerHandle);
+			_logger.LogInformation("Follow: {Name} {State} player 0x{Player:X8} (by name).", npcName, follow
+				? "now follows"
+				: "stopped following", playerHandle);
 			return true;
 		}
 
@@ -249,9 +233,7 @@ namespace Faolan.GameServer.World
 			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
-					client.Endpoint(Endpoints.GameCharInterfaceType),
-					GameCharInterfaceDispatchOpcodes.DispatchCloseLootBag)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchCloseLootBag)
 				.WriteUInt32(WorldLoot.LootTypeTag)
 				.WriteUInt32(bag.Handle)
 				.SendAsync(client);
@@ -329,7 +311,10 @@ namespace Faolan.GameServer.World
 				if (viewer.Client == null)
 					continue;
 
-				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(viewer.Client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(viewer.Client);
+				await new PacketStream()
+					.WriteHeader(WorldFraming.Sender, viewer.Client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteArrayUInt32Length(s => s.WriteArray(body))
+					.SendAsync(viewer.Client);
 			}
 		}
 
@@ -362,10 +347,9 @@ namespace Faolan.GameServer.World
 		// get it (mirrors BroadcastNpcMove).
 		public async Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
 		{
-			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode,
-				inCombat
-					? NpcCombatModeValue
-					: 0u);
+			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, inCombat
+				? NpcCombatModeValue
+				: 0u);
 			var body = StatUpdateCodec.BuildBody(npc.Handle, stats);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
@@ -451,10 +435,9 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return;
 
-			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode,
-				inCombat
-					? PlayerCombatModeValue
-					: 0u);
+			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, inCombat
+				? PlayerCombatModeValue
+				: 0u);
 			var body = StatUpdateCodec.BuildBody(player.Handle, stats);
 
 			await SendWorldIir(client, body); // the player's own view draws/sheathes its weapon
@@ -525,7 +508,10 @@ namespace Faolan.GameServer.World
 			}
 
 			if (spawns > 0 || despawns > 0)
-				_logger.LogInformation("Interest: {Player} at {Pos} -> streamed +{Spawns} / -{Despawns} entities (now knows {Known}).", entity.Name, entity.Position, spawns, despawns, entity.Known.Count);
+			{
+				_logger.LogInformation("Interest: {Player} at {Pos} -> streamed +{Spawns} / -{Despawns} entities (now knows {Known}).", entity.Name, entity.Position, spawns, despawns,
+					entity.Known.Count);
+			}
 
 			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail));
 		}
@@ -595,9 +581,8 @@ namespace Faolan.GameServer.World
 			{
 				var dropsContents = LootResolver.RollsDrop(Random.Shared.NextDouble());
 				items = await RollLootItems(dropsContents
-						? Random.Shared.Next(0, 3)
-						: 0,
-					deadNpc.MapId); // 0-2 items, or none
+					? Random.Shared.Next(0, 3)
+					: 0, deadNpc.MapId); // 0-2 items, or none
 				cash = dropsContents
 					? LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level)
 					: 0u;
@@ -628,17 +613,9 @@ namespace Faolan.GameServer.World
 				}
 
 				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, dropRot, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
-				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).",
-					deadNpc.Name,
-					deadNpc.Handle,
-					bag?.Handle ?? 0,
-					items.Count,
-					cash,
-					deadNpc.LastAttackerHandle,
-					questDrop,
-					deadNpc.MapId,
-					dropPos,
-					deadNpc.Position);
+				_logger.LogInformation(
+					"Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).", deadNpc.Name,
+					deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
 			}
 
 			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
@@ -770,12 +747,8 @@ namespace Faolan.GameServer.World
 				zone.Add(entity);
 			}
 
-			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} rows, {Collapsed} cross-session re-captures collapsed).",
-				zone.Count,
-				mapId,
-				instanceId,
-				npcs.Length,
-				npcs.Length - seenCells.Count);
+			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} rows, {Collapsed} cross-session re-captures collapsed).", zone.Count, mapId, instanceId,
+				npcs.Length, npcs.Length - seenCells.Count);
 		}
 
 		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW
@@ -792,7 +765,7 @@ namespace Faolan.GameServer.World
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle)))
 				.SendAsync(client);
 
@@ -802,9 +775,7 @@ namespace Faolan.GameServer.World
 			// window). Decoded from the hoxxling gameplay capture (f1477): after this the client itself sends
 			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
-					client.Endpoint(Endpoints.GameCharInterfaceType),
-					GameCharInterfaceDispatchOpcodes.DispatchOpenLootBag)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchOpenLootBag)
 				.WriteUInt32(WorldLoot.LootTypeTag)
 				.WriteUInt32(bag.Handle)
 				.SendAsync(client);
@@ -898,34 +869,6 @@ namespace Faolan.GameServer.World
 				await DropBeachWall(client);
 		}
 
-		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
-		// from the first definition. The trailing "tracked quest" pointer is the captured no-track block; pinning the
-		// multi-quest tracked variant needs more decode.
-		public static Task SendQuestJournal(INetworkClient client, IReadOnlyList<QuestDefinition> definitions)
-		{
-			var first = definitions[0];
-			var areaHeader = new[]
-			{
-				WorldBroadcastBodies.Record(first, QuestTextSlot.AreaTitle),
-				WorldBroadcastBodies.Record(first, QuestTextSlot.MapName),
-				WorldBroadcastBodies.Record(first, QuestTextSlot.RegionName)
-			};
-			var entries = definitions.Select(d => new WorldQuest.JournalEntry(d.QuestId, WorldBroadcastBodies.Record(d, QuestTextSlot.Title), WorldBroadcastBodies.Record(d, QuestTextSlot.ListSubLine))).ToList();
-			var trailing = WorldQuest.BuildTrackedQuestPointer();
-
-			var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
-		}
-
-		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
-		// appears in the log even though the client got its QuestFullUpdate detail (decoded from the grant capture). trackedDef is the highlighted (just-accepted) quest; activeQuestIds are all the
-		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
-		public static Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
-		{
-			var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds, WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
-		}
-
 		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
 		// world tick (WorldState) then steps it toward the player and broadcasts a MoveTask each step. Returns the NPC,
 		// or null if the handle isn't a non-player entity in the caller's zone. Used by the .npcfollow GM command and by
@@ -939,13 +882,9 @@ namespace Faolan.GameServer.World
 			npc.FollowTargetHandle = follow
 				? player.Handle
 				: 0;
-			_logger.LogInformation("Follow: {Name} 0x{Handle:X8} {State} {Player}.",
-				npc.Name,
-				npcHandle,
-				follow
-					? "now follows"
-					: "stopped following",
-				player.Name);
+			_logger.LogInformation("Follow: {Name} 0x{Handle:X8} {State} {Player}.", npc.Name, npcHandle, follow
+				? "now follows"
+				: "stopped following", player.Name);
 			return npc;
 		}
 
@@ -962,8 +901,8 @@ namespace Faolan.GameServer.World
 
 			var npc = await _database.GetNpcSpawnByName(npcName);
 			var handle = NextLootHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
-			// baked ones are just placeholders (the player's zone token here).
+										   // Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
+										   // baked ones are just placeholders (the player's zone token here).
 			if (npc == null || !NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken, out var body))
 			{
 				_logger.LogInformation("Spawn: no spawnable '{Npc}' template found.", npcName);
@@ -1167,7 +1106,11 @@ namespace Faolan.GameServer.World
 			// '!' when the quest isn't held yet; '?' once its objective is done but it's still ACTIVE (awaiting turn-in
 			// at the giver - the quest is only marked Completed on turn-in, not on the kill, #47/#241); no marker while
 			// in progress or after it's been turned in (Completed).
-			return held == null ? QuestMarkerAvailable : held.State == QuestState.Active && held.GoalRequired > 0 && held.GoalProgress >= held.GoalRequired ? QuestMarkerTurnIn : QuestMarkerNone;
+			return held == null
+				? QuestMarkerAvailable
+				: held.State == QuestState.Active && held.GoalRequired > 0 && held.GoalProgress >= held.GoalRequired
+					? QuestMarkerTurnIn
+					: QuestMarkerNone;
 		}
 
 		// Dispatches interest events. `move` (the mover's Move components) is required to forward Move events and is
@@ -1217,16 +1160,6 @@ namespace Faolan.GameServer.World
 					}
 				}
 			}
-		}
-
-		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
-		// SCRATCH by WorldObjectBuilder.BuildBody - map-independent, needs NO captured loot-bag WorldObject in
-		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
-		private static WorldObject GetLootTemplate()
-		{
-			return LootBagTemplate.IsAvailable
-				? LootBagTemplate.Create()
-				: null;
 		}
 
 		// Whether the character has freed Casilda - data-driven (no hard-coded quest ids): any COMPLETED quest whose
@@ -1322,36 +1255,10 @@ namespace Faolan.GameServer.World
 				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
 				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
 			var body = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
-			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.",
-				captive
-					? "CAPTIVE"
-					: "freed",
-				casildaHandle,
-				client.Session?.Character?.Name);
+			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
+				? "CAPTIVE"
+				: "freed", casildaHandle, client.Session?.Character?.Name);
 			return SendWorldIir(client, body);
-		}
-
-		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
-		// the world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the body is already
-		// placed at the corpse's spot.
-		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
-		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
-		}
-
-		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
-		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
-		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
-		// the spawn it was just sent); the waypoints are the absolute captured world coords. BuildPatrol emits a
-		// self-contained record (it prepends its own [u32 len]), so it rides SendWorldRecord, not SendWorldIir.
-		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
-		{
-			if (!npc.Patrols)
-				return Task.CompletedTask;
-
-			// Replay the captured MoveTask record (already re-addressed to this NPC's handle + spawn position). Encode
-			// emits a bare 0x2000 body (no length prefix), so it rides SendWorldIir.
-			return SendWorldIir(recipient, npc.PatrolBody);
 		}
 
 		// #241: drive a quest-giver NPC's marker from the viewer's quest state when it enters view. Recomputed each
@@ -1383,41 +1290,9 @@ namespace Faolan.GameServer.World
 			}
 
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(subjectHandle, token)))
 				.SendAsync(recipient);
-		}
-
-		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the
-		// dedicated builders share - e.g. the NPC MoveTask chase step).
-		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
-		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(recipient);
-		}
-
-		// Forwards a player's Move to `recipient` (same body - the moving entity's handle + transform - only the
-		// receiver differs), so the recipient sees the subject move.
-		private static Task SendWorldMove(INetworkClient recipient, MoveForward move)
-		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(move.Subop)
-					.WriteUInt32(move.DataObject)
-					.WriteUInt32(move.DataClientInstance)
-					.WriteUInt16(move.MovingType)
-					.WriteVector3(move.Position)
-					.WriteVector3(move.Rotation)
-					.WriteArray(move.Tail))
-				.SendAsync(recipient);
-		}
-
-		// Sends a SELF-CONTAINED IIR record (one whose builder already prepends the [u32 len] prefix, e.g. the
-		// ChatText/Knubot/dead-reckoning codecs) - written verbatim, NOT re-wrapped with another length (which would
-		// double-prefix it). Mirrors ChatTextSender. Use SendWorldIir for bare bodies (MoveTask/loot/vitals).
-		private static Task SendWorldRecord(INetworkClient recipient, byte[] record)
-		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(record).SendAsync(recipient);
 		}
 
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
@@ -1440,7 +1315,10 @@ namespace Faolan.GameServer.World
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
 
-			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
+			await new PacketStream()
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArray(body)
+				.SendAsync(recipient);
 		}
 
 		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled
@@ -1448,7 +1326,8 @@ namespace Faolan.GameServer.World
 		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
-		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle, string lootSourceName = null)
+		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle,
+			string lootSourceName = null)
 		{
 			var template = GetLootTemplate();
 			if (template == null)
@@ -1498,14 +1377,57 @@ namespace Faolan.GameServer.World
 				// packet is a loot-PERMISSION grant, so it names the bag's OWNER (the killer / spawning player), not the
 				// recipient - a drop belongs to whoever earned it. Fall back to the viewer when there's no owner (e.g. a
 				// legacy .spawnbag) so the bag still renders.
-				await SendWorldIir(viewer.Client,
-					WorldLoot.BuildNewAllowedLooterBody(handle,
-						allowedLooterHandle != 0
-							? allowedLooterHandle
-							: viewer.Handle));
+				await SendWorldIir(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, allowedLooterHandle != 0
+					? allowedLooterHandle
+					: viewer.Handle));
 			}
 
 			return bag;
+		}
+
+		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
+		// from the first definition. The trailing "tracked quest" pointer is the captured no-track block; pinning the
+		// multi-quest tracked variant needs more decode.
+		public static Task SendQuestJournal(INetworkClient client, IReadOnlyList<QuestDefinition> definitions)
+		{
+			var first = definitions[0];
+			var areaHeader = new[]
+			{
+				WorldBroadcastBodies.Record(first, QuestTextSlot.AreaTitle), WorldBroadcastBodies.Record(first, QuestTextSlot.MapName), WorldBroadcastBodies.Record(first, QuestTextSlot.RegionName)
+			};
+			var entries = definitions
+				.Select(d => new WorldQuest.JournalEntry(d.QuestId, WorldBroadcastBodies.Record(d, QuestTextSlot.Title), WorldBroadcastBodies.Record(d, QuestTextSlot.ListSubLine)))
+				.ToList();
+			var trailing = WorldQuest.BuildTrackedQuestPointer();
+
+			var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
+		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
+		// appears in the log even though the client got its QuestFullUpdate detail (decoded from the grant capture). trackedDef is the highlighted (just-accepted) quest; activeQuestIds are all the
+		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
+		public static Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
+		{
+			var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds,
+				WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
+		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
+		// SCRATCH by WorldObjectBuilder.BuildBody - map-independent, needs NO captured loot-bag WorldObject in
+		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
+		private static WorldObject GetLootTemplate()
+		{
+			return LootBagTemplate.IsAvailable
+				? LootBagTemplate.Create()
+				: null;
 		}
 
 		// Maps each FA015807 NPC the burst renders to (rounded position) -> the wire handle it renders under, by
@@ -1518,18 +1440,80 @@ namespace Faolan.GameServer.World
 			return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
 		}
 
+		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
+		// the world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the body is already
+		// placed at the corpse's spot.
+		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArray(body)
+				.SendAsync(recipient);
+		}
+
+		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
+		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
+		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
+		// the spawn it was just sent); the waypoints are the absolute captured world coords. BuildPatrol emits a
+		// self-contained record (it prepends its own [u32 len]), so it rides SendWorldRecord, not SendWorldIir.
+		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
+		{
+			if (!npc.Patrols)
+				return Task.CompletedTask;
+
+			// Replay the captured MoveTask record (already re-addressed to this NPC's handle + spawn position). Encode
+			// emits a bare 0x2000 body (no length prefix), so it rides SendWorldIir.
+			return SendWorldIir(recipient, npc.PatrolBody);
+		}
+
 		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch
 		// (same framing as the static create-editor marker burst).
 		private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state)
 		{
 			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59),
-					client.Endpoint(Endpoints.GameCharInterfaceType),
-					GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(npcHandle)
 				.WriteByte(state)
 				.SendAsync(client);
+		}
+
+		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the
+		// dedicated builders share - e.g. the NPC MoveTask chase step).
+		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(recipient);
+		}
+
+		// Forwards a player's Move to `recipient` (same body - the moving entity's handle + transform - only the
+		// receiver differs), so the recipient sees the subject move.
+		private static Task SendWorldMove(INetworkClient recipient, MoveForward move)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(move.Subop)
+					.WriteUInt32(move.DataObject)
+					.WriteUInt32(move.DataClientInstance)
+					.WriteUInt16(move.MovingType)
+					.WriteVector3(move.Position)
+					.WriteVector3(move.Rotation)
+					.WriteArray(move.Tail))
+				.SendAsync(recipient);
+		}
+
+		// Sends a SELF-CONTAINED IIR record (one whose builder already prepends the [u32 len] prefix, e.g. the
+		// ChatText/Knubot/dead-reckoning codecs) - written verbatim, NOT re-wrapped with another length (which would
+		// double-prefix it). Mirrors ChatTextSender. Use SendWorldIir for bare bodies (MoveTask/loot/vitals).
+		private static Task SendWorldRecord(INetworkClient recipient, byte[] record)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArray(record)
+				.SendAsync(recipient);
 		}
 
 		// The components of a player's Move, forwarded verbatim to other viewers (only the receiver differs).

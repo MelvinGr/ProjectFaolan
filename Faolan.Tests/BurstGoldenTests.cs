@@ -32,14 +32,12 @@ namespace Faolan.Tests
 		[Fact]
 		public Task CreateWorldEntryBurst_IsByteStable()
 		{
-			return AssertBurstStable("CreateWorldEntryBurst",
-				async c =>
-				{
-					await RetailCreateWorldEntryBurst.SendCreateWorldSceneBurst(c);
-					for (var i = 0; i < 5; i++)
-						await RetailCreateWorldEntryBurst.SendNextCreateWorldChunk(c);
-				},
-				CreateWorldCapturedInstance);
+			return AssertBurstStable("CreateWorldEntryBurst", async c =>
+			{
+				await RetailCreateWorldEntryBurst.SendCreateWorldSceneBurst(c);
+				for (var i = 0; i < 5; i++)
+					await RetailCreateWorldEntryBurst.SendNextCreateWorldChunk(c);
+			}, CreateWorldCapturedInstance);
 		}
 
 		[Fact]
@@ -78,6 +76,5 @@ namespace Faolan.Tests
 		{
 			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
 		}
-
 	}
 }

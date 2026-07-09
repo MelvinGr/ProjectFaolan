@@ -45,7 +45,9 @@ namespace Faolan.Core.Network.Server.AgentServer
 		public IReadOnlyList<SessionInfo> GetSessions()
 		{
 			lock (_lock)
+			{
 				return _provider?.GetSessions() ?? [];
+			}
 		}
 
 		public async Task<int> SendClaudeChannelMessage(string message)

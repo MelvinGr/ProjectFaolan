@@ -25,48 +25,46 @@ namespace Faolan.Core.Rdb.Assets
 		// (slider accessor, morph name) for the 7 body sliders.
 		private static readonly (Func<Morphs, float> Value, string Name)[] Sliders =
 		[
-			(m => m.Arm, "arm"), (m => m.Chest, "chest"), (m => m.Bosom, "bosom"),
-			(m => m.Stomach, "stomach"), (m => m.Arse, "arse"), (m => m.Thigh, "thigh"), (m => m.Leg, "leg")
+			(m => m.Arm, "arm"), (m => m.Chest, "chest"), (m => m.Bosom, "bosom"), (m => m.Stomach, "stomach"), (m => m.Arse, "arse"), (m => m.Thigh, "thigh"), (m => m.Leg, "leg")
 		];
 
 		// Captured Aquilonian-female deform-joint data: per morph the CHARACTERCREATOR min/max scale + the
 		// weighted joints (world position, influence weight) the slider drives.
-		private static readonly Dictionary<string, MorphDef> Defs = new Dictionary<string, MorphDef>
+		private static readonly Dictionary<string, MorphDef> Defs = new()
 		{
-			["arm"] = new MorphDef(-0.0500f,
-				0.0500f,
-				[
-					new Joint((-0.1425f, 1.5423f, -0.0620f), 0.800f), new Joint((-0.2276f, 1.2656f, -0.0800f), 0.600f), new Joint((-0.2536f, 1.1391f, -0.0361f), 0.400f), new Joint((-0.0178f, 1.5859f, -0.0691f), 0.800f),
-					new Joint((0.1432f, 1.5371f, -0.0924f), 0.800f), new Joint((0.2191f, 1.2572f, -0.0978f), 0.600f), new Joint((0.2478f, 1.1272f, -0.0679f), 0.400f), new Joint((0.0212f, 1.5849f, -0.0750f), 0.800f)
-				]),
-			["chest"] = new MorphDef(-0.1000f,
-				0.1000f,
-				[
-					new Joint((-0.1425f, 1.5423f, -0.0620f), 0.200f), new Joint((-0.0178f, 1.5859f, -0.0691f), 0.300f), new Joint((0.1432f, 1.5371f, -0.0924f), 0.200f), new Joint((0.0212f, 1.5849f, -0.0750f), 0.300f),
-					new Joint((-0.0006f, 1.2712f, -0.0263f), 0.600f), new Joint((0.0018f, 1.3387f, -0.0323f), 0.800f)
-				]),
-			["bosom"] = new MorphDef(-0.1000f, 0.2000f, [new Joint((0.0018f, 1.3387f, -0.0323f), 0.200f), new Joint((-0.0870f, 1.4220f, 0.0699f), 0.800f), new Joint((0.1206f, 1.4170f, 0.0386f), 0.800f)]),
-			["stomach"] = new MorphDef(-0.1500f,
-				0.2000f,
-				[new Joint((-0.0016f, 1.0528f, 0.0004f), 0.350f), new Joint((-0.0031f, 1.2158f, -0.0146f), 0.700f), new Joint((-0.0006f, 1.2712f, -0.0263f), 0.350f), new Joint((0.0018f, 1.3387f, -0.0323f), 0.150f)]),
-			["arse"] = new MorphDef(-0.1000f,
-				0.1000f,
-				[
-					new Joint((-0.0016f, 1.0528f, 0.0004f), 0.800f), new Joint((-0.1176f, 1.0761f, -0.0137f), 0.200f), new Joint((0.1007f, 1.0741f, -0.0569f), 0.200f), new Joint((-0.0031f, 1.2158f, -0.0146f), 0.300f),
-					new Joint((-0.0006f, 1.2712f, -0.0263f), 0.150f)
-				]),
-			["thigh"] = new MorphDef(-0.0500f,
-				0.1000f,
-				[
-					new Joint((-0.0016f, 1.0528f, 0.0004f), 0.200f), new Joint((-0.1312f, 0.5794f, 0.0820f), 0.200f), new Joint((-0.1176f, 1.0761f, -0.0137f), 0.800f), new Joint((0.0948f, 0.5683f, -0.0421f), 0.200f),
-					new Joint((0.1007f, 1.0741f, -0.0569f), 0.800f)
-				]),
-			["leg"] = new MorphDef(-0.0350f,
-				0.1000f,
-				[
-					new Joint((-0.1635f, 0.0732f, 0.1044f), 0.200f), new Joint((-0.1312f, 0.5794f, 0.0820f), 0.800f), new Joint((-0.1176f, 1.0761f, -0.0137f), 0.500f), new Joint((0.0488f, 0.0732f, -0.1449f), 0.200f),
-					new Joint((0.0948f, 0.5683f, -0.0421f), 0.800f), new Joint((0.1007f, 1.0741f, -0.0569f), 0.500f)
-				])
+			["arm"] = new MorphDef(-0.0500f, 0.0500f,
+			[
+				new Joint((-0.1425f, 1.5423f, -0.0620f), 0.800f), new Joint((-0.2276f, 1.2656f, -0.0800f), 0.600f), new Joint((-0.2536f, 1.1391f, -0.0361f), 0.400f),
+				new Joint((-0.0178f, 1.5859f, -0.0691f), 0.800f), new Joint((0.1432f, 1.5371f, -0.0924f), 0.800f), new Joint((0.2191f, 1.2572f, -0.0978f), 0.600f),
+				new Joint((0.2478f, 1.1272f, -0.0679f), 0.400f), new Joint((0.0212f, 1.5849f, -0.0750f), 0.800f)
+			]),
+			["chest"] = new MorphDef(-0.1000f, 0.1000f,
+			[
+				new Joint((-0.1425f, 1.5423f, -0.0620f), 0.200f), new Joint((-0.0178f, 1.5859f, -0.0691f), 0.300f), new Joint((0.1432f, 1.5371f, -0.0924f), 0.200f),
+				new Joint((0.0212f, 1.5849f, -0.0750f), 0.300f), new Joint((-0.0006f, 1.2712f, -0.0263f), 0.600f), new Joint((0.0018f, 1.3387f, -0.0323f), 0.800f)
+			]),
+			["bosom"] = new MorphDef(-0.1000f, 0.2000f,
+				[new Joint((0.0018f, 1.3387f, -0.0323f), 0.200f), new Joint((-0.0870f, 1.4220f, 0.0699f), 0.800f), new Joint((0.1206f, 1.4170f, 0.0386f), 0.800f)]),
+			["stomach"] = new MorphDef(-0.1500f, 0.2000f,
+			[
+				new Joint((-0.0016f, 1.0528f, 0.0004f), 0.350f), new Joint((-0.0031f, 1.2158f, -0.0146f), 0.700f), new Joint((-0.0006f, 1.2712f, -0.0263f), 0.350f),
+				new Joint((0.0018f, 1.3387f, -0.0323f), 0.150f)
+			]),
+			["arse"] = new MorphDef(-0.1000f, 0.1000f,
+			[
+				new Joint((-0.0016f, 1.0528f, 0.0004f), 0.800f), new Joint((-0.1176f, 1.0761f, -0.0137f), 0.200f), new Joint((0.1007f, 1.0741f, -0.0569f), 0.200f),
+				new Joint((-0.0031f, 1.2158f, -0.0146f), 0.300f), new Joint((-0.0006f, 1.2712f, -0.0263f), 0.150f)
+			]),
+			["thigh"] = new MorphDef(-0.0500f, 0.1000f,
+			[
+				new Joint((-0.0016f, 1.0528f, 0.0004f), 0.200f), new Joint((-0.1312f, 0.5794f, 0.0820f), 0.200f), new Joint((-0.1176f, 1.0761f, -0.0137f), 0.800f),
+				new Joint((0.0948f, 0.5683f, -0.0421f), 0.200f), new Joint((0.1007f, 1.0741f, -0.0569f), 0.800f)
+			]),
+			["leg"] = new MorphDef(-0.0350f, 0.1000f,
+			[
+				new Joint((-0.1635f, 0.0732f, 0.1044f), 0.200f), new Joint((-0.1312f, 0.5794f, 0.0820f), 0.800f), new Joint((-0.1176f, 1.0761f, -0.0137f), 0.500f),
+				new Joint((0.0488f, 0.0732f, -0.1449f), 0.200f), new Joint((0.0948f, 0.5683f, -0.0421f), 0.800f), new Joint((0.1007f, 1.0741f, -0.0569f), 0.500f)
+			])
 		};
 
 		// Deform the body submesh positions in place. positions = the rendered base mesh's xyz array. No-op if neutral.

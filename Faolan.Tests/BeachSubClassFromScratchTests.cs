@@ -2,13 +2,14 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -18,10 +19,10 @@ namespace Faolan.Tests
 	// Proving this means the .bin is no longer needed to author a beach world-entry snapshot's tails.
 	public class BeachTailsFromScratchTests
 	{
-		private static readonly string DbPath = TestPaths.FaolanDb;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x02165EFF;
+		private static readonly string DbPath = TestPaths.FaolanDb;
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		// The template IS Strie (an Assassin/Rogue: HP 98 base 90, Mana 0, Stamina 236 base 230). When the WHOLE
 		// per-class stat block is authored (#4) for an Assassin at L1 it must reproduce that block exactly - i.e. the
@@ -102,20 +103,8 @@ namespace Faolan.Tests
 			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null, live);
 
 			// the template instance must be gone, the live one present (raw big-endian)
-			var needleOld = new byte[]
-			{
-				0x02,
-				0x16,
-				0x5E,
-				0xFF
-			};
-			var needleNew = new byte[]
-			{
-				0x08,
-				0x02,
-				0xAB,
-				0xCD
-			};
+			var needleOld = new byte[] { 0x02, 0x16, 0x5E, 0xFF };
+			var needleNew = new byte[] { 0x08, 0x02, 0xAB, 0xCD };
 			Assert.False(Contains(built, needleOld), "template instance should be re-addressed away");
 			Assert.True(Contains(built, needleNew), "live instance should be present");
 		}

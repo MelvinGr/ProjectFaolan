@@ -1,4 +1,5 @@
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.World
@@ -11,13 +12,13 @@ namespace Faolan.Core.Network.Codecs.World
 	// assembles header/transform + identity-from-columns + this tail; SpliceLootContents then splices the live items + cash.
 	public static class LootBagTemplate
 	{
-		public const uint SubOpcode = 0xF096251E; // LootBagFullUpdateIIR
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // LootBagFullUpdateIIR
 		public const uint TypeTag = 0x0000C87A; // the loot typetag (WorldLoot.LootTypeTag)
 		private const uint DefaultMaxSize = 10;
 
 		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +
 		// size are spliced per drop (SpliceLootContents). Loot ops key on the bag ENTITY handle, not this id.
-		private const uint LootContainerKind = 115;
+		private const uint LootContainerKind = 115; // TODO: Add to ContainerKind?
 
 		// The loot bag's kd-tree / spatial-bounds node, decoded from the captured loot-bag tail and CONSTANT across all
 		// 10 captured bags (Captures/scripts, every *-login/gameplay bag). A single leaf node:
@@ -68,16 +69,15 @@ namespace Faolan.Core.Network.Codecs.World
 		// items per drop. Built via the proven typed codec, not a captured blob.
 		private static ProtoLootBagIIR BuildEmptyScaffold()
 		{
-			return LootBagMessageCodec.BuildLootBag(0,
-				new ProtoInventoryGame
+			return LootBagMessageCodec.BuildLootBag(0, new ProtoInventoryGame
+			{
+				InventoryId = new ProtoID32
 				{
-					InventoryId = new ProtoID32
-					{
-						Type = LootContainerKind,
-						Instance = 0
-					},
-					MaxSize = DefaultMaxSize
-				});
+					Type = LootContainerKind,
+					Instance = 0
+				},
+				MaxSize = DefaultMaxSize
+			});
 		}
 	}
 }

@@ -21,7 +21,8 @@ namespace Faolan.Core.Network.Codecs.Text
 
 		// Root attrs, then the `knubot="X" {antitag} >` slot - antitag sits between two spaces (empty when absent,
 		// giving the double space `knubot="0"  >`), so the optional group must NOT eat the trailing space.
-		private static readonly Regex RootRx = new Regex("^<remoteformat id=\"(?<id>.*?)\" category=\"(?<cat>.*?)\" key=\"(?<key>.*?)\" knubot=\"(?<knubot>.*?)\" (?:antitag=\"(?<antitag>.*?)\")? >", RegexOptions.Compiled);
+		private static readonly Regex RootRx = new Regex("^<remoteformat id=\"(?<id>.*?)\" category=\"(?<cat>.*?)\" key=\"(?<key>.*?)\" knubot=\"(?<knubot>.*?)\" (?:antitag=\"(?<antitag>.*?)\")? >",
+			RegexOptions.Compiled);
 
 		public static string Build(Screen s)
 		{
@@ -43,14 +44,9 @@ namespace Faolan.Core.Network.Codecs.Text
 			foreach (Match m in ParamRx.Matches(xml))
 				pars.Add(new Parameter(m.Groups["name"].Value, Unescape(m.Groups["inner"].Value)));
 
-			return new Screen(root.Groups["id"].Value,
-				root.Groups["cat"].Value,
-				root.Groups["key"].Value,
-				root.Groups["knubot"].Value,
-				root.Groups["antitag"].Success
-					? root.Groups["antitag"].Value
-					: null,
-				pars);
+			return new Screen(root.Groups["id"].Value, root.Groups["cat"].Value, root.Groups["key"].Value, root.Groups["knubot"].Value, root.Groups["antitag"].Success
+				? root.Groups["antitag"].Value
+				: null, pars);
 		}
 
 		// Convenience for the two live (session) parameters: a literal string entry the client renders verbatim.
@@ -71,7 +67,10 @@ namespace Faolan.Core.Network.Codecs.Text
 				_           => p
 			}));
 
-			return s with { Parameters = pars };
+			return s with
+			{
+				Parameters = pars
+			};
 		}
 
 		// XML escape/unescape for the parameter value's inner (& must be first on the way out, last on the way in).

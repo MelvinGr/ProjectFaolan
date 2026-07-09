@@ -13,6 +13,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   the capture shows a COMBAT pet = (0,2,2) and a SOCIAL pet = (5,0,1).
 	public static class PetIirCodec
 	{
+		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.PetIIR;
+
 		private const byte Env = 0x00;
 
 		// (f1,f2,f3) kind triples observed in the capture.
@@ -40,7 +42,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public static byte[] BuildRemove(uint owner, uint pet)
 		{
 			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000Opcodes.PetIIR)
+				.WriteUInt32(SubOpcode)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(owner)
 				.WriteByte(Env)

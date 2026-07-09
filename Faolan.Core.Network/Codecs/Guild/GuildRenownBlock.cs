@@ -28,11 +28,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 
 		// The 13 guild stat-slot ids (the first 0x3F1 list). Constant across guilds - the structural scaffold a
 		// fresh-guild block reproduces (ascending, the classic AoC stat-id stepping).
-		public static readonly uint[] StatSlotIds =
-		[
-			0x4FFB0, 0x4FFB1, 0x50014, 0x50078, 0x500DC, 0x50140, 0x501A4,
-			0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334
-		];
+		public static readonly uint[] StatSlotIds = [0x4FFB0, 0x4FFB1, 0x50014, 0x50078, 0x500DC, 0x50140, 0x501A4, 0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334];
 
 		public byte BoolA { get; set; } = 1; // ReadByte -> param_1[0x1b]
 		public byte BoolB { get; set; } // ReadByte -> param_1[0x6d]
@@ -60,8 +56,12 @@ namespace Faolan.Core.Network.Codecs.Guild
 		// the two captured snapshots, and the value ForRenown sets. Zeroed for a fresh guild.
 		public ulong[] RenownCounters { get; set; } = new ulong[6];
 
-		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
-		public byte[] Encode() => this.ToArray();
+		// ICodec stream Read: the block is a fixed 277 bytes; delegate to the span-based Decode (the zero-copy entry
+		// point used when the block is a sub-region of the 0x203F guild-update body).
+		public static GuildRenownBlock Read(FaolanStream s)
+		{
+			return Decode(s.ReadArray(Length));
+		}
 
 		public void Write(FaolanStream s)
 		{
@@ -87,9 +87,11 @@ namespace Faolan.Core.Network.Codecs.Guild
 			s.WriteUInt32(Group5).WriteUInt64(Counters64D);
 		}
 
-		// ICodec stream Read: the block is a fixed 277 bytes; delegate to the span-based Decode (the zero-copy entry
-		// point used when the block is a sub-region of the 0x203F guild-update body).
-		public static GuildRenownBlock Read(FaolanStream s) => Decode(s.ReadArray(Length));
+		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
+		public byte[] Encode()
+		{
+			return this.ToArray();
+		}
 
 		// The captured "Sepulchra Invictus" block as structured fields (replaces the old hand-transcribed verbatim
 		// blob, which had dropped 3 bytes -> 274 not 277, misaligning the roster). Encode() reproduces the capture

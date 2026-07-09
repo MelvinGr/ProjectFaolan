@@ -8,7 +8,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -18,14 +17,12 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Scripting;
-using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-
 		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist
 		// a CharacterInventory row in the first free bag slot, then re-send the rebuilt 0x737A6DF9 inventory
 		// snapshot so it appears live (the snapshot is the ONLY item-delivery packet - there is no incremental
@@ -46,9 +43,9 @@ namespace Faolan.GameServer
 			var item = await Database.GetItem(itemId);
 			if (item is not { Hash: not 0 })
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, 					item == null
-						? $"No item with id {itemId}."
-						: $"Item {itemId} ('{item.Name}') has no hash - not snapshot-buildable.");
+				await _agentServerDispatcher.SendSystemMessage(characterId, item == null
+					? $"No item with id {itemId}."
+					: $"Item {itemId} ('{item.Name}') has no hash - not snapshot-buildable.");
 				return;
 			}
 
@@ -95,9 +92,9 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (!await Database.SetAccountState(account.Id, 				    ban
-					    ? AccountState.Banned
-					    : AccountState.Active))
+			if (!await Database.SetAccountState(account.Id, ban
+				    ? AccountState.Banned
+				    : AccountState.Active))
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">Account '{account.UserName}' not found.</span>");
 				return;
@@ -116,9 +113,9 @@ namespace Faolan.GameServer
 				}
 			}
 
-			await _agentServerDispatcher.SendSystemMessage(gmId, 				ban
-					? $"Banned account '{account.UserName}'{(kicked > 0 ? $" and kicked {kicked} live session(s)" : "")}."
-					: $"Unbanned account '{account.UserName}'.");
+			await _agentServerDispatcher.SendSystemMessage(gmId, ban
+				? $"Banned account '{account.UserName}'{(kicked > 0 ? $" and kicked {kicked} live session(s)" : "")}."
+				: $"Unbanned account '{account.UserName}'.");
 		}
 
 		// .delete [<handle>]  - PERMANENTLY remove the player's currently SELECTED target (or the given handle): despawn
@@ -131,7 +128,11 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
-			var handle = arg.Length == 0 ? client.Session.SelectedTargetHandle : TryParseHandle(arg, out var parsed) ? parsed : 0;
+			var handle = arg.Length == 0
+				? client.Session.SelectedTargetHandle
+				: TryParseHandle(arg, out var parsed)
+					? parsed
+					: 0;
 			if (handle == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .delete [&lt;handle&gt;]  (no arg = your selected target). Removes it live AND deletes its spawn row.");
@@ -145,13 +146,13 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var deleted = await Database.DeleteNpcSpawns(entity.MapId, 				entity.Name, 				entity.Hostile
-					? entity.SpawnPosition.X
-					: null, 				entity.Hostile
-					? entity.SpawnPosition.Y
-					: null, 				entity.Hostile
-					? entity.SpawnPosition.Z
-					: null, 				10f);
+			var deleted = await Database.DeleteNpcSpawns(entity.MapId, entity.Name, entity.Hostile
+				? entity.SpawnPosition.X
+				: null, entity.Hostile
+				? entity.SpawnPosition.Y
+				: null, entity.Hostile
+				? entity.SpawnPosition.Z
+				: null, 10f);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
 		}
 
@@ -184,7 +185,8 @@ namespace Faolan.GameServer
 				var spawn = await Database.GetDefaultSpawn(map.Id);
 				if (spawn == null)
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, 						$"<span style=\"color: red;\">No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;.</span>");
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						$"<span style=\"color: red;\">No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;.</span>");
 					return;
 				}
 
@@ -265,14 +267,14 @@ namespace Faolan.GameServer
 			if (command == PetCommand.Dismiss)
 			{
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildRemove(owner, petHandle)))
 					.SendAsync(client);
 
 				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
 				Logger.LogInformation(removed != null
-						? "Pet 0x{Pet:X8} dismissed (despawned)."
-						: "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", 					petHandle);
+					? "Pet 0x{Pet:X8} dismissed (despawned)."
+					: "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", petHandle);
 			}
 		}
 
@@ -280,7 +282,26 @@ namespace Faolan.GameServer
 		{
 			_gmCommandsDict = new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
 			{
-				["save"] = (client, _) => SaveChanges(client.Session.Character.Id), 				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id), 				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id), 				["teleport"] = TeleportCommand, 				["position"] = (client, _) => PositionCommand(client), 				["recall"] = (client, _) => RecallToBindCommand(client), 				["setstat"] = SetStatCommand, 				["setstatrange"] = SetStatRangeCommand, 				["level"] = SetLevelCommand, 				["godmode"] = (client, _) => ToggleGodModeCommand(client), 				["invisible"] = (client, _) => ToggleInvisibleCommand(client), 				["delete"] = DeleteCommand, 				["kill"] = KillCommand, 				["additem"] = AddItemCommand, 				["removeitem"] = RemoveItemCommand, 				["syschat"] = (client, _) => SysChatCommand(client), 				["lua"] = LuaCommand, 				["ah"] = (client, _) => OpenAuctionHouseCommand(client), 				["ban"] = (client, arguments) => BanCommand(client, arguments, true), 				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
+				["save"] = (client, _) => SaveChanges(client.Session.Character.Id),
+				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
+				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id),
+				["teleport"] = TeleportCommand,
+				["position"] = (client, _) => PositionCommand(client),
+				["recall"] = (client, _) => RecallToBindCommand(client),
+				["setstat"] = SetStatCommand,
+				["setstatrange"] = SetStatRangeCommand,
+				["level"] = SetLevelCommand,
+				["godmode"] = (client, _) => ToggleGodModeCommand(client),
+				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
+				["delete"] = DeleteCommand,
+				["kill"] = KillCommand,
+				["additem"] = AddItemCommand,
+				["removeitem"] = RemoveItemCommand,
+				["syschat"] = (client, _) => SysChatCommand(client),
+				["lua"] = LuaCommand,
+				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
+				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
+				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
 			};
 		}
 
@@ -351,7 +372,8 @@ namespace Faolan.GameServer
 			foreach (var t in player.AddedTags)
 				await Database.AddCharacterTag(characterId, (uint)t);
 
-			await _agentServerDispatcher.SendSystemMessage(characterId, 				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
 		}
 
 		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger
@@ -392,7 +414,8 @@ namespace Faolan.GameServer
 			var entity = _simulation.PlayerWorldEntity(client);
 			var mapId = entity?.MapId ?? character.MapId;
 			var pos = entity?.Position ?? character.Position;
-			return _agentServerDispatcher.SendSystemMessage(character.Id, 				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
+			return _agentServerDispatcher.SendSystemMessage(character.Id,
+				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
 		}
 
 		// .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The real
@@ -430,9 +453,9 @@ namespace Faolan.GameServer
 			}
 
 			var removed = await RemoveItemFromBackpack(client, slot);
-			await _agentServerDispatcher.SendSystemMessage(characterId, 				removed
-					? $"Removed the item in bag slot {slot} (live DispatchRemoveItem)."
-					: $"No item in bag slot {slot}.");
+			await _agentServerDispatcher.SendSystemMessage(characterId, removed
+				? $"Removed the item in bag slot {slot} (live DispatchRemoveItem)."
+				: $"No item in bag slot {slot}.");
 		}
 
 		private Task SendGmHelpText(uint characterId)
@@ -466,7 +489,8 @@ namespace Faolan.GameServer
 			// Push Level AND a refreshed XP bar (Exp/MaxExp) so a GM `.level` ding shows exactly like an XP-driven ding
 			// (#209): the kill path (CombatService.PushLevelUp) sets the same three stats, so both level-up paths emit an
 			// identical Level + AttributeChanged-burst + vitals max push.
-			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)));
+			await SendStatUpdate(client,
+				new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)));
 			await SendVitals(client);
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
@@ -533,15 +557,16 @@ namespace Faolan.GameServer
 			var arg = (arguments ?? string.Empty).Trim();
 			if (arg.Length == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, 					"Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map)  or  .teleport &lt;mapId | name&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;  (see .maps)");
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					"Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map)  or  .teleport &lt;mapId | name&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;  (see .maps)");
 				return;
 			}
 
 			// .teleport <x> <y> <z>  - three numeric tokens = a position on the CURRENT map (no map change).
 			// Invariant culture so a comma-decimal locale doesn't reject the dotted coordinates.
 			var tokens = arg.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
-			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) && float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) &&
-			    float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
+			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) &&
+			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
 			{
 				await DoTeleport(characterId, client.Session.Character.MapId, new Vector3(px, py, pz));
 				return;
@@ -550,8 +575,8 @@ namespace Faolan.GameServer
 			// .teleport <mapId | name> <x> <y> <z>  - jump to a precise spot on a NAMED (or numeric) map in one command
 			// (#247). The map is the first token, the trailing three are the coordinates; the map name itself may contain
 			// spaces, so everything before the last three tokens is the map argument.
-			if (tokens.Length >= 4 && float.TryParse(tokens[^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpx) && float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy) &&
-			    float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
+			if (tokens.Length >= 4 && float.TryParse(tokens[^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpx) &&
+			    float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy) && float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
 			{
 				var mapArg = string.Join(' ', tokens[..^3]);
 				var resolved = await ResolveMap(mapArg);
@@ -596,9 +621,9 @@ namespace Faolan.GameServer
 			entity.GodMode = !entity.GodMode;
 			client.Session.Account.GmGodMode = entity.GodMode;
 			await Database.SaveAccount(client.Session.Account);
-			await _agentServerDispatcher.SendSystemMessage(characterId, 				entity.GodMode
-					? "God mode <span style=\"color: lime;\">ON</span> - you take no damage."
-					: "God mode <span style=\"color: red;\">OFF</span>.");
+			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
+				? "God mode <span style=\"color: lime;\">ON</span> - you take no damage."
+				: "God mode <span style=\"color: red;\">OFF</span>.");
 		}
 
 		// .invisible  - toggle aggro invisibility on yourself: hostile NPCs won't target/aggro you (skipped in the
@@ -617,9 +642,9 @@ namespace Faolan.GameServer
 			entity.Invisible = !entity.Invisible;
 			client.Session.Account.GmInvisible = entity.Invisible;
 			await Database.SaveAccount(client.Session.Account);
-			await _agentServerDispatcher.SendSystemMessage(characterId, 				entity.Invisible
-					? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
-					: "Invisible <span style=\"color: red;\">OFF</span>.");
+			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
+				? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
+				: "Invisible <span style=\"color: red;\">OFF</span>.");
 		}
 
 		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
@@ -650,7 +675,7 @@ namespace Faolan.GameServer
 		private static Task SetTimeOfDay(INetworkClient client)
 		{
 			var sender0 = WorldFraming.Sender;
-			var receiver0 = WorldFraming.Receiver(client);
+			var receiver0 = client.Endpoint(Endpoints.GameInterfaceType);
 
 			return new PacketStream()
 				.WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchPassBlob)
@@ -658,7 +683,8 @@ namespace Faolan.GameServer
 					.WriteUInt32(GameServer0X2000Opcodes.GameTimeIIR)
 					/*.WriteArray(
 						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x46, 0xA8, 0xD8, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x42, 0x10, 0x54, 0xEB, 0x48, 0xD4, 0x3F, 0x80)*/
-					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0x59, 0x92, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x6C, 0xD7, 0x60, 0x32, 0xDC, 0x20, 0x3F, 0x80, 0x00, 0x00))
+					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0x59, 0x92, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x6C, 0xD7, 0x60, 0x32, 0xDC, 0x20, 0x3F, 0x80, 0x00,
+						0x00))
 				.SendAsync(client);
 		}
 

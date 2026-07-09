@@ -50,13 +50,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			var trailer = new FaolanStream().WriteUInt32(1).WriteUInt32(elementBaseId).WriteByte(0x01).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).WriteByte(complete).ToArray();
 
-			return Build(caster,
-				complete
-					? SeqComplete
-					: SeqBegin,
-				4,
-				args,
-				trailer);
+			return Build(caster, complete
+				? SeqComplete
+				: SeqBegin, 4, args, trailer);
 		}
 
 		public static byte[] SpellweaveTrance(uint caster)
@@ -81,7 +77,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] SpellweaveTranceExit(uint caster)
 		{
-			var args = new FaolanStream().WriteByte(0x08).WriteVarint(SpellweaveExitAction).WriteByte(0x18).WriteVarint(6).WriteByte(0x28).WriteVarint(8).WriteByte(0x30).WriteVarint(0).WriteByte(0x58).WriteVarint(79).ToArray();
+			var args = new FaolanStream()
+				.WriteByte(0x08)
+				.WriteVarint(SpellweaveExitAction)
+				.WriteByte(0x18)
+				.WriteVarint(6)
+				.WriteByte(0x28)
+				.WriteVarint(8)
+				.WriteByte(0x30)
+				.WriteVarint(0)
+				.WriteByte(0x58)
+				.WriteVarint(79)
+				.ToArray();
 
 			var trailer = new FaolanStream().WriteUInt32(4).WriteUInt32(0x27).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).ToArray();
 
@@ -91,7 +98,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The shared BCC framing primitive: header + behaviorId + length-prefixed args + the behavior-specific trailer.
 		private static byte[] Build(uint actor, ushort seq, uint behaviorId, byte[] args, byte[] trailer)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteUInt32(EntityClass.Character).WriteUInt32(actor).WriteUInt16(seq).WriteUInt32(behaviorId).WriteUInt32(args.Length).WriteArray(args).WriteArray(trailer).ToArray();
+			return new FaolanStream()
+				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(actor)
+				.WriteUInt16(seq)
+				.WriteUInt32(behaviorId)
+				.WriteUInt32(args.Length)
+				.WriteArray(args)
+				.WriteArray(trailer)
+				.ToArray();
 		}
 	}
 }

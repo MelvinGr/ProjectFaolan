@@ -1,8 +1,8 @@
 using System.IO;
 using System.Linq;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Xunit;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {

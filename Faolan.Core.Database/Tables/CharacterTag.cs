@@ -9,10 +9,10 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(TagId))]
 	public class CharacterTag
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
-
-		public uint CharacterId { get; set; }
 
 		public uint TagId { get; set; }
 	}

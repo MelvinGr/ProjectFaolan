@@ -52,8 +52,7 @@ namespace Faolan.Tests
 				// only ever sent for the local player); without it the spawn is dropped as an other-player sighting.
 				var capture = new[]
 				{
-					new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)),
-					new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Golden.Bytes("SpawnDikketestLogin"))),
+					new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)), new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Golden.Bytes("SpawnDikketestLogin"))),
 					new CapturedPacket(2, true, 0x2000, 0x737A6DF9, SnapshotPacket(dikketestHandle))
 				};
 

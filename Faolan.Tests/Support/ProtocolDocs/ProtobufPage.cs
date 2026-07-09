@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -19,11 +20,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 		public static string Render()
 		{
-			var types = typeof(ProtoScryScriptIIR).Assembly
-				.GetTypes()
-				.Where(t => t.GetCustomAttribute<ProtoContractAttribute>() != null)
-				.OrderBy(t => FullName(t), StringComparer.Ordinal)
-				.ToList();
+			var types = typeof(ProtoScryScriptIIR).Assembly.GetTypes().Where(t => t.GetCustomAttribute<ProtoContractAttribute>() != null).OrderBy(t => FullName(t), StringComparer.Ordinal).ToList();
 
 			var totalFields = types.Sum(t => Fields(t).Count);
 			var zigzag = types.SelectMany(Fields).Count(f => f.DataFormat == DataFormat.ZigZag);
@@ -74,17 +71,15 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			return sb.ToString();
 		}
 
-		private static string FullName(Type t) => t.DeclaringType != null ? $"{t.DeclaringType.Name}.{t.Name}" : t.Name;
-
-		private record FieldInfo(int Tag, string Name, string ClrType, DataFormat DataFormat, bool Required, string Wire);
-
 		private static List<FieldInfo> Fields(Type t)
 		{
 			var list = new List<FieldInfo>();
 			foreach (var p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
 			{
 				var m = p.GetCustomAttribute<ProtoMemberAttribute>();
-				if (m == null) continue;
+				if (m == null)
+					continue;
+
 				var clr = FriendlyType(p.PropertyType);
 				list.Add(new FieldInfo(m.Tag, m.Name ?? p.Name, clr, m.DataFormat, m.IsRequired, Wire(p.PropertyType, m.DataFormat)));
 			}
@@ -92,41 +87,76 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			return list;
 		}
 
+		private static string FriendlyType(Type t)
+		{
+			var u = Nullable.GetUnderlyingType(t);
+			if (u != null)
+				return FriendlyType(u) + "?";
+			if (t == typeof(uint))
+				return "uint";
+			if (t == typeof(int))
+				return "int";
+			if (t == typeof(ulong))
+				return "ulong";
+			if (t == typeof(long))
+				return "long";
+			if (t == typeof(byte[]))
+				return "byte[]";
+
+			if (t.IsGenericType)
+				return t.Name.Split('`')[0] + "<" + string.Join(",", t.GetGenericArguments().Select(FriendlyType)) + ">";
+
+			return t.Name;
+		}
+
+		private static string FullName(Type t)
+		{
+			return t.DeclaringType != null
+				? $"{t.DeclaringType.Name}.{t.Name}"
+				: t.Name;
+		}
+
 		private static string Wire(Type clr, DataFormat fmt)
 		{
 			var t = Nullable.GetUnderlyingType(clr) ?? clr;
-			if (t == typeof(float)) return fmt == DataFormat.FixedSize ? "`fixed32` (LE)" : "`varint`?";
-			if (t == typeof(double)) return fmt == DataFormat.FixedSize ? "`fixed64` (LE)" : "`varint`?";
-			if (t == typeof(string)) return "`length-delimited` (string)";
-			if (t == typeof(byte[])) return "`length-delimited` (bytes)";
+			if (t == typeof(float))
+			{
+				return fmt == DataFormat.FixedSize
+					? "`fixed32` (LE)"
+					: "`varint`?";
+			}
+
+			if (t == typeof(double))
+			{
+				return fmt == DataFormat.FixedSize
+					? "`fixed64` (LE)"
+					: "`varint`?";
+			}
+
+			if (t == typeof(string))
+				return "`length-delimited` (string)";
+			if (t == typeof(byte[]))
+				return "`length-delimited` (bytes)";
+
 			if (t.IsPrimitive || t.IsEnum)
 			{
 				return fmt switch
 				{
 					DataFormat.ZigZag => "**`zigzag`** (signed varint)",
-					DataFormat.FixedSize => t == typeof(long) || t == typeof(ulong) ? "`fixed64` (LE)" : "`fixed32` (LE)",
+					DataFormat.FixedSize => t == typeof(long) || t == typeof(ulong)
+						? "`fixed64` (LE)"
+						: "`fixed32` (LE)",
 					_ => "`varint`"
 				};
 			}
 
 			// A nested message / list.
-			if (typeof(System.Collections.IEnumerable).IsAssignableFrom(t) && t != typeof(string))
+			if (typeof(IEnumerable).IsAssignableFrom(t) && t != typeof(string))
 				return "`length-delimited` (repeated)";
+
 			return "`length-delimited` (message)";
 		}
 
-		private static string FriendlyType(Type t)
-		{
-			var u = Nullable.GetUnderlyingType(t);
-			if (u != null) return FriendlyType(u) + "?";
-			if (t == typeof(uint)) return "uint";
-			if (t == typeof(int)) return "int";
-			if (t == typeof(ulong)) return "ulong";
-			if (t == typeof(long)) return "long";
-			if (t == typeof(byte[])) return "byte[]";
-			if (t.IsGenericType)
-				return t.Name.Split('`')[0] + "<" + string.Join(",", t.GetGenericArguments().Select(FriendlyType)) + ">";
-			return t.Name;
-		}
+		private record FieldInfo(int Tag, string Name, string ClrType, DataFormat DataFormat, bool Required, string Wire);
 	}
 }

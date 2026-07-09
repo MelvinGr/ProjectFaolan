@@ -85,7 +85,8 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Draw a decal (e.g. a tattoo) onto a copy of the base atlas at UV (u,v in 0..1), scaled and rotated, blended
 		// by alpha. scale is the decal's drawn size as a fraction of the atlas width (the TexScript "scale" / 255).
-		public static byte[] DrawDecal(byte[] baseRgba, int bw, int bh, byte[] decalRgba, int dw, int dh, float u, float v, float scaleFraction, float rotationDeg, float blend, RdbAssetExtractor.Tint? tint = null)
+		public static byte[] DrawDecal(byte[] baseRgba, int bw, int bh, byte[] decalRgba, int dw, int dh, float u, float v, float scaleFraction, float rotationDeg, float blend,
+			RdbAssetExtractor.Tint? tint = null)
 		{
 			using var baseBmp = FromRgba(baseRgba, bw, bh);
 			using var decalBmp = FromRgba(decalRgba, dw, dh);
@@ -127,6 +128,20 @@ namespace Faolan.Core.Rdb.Assets
 			return bmp;
 		}
 
+		// SKCanvas.DrawBitmap is obsolete in SkiaSharp 4.x; the supported path is SKImage.FromBitmap + DrawImage.
+		// `default` sampling = nearest, matching the prior DrawBitmap behaviour (no FilterQuality was ever set).
+		private static void Blit(SKCanvas canvas, SKBitmap bmp, float x, float y, SKPaint paint = null)
+		{
+			using var img = SKImage.FromBitmap(bmp);
+			canvas.DrawImage(img, x, y, default, paint);
+		}
+
+		private static void Blit(SKCanvas canvas, SKBitmap bmp, SKRect source, SKRect dest, SKPaint paint = null)
+		{
+			using var img = SKImage.FromBitmap(bmp);
+			canvas.DrawImage(img, source, dest, default, paint);
+		}
+
 		private static byte[] Encode(SKBitmap bmp, RdbAssetExtractor.Tint? tint)
 		{
 			if (tint is { } t)
@@ -135,12 +150,7 @@ namespace Faolan.Core.Rdb.Assets
 				using (var canvas = new SKCanvas(tinted))
 				using (var paint = new SKPaint
 				{
-					ColorFilter = SKColorFilter.CreateColorMatrix([
-						t.R / 255f, 0, 0, 0, 0,
-						0, t.G / 255f, 0, 0, 0,
-						0, 0, t.B / 255f, 0, 0,
-						0, 0, 0, 1, 0
-					])
+					ColorFilter = SKColorFilter.CreateColorMatrix([t.R / 255f, 0, 0, 0, 0, 0, t.G / 255f, 0, 0, 0, 0, 0, t.B / 255f, 0, 0, 0, 0, 0, 1, 0])
 				})
 					Blit(canvas, bmp, 0, 0, paint);
 
@@ -168,20 +178,6 @@ namespace Faolan.Core.Rdb.Assets
 		private static SKImageInfo Unpremul(int w, int h)
 		{
 			return new SKImageInfo(w, h, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-		}
-
-		// SKCanvas.DrawBitmap is obsolete in SkiaSharp 4.x; the supported path is SKImage.FromBitmap + DrawImage.
-		// `default` sampling = nearest, matching the prior DrawBitmap behaviour (no FilterQuality was ever set).
-		private static void Blit(SKCanvas canvas, SKBitmap bmp, float x, float y, SKPaint paint = null)
-		{
-			using var img = SKImage.FromBitmap(bmp);
-			canvas.DrawImage(img, x, y, default, paint);
-		}
-
-		private static void Blit(SKCanvas canvas, SKBitmap bmp, SKRect source, SKRect dest, SKPaint paint = null)
-		{
-			using var img = SKImage.FromBitmap(bmp);
-			canvas.DrawImage(img, source, dest, default, paint);
 		}
 
 		// One decal to lay onto a base atlas: RGBA pixels at (U,V) in 0..1, drawn ScaleFraction of the atlas width wide,

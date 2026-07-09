@@ -60,7 +60,10 @@ namespace Faolan.Importer.Rdb
 				seen++;
 				if (!existing.TryGetValue(e.Id, out var row))
 				{
-					row = new Combo { Id = e.Id };
+					row = new Combo
+					{
+						Id = e.Id
+					};
 					db.Combos.Add(row);
 					existing[e.Id] = row;
 				}

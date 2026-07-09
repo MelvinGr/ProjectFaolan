@@ -32,21 +32,20 @@ namespace Faolan.Core.Network.Codecs.Text
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
 		private const byte LeadFlag = 0x01;
 
-		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml) => new Message(instance, typeFlags, footer, xml).ToArray();
+		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml)
+		{
+			return new Message(instance, typeFlags, footer, xml).ToArray();
+		}
 
-		public static Message Parse(byte[] body) => Message.Read(new FaolanStream(body));
+		public static Message Parse(byte[] body)
+		{
+			return Message.Read(new FaolanStream(body));
+		}
 
 		// The decoded FormatFeedbackIIR body as a self-serializing codec (ICodec): Write frames the whole
 		// [len][subop][marker][instance][lead][reserved][typeFlags][xmlLen][xml][footer]; Read recovers the fields.
 		public sealed record Message(uint Instance, uint TypeFlags, uint Footer, byte[] Xml) : ICodec<Message>
 		{
-
-			public void Write(FaolanStream s)
-			{
-				s.WriteArrayUInt32Length(content =>
-					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt64(0ul).WriteUInt32(TypeFlags).WriteUInt16(Xml.Length).WriteArray(Xml).WriteUInt32(Footer));
-			}
-
 			public static Message Read(FaolanStream s)
 			{
 				s.ReadUInt32(); // len
@@ -60,6 +59,21 @@ namespace Faolan.Core.Network.Codecs.Text
 				var xml = s.ReadArray(xmlLen);
 				var footer = s.ReadUInt32();
 				return new Message(instance, typeFlags, footer, xml);
+			}
+
+			public void Write(FaolanStream s)
+			{
+				s.WriteArrayUInt32Length(content =>
+					content
+						.WriteUInt32(SubOpcode)
+						.WriteUInt32(EntityClass.Character)
+						.WriteUInt32(Instance)
+						.WriteByte(LeadFlag)
+						.WriteUInt64(0ul)
+						.WriteUInt32(TypeFlags)
+						.WriteUInt16(Xml.Length)
+						.WriteArray(Xml)
+						.WriteUInt32(Footer));
 			}
 		}
 	}

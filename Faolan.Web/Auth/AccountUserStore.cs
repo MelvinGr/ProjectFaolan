@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Microsoft.AspNetCore.Identity;
@@ -23,7 +25,7 @@ namespace Faolan.Web.Auth
 
 		public Task<string?> GetPasswordHashAsync(Account user, CancellationToken ct)
 		{
-			return Task.FromResult<string?>(user.Password);
+			return Task.FromResult(user.Password);
 		}
 
 		public Task<bool> HasPasswordAsync(Account user, CancellationToken ct)
@@ -82,7 +84,7 @@ namespace Faolan.Web.Auth
 
 		public Task<string?> GetNormalizedUserNameAsync(Account user, CancellationToken ct)
 		{
-			return Task.FromResult<string?>(user.UserName?.ToUpperInvariant());
+			return Task.FromResult(user.UserName?.ToUpperInvariant());
 		}
 
 		// --- identity / lookup -----------------------------------------------------------------------------------
@@ -93,7 +95,7 @@ namespace Faolan.Web.Auth
 
 		public Task<string?> GetUserNameAsync(Account user, CancellationToken ct)
 		{
-			return Task.FromResult<string?>(user.UserName);
+			return Task.FromResult(user.UserName);
 		}
 
 		public Task SetNormalizedUserNameAsync(Account user, string? normalizedName, CancellationToken ct)

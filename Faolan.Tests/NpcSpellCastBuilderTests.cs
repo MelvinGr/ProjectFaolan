@@ -1,10 +1,11 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Tests.Support;
-using Xunit;
+using Faolan.Core;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
+using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -42,7 +43,7 @@ namespace Faolan.Tests
 			Assert.Equal(golden, built);
 
 			// ICodec round-trip: Read recovers the fields + payload and rebuilds byte-for-byte.
-			var rt = NpcSpellCastBuilder.NpcSpellCast.Read(new Faolan.Core.FaolanStream(built));
+			var rt = NpcSpellCastBuilder.NpcSpellCast.Read(new FaolanStream(built));
 			Assert.Equal(applyTo, rt.ApplyTo);
 			Assert.Equal(applyFrom, rt.ApplyFrom);
 			Assert.Equal(spellId, rt.SpellId);
@@ -55,7 +56,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_MountRideBuff_IsByteIdenticalToFrame520()
 		{
-			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" + "00000000000000000083d600000100000001000000000031eb150000005000000000000000000000000000000050000000001560f9bb");
+			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" +
+			                                            "00000000000000000083d600000100000001000000000031eb150000005000000000000000000000000000000050000000001560f9bb");
 
 			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
 

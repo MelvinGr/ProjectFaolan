@@ -25,10 +25,7 @@ namespace Faolan.Importer.Rdb
 		// "Old Tarantia Statels and Hmap"). Cut the name at the first such marker so .maps/teleport labels show the
 		// clean name (#31). The markers are level-editor artifacts (statel = static element, hmap = height map),
 		// never part of a real map name, so this can't truncate a legitimate one.
-		private static readonly string[] ToolingMarkers =
-		[
-			" Heigh_Tiles", "_statel", " Statels", "_height", "_painting", " and Hmap", " Hmap"
-		];
+		private static readonly string[] ToolingMarkers = [" Heigh_Tiles", "_statel", " Statels", "_height", "_painting", " and Hmap", " Hmap"];
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
 		{

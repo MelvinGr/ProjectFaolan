@@ -1,11 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
-using Faolan.Importer.Captures;
-using Xunit;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
+using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -15,29 +15,15 @@ namespace Faolan.Tests
 	// and rebuilding it via the codec must reproduce the wire body exactly.
 	public class TradeskillRecipeCodecTests
 	{
-		private static readonly string Capture = TestPaths.Capture("NecroL80_mage-necromancer_shops_open-crrafting-receipies.tshark.json");
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59];
+		private static readonly string Capture = TestPaths.Capture("NecroL80_mage-necromancer_shops_open-crrafting-receipies.tshark.json");
 
 		[Fact]
-		public void ParseThenBuild_ReproducesTheCapturedRecipeBook_ByteExact()
+		public void BuildReplyBody_EmptyCatalog_IsAValidEmptyList()
 		{
-			if (!File.Exists(Capture))
-				return; // capture not present in this checkout - nothing to assert
-
-			var packets = TsharkCaptureReader.Read(Capture);
-			var reply = packets.FirstOrDefault(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000Opcodes.TradeskillReplyIIR);
-			Assert.NotEqual(default, reply);
-
-			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
-			Assert.True(sub >= 0);
-			var capturedBody = reply.Bytes.AsSpan(sub + 12).ToArray(); // past [subop][0xC350][handle]
-
-			var records = TradeskillRecipeCodec.ParseReplyBody(capturedBody);
-			Assert.Equal(603, records.Count);
-			Assert.Equal(9u, records[0].Id); // first recipe id in the capture
-
-			var rebuilt = TradeskillRecipeCodec.BuildReplyBody(records);
-			Assert.Equal(Convert.ToHexStringLower(capturedBody), Convert.ToHexStringLower(rebuilt));
+			// The correct reply for a character with no learned recipes: env=0, version=1, type=3, count=0x3F1.
+			var body = TradeskillRecipeCodec.BuildReplyBody([]);
+			Assert.Equal("00" + "00000001" + "03" + "000003f1", Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
@@ -69,11 +55,25 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void BuildReplyBody_EmptyCatalog_IsAValidEmptyList()
+		public void ParseThenBuild_ReproducesTheCapturedRecipeBook_ByteExact()
 		{
-			// The correct reply for a character with no learned recipes: env=0, version=1, type=3, count=0x3F1.
-			var body = TradeskillRecipeCodec.BuildReplyBody([]);
-			Assert.Equal("00" + "00000001" + "03" + "000003f1", Convert.ToHexStringLower(body));
+			if (!File.Exists(Capture))
+				return; // capture not present in this checkout - nothing to assert
+
+			var packets = TsharkCaptureReader.Read(Capture);
+			var reply = packets.FirstOrDefault(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000Opcodes.TradeskillReplyIIR);
+			Assert.NotEqual(default, reply);
+
+			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
+			Assert.True(sub >= 0);
+			var capturedBody = reply.Bytes.AsSpan(sub + 12).ToArray(); // past [subop][0xC350][handle]
+
+			var records = TradeskillRecipeCodec.ParseReplyBody(capturedBody);
+			Assert.Equal(603, records.Count);
+			Assert.Equal(9u, records[0].Id); // first recipe id in the capture
+
+			var rebuilt = TradeskillRecipeCodec.BuildReplyBody(records);
+			Assert.Equal(Convert.ToHexStringLower(capturedBody), Convert.ToHexStringLower(rebuilt));
 		}
 
 		private static int IndexOf(byte[] haystack, byte[] needle)
@@ -82,11 +82,13 @@ namespace Faolan.Tests
 			{
 				var ok = true;
 				for (var j = 0; j < needle.Length; j++)
+				{
 					if (haystack[i + j] != needle[j])
 					{
 						ok = false;
 						break;
 					}
+				}
 
 				if (ok)
 					return i;

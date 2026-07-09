@@ -13,10 +13,10 @@ namespace Faolan.Tests
 	// captured body - both NpcSpawn.Data and Npc.Data are retired), covering the animal + humanoid core shapes.
 	public class NpcStatCoreCodecTests
 	{
-		[Theory]
-		[InlineData("SpawnNpcCrocodile")]      // animal
-		[InlineData("SpawnNpcMinimalPanther")] // animal (minimal)
-		[InlineData("SpawnNpcCasilda")]        // humanoid (full core + equipment)
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther"), InlineData("SpawnNpcCasilda")]
+		// animal
+		// animal (minimal)
+		// humanoid (full core + equipment)
 		public void StatCore_RoundTripsByteExact(string golden)
 		{
 			var body = Golden.Bytes(golden);
@@ -25,15 +25,19 @@ namespace Faolan.Tests
 			// Lift(msg) -> NpcStatCore -> To*(core) must reproduce each stat-core sub-message byte-for-byte, so a spawn
 			// built from typed columns matches the capture.
 			var core = NpcStatCoreCodec.Lift(read.Message);
-			if (read.Message.Stats != null) Assert.True(Same(read.Message.Stats, NpcStatCoreCodec.ToStats(core)), "CharacterStats");
-			if (read.Message.npc_stats != null) Assert.True(Same(read.Message.npc_stats, NpcStatCoreCodec.ToNpcStats(core)), "NpcStats");
-			if (read.Message.Bcc != null) Assert.True(Same(read.Message.Bcc, NpcStatCoreCodec.ToBcc(core)), "CharacterBcc");
+			if (read.Message.Stats != null)
+				Assert.True(Same(read.Message.Stats, NpcStatCoreCodec.ToStats(core)), "CharacterStats");
+			if (read.Message.npc_stats != null)
+				Assert.True(Same(read.Message.npc_stats, NpcStatCoreCodec.ToNpcStats(core)), "NpcStats");
+			if (read.Message.Bcc != null)
+				Assert.True(Same(read.Message.Bcc, NpcStatCoreCodec.ToBcc(core)), "CharacterBcc");
 		}
 
 		private static bool Same<T>(T a, T b)
 		{
 			if (a == null && b == null)
 				return true;
+
 			return a != null && b != null && Ser(a).AsSpan().SequenceEqual(Ser(b));
 		}
 

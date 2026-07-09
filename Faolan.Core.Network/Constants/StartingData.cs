@@ -14,7 +14,6 @@ namespace Faolan.Core.Network.Constants
 	{
 		// The character-create editor playfield/map id (the scene props are WorldObjects rows on it).
 		public const uint EditorMapId = 4000;
-		public static readonly Vector3 EditorSpawnPosition = new Vector3(260.0f, 0.0f, 290.0f);
 
 		// Male (Sex 0): loincloth in the legs slot, no chest item.
 		public const uint StartingMaleLegsItem = 3805575; // Red Loincloth
@@ -25,10 +24,12 @@ namespace Faolan.Core.Network.Constants
 		public static readonly ImmutableArray<(Race race, ArchType archType, Class clas)> RaceArchClassCombinations =
 		[
 			(Race.Aquilonian, ArchType.Priest, Class.PriestOfMitra), (Race.Aquilonian, ArchType.Soldier, Class.Conqueror), (Race.Aquilonian, ArchType.Soldier, Class.DarkTemplar),
-			(Race.Aquilonian, ArchType.Soldier, Class.Guardian), (Race.Aquilonian, ArchType.Rogue, Class.Barbarian), (Race.Aquilonian, ArchType.Rogue, Class.Ranger), (Race.Aquilonian, ArchType.Rogue, Class.Assassin),
-			(Race.Cimmerian, ArchType.Priest, Class.BearShaman), (Race.Cimmerian, ArchType.Soldier, Class.Conqueror), (Race.Cimmerian, ArchType.Soldier, Class.DarkTemplar), (Race.Cimmerian, ArchType.Soldier, Class.Guardian),
-			(Race.Cimmerian, ArchType.Rogue, Class.Barbarian), (Race.Cimmerian, ArchType.Rogue, Class.Ranger), (Race.Stygian, ArchType.Priest, Class.TempestOfSet), (Race.Stygian, ArchType.Rogue, Class.Ranger),
-			(Race.Stygian, ArchType.Rogue, Class.Assassin), (Race.Stygian, ArchType.Mage, Class.HeraldOfXotli), (Race.Stygian, ArchType.Mage, Class.Demonologist), (Race.Stygian, ArchType.Mage, Class.Necromancer)
+			(Race.Aquilonian, ArchType.Soldier, Class.Guardian), (Race.Aquilonian, ArchType.Rogue, Class.Barbarian), (Race.Aquilonian, ArchType.Rogue, Class.Ranger),
+			(Race.Aquilonian, ArchType.Rogue, Class.Assassin), (Race.Cimmerian, ArchType.Priest, Class.BearShaman), (Race.Cimmerian, ArchType.Soldier, Class.Conqueror),
+			(Race.Cimmerian, ArchType.Soldier, Class.DarkTemplar), (Race.Cimmerian, ArchType.Soldier, Class.Guardian), (Race.Cimmerian, ArchType.Rogue, Class.Barbarian),
+			(Race.Cimmerian, ArchType.Rogue, Class.Ranger), (Race.Stygian, ArchType.Priest, Class.TempestOfSet), (Race.Stygian, ArchType.Rogue, Class.Ranger),
+			(Race.Stygian, ArchType.Rogue, Class.Assassin), (Race.Stygian, ArchType.Mage, Class.HeraldOfXotli), (Race.Stygian, ArchType.Mage, Class.Demonologist),
+			(Race.Stygian, ArchType.Mage, Class.Necromancer)
 		];
 
 		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
@@ -52,5 +53,7 @@ namespace Faolan.Core.Network.Constants
 			[Class.Necromancer] = 3395744, // Broken Bottle (0x33D0A0; necro create capture, BccIIR slot-6)
 			[Class.TempestOfSet] = 215711 // Broken Bottle (0x34A9F - the OTHER bottle; tempest create capture, BccIIR slot-6)
 		}.ToImmutableDictionary();
+
+		public static readonly Vector3 EditorSpawnPosition = new Vector3(260.0f, 0.0f, 290.0f);
 	}
 }

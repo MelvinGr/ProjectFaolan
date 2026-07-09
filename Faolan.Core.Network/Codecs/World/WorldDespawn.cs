@@ -24,7 +24,13 @@ namespace Faolan.Core.Network.Codecs.World
 		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` in playfield `token`.
 		public static byte[] BuildBody(uint handle, uint token)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.N3ToClientQuitIIR).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(RecordMarker).WriteUInt32(token).ToArray();
+			return new FaolanStream()
+				.WriteUInt32(GameServer0X2000Opcodes.N3ToClientQuitIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteByte(RecordMarker)
+				.WriteUInt32(token)
+				.ToArray();
 		}
 
 		// Finds the playfield token in a 0x737A6DF9 snapshot body: the 4 bytes framed by 000000BF ... 0000040B

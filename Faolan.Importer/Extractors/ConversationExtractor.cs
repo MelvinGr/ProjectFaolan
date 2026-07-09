@@ -173,10 +173,18 @@ namespace Faolan.Importer.Extractors
 					var grant = e.GrantQuestId != 0
 						? e.GrantQuestId
 						: cur.entry?.GrantQuestId ?? 0;
-					best[key] = (score, e with { GrantQuestId = grant });
+					best[key] = (score, e with
+					{
+						GrantQuestId = grant
+					});
 				}
 				else if (e.GrantQuestId != 0 && cur.entry.GrantQuestId == 0)
-					best[key] = (cur.score, cur.entry with { GrantQuestId = e.GrantQuestId });
+				{
+					best[key] = (cur.score, cur.entry with
+					{
+						GrantQuestId = e.GrantQuestId
+					});
+				}
 			}
 
 			return best.Values.Select(v => v.entry).ToList();

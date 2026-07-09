@@ -3,22 +3,22 @@
 <PageTitle>Log in — Project Faolan</PageTitle>
 
 <div class="auth-card">
-    <h1>Log in</h1>
-    <form method="post" action="/auth/login">
-        <input name="username" placeholder="Username" autocomplete="username" required autofocus/>
-        <input name="password" type="password" placeholder="Password" autocomplete="current-password" required/>
-        <button class="btn primary" type="submit">Log in</button>
-    </form>
-    @if (Error != null)
-    {
-        <p class="err">Invalid username or password.</p>
-    }
-    <p class="alt">No account? <a href="/register">Register</a></p>
+	<h1>Log in</h1>
+	<form method="post" action="/auth/login">
+		<input name="username" placeholder="Username" autocomplete="username" required autofocus/>
+		<input name="password" type="password" placeholder="Password" autocomplete="current-password" required/>
+		<button class="btn primary" type="submit">Log in</button>
+	</form>
+	@if (Error != null)
+	{
+		<p class="err">Invalid username or password.</p>
+	}
+	<p class="alt">No account? <a href="/register">Register</a></p>
 </div>
 
 @code {
 
-    [SupplyParameterFromQuery(Name = "error")]
-    public string? Error { get; set; }
+	[SupplyParameterFromQuery(Name = "error")]
+	public string? Error { get; set; }
 
 }

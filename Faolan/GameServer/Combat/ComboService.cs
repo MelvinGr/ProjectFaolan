@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Combat

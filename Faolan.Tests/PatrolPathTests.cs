@@ -2,11 +2,11 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
-using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Tests
 {

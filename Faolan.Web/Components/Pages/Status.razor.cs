@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Faolan.Web.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,7 +41,11 @@ namespace Faolan.Web.Components.Pages
 			var dayAgo = DateTimeOffset.UtcNow.AddDays(-1);
 			_recent24h = chars.Count(c => c.LastConnection is { } lc && lc >= dayAgo);
 
-			_recent = chars.OrderByDescending(c => c.LastConnection ?? DateTimeOffset.MinValue).Take(12).Select(c => new RecentRow(c.Id, c.Name, c.Level, c.Class.ToString(), c.Map?.Name ?? "—", c.LastConnection)).ToList();
+			_recent = chars
+				.OrderByDescending(c => c.LastConnection ?? DateTimeOffset.MinValue)
+				.Take(12)
+				.Select(c => new RecentRow(c.Id, c.Name, c.Level, c.Class.ToString(), c.Map?.Name ?? "—", c.LastConnection))
+				.ToList();
 
 			_classes = chars.GroupBy(c => c.Class).Select(g => new ClassRow(g.Key.ToString(), g.Count())).OrderByDescending(x => x.Count).ToList();
 			_classMax = _classes.Count == 0

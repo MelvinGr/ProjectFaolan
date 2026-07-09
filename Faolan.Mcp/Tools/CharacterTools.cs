@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Server.GameServer;
 using ModelContextProtocol.Server;
 
@@ -17,7 +17,7 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class CharacterTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+		private static readonly JsonSerializerOptions JsonOptions = new()
 		{
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -46,17 +46,17 @@ namespace Faolan.Mcp.Tools
 			var tags = await _db.GetCharacterTags(characterId);
 
 			return JsonSerializer.Serialize(new
-				{
-					character.Id,
-					character.Name,
-					character.Level,
-					character.Experience,
-					MoneyCopper = character.Money,
-					character.MapId,
-					character.AccountId,
-					character.GuildId,
-					Live = _gameServer.GetCharacterLiveState(characterId), // null = not connected to a world listener
-					Inventory = inventory
+			{
+				character.Id,
+				character.Name,
+				character.Level,
+				character.Experience,
+				MoneyCopper = character.Money,
+				character.MapId,
+				character.AccountId,
+				character.GuildId,
+				Live = _gameServer.GetCharacterLiveState(characterId), // null = not connected to a world listener
+				Inventory = inventory
 					.OrderBy(r => r.Container)
 					.ThenBy(r => r.Slot)
 					.Select(r => new
@@ -67,17 +67,16 @@ namespace Faolan.Mcp.Tools
 						ItemName = r.Item?.Name,
 						r.Count
 					}),
-					Quests = quests.Select(q => new
-					{
-						q.QuestId,
-						State = q.State.ToString(),
-						q.GoalProgress,
-						q.GoalRequired,
-						q.GoalTargetName
-					}),
-					Tags = tags
-				},
-				JsonOptions);
+				Quests = quests.Select(q => new
+				{
+					q.QuestId,
+					State = q.State.ToString(),
+					q.GoalProgress,
+					q.GoalRequired,
+					q.GoalTargetName
+				}),
+				Tags = tags
+			}, JsonOptions);
 		}
 	}
 }

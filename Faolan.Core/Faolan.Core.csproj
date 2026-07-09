@@ -1,14 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <OutputType>Library</OutputType>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="protobuf-net" Version="3.2.56"/>
-        <PackageReference Include="SharpZipLib" Version="1.4.2"/>
-        <PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802"/>
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9"/>
-		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.9"/>
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="protobuf-net" Version="3.2.56" />
+		<PackageReference Include="SharpZipLib" Version="1.4.2" />
+		<PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.9" />
+	</ItemGroup>
 </Project>

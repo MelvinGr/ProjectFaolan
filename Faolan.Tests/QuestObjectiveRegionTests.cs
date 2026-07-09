@@ -1,8 +1,8 @@
 using System.IO;
 using System.Text;
-using Xunit;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -88,7 +88,13 @@ namespace Faolan.Tests
 			var goal = QuestObjectiveGoal.BuildSingle(0x1234, 14012, 6491, 1, 12, 0, 4010, 0, 0, obj, txt, requiredCount: 3);
 			Assert.Equal(3u, goal.RequiredCount);
 
-			var region = new QuestObjectiveRegion { Goals = { goal } };
+			var region = new QuestObjectiveRegion
+			{
+				Goals =
+				{
+					goal
+				}
+			};
 			var reparsed = QuestObjectiveRegion.Parse(region.ToArray(), 0);
 			Assert.Equal(3u, reparsed.Goals[0].RequiredCount);
 		}

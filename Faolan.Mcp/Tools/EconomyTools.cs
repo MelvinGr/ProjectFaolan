@@ -5,12 +5,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
-using Microsoft.EntityFrameworkCore;
-using ModelContextProtocol.Server;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
+using Microsoft.EntityFrameworkCore;
+using ModelContextProtocol.Server;
 
 namespace Faolan.Mcp.Tools
 {
@@ -23,7 +23,7 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class EconomyTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+		private static readonly JsonSerializerOptions JsonOptions = new()
 		{
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -71,7 +71,8 @@ namespace Faolan.Mcp.Tools
 			};
 
 			await _db.CreateTradepostListing(listing);
-			return $"Listed {listing.Quantity}x \"{item.Name}\" (id {itemId}) for {priceTin} tin by \"{listing.SellerName}\" (saleId 0x{listing.SaleId:X16}). Searchable under itemId {itemId} in-game.";
+			return
+				$"Listed {listing.Quantity}x \"{item.Name}\" (id {itemId}) for {priceTin} tin by \"{listing.SellerName}\" (saleId 0x{listing.SaleId:X16}). Searchable under itemId {itemId} in-game.";
 		}
 
 		[McpServerTool(Name = "get_mailbox"),
@@ -85,27 +86,26 @@ namespace Faolan.Mcp.Tools
 
 			var mails = await _db.GetMailsForRecipient(character.Name);
 			return JsonSerializer.Serialize(new
+			{
+				Owner = character.Name,
+				mails.Count,
+				Mails = mails.Select(m => new
 				{
-					Owner = character.Name,
-					mails.Count,
-					Mails = mails.Select(m => new
+					MailId = "0x" + m.MailId.ToString("X16"),
+					From = string.IsNullOrEmpty(m.SenderName)
+						? "(system)"
+						: m.SenderName,
+					m.IsRead,
+					MoneyTin = m.Money,
+					Body = m.BodyXml,
+					Attachments = m.Attachments.Select(a => new
 					{
-						MailId = "0x" + m.MailId.ToString("X16"),
-						From = string.IsNullOrEmpty(m.SenderName)
-							? "(system)"
-							: m.SenderName,
-						m.IsRead,
-						MoneyTin = m.Money,
-						Body = m.BodyXml,
-						Attachments = m.Attachments.Select(a => new
-						{
-							a.Template,
-							a.Quantity,
-							ItemInstanceId = "0x" + a.ItemInstanceId.ToString("X16")
-						})
+						a.Template,
+						a.Quantity,
+						ItemInstanceId = "0x" + a.ItemInstanceId.ToString("X16")
 					})
-				},
-				JsonOptions);
+				})
+			}, JsonOptions);
 		}
 
 		[McpServerTool(Name = "list_tradepost_listings"),
@@ -117,25 +117,24 @@ namespace Faolan.Mcp.Tools
 			var rows = await _db.Query(ctx => ctx.TradepostListings.Where(l => (itemId == 0 || l.ItemId == itemId) && (sellerName == null || l.SellerName == sellerName)).Take(1000).ToListAsync());
 
 			var listings = rows
-			.OrderBy(l => l.Price)
-			.Take(Math.Max(1, limit))
-			.Select(l => new
-			{
-				SaleId = "0x" + l.SaleId.ToString("X16"),
-				l.SellerName,
-				PriceTin = l.Price,
-				l.Quantity,
-				l.ItemId,
-				l.Template,
-				l.BankSlot
-			});
+				.OrderBy(l => l.Price)
+				.Take(Math.Max(1, limit))
+				.Select(l => new
+				{
+					SaleId = "0x" + l.SaleId.ToString("X16"),
+					l.SellerName,
+					PriceTin = l.Price,
+					l.Quantity,
+					l.ItemId,
+					l.Template,
+					l.BankSlot
+				});
 
 			return JsonSerializer.Serialize(new
-				{
-					rows.Count,
-					Listings = listings
-				},
-				JsonOptions);
+			{
+				rows.Count,
+				Listings = listings
+			}, JsonOptions);
 		}
 
 		[McpServerTool(Name = "send_mail"),

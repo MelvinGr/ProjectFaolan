@@ -17,9 +17,9 @@ namespace Faolan.Tests
 		private static bool Updating => Environment.GetEnvironmentVariable("FAOLAN_UPDATE_DOCS") == "1";
 
 		[Fact]
-		public void OpcodesPage_IsUpToDate()
+		public void CoveragePage_IsUpToDate()
 		{
-			AssertGenerated(OpcodesPage.RelativePath, OpcodesPage.Render());
+			AssertGenerated(CoveragePage.RelativePath, CoveragePage.Render());
 		}
 
 		[Fact]
@@ -29,15 +29,15 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void ProtobufPage_IsUpToDate()
+		public void OpcodesPage_IsUpToDate()
 		{
-			AssertGenerated(ProtobufPage.RelativePath, ProtobufPage.Render());
+			AssertGenerated(OpcodesPage.RelativePath, OpcodesPage.Render());
 		}
 
 		[Fact]
-		public void CoveragePage_IsUpToDate()
+		public void ProtobufPage_IsUpToDate()
 		{
-			AssertGenerated(CoveragePage.RelativePath, CoveragePage.Render());
+			AssertGenerated(ProtobufPage.RelativePath, ProtobufPage.Render());
 		}
 
 		// The BKDR-31 class-id guard is the same one the Wireshark generator applies; assert it independently so a
@@ -63,8 +63,7 @@ namespace Faolan.Tests
 				return;
 			}
 
-			Assert.True(File.Exists(path),
-				$"{relativePath} is missing. Generate it: FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs");
+			Assert.True(File.Exists(path), $"{relativePath} is missing. Generate it: FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs");
 
 			var committed = File.ReadAllText(path).Replace("\r\n", "\n");
 			if (committed == rendered)
@@ -72,7 +71,7 @@ namespace Faolan.Tests
 
 			var diffLine = FirstDiffLine(committed, rendered);
 			Assert.Fail($"{relativePath} is stale (first diff at line {diffLine}). It is GENERATED from Opcodes.cs - " +
-				"do not hand-edit. Regenerate: FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs");
+			            "do not hand-edit. Regenerate: FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs");
 		}
 
 		private static int FirstDiffLine(string a, string b)
@@ -80,8 +79,11 @@ namespace Faolan.Tests
 			var la = a.Split('\n');
 			var lb = b.Split('\n');
 			for (var i = 0; i < Math.Min(la.Length, lb.Length); i++)
+			{
 				if (la[i] != lb[i])
 					return i + 1;
+			}
+
 			return Math.Min(la.Length, lb.Length) + 1;
 		}
 	}

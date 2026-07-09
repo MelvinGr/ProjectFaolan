@@ -181,7 +181,8 @@ namespace Faolan.Importer.Extractors
 
 		private static Vector3 ReadVec3(byte[] b, int offset)
 		{
-			return new Vector3(BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset, 4)), BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 4, 4)), BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 8, 4)));
+			return new Vector3(BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset, 4)), BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 4, 4)),
+				BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 8, 4)));
 		}
 
 		// True (with the parsed fields) iff `body` is EXACTLY the canonical single-segment patrol - the form

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core.Enums;
 
-namespace Faolan.GameServer.Combat
+namespace Faolan.Core.Network.Constants
 {
 	// Per-class spellweaving profile: the data the activate-response needs to be built for a given caster (docs/combos.md).
 	// The 4 pure casters weave; the necromancer set is capture-derived (NecroL80, decode_spellweave.py) and REAL - the
@@ -17,10 +17,8 @@ namespace Faolan.GameServer.Combat
 
 	public static class SpellweaveCatalog
 	{
-		private static readonly SpellweaveProfile
-			Necromancer = new SpellweaveProfile([0x37F29800, 0x37E5A800, 0x3969D000],
-				[0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D],
-				[0x398, 0x39B, 0x39A, 0x39D],
+		private static readonly SpellweaveProfile Necromancer =
+			new SpellweaveProfile([0x37F29800, 0x37E5A800, 0x3969D000], [0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D], [0x398, 0x39B, 0x39A, 0x39D],
 				0x37E5A8); // Spellweaving(1); refreshes 37e5a8 -> 37e5a9 -> 37e5aa each reappear
 
 		private static readonly Dictionary<Class, SpellweaveProfile> Profiles = new Dictionary<Class, SpellweaveProfile>
@@ -28,6 +26,7 @@ namespace Faolan.GameServer.Combat
 			[Class.Necromancer] = Necromancer
 			// TODO: Demonologist / PriestOfMitra / TempestOfSet - need per-class spellweaving captures.
 		};
+
 		// Necromancer (NecroL80 capture): trance buffs 0x37F29800/0x37E5A800/0x3969D000; weave elements Arcane Renewal
 		// 0x396AE9, Arcane Surge 0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D; fire stages
 		// 0x398/0x39B/0x39A/0x39D.

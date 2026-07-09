@@ -35,10 +35,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// DispatchOpenTradepost body = the auctioneer access point [posX][posY][posZ][maxRadius] (big-endian floats).
 		// This captured value (Tortage auctioneer + 15.0) is kept only as the golden-test oracle; live opens build
 		// the body from the player's position (BuildAccessPointBody) so the client's within-radius check passes.
-		private static readonly byte[] CapturedAccessPointBody =
-		[
-			0x44, 0x7D, 0x70, 0x0C, 0x42, 0xE6, 0x2E, 0x00, 0x44, 0x1A, 0x8D, 0xDB, 0x41, 0x70, 0x00, 0x00
-		];
+		private static readonly byte[] CapturedAccessPointBody = [0x44, 0x7D, 0x70, 0x0C, 0x42, 0xE6, 0x2E, 0x00, 0x44, 0x1A, 0x8D, 0xDB, 0x41, 0x70, 0x00, 0x00];
 
 		// A captured single-row DispatchTradepostSearchResults body (necrol80 auctionhouse pkt#1028: seller "Jocko",
 		// item 0x755D, price 1,000,000, qty 1, + the item's ProtoAcgItem). [head:u32][row]* per
@@ -60,6 +57,28 @@ namespace Faolan.Core.Network.Codecs.Economy
 		public static byte[] BuildSearchResultsBytes(uint interfaceInstance)
 		{
 			return Finalize(Build(TradepostInterfaceDispatchOpcodes.DispatchTradepostSearchResults, SearchResultsReplayBody, interfaceInstance));
+		}
+
+		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
+		// Category is echoed back as the search-results `head` (const 0x7E2 in the captures).
+		public static SearchQuery ParseSearch(FaolanStream body)
+		{
+			if (body == null)
+				return new SearchQuery("", 0x7e2, 0, 0);
+
+			try
+			{
+				var lang = Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
+				var cat = body.ReadUInt32(); // category root (const 0x7E2 in captures)
+				var page = body.ReadUInt32();
+				body.ReadUInt32(); // cat2 (mirror of cat)
+				var itemId = body.ReadUInt32();
+				return new SearchQuery(lang, cat, page, itemId);
+			}
+			catch (Exception)
+			{
+				return new SearchQuery("", 0x7e2, 0, 0);
+			}
 		}
 
 		// Push a mail (DispatchMailMessage 0x2002), built byte-exact from the Mail row by MailMessageCodec. The base
@@ -150,29 +169,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return stream.ToArray();
 		}
 
-		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
-		// Category is echoed back as the search-results `head` (const 0x7E2 in the captures).
-		public static SearchQuery ParseSearch(FaolanStream body)
-		{
-			if (body == null)
-				return new SearchQuery("", 0x7e2, 0, 0);
-
-			try
-			{
-				var lang = Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
-				var cat = body.ReadUInt32(); // category root (const 0x7E2 in captures)
-				var page = body.ReadUInt32();
-				body.ReadUInt32(); // cat2 (mirror of cat)
-				var itemId = body.ReadUInt32();
-				return new SearchQuery(lang, cat, page, itemId);
-			}
-			catch (Exception)
-			{
-				return new SearchQuery("", 0x7e2, 0, 0);
-			}
-		}
-
 		public readonly record struct SearchQuery(string Lang, uint Category, uint Page, uint ItemId);
-
 	}
 }

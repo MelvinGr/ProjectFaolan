@@ -9,16 +9,17 @@ namespace Faolan.Core.Database.Tables
 	// the wire order; the texscript entry (id 0x10D) carries a resource string in Text. Cascade-deletes with its Npc.
 	public class NpcMorph : BaseEntity
 	{
+		public uint MorphId { get; set; }
+
+		public uint NpcId { get; set; }
+
 		[ForeignKey(nameof(NpcId))]
 		public virtual Npc Npc { get; set; }
 
-		public uint NpcId { get; set; }
 		public float Value { get; set; }
 		public int Ordinal { get; set; }
 
 		[MaxLength(128)]
 		public string Text { get; set; } = "";
-
-		public uint MorphId { get; set; }
 	}
 }

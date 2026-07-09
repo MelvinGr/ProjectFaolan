@@ -15,46 +15,17 @@ namespace Faolan.Importer.Cli
 		public static IReadOnlyList<IImportModule> All { get; } =
 		[
 			// --- capture modules ---
-			new ListingsModule(),
-			new StockPhrasesModule(),
-			new ItemsModule(),
-			new MapsModule(),
-			new SpellsModule(),
-			new StatDamageModule(),
-			new AbilitiesModule(),
-			new StartingSpellsModule(),
-			new CharactersModule(),
-			new ConversationsModule(),
-			new CharacterStateModule(),
-			new LearnedSpellsModule(),
-			new CharacterAbilitiesModule(),
-			new CharacterQuestsModule(),
-			new CharacterBankModule(),
-			new ShopsModule(),
-			new NpcsModule(),
-			new WorldObjectsModule(),
-			new MapLootModule(),
-			new QuestsModule(),
-			new MountsModule(), // opt-in
+			new ListingsModule(), new StockPhrasesModule(), new ItemsModule(), new MapsModule(), new SpellsModule(), new StatDamageModule(), new AbilitiesModule(), new StartingSpellsModule(),
+			new CharactersModule(), new ConversationsModule(), new CharacterStateModule(), new LearnedSpellsModule(), new CharacterAbilitiesModule(), new CharacterQuestsModule(),
+			new CharacterBankModule(), new ShopsModule(), new NpcsModule(), new WorldObjectsModule(), new MapLootModule(), new QuestsModule(), new MountsModule(), // opt-in
 			new PetsModule(), // opt-in (#307)
 			new RecipesModule(), // opt-in (crafting recipe book)
 			// --- tsv modules ---
-			new EllathaLevelsModule(),
-			new EllathaCombosModule(),
-			new WikiClassSpellsModule(),
-			new WikiSpellLevelsModule(),
+			new EllathaLevelsModule(), new EllathaCombosModule(), new WikiClassSpellsModule(), new WikiSpellLevelsModule(),
 			new StarterSpellLevelsModule(), // capture-sourced but runs late: overrides the ellatha/wiki levels
 			// --- rdb modules (opt-in, require --rdb) ---
-			new RdbInventoryModule(),
-			new RdbMorphsModule(),
-			new RdbAppearanceModule(),
-			new RdbSpellsModule(),
-			new RdbAbilitiesModule(),
-			new RdbCombosModule(),
-			new RdbMapsModule(),
-			new RdbLuaModule(),
-			new RdbRespawnsModule(),
-			new RdbItemsModule()
+			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbAbilitiesModule(), new RdbCombosModule(), new RdbMapsModule(), new RdbLuaModule(),
+			new RdbRespawnsModule(), new RdbItemsModule()
 		];
 
 		// The default set when no --only is given: every module that opts in (RDB + mounts are opt-in).

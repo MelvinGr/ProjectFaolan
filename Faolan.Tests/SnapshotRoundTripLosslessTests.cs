@@ -6,9 +6,9 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
+using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Abstractions;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {

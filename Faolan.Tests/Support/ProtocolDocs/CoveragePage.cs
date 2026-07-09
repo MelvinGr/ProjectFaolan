@@ -19,9 +19,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	public static class CoveragePage
 	{
 		public const string RelativePath = "docs/protocol/gen/coverage.md";
+		private static readonly Regex ClassDecl = new(@"\b(?:public|internal)\s+(?:static\s+|sealed\s+|abstract\s+|partial\s+)*class\s+(\w+)");
 
 		private static readonly Regex IirRef = new(@"GameServer0X2000Opcodes\.(\w+)");
-		private static readonly Regex ClassDecl = new(@"\b(?:public|internal)\s+(?:static\s+|sealed\s+|abstract\s+|partial\s+)*class\s+(\w+)");
+
 		// byte-exact test signals: golden loads + hex/byte asserts.
 		private static readonly string[] ByteExactMarkers = { "Golden.Bytes", "ToHexString", "TestPaths.Asset", "SequenceEqual" };
 
@@ -32,23 +33,20 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var testDir = Path.Combine(repo, "Faolan.Tests");
 
 			// The IIR type names up front - needed to detect the `<Base>Iir` builder-identifier convention below.
-			var allIirNames = typeof(GameServer0X2000Opcodes)
-				.GetFields(BindingFlags.Public | BindingFlags.Static)
-				.Select(f => f.Name)
-				.Where(n => n.EndsWith("IIR", StringComparison.Ordinal))
-				.ToList();
+			var allIirNames = typeof(GameServer0X2000Opcodes).GetFields(BindingFlags.Public | BindingFlags.Static).Select(f => f.Name).Where(n => n.EndsWith("IIR", StringComparison.Ordinal)).ToList();
 
 			// A codec "covers" an IIR type when its source references EITHER the opcode enum member
 			// (GameServer0X2000Opcodes.FooIIR) OR the builder/codec identifier convention `FooIir` (e.g.
 			// BuildCharacterActionIir, ComboBookIirCodec). The second catches builders that never name the enum.
 			var codecFiles = Directory.EnumerateFiles(codecDir, "*.cs", SearchOption.AllDirectories).ToList();
-			var codecToIir = new Dictionary<string, HashSet<string>>();      // codec class -> IIR type names
-			var iirToCodecs = new Dictionary<string, SortedSet<string>>();   // IIR type -> codec classes
+			var codecToIir = new Dictionary<string, HashSet<string>>(); // codec class -> IIR type names
+			var iirToCodecs = new Dictionary<string, SortedSet<string>>(); // IIR type -> codec classes
 			foreach (var file in codecFiles)
 			{
 				var text = File.ReadAllText(file);
 				var classes = ClassDecl.Matches(text).Select(m => m.Groups[1].Value).ToHashSet();
-				if (classes.Count == 0) continue;
+				if (classes.Count == 0)
+					continue;
 
 				var iirs = new HashSet<string>(IirRef.Matches(text).Select(m => m.Groups[1].Value));
 				foreach (var iir in allIirNames)
@@ -82,18 +80,18 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			foreach (var dir in new[] { Path.Combine(repo, "Faolan"), Path.Combine(repo, "Faolan.Core.Network") })
 			foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
 			{
-				if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") ||
-				    file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
-				    file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") ||
-				    file.EndsWith("Opcodes.cs", StringComparison.Ordinal)) // the enum DEFINITION, not a use
+				if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
+				    file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") || file.EndsWith("Opcodes.cs", StringComparison.Ordinal)) // the enum DEFINITION, not a use
 					continue;
+
 				var text = File.ReadAllText(file);
 				foreach (var iir in allIirNames)
 				{
-					if (builtSomewhere.Contains(iir)) continue;
+					if (builtSomewhere.Contains(iir))
+						continue;
+
 					var ident = iir[..^3] + "Iir";
-					if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal) ||
-					    Regex.IsMatch(text, Regex.Escape(ident) + @"(?![a-z0-9])"))
+					if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal) || Regex.IsMatch(text, Regex.Escape(ident) + @"(?![a-z0-9])"))
 					{
 						builtSomewhere.Add(iir);
 						builtIn[iir] = Path.GetFileNameWithoutExtension(file);
@@ -102,19 +100,20 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			}
 
 			// codec class -> has a byte-exact test.
-			var testTexts = Directory.EnumerateFiles(testDir, "*.cs", SearchOption.AllDirectories)
-				.Select(File.ReadAllText).ToList();
+			var testTexts = Directory.EnumerateFiles(testDir, "*.cs", SearchOption.AllDirectories).Select(File.ReadAllText).ToList();
+
 			bool HasByteExactTest(string codec)
 			{
 				var re = new Regex(@"\b" + Regex.Escape(codec) + @"\b");
 				return testTexts.Any(t => re.IsMatch(t) && ByteExactMarkers.Any(t.Contains));
 			}
+
 			var codecGolden = codecToIir.Keys.ToDictionary(c => c, HasByteExactTest);
 
 			// Level per IIR type.
 			var iirTypes = typeof(GameServer0X2000Opcodes)
 				.GetFields(BindingFlags.Public | BindingFlags.Static)
-				.Select(f => (Name: f.Name, Value: Convert.ToUInt32(f.GetRawConstantValue())))
+				.Select(f => (f.Name, Value: Convert.ToUInt32(f.GetRawConstantValue())))
 				.Where(x => x.Value >= 0x10000) // drop the command opcode (see iir-types.md)
 				.OrderBy(x => x.Name, StringComparer.Ordinal)
 				.ToList();
@@ -123,16 +122,31 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			{
 				if (iirToCodecs.TryGetValue(iir, out var codecs) && codecs.Any(c => codecGolden.GetValueOrDefault(c)))
 					return "V3";
-				return builtSomewhere.Contains(iir) ? "V2" : "V1";
+
+				return builtSomewhere.Contains(iir)
+					? "V2"
+					: "V1";
 			}
 
 			int v3 = 0, v2 = 0, v1 = 0;
 			foreach (var (name, _) in iirTypes)
 			{
-				switch (Level(name)) { case "V3": v3++; break; case "V2": v2++; break; default: v1++; break; }
+				switch (Level(name))
+				{
+					case "V3":
+						v3++;
+						break;
+					case "V2":
+						v2++;
+						break;
+					default:
+						v1++;
+						break;
+				}
 			}
 
-			var rpcTotal = typeof(GameCharAgentOpcodes).Assembly.GetTypes()
+			var rpcTotal = typeof(GameCharAgentOpcodes)
+				.Assembly.GetTypes()
 				.Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Network.Constants" && t.Name != "GameServer0X2000Opcodes")
 				.Sum(t => t.GetFields(BindingFlags.Public | BindingFlags.Static).Length);
 			var dissectors = Directory.EnumerateFiles(Path.Combine(repo, "Captures", "scripts"), "decode_*.py").Count();
@@ -184,10 +198,19 @@ namespace Faolan.Tests.Support.ProtocolDocs
 					builtBy = "—";
 				sb.AppendLine($"| {Level(name)} | `{name}` | {builtBy} |");
 			}
+
 			sb.AppendLine();
 			return sb.ToString();
 		}
 
-		private static int Rank(string level) => level switch { "V3" => 0, "V2" => 1, _ => 2 };
+		private static int Rank(string level)
+		{
+			return level switch
+			{
+				"V3" => 0,
+				"V2" => 1,
+				_    => 2
+			};
+		}
 	}
 }

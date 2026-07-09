@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -88,7 +88,10 @@ namespace Faolan.GameServer.Inventory
 					return;
 				}
 
-				var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment { CharacterId = character.Id };
+				var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment
+				{
+					CharacterId = character.Id
+				};
 
 				equipment[targetSlot] = item;
 
@@ -177,16 +180,9 @@ namespace Faolan.GameServer.Inventory
 				await _database.SetCharacterInventorySlot(character.Id, dKind, dPos, srcId, srcCount);
 				await _database.SetCharacterInventorySlot(character.Id, sKind, sPos, dstId, dstCount);
 
-				_logger.LogInformation("Persisted MOVE: item {Src} {SKind}[{SPos}] -> {DKind}[{DPos}]{Swap} for character {CharacterId}.",
-					srcId,
-					sKind,
-					sPos,
-					dKind,
-					dPos,
-					dstId.HasValue
-						? $" (swap with {dstId})"
-						: string.Empty,
-					character.Id);
+				_logger.LogInformation("Persisted MOVE: item {Src} {SKind}[{SPos}] -> {DKind}[{DPos}]{Swap} for character {CharacterId}.", srcId, sKind, sPos, dKind, dPos, dstId.HasValue
+					? $" (swap with {dstId})"
+					: string.Empty, character.Id);
 			}
 			catch (Exception ex)
 			{
@@ -216,13 +212,8 @@ namespace Faolan.GameServer.Inventory
 
 				await _database.SetCharacterInventorySlot(character.Id, bag, sourceSlot, src.ItemId, src.Count - splitSize);
 				await _database.SetCharacterInventorySlot(character.Id, bag, targetSlot, src.ItemId, splitSize);
-				_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.",
-					sourceSlot,
-					src.Count,
-					src.Count - splitSize,
-					targetSlot,
-					splitSize,
-					character.Id);
+				_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, src.Count - splitSize,
+					targetSlot, splitSize, character.Id);
 			}
 			catch (Exception ex)
 			{

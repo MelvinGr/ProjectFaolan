@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.CreateFlow;
@@ -77,13 +78,7 @@ namespace Faolan.Tests
 		private static List<(uint Handle, byte[] Body)> ExtractBurstDynelRecords()
 		{
 			var burst = Golden.Bytes("InitialBurst");
-			var sig = new byte[]
-			{
-				0x00,
-				0x00,
-				0xC8,
-				0x78
-			};
+			var sig = new byte[] { 0x00, 0x00, 0xC8, 0x78 };
 			var result = new List<(uint, byte[])>();
 			for (var i = 0; i + 13 < burst.Length;)
 			{

@@ -2,32 +2,10 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// Pure quest objective-tracking rules (docs/archive/quests-and-combat.md) - testable without the DB/network.
-	public static class QuestProgress
-	{
-		// True if a trigger of `triggerType` against `targetName` advances this quest's goal (#261): the quest is Active,
-		// its first goal is of that type and names that target, and the objective isn't already complete. The trigger
-		// fires per goal type - a kill (CombatService), a corpse-bag loot (LootService), or a talk (ConversationService).
-		// Required is clamped to >= 1 so a goal seeded with RequiredCount 0 still completes on the first trigger.
-		public static bool Advances(CharacterQuest quest, QuestGoalDefinition goal, QuestGoalType triggerType, string targetName)
-		{
-			return quest.State == QuestState.Active && goal != null && goal.GoalType == triggerType && !string.IsNullOrEmpty(goal.TargetName) && !string.IsNullOrEmpty(targetName) &&
-				   goal.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase) && quest.GoalProgress < Math.Max(quest.GoalRequired, 1);
-		}
-
-		// True if killing an NPC named `npcName` advances this quest's kill objective (active, matching, not yet done).
-		public static bool AdvancesOnKill(CharacterQuest quest, string npcName)
-		{
-			return quest.State == QuestState.Active && !string.IsNullOrEmpty(quest.GoalTargetName) && !string.IsNullOrEmpty(npcName) && quest.GoalTargetName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
-				   quest.GoalProgress < quest.GoalRequired;
-		}
-	}
-
 	// Quest state packets, decoded from captures (docs/archive/quests-and-combat.md). These build the 0x2000 IIR record
 	// bodies (after the u32 length prefix). Quest text (title/desc/journal) is NOT sent here - the client renders it
 	// from its RDB by quest id; the server only drives quest STATE + objective progress. The full accept/branch logic
@@ -69,7 +47,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// Builders emit from the subopcode onward; the 4-byte length prefix is added by the send layer
 		// (matching BuildQuestIir/BuildQuestGoal).
 
-
 		// Quest state codes (from the capture). On completion retail sends QuestIIR twice for the quest: state 2
 		// (active/update) then state 4 (completed) - see the Stihetfv compeltefirstquest capture (13479 idx858/860).
 		public const uint StateActive = 2;
@@ -90,8 +67,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		//   <objective text 50304> <objective localized> [00]
 		// The mid-run scalars (0x50/0x64/0x7e2/0x0c ...) are not yet semantically pinned; they are
 		// reproduced as a documented template and locked by the golden test.
-		public static byte[] BuildQuestFullUpdate(uint playerHandle, uint questId, uint state, uint areaId, IReadOnlyList<byte[]> textRefs, uint goalId, ulong acceptTime, uint mapId, uint markerX, uint markerY,
-			byte[] objectiveText, byte[] objectiveLocalized)
+		public static byte[] BuildQuestFullUpdate(uint playerHandle, uint questId, uint state, uint areaId, IReadOnlyList<byte[]> textRefs, uint goalId, ulong acceptTime, uint mapId, uint markerX,
+			uint markerY, byte[] objectiveText, byte[] objectiveLocalized)
 		{
 			var w = new FaolanStream();
 			WriteHeader(w, (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, playerHandle);

@@ -11,10 +11,15 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	{
 		public static byte[] BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
 		{
-			var body = new FaolanStream().WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle).WriteUInt32(EntityClass.Character).WriteUInt32(liveInstance).WriteArray(cameraParams ?? []).ToArray();
+			var body = new FaolanStream()
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(npcHandle)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(liveInstance)
+				.WriteArray(cameraParams ?? [])
+				.ToArray();
 
-			var ps = new PacketStream().WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, agentInstance),
-				Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, liveInstance),
+			var ps = new PacketStream().WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, agentInstance), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, liveInstance),
 				(ushort)ConversationScreenDecoder.SetDialogueCamera);
 			ps.WriteArray(body);
 			ps.WriteLengthHash();

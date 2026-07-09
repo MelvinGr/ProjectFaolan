@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,8 +16,39 @@ namespace Faolan.Core.Database.Tables
 		// depends on the exact value, so this only affects the wire member record (now retail-accurate). See #306.
 		public const byte GuildLeaderRank = 4;
 
+		public uint AccountId { get; set; }
+
 		[ForeignKey(nameof(AccountId))]
 		public virtual Account Account { get; set; }
+
+		// Bind / recall point: the resurrection point the Totem of Origin (and, later, death-recall) returns the
+		// character to. A reference to a RespawnPoint the player has DISCOVERED (CharacterRespawnPoint) - set by a
+		// wayfarer NPC (today: the .bind GM command). It answers the client's RequestBindLocation poll (the Totem
+		// destination playfield) and resolves to the point's map+position on recall. Null = UNBOUND (falls back to the
+		// character's current map). See issue #64.
+		public uint? BindRespawnPointId { get; set; }
+
+		[ForeignKey(nameof(BindRespawnPointId))]
+		public virtual RespawnPoint BindRespawnPoint { get; set; }
+
+		// Guild membership; null = guildless. Rank 0 = fresh member (retail's invite-accept record), higher =
+		// promoted; the guild creator gets GuildLeaderRank. See Captures/scripts/decode_guild.py for the wire records.
+		public uint? GuildId { get; set; }
+
+		[ForeignKey(nameof(GuildId))]
+		public virtual Guild Guild { get; set; }
+
+		// Required: a character always lives on a map; Tortage Beach is the universal fallback world.
+		public uint MapId { get; set; } = Map.TortageBeachId;
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
+
+		// Required: set on creation (CreateCharacter) and by the capture importer.
+		public uint RealmId { get; set; }
+
+		[ForeignKey(nameof(RealmId))]
+		public virtual Realm Realm { get; set; }
 
 		public virtual CharacterBody Body { get; set; }
 		public virtual CharacterEquipment Equipment { get; set; }
@@ -24,9 +56,6 @@ namespace Faolan.Core.Database.Tables
 		// One-to-one max-stat block (Health/Mana/Stamina, player-facing values). Created with class/level
 		// defaults on character creation; the ×100 vitals wire scale is applied when sending (CharacterStatBlock).
 		public virtual CharacterMaxStats MaxStats { get; set; }
-
-		[ForeignKey(nameof(GuildId))]
-		public virtual Guild Guild { get; set; }
 
 		// The spawn's IIR scaffold, structured so it can be generated instead of template-copied: the uniform
 		// entry table (Attributes), the feat/ability ID list (Skills), the two ending pair lists (ScaffoldPairs)
@@ -52,15 +81,6 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterSkill> Skills { get; set; }
 		public virtual ICollection<CharacterSpell> Spells { get; set; }
 		public virtual ICollection<CharacterTag> Tags { get; set; }
-
-		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
-
-		[ForeignKey(nameof(RealmId))]
-		public virtual Realm Realm { get; set; }
-
-		[ForeignKey(nameof(BindRespawnPointId))]
-		public virtual RespawnPoint BindRespawnPoint { get; set; }
 
 		// True once a bind point has been set (an unbound character recalls to / reports its current map).
 		[NotMapped]
@@ -100,25 +120,7 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string Name { get; set; }
 
-		public uint AccountId { get; set; }
 		public uint Experience { get; set; }
-
-		// Required: a character always lives on a map; Tortage Beach is the universal fallback world.
-		public uint MapId { get; set; } = Map.TortageBeachId;
-
-		// Required: set on creation (CreateCharacter) and by the capture importer.
-		public uint RealmId { get; set; }
-
-		// Bind / recall point: the resurrection point the Totem of Origin (and, later, death-recall) returns the
-		// character to. A reference to a RespawnPoint the player has DISCOVERED (CharacterRespawnPoint) - set by a
-		// wayfarer NPC (today: the .bind GM command). It answers the client's RequestBindLocation poll (the Totem
-		// destination playfield) and resolves to the point's map+position on recall. Null = UNBOUND (falls back to the
-		// character's current map). See issue #64.
-		public uint? BindRespawnPointId { get; set; }
-
-		// Guild membership; null = guildless. Rank 0 = fresh member (retail's invite-accept record), higher =
-		// promoted; the guild creator gets GuildLeaderRank. See Captures/scripts/decode_guild.py for the wire records.
-		public uint? GuildId { get; set; }
 
 		// Wallet, in tin (the wire unit and the game's smallest coin; 100 tin = 1 copper, 100 copper = 1 silver,
 		// 100 silver = 1 gold). Pushed to the client as a 0x2005 money update [u64 balance][u32 reason] whenever

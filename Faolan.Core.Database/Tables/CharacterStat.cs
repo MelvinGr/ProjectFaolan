@@ -13,6 +13,8 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(Ordinal))]
 	public class CharacterStat
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
@@ -21,8 +23,6 @@ namespace Faolan.Core.Database.Tables
 		// Position in the stat block: 0..16 = StatList#1 (displayed), 17.. = StatList#2 (sheet). Preserves order and
 		// disambiguates repeated stat ids.
 		public int Ordinal { get; set; }
-
-		public uint CharacterId { get; set; }
 
 		public uint Value { get; set; }
 	}

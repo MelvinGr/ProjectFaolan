@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
@@ -40,13 +40,16 @@ namespace Faolan.GameServer.Dialogue
 			var phrases = _phrases ??= await _database.GetStockPhrases();
 			if (!phrases.TryGetValue(stockKey, out var textBytes))
 			{
-				_logger.LogWarning("PlayStockphraseAsSubtitle: no StockPhrases row for {Key} (tc=0x{Tc:X8}) - client will time out; re-run the importer's stock-phrases module against a capture that has it", stockKey, threadContext);
+				_logger.LogWarning(
+					"PlayStockphraseAsSubtitle: no StockPhrases row for {Key} (tc=0x{Tc:X8}) - client will time out; re-run the importer's stock-phrases module against a capture that has it",
+					stockKey, threadContext);
 				return;
 			}
 
 			var id = client.Session.Account.ClientInstance;
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
+					GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText)
 				.WriteArray(BuildReceivedStockPhraseBody(threadContext, textBytes))
 				.SendAsync(client);
 

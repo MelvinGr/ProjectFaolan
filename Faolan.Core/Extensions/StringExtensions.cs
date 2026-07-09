@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using System.Text;
 
 namespace Faolan.Core.Extensions
 {
@@ -38,11 +37,8 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? byte.TryParse(str.AsSpan(str[0] == '#'
-							? 1
-							: 2),
-						NumberStyles.HexNumber,
-						CultureInfo.InvariantCulture,
-						out output)
+						? 1
+						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
 					: byte.TryParse(str, out output);
 			}
 
@@ -50,11 +46,8 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? ushort.TryParse(str.AsSpan(str[0] == '#'
-							? 1
-							: 2),
-						NumberStyles.HexNumber,
-						CultureInfo.InvariantCulture,
-						out output)
+						? 1
+						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
 					: ushort.TryParse(str, out output);
 			}
 
@@ -62,11 +55,8 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? uint.TryParse(str.AsSpan(str[0] == '#'
-							? 1
-							: 2),
-						NumberStyles.HexNumber,
-						CultureInfo.InvariantCulture,
-						out output)
+						? 1
+						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
 					: uint.TryParse(str, out output);
 			}
 
@@ -74,42 +64,9 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? ulong.TryParse(str.AsSpan(str[0] == '#'
-							? 1
-							: 2),
-						NumberStyles.HexNumber,
-						CultureInfo.InvariantCulture,
-						out output)
+						? 1
+						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
 					: ulong.TryParse(str, out output);
-			}
-		}
-
-		extension(byte[] bytes)
-		{
-			public string GetPrintable()
-			{
-				var builder = new StringBuilder();
-				foreach (var b in bytes)
-				{
-					if (b is >= 0x21 and <= 0x7e)
-						builder.Append((char)b);
-					else if (b == '\n')
-						builder.Append(' ');
-				}
-
-				return builder.ToString();
-			}
-
-			public string ToAsciiRepresentation(char nonPrintable = '.')
-			{
-				var builder = new StringBuilder(bytes.Length);
-				foreach (var b in bytes)
-				{
-					builder.Append(b is >= 0x20 and <= 0x7e
-						? (char)b
-						: nonPrintable);
-				}
-
-				return builder.ToString();
 			}
 		}
 	}

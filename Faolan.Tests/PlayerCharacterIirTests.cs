@@ -3,8 +3,8 @@ using System.IO;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Protobuf;
-using Xunit;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {

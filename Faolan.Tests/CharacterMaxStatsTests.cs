@@ -62,7 +62,10 @@ namespace Faolan.Tests
 		public void RegenerateMaxStats_UpdatesExistingRowInPlace()
 		{
 			// Seeded baseline (level-1 rogue default before the class is chosen).
-			var character = new Character { Level = 1 };
+			var character = new Character
+			{
+				Level = 1
+			};
 			character.RegenerateMaxStats();
 			var seeded = character.MaxStats;
 

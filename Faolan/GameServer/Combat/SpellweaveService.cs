@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Constants;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
@@ -53,8 +54,9 @@ namespace Faolan.GameServer.Combat
 		private readonly Func<INetworkClient, uint, uint, uint, Task> _removeBuff; // SendBuffRemoval end-twin
 		private readonly ILogger _logger;
 
-		public SpellweaveService(ILogger logger, Func<INetworkClient, string, Task> feedback, Func<INetworkClient, uint, uint, uint, Task> applySpell = null, Func<INetworkClient, byte[], Task> sendIir = null,
-			Func<INetworkClient, uint, uint, uint, Task> removeBuff = null, Func<INetworkClient, uint, Task> sendSprintBar = null, Action<INetworkClient> ensureEnergyLoop = null)
+		public SpellweaveService(ILogger logger, Func<INetworkClient, string, Task> feedback, Func<INetworkClient, uint, uint, uint, Task> applySpell = null,
+			Func<INetworkClient, byte[], Task> sendIir = null, Func<INetworkClient, uint, uint, uint, Task> removeBuff = null, Func<INetworkClient, uint, Task> sendSprintBar = null,
+			Action<INetworkClient> ensureEnergyLoop = null)
 		{
 			_logger = logger;
 			_feedback = feedback;
@@ -107,24 +109,22 @@ namespace Faolan.GameServer.Combat
 			// cooldown by re-sending the full list, so the flow is: pick -> picker disappears -> ~cooldown -> reappears.
 			if (profile != null && _sendIir != null)
 			{
-				Task.RunAfter(ElementCooldownMs,
-					async () =>
+				Task.RunAfter(ElementCooldownMs, async () =>
+				{
+					var session = client.Session;
+					if (session?.Account == null || !session.IsSpellweaving)
+						return;
+
+					// Refresh the Spellweaving buff at the NEXT stack level (a new buff id that overlaps the previous
+					// one still ticking down -> the brief x2 the user sees), then bring the picker back.
+					if (_applySpell != null)
 					{
-						var session = client.Session;
-						if (session?.Account == null || !session.IsSpellweaving)
-							return;
+						session.SpellweaveBuffStack++;
+						await _applySpell(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8);
+					}
 
-						// Refresh the Spellweaving buff at the NEXT stack level (a new buff id that overlaps the previous
-						// one still ticking down -> the brief x2 the user sees), then bring the picker back.
-						if (_applySpell != null)
-						{
-							session.SpellweaveBuffStack++;
-							await _applySpell(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8);
-						}
-
-						await _sendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
-					},
-					_logger);
+					await _sendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
+				}, _logger);
 			}
 
 			await Feedback(client, $"Weave component added ({session.WeaveComponents.Count}).");

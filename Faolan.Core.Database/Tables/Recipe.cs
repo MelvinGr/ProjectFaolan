@@ -1,6 +1,5 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -18,13 +17,13 @@ namespace Faolan.Core.Database.Tables
 	// the item templates); normalising ingredients/results into child tables is the follow-up.
 	public class Recipe : BaseEntity
 	{
+		// The decoded ingredient (input) + result (output) items - a queryable projection of Data's KEY1/listC
+		// element lists (TradeskillRecipeCodec.ParseRecordItems). Data stays the byte-exact wire source.
+		public virtual ICollection<RecipeItem> Items { get; set; } = new List<RecipeItem>();
+
 		// The record bytes AFTER the leading list-key (which is Id): everything FUN_0077be70 reads plus the trailing
 		// 1-byte flag. The wire list element is [u32 Id][Data]; the builder reproduces exactly that.
 		[Column(TypeName = "BLOB")]
 		public byte[] Data { get; set; } = [];
-
-		// The decoded ingredient (input) + result (output) items - a queryable projection of Data's KEY1/listC
-		// element lists (TradeskillRecipeCodec.ParseRecordItems). Data stays the byte-exact wire source.
-		public virtual ICollection<RecipeItem> Items { get; set; } = new List<RecipeItem>();
 	}
 }

@@ -5,18 +5,6 @@ using System.Text;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// One entry in a HUMANOID NPC's FA015807 post-IIR APPEARANCE / morph table: a morph id, its float value, and
-	// an optional texscript string (e.g. the "*ii=-1;*bl=-1" colour ref carried on the id 0x10D entry). This is
-	// the data the minimal post-IIR drops, which renders the NPC bald (Gitea #243). Lifting it into rows lets the
-	// post-IIR generate from the DB so NpcSpawn.Data can be retired (#185). Grammar + round-trip oracle:
-	// Captures/scripts/decode_npc_morphs.py.
-	public sealed class NpcAppearanceMorph
-	{
-		public float Value { get; set; }
-		public string Text { get; set; } = "";
-		public uint MorphId { get; set; }
-	}
-
 	// Decodes / re-encodes the humanoid NPC post-IIR appearance table byte-exact. The post-IIR (the stream after
 	// the embedded CoreCharacterIIR) of a humanoid is its morph table, NOT runtime state - dropping it renders the
 	// NPC bald (#243). Animals carry no table (they ship the 41-byte minimal form, NpcSpawnScaffold.BuildMinimalPostIir);
@@ -40,13 +28,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The constant tail after the entry list: empty pair list + 0x3F1 markers (same terminators the minimal
 		// form ends on). 00 00 03 F1 | 00 00 03 F1 | 00 00 00 00 00 00 00 00 | 00 00 03 F1.
-		private static readonly byte[] Terminator =
-		[
-			0x00, 0x00, 0x03, 0xF1,
-			0x00, 0x00, 0x03, 0xF1,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x03, 0xF1
-		];
+		private static readonly byte[] Terminator = [0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1];
 
 		// Builds the post-IIR bytes for a humanoid from its morph rows (the inverse of TryDecodeAppearance).
 		public static byte[] BuildPostIir(IReadOnlyList<NpcAppearanceMorph> morphs)
@@ -152,5 +134,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			morphs = result;
 			return true;
 		}
+	}
+
+	// One entry in a HUMANOID NPC's FA015807 post-IIR APPEARANCE / morph table: a morph id, its float value, and
+	// an optional texscript string (e.g. the "*ii=-1;*bl=-1" colour ref carried on the id 0x10D entry). This is
+	// the data the minimal post-IIR drops, which renders the NPC bald (Gitea #243). Lifting it into rows lets the
+	// post-IIR generate from the DB so NpcSpawn.Data can be retired (#185). Grammar + round-trip oracle:
+	// Captures/scripts/decode_npc_morphs.py.
+	public sealed class NpcAppearanceMorph
+	{
+		public uint MorphId { get; set; }
+		public float Value { get; set; }
+		public string Text { get; set; } = "";
 	}
 }

@@ -7,8 +7,13 @@ namespace Faolan.Core.Database.Tables
 	// (RefId, Category) against its RDB.
 	public class QuestTextRef : BaseEntity
 	{
-		[ForeignKey(nameof(QuestDefinitionId))]
+		[Column("QuestDefinitionId")]
+		public uint QuestId { get; set; }
+
+		[ForeignKey(nameof(QuestId))]
 		public virtual QuestDefinition Quest { get; set; }
+
+		public uint RefId { get; set; }
 
 		// True for <localized> slots (which carry Flags and have no closing tag); false for <remoteformat>.
 		public bool IsLocalized { get; set; }
@@ -25,9 +30,5 @@ namespace Faolan.Core.Database.Tables
 		public string KeyText { get; set; }
 
 		public uint Category { get; set; }
-
-		public uint QuestDefinitionId { get; set; }
-
-		public uint RefId { get; set; }
 	}
 }

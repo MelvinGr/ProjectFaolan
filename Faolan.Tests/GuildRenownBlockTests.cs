@@ -1,3 +1,4 @@
+using Faolan.Core;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Tests.Support;
@@ -28,7 +29,7 @@ namespace Faolan.Tests
 			Assert.Equal((byte)0x01, block.Flag);
 			Assert.Equal(GuildRenownBlock.StatSlotIds, block.StatIds);
 			Assert.Equal(3, block.List2.Length); // the second 0x3F1 list (count 3)
-												 // RenownCounters[1] is the renown total that ticked between the two captured snapshots.
+			// RenownCounters[1] is the renown total that ticked between the two captured snapshots.
 			Assert.Equal(20085677ul, block.RenownCounters[1]);
 		}
 
@@ -41,7 +42,7 @@ namespace Faolan.Tests
 			Assert.Equal(golden, block.Encode());
 
 			// ICodec stream Read/ToArray round-trips too.
-			Assert.Equal(golden, GuildRenownBlock.Read(new Faolan.Core.FaolanStream(golden)).ToArray());
+			Assert.Equal(golden, GuildRenownBlock.Read(new FaolanStream(golden)).ToArray());
 		}
 
 		[Fact]

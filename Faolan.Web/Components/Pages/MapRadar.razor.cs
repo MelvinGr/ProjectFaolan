@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -11,10 +14,10 @@ namespace Faolan.Web.Components.Pages
 		private IJSObjectReference? _module;
 		private List<(uint Id, string Name)> _maps = [];
 
+		private uint MapId { get; set; } = 4010; // Tortage Island default
+
 		[CascadingParameter]
 		private Task<AuthenticationState>? AuthState { get; set; }
-
-		private uint MapId { get; set; } = 4010; // Tortage Island default
 
 		public async ValueTask DisposeAsync()
 		{
@@ -56,8 +59,7 @@ namespace Faolan.Web.Components.Pages
 
 			await using var db = await DbFactory.CreateDbContextAsync();
 			_maps = (await db
-					.Maps
-					.OrderBy(m => m.Id)
+					.Maps.OrderBy(m => m.Id)
 					.Select(m => new
 					{
 						m.Id,

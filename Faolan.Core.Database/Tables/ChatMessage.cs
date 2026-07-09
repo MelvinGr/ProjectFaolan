@@ -11,6 +11,15 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(SentAt)), Index(nameof(ChannelId))]
 	public class ChatMessage : BaseEntity
 	{
+		public uint ChannelId { get; set; }
+
+		// The sender's ClientInstance (== character id for a player; see player_handle_equals_character_id). 0 for a
+		// system/synthetic sender.
+		public uint SenderId { get; set; }
+
+		// Non-null for a whisper/tell: the recipient character id. Null for a channel post.
+		public uint? TargetId { get; set; }
+
 		// True if this line was a private tell rather than a channel broadcast.
 		public bool IsWhisper { get; set; }
 
@@ -26,14 +35,5 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(512)]
 		public string Text { get; set; }
-
-		public uint ChannelId { get; set; }
-
-		// The sender's ClientInstance (== character id for a player; see player_handle_equals_character_id). 0 for a
-		// system/synthetic sender.
-		public uint SenderId { get; set; }
-
-		// Non-null for a whisper/tell: the recipient character id. Null for a channel post.
-		public uint? TargetId { get; set; }
 	}
 }

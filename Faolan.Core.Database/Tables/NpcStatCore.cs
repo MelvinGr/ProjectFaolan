@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ namespace Faolan.Core.Database.Tables
 	public class NpcStatCore
 	{
 		public uint NpcId { get; set; }
+
 		[ForeignKey(nameof(NpcId))]
 		public virtual Npc Npc { get; set; }
 
@@ -45,6 +47,7 @@ namespace Faolan.Core.Database.Tables
 		// The wire sex code, same enum as players (None=0 for genderless creatures, Male=2, Female=3).
 		[ConstrainToEnumValues]
 		public Sex? Sex { get; set; }
+
 		public uint? Side { get; set; }
 		public uint? Flags { get; set; }
 		public uint? HeadMesh { get; set; }
@@ -98,7 +101,9 @@ namespace Faolan.Core.Database.Tables
 		public uint? HearingSkill { get; set; }
 		public uint? SmellingSkill { get; set; }
 		public uint? SpawnAnimation { get; set; }
+
 		public uint? LosHeight { get; set; }
+
 		// The faction this NPC belongs to (membership). See the Community note above re: player reputation (#315).
 		public uint? FactionId { get; set; }
 

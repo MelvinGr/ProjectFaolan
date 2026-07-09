@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Tables
 		// defines no real RespawnPoint. A TRANSIENT carrier (never persisted; Id 0 = no DB point, not a real spawn id)
 		// positioned at the Tortage Beach new-player spawn. Maps with their own RespawnPoints advertise their real
 		// RespawnPoint.Id instead (the id RespawnMe echoes back).
-		public static readonly RespawnPoint NewPlayerSpawnSpawnPoint = new RespawnPoint
+		public static readonly RespawnPoint NewPlayerSpawnSpawnPoint = new()
 		{
 			Id = 0,
 			MapId = TortageBeachId,

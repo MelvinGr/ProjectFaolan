@@ -13,7 +13,14 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// (WriteHeader with the world endpoints) and the live send.
 	public sealed record GuildTagBody(uint CharacterId, string GuildName) : ICodec<GuildTagBody>
 	{
-
+		public static GuildTagBody Read(FaolanStream s)
+		{
+			s.ReadUInt32(); // subop
+			s.ReadUInt32(); // 0xC350 marker
+			var characterId = s.ReadUInt32();
+			s.ReadUInt16(); // constant 0
+			return new GuildTagBody(characterId, s.ReadString());
+		}
 
 		public void Write(FaolanStream s)
 		{
@@ -22,15 +29,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 			s.WriteUInt32(CharacterId);
 			s.WriteUInt16(0);
 			s.WriteString(GuildName);
-		}
-
-		public static GuildTagBody Read(FaolanStream s)
-		{
-			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350 marker
-			var characterId = s.ReadUInt32();
-			s.ReadUInt16(); // constant 0
-			return new GuildTagBody(characterId, s.ReadString());
 		}
 
 		// Zero-copy inverse over a raw body: recovers (characterId, guildName), validating the sub-opcode + C350 wire

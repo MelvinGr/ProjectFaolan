@@ -2,8 +2,8 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Extensions;
-using Xunit;
 using Faolan.Core.Network.Codecs.World;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -68,11 +68,7 @@ namespace Faolan.Tests
 		public void PathBody_LiveOverload_ComputesPathLengthAndStaysWellFormed()
 		{
 			var from = new Vector3(10, 0, 0);
-			var wps = new[]
-			{
-				from,
-				new Vector3(13, 0, 4)
-			}; // dist(from, last) = 5
+			var wps = new[] { from, new Vector3(13, 0, 4) }; // dist(from, last) = 5
 
 			var body = MoveTaskCodec.BuildPathBody(0x00017E45, from, wps);
 
@@ -93,7 +89,8 @@ namespace Faolan.Tests
 
 			var body = MoveTaskCodec.BuildPathBody(0x00017E45, from, [from, wp1], pathLength);
 
-			Assert.Equal("96c467400000c35000017e4500004414b6554330d189443640ed010100000000024414b6554330d189443640ed44144be743313d4f4433ebe700" + "4117c22d0000000000000000000000004414b6554330d189443640ed",
+			Assert.Equal(
+				"96c467400000c35000017e4500004414b6554330d189443640ed010100000000024414b6554330d189443640ed44144be743313d4f4433ebe700" + "4117c22d0000000000000000000000004414b6554330d189443640ed",
 				Convert.ToHexStringLower(body));
 		}
 

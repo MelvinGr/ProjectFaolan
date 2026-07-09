@@ -10,6 +10,7 @@ namespace Faolan.UniverseAgent
 	partial class UniverseAgentListener
 	{
 		private static readonly byte[] Sender = [0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01];
+
 		private Task SendPlayerAgentRealm(INetworkClient client)
 		{
 			return new PacketStream()
@@ -24,7 +25,10 @@ namespace Faolan.UniverseAgent
 
 		private static Task InitAuth(INetworkClient client)
 		{
-			return new PacketStream().WriteHeader(Sender, [0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42], UniverseAgentResponseOpcodes.DispatchChallenge).WriteString(client.Session.Account.AuthChallenge).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(Sender, [0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42], UniverseAgentResponseOpcodes.DispatchChallenge)
+				.WriteString(client.Session.Account.AuthChallenge)
+				.SendAsync(client);
 		}
 
 		private static Task SendInvalidLogin(INetworkClient client, InvalidLoginReasons reason)

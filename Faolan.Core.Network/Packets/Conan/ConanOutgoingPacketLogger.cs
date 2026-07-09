@@ -36,13 +36,8 @@ namespace Faolan.Core.Network.Packets.Conan
 					var subOpcodeValue = data.ReadUInt32();
 					var subOpcodeName = FormatSubOpcodeName(_subOpcodeEnumType, subOpcodeValue);
 
-					_logger.LogInformation("<= [{Channel} {OpcodeName}] subOpcode={SubOpcodeName}, payloadLength={PayloadLength}, bodyLength={BodyLength}, packetLength={PacketLength}",
-						_channelName,
-						opcodeName,
-						subOpcodeName,
-						payloadLength,
-						packet.Body.Length,
-						packet.Bytes.Length);
+					_logger.LogInformation("<= [{Channel} {OpcodeName}] subOpcode={SubOpcodeName}, payloadLength={PayloadLength}, bodyLength={BodyLength}, packetLength={PacketLength}", _channelName,
+						opcodeName, subOpcodeName, payloadLength, packet.Body.Length, packet.Bytes.Length);
 					LogDebugDetails(opcodeName, packet);
 
 					if (subOpcodeValue == (uint)GameServer0X2000Opcodes.StatIIR && data.Length >= 25)
@@ -52,14 +47,8 @@ namespace Faolan.Core.Network.Packets.Conan
 						var flag = data.ReadByte();
 						var value0 = data.ReadUInt32();
 						var value1 = data.ReadUInt32();
-						_logger.LogInformation("<= [{Channel} {OpcodeName}] 0xF98E10B3 unk0={Unk0:X}, characterId={CharacterId:X}, flag={Flag:X2}, value0={Value0:X}, value1={Value1:X}",
-							_channelName,
-							opcodeName,
-							unk0,
-							characterId,
-							flag,
-							value0,
-							value1);
+						_logger.LogInformation("<= [{Channel} {OpcodeName}] 0xF98E10B3 unk0={Unk0:X}, characterId={CharacterId:X}, flag={Flag:X2}, value0={Value0:X}, value1={Value1:X}", _channelName,
+							opcodeName, unk0, characterId, flag, value0, value1);
 					}
 
 					return;

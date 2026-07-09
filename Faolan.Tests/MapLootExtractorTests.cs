@@ -35,17 +35,18 @@ namespace Faolan.Tests
 		[Fact]
 		public void Extract_IgnoresBagsBeforeAnyMapChange()
 		{
-			Assert.Empty(MapLootExtractor.Extract(new List<CapturedPacket> { LootBag(Convert.FromHexString(RecordHex)) }));
+			Assert.Empty(MapLootExtractor.Extract(new List<CapturedPacket>
+			{
+				LootBag(Convert.FromHexString(RecordHex))
+			}));
 		}
 
 		[Fact]
 		public void Merge_DedupsRepeatedMapItemPairs()
 		{
 			var merged = MapLootExtractor.Merge([
-				new MapLootPoolEntry(4010, 1),
-				new MapLootPoolEntry(4010, 1), // duplicate (same map + item)
-				new MapLootPoolEntry(4010, 2),
-				new MapLootPoolEntry(4020, 1) // same item, different map - kept
+				new MapLootPoolEntry(4010, 1), new MapLootPoolEntry(4010, 1), // duplicate (same map + item)
+				new MapLootPoolEntry(4010, 2), new MapLootPoolEntry(4020, 1) // same item, different map - kept
 			]);
 
 			Assert.Equal(3, merged.Count);

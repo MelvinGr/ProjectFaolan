@@ -39,7 +39,10 @@ namespace Faolan.Tests
 			var record = Convert.FromHexString(RecordHex);
 			Assert.True(SimpleDynelMessageCodec.TryParse(record, out var msg, out _, out _));
 
-			var row = new WorldObject { SubOpcode = SimpleDynelMessageCodec.SubOpcode };
+			var row = new WorldObject
+			{
+				SubOpcode = SimpleDynelMessageCodec.SubOpcode
+			};
 			SimpleDynelMessageCodec.ApplyColumns(row, msg); // importer side
 			Assert.Equal("Acheronian Ruins", row.Name);
 			Assert.Equal(1u, row.CarsGroup);

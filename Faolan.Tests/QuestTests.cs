@@ -80,10 +80,8 @@ namespace Faolan.Tests
 			// stricken997 randochar capture, frame 687 (fresh Casilda offer, player 0x0131720B).
 			var textRefs = new[]
 			{
-				WorldQuest.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
-				WorldQuest.RemoteFormat(13479, 50302, "iHLlH81PhqeCC&#36;cD0VwJ"),
-				WorldQuest.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
-				WorldQuest.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
+				WorldQuest.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"), WorldQuest.RemoteFormat(13479, 50302, "iHLlH81PhqeCC&#36;cD0VwJ"),
+				WorldQuest.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"), WorldQuest.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
 				WorldQuest.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/")
 			};
 			var objectiveText = WorldQuest.RemoteFormat(5744, 50304, "M8Zw&quot;&quot;xo*V@DWHQ&amp;oPn1");
@@ -116,8 +114,7 @@ namespace Faolan.Tests
 			// stricken998 strickenbla capture, frame 9947 (single-quest journal for 13479).
 			var areaHeader = new[]
 			{
-				WorldQuest.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
-				WorldQuest.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
+				WorldQuest.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"), WorldQuest.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
 				WorldQuest.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr")
 			};
 			var entries = new[]
@@ -137,7 +134,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildScryCreationStep_MatchesCapture()
 		{
-			const string token = "<remoteformat token=\"playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley (server-side)\" category=\"50023\" key=\"&quot;B]SZ.AGRGrAyOGe*BG-\" knubot=\"0\"  ></remoteformat>";
+			const string token =
+				"<remoteformat token=\"playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley (server-side)\" category=\"50023\" key=\"&quot;B]SZ.AGRGrAyOGe*BG-\" knubot=\"0\"  ></remoteformat>";
 			const string resources =
 				"1010004:793713;1010004:793714;1070003:4000;1000097:4000;1010030:156211;1010030:239448;1010030:565913;1010004:3728533;1060668:4000;1000059:4000;1060667:167368;1010004:3075445;1010004:3180025;1010004:221285;1010004:3663190;1010004:208923;1010004:208266;1010004:226891;1010004:3663191;1010004:3656109;1010030:210069;1010001:210070;1010004:3075452;1010004:3075450;1010004:3075451;1010300:4000;1000049:4000;1066611:4000;1000013:40000000;1000015:40000000;1010506:4000;1000058:4000;1010207:110006;1010207:262241;1010207:568806;1010207:3420331;1010207:167183";
 
@@ -154,12 +152,15 @@ namespace Faolan.Tests
 		public void BuildScryStep_MatchesCapture()
 		{
 			Assert.Equal("a36d3b740000c35001316d8a00000000190805100218002209496e74726f446f6e652a00320408001000", Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "IntroDone")).ToLowerInvariant());
-			Assert.Equal("a36d3b740000c35001316d8a000000001908051002180622094368616e67655365782a00320408001000", Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "ChangeSex", flag: 6)).ToLowerInvariant());
+			Assert.Equal("a36d3b740000c35001316d8a000000001908051002180622094368616e67655365782a00320408001000",
+				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "ChangeSex", flag: 6)).ToLowerInvariant());
 
 			// The PostReadyBurst login destiny steps (records 2 + 4), proving BuildStep reproduces them so the
 			// verbatim byte arrays there can be retired (construct, don't replay - #191).
-			Assert.Equal("a36d3b740000c35001316d8a000000001c080510021800220c5374617274466978656433642a00320408001000", Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "StartFixed3d")).ToLowerInvariant());
-			Assert.Equal("a36d3b740000c35001316d8a000000001f080510021800220f57656c636f6d655475746f7269616c2a00320408001000", Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "WelcomeTutorial")).ToLowerInvariant());
+			Assert.Equal("a36d3b740000c35001316d8a000000001c080510021800220c5374617274466978656433642a00320408001000",
+				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "StartFixed3d")).ToLowerInvariant());
+			Assert.Equal("a36d3b740000c35001316d8a000000001f080510021800220f57656c636f6d655475746f7269616c2a00320408001000",
+				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "WelcomeTutorial")).ToLowerInvariant());
 		}
 
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back
@@ -178,41 +179,16 @@ namespace Faolan.Tests
 			Assert.Equal(0x2A6u, def.MarkerY);
 
 			// Journal list (no timestamp) - byte-exact against frame 9947.
-			var areaHeader = new[]
-			{
-				Rec(QuestTextSlot.AreaTitle),
-				Rec(QuestTextSlot.MapName),
-				Rec(QuestTextSlot.RegionName)
-			};
-			var entries = new[]
-			{
-				new WorldQuest.JournalEntry(0x34A7, Rec(QuestTextSlot.Title), Rec(QuestTextSlot.ListSubLine))
-			};
+			var areaHeader = new[] { Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.MapName), Rec(QuestTextSlot.RegionName) };
+			var entries = new[] { new WorldQuest.JournalEntry(0x34A7, Rec(QuestTextSlot.Title), Rec(QuestTextSlot.ListSubLine)) };
 			var trailing = WorldQuest.BuildTrackedQuestPointer();
 			var journal = WorldQuest.BuildQuestJournal(0x01316D8A, def.AreaId, areaHeader, entries, trailing);
 			Assert.Equal(CaptureBody("79f8c7a1"), Convert.ToHexString(journal).ToLowerInvariant());
 
 			// Full update - byte-exact against frame 687 when fed the captured accept timestamp.
-			var textRefs = new[]
-			{
-				Rec(QuestTextSlot.Title),
-				Rec(QuestTextSlot.Summary),
-				Rec(QuestTextSlot.AreaTitle),
-				Rec(QuestTextSlot.RegionName),
-				Rec(QuestTextSlot.MapName)
-			};
-			var full = WorldQuest.BuildQuestFullUpdate(0x0131720B,
-				def.QuestId,
-				3,
-				def.AreaId,
-				textRefs,
-				def.GoalId,
-				WorldQuest.SnapshotQuestAcceptTime,
-				def.MapId,
-				def.MarkerX,
-				def.MarkerY,
-				Rec(QuestTextSlot.Objective),
-				Rec(QuestTextSlot.ObjectiveLocalized));
+			var textRefs = new[] { Rec(QuestTextSlot.Title), Rec(QuestTextSlot.Summary), Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.RegionName), Rec(QuestTextSlot.MapName) };
+			var full = WorldQuest.BuildQuestFullUpdate(0x0131720B, def.QuestId, 3, def.AreaId, textRefs, def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId, def.MarkerX, def.MarkerY,
+				Rec(QuestTextSlot.Objective), Rec(QuestTextSlot.ObjectiveLocalized));
 			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(full).ToLowerInvariant());
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
@@ -286,8 +262,7 @@ namespace Faolan.Tests
 		{
 			foreach (var (file, frame) in new[]
 			{
-				("Ranochar_mage-necromancer_login_get-casilda-quest.tshark.json", 687),
-				("Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json", 9947)
+				("Ranochar_mage-necromancer_login_get-casilda-quest.tshark.json", 687), ("Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json", 9947)
 			})
 			{
 				var path = Path.Combine(CapturesDir, file);

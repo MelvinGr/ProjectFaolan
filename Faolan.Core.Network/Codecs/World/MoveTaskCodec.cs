@@ -48,7 +48,15 @@ namespace Faolan.Core.Network.Codecs.World
 		// simplest move; the dominant shape for the player's own position ticks. Validated 74/74.
 		public static byte[] BuildBarePositionBody(uint handle, Vector3 from)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteUInt16(0).WriteVector3(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
+			return new FaolanStream()
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteUInt16(0)
+				.WriteVector3(from)
+				.WriteByte(ModeBarePosition)
+				.WriteByte(0x01)
+				.ToArray();
 		}
 
 		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a

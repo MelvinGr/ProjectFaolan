@@ -1,9 +1,10 @@
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Faolan.Core.Database
+namespace Faolan.Core.Database.Extensions
 {
 	public static class DatabaseServiceCollectionExtensions
 	{

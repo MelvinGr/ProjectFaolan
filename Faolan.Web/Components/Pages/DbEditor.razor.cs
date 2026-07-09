@@ -1,5 +1,9 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components;
@@ -14,7 +18,7 @@ namespace Faolan.Web.Components.Pages
 
 		private const int RowCap = 500;
 		private static readonly MethodInfo SetMethod = typeof(DbContext).GetMethod(nameof(DbContext.Set), 1, Type.EmptyTypes)!;
-		private readonly Dictionary<string, FkOptions> _fks = new Dictionary<string, FkOptions>();
+		private readonly Dictionary<string, FkOptions> _fks = new();
 		private readonly List<object> _rows = [];
 		private bool _authorized;
 		private bool _error;

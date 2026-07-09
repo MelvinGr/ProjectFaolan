@@ -5,7 +5,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.GameServer.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -49,10 +49,8 @@ namespace Faolan.Importer.Captures
 			{
 				// The pet creature TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
 				// resolves by name. Upsert so re-runs keep the type id stable.
-				var type = await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs)
-					.FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0)
-					?? await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs)
-					.FirstOrDefaultAsync(n => n.Name == e.Name);
+				var type = await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ??
+				           await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs).FirstOrDefaultAsync(n => n.Name == e.Name);
 				if (type == null)
 				{
 					type = new Npc
@@ -62,7 +60,6 @@ namespace Faolan.Importer.Captures
 					};
 					db.Npcs.Add(type);
 				}
-
 
 				// #307/#244: lift the whole spawn onto the TYPE from its capture so a summoned pet builds wholly from
 				// columns (no Data blob) - the stat core + no-morph recordCount, and, since a pet has no NpcSpawn
@@ -83,15 +80,26 @@ namespace Faolan.Importer.Captures
 							type.Equipment.Clear(); // decline all if any item isn't byte-reproducible
 							break;
 						}
+
 						type.Equipment.Add(eq);
 					}
 
 					type.Morphs.Clear();
-					var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var dm) ? dm
-						: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lm) ? lm
-						: new();
+					var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var dm)
+						? dm
+						: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lm)
+							? lm
+							: new List<NpcAppearanceMorph>();
 					for (var i = 0; i < morphs.Count; i++)
-						type.Morphs.Add(new NpcMorph { Ordinal = i, MorphId = morphs[i].MorphId, Value = morphs[i].Value, Text = morphs[i].Text ?? "" });
+					{
+						type.Morphs.Add(new NpcMorph
+						{
+							Ordinal = i,
+							MorphId = morphs[i].MorphId,
+							Value = morphs[i].Value,
+							Text = morphs[i].Text ?? ""
+						});
+					}
 				}
 
 				seeded++;

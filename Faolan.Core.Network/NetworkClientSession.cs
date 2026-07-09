@@ -5,6 +5,8 @@ namespace Faolan.Core.Network
 {
 	public interface INetworkClientSession
 	{
+		uint ConversationTypeId { get; set; }
+		uint? LastGameServer2020RequestId { get; set; }
 		Account Account { get; set; }
 
 		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
@@ -53,7 +55,6 @@ namespace Faolan.Core.Network
 		// that conversation routing keys on. Populated when the burst is replayed.
 		Dictionary<uint, string> SpawnedNpcNamesByHandle { get; }
 
-
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
 		int CreateWorldChunkIndex { get; set; }
@@ -78,7 +79,6 @@ namespace Faolan.Core.Network
 		// model - Mode and Field3 were session-volatile counters, not branch ids; memory protocol_conversation_routing.)
 		string ConversationNpcName { get; set; }
 
-
 		// The GameAgent sender instance the active conversation's packets use (retail varies it per conversation,
 		// e.g. 0x0a). The close must be sent from this SAME instance or the client won't match it to the dialogue
 		// and re-fires the greeting (#217). Captured from the served screens; 0 = none (fall back to 0x08).
@@ -90,7 +90,6 @@ namespace Faolan.Core.Network
 		// clears it = fresh intent to talk). 0 = nothing suppressed.
 		uint ConversationEndedNpcHandle { get; set; }
 		uint ConversationNpcHandle { get; set; }
-		uint ConversationTypeId { get; set; }
 
 		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
 		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
@@ -112,11 +111,13 @@ namespace Faolan.Core.Network
 		// the .kill GM command to target whatever the player is looking at (the player's own ClientInstance when they
 		// select themselves).
 		uint SelectedTargetHandle { get; set; }
-		uint? LastGameServer2020RequestId { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
+		public uint ConversationTypeId { get; set; }
+
+		public uint? LastGameServer2020RequestId { get; set; }
 		public Account Account { get; set; }
 
 		public bool AwaitingEnterWorld { get; set; }
@@ -132,7 +133,7 @@ namespace Faolan.Core.Network
 		public byte[] ClientConversation { get; set; }
 		public Character Character { get; set; }
 
-		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
+		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new();
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
@@ -144,13 +145,10 @@ namespace Faolan.Core.Network
 		public uint ConversationAgentInstance { get; set; }
 		public uint ConversationEndedNpcHandle { get; set; }
 		public uint ConversationNpcHandle { get; set; }
-		public uint ConversationTypeId { get; set; }
 		public uint Energy { get; set; }
 		public uint EnergyMax { get; set; }
 		public uint MorphAckCounter { get; set; }
 		public uint MorphActivitySequence { get; set; }
 		public uint SelectedTargetHandle { get; set; }
-
-		public uint? LastGameServer2020RequestId { get; set; }
 	}
 }

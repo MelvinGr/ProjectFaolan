@@ -1,7 +1,8 @@
 using System;
-using Xunit;
+using Faolan.Core;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -21,7 +22,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, built);
 
 			// ICodec round-trip.
-			var rt = CombatEffectBuilder.DamageResult.Read(new Faolan.Core.FaolanStream(built));
+			var rt = DamageResult.Read(new FaolanStream(built));
 			Assert.Equal(83u, rt.Damage);
 			Assert.Equal(built, rt.ToArray());
 		}
@@ -31,14 +32,15 @@ namespace Faolan.Tests
 		[Fact]
 		public void StatDamage_IsByteIdentical()
 		{
-			var captured = Convert.FromHexString("e9f241840000c35001316d8a0000002ffa0000000000000000000000000000001b00000002" + "fffffff8000000010000c35000002c5800000001000000000031644900000001000000000000000000000000");
+			var captured = Convert.FromHexString(
+				"e9f241840000c35001316d8a0000002ffa0000000000000000000000000000001b00000002fffffff8000000010000c35000002c5800000001000000000031644900000001000000000000000000000000");
 
 			var built = CombatEffectBuilder.BuildStatDamage(0x01316D8A, 0x2FFA, -8, 1, 0x00002C58, 1, 0x316449);
 
 			Assert.Equal(captured, built);
 
 			// ICodec round-trip: the signed delta survives.
-			var rt = CombatEffectBuilder.StatDamage.Read(new Faolan.Core.FaolanStream(built));
+			var rt = StatDamage.Read(new FaolanStream(built));
 			Assert.Equal(-8, rt.Delta);
 			Assert.Equal(0x316449u, rt.SpellBaseId);
 			Assert.Equal(built, rt.ToArray());

@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Dialogue;
@@ -41,14 +41,11 @@ namespace Faolan.GameServer.Dialogue
 		// constant; only the player instance @offset 12 is re-addressed. See SendConversationClose.
 		private static readonly byte[] KnubotCloseChatWindowBody =
 		[
-			0x00, 0x00, 0x00, 0x7C, 0xC4, 0xAF, 0x39, 0xEB, 0x00, 0x00, 0xC3, 0x50, 0x01, 0x31, 0x6E, 0x71, 0x00, 0x00,
-			0x01, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x5F, 0x3C, 0x72, 0x65,
-			0x6D, 0x6F, 0x74, 0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x69, 0x64, 0x3D, 0x22, 0x30, 0x22, 0x20,
-			0x63, 0x61, 0x74, 0x65, 0x67, 0x6F, 0x72, 0x79, 0x3D, 0x22, 0x31, 0x30, 0x30, 0x22, 0x20, 0x6B, 0x65, 0x79,
-			0x3D, 0x22, 0x2E, 0x66, 0x7A, 0x54, 0x75, 0x45, 0x79, 0x69, 0x75, 0x37, 0x42, 0x26, 0x23, 0x39, 0x32, 0x3B,
-			0x5A, 0x59, 0x5A, 0x4D, 0x6F, 0x71, 0x31, 0x2D, 0x22, 0x20, 0x6B, 0x6E, 0x75, 0x62, 0x6F, 0x74, 0x3D, 0x22,
-			0x30, 0x22, 0x20, 0x20, 0x3E, 0x3C, 0x2F, 0x72, 0x65, 0x6D, 0x6F, 0x74, 0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61,
-			0x74, 0x3E
+			0x00, 0x00, 0x00, 0x7C, 0xC4, 0xAF, 0x39, 0xEB, 0x00, 0x00, 0xC3, 0x50, 0x01, 0x31, 0x6E, 0x71, 0x00, 0x00, 0x01, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x5F, 0x3C, 0x72, 0x65, 0x6D, 0x6F, 0x74, 0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x69, 0x64, 0x3D, 0x22, 0x30, 0x22, 0x20, 0x63, 0x61, 0x74, 0x65, 0x67, 0x6F,
+			0x72, 0x79, 0x3D, 0x22, 0x31, 0x30, 0x30, 0x22, 0x20, 0x6B, 0x65, 0x79, 0x3D, 0x22, 0x2E, 0x66, 0x7A, 0x54, 0x75, 0x45, 0x79, 0x69, 0x75, 0x37, 0x42, 0x26, 0x23, 0x39, 0x32, 0x3B,
+			0x5A, 0x59, 0x5A, 0x4D, 0x6F, 0x71, 0x31, 0x2D, 0x22, 0x20, 0x6B, 0x6E, 0x75, 0x62, 0x6F, 0x74, 0x3D, 0x22, 0x30, 0x22, 0x20, 0x20, 0x3E, 0x3C, 0x2F, 0x72, 0x65, 0x6D, 0x6F, 0x74,
+			0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x3E
 		];
 
 		private readonly IDatabaseRepository _database;
@@ -87,36 +84,6 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			await ServeScreen(client, screen, client.Session.ConversationNpcHandle);
-		}
-
-		public static Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
-		{
-			// #217: the close's KnubotBase header carries the NPC handle the client uses to tear down THAT dialogue
-			// and RELEASE its dialogue camera. We used to re-address only the player instance and keep the captured
-			// (stale) NPC handle, so the client never matched the live dialogue: the camera stayed locked (soft-lock,
-			// relog to recover) and the client re-fired TalkToNpc (the conversation re-opened). Retail's close carries
-			// the LIVE NPC handle (e.g. 0x6A0A Kalanthes). Use the active dialogue's NPC (captured BEFORE EndConversation
-			// clears it), or the caller's clicked NPC for the no-node-on-click close.
-			if (npcHandle == 0)
-				npcHandle = client.Session.ConversationNpcHandle;
-			// The close must ride the SAME GameAgent instance the conversation's screens used (#217); 0x08 is the
-			// fallback when there was no active conversation. Captured BEFORE EndConversation clears it.
-			var agentInstance = client.Session.ConversationAgentInstance != 0
-				? client.Session.ConversationAgentInstance
-				: 0x08;
-			EndConversation(client); // end any active conversation
-			var id = client.Session.Account.ClientInstance;
-
-			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
-			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).
-			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
-			var record = KnubotCodec.BuildCloseChatWindow(id,
-				npcHandle != 0
-					? npcHandle
-					: captured.NpcHandle,
-				captured.Strings,
-				captured.Env);
-			return SendConstructedKnubot(client, agentInstance, id, record);
 		}
 
 		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,
@@ -253,7 +220,8 @@ namespace Faolan.GameServer.Dialogue
 			var goalTargetName = firstGoal?.TargetName;
 
 			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
-			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired, goalTargetName ?? "-");
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired,
+				goalTargetName ?? "-");
 			return def;
 		}
 
@@ -264,7 +232,10 @@ namespace Faolan.GameServer.Dialogue
 		{
 			var character = client.Session.Character;
 			var active = await _database.GetCharacterQuests(character.Id);
-			var ids = new List<uint> { grantDef.QuestId };
+			var ids = new List<uint>
+			{
+				grantDef.QuestId
+			};
 			ids.AddRange(active.Where(q => q.State == QuestState.Active && q.QuestId != grantDef.QuestId).Select(q => q.QuestId));
 
 			await WorldBroadcaster.SendQuestLogList(client, grantDef, ids);
@@ -382,7 +353,8 @@ namespace Faolan.GameServer.Dialogue
 			client.Session.ConversationAnswerPath = node.AnswerPath;
 			client.Session.ConversationNpcHandle = clickedNpcHandle;
 
-			_logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, node.Packets.Count, clickedNpcHandle);
+			_logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath,
+				node.Packets.Count, clickedNpcHandle);
 		}
 
 		// Completes any quest GIVEN by `npcName` whose objective is done (Active + GoalProgress >= GoalRequired): marks
@@ -430,6 +402,33 @@ namespace Faolan.GameServer.Dialogue
 			client.Session.ConversationTypeId = 0;
 			client.Session.ConversationNpcHandle = 0;
 			client.Session.ConversationAgentInstance = 0;
+		}
+
+		public static Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
+		{
+			// #217: the close's KnubotBase header carries the NPC handle the client uses to tear down THAT dialogue
+			// and RELEASE its dialogue camera. We used to re-address only the player instance and keep the captured
+			// (stale) NPC handle, so the client never matched the live dialogue: the camera stayed locked (soft-lock,
+			// relog to recover) and the client re-fired TalkToNpc (the conversation re-opened). Retail's close carries
+			// the LIVE NPC handle (e.g. 0x6A0A Kalanthes). Use the active dialogue's NPC (captured BEFORE EndConversation
+			// clears it), or the caller's clicked NPC for the no-node-on-click close.
+			if (npcHandle == 0)
+				npcHandle = client.Session.ConversationNpcHandle;
+			// The close must ride the SAME GameAgent instance the conversation's screens used (#217); 0x08 is the
+			// fallback when there was no active conversation. Captured BEFORE EndConversation clears it.
+			var agentInstance = client.Session.ConversationAgentInstance != 0
+				? client.Session.ConversationAgentInstance
+				: 0x08;
+			EndConversation(client); // end any active conversation
+			var id = client.Session.Account.ClientInstance;
+
+			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
+			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).
+			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
+			var record = KnubotCodec.BuildCloseChatWindow(id, npcHandle != 0
+				? npcHandle
+				: captured.NpcHandle, captured.Strings, captured.Env);
+			return SendConstructedKnubot(client, agentInstance, id, record);
 		}
 
 		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen text comes from ScreensJson, the
@@ -584,7 +583,8 @@ namespace Faolan.GameServer.Dialogue
 		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
 		{
 			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, senderInstance), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, liveInstance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, senderInstance), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, liveInstance),
+					GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(record)
 				.SendAsync(client);
 		}

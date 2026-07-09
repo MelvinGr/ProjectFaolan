@@ -88,7 +88,13 @@ namespace Faolan.Core.Rdb.Assets
 					// A skinned section indexes the bone palette that precedes its declaration (the g_BoneN= block sits in
 					// the section's material-param string, right before the vertex decl). Pick the nearest one before it.
 					if (sub.BlendBones != null)
-						sub = sub with { BonePalette = NearestPaletteBefore(palettes, anchor) };
+					{
+						sub = sub with
+						{
+							BonePalette = NearestPaletteBefore(palettes, anchor)
+						};
+					}
+
 					subs.Add(sub);
 				}
 			}

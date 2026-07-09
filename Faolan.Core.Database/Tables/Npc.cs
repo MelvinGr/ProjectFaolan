@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
@@ -14,6 +13,19 @@ namespace Faolan.Core.Database.Tables
 	// `NpcSpawn` (table `NpcSpawns`).
 	public class Npc : BaseEntity
 	{
+		// Community/Level/Race/Sex are type-level identity that now live on the 1:1 StatCore side table
+		// (StatCore.Community / .Level / .Race / .Sex) - the old duplicate Npc columns were retired.
+
+		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId). Unique - one Npc row per template.
+		public uint TemplateId { get; set; }
+
+		// The type-level worn equipment + appearance/morph table (#307), for a summon-only creature that has no NpcSpawn
+		// placement to carry them - the per-TYPE counterpart of NpcSpawnEquipment/NpcSpawnMorph. Empty for a plain map
+		// NPC type (its placements carry these). TryBuildFromType builds the spawn body from these + StatCore.
+		public virtual ICollection<NpcEquipment> Equipment { get; set; } = new List<NpcEquipment>();
+
+		public virtual ICollection<NpcMorph> Morphs { get; set; } = new List<NpcMorph>();
+
 		// The placements of this type across all maps.
 		public virtual ICollection<NpcSpawn> Spawns { get; set; } = new List<NpcSpawn>();
 
@@ -26,20 +38,8 @@ namespace Faolan.Core.Database.Tables
 		// caller-supplied transform and NO world placement (NpcSpawnBuilder.TryBuildFromType).
 		public virtual NpcStatCore StatCore { get; set; }
 
-		// The type-level worn equipment + appearance/morph table (#307), for a summon-only creature that has no NpcSpawn
-		// placement to carry them - the per-TYPE counterpart of NpcSpawnEquipment/NpcSpawnMorph. Empty for a plain map
-		// NPC type (its placements carry these). TryBuildFromType builds the spawn body from these + StatCore.
-		public virtual ICollection<NpcEquipment> Equipment { get; set; } = new List<NpcEquipment>();
-		public virtual ICollection<NpcMorph> Morphs { get; set; } = new List<NpcMorph>();
-
 		// The creature's display name (the stable join key conversations/shops/spells use).
 		[MaxLength(128)]
 		public string Name { get; set; }
-
-		// Community/Level/Race/Sex are type-level identity that now live on the 1:1 StatCore side table
-		// (StatCore.Community / .Level / .Race / .Sex) - the old duplicate Npc columns were retired.
-
-		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId). Unique - one Npc row per template.
-		public uint TemplateId { get; set; }
 	}
 }

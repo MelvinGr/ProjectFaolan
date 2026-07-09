@@ -10,6 +10,8 @@ namespace Faolan.Core.Database.Tables
 	// deletes with its NpcSpawn. Codec/build: NpcSpawnEquipmentBuilder.
 	public class NpcSpawnEquipment : BaseEntity, INpcEquipment
 	{
+		public uint NpcSpawnId { get; set; }
+
 		[ForeignKey(nameof(NpcSpawnId))]
 		public virtual NpcSpawn NpcSpawn { get; set; }
 
@@ -21,7 +23,6 @@ namespace Faolan.Core.Database.Tables
 		public uint Key3 { get; set; }
 		public uint Key4 { get; set; }
 		public uint Level { get; set; }
-		public uint NpcSpawnId { get; set; }
 
 		// The equip-slot id (ProtoCoreCharacterIIR.InventoryEntry.pos), e.g. 18 = wrist.
 		public uint Pos { get; set; }

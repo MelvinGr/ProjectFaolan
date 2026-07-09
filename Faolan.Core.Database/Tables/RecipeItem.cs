@@ -1,3 +1,5 @@
+using Faolan.Core.Database.Attributes;
+
 namespace Faolan.Core.Database.Tables
 {
 	// One ingredient (input) or result (output) item of a crafting Recipe - a queryable projection of the recipe
@@ -6,26 +8,29 @@ namespace Faolan.Core.Database.Tables
 	// recipes are queryable ("which recipes produce / consume item X"). Each carries the referenced item template
 	// id + its 16-byte TEA DecryptionKey (Data1..4) - the same key RequestRecipeInfo (0x2090) uses to fetch the
 	// item's details.
-	public class RecipeItem
+	public class RecipeItem //: BaseEntity
 	{
-		public int Id { get; set; } // surrogate PK (auto)
+		public uint ItemId { get; set; } // the referenced item template id
 
 		public uint RecipeId { get; set; } // FK -> Recipe.Id
 		public virtual Recipe Recipe { get; set; }
 
-		[ConstrainToEnumValues]
-		public RecipeItemRole Role { get; set; } // ingredient (input) or result (output)
+		public int Id { get; set; } // surrogate PK (auto)
+
 		public int Position { get; set; } // order within its list
 
-		public uint ItemId { get; set; } // the referenced item template id
-		public uint Flag { get; set; } // element field [3] (small enum-ish; 0x14/0x28/...)
-		public uint Hash { get; set; } // element field [4]
+		[ConstrainToEnumValues]
+		public RecipeItemRole Role { get; set; } // ingredient (input) or result (output)
 
 		// The referenced item's TEA DecryptionKey (element words [5..8]); mirrors Item.Data1..4.
+		// TODO: Rename Key1..4
 		public uint Data1 { get; set; }
 		public uint Data2 { get; set; }
 		public uint Data3 { get; set; }
 		public uint Data4 { get; set; }
+
+		public uint Flag { get; set; } // element field [3] (small enum-ish; 0x14/0x28/...)
+		public uint Hash { get; set; } // element field [4]
 
 		public uint Trailing { get; set; } // ingredient trailing word [17] (0 for results)
 	}

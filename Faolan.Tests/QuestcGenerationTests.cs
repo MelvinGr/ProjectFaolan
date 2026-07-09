@@ -1,13 +1,14 @@
 using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
-using Microsoft.EntityFrameworkCore;
-using Xunit;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -19,13 +20,13 @@ namespace Faolan.Tests
 	public class QuestcGenerationTests
 	{
 		private const int RegionEnd = 609;
-		private static readonly string DbPath = TestPaths.FaolanDb;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private const uint BeachStarterQuestId = 10238;
 
 		// The per-character quest STATE (1 = active); the only quest-portion value that isn't quest-definition data
 		// (it comes from CharacterQuest live). Everything else now rides in QuestDefinition (seeded for 10238).
 		private const uint BeachState = 1;
+		private static readonly string DbPath = TestPaths.FaolanDb;
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		// The @609 objective region GENERATES from the DB per-goal model (QuestGoalDefinition rows seeded for the beach
 		// starter), reproducing the template's @609..1168 bytes exactly - so the whole quest region is now DB-sourced.
@@ -51,7 +52,13 @@ namespace Faolan.Tests
 
 			// All scalars sourced from the DB (SnapshotN/FieldEc/FieldF0/FieldF8) - no literals but the per-char state.
 			var record = QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8);
-			var region = new QuestcRegion { Records = { record } };
+			var region = new QuestcRegion
+			{
+				Records =
+				{
+					record
+				}
+			};
 			var built = region.ToArray();
 
 			var template = File.ReadAllBytes(TemplatePath);
@@ -83,7 +90,13 @@ namespace Faolan.Tests
 			Assert.NotNull(def);
 			const uint instance = 0x02165EFF;
 
-			var quests = new QuestcRegion { Records = { QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) } };
+			var quests = new QuestcRegion
+			{
+				Records =
+				{
+					QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8)
+				}
+			};
 			var objectives = QuestObjectiveRegion.Build(def, instance);
 			var index = QuestIndexRegion.Build([def], def);
 

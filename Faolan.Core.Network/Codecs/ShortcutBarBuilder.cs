@@ -19,8 +19,10 @@ namespace Faolan.Core.Network.Codecs
 	{
 		private const uint ListFraming = 0x3F1;
 
-		public static byte[] BuildBody(IReadOnlyList<CharacterShortcut> shortcuts) =>
-			new ShortcutBar([.. shortcuts.Select(sc => new ShortcutEntry(sc.Slot, sc.ShortcutType, sc.TargetId))]).ToArray();
+		public static byte[] BuildBody(IReadOnlyList<CharacterShortcut> shortcuts)
+		{
+			return new ShortcutBar([.. shortcuts.Select(sc => new ShortcutEntry(sc.Slot, sc.ShortcutType, sc.TargetId))]).ToArray();
+		}
 
 		// One 24-byte bar record: [u32 slot][u32 type][u32 id][u32 0 x3].
 		public sealed record ShortcutEntry(uint Slot, uint Type, uint Id);
@@ -29,25 +31,11 @@ namespace Faolan.Core.Network.Codecs
 		// per-slot records; Read recovers the entries. BuildBody maps the CharacterShortcut DB rows to it.
 		public sealed record ShortcutBar(IReadOnlyList<ShortcutEntry> Entries) : ICodec<ShortcutBar>
 		{
-			public void Write(FaolanStream s)
-			{
-				s.WriteUInt32((Entries.Count + 1) * ListFraming);
-				foreach (var e in Entries)
-				{
-					s.WriteUInt32(e.Slot);
-					s.WriteUInt32(e.Type);
-					s.WriteUInt32(e.Id);
-					s.WriteUInt32(0);
-					s.WriteUInt32(0);
-					s.WriteUInt32(0);
-				}
-			}
-
 			public static ShortcutBar Read(FaolanStream s)
 			{
 				var header = s.ReadUInt32();
 				var count = header / ListFraming - 1;
-				var entries = new List<ShortcutEntry>((int)count);
+				var entries = new List<ShortcutEntry>(checked((int)count));
 				for (var i = 0u; i < count; i++)
 				{
 					var slot = s.ReadUInt32();
@@ -60,6 +48,20 @@ namespace Faolan.Core.Network.Codecs
 				}
 
 				return new ShortcutBar(entries);
+			}
+
+			public void Write(FaolanStream s)
+			{
+				s.WriteUInt32((Entries.Count + 1) * ListFraming);
+				foreach (var e in Entries)
+				{
+					s.WriteUInt32(e.Slot);
+					s.WriteUInt32(e.Type);
+					s.WriteUInt32(e.Id);
+					s.WriteUInt32(0);
+					s.WriteUInt32(0);
+					s.WriteUInt32(0);
+				}
 			}
 		}
 	}

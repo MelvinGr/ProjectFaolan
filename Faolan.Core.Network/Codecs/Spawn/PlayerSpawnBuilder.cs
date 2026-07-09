@@ -51,18 +51,24 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// Quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
-		private static byte[] EncodeQuat(Quaternion q) => new FaolanStream()
-			.WriteByte(VecField1).WriteFloatLittleEndian(q.X)
-			.WriteByte(VecField2).WriteFloatLittleEndian(q.Y)
-			.WriteByte(VecField3).WriteFloatLittleEndian(q.Z)
-			.WriteByte(VecField4).WriteFloatLittleEndian(q.W)
-			.ToArray();
+		private static byte[] EncodeQuat(Quaternion q)
+		{
+			return new FaolanStream()
+				.WriteByte(VecField1)
+				.WriteFloatLittleEndian(q.X)
+				.WriteByte(VecField2)
+				.WriteFloatLittleEndian(q.Y)
+				.WriteByte(VecField3)
+				.WriteFloatLittleEndian(q.Z)
+				.WriteByte(VecField4)
+				.WriteFloatLittleEndian(q.W)
+				.ToArray();
+		}
 
 		// Vec3 = [0D x][15 y][1D z], each a little-endian fixed32 - the transform's protobuf float triple (15 bytes).
-		private static byte[] EncodeVec3(Vector3 v) => new FaolanStream()
-			.WriteByte(VecField1).WriteFloatLittleEndian(v.X)
-			.WriteByte(VecField2).WriteFloatLittleEndian(v.Y)
-			.WriteByte(VecField3).WriteFloatLittleEndian(v.Z)
-			.ToArray();
+		private static byte[] EncodeVec3(Vector3 v)
+		{
+			return new FaolanStream().WriteByte(VecField1).WriteFloatLittleEndian(v.X).WriteByte(VecField2).WriteFloatLittleEndian(v.Y).WriteByte(VecField3).WriteFloatLittleEndian(v.Z).ToArray();
+		}
 	}
 }

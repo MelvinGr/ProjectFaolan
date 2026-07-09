@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
@@ -28,24 +28,6 @@ namespace Faolan.GameServer.Inventory
 		{
 			_database = database;
 			_logger = logger;
-		}
-
-		// RequestShortcutBar (0x206D): the client asks for its saved hotbar at login; reply with the restored bar.
-		// Sent from the GameCharAgent world conversation (sub-id 0x58 / the client instance), NOT echoed from the
-		// request bytes - the 0x206D request's receiver carries no instance, so echoing it produced an empty-instance
-		// sender the client silently dropped (#71: bar stayed empty in every slot though the body was byte-exact).
-		// Retail sends 0x2076 from this same endpoint as the 0x2052 grants (login capture pkt 182 vs 237).
-		public async Task SendRestoredBar(INetworkClient client)
-		{
-			if (client.Session.Character == null)
-				return;
-
-			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
-			var ps = new PacketStream();
-			ps.WriteHeader(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply);
-			ps.WriteArray(ShortcutBarBuilder.BuildBody(shortcuts));
-			await ps.SendAsync(client);
-			_logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
 		}
 
 		// AddShortcut (0x206E, in-game branch): the player dragged an ability/item onto the bar. Persist the slot
@@ -85,6 +67,24 @@ namespace Faolan.GameServer.Inventory
 
 			_logger.LogInformation("UpdateShortcut bar-page slot 0x{Slot:X4} flag={Flag} container=0x{Container:X} (#71; log-only).", slot, flag, container);
 			return Task.CompletedTask;
+		}
+
+		// RequestShortcutBar (0x206D): the client asks for its saved hotbar at login; reply with the restored bar.
+		// Sent from the GameCharAgent world conversation (sub-id 0x58 / the client instance), NOT echoed from the
+		// request bytes - the 0x206D request's receiver carries no instance, so echoing it produced an empty-instance
+		// sender the client silently dropped (#71: bar stayed empty in every slot though the body was byte-exact).
+		// Retail sends 0x2076 from this same endpoint as the 0x2052 grants (login capture pkt 182 vs 237).
+		public async Task SendRestoredBar(INetworkClient client)
+		{
+			if (client.Session.Character == null)
+				return;
+
+			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
+			var ps = new PacketStream();
+			ps.WriteHeader(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply);
+			ps.WriteArray(ShortcutBarBuilder.BuildBody(shortcuts));
+			await ps.SendAsync(client);
+			_logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
 		}
 	}
 }

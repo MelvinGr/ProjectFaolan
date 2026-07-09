@@ -247,7 +247,10 @@ namespace Faolan.Tests
 			var zone = world.ZoneFor(4010);
 			zone.Add(Npc(1, 0, 0));
 			// Right above the NPC (1u horizontal) but a storey up - through a floor (#284 vertical-delta gate).
-			var player = new WorldEntity(2, 4010, true, "P2", null) { Position = new Vector3(1, WorldState.NpcAggroVerticalRange + 2f, 0) };
+			var player = new WorldEntity(2, 4010, true, "P2", null)
+			{
+				Position = new Vector3(1, WorldState.NpcAggroVerticalRange + 2f, 0)
+			};
 			zone.Add(player);
 
 			Assert.Empty(world.Tick(WorldState.NpcAttackInterval)); // no aggro across the vertical gap -> no effects
@@ -296,7 +299,10 @@ namespace Faolan.Tests
 
 		private static WorldEntity Player(uint handle, float x, float z)
 		{
-			return new WorldEntity(handle, 4010, true, $"P{handle}", null) { Position = new Vector3(x, 0, z) };
+			return new WorldEntity(handle, 4010, true, $"P{handle}", null)
+			{
+				Position = new Vector3(x, 0, z)
+			};
 		}
 	}
 }

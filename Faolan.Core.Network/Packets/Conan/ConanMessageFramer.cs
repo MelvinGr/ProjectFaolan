@@ -7,8 +7,9 @@ namespace Faolan.Core.Network.Packets.Conan
 {
 	public sealed class ConanMessageFramer : IMessageFramer
 	{
-		private const int MaxPacketSize = 16 * 1024 * 1024;
+		private const int CompressionMarkerLength = 9;
 		private const int HeaderSize = sizeof(int);
+		private const int MaxPacketSize = 16 * 1024 * 1024;
 
 		// The compression-stream marker: a fixed 9-byte control frame = this 4-byte tag (0x80000005) + 5 trailing
 		// bytes. Retail only ever sends it SERVER->CLIENT to open the download compression stream; our server does not
@@ -18,7 +19,6 @@ namespace Faolan.Core.Network.Packets.Conan
 		// on it), which - when TCP coalesced the marker with the packets behind it - silently ate them, giving the
 		// non-deterministic loss of the post-ready 0x205f grant-arm packet (abilities/spellbar intermittently empty).
 		private const uint CompressionMarkerTag = 0x80000005u;
-		private const int CompressionMarkerLength = 9;
 
 		private readonly byte[] _lengthBuffer = new byte[HeaderSize];
 
@@ -26,8 +26,8 @@ namespace Faolan.Core.Network.Packets.Conan
 		// known so a completed packet is emitted with no extra copy. Null while the 4-byte length header is being read.
 		private byte[] _frame;
 		private int _lengthBytesRead;
-		private int _payloadBytesRead;
 		private int _markerSkipRemaining;
+		private int _payloadBytesRead;
 
 		public IEnumerable<byte[]> PushBytes(byte[] bytes, int length)
 		{

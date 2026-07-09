@@ -12,398 +12,459 @@
 @* ?char=<id> deep-links a character so the viewer auto-loads it (used by headless screenshot tooling). *@
 
 <div class="viewer-page">
-    <aside class="roster">
-        <h2>Characters</h2>
-        @if (_characters == null)
-        {
-            <p>Loading…</p>
-        }
-        else if (_characters.Count == 0)
-        {
-            <p>No characters in the database.</p>
-        }
-        else
-        {
-            <ul>
-                @foreach (var c in _characters)
-                {
-                    <li>
-                        <button class="@(c.Id == _selected?.Id
-                                           ? "sel"
-                                           : "")" @onclick="() => Select(c)">
-                            <strong>@c.Name</strong>
-                            <span>@c.Race @c.Sex · @c.Class</span>
-                        </button>
-                    </li>
-                }
-            </ul>
-        }
-        @if (!Models.RdbAvailable)
-        {
-            <p class="warn">Client RDB not found — set <code>Rdb:Path</code>.</p>
-        }
-    </aside>
+<aside class="roster">
+	<h2>Characters</h2>
+	@if (_characters == null)
+	{
+		<p>Loading…</p>
+	}
+	else if (_characters.Count == 0)
+	{
+		<p>No characters in the database.</p>
+	}
+	else
+	{
+		<ul>
+			@foreach (var c in _characters)
+			{
+				<li>
+					<button class="@(c.Id == _selected?.Id
+						               ? "sel"
+						               : "")" @onclick="() => Select(c)">
+						<strong>@c.Name</strong>
+						<span>@c.Race @c.Sex · @c.Class</span>
+					</button>
+				</li>
+			}
+		</ul>
+	}
+	@if (!Models.RdbAvailable)
+	{
+		<p class="warn">Client RDB not found — set <code>Rdb:Path</code>.</p>
+	}
+</aside>
 
-    <section class="stage">
-        <Window Floating="false" Title="Sheet" Class="stats-win">
-            @if (_selected == null)
-            {
-                <p class="stats-empty">Select a character to view their sheet.</p>
-            }
-            else
-            {
-                <div class="stat-head">
-                    <div class="stat-name">@_selected.Name</div>
-                    <div class="stat-sub">Level @_selected.Level · @_selected.Class</div>
-                    <div class="stat-sub2">@_selected.Race · @_selected.Sex</div>
-                </div>
+<section class="stage">
+	<Window Floating="false" Title="Sheet" Class="stats-win">
+		@if (_selected == null)
+		{
+			<p class="stats-empty">Select a character to view their sheet.</p>
+		}
+		else
+		{
+			<div class="stat-head">
+				<div class="stat-name">@_selected.Name</div>
+				<div class="stat-sub">Level @_selected.Level · @_selected.Class</div>
+				<div class="stat-sub2">@_selected.Race · @_selected.Sex</div>
+			</div>
 
-                <div class="vitals">
-                    @if (_health > 0)
-                    {
-                        <div class="vital hp"><span class="vlabel">Health</span>
-                            <div class="vbar"><i style="width:100%"></i></div>
-                            <span class="vval">@_health</span></div>
-                    }
-                    @if (_mana > 0)
-                    {
-                        <div class="vital mp"><span class="vlabel">Mana</span>
-                            <div class="vbar"><i style="width:100%"></i></div>
-                            <span class="vval">@_mana</span></div>
-                    }
-                    @if (_stamina > 0)
-                    {
-                        <div class="vital sp"><span class="vlabel">Stamina</span>
-                            <div class="vbar"><i style="width:100%"></i></div>
-                            <span class="vval">@_stamina</span></div>
-                    }
-                </div>
+			<div class="vitals">
+				@if (_health > 0)
+				{
+					<div class="vital hp">
+						<span class="vlabel">Health</span>
+						<div class="vbar">
+							<i style="width: 100%"></i>
+						</div>
+						<span class="vval">@_health</span>
+					</div>
+				}
+				@if (_mana > 0)
+				{
+					<div class="vital mp">
+						<span class="vlabel">Mana</span>
+						<div class="vbar">
+							<i style="width: 100%"></i>
+						</div>
+						<span class="vval">@_mana</span>
+					</div>
+				}
+				@if (_stamina > 0)
+				{
+					<div class="vital sp">
+						<span class="vlabel">Stamina</span>
+						<div class="vbar">
+							<i style="width: 100%"></i>
+						</div>
+						<span class="vval">@_stamina</span>
+					</div>
+				}
+			</div>
 
-                <div class="stat-rows">
-                    <div class="srow"><span class="k">Experience</span><span
-                            class="v">@_selected.Experience.ToString("N0")</span></div>
-                    <div class="srow"><span class="k">Money</span><span class="v">@_money</span></div>
-                    <div class="srow"><span class="k">Location</span><span class="v">@_mapName</span></div>
-                    <div class="srow"><span class="k">Guild</span><span class="v">@(_guildName ?? "—")</span></div>
-                </div>
+			<div class="stat-rows">
+				<div class="srow">
+					<span class="k">Experience</span>
+					<span
+						class="v">
+						@_selected.Experience.ToString("N0")
+					</span>
+				</div>
+				<div class="srow">
+					<span class="k">Money</span><span class="v">@_money</span>
+				</div>
+				<div class="srow">
+					<span class="k">Location</span><span class="v">@_mapName</span>
+				</div>
+				<div class="srow">
+					<span class="k">Guild</span><span class="v">@(_guildName ?? "—")</span>
+				</div>
+			</div>
 
-                @if (_spells.Count > 0)
-                {
-                    <div class="spellbook">
-                        <div class="sb-title">Spells <span class="sb-count">@_spells.Count</span></div>
-                        <ul>
-                            @foreach (var sp in _spells)
-                            {
-                                <li>
-                                    <span class="sp-name">@sp.Name</span>
-                                    <span class="sp-meta">
-                                        @if (sp.Level > 0)
-                                        {
-                                            <span>L@sp.Level</span>
-                                        }
-                                        @if (sp.Damage > 0)
-                                        {
-                                            <span>@sp.Damage.ToString("0")% dmg</span>
-                                        }
-                                        @if (sp.Range > 0)
-                                        {
-                                            <span>@sp.Range.ToString("0")m</span>
-                                        }
-                                    </span>
-                                </li>
-                            }
-                        </ul>
-                    </div>
-                }
-            }
-        </Window>
+			@if (_spells.Count > 0)
+			{
+				<div class="spellbook">
+					<div class="sb-title">Spells <span class="sb-count">@_spells.Count</span></div>
+					<ul>
+						@foreach (var sp in _spells)
+						{
+							<li>
+								<span class="sp-name">@sp.Name</span>
+								<span class="sp-meta">
+									@if (sp.Level > 0)
+									{
+										<span>L@sp.Level</span>
+									}
+									@if (sp.Damage > 0)
+									{
+										<span>@sp.Damage.ToString("0")% dmg</span>
+									}
+									@if (sp.Range > 0)
+									{
+										<span>@sp.Range.ToString("0")m</span>
+									}
+								</span>
+							</li>
+						}
+					</ul>
+				</div>
+			}
+		}
+	</Window>
 
-        <Window Floating="false" Title="Equipment" Class="equip-win">
-            <div class="equip-grid">
-                @Slot("Head", "center-slot top")
-                <div class="equip-col left">
-                    @foreach (var s in LeftSlots)
-                    {
-                        @Slot(s)
-                    }
-                </div>
-                <div class="equip-center">
-                    <canvas id="char-canvas"></canvas>
-                </div>
-                <div class="equip-col right">
-                    @foreach (var s in RightSlots)
-                    {
-                        @Slot(s)
-                    }
-                </div>
-                @Slot("Legs", "center-slot bottom")
-            </div>
-            <div class="equip-bottom">
-                @foreach (var s in WeaponSlots)
-                {
-                    @Slot(s, "wide")
-                }
-            </div>
-            <div class="equip-tip">
-                @if (_selected != null)
-                {
-                    <div class="tip-line">@_selected.Name — @_selected.Race @_selected.Sex (@_status)</div>
-                }
-                else
-                {
-                    <div class="tip-line">Select a character to view their equipment.</div>
-                }
-            </div>
-        </Window>
+	<Window Floating="false" Title="Equipment" Class="equip-win">
+		<div class="equip-grid">
+			@Slot("Head", "center-slot top")
+			<div class="equip-col left">
+				@foreach (var s in LeftSlots)
+				{
+					@Slot(s)
+				}
+			</div>
+			<div class="equip-center">
+				<canvas id="char-canvas"></canvas>
+			</div>
+			<div class="equip-col right">
+				@foreach (var s in RightSlots)
+				{
+					@Slot(s)
+				}
+			</div>
+			@Slot("Legs", "center-slot bottom")
+		</div>
+		<div class="equip-bottom">
+			@foreach (var s in WeaponSlots)
+			{
+				@Slot(s, "wide")
+			}
+		</div>
+		<div class="equip-tip">
+			@if (_selected != null)
+			{
+				<div class="tip-line">@_selected.Name — @_selected.Race @_selected.Sex (@_status)</div>
+			}
+			else
+			{
+				<div class="tip-line">Select a character to view their equipment.</div>
+			}
+		</div>
+	</Window>
 
-        @* Inventory is private: only shown for a character the signed-in account owns. *@
-        @if (_ownsSelected)
-        {
-            var tabItems = TabItems;
+	@* Inventory is private: only shown for a character the signed-in account owns. *@
+	@if (_ownsSelected)
+	{
+		var tabItems = TabItems;
 
-            <Window Floating="false" Title="Inventory" Class="inv-win">
-                <div class="inv-tabs">
-                    @foreach (var tab in InvTabs)
-                    {
-                        var n = _inventory.Count(i => i.Tab == tab);
-                        <button class="inv-tab @(tab == _invTab
-                                                   ? "sel"
-                                                   : "")" @onclick="() => SelectInvTab(tab)">
-                            @tab
-                            @if (n > 0)
-                            {
-                                <span class="tabcount">@n</span>
-                            }
-                        </button>
-                    }
-                </div>
-                <div class="inv-grid">
-                    @for (var i = 0; i < InvPageSize; i++)
-                    {
-                        var idx = _invPage * InvPageSize + i;
-                        var item = _selected != null && idx < tabItems.Count
-                            ? tabItems[idx].Info
-                            : (ItemInfo?)null;
-                        @ItemSlot(item, "")
-                    }
-                </div>
-                <div class="inv-foot">
-                    @if (tabItems.Count > InvPageSize)
-                    {
-                        <button class="inv-page" disabled="@(_invPage == 0)" @onclick="() => PageInventory(-1)">‹
-                        </button>
-                        <span>Page @(_invPage + 1) of @InvPageCount</span>
-                        <button class="inv-page" disabled="@(_invPage >= InvPageCount - 1)"
-                                @onclick="() => PageInventory(1)">›
-                        </button>
-                    }
-                    else
-                    {
-                        <span>@tabItems.Count item@(tabItems.Count == 1
-                                                          ? ""
-                                                          : "s")</span>
-                    }
-                </div>
-            </Window>
-        }
-    </section>
+		<Window Floating="false" Title="Inventory" Class="inv-win">
+			<div class="inv-tabs">
+				@foreach (var tab in InvTabs)
+				{
+					var n = _inventory.Count(i => i.Tab == tab);
+					<button class="inv-tab @(tab == _invTab
+						                       ? "sel"
+						                       : "")" @onclick="() => SelectInvTab(tab)">
+						@tab
+						@if (n > 0)
+						{
+							<span class="tabcount">@n</span>
+						}
+					</button>
+				}
+			</div>
+			<div class="inv-grid">
+				@for (var i = 0; i < InvPageSize; i++)
+				{
+					var idx = _invPage * InvPageSize + i;
+					var item = _selected != null && idx < tabItems.Count
+						? tabItems[idx].Info
+						: (ItemInfo?)null;
+					@ItemSlot(item, "")
+				}
+			</div>
+			<div class="inv-foot">
+				@if (tabItems.Count > InvPageSize)
+				{
+					<button class="inv-page" disabled="@(_invPage == 0)" @onclick="() => PageInventory(-1)">
+						‹
+					</button>
+					<span>Page @(_invPage + 1) of @InvPageCount</span>
+					<button class="inv-page" disabled="@(_invPage >= InvPageCount - 1)"
+					        @onclick="() => PageInventory(1)">
+						›
+					</button>
+				}
+				else
+				{
+					<span>
+						@tabItems.Count item@(tabItems.Count == 1
+							                    ? ""
+							                    : "s")
+					</span>
+				}
+			</div>
+		</Window>
+	}
+</section>
 
-    @if (_selected != null && _appOptions != null)
-    {
-        <Window Title="Edit" Floating="true" Collapsed="true" Id="edit-window" Class="edit-window"
-                Style="top:4.75rem; right:1.25rem; width:16.5rem; max-height:84vh;">
-            <div class="edit-scroll">
-                <div class="edit-head">Body</div>
-                @* Morph sliders are editable only for a character you own — a disabled fieldset greys out all 7. *@
-                <fieldset class="morph-set" disabled="@(!_ownsSelected)">
-                    <label class="pose"><span>Arm</span><input type="range" min="@MorphMin("arm")"
-                                                               max="@MorphMax("arm")"
-                                                               @bind="_eArm" @bind:after="PreviewEdit"/></label>
-                    <label class="pose"><span>Chest</span><input type="range" min="@MorphMin("chest")"
-                                                                 max="@MorphMax("chest")" @bind="_eChest"
-                                                                 @bind:after="PreviewEdit"/></label>
-                    <label class="pose"><span>Bosom</span><input type="range" min="@MorphMin("bosom")"
-                                                                 max="@MorphMax("bosom")" @bind="_eBosom"
-                                                                 @bind:after="PreviewEdit"/></label>
-                    <label class="pose"><span>Stomach</span><input type="range" min="@MorphMin("stomach")"
-                                                                   max="@MorphMax("stomach")" @bind="_eStomach"
-                                                                   @bind:after="PreviewEdit"/></label>
-                    <label class="pose"><span>Arse</span><input type="range" min="@MorphMin("arse")"
-                                                                max="@MorphMax("arse")"
-                                                                @bind="_eArse" @bind:after="PreviewEdit"/></label>
-                    <label class="pose"><span>Thigh</span><input type="range" min="@MorphMin("thigh")"
-                                                                 max="@MorphMax("thigh")" @bind="_eThigh"
-                                                                 @bind:after="PreviewEdit"/></label>
-                    <label class="pose"><span>Leg</span><input type="range" min="@MorphMin("leg")"
-                                                               max="@MorphMax("leg")"
-                                                               @bind="_eLeg" @bind:after="PreviewEdit"/></label>
-                </fieldset>
+@if (_selected != null && _appOptions != null)
+{
+	<Window Title="Edit" Floating="true" Collapsed="true" Id="edit-window" Class="edit-window"
+	        Style="max-height: 84vh; right: 1.25rem; top: 4.75rem; width: 16.5rem;">
+		<div class="edit-scroll">
+			<div class="edit-head">Body</div>
+			@* Morph sliders are editable only for a character you own — a disabled fieldset greys out all 7. *@
+			<fieldset class="morph-set" disabled="@(!_ownsSelected)">
+				<label class="pose">
+					<span>Arm</span>
+					<input type="range" min="@MorphMin("arm")"
+					       max="@MorphMax("arm")"
+					       @bind="_eArm" @bind:after="PreviewEdit"/>
+				</label>
+				<label class="pose">
+					<span>Chest</span>
+					<input type="range" min="@MorphMin("chest")"
+					       max="@MorphMax("chest")" @bind="_eChest"
+					       @bind:after="PreviewEdit"/>
+				</label>
+				<label class="pose">
+					<span>Bosom</span>
+					<input type="range" min="@MorphMin("bosom")"
+					       max="@MorphMax("bosom")" @bind="_eBosom"
+					       @bind:after="PreviewEdit"/>
+				</label>
+				<label class="pose">
+					<span>Stomach</span>
+					<input type="range" min="@MorphMin("stomach")"
+					       max="@MorphMax("stomach")" @bind="_eStomach"
+					       @bind:after="PreviewEdit"/>
+				</label>
+				<label class="pose">
+					<span>Arse</span>
+					<input type="range" min="@MorphMin("arse")"
+					       max="@MorphMax("arse")"
+					       @bind="_eArse" @bind:after="PreviewEdit"/>
+				</label>
+				<label class="pose">
+					<span>Thigh</span>
+					<input type="range" min="@MorphMin("thigh")"
+					       max="@MorphMax("thigh")" @bind="_eThigh"
+					       @bind:after="PreviewEdit"/>
+				</label>
+				<label class="pose">
+					<span>Leg</span>
+					<input type="range" min="@MorphMin("leg")"
+					       max="@MorphMax("leg")"
+					       @bind="_eLeg" @bind:after="PreviewEdit"/>
+				</label>
+			</fieldset>
 
-                <div class="edit-head">Hair</div>
-                <label class="edit-row"><span>Style</span>
-                    <select @bind="_eHairStyle" @bind:after="PreviewEdit">
-                        <option value="">— none —</option>
-                        @foreach (var o in _appOptions.HairStyle)
-                        {
-                            <option value="@o.Value">@o.Label</option>
-                        }
-                    </select>
-                </label>
-                <div class="edit-row"><span>Colour</span>
-                    <div class="swatches">
-                        <button type="button" class="swatch none @(string.IsNullOrEmpty(_eHairColor)
-                                                                     ? "sel"
-                                                                     : "")" title="none" @onclick="@(async () =>
-                                                                                                   {
-                                                                                                       _eHairColor = string.Empty;
-                                                                                                       await PreviewEdit();
-                                                                                                   })"></button>
-                        @foreach (var o in _appOptions.HairColor)
-                        {
-                            <button type="button" class="swatch @(_eHairColor == o.Value
-                                                                    ? "sel"
-                                                                    : "")" style="background:@o.Color" title="@o.Color"
-                                    @onclick="@(async () =>
-                                              {
-                                                  _eHairColor = o.Value;
-                                                  await PreviewEdit();
-                                              })"></button>
-                        }
-                    </div>
-                </div>
+			<div class="edit-head">Hair</div>
+			<label class="edit-row">
+				<span>Style</span>
+				<select @bind="_eHairStyle" @bind:after="PreviewEdit">
+					<option value="">— none —</option>
+					@foreach (var o in _appOptions.HairStyle)
+					{
+						<option value="@o.Value">@o.Label</option>
+					}
+				</select>
+			</label>
+			<div class="edit-row">
+				<span>Colour</span>
+				<div class="swatches">
+					<button type="button" class="swatch none @(string.IsNullOrEmpty(_eHairColor)
+						                                         ? "sel"
+						                                         : "")" title="none" @onclick="@(async () =>
+						                                                                       {
+							                                                                       _eHairColor = string.Empty;
+							                                                                       await PreviewEdit();
+						                                                                       })">
+					</button>
+					@foreach (var o in _appOptions.HairColor)
+					{
+						<button type="button" class="swatch @(_eHairColor == o.Value
+							                                    ? "sel"
+							                                    : "")" style="background: @o.Color" title="@o.Color"
+						        @onclick="@(async () =>
+						                  {
+							                  _eHairColor = o.Value;
+							                  await PreviewEdit();
+						                  })">
+						</button>
+					}
+				</div>
+			</div>
 
-                <div class="edit-head">Face</div>
-                <div class="edit-row"><span>Skin</span>
-                    <div class="swatches">
-                        @foreach (var o in _appOptions.Skin)
-                        {
-                            <button type="button" class="swatch @(_eSkin == o.Value
-                                                                    ? "sel"
-                                                                    : "")" style="background:@o.Color" title="@o.Color"
-                                    @onclick="@(async () =>
-                                              {
-                                                  _eSkin = o.Value;
-                                                  await PreviewEdit();
-                                              })"></button>
-                        }
-                    </div>
-                </div>
-                <div class="edit-row"><span>Eyes</span>
-                    <div class="swatches">
-                        @foreach (var o in _appOptions.Eyes)
-                        {
-                            <button type="button" class="swatch @(_eEyes == o.Value
-                                                                    ? "sel"
-                                                                    : "")" style="background:@o.Color" title="@o.Color"
-                                    @onclick="@(async () =>
-                                              {
-                                                  _eEyes = o.Value;
-                                                  await PreviewEdit();
-                                              })"></button>
-                        }
-                    </div>
-                </div>
-                <label class="edit-row"><span>Head</span>
-                    <select @bind="_eHead" @bind:after="PreviewEdit">
-                        <option value="0">— default —</option>
-                        @foreach (var o in _appOptions.Heads)
-                        {
-                            <option value="@o.Value">@o.Label</option>
-                        }
-                    </select>
-                </label>
+			<div class="edit-head">Face</div>
+			<div class="edit-row">
+				<span>Skin</span>
+				<div class="swatches">
+					@foreach (var o in _appOptions.Skin)
+					{
+						<button type="button" class="swatch @(_eSkin == o.Value
+							                                    ? "sel"
+							                                    : "")" style="background: @o.Color" title="@o.Color"
+						        @onclick="@(async () =>
+						                  {
+							                  _eSkin = o.Value;
+							                  await PreviewEdit();
+						                  })">
+						</button>
+					}
+				</div>
+			</div>
+			<div class="edit-row">
+				<span>Eyes</span>
+				<div class="swatches">
+					@foreach (var o in _appOptions.Eyes)
+					{
+						<button type="button" class="swatch @(_eEyes == o.Value
+							                                    ? "sel"
+							                                    : "")" style="background: @o.Color" title="@o.Color"
+						        @onclick="@(async () =>
+						                  {
+							                  _eEyes = o.Value;
+							                  await PreviewEdit();
+						                  })">
+						</button>
+					}
+				</div>
+			</div>
+			<label class="edit-row">
+				<span>Head</span>
+				<select @bind="_eHead" @bind:after="PreviewEdit">
+					<option value="0">— default —</option>
+					@foreach (var o in _appOptions.Heads)
+					{
+						<option value="@o.Value">@o.Label</option>
+					}
+				</select>
+			</label>
 
-                <div class="edit-head">Tattoos</div>
-                <label class="edit-row"><span>Body</span>
-                    <select @bind="_eBodyTat" @bind:after="PreviewEdit">
-                        <option value="">— none —</option>
-                        @foreach (var o in _appOptions.BodyTattoo)
-                        {
-                            <option value="@o.Value">@o.Label</option>
-                        }
-                    </select>
-                </label>
-                <label class="edit-row"><span>Face</span>
-                    <select @bind="_eFaceTat" @bind:after="PreviewEdit">
-                        <option value="">— none —</option>
-                        @foreach (var o in _appOptions.FaceTattoo)
-                        {
-                            <option value="@o.Value">@o.Label</option>
-                        }
-                    </select>
-                </label>
-                <div class="edit-note">Face tattoo &amp; head morph don't render yet (#275) — they still save.</div>
-            </div>
+			<div class="edit-head">Tattoos</div>
+			<label class="edit-row">
+				<span>Body</span>
+				<select @bind="_eBodyTat" @bind:after="PreviewEdit">
+					<option value="">— none —</option>
+					@foreach (var o in _appOptions.BodyTattoo)
+					{
+						<option value="@o.Value">@o.Label</option>
+					}
+				</select>
+			</label>
+			<label class="edit-row">
+				<span>Face</span>
+				<select @bind="_eFaceTat" @bind:after="PreviewEdit">
+					<option value="">— none —</option>
+					@foreach (var o in _appOptions.FaceTattoo)
+					{
+						<option value="@o.Value">@o.Label</option>
+					}
+				</select>
+			</label>
+			<div class="edit-note">Face tattoo &amp; head morph don't render yet (#275) — they still save.</div>
+		</div>
 
-            <div class="edit-actions">
-                @* Save only appears for a character you own; others get a preview-only editor. *@
-                @if (_ownsSelected)
-                {
-                    <button class="pose-reset" @onclick="SaveEdit">Save</button>
-                }
-                <button class="pose-reset" @onclick="RevertEdit">Revert</button>
-                <span class="edit-status">@_editStatus</span>
-            </div>
-            @if (_editError != null)
-            {
-                <div class="edit-error">@_editError</div>
-            }
-        </Window>
-    }
+		<div class="edit-actions">
+			@* Save only appears for a character you own; others get a preview-only editor. *@
+			@if (_ownsSelected)
+			{
+				<button class="pose-reset" @onclick="SaveEdit">Save</button>
+			}
+			<button class="pose-reset" @onclick="RevertEdit">Revert</button>
+			<span class="edit-status">@_editStatus</span>
+		</div>
+		@if (_editError != null)
+		{
+			<div class="edit-error">@_editError</div>
+		}
+	</Window>
+}
 
-    @if (_selected != null)
-    {
-        <Window Title="Pose" Floating="true" Collapsed="true" Id="pose-window"
-                Style="bottom:1.25rem; right:1.25rem; width:15rem;">
-            <label class="anim-select">
-                <span>Animation</span>
-                <select id="anim-select"></select>
-            </label>
-            <div class="tip-controls" id="pose-controls"></div>
-        </Window>
-    }
+@if (_selected != null)
+{
+	<Window Title="Pose" Floating="true" Collapsed="true" Id="pose-window"
+	        Style="bottom: 1.25rem; right: 1.25rem; width: 15rem;">
+		<label class="anim-select">
+			<span>Animation</span>
+			<select id="anim-select"></select>
+		</label>
+		<div class="tip-controls" id="pose-controls"></div>
+	</Window>
+}
 </div>
 
 @code {
 
-    // Render one item slot (equipment or bag): a 3D thumbnail filled in by JS, the item name as fallback/label (or the
-    // placeholder label when empty), a stack-count badge, and data-* attributes the JS tooltip reads on hover.
-    private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "", string? equipSlot = null) =>
-        @<div
-            class="slot @extra @(info != null
-                                   ? "filled"
-                                   : "")"
-            data-item="@(info?.Id.ToString() ?? "")"
-            data-name="@(info?.Name)"
-            data-type="@(info?.Type)"
-            data-level="@(info?.Level ?? 0)"
-            data-value="@(info?.Value ?? 0)"
-            data-sell="@(info?.Sell ?? 0)"
-            data-count="@(info?.Count ?? 0)">
-            <img class="slot-img" alt=""/>
-            <span class="@(info != null
-                             ? "item"
-                             : "")">@(info?.Name ?? label)</span>
-            @if (info is { Count: > 1 } c)
-            {
-                <span class="count">@c.Count</span>
-            }
-            @* Per-slot show/hide-in-render toggle (equipped items only): ● shown, ○ hidden. *@
-            @if (equipSlot != null && info != null)
-            {
-                var hidden = _hiddenSlots.Contains(equipSlot);
-                <button class="slot-hide @(hidden
-                                             ? "off"
-                                             : "")" type="button"
-                        title="@(hidden
-                                   ? "Show in render"
-                                   : "Hide from render")"
-                        @onclick="() => ToggleSlotHidden(equipSlot)" @onclick:stopPropagation="true">
-                    @(hidden
-                        ? "○"
-                        : "●")
-                </button>
-            }
-        </div>;
+	// Render one item slot (equipment or bag): a 3D thumbnail filled in by JS, the item name as fallback/label (or the
+	// placeholder label when empty), a stack-count badge, and data-* attributes the JS tooltip reads on hover.
+	private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "", string? equipSlot = null) =>
+		@<div
+			 class="slot @extra @(info != null
+				                    ? "filled"
+				                    : "")"
+			 data-item="@(info?.Id.ToString() ?? "")"
+			 data-name="@(info?.Name)"
+			 data-type="@(info?.Type)"
+			 data-level="@(info?.Level ?? 0)"
+			 data-value="@(info?.Value ?? 0)"
+			 data-sell="@(info?.Sell ?? 0)"
+			 data-count="@(info?.Count ?? 0)">
+			<img class="slot-img" alt=""/>
+			<span class="@(info != null
+				             ? "item"
+				             : "")">
+				@(info?.Name ?? label)
+			</span>
+			@if (info is { Count: > 1 } c)
+			{
+				<span class="count">@c.Count</span>
+			}
+			@* Per-slot show/hide-in-render toggle (equipped items only): ● shown, ○ hidden. *@
+			@if (equipSlot != null && info != null)
+			{
+				var hidden = _hiddenSlots.Contains(equipSlot);
+				<button class="slot-hide @(hidden
+					                         ? "off"
+					                         : "")" type="button"
+				        title="@(hidden
+					               ? "Show in render"
+					               : "Hide from render")"
+				        @onclick="() => ToggleSlotHidden(equipSlot)" @onclick:stopPropagation="true">
+					@(hidden
+						? "○"
+						: "●")
+				</button>
+			}
+		</div>;
 
 }

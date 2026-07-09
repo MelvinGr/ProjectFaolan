@@ -8,128 +8,136 @@
 <PageTitle>Realm Status — Project Faolan</PageTitle>
 
 <div class="status">
-    <h1>Realm Status</h1>
+	<h1>Realm Status</h1>
 
-    @if (_loaded)
-    {
-        <div class="server-banner @(_online == null
-                                      ? "offline"
-                                      : "online")">
-            <span class="dot"></span>
-            @if (_online == null)
-            {
-                <span>Game server offline</span>
-            }
-            else
-            {
-                <span><strong>Server online</strong> · @_online.Count player@(_online.Count == 1
-                                                                                    ? ""
-                                                                                    : "s") connected</span>
-            }
-        </div>
+	@if (_loaded)
+	{
+		<div class="server-banner @(_online == null
+			                          ? "offline"
+			                          : "online")">
+			<span class="dot"></span>
+			@if (_online == null)
+			{
+				<span>Game server offline</span>
+			}
+			else
+			{
+				<span>
+					<strong>Server online</strong> · @_online.Count player@(_online.Count == 1
+						                                                      ? ""
+						                                                      : "s") connected
+				</span>
+			}
+		</div>
 
-        @if (_online is { Count: > 0 })
-        {
-            <section class="panel online-now">
-                <h2>Online now</h2>
-                <ul class="recent">
-                    @foreach (var s in _online)
-                    {
-                        <a class="rrow" href="@(s.CharacterId is { } id
-                                                  ? $"/characters?char={id}"
-                                                  : "#")">
-                            <span class="rname">@(s.CharacterName ?? "(in character select)")</span>
-                            <span class="rsub">@(s.CharacterLevel is { } lvl
-                                                       ? $"Lvl {lvl}"
-                                                       : "—")@(s.AccountName is { } a
-                                                                     ? $" · {a}"
-                                                                     : "")</span>
-                            <span class="rwhen live">online</span>
-                        </a>
-                    }
-                </ul>
-            </section>
-        }
+		@if (_online is { Count: > 0 })
+		{
+			<section class="panel online-now">
+				<h2>Online now</h2>
+				<ul class="recent">
+					@foreach (var s in _online)
+					{
+						<a class="rrow" href="@(s.CharacterId is { } id
+							                      ? $"/characters?char={id}"
+							                      : "#")">
+							<span class="rname">@(s.CharacterName ?? "(in character select)")</span>
+							<span class="rsub">
+								@(s.CharacterLevel is { } lvl
+									? $"Lvl {lvl}"
+									: "—")@(s.AccountName is { } a
+										      ? $" · {a}"
+										      : "")
+							</span>
+							<span class="rwhen live">online</span>
+						</a>
+					}
+				</ul>
+			</section>
+		}
 
-        <div class="stat-cards">
-            <div class="scard">
-                <div class="num">@_recent24h</div>
-                <div class="lbl">Active (24h)</div>
-            </div>
-            <div class="scard">
-                <div class="num">@_accounts</div>
-                <div class="lbl">Accounts</div>
-            </div>
-            <div class="scard">
-                <div class="num">@_chars</div>
-                <div class="lbl">Characters</div>
-            </div>
-            <div class="scard">
-                <div class="num">@_items.ToString("N0")</div>
-                <div class="lbl">Items</div>
-            </div>
-            <div class="scard">
-                <div class="num">@_maps</div>
-                <div class="lbl">Maps</div>
-            </div>
-            <div class="scard">
-                <div class="num">@_spells.ToString("N0")</div>
-                <div class="lbl">Spells</div>
-            </div>
-        </div>
+		<div class="stat-cards">
+			<div class="scard">
+				<div class="num">@_recent24h</div>
+				<div class="lbl">Active (24h)</div>
+			</div>
+			<div class="scard">
+				<div class="num">@_accounts</div>
+				<div class="lbl">Accounts</div>
+			</div>
+			<div class="scard">
+				<div class="num">@_chars</div>
+				<div class="lbl">Characters</div>
+			</div>
+			<div class="scard">
+				<div class="num">@_items.ToString("N0")</div>
+				<div class="lbl">Items</div>
+			</div>
+			<div class="scard">
+				<div class="num">@_maps</div>
+				<div class="lbl">Maps</div>
+			</div>
+			<div class="scard">
+				<div class="num">@_spells.ToString("N0")</div>
+				<div class="lbl">Spells</div>
+			</div>
+		</div>
 
-        <div class="status-cols">
-            <section class="panel">
-                <h2>Recently active</h2>
-                @if (_recent.Count == 0)
-                {
-                    <p class="muted">No characters have logged in yet.</p>
-                }
-                else
-                {
-                    <ul class="recent">
-                        @foreach (var r in _recent)
-                        {
-                            <a class="rrow" href="@($"/characters?char={r.Id}")">
-                                <span class="rname">@r.Name</span>
-                                <span class="rsub">Lvl @r.Level · @r.Class · @r.Map</span>
-                                <span class="rwhen">@Ago(r.LastConnection)</span>
-                            </a>
-                        }
-                    </ul>
-                }
-            </section>
+		<div class="status-cols">
+			<section class="panel">
+				<h2>Recently active</h2>
+				@if (_recent.Count == 0)
+				{
+					<p class="muted">No characters have logged in yet.</p>
+				}
+				else
+				{
+					<ul class="recent">
+						@foreach (var r in _recent)
+						{
+							<a class="rrow" href="@($"/characters?char={r.Id}")">
+								<span class="rname">@r.Name</span>
+								<span class="rsub">Lvl @r.Level · @r.Class · @r.Map</span>
+								<span class="rwhen">@Ago(r.LastConnection)</span>
+							</a>
+						}
+					</ul>
+				}
+			</section>
 
-            <section class="panel">
-                <h2>Classes</h2>
-                @if (_classes.Count == 0)
-                {
-                    <p class="muted">No characters yet.</p>
-                }
-                else
-                {
-                    <ul class="bars">
-                        @foreach (var c in _classes)
-                        {
-                            <li>
-                                <span class="bname">@c.Class</span>
-                                <div class="bbar"><i style="width:@(_classMax == 0
-                                                                      ? 0
-                                                                      : c.Count * 100 / _classMax)%"></i></div>
-                                <span class="bcount">@c.Count</span>
-                            </li>
-                        }
-                    </ul>
-                }
-            </section>
-        </div>
+			<section class="panel">
+				<h2>Classes</h2>
+				@if (_classes.Count == 0)
+				{
+					<p class="muted">No characters yet.</p>
+				}
+				else
+				{
+					<ul class="bars">
+						@foreach (var c in _classes)
+						{
+							<li>
+								<span class="bname">@c.Class</span>
+								<div class="bbar">
+									<i style="width: @(_classMax == 0
+										                 ? 0
+										                 : c.Count * 100 / _classMax)%">
+									</i>
+								</div>
+								<span class="bcount">@c.Count</span>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+		</div>
 
-        <p class="status-foot">Snapshot from the game database · last
-            login @(_lastLogin?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")</p>
-    }
-    else
-    {
-        <p class="muted">Loading…</p>
-    }
+		<p class="status-foot">
+			Snapshot from the game database · last
+			login @(_lastLogin?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")
+		</p>
+	}
+	else
+	{
+		<p class="muted">Loading…</p>
+	}
 </div>
-

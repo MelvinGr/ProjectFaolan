@@ -1,39 +1,39 @@
 ﻿@inherits LayoutComponentBase
 
 <header class="topbar">
-    <a class="brand" href="/"><img class="brand-logo" src="logo-small.png" alt=""/>Project Faolan</a>
-    <nav>
-        <a href="/characters">Characters</a>
-        <a href="/items">Armory</a>
-        <a href="/status">Status</a>
-        <AuthorizeView Roles="Admin">
-            <a class="admin-link" href="/admin">Admin</a>
-            <a class="admin-link" href="/gm">GM</a>
-            <a class="admin-link" href="/admin/map">Map</a>
-            <a class="admin-link" href="/admin/db">DB</a>
-        </AuthorizeView>
-        <AuthorizeView>
-            <Authorized>
-                <a href="/mail">Mail</a>
-                <a class="who" href="/account">@context.User.Identity?.Name</a>
-                <form method="post" action="/auth/logout">
-                    <button class="linkbtn" type="submit">Log out</button>
-                </form>
-            </Authorized>
-            <NotAuthorized>
-                <a href="/login">Log in</a>
-                <a href="/register">Register</a>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
+	<a class="brand" href="/"><img class="brand-logo" src="logo-small.png" alt=""/>Project Faolan</a>
+	<nav>
+		<a href="/characters">Characters</a>
+		<a href="/items">Armory</a>
+		<a href="/status">Status</a>
+		<AuthorizeView Roles="Admin">
+			<a class="admin-link" href="/admin">Admin</a>
+			<a class="admin-link" href="/gm">GM</a>
+			<a class="admin-link" href="/admin/map">Map</a>
+			<a class="admin-link" href="/admin/db">DB</a>
+		</AuthorizeView>
+		<AuthorizeView>
+			<Authorized>
+				<a href="/mail">Mail</a>
+				<a class="who" href="/account">@context.User.Identity?.Name</a>
+				<form method="post" action="/auth/logout">
+					<button class="linkbtn" type="submit">Log out</button>
+				</form>
+			</Authorized>
+			<NotAuthorized>
+				<a href="/login">Log in</a>
+				<a href="/register">Register</a>
+			</NotAuthorized>
+		</AuthorizeView>
+	</nav>
 </header>
 
 <main class="content">
-    @Body
+	@Body
 </main>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+	An unhandled error has occurred.
+	<a href="." class="reload">Reload</a>
+	<span class="dismiss">🗙</span>
 </div>

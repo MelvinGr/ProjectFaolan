@@ -13,12 +13,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Vendor shop windows (0x2033 NPC trade lists).";
 		public string Name => "shops";

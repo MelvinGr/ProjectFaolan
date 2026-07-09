@@ -2,22 +2,22 @@
 <html lang="en">
 
 <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <base href="/"/>
-    <link rel="icon" href="favicon.ico" sizes="any"/>
-    <link rel="icon" type="image/png" href="logo-small.png"/>
-    <link rel="apple-touch-icon" href="logo-small.png"/>
-    <ResourcePreloader/>
-    @* Cinzel — a chiselled serif for the "Age of Conan" display type (brand + headings). *@
-    <link rel="preconnect" href="https://fonts.googleapis.com"/>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&display=swap"/>
-    <link rel="stylesheet" href="@Assets["app.css"]"/>
-    <link rel="stylesheet" href="@Assets["Faolan.Web.styles.css"]"/>
-    <ImportMap/>
-    @* three.js + addons: the loader/control modules import the bare specifier "three", so map it here. *@
-    <script type="importmap">
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<base href="/"/>
+	<link rel="icon" href="favicon.ico" sizes="any"/>
+	<link rel="icon" type="image/png" href="logo-small.png"/>
+	<link rel="apple-touch-icon" href="logo-small.png"/>
+	<ResourcePreloader/>
+	@* Cinzel — a chiselled serif for the "Age of Conan" display type (brand + headings). *@
+	<link rel="preconnect" href="https://fonts.googleapis.com"/>
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&display=swap"/>
+	<link rel="stylesheet" href="@Assets["app.css"]"/>
+	<link rel="stylesheet" href="@Assets["Faolan.Web.styles.css"]"/>
+	<ImportMap/>
+	@* three.js + addons: the loader/control modules import the bare specifier "three", so map it here. *@
+	<script type="importmap">
         {
           "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -25,7 +25,7 @@
           }
         }
     </script>
-    <HeadOutlet/>
+	<HeadOutlet/>
 </head>
 
 <body>

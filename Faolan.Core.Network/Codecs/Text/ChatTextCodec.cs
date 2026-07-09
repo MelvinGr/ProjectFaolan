@@ -30,21 +30,20 @@ namespace Faolan.Core.Network.Codecs.Text
 		private const byte TrailerByte = 0x00;
 		private const uint TrailerWord = 0x40000001;
 
-		public static byte[] Build(uint instance, byte[] xml) => new Message(instance, xml).ToArray();
+		public static byte[] Build(uint instance, byte[] xml)
+		{
+			return new Message(instance, xml).ToArray();
+		}
 
-		public static Message Parse(byte[] body) => Message.Read(new FaolanStream(body));
+		public static Message Parse(byte[] body)
+		{
+			return Message.Read(new FaolanStream(body));
+		}
 
 		// The decoded ChatTextIIR body as a self-serializing codec (ICodec): Write frames the whole
 		// [len][subop][marker][instance][lead][xmlLen][xml][trailer]; Read recovers the (instance, xml).
 		public sealed record Message(uint Instance, byte[] Xml) : ICodec<Message>
 		{
-
-			public void Write(FaolanStream s)
-			{
-				s.WriteArrayUInt32Length(content =>
-					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt16(Xml.Length).WriteArray(Xml).WriteByte(TrailerByte).WriteUInt32(TrailerWord));
-			}
-
 			public static Message Read(FaolanStream s)
 			{
 				s.ReadUInt32(); // len
@@ -55,6 +54,20 @@ namespace Faolan.Core.Network.Codecs.Text
 				var xmlLen = s.ReadUInt16();
 				var xml = s.ReadArray(xmlLen);
 				return new Message(instance, xml);
+			}
+
+			public void Write(FaolanStream s)
+			{
+				s.WriteArrayUInt32Length(content =>
+					content
+						.WriteUInt32(SubOpcode)
+						.WriteUInt32(EntityClass.Character)
+						.WriteUInt32(Instance)
+						.WriteByte(LeadFlag)
+						.WriteUInt16(Xml.Length)
+						.WriteArray(Xml)
+						.WriteByte(TrailerByte)
+						.WriteUInt32(TrailerWord));
 			}
 		}
 	}

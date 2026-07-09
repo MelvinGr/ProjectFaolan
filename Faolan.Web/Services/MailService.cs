@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -31,21 +35,13 @@ namespace Faolan.Web.Services
 			var names = await db.Items.Where(i => templateIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.Name);
 
 			return mails
-				.Select(m => new MailView(m.MailId,
-					string.IsNullOrEmpty(m.SenderName)
-						? "(system)"
-						: m.SenderName,
-					m.BodyXml ?? "",
-					m.Money,
-					m.IsRead,
-					DateTimeOffset.FromUnixTimeSeconds(m.Timestamp1),
-					m
-						.Attachments
-						.Select(a => new MailItemView(names.TryGetValue(a.Template, out var n) && !string.IsNullOrWhiteSpace(n)
-								? n
-								: $"Item {a.Template}",
-							a.Quantity))
-						.ToList()))
+				.Select(m => new MailView(m.MailId, string.IsNullOrEmpty(m.SenderName)
+					? "(system)"
+					: m.SenderName, m.BodyXml ?? "", m.Money, m.IsRead, DateTimeOffset.FromUnixTimeSeconds(m.Timestamp1), m
+					.Attachments.Select(a => new MailItemView(names.TryGetValue(a.Template, out var n) && !string.IsNullOrWhiteSpace(n)
+						? n
+						: $"Item {a.Template}", a.Quantity))
+					.ToList()))
 				.ToList();
 		}
 

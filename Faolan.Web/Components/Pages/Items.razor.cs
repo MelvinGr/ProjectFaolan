@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -69,7 +72,11 @@ namespace Faolan.Web.Components.Pages
 		private static string Initials(string name)
 		{
 			var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			return parts.Length == 0 ? "?" : parts.Length == 1 ? parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant() : (parts[0][..1] + parts[1][..1]).ToUpperInvariant();
+			return parts.Length == 0
+				? "?"
+				: parts.Length == 1
+					? parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant()
+					: (parts[0][..1] + parts[1][..1]).ToUpperInvariant();
 		}
 	}
 }

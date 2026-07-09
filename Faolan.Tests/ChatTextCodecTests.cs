@@ -1,8 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.Text;
-using Xunit;
 using Faolan.Core.Network.Codecs.Text;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -21,7 +21,8 @@ namespace Faolan.Tests
 		                                        "206b65793d2671756f743b5e344c3226616d703b2333363b64553541476a6354585f784a5b2a512671756f743b202667743b22" +
 		                                        "202f3e3c706172616d657465722076616c75653d22373b266c743b6c6f63616c697a65642069643d2671756f743b3730302671" +
 		                                        "756f743b2063617465676f72793d2671756f743b35353230302671756f743b20666c6167733d2671756f743b2671756f743b20" +
-		                                        "6b65793d2671756f743b4d7052662e43782e255e4d476446585426616d703b71756f743b3958282671756f743b202667743b22" + "202f3e3c2f72656d6f7465666f726d61743e0040000001";
+		                                        "6b65793d2671756f743b4d7052662e43782e255e4d476446585426616d703b71756f743b3958282671756f743b202667743b22" +
+		                                        "202f3e3c2f72656d6f7465666f726d61743e0040000001";
 
 		[Fact]
 		public void Build_FromArbitraryXml_FramesLengthAndSubopcode()

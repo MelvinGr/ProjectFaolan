@@ -18,25 +18,66 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// world-entry/interest path calls per NPC.
 	public static class NpcSpawnBuilder
 	{
-		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO world
-		// placement (#244/#307). This is what a summoned PET/MOUNT uses: the creature type carries the lifted stat core
-		// (Npc.StatCore), worn equipment (Npc.Equipment), appearance morphs (Npc.Morphs) and the no-morph recordCount,
-		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
-		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
-		// lifted stat core.
-		public static bool TryBuildFromType(Npc npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
+		// Assembles a whole NPC FA015807 spawn body FROM SCRATCH (#244) - no captured template. The playfield token is
+		// written into the transform directly (no post-hoc SpawnPlayfieldRewriter), and every section has its own
+		// builder: header constants + handle; transform = [2C 0A <vec3 LE> 12 <quat LE> 18 <token varint>]; pre-IIR =
+		// NpcSpawnPreIir.BuildMinimal; the CoreChar header [41][X][msgLen] with X = the lifted IirHeader; the serialised
+		// CharacterIIR message; and the post-IIR: the appearance/morph table when `morphs` are given, else the minimal
+		// form with `minimalRecordCount` (the type-stable 1 or 2 - #243).
+		// This is the sole NPC spawn-body path (the captured Data blob was retired): every shipped spawn is an animal,
+		// a clean-appearance humanoid, or a no-morph spawn expressible from columns (NpcSpawnFromScratchTests).
+		public static byte[] BuildBody(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs,
+			uint minimalRecordCount = NpcSpawnScaffold.MinimalRecordCount)
 		{
-			body = null;
-			if (npc?.StatCore?.IirHeader is not { } x)
-				return false;
+			var msgBytes = message.ToProtobuf();
+			var preIir = NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal());
+			var postIir = morphs is { Count: > 0 }
+				? NpcSpawnAppearanceCodec.BuildPostIir(morphs)
+				: NpcSpawnScaffold.BuildMinimalPostIir(minimalRecordCount);
 
-			var morphs = npc.Morphs
-				.OrderBy(m => m.Ordinal)
-				.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
-				.ToList();
-			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
-			body = BuildBody(handle, x, position, rotation, 0, BuildMessageFromType(npc), morphs, minimalRc);
-			return true;
+			var body = new FaolanStream()
+				.WriteUInt32(0) // body length placeholder (set below)
+				.WriteUInt32(0xFA015807u) // TODO: Add subOpcode (SimpleCharFullUpdate)
+				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
+				.WriteUInt32(handle)
+				.WriteUInt32(0) // fieldA
+				.WriteByte(0x2C)
+				.WriteByte(0x0A)
+				.WriteArrayByteLength(EncodeVec3(position))
+				.WriteByte(0x12)
+				.WriteArrayByteLength(EncodeQuat(rotation))
+				.WriteByte(0x18)
+				.WritePlayfieldToken(playfieldToken)
+				.WriteArray(preIir)
+				.WriteByte(0x41)
+				.WriteUInt32(iirHeader)
+				.WriteUInt32((uint)msgBytes.Length) // CoreChar header
+				.WriteArray(msgBytes)
+				.WriteArray(postIir)
+				.ToArray();
+
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
+			return body;
+		}
+
+		// Constructs the WHOLE ProtoCoreCharacterIIR message for a spawn from typed columns/rows (#244) - no captured
+		// Data: Name from the type, the stat core from StatCore + placement (ApplyStatCore), worn equipment from the
+		// NpcSpawnEquipment rows. Runtime/target fields are omitted (canonical fresh spawn). Feed this to
+		// BuildBody to assemble the whole body from the DB.
+		public static ProtoCoreCharacterIIR BuildMessageFromColumns(NpcSpawn row)
+		{
+			var msg = new ProtoCoreCharacterIIR
+			{
+				Name = row.Npc?.Name ?? ""
+			};
+			ApplyStatCore(msg, row);
+			if (row.Equipment is { Count: > 0 })
+			{
+				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(row.Equipment))
+					msg.InventoryEntries.Add(entry);
+			}
+
+			return msg;
 		}
 
 		// Constructs the WHOLE ProtoCoreCharacterIIR for a creature TYPE (#307): Name + the stat core straight from
@@ -56,61 +97,39 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (core.MovementMode.HasValue)
 				msg.MovementMode = core.MovementMode.Value;
 			if (npc.Equipment is { Count: > 0 })
+			{
 				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(npc.Equipment))
 					msg.InventoryEntries.Add(entry);
+			}
+
 			return msg;
 		}
 
-		// Assembles a whole NPC FA015807 spawn body FROM SCRATCH (#244) - no captured template. The playfield token is
-		// written into the transform directly (no post-hoc SpawnPlayfieldRewriter), and every section has its own
-		// builder: header constants + handle; transform = [2C 0A <vec3 LE> 12 <quat LE> 18 <token varint>]; pre-IIR =
-		// NpcSpawnPreIir.BuildMinimal; the CoreChar header [41][X][msgLen] with X = the lifted IirHeader; the serialised
-		// CharacterIIR message; and the post-IIR: the appearance/morph table when `morphs` are given, else the minimal
-		// form with `minimalRecordCount` (the type-stable 1 or 2 - #243).
-		// This is the sole NPC spawn-body path (the captured Data blob was retired): every shipped spawn is an animal,
-		// a clean-appearance humanoid, or a no-morph spawn expressible from columns (NpcSpawnFromScratchTests).
-		public static byte[] BuildBody(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs, uint minimalRecordCount = NpcSpawnScaffold.MinimalRecordCount)
+		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO world
+		// placement (#244/#307). This is what a summoned PET/MOUNT uses: the creature type carries the lifted stat core
+		// (Npc.StatCore), worn equipment (Npc.Equipment), appearance morphs (Npc.Morphs) and the no-morph recordCount,
+		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
+		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
+		// lifted stat core.
+		public static bool TryBuildFromType(Npc npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
 		{
-			var msgBytes = message.ToProtobuf();
-			var preIir = NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal());
-			var postIir = morphs is { Count: > 0 }
-				? NpcSpawnAppearanceCodec.BuildPostIir(morphs)
-				: NpcSpawnScaffold.BuildMinimalPostIir(minimalRecordCount);
+			body = null;
+			if (npc?.StatCore?.IirHeader is not { } x)
+				return false;
 
-			var body = new FaolanStream()
-				.WriteUInt32(0) // body length placeholder (set below)
-				.WriteUInt32(0xFA015807u) // TODO: Add subOpcode (SimpleCharFullUpdate)
-				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
-				.WriteUInt32(handle)
-				.WriteUInt32(0) // fieldA
-				.WriteByte(0x2C).WriteByte(0x0A).WriteArrayByteLength(EncodeVec3(position))
-				.WriteByte(0x12).WriteArrayByteLength(EncodeQuat(rotation))
-				.WriteByte(0x18).WritePlayfieldToken(playfieldToken)
-				.WriteArray(preIir)
-				.WriteByte(0x41).WriteUInt32(iirHeader).WriteUInt32((uint)msgBytes.Length) // CoreChar header
-				.WriteArray(msgBytes)
-				.WriteArray(postIir)
-				.ToArray();
-
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
-			return body;
+			var morphs = npc
+				.Morphs.OrderBy(m => m.Ordinal)
+				.Select(m => new NpcAppearanceMorph
+				{
+					MorphId = m.MorphId,
+					Value = m.Value,
+					Text = m.Text ?? ""
+				})
+				.ToList();
+			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
+			body = BuildBody(handle, x, position, rotation, 0, BuildMessageFromType(npc), morphs, minimalRc);
+			return true;
 		}
-
-		// The transform vec3 = [0D x][15 y][1D z], each a little-endian fixed32 (15 bytes).
-		private static byte[] EncodeVec3(Vector3 v) => new FaolanStream()
-			.WriteByte(0x0D).WriteFloatLittleEndian(v.X)
-			.WriteByte(0x15).WriteFloatLittleEndian(v.Y)
-			.WriteByte(0x1D).WriteFloatLittleEndian(v.Z)
-			.ToArray();
-
-		// The transform quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
-		private static byte[] EncodeQuat(Quaternion q) => new FaolanStream()
-			.WriteByte(0x0D).WriteFloatLittleEndian(q.X)
-			.WriteByte(0x15).WriteFloatLittleEndian(q.Y)
-			.WriteByte(0x1D).WriteFloatLittleEndian(q.Z)
-			.WriteByte(0x25).WriteFloatLittleEndian(q.W)
-			.ToArray();
-
 
 		// The LIVE spawn path (#244/#243): assemble the whole body from typed columns with `playfieldToken` baked into
 		// the transform - no captured Data, no SpawnPlayfieldRewriter. Every shipped spawn is expressible from scratch:
@@ -125,9 +144,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (row?.Npc?.StatCore?.IirHeader is not { } x)
 				return false;
 
-			var morphs = row.Morphs
-				.OrderBy(m => m.Ordinal)
-				.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
+			var morphs = row
+				.Morphs.OrderBy(m => m.Ordinal)
+				.Select(m => new NpcAppearanceMorph
+				{
+					MorphId = m.MorphId,
+					Value = m.Value,
+					Text = m.Text ?? ""
+				})
 				.ToList();
 
 			// Animal or morph-humanoid: minimal record count is 1 (unused when morphs are present).
@@ -143,20 +167,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs, minimalRecordCount);
 			return true;
-		}
-
-		// Constructs the WHOLE ProtoCoreCharacterIIR message for a spawn from typed columns/rows (#244) - no captured
-		// Data: Name from the type, the stat core from StatCore + placement (ApplyStatCore), worn equipment from the
-		// NpcSpawnEquipment rows. Runtime/target fields are omitted (canonical fresh spawn). Feed this to
-		// BuildBody to assemble the whole body from the DB.
-		public static ProtoCoreCharacterIIR BuildMessageFromColumns(NpcSpawn row)
-		{
-			var msg = new ProtoCoreCharacterIIR { Name = row.Npc?.Name ?? "" };
-			ApplyStatCore(msg, row);
-			if (row.Equipment is { Count: > 0 })
-				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(row.Equipment))
-					msg.InventoryEntries.Add(entry);
-			return msg;
 		}
 
 		// Constructs the CharacterIIR stat core (#244) from the type-level Npc.StatCore + this placement's overrides,
@@ -208,6 +218,28 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				msg.CanFall = core.CanFall.Value;
 			if (core.MovementMode.HasValue)
 				msg.MovementMode = core.MovementMode.Value;
+		}
+
+		// The transform quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
+		[Obsolete("Use FaolanStream")]
+		private static byte[] EncodeQuat(Quaternion q)
+		{
+			return new FaolanStream()
+				.WriteByte(0x0D)
+				.WriteFloatLittleEndian(q.X)
+				.WriteByte(0x15)
+				.WriteFloatLittleEndian(q.Y)
+				.WriteByte(0x1D)
+				.WriteFloatLittleEndian(q.Z)
+				.WriteByte(0x25)
+				.WriteFloatLittleEndian(q.W)
+				.ToArray();
+		}
+
+		// The transform vec3 = [0D x][15 y][1D z], each a little-endian fixed32 (15 bytes).
+		private static byte[] EncodeVec3(Vector3 v)
+		{
+			return new FaolanStream().WriteByte(0x0D).WriteFloatLittleEndian(v.X).WriteByte(0x15).WriteFloatLittleEndian(v.Y).WriteByte(0x1D).WriteFloatLittleEndian(v.Z).ToArray();
 		}
 	}
 }

@@ -41,6 +41,25 @@ namespace Faolan.Tests
 			Assert.Equal(capturedPostIir, NpcSpawnAppearanceCodec.BuildPostIir(morphs));
 		}
 
+		// Animals (the 41-byte minimal post-IIR) carry no table under either decoder.
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther")]
+		public void DecodeAppearanceLenient_Animal_ReturnsFalse(string golden)
+		{
+			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(Golden.Bytes(golden), out var morphs));
+			Assert.Empty(morphs);
+		}
+
+		// A clean-shape body decodes identically under the lenient path (firstRecordLen == 5, record1 == the empty
+		// record) - the lenient decode is a strict superset, so it never regresses the 582 clean captures.
+		[Fact]
+		public void DecodeAppearanceLenient_CleanShape_MatchesStrict()
+		{
+			var body = Golden.Bytes("SpawnNpcCasilda");
+			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var strict));
+			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lenient));
+			Assert.Equal(NpcSpawnAppearanceCodec.BuildPostIir(strict), NpcSpawnAppearanceCodec.BuildPostIir(lenient));
+		}
+
 		// #243 lenient decode: a mid-session humanoid capture carries the SAME morph table behind a large RUNTIME
 		// record1 instead of the empty 5-byte record1. Strict TryDecodeAppearance declines it; TryDecodeAppearanceLenient
 		// skips the runtime record (using firstRecordLen) and recovers the identical table. Synthesize the runtime shape
@@ -60,9 +79,7 @@ namespace Faolan.Tests
 			var runtime = new byte[40];
 			new Random(1).NextBytes(runtime);
 			runtime[0] = 0xFF; // ensure bytes[12..17] can't be mistaken for the empty record1 (strict must decline)
-			var runtimePost = new FaolanStream()
-				.WriteUInt32(0u).WriteUInt32((uint)runtime.Length).WriteUInt32(1u)
-				.WriteArray(runtime).WriteArray(tableAndTerminator).ToArray();
+			var runtimePost = new FaolanStream().WriteUInt32(0u).WriteUInt32((uint)runtime.Length).WriteUInt32(1u).WriteArray(runtime).WriteArray(tableAndTerminator).ToArray();
 
 			var runtimeBody = new byte[postStart + runtimePost.Length];
 			Array.Copy(body, runtimeBody, postStart);
@@ -74,25 +91,6 @@ namespace Faolan.Tests
 			Assert.Equal(cleanMorphs.Count, lenientMorphs.Count);
 			// Both lift the identical appearance table (BuildPostIir is the canonical fresh form for both).
 			Assert.Equal(NpcSpawnAppearanceCodec.BuildPostIir(cleanMorphs), NpcSpawnAppearanceCodec.BuildPostIir(lenientMorphs));
-		}
-
-		// A clean-shape body decodes identically under the lenient path (firstRecordLen == 5, record1 == the empty
-		// record) - the lenient decode is a strict superset, so it never regresses the 582 clean captures.
-		[Fact]
-		public void DecodeAppearanceLenient_CleanShape_MatchesStrict()
-		{
-			var body = Golden.Bytes("SpawnNpcCasilda");
-			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var strict));
-			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lenient));
-			Assert.Equal(NpcSpawnAppearanceCodec.BuildPostIir(strict), NpcSpawnAppearanceCodec.BuildPostIir(lenient));
-		}
-
-		// Animals (the 41-byte minimal post-IIR) carry no table under either decoder.
-		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther")]
-		public void DecodeAppearanceLenient_Animal_ReturnsFalse(string golden)
-		{
-			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(Golden.Bytes(golden), out var morphs));
-			Assert.Empty(morphs);
 		}
 	}
 }

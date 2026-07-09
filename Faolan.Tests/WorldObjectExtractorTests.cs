@@ -14,11 +14,15 @@ namespace Faolan.Tests
 		[Fact]
 		public void Extract_IgnoresObjectsBeforeAnyMapChange()
 		{
-			Assert.Empty(WorldObjectExtractor.Extract(new List<CapturedPacket> { RawObject(Golden.Bytes("WorldObjZone")) }));
+			Assert.Empty(WorldObjectExtractor.Extract(new List<CapturedPacket>
+			{
+				RawObject(Golden.Bytes("WorldObjZone"))
+			}));
 		}
 
 		// Decor (66AEDD50) is identified by name only (its message id is 0); the container/zone carry a numeric id.
-		[Theory, InlineData("WorldObjDecor", 0x66AEDD50u, "Broken Bottle", 0u), InlineData("WorldObjChest", 0xF096251Eu, "Chest [N7FU]", 3662806u), InlineData("WorldObjZone", 0x33A56FB0u, "City of Tortage", 196787u)]
+		[Theory, InlineData("WorldObjDecor", 0x66AEDD50u, "Broken Bottle", 0u), InlineData("WorldObjChest", 0xF096251Eu, "Chest [N7FU]", 3662806u),
+		 InlineData("WorldObjZone", 0x33A56FB0u, "City of Tortage", 196787u)]
 		public void Extract_LiftsClassIdAndName(string golden, uint subOpcode, string name, uint objectId)
 		{
 			var packets = new List<CapturedPacket>

@@ -40,6 +40,14 @@ namespace Faolan.GameServer.World
 
 		// Remaining time (seconds) until respawn while dead; meaningless when alive.
 		private double _respawnRemaining;
+
+		// Which instance (copy) of MapId this entity lives in (#268). Equals its Zone's PlayfieldToken - the retail
+		// playfield-instance id. 0 until placed; WorldState.Place sets it from the resolved/created instance so every
+		// later ZoneFor(entity) lands in the same copy. Two entities only see each other if MapId AND InstanceId match.
+		public uint InstanceId { get; set; }
+
+		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
+		public uint MapId { get; set; }
 		public bool Following => FollowTargetHandle != 0;
 
 		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.
@@ -194,11 +202,6 @@ namespace Faolan.GameServer.World
 		// The wire handle other entities address this one by (the player's client instance / an NPC's spawn handle).
 		public uint Handle { get; }
 
-		// Which instance (copy) of MapId this entity lives in (#268). Equals its Zone's PlayfieldToken - the retail
-		// playfield-instance id. 0 until placed; WorldState.Place sets it from the resolved/created instance so every
-		// later ZoneFor(entity) lands in the same copy. Two entities only see each other if MapId AND InstanceId match.
-		public uint InstanceId { get; set; }
-
 		// For a PLAYER: the handle of the NPC that last damaged them - used as the killer in the death's
 		// SimpleCharKilledBy record. The resurrect window goes WAVE iff the killer resolves to the LOCAL player; a
 		// real mob killer makes it INSTANT like retail (#214). Set by ApplyNpcAttack/ApplyNpcCast when a hit lands.
@@ -206,9 +209,6 @@ namespace Faolan.GameServer.World
 
 		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
 		public uint Level { get; set; }
-
-		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
-		public uint MapId { get; set; }
 
 		// If this entity is a PET, the handle of the owner (the summoner's client instance); 0 = not a pet (#307).
 		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.

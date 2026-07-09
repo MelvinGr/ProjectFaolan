@@ -56,8 +56,8 @@ namespace Faolan.Tests
 		// constant - it is a COUNT marker, tag = (feat/skill IdList length + 2) * 0x3F1. So a fresh character's closer
 		// tag must equal that formula for EVERY class (this is why a mismatched closer crashes - #250). Includes the
 		// Assassin (14 feats -> 0x3F10), whose earlier hardcoded 0x56B6 guess was wrong.
-		[Theory, InlineData(Class.Guardian), InlineData(Class.Conqueror), InlineData(Class.DarkTemplar), InlineData(Class.Barbarian), InlineData(Class.Assassin), InlineData(Class.Ranger), InlineData(Class.BearShaman),
-		 InlineData(Class.PriestOfMitra), InlineData(Class.TempestOfSet), InlineData(Class.Necromancer), InlineData(Class.Demonologist), InlineData(Class.HeraldOfXotli)]
+		[Theory, InlineData(Class.Guardian), InlineData(Class.Conqueror), InlineData(Class.DarkTemplar), InlineData(Class.Barbarian), InlineData(Class.Assassin), InlineData(Class.Ranger),
+		 InlineData(Class.BearShaman), InlineData(Class.PriestOfMitra), InlineData(Class.TempestOfSet), InlineData(Class.Necromancer), InlineData(Class.Demonologist), InlineData(Class.HeraldOfXotli)]
 		public void FreshCloser_TagIsDerivedFromFeatCount(Class @class)
 		{
 			var character = new Character
@@ -112,16 +112,7 @@ namespace Faolan.Tests
 				Class = Class.Barbarian,
 				Body = new CharacterBody()
 			};
-			foreach (var (morph, raw) in new (string, uint)[]
-			{
-				("arm", 59),
-				("arse", 14),
-				("bosom", 30),
-				("chest", 59),
-				("leg", 59),
-				("stomach", 14),
-				("thigh", 59)
-			})
+			foreach (var (morph, raw) in new (string, uint)[] { ("arm", 59), ("arse", 14), ("bosom", 30), ("chest", 59), ("leg", 59), ("stomach", 14), ("thigh", 59) })
 				// raw = Dikketest's captured wire values; decode as the read side does before storing.
 				Assert.True(CharacterMorphs.TryApply(character.Body, morph, (int)(raw >> 1) ^ -(int)(raw & 1)));
 
@@ -166,7 +157,10 @@ namespace Faolan.Tests
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnDikketestLogin"), out var scaffold, out _));
 
-			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(new Character { Id = 1 }, scaffold));
+			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(new Character
+			{
+				Id = 1
+			}, scaffold));
 			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(null, scaffold));
 		}
 

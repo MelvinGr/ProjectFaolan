@@ -12,6 +12,27 @@ namespace Faolan.Core.Database.Tables
 	// definition looked up by the RDB quest id.
 	public class QuestDefinition : BaseEntity
 	{
+		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
+		public uint AreaId { get; set; }
+
+		// The primary objective's goal id (e.g. 0x1670 = 5744), echoed in QuestGoal and the full-update.
+		public uint GoalId { get; set; }
+
+		// The objective's world-marker (map id + x/y) shown on the map; 0 when the quest has no map marker.
+		public uint MapId { get; set; }
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
+
+		// The next stage in a multi-stage quest CHAIN (Gitea #261): completing this quest's goal SUPERSEDES it with
+		// NextQuestId (QuestProgressionService sends QuestGoal + QuestIIR 2->4 + QuestFullUpdate(next) and sets the next
+		// quest Active). 0 = no successor (a standalone quest, or the last stage of a chain). The Tortage intro chain is
+		// 13479 (kill Tuut) -> 13563 (loot key) -> 13480 (free/talk Casilda) -> 12407 (escort) -> 0.
+		public uint NextQuestId { get; set; }
+
+		// The RDB quest id (e.g. 13479) - the stable lookup key; the synthetic Id is the row PK.
+		public uint QuestId { get; set; }
+
 		// The per-GOAL objective detail (the @609 region of the FullChar snapshot tails) - one row per goal of the
 		// quest. A quest can have several goals each with its own world marker + objective text (the beach starter has
 		// two: 1448 + 3490). Distinct from TextRefs (the journal header); these drive QuestObjectiveRegion generation
@@ -19,17 +40,8 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = new List<QuestGoalDefinition>();
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
 
-		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
-
 		[MaxLength(128)]
 		public string IndexGoalSteps { get; set; }
-
-		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
-		public uint AreaId { get; set; }
-
-		// The primary objective's goal id (e.g. 0x1670 = 5744), echoed in QuestGoal and the full-update.
-		public uint GoalId { get; set; }
 
 		// Quest index region: the W6QT goal-id table's marker + three lead words + trailer word, and the goal-step ids
 		// (CSV, the client's 1..n goal index). Beach 10238: marker 0x7E2, fields 1/7/0, trailer 0x156E7, 8 steps.
@@ -41,20 +53,8 @@ namespace Faolan.Core.Database.Tables
 		public uint IndexTableField2 { get; set; }
 		public uint IndexTableField3 { get; set; }
 		public uint IndexTrailerWord { get; set; }
-
-		// The objective's world-marker (map id + x/y) shown on the map; 0 when the quest has no map marker.
-		public uint MapId { get; set; }
 		public uint MarkerX { get; set; }
 		public uint MarkerY { get; set; }
-
-		// The next stage in a multi-stage quest CHAIN (Gitea #261): completing this quest's goal SUPERSEDES it with
-		// NextQuestId (QuestProgressionService sends QuestGoal + QuestIIR 2->4 + QuestFullUpdate(next) and sets the next
-		// quest Active). 0 = no successor (a standalone quest, or the last stage of a chain). The Tortage intro chain is
-		// 13479 (kill Tuut) -> 13563 (loot key) -> 13480 (free/talk Casilda) -> 12407 (escort) -> 0.
-		public uint NextQuestId { get; set; }
-
-		// The RDB quest id (e.g. 13479) - the stable lookup key; the synthetic Id is the row PK.
-		public uint QuestId { get; set; }
 		public uint SnapshotField28 { get; set; }
 		public uint SnapshotFieldEc { get; set; }
 		public uint SnapshotFieldF0 { get; set; }

@@ -4,7 +4,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -25,7 +24,8 @@ namespace Faolan.GameServer
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.CoreClaimIIR).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Account.ClientInstance).WriteArray(0x00, 0x09))
+				.WriteArrayUInt32Length(s =>
+					s.WriteUInt32(GameServer0X2000Opcodes.CoreClaimIIR).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Account.ClientInstance).WriteArray(0x00, 0x09))
 				.SendAsync(client);
 
 			// record 0: 0x00002000, 17-byte body
@@ -38,7 +38,8 @@ namespace Faolan.GameServer
 
 			// record 1: 0x0000200C, 1-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance), GameInterfaceDispatchOpcodes.DispatchReportServerID)
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance),
+					GameInterfaceDispatchOpcodes.DispatchReportServerID)
 				.WriteArray(0x01)
 				.SendAsync(client);
 

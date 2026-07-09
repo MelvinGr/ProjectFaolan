@@ -9,100 +9,108 @@
 <PageTitle>Database — Admin</PageTitle>
 
 <div class="dbe">
-    <div class="dbe-head">
-        <h1>Database</h1>
-        <span class="warn">⚠ edits the live game DB — the server may need a restart to pick up changes</span>
-    </div>
+	<div class="dbe-head">
+		<h1>Database</h1>
+		<span class="warn">⚠ edits the live game DB — the server may need a restart to pick up changes</span>
+	</div>
 
-    @if (!_authorized)
-    {
-        <p class="muted">Checking access…</p>
-    }
-    else
-    {
-        @if (_status != null)
-        {
-            <p class="dbe-status @(_error
-                                     ? "err"
-                                     : "")">@_status</p>
-        }
+	@if (!_authorized)
+	{
+		<p class="muted">Checking access…</p>
+	}
+	else
+	{
+		@if (_status != null)
+		{
+			<p class="dbe-status @(_error
+				                     ? "err"
+				                     : "")">
+				@_status
+			</p>
+		}
 
-        <div class="dbe-grid">
-            <aside class="dbe-tables">
-                @foreach (var t in _tables)
-                {
-                    <button class="@(t == _table
-                                       ? "sel"
-                                       : "")" @onclick="() => SelectTable(t)">@t.Name</button>
-                }
-            </aside>
+		<div class="dbe-grid">
+			<aside class="dbe-tables">
+				@foreach (var t in _tables)
+				{
+					<button class="@(t == _table
+						               ? "sel"
+						               : "")" @onclick="() => SelectTable(t)">
+						@t.Name
+					</button>
+				}
+			</aside>
 
-            <section class="dbe-rows">
-                <input class="filter" placeholder="Filter rows…" @bind="_filter" @bind:event="oninput"/>
-                <div class="rowlist">
-                    @foreach (var r in Filtered())
-                    {
-                        <button class="@(ReferenceEquals(r, _row)
-                                           ? "sel"
-                                           : "")" @onclick="() => SelectRow(r)">@r.ToString()</button>
-                    }
-                </div>
-                <div class="rowbar">
-                    <button class="btn" disabled="@(_table == null)" @onclick="AddRow">+ Add</button>
-                    <button class="btn" disabled="@(_row == null)" @onclick="DeleteRow">Delete</button>
-                    <button class="btn primary" @onclick="Save">Save</button>
-                    <span class="count">@_rows.Count loaded@(_rows.Count >= RowCap
-                                                                   ? $" (cap {RowCap})"
-                                                                   : "")</span>
-                </div>
-            </section>
+			<section class="dbe-rows">
+				<input class="filter" placeholder="Filter rows…" @bind="_filter" @bind:event="oninput"/>
+				<div class="rowlist">
+					@foreach (var r in Filtered())
+					{
+						<button class="@(ReferenceEquals(r, _row)
+							               ? "sel"
+							               : "")" @onclick="() => SelectRow(r)">
+							@r.ToString()
+						</button>
+					}
+				</div>
+				<div class="rowbar">
+					<button class="btn" disabled="@(_table == null)" @onclick="AddRow">+ Add</button>
+					<button class="btn" disabled="@(_row == null)" @onclick="DeleteRow">Delete</button>
+					<button class="btn primary" @onclick="Save">Save</button>
+					<span class="count">
+						@_rows.Count loaded@(_rows.Count >= RowCap
+							                   ? $" (cap {RowCap})"
+							                   : "")
+					</span>
+				</div>
+			</section>
 
-            <section class="dbe-fields">
-                @if (_row == null)
-                {
-                    <p class="muted">Select a row to edit.</p>
-                }
-                else
-                {
-                    @foreach (var f in _fields)
-                    {
-                        <div class="field">
-                            <label>@f.Name</label>
-                            @if (f.IsBool)
-                            {
-                                <input type="checkbox" checked="@f.BoolValue"
-                                       @onchange="e => f.BoolValue = (bool)(e.Value ?? false)"/>
-                            }
-                            else if (_fks.TryGetValue(f.Name, out var fk))
-                            {
-                                <select value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())">
-                                    @if (fk.Nullable)
-                                    {
-                                        <option value="">(none)</option>
-                                    }
-                                    @foreach (var o in fk.Items)
-                                    {
-                                        <option value="@o.Value">@o.Label</option>
-                                    }
-                                </select>
-                            }
-                            else if (f.IsEnum)
-                            {
-                                <select value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())">
-                                    @foreach (var ev in f.EnumValues)
-                                    {
-                                        <option value="@ev">@ev</option>
-                                    }
-                                </select>
-                            }
-                            else
-                            {
-                                <input value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())"/>
-                            }
-                        </div>
-                    }
-                }
-            </section>
-        </div>
-    }
+			<section class="dbe-fields">
+				@if (_row == null)
+				{
+					<p class="muted">Select a row to edit.</p>
+				}
+				else
+				{
+					@foreach (var f in _fields)
+					{
+						<div class="field">
+							<label>@f.Name</label>
+							@if (f.IsBool)
+							{
+								<input type="checkbox" checked="@f.BoolValue"
+								       @onchange="e => f.BoolValue = (bool)(e.Value ?? false)"/>
+							}
+							else if (_fks.TryGetValue(f.Name, out var fk))
+							{
+								<select value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())">
+									@if (fk.Nullable)
+									{
+										<option value="">(none)</option>
+									}
+									@foreach (var o in fk.Items)
+									{
+										<option value="@o.Value">@o.Label</option>
+									}
+								</select>
+							}
+							else if (f.IsEnum)
+							{
+								<select value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())">
+									@foreach (var ev in f.EnumValues)
+									{
+										<option value="@ev">@ev</option>
+									}
+								</select>
+							}
+							else
+							{
+								<input value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())"/>
+							}
+						</div>
+					}
+				}
+			</section>
+		</div>
+	}
 </div>

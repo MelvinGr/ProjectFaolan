@@ -1,4 +1,7 @@
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -7,13 +10,13 @@ namespace Faolan.Web.Components.Pages
 {
 	public partial class GmConsole
 	{
-		private readonly Dictionary<uint, string> _cmds = new Dictionary<uint, string>();
-		private readonly Dictionary<uint, string> _msgs = new Dictionary<uint, string>();
-		private readonly Dictionary<uint, string> _tpMap = new Dictionary<uint, string>();
-		private readonly Dictionary<uint, string> _tpX = new Dictionary<uint, string>();
-		private readonly Dictionary<uint, string> _tpY = new Dictionary<uint, string>();
-		private readonly Dictionary<uint, string> _tpZ = new Dictionary<uint, string>();
-		private readonly Dictionary<uint, uint> _tpTarget = new Dictionary<uint, uint>();
+		private readonly Dictionary<uint, string> _cmds = new();
+		private readonly Dictionary<uint, string> _msgs = new();
+		private readonly Dictionary<uint, string> _tpMap = new();
+		private readonly Dictionary<uint, string> _tpX = new();
+		private readonly Dictionary<uint, string> _tpY = new();
+		private readonly Dictionary<uint, string> _tpZ = new();
+		private readonly Dictionary<uint, uint> _tpTarget = new();
 
 		private bool _authorized;
 		private bool _busy;

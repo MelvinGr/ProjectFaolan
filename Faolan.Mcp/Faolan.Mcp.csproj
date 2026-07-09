@@ -5,20 +5,16 @@
              Claude Code over stdio via .mcp.json "faolan-chat"). Exe-to-exe project references are fine. -->
         <OutputType>Exe</OutputType>
         <StartupObject>Faolan.Mcp.ChannelBridge</StartupObject>
-        <!-- Required when referencing Microsoft.AspNetCore.App from the non-Web SDK on .NET 10 (NETSDK1226). -->
         <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
-        <ProjectReference Include="..\Faolan.Core.Network\Faolan.Core.Network.csproj"/>
+        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+        <ProjectReference Include="..\Faolan.Core.Network\Faolan.Core.Network.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <!-- In-process MCP server (Claude tooling) hosted on a localhost Kestrel port. -->
-        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
-        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0"/>
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9"/>
-        <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9"/>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.1" />
     </ItemGroup>
 </Project>

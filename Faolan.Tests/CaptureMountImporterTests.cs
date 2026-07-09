@@ -3,9 +3,9 @@ using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Importer.Captures;
+using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {

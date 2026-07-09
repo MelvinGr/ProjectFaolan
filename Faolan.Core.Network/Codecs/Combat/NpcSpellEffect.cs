@@ -15,10 +15,17 @@ namespace Faolan.Core.Network.Codecs.Combat
 	{
 		public const int Length = 54;
 
+		public static NpcSpellEffect Read(FaolanStream s)
+		{
+			return Parse(s.ReadArray(Length));
+		}
+
 		// ICodec seam over the fixed-offset 54-byte payload (ToArray/Parse remain the byte-packed core - the payload
 		// is a sparse fixed-offset layout with every other byte a constant 0, which does not map to sequential writes).
-		public void Write(FaolanStream s) => s.WriteArray(ToArray());
-		public static NpcSpellEffect Read(FaolanStream s) => Parse(s.ReadArray(Length));
+		public void Write(FaolanStream s)
+		{
+			s.WriteArray(ToArray());
+		}
 
 		public byte[] ToArray()
 		{
@@ -39,7 +46,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 			if (b.Length != Length)
 				throw new ArgumentException($"NpcSpellEffect payload must be {Length} bytes, got {b.Length}.", nameof(b));
 
-			return new NpcSpellEffect(BinaryPrimitives.ReadUInt32BigEndian(b[23..]), BinaryPrimitives.ReadUInt16BigEndian(b[10..]), b[29], b[45], b[13], b[17], b[33], BinaryPrimitives.ReadUInt32BigEndian(b[50..]));
+			return new NpcSpellEffect(BinaryPrimitives.ReadUInt32BigEndian(b[23..]), BinaryPrimitives.ReadUInt16BigEndian(b[10..]), b[29], b[45], b[13], b[17], b[33],
+				BinaryPrimitives.ReadUInt32BigEndian(b[50..]));
 		}
 	}
 }

@@ -8,45 +8,63 @@
 
 @if (_account == null)
 {
-    <div class="account"><p class="muted">Loading…</p></div>
+	<div class="account">
+		<p class="muted">Loading…</p>
+	</div>
 }
 else
 {
-    <div class="account">
-        <h1>@_account.UserName</h1>
+	<div class="account">
+		<h1>@_account.UserName</h1>
 
-        <div class="card meta">
-            <div class="row"><span class="k">Account type</span><span class="v">@_account.Type</span></div>
-            <div class="row"><span class="k">Status</span><span class="v">@_account.State</span></div>
-            <div class="row"><span class="k">Member since</span><span
-                    class="v">@_account.CreationDate.ToString("yyyy-MM-dd")</span></div>
-            <div class="row"><span class="k">Last login</span><span
-                    class="v">@(_account.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")</span></div>
-            <div class="row"><span class="k">Characters</span><span class="v">@_characters.Count</span></div>
-        </div>
+		<div class="card meta">
+			<div class="row">
+				<span class="k">Account type</span><span class="v">@_account.Type</span>
+			</div>
+			<div class="row">
+				<span class="k">Status</span><span class="v">@_account.State</span>
+			</div>
+			<div class="row">
+				<span class="k">Member since</span>
+				<span
+					class="v">
+					@_account.CreationDate.ToString("yyyy-MM-dd")
+				</span>
+			</div>
+			<div class="row">
+				<span class="k">Last login</span>
+				<span
+					class="v">
+					@(_account.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+				</span>
+			</div>
+			<div class="row">
+				<span class="k">Characters</span><span class="v">@_characters.Count</span>
+			</div>
+		</div>
 
-        <div class="card">
-            <h2>Characters</h2>
-            @if (_characters.Count == 0)
-            {
-                <p class="muted">No characters yet.</p>
-            }
-            else
-            {
-                <ul class="chars">
-                    @foreach (var c in _characters)
-                    {
-                        <a class="char" href="@($"/characters?char={c.Id}")">
-                            <strong>@c.Name</strong>
-                            <span>Lvl @c.Level · @c.Race @c.Sex · @c.Class</span>
-                        </a>
-                    }
-                </ul>
-            }
-        </div>
+		<div class="card">
+			<h2>Characters</h2>
+			@if (_characters.Count == 0)
+			{
+				<p class="muted">No characters yet.</p>
+			}
+			else
+			{
+				<ul class="chars">
+					@foreach (var c in _characters)
+					{
+						<a class="char" href="@($"/characters?char={c.Id}")">
+							<strong>@c.Name</strong>
+							<span>Lvl @c.Level · @c.Race @c.Sex · @c.Class</span>
+						</a>
+					}
+				</ul>
+			}
+		</div>
 
-        <form method="post" action="/auth/logout" class="signout">
-            <button class="btn ghost" type="submit">Sign out</button>
-        </form>
-    </div>
+		<form method="post" action="/auth/logout" class="signout">
+			<button class="btn ghost" type="submit">Sign out</button>
+		</form>
+	</div>
 }

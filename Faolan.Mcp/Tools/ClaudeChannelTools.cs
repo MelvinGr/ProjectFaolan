@@ -14,7 +14,10 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class ClaudeChannelTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
+		private static readonly JsonSerializerOptions JsonOptions = new()
+		{
+			WriteIndented = true
+		};
 
 		private readonly ClaudeChannel _channel;
 		private readonly IAgentServerDispatcher _dispatcher;
@@ -27,7 +30,8 @@ namespace Faolan.Mcp.Tools
 
 		[McpServerTool(Name = "read_claude_channel"),
 		 Description("Read the in-game Claude chat channel log (player posts + Claude's replies), oldest first. Pass afterSequence from a previous read to only get new messages. Read-only.")]
-		public string ReadClaudeChannel([Description("Only return messages with Sequence greater than this (0 = all retained messages). Use the highest Sequence you have seen to poll for new posts.")] ulong afterSequence = 0)
+		public string ReadClaudeChannel(
+			[Description("Only return messages with Sequence greater than this (0 = all retained messages). Use the highest Sequence you have seen to poll for new posts.")] ulong afterSequence = 0)
 		{
 			var messages = _channel.ReadSince(afterSequence);
 			if (messages.Count == 0)
@@ -50,7 +54,8 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "send_claude_whisper"),
-		 Description("Whisper (private tell) a single connected character as \"Claude\" - only they see it, unlike the channel broadcast. Use the sender's character id from the channel log / channel event meta.")]
+		 Description(
+			 "Whisper (private tell) a single connected character as \"Claude\" - only they see it, unlike the channel broadcast. Use the sender's character id from the channel log / channel event meta.")]
 		public async Task<string> SendClaudeWhisper([Description("Character id of the connected player to whisper.")] uint characterId, [Description("The whisper text.")] string message)
 		{
 			if (string.IsNullOrWhiteSpace(message))

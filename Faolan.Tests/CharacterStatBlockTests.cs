@@ -56,6 +56,34 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void StatUpdateCodec_Body_RejectsWrongSubOpcode()
+		{
+			var body = new byte[17];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u);
+			Assert.False(StatUpdateCodec.TryParseBody(body, out _, out _));
+		}
+
+		[Fact]
+		public void StatUpdateCodec_Body_RoundTrips()
+		{
+			// Reconstruct the 0x96B8DC59 IIR body (the bytes wrapped by WriteArrayUInt32Length) and parse it back.
+			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
+			const uint handle = 0x0002324B;
+
+			var statBytes = stats.ToArray();
+			var body = new byte[16 + statBytes.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), 0x96B8DC59u); // StatUpdateIIR
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u); // VitalsMarker
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
+			// body[12..16] left zero (the constant padding word)
+			statBytes.CopyTo(body, 16);
+
+			Assert.True(StatUpdateCodec.TryParseBody(body, out var parsedHandle, out var parsedStats));
+			Assert.Equal(handle, parsedHandle);
+			Assert.Equal(ToHex(statBytes), ToHex(parsedStats.ToArray()));
+		}
+
+		[Fact]
 		public void TryParse_ReadsCapturedVitalsBlock()
 		{
 			// The exact captured block bytes from Build_VitalsBlock_MatchesCapturedBytes.
@@ -91,34 +119,6 @@ namespace Faolan.Tests
 			Assert.True(CharacterStatBlock.TryParse(withTrailer, out var parsed, out var consumed));
 			Assert.Equal(built.Length, consumed);
 			Assert.Equal(ToHex(built), ToHex(parsed.ToArray()));
-		}
-
-		[Fact]
-		public void StatUpdateCodec_Body_RejectsWrongSubOpcode()
-		{
-			var body = new byte[17];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u);
-			Assert.False(StatUpdateCodec.TryParseBody(body, out _, out _));
-		}
-
-		[Fact]
-		public void StatUpdateCodec_Body_RoundTrips()
-		{
-			// Reconstruct the 0x96B8DC59 IIR body (the bytes wrapped by WriteArrayUInt32Length) and parse it back.
-			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
-			const uint handle = 0x0002324B;
-
-			var statBytes = stats.ToArray();
-			var body = new byte[16 + statBytes.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), 0x96B8DC59u); // StatUpdateIIR
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u); // VitalsMarker
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
-			// body[12..16] left zero (the constant padding word)
-			statBytes.CopyTo(body, 16);
-
-			Assert.True(StatUpdateCodec.TryParseBody(body, out var parsedHandle, out var parsedStats));
-			Assert.Equal(handle, parsedHandle);
-			Assert.Equal(ToHex(statBytes), ToHex(parsedStats.ToArray()));
 		}
 
 		private static byte[] FromHex(string hex)

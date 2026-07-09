@@ -7,117 +7,127 @@
 <PageTitle>GM Console — Project Faolan</PageTitle>
 
 <div class="gm">
-    <div class="gm-head">
-        <h1>GM Console</h1>
-        <button class="btn ghost" @onclick="Refresh" disabled="@_busy">Refresh</button>
-    </div>
+	<div class="gm-head">
+		<h1>GM Console</h1>
+		<button class="btn ghost" @onclick="Refresh" disabled="@_busy">Refresh</button>
+	</div>
 
-    @if (!_authorized)
-    {
-        <p class="muted">Checking access…</p>
-    }
-    else if (_online == null)
-    {
-        <p class="offline">Game server is offline — no live actions available.</p>
-    }
-    else
-    {
-        @if (_notice != null)
-        {
-            <p class="notice">@_notice</p>
-        }
+	@if (!_authorized)
+	{
+		<p class="muted">Checking access…</p>
+	}
+	else if (_online == null)
+	{
+		<p class="offline">Game server is offline — no live actions available.</p>
+	}
+	else
+	{
+		@if (_notice != null)
+		{
+			<p class="notice">@_notice</p>
+		}
 
-        <section class="panel broadcast">
-            <h2>Broadcast</h2>
-            <div class="bcast-row">
-                <input class="ti" placeholder="Message to all connected players…" @bind="_broadcast"
-                       @bind:event="oninput"/>
-                <button class="btn primary"
-                        disabled="@(_busy || _online.Count == 0 || string.IsNullOrWhiteSpace(_broadcast))"
-                        @onclick="Broadcast">Send to all (@_online.Count)
-                </button>
-            </div>
-        </section>
+		<section class="panel broadcast">
+			<h2>Broadcast</h2>
+			<div class="bcast-row">
+				<input class="ti" placeholder="Message to all connected players…" @bind="_broadcast"
+				       @bind:event="oninput"/>
+				<button class="btn primary"
+				        disabled="@(_busy || _online.Count == 0 || string.IsNullOrWhiteSpace(_broadcast))"
+				        @onclick="Broadcast">
+					Send to all (@_online.Count)
+				</button>
+			</div>
+		</section>
 
-        @if (_online.Count == 0)
-        {
-            <p class="muted">No players are connected right now.</p>
-        }
-        else
-        {
-            <div class="players">
-                @foreach (var s in _online)
-                {
-                    var id = s.CharacterId;
-                    <section class="panel player">
-                        <div class="phead">
-                            <span class="pname">@(s.CharacterName ?? "(character select)")</span>
-                            <span class="psub">@(s.CharacterLevel is { } lvl
-                                                       ? $"Lvl {lvl}"
-                                                       : "")@(s.AccountName is { } a
-                                                                    ? $" · {a}"
-                                                                    : "")</span>
-                        </div>
+		@if (_online.Count == 0)
+		{
+			<p class="muted">No players are connected right now.</p>
+		}
+		else
+		{
+			<div class="players">
+				@foreach (var s in _online)
+				{
+					var id = s.CharacterId;
+					<section class="panel player">
+						<div class="phead">
+							<span class="pname">@(s.CharacterName ?? "(character select)")</span>
+							<span class="psub">
+								@(s.CharacterLevel is { } lvl
+									? $"Lvl {lvl}"
+									: "")@(s.AccountName is { } a
+										     ? $" · {a}"
+										     : "")
+							</span>
+						</div>
 
-                        @if (id is { } cid)
-                        {
-                            <div class="prow">
-                                <input class="ti" placeholder="Whisper a system message…"
-                                       value="@Msg(cid)"
-                                       @oninput="e => _msgs[cid] = e.Value?.ToString() ?? string.Empty"/>
-                                <button class="btn" disabled="@(_busy || string.IsNullOrWhiteSpace(Msg(cid)))"
-                                        @onclick="() => Whisper(cid)">Send
-                                </button>
-                            </div>
-                            <div class="quick">
-                                <button class="btn ghost" disabled="@_busy" @onclick='() => Gm(cid, "heal")'>Heal
-                                </button>
-                                <button class="btn ghost" disabled="@_busy" @onclick='() => Gm(cid, "kill")'>Kill
-                                </button>
-                                <input class="ti cmd" placeholder="GM command (e.g. level 80)"
-                                       value="@Cmd(cid)"
-                                       @oninput="e => _cmds[cid] = e.Value?.ToString() ?? string.Empty"/>
-                                <button class="btn" disabled="@(_busy || string.IsNullOrWhiteSpace(Cmd(cid)))"
-                                        @onclick="() => Gm(cid, Cmd(cid))">Run
-                                </button>
-                            </div>
+						@if (id is { } cid)
+						{
+							<div class="prow">
+								<input class="ti" placeholder="Whisper a system message…"
+								       value="@Msg(cid)"
+								       @oninput="e => _msgs[cid] = e.Value?.ToString() ?? string.Empty"/>
+								<button class="btn" disabled="@(_busy || string.IsNullOrWhiteSpace(Msg(cid)))"
+								        @onclick="() => Whisper(cid)">
+									Send
+								</button>
+							</div>
+							<div class="quick">
+								<button class="btn ghost" disabled="@_busy" @onclick='() => Gm(cid, "heal")'>
+									Heal
+								</button>
+								<button class="btn ghost" disabled="@_busy" @onclick='() => Gm(cid, "kill")'>
+									Kill
+								</button>
+								<input class="ti cmd" placeholder="GM command (e.g. level 80)"
+								       value="@Cmd(cid)"
+								       @oninput="e => _cmds[cid] = e.Value?.ToString() ?? string.Empty"/>
+								<button class="btn" disabled="@(_busy || string.IsNullOrWhiteSpace(Cmd(cid)))"
+								        @onclick="() => Gm(cid, Cmd(cid))">
+									Run
+								</button>
+							</div>
 
-                            <div class="tp">
-                                <span class="tplabel">Teleport</span>
-                                @if (Others(cid).Count > 0)
-                                {
-                                    <select class="ti tpsel" value="@TpTarget(cid)"
-                                            @onchange="e => _tpTarget[cid] = uint.TryParse(e.Value?.ToString(), out var v) ? v : 0">
-                                        <option value="0">to player…</option>
-                                        @foreach (var o in Others(cid))
-                                        {
-                                            <option
-                                                value="@o.CharacterId">@(o.CharacterName ?? o.CharacterId?.ToString())</option>
-                                        }
-                                    </select>
-                                    <button class="btn" disabled="@(_busy || TpTarget(cid) == 0)"
-                                            @onclick="() => TeleportToPlayer(cid)">Go
-                                    </button>
-                                }
-                                <span class="tpor">or</span>
-                                <input class="ti tpc" placeholder="map" value="@Tp(_tpMap, cid)"
-                                       @oninput="e => _tpMap[cid] = e.Value?.ToString() ?? string.Empty"/>
-                                <input class="ti tpc" placeholder="x" value="@Tp(_tpX, cid)"
-                                       @oninput="e => _tpX[cid] = e.Value?.ToString() ?? string.Empty"/>
-                                <input class="ti tpc" placeholder="y" value="@Tp(_tpY, cid)"
-                                       @oninput="e => _tpY[cid] = e.Value?.ToString() ?? string.Empty"/>
-                                <input class="ti tpc" placeholder="z" value="@Tp(_tpZ, cid)"
-                                       @oninput="e => _tpZ[cid] = e.Value?.ToString() ?? string.Empty"/>
-                                <button class="btn" disabled="@_busy" @onclick="() => TeleportToCoords(cid)">Go</button>
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="muted">No character bound yet (still in character select).</p>
-                        }
-                    </section>
-                }
-            </div>
-        }
-    }
+							<div class="tp">
+								<span class="tplabel">Teleport</span>
+								@if (Others(cid).Count > 0)
+								{
+									<select class="ti tpsel" value="@TpTarget(cid)"
+									        @onchange="e => _tpTarget[cid] = uint.TryParse(e.Value?.ToString(), out var v) ? v : 0">
+										<option value="0">to player…</option>
+										@foreach (var o in Others(cid))
+										{
+											<option
+												value="@o.CharacterId">
+												@(o.CharacterName ?? o.CharacterId?.ToString())
+											</option>
+										}
+									</select>
+									<button class="btn" disabled="@(_busy || TpTarget(cid) == 0)"
+									        @onclick="() => TeleportToPlayer(cid)">
+										Go
+									</button>
+								}
+								<span class="tpor">or</span>
+								<input class="ti tpc" placeholder="map" value="@Tp(_tpMap, cid)"
+								       @oninput="e => _tpMap[cid] = e.Value?.ToString() ?? string.Empty"/>
+								<input class="ti tpc" placeholder="x" value="@Tp(_tpX, cid)"
+								       @oninput="e => _tpX[cid] = e.Value?.ToString() ?? string.Empty"/>
+								<input class="ti tpc" placeholder="y" value="@Tp(_tpY, cid)"
+								       @oninput="e => _tpY[cid] = e.Value?.ToString() ?? string.Empty"/>
+								<input class="ti tpc" placeholder="z" value="@Tp(_tpZ, cid)"
+								       @oninput="e => _tpZ[cid] = e.Value?.ToString() ?? string.Empty"/>
+								<button class="btn" disabled="@_busy" @onclick="() => TeleportToCoords(cid)">Go</button>
+							</div>
+						}
+						else
+						{
+							<p class="muted">No character bound yet (still in character select).</p>
+						}
+					</section>
+				}
+			</div>
+		}
+	}
 </div>

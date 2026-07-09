@@ -12,13 +12,13 @@ namespace Faolan.Core.Database.Tables
 	// captures (see the issue). Dedup key is (MapId, ItemTemplateId); the row carries no quantity/weight yet.
 	public class MapLootEntry : BaseEntity
 	{
-		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
-
 		// The item template id (matches Item.Id) seen in a bag on that map.
 		public uint ItemTemplateId { get; set; }
 
 		// The map whose captured bags carried this item.
 		public uint MapId { get; set; }
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
 	}
 }

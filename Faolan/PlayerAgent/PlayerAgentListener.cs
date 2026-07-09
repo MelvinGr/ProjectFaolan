@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
@@ -13,11 +13,8 @@ namespace Faolan.PlayerAgent
 {
 	public partial class PlayerAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
 	{
-		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.PlayerAgentPort,
-			logger,
-			configuration,
-			database,
-			new ConanOutgoingPacketLogger(logger, "PlayerAgent", typeof(PlayerAgentResponseOpcodes)))
+		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.PlayerAgentPort, logger, configuration,
+			database, new ConanOutgoingPacketLogger(logger, "PlayerAgent", typeof(PlayerAgentResponseOpcodes)))
 		{
 			//
 		}
@@ -45,7 +42,10 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.AuthStatus = packet.Body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
-					await new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.InitAuth, [0x93, 0x86, 0xee, 0x05]).WriteUInt32(client.Session.Account.AuthStatus).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.InitAuth, [0x93, 0x86, 0xee, 0x05])
+						.WriteUInt32(client.Session.Account.AuthStatus)
+						.SendAsync(client);
 
 					break;
 				}
@@ -74,7 +74,10 @@ namespace Faolan.PlayerAgent
 					await SendCharacterList(client);
 					await SendRealmList(client);
 
-					await new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendCharacterRealmData, [0xcb, 0xc6, 0xfc, 0x04]).WriteUInt32(1).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendCharacterRealmData, [0xcb, 0xc6, 0xfc, 0x04])
+						.WriteUInt32(1)
+						.SendAsync(client);
 
 					break;
 				}
@@ -129,9 +132,7 @@ namespace Faolan.PlayerAgent
 
 					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on
 					// login. Body is built from the named GameTweaks catalog; see GameTweaks.cs for the wire format.
-					var gameTweaks = new PacketStream().WriteHeader(ServiceConnectionSender,
-						client.Session.ClientConversation,
-						PlayerAgentResponseOpcodes.Ox1A07,
+					var gameTweaks = new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07,
 						[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07]);
 
 					// The PlayerInterface OverrideGameTweaks (0x1A07) payload: the server's "dynamic game tweaks" the client
@@ -149,24 +150,10 @@ namespace Faolan.PlayerAgent
 
 					(string Name, double Value)[] Defaults =
 					[
-						("AAPointsPerLevel", 1.0),
-						("AlternateAdvancement_GenericTokensAwarded", 1.0),
-						("AlternateAdvancement_SpecificTokensAwarded", 3.0),
-						("Anniversary2020", 0.0),
-						("Anniversary2020_CanGetArmor", 0.0),
-						("Anniversary_5_SpawnBosses", 0.0),
-						("CurrentSeason", 3.0),
-						("DoubleRaidFinderTokens", 0.0),
-						("EventAnniversary_2014", 0.0),
-						("EventDoubleXP", 0.0),
-						("EventHalloween", 1.0),
-						("ExpandInventories_MaxBankSlots", 300.0),
-						("IsPvPServer", 0.0),
-						("PvEXPFromPvPMultiplier", 0.1),
-						("RaidFinderEventChest", 0.0),
-						("WorldBoss_SpawnDay_Boss_11", 0.0),
-						("WorldBoss_SpawnDay_Boss_4", 0.0),
-						("WorldBoss_SpawnWeek_Boss_11", 0.0),
+						("AAPointsPerLevel", 1.0), ("AlternateAdvancement_GenericTokensAwarded", 1.0), ("AlternateAdvancement_SpecificTokensAwarded", 3.0), ("Anniversary2020", 0.0),
+						("Anniversary2020_CanGetArmor", 0.0), ("Anniversary_5_SpawnBosses", 0.0), ("CurrentSeason", 3.0), ("DoubleRaidFinderTokens", 0.0), ("EventAnniversary_2014", 0.0),
+						("EventDoubleXP", 0.0), ("EventHalloween", 1.0), ("ExpandInventories_MaxBankSlots", 300.0), ("IsPvPServer", 0.0), ("PvEXPFromPvPMultiplier", 0.1),
+						("RaidFinderEventChest", 0.0), ("WorldBoss_SpawnDay_Boss_11", 0.0), ("WorldBoss_SpawnDay_Boss_4", 0.0), ("WorldBoss_SpawnWeek_Boss_11", 0.0),
 						("WorldBoss_SpawnWeek_Boss_3", 3.0)
 					];
 

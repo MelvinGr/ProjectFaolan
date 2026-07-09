@@ -2,12 +2,13 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
-using Microsoft.EntityFrameworkCore;
-using Xunit;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -17,13 +18,13 @@ namespace Faolan.Tests
 	// docs/archive/handoff-2026-06-20-snapshot-known-spell-list.md.
 	public class KnownSpellListTests
 	{
-		private static readonly string DbPath = TestPaths.FaolanDb;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x02165EFF;
 
 		// The captured count word + 2 records from Faolanx's snapshot (pkt51 @0x25F6): the byte-exact target shape.
 		private static readonly byte[] FaolanxKnownListGolden = Convert.FromHexString("00000bd30042ca77ffffffff0000000200125d9bffffffff00000002");
+		private static readonly string DbPath = TestPaths.FaolanDb;
+		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		private static readonly uint[] FaolanxSpellIds = [0x42CA77, 0x125D9B];
 
@@ -70,7 +71,8 @@ namespace Faolan.Tests
 			Assert.True(withSpells.AsSpan(slotStart, FaolanxKnownListGolden.Length).SequenceEqual(FaolanxKnownListGolden), "the spliced known-list must equal the captured Faolanx bytes");
 
 			// Everything AFTER the list (the empty build's trailing bytes) is preserved, just shifted by 24.
-			Assert.True(empty.AsSpan(slotStart + 4).SequenceEqual(withSpells.AsSpan(slotStart + FaolanxKnownListGolden.Length)), "bytes after the known-list must be preserved (shifted by the records)");
+			Assert.True(empty.AsSpan(slotStart + 4).SequenceEqual(withSpells.AsSpan(slotStart + FaolanxKnownListGolden.Length)),
+				"bytes after the known-list must be preserved (shifted by the records)");
 		}
 
 		[Fact]

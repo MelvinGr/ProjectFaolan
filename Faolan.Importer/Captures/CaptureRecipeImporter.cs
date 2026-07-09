@@ -4,10 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Importer.Extractors;
-using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
+using Faolan.Importer.Extractors;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
@@ -31,14 +31,20 @@ namespace Faolan.Importer.Captures
 				var sub = IndexOf(p.Bytes, ReplySubOpBe);
 				if (sub < 0)
 					continue;
+
 				var bodyStart = sub + 12;
 				if (bodyStart >= p.Bytes.Length)
 					continue;
 
 				foreach (var r in TradeskillRecipeCodec.ParseReplyBody(p.Bytes.AsSpan(bodyStart)))
 				{
-					var recipe = new Recipe { Id = r.Id, Data = r.Data };
+					var recipe = new Recipe
+					{
+						Id = r.Id,
+						Data = r.Data
+					};
 					foreach (var e in TradeskillRecipeCodec.ParseRecordItems(r.Data))
+					{
 						recipe.Items.Add(new RecipeItem
 						{
 							Role = (RecipeItemRole)e.Role,
@@ -52,15 +58,14 @@ namespace Faolan.Importer.Captures
 							Data4 = e.Data4,
 							Trailing = e.Trailing
 						});
+					}
+
 					recipes.Add(recipe);
 				}
 			}
 
 			// De-dupe by recipe id (keep first) in case a capture carries the list more than once.
-			return recipes
-				.GroupBy(r => r.Id)
-				.Select(g => g.First())
-				.ToList();
+			return recipes.GroupBy(r => r.Id).Select(g => g.First()).ToList();
 		}
 
 		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IReadOnlyCollection<Recipe> recipes)

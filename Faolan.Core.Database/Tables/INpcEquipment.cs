@@ -6,13 +6,13 @@ namespace Faolan.Core.Database.Tables
 	// codec serves both. Fields: the equip slot + the ProtoAcgItem quad/template/level/hash (see NpcSpawnEquipment).
 	public interface INpcEquipment
 	{
-		uint Pos { get; set; }
+		uint Hash { get; set; }
 		uint Key1 { get; set; }
 		uint Key2 { get; set; }
 		uint Key3 { get; set; }
 		uint Key4 { get; set; }
-		uint Template { get; set; }
 		uint Level { get; set; }
-		uint Hash { get; set; }
+		uint Pos { get; set; }
+		uint Template { get; set; }
 	}
 }

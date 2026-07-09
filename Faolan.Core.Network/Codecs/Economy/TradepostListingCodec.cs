@@ -106,7 +106,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		// Decodes a captured/served body back into structured rows (the entry boundary falls out of the u32 length
 		// prefix, so no prefix-sniffing is needed - unlike the Python dissector).
-		public static ParsedResults Parse(byte[] body) => ParsedResults.Read(new FaolanStream(body));
+		public static ParsedResults Parse(byte[] body)
+		{
+			return ParsedResults.Read(new FaolanStream(body));
+		}
 
 		public sealed record ParsedRow(ulong SaleId, uint Handle, string Seller, ulong Price, uint Quantity, uint ItemId, ulong InstanceField, uint ItemHandle, ProtoInventoryGameEntry Entry);
 
@@ -114,6 +117,30 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// trailing ProtoInventoryGameEntry serialized length-prefixed); Read recovers the rows.
 		public sealed record ParsedResults(uint Head, IReadOnlyList<ParsedRow> Rows) : ICodec<ParsedResults>
 		{
+			public static ParsedResults Read(FaolanStream s)
+			{
+				var head = s.ReadUInt32();
+
+				var rows = new List<ParsedRow>();
+				while (s.Position + 4 <= s.Length)
+				{
+					var saleId = s.ReadUInt64();
+					var handle = s.ReadUInt32();
+					var seller = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
+					var price = s.ReadUInt64();
+					var qty = s.ReadUInt32();
+					var itemId = s.ReadUInt32();
+					var instanceField = s.ReadUInt64();
+					var itemHandle = s.ReadUInt32();
+					var entryBytes = s.ReadArrayUInt32Length();
+
+					using var ms = new MemoryStream(entryBytes);
+					var entry = Serializer.Deserialize<ProtoInventoryGameEntry>(ms);
+					rows.Add(new ParsedRow(saleId, handle, seller, price, qty, itemId, instanceField, itemHandle, entry));
+				}
+
+				return new ParsedResults(head, rows);
+			}
 
 			public void Write(FaolanStream s)
 			{
@@ -138,31 +165,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 						.WriteUInt32(row.ItemHandle)
 						.WriteArrayUInt32Length(entryBytes);
 				}
-			}
-
-			public static ParsedResults Read(FaolanStream s)
-			{
-				var head = s.ReadUInt32();
-
-				var rows = new List<ParsedRow>();
-				while (s.Position + 4 <= s.Length)
-				{
-					var saleId = s.ReadUInt64();
-					var handle = s.ReadUInt32();
-					var seller = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
-					var price = s.ReadUInt64();
-					var qty = s.ReadUInt32();
-					var itemId = s.ReadUInt32();
-					var instanceField = s.ReadUInt64();
-					var itemHandle = s.ReadUInt32();
-					var entryBytes = s.ReadArrayUInt32Length();
-
-					using var ms = new MemoryStream(entryBytes);
-					var entry = Serializer.Deserialize<ProtoInventoryGameEntry>(ms);
-					rows.Add(new ParsedRow(saleId, handle, seller, price, qty, itemId, instanceField, itemHandle, entry));
-				}
-
-				return new ParsedResults(head, rows);
 			}
 		}
 	}

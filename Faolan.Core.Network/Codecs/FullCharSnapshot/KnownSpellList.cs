@@ -24,19 +24,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public List<KnownSpellRecord> Records { get; init; } = [];
 
-		// The count word + the records, big-endian (the on-wire bytes that replace the empty list's count word).
-
-		public void Write(FaolanStream w)
-		{
-			w.WriteUInt32((Records.Count + 1) * Frame);
-			foreach (var record in Records)
-			{
-				w.WriteUInt32(record.Id);
-				w.WriteUInt32(Unbound);
-				w.WriteUInt32(record.Type); // big-endian => 00 00 00 <type>
-			}
-		}
-
 		// Reads a known-list at the stream's current position (the ICodec entry). The span-based Parse below is kept for
 		// TryExtractFromSnapshot's zero-copy scan over a raw snapshot body.
 		public static KnownSpellList Read(FaolanStream r)
@@ -57,12 +44,31 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				records.Add(new KnownSpellRecord(id, (byte)r.ReadUInt32()));
 			}
 
-			return new KnownSpellList { Records = records };
+			return new KnownSpellList
+			{
+				Records = records
+			};
+		}
+
+		// The count word + the records, big-endian (the on-wire bytes that replace the empty list's count word).
+
+		public void Write(FaolanStream w)
+		{
+			w.WriteUInt32((Records.Count + 1) * Frame);
+			foreach (var record in Records)
+			{
+				w.WriteUInt32(record.Id);
+				w.WriteUInt32(Unbound);
+				w.WriteUInt32(record.Type); // big-endian => 00 00 00 <type>
+			}
 		}
 
 		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds)
 		{
-			return new KnownSpellList { Records = [.. (spellIds ?? []).Select(id => new KnownSpellRecord(id, SpellType))] };
+			return new KnownSpellList
+			{
+				Records = [.. (spellIds ?? []).Select(id => new KnownSpellRecord(id, SpellType))]
+			};
 		}
 
 		// Parses the [count][records] sub-structure beginning at `data[offset]` (the count word). `consumed` reports the
@@ -90,7 +96,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			}
 
 			consumed = pos - offset;
-			return new KnownSpellList { Records = records };
+			return new KnownSpellList
+			{
+				Records = records
+			};
 		}
 
 		// Locates + parses the known-spell list inside a raw 0x737A6DF9 snapshot body, WITHOUT deserializing the whole

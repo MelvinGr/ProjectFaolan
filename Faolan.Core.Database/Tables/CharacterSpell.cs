@@ -12,10 +12,10 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(SpellId))]
 	public class CharacterSpell
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
-
-		public uint CharacterId { get; set; }
 
 		// The RDB spell id (e.g. 0x4213CD); the client resolves the spell's name/icon/effect from this.
 		public uint SpellId { get; set; }

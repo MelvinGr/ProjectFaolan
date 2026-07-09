@@ -8,10 +8,11 @@ namespace Faolan.Core.Database.Tables
 	// the retired Npc.Data blob). Same stored shape as NpcSpawnEquipment (INpcEquipment); cascade-deletes with its Npc.
 	public class NpcEquipment : BaseEntity, INpcEquipment
 	{
+		public uint NpcId { get; set; }
+
 		[ForeignKey(nameof(NpcId))]
 		public virtual Npc Npc { get; set; }
 
-		public uint NpcId { get; set; }
 		public uint Hash { get; set; }
 		public uint Key1 { get; set; }
 		public uint Key2 { get; set; }

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,9 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(Class), nameof(ComboId))]
 	public class ClassCombo
 	{
+		// FK into the Combos catalog (Combo.Id = the ComboBookIIR / CharacterCombo combo id).
+		public uint ComboId { get; set; }
+
 		[ForeignKey(nameof(ComboId))]
 		public virtual Combo Combo { get; set; }
 
@@ -25,8 +29,5 @@ namespace Faolan.Core.Database.Tables
 
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }
-
-		// FK into the Combos catalog (Combo.Id = the ComboBookIIR / CharacterCombo combo id).
-		public uint ComboId { get; set; }
 	}
 }

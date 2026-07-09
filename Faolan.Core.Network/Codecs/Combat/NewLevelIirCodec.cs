@@ -25,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class NewLevelIirCodec
 	{
 		public const int DeltaCount = 6;
-		public const uint SubOpcode = 0x6D314743;
+		public const uint SubOpcode = 0x6D314743; // TODO: Move to enum
 		private const byte LeadFlag = 0x00;
 
 		// Full-control build (the golden test reproduces the captured deltas). `deltas` is padded/truncated to 6.
@@ -38,25 +38,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 
 		// Live path: the new level with an empty (all-zero) delta summary - enough to fire the banner + effect.
-		public static byte[] Build(uint instance, uint newLevel) => Build(instance, newLevel, ReadOnlySpan<uint>.Empty);
+		public static byte[] Build(uint instance, uint newLevel)
+		{
+			return Build(instance, newLevel, ReadOnlySpan<uint>.Empty);
+		}
 
 		// The NewLevelIIR_t body as a self-serializing codec (ICodec): Write frames the whole
 		// [len][subop][marker][instance][lead][newLevel][6 deltas]; Read recovers the fields. Deltas is always 6 words.
 		public sealed record Message(uint Instance, uint NewLevel, uint[] Deltas) : ICodec<Message>
 		{
-
-			public void Write(FaolanStream s)
-			{
-				s.WriteArrayUInt32Length(content =>
-				{
-					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt32(NewLevel);
-					for (var i = 0; i < DeltaCount; i++)
-						content.WriteUInt32(i < Deltas.Length
-							? Deltas[i]
-							: 0u);
-				});
-			}
-
 			public static Message Read(FaolanStream s)
 			{
 				s.ReadUInt32(); // len
@@ -69,6 +59,20 @@ namespace Faolan.Core.Network.Codecs.Combat
 				for (var i = 0; i < DeltaCount; i++)
 					deltas[i] = s.ReadUInt32();
 				return new Message(instance, newLevel, deltas);
+			}
+
+			public void Write(FaolanStream s)
+			{
+				s.WriteArrayUInt32Length(content =>
+				{
+					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt32(NewLevel);
+					for (var i = 0; i < DeltaCount; i++)
+					{
+						content.WriteUInt32(i < Deltas.Length
+							? Deltas[i]
+							: 0u);
+					}
+				});
 			}
 		}
 	}

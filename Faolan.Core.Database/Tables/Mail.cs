@@ -12,6 +12,9 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(MailId), IsUnique = true), Index(nameof(RecipientName))]
 	public class Mail : BaseEntity
 	{
+		// The unique wire mail id (the client's GetMailByID / GetMailItem target).
+		public ulong MailId { get; set; }
+
 		public virtual ICollection<MailAttachment> Attachments { get; set; } = new List<MailAttachment>();
 
 		// DB-only: whether the recipient has read the mail (MarkMailRead). Not on this body.
@@ -48,9 +51,6 @@ namespace Faolan.Core.Database.Tables
 		public uint Timestamp1 { get; set; }
 
 		public uint Timestamp2 { get; set; }
-
-		// The unique wire mail id (the client's GetMailByID / GetMailItem target).
-		public ulong MailId { get; set; }
 
 		// Attached cash (COD) in the wallet wire unit (tin). u64 on the wire; 0 in the capture.
 		public ulong Money { get; set; }

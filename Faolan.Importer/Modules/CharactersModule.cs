@@ -14,7 +14,12 @@ namespace Faolan.Importer.Modules
 	{
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["items"];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert };
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert
+		};
+
 		public string Description => "Captured characters (incl. other players) and their bodies/gear.";
 		public string Name => "characters";
 

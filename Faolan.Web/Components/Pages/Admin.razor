@@ -10,71 +10,74 @@
 <PageTitle>Admin — Project Faolan</PageTitle>
 
 <div class="admin">
-    <div class="admin-top">
-        <h1>Admin · Accounts</h1>
-        <button class="abtn" @onclick="ClearCache">Clear render cache</button>
-    </div>
+	<div class="admin-top">
+		<h1>Admin · Accounts</h1>
+		<button class="abtn" @onclick="ClearCache">Clear render cache</button>
+	</div>
 
-    @if (!_authorized)
-    {
-        <p class="muted">Checking access…</p>
-    }
-    else
-    {
-        @if (_notice != null)
-        {
-            <p class="notice">@_notice</p>
-        }
+	@if (!_authorized)
+	{
+		<p class="muted">Checking access…</p>
+	}
+	else
+	{
+		@if (_notice != null)
+		{
+			<p class="notice">@_notice</p>
+		}
 
-        <table class="acct-table">
-            <thead>
-            <tr>
-                <th>Account</th>
-                <th>Type</th>
-                <th>State</th>
-                <th>Last login</th>
-                <th>Chars</th>
-                <th>Actions</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach (var a in _accounts)
-            {
-                var isSelf = a.Id == _selfId;
-                <tr class="@(a.State == AccountState.Banned
-                               ? "banned"
-                               : "")">
-                    <td class="aname"><a href="@($"/admin/account/{a.Id}")">@a.UserName</a>
-                        @if (isSelf)
-                        {
-                            <span class="you">you</span>
-                        }
-                    </td>
-                    <td>
-                        <select value="@a.Type" disabled="@isSelf"
-                                @onchange="e => ChangeType(a.Id, e.Value?.ToString())">
-                            @foreach (var t in Enum.GetValues<AccountType>())
-                            {
-                                <option value="@t" selected="@(t == a.Type)">@t</option>
-                            }
-                        </select>
-                    </td>
-                    <td><span class="state @a.State.ToString().ToLower()">@a.State</span></td>
-                    <td class="dim">@(a.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
-                    <td class="dim">@a.Characters</td>
-                    <td>
-                        @if (a.State == AccountState.Banned)
-                        {
-                            <button class="abtn unban" @onclick="() => SetBan(a.Id, false)">Unban</button>
-                        }
-                        else
-                        {
-                            <button class="abtn ban" disabled="@isSelf" @onclick="() => SetBan(a.Id, true)">Ban</button>
-                        }
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    }
+		<table class="acct-table">
+			<thead>
+			<tr>
+				<th>Account</th>
+				<th>Type</th>
+				<th>State</th>
+				<th>Last login</th>
+				<th>Chars</th>
+				<th>Actions</th>
+			</tr>
+			</thead>
+			<tbody>
+			@foreach (var a in _accounts)
+			{
+				var isSelf = a.Id == _selfId;
+				<tr class="@(a.State == AccountState.Banned
+					           ? "banned"
+					           : "")">
+					<td class="aname">
+						<a href="@($"/admin/account/{a.Id}")">@a.UserName</a>
+						@if (isSelf)
+						{
+							<span class="you">you</span>
+						}
+					</td>
+					<td>
+						<select value="@a.Type" disabled="@isSelf"
+						        @onchange="e => ChangeType(a.Id, e.Value?.ToString())">
+							@foreach (var t in Enum.GetValues<AccountType>())
+							{
+								<option value="@t" selected="@(t == a.Type)">@t</option>
+							}
+						</select>
+					</td>
+					<td>
+						<span class="state @a.State.ToString().ToLower()">@a.State</span>
+					</td>
+					<td class="dim">@(a.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+					<td class="dim">@a.Characters</td>
+					<td>
+						@if (a.State == AccountState.Banned)
+						{
+							<button class="abtn unban" @onclick="() => SetBan(a.Id, false)">Unban</button>
+						}
+						else
+						{
+							<button class="abtn ban" disabled="@isSelf" @onclick="() => SetBan(a.Id, true)">Ban</button>
+						}
+					</td>
+				</tr>
+			}
+			</tbody>
+		</table>
+	}
 </div>

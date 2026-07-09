@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -14,6 +14,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.AgentServer;
 using Faolan.Core.Network.Server.AgentServer;
 using Faolan.Core.Network.Server.GameServer;
+using Faolan.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -25,8 +26,8 @@ namespace Faolan.AgentServer
 		private readonly IAgentServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher, IGameServerDispatcher gameServerDispatcher,
-			ClaudeChannel claudeChannel) : base(configuration.AgentServerPort, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
+		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher,
+			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(configuration.AgentServerPort, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
 		{
 			_dispatcher = dispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -75,10 +76,8 @@ namespace Faolan.AgentServer
 
 					if (client.Session.Account.ClientInstance != clientInstance)
 					{
-						Logger.LogWarning("AgentServer hello: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.",
-							accountId,
-							client.Session.Account.ClientInstance,
-							clientInstance);
+						Logger.LogWarning("AgentServer hello: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.", accountId,
+							client.Session.Account.ClientInstance, clientInstance);
 					}
 
 					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
@@ -201,7 +200,10 @@ namespace Faolan.AgentServer
 						break;
 					}
 
-					await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox0014).WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)).SendAsync(target);
+					await new FaolanStream()
+						.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+						.WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName))
+						.SendAsync(target);
 					await target.SendAsync(BuildWhisper(senderId, message));
 
 					break;

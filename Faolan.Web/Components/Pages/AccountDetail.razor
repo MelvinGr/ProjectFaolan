@@ -9,79 +9,100 @@
 <PageTitle>Account — Admin</PageTitle>
 
 <div class="adetail">
-    <a class="back" href="/admin">‹ All accounts</a>
+	<a class="back" href="/admin">‹ All accounts</a>
 
-    @if (!_authorized)
-    {
-        <p class="muted">Checking access…</p>
-    }
-    else if (_account == null)
-    {
-        <p class="muted">Account not found.</p>
-    }
-    else
-    {
-        <h1>@_account.UserName
-            @if (_isSelf)
-            {
-                <span class="you">you</span>
-            }</h1>
-        @if (_notice != null)
-        {
-            <p class="notice">@_notice</p>
-        }
+	@if (!_authorized)
+	{
+		<p class="muted">Checking access…</p>
+	}
+	else if (_account == null)
+	{
+		<p class="muted">Account not found.</p>
+	}
+	else
+	{
+		<h1>
+			@_account.UserName
+			@if (_isSelf)
+			{
+				<span class="you">you</span>
+			}
+		</h1>
+		@if (_notice != null)
+		{
+			<p class="notice">@_notice</p>
+		}
 
-        <div class="cards">
-            <div class="card meta">
-                <div class="row"><span class="k">Account type</span>
-                    <span class="v">
-                        <select value="@_account.Type" disabled="@_isSelf" @onchange="ChangeType">
-                            @foreach (var t in Enum.GetValues<AccountType>())
-                            {
-                                <option value="@t" selected="@(t == _account.Type)">@t</option>
-                            }
-                        </select>
-                    </span></div>
-                <div class="row"><span class="k">State</span>
-                    <span class="v"><span
-                            class="state @_account.State.ToString().ToLower()">@_account.State</span></span></div>
-                <div class="row"><span class="k">Created</span><span
-                        class="v">@_account.CreationDate.ToString("yyyy-MM-dd")</span></div>
-                <div class="row"><span class="k">Last login</span><span
-                        class="v">@(_account.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")</span></div>
-                <div class="row"><span class="k">Last IP</span><span class="v mono">@(_account.LastIp ?? "—")</span>
-                </div>
-                <div class="row actions">
-                    @if (_account.State == AccountState.Banned)
-                    {
-                        <button class="abtn unban" @onclick="() => SetBan(false)">Unban account</button>
-                    }
-                    else
-                    {
-                        <button class="abtn ban" disabled="@_isSelf" @onclick="() => SetBan(true)">Ban account</button>
-                    }
-                </div>
-            </div>
+		<div class="cards">
+			<div class="card meta">
+				<div class="row">
+					<span class="k">Account type</span>
+					<span class="v">
+						<select value="@_account.Type" disabled="@_isSelf" @onchange="ChangeType">
+							@foreach (var t in Enum.GetValues<AccountType>())
+							{
+								<option value="@t" selected="@(t == _account.Type)">@t</option>
+							}
+						</select>
+					</span>
+				</div>
+				<div class="row">
+					<span class="k">State</span>
+					<span class="v">
+						<span
+							class="state @_account.State.ToString().ToLower()">
+							@_account.State
+						</span>
+					</span>
+				</div>
+				<div class="row">
+					<span class="k">Created</span>
+					<span
+						class="v">
+						@_account.CreationDate.ToString("yyyy-MM-dd")
+					</span>
+				</div>
+				<div class="row">
+					<span class="k">Last login</span>
+					<span
+						class="v">
+						@(_account.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+					</span>
+				</div>
+				<div class="row">
+					<span class="k">Last IP</span><span class="v mono">@(_account.LastIp ?? "—")</span>
+				</div>
+				<div class="row actions">
+					@if (_account.State == AccountState.Banned)
+					{
+						<button class="abtn unban" @onclick="() => SetBan(false)">Unban account</button>
+					}
+					else
+					{
+						<button class="abtn ban" disabled="@_isSelf" @onclick="() => SetBan(true)">Ban account</button>
+					}
+				</div>
+			</div>
 
-            <div class="card">
-                <h2>Characters (@_account.Characters.Count)</h2>
-                @if (_account.Characters.Count == 0)
-                {
-                    <p class="muted">No characters.</p>
-                }
-                else
-                {
-                    <ul class="chars">
-                        @foreach (var c in _account.Characters)
-                        {
-                            <a class="char" href="@($"/characters?char={c.Id}")">
-                                <span class="cname">@c.Name</span>
-                                <span class="csub">Lvl @c.Level · @c.Race @c.Class · @Money(c.Money)</span>
-                            </a>
-                        }
-                    </ul>
-                }
-            </div>
-        </div>
-    }
+			<div class="card">
+				<h2>Characters (@_account.Characters.Count)</h2>
+				@if (_account.Characters.Count == 0)
+				{
+					<p class="muted">No characters.</p>
+				}
+				else
+				{
+					<ul class="chars">
+						@foreach (var c in _account.Characters)
+						{
+							<a class="char" href="@($"/characters?char={c.Id}")">
+								<span class="cname">@c.Name</span>
+								<span class="csub">Lvl @c.Level · @c.Race @c.Class · @Money(c.Money)</span>
+							</a>
+						}
+					</ul>
+				}
+			</div>
+		</div>
+	}
 </div>

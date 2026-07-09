@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +12,15 @@ namespace Faolan.Web.Services
 	public sealed record AccountRow(uint Id, string UserName, AccountType Type, AccountState State, DateTimeOffset? LastConnection, int Characters);
 
 	// Full account detail for the per-account admin page.
-	public sealed record AccountDetail(uint Id, string UserName, AccountType Type, AccountState State, DateTimeOffset CreationDate, DateTimeOffset? LastConnection, string? LastIp, List<AccountChar> Characters);
+	public sealed record AccountDetail(
+		uint Id,
+		string UserName,
+		AccountType Type,
+		AccountState State,
+		DateTimeOffset CreationDate,
+		DateTimeOffset? LastConnection,
+		string? LastIp,
+		List<AccountChar> Characters);
 
 	public sealed record AccountChar(uint Id, string Name, ushort Level, string Class, string Race, ulong Money, DateTimeOffset? LastConnection);
 
@@ -31,29 +43,24 @@ namespace Faolan.Web.Services
 				return null;
 
 			var chars = a
-				.Characters
-				.Where(c => !string.IsNullOrEmpty(c.Name))
+				.Characters.Where(c => !string.IsNullOrEmpty(c.Name))
 				.OrderByDescending(c => c.Level)
 				.ThenBy(c => c.Name)
 				.Select(c => new AccountChar(c.Id, c.Name, c.Level, c.Class.ToString(), c.Race.ToString(), c.Money, c.LastConnection))
 				.ToList();
 
-			return new AccountDetail(a.Id,
-				a.UserName,
-				a.Type,
-				a.State,
-				a.CreationDate,
-				a.LastConnection,
-				string.IsNullOrEmpty(a.LastIpAddress)
-					? null
-					: a.LastIpAddress,
-				chars);
+			return new AccountDetail(a.Id, a.UserName, a.Type, a.State, a.CreationDate, a.LastConnection, string.IsNullOrEmpty(a.LastIpAddress)
+				? null
+				: a.LastIpAddress, chars);
 		}
 
 		public async Task<List<AccountRow>> ListAccountsAsync()
 		{
 			await using var db = await _dbFactory.CreateDbContextAsync();
-			return await db.Accounts.OrderBy(a => a.UserName).Select(a => new AccountRow(a.Id, a.UserName, a.Type, a.State, a.LastConnection, a.Characters.Count(c => c.Name != null && c.Name != ""))).ToListAsync();
+			return await db
+				.Accounts.OrderBy(a => a.UserName)
+				.Select(a => new AccountRow(a.Id, a.UserName, a.Type, a.State, a.LastConnection, a.Characters.Count(c => c.Name != null && c.Name != "")))
+				.ToListAsync();
 		}
 
 		// Ban / unban: Banned <-> Active. Returns the new state, or null if the account is gone.

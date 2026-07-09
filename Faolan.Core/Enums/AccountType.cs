@@ -1,4 +1,4 @@
-﻿namespace Faolan.Core.Enums
+namespace Faolan.Core.Enums
 {
 	public enum AccountType : byte
 	{

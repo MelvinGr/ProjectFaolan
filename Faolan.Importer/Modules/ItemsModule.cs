@@ -12,12 +12,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Item identities from inventory/ApplySpell packets.";
 		public string Name => "items";

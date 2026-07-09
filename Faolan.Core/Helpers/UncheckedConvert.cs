@@ -1,6 +1,6 @@
 using System;
 
-namespace Faolan.Core.Extensions
+namespace Faolan.Core.Helpers
 {
 	public static class UncheckedConvert
 	{
@@ -24,7 +24,9 @@ namespace Faolan.Core.Extensions
 
 				char v when v <= byte.MaxValue => unchecked((byte)v),
 
-				bool v => v ? (byte)1 : (byte)0,
+				bool v => v
+					? (byte)1
+					: (byte)0,
 
 				Enum e => ToByte(ToEnumValue(e)),
 
@@ -72,7 +74,9 @@ namespace Faolan.Core.Extensions
 
 				char v => unchecked((short)v),
 
-				bool v => v ? (short)1 : (short)0,
+				bool v => v
+					? (short)1
+					: (short)0,
 
 				Enum e => ToInt16(ToEnumValue(e)),
 
@@ -100,7 +104,9 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
-				bool v => v ? 1 : 0,
+				bool v => v
+					? 1
+					: 0,
 
 				Enum e => ToInt32(ToEnumValue(e)),
 
@@ -128,7 +134,9 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
-				bool v => v ? 1L : 0L,
+				bool v => v
+					? 1L
+					: 0L,
 
 				Enum e => ToInt64(ToEnumValue(e)),
 
@@ -156,7 +164,9 @@ namespace Faolan.Core.Extensions
 
 				char v when v <= byte.MaxValue => unchecked((sbyte)v),
 
-				bool v => v ? (sbyte)1 : (sbyte)0,
+				bool v => v
+					? (sbyte)1
+					: (sbyte)0,
 
 				Enum e => ToSByte(ToEnumValue(e)),
 
@@ -184,7 +194,9 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
-				bool v => v ? (ushort)1 : (ushort)0,
+				bool v => v
+					? (ushort)1
+					: (ushort)0,
 
 				Enum e => ToUInt16(ToEnumValue(e)),
 
@@ -212,7 +224,9 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
-				bool v => v ? 1u : 0u,
+				bool v => v
+					? 1u
+					: 0u,
 
 				Enum e => ToUInt32(ToEnumValue(e)),
 
@@ -240,7 +254,9 @@ namespace Faolan.Core.Extensions
 
 				char v => v,
 
-				bool v => v ? 1UL : 0UL,
+				bool v => v
+					? 1UL
+					: 0UL,
 
 				Enum e => ToUInt64(ToEnumValue(e)),
 

@@ -41,8 +41,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// BuildBehaviorControlCenterIirLong below.) Decoded by Captures/scripts/decode_create_iir_records.py + decode_behaviorcc.py.
 		// `form` is 0x0004 for the common registration; the rarer 0x0007 subtype adds protobuf field 4 (a varint,
 		// between phase and field5). Protobuf wire order: f1=behaviorId, [f2], f3=phase, [f4], f5, f6, [f11], [f12].
-		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint type = EntityClass.Character, uint? field2 = null, uint? field4 = null,
-			uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = 0x0004)
+		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint type = EntityClass.Character, uint? field2 = null,
+			uint? field4 = null, uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = 0x0004)
 		{
 			var pb = new FaolanStream().WriteByte(0x08).WriteVarint(behaviorId);
 			if (field2 is uint f2)
@@ -64,8 +64,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The trailing 3 u32 (`trailingA/B/C`) are 0 in the WorldPrep equipment records but carry a small state pair
 		// (e.g. 0,1,1) in the create-world cutscene's mount/companion long form - so they're parameterized (default 0).
-		public static byte[] BuildBehaviorControlCenterIirLong(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag, byte[] transform,
-			uint type = EntityClass.Character, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
+		public static byte[] BuildBehaviorControlCenterIirLong(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag,
+			byte[] transform, uint type = EntityClass.Character, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
 		{
 			var tagBytes = Encoding.ASCII.GetBytes(tag);
 			if (tagBytes.Length != 4)
@@ -102,14 +102,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(0x1D).WriteArray(new byte[16]).WriteUInt32(actionId).WriteArray(new byte[8]).ToArray();
 		}
 
-		// ComboBookIIR (0xA8BBEB7F): grants one combo/ability to the entity's combo book. 14 bytes:
-		//   [u32 type][u32 handle][u16 0x0001][u32 comboId]
-		// The WorldPrep burst streams one per combo id. Decoded by Captures/scripts/decode_create_iir_records.py.
-		public static byte[] BuildComboBookIir(uint handle, uint comboId, uint type = EntityClass.Character)
-		{
-			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(0x0001).WriteUInt32(comboId).ToArray();
-		}
-
 		// CharInPlayIIR (0x864CFEF8): the "character is now in play" signal. 9 bytes:
 		//   [u32 type][u32 handle][u8 flag]
 		// An EMPTY record - the client reader (FUN_0075a920) only resolves the SimpleChar for `handle` and logs; the
@@ -117,6 +109,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static byte[] BuildCharInPlayIir(uint handle, byte flag = 0, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).ToArray();
+		}
+
+		// ComboBookIIR (0xA8BBEB7F): grants one combo/ability to the entity's combo book. 14 bytes:
+		//   [u32 type][u32 handle][u16 0x0001][u32 comboId]
+		// The WorldPrep burst streams one per combo id. Decoded by Captures/scripts/decode_create_iir_records.py.
+		public static byte[] BuildComboBookIir(uint handle, uint comboId, uint type = EntityClass.Character)
+		{
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(0x0001).WriteUInt32(comboId).ToArray();
 		}
 
 		// EnergyIIR (0x40749B8A): an entity energy/value record. 13 bytes:
@@ -152,7 +152,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// and `field58` (a u32 at [58:62] - 0 in some captures, 0x01000000 in others) are not yet semantically
 		// pinned, so they're passed through. Constructing this drives the map change from the Map row + the session
 		// token instead of replaying the captured MapChange.
-		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags, uint field58 = 0u, uint fieldB = 0u)
+		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags,
+			uint field58 = 0u, uint fieldB = 0u)
 		{
 			return new FaolanStream()
 				.WriteUInt32(0u)

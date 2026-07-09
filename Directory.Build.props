@@ -1,19 +1,23 @@
 <Project>
-    <PropertyGroup>
-        <PlatformTarget>AnyCPU</PlatformTarget>
-        <TargetFramework>net10.0</TargetFramework>
-        <LangVersion>latest</LangVersion>
-        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-        <!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
-        <Authors>Project Faolan</Authors>
-        <ApplicationIcon>..\logo.ico</ApplicationIcon>
-        <!--<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>-->
-    </PropertyGroup>
+	<PropertyGroup>
+		<PlatformTarget>AnyCPU</PlatformTarget>
+		<TargetFramework>net10.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+		<!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
+		<Authors>Project Faolan</Authors>
+		<ApplicationIcon>..\logo.ico</ApplicationIcon>
+		<!--<Nullable>enable</Nullable>-->
+		<!--<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>-->
+	</PropertyGroup>
 
-    <!--<PropertyGroup>
-        <ProjectNameSlug>$([System.String]::Copy('$(MSBuildProjectName)').Replace('.',
-    '_').ToLower())</ProjectNameSlug>
+	<ItemGroup>
+		<InternalsVisibleTo Include="Faolan.Tests" />
+	</ItemGroup>
+
+	<!--<PropertyGroup>
+        <ProjectNameSlug>$([System.String]::Copy('$(MSBuildProjectName)').Replace('.', '_').ToLower())</ProjectNameSlug>
 
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <DockerfilePath>../Dockerfile</DockerfilePath>
@@ -23,39 +27,37 @@
         <ContainerImageTag>dev</ContainerImageTag>
     </PropertyGroup>-->
 
-    <!-- The HEAD commit SHA is appended to AssemblyInformationalVersion automatically by the SDK's
-         bundled git source-control tasks (replaces GitVersion.MsBuild); Statics reads it from there. -->
-    <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">
-        <ItemGroup>
-            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-                <_Parameter1>BuildDateTimeUtc</_Parameter1>
-                <_Parameter2>$([System.DateTime]::UtcNow.ToString("O"))</_Parameter2>
-            </AssemblyAttribute>
+	<Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">
+		<ItemGroup>
+			<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+				<_Parameter1>BuildDateTimeUtc</_Parameter1>
+				<_Parameter2>$([System.DateTime]::UtcNow.ToString("O"))</_Parameter2>
+			</AssemblyAttribute>
 
-            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-                <_Parameter1>BuildConfiguration</_Parameter1>
-                <_Parameter2>$(Configuration)</_Parameter2>
-            </AssemblyAttribute>
-        </ItemGroup>
-    </Target>
+			<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+				<_Parameter1>BuildConfiguration</_Parameter1>
+				<_Parameter2>$(Configuration)</_Parameter2>
+			</AssemblyAttribute>
+		</ItemGroup>
+	</Target>
 
-    <Target Name="RemoveUnneededRuntimeFolders" AfterTargets="CopyFilesToOutputDirectory"
-            Condition="'$(Configuration)' == 'Debug'">
-        <ItemGroup>
-            <RuntimeFolders
-                    Include="$([System.IO.Directory]::GetDirectories('$(TargetDir)runtimes'))"
-                    Condition="Exists('$(TargetDir)runtimes')"/>
+	<Target Name="RemoveUnneededRuntimeFolders" AfterTargets="CopyFilesToOutputDirectory"
+	        Condition="'$(Configuration)' == 'Debug'">
+		<ItemGroup>
+			<RuntimeFolders
+				Include="$([System.IO.Directory]::GetDirectories('$(TargetDir)runtimes'))"
+				Condition="Exists('$(TargetDir)runtimes')" />
 
-            <RuntimeFoldersToRemove Include="@(RuntimeFolders)"
-                                    Exclude="$(TargetDir)runtimes/linux-x64;$(TargetDir)runtimes/win-x64"/>
-        </ItemGroup>
+			<RuntimeFoldersToRemove Include="@(RuntimeFolders)"
+			                        Exclude="$(TargetDir)runtimes/linux-x64;$(TargetDir)runtimes/win-x64" />
+		</ItemGroup>
 
-        <Message Importance="High"
-                 Text="Removing runtime folders: @(RuntimeFoldersToRemove)"
-                 Condition="'@(RuntimeFoldersToRemove)' != ''"/>
+		<Message Importance="High"
+		         Text="Removing runtime folders: @(RuntimeFoldersToRemove)"
+		         Condition="'@(RuntimeFoldersToRemove)' != ''" />
 
-        <RemoveDir Directories="@(RuntimeFoldersToRemove)"/>
-    </Target>
+		<RemoveDir Directories="@(RuntimeFoldersToRemove)" />
+	</Target>
 
-    <Import Project="Directory.Build.user.props" Condition="Exists('Directory.Build.user.props')"/>
+	<Import Project="Directory.Build.user.props" Condition="Exists('Directory.Build.user.props')" />
 </Project>

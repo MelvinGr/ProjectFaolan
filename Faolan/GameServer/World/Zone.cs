@@ -13,10 +13,6 @@ namespace Faolan.GameServer.World
 	{
 		private readonly ConcurrentDictionary<uint, WorldEntity> _entities = new ConcurrentDictionary<uint, WorldEntity>();
 
-		public int Count => _entities.Count;
-
-		public IReadOnlyCollection<WorldEntity> Entities => _entities.Values.ToArray();
-
 		// Which copy (instance) of MapId this zone is (#268). Together with MapId it is the zone's identity key in
 		// WorldState. 0 = the default shared instance (the historical single-zone-per-map behaviour); a Solo/Group
 		// map mints a non-zero id per copy. Distinct from PlayfieldToken (the WIRE token below): the InstanceId is
@@ -26,6 +22,10 @@ namespace Faolan.GameServer.World
 		public uint InstanceId { get; set; }
 
 		public uint MapId { get; }
+
+		public int Count => _entities.Count;
+
+		public IReadOnlyCollection<WorldEntity> Entities => _entities.Values.ToArray();
 
 		// The per-playfield-instance token stamped into every despawn so the client scopes the removal to this playfield
 		// (see WorldDespawn). Minted by WorldState on zone creation as a fallback; for a REPLAYED playfield the burst's

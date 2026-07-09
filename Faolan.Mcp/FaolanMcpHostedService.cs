@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Server.AgentServer;
 using Faolan.Core.Network.Server.GameServer;
@@ -57,8 +57,7 @@ namespace Faolan.Mcp
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<ClaudeChannel>());
 
 			builder
-				.Services
-				.AddMcpServer()
+				.Services.AddMcpServer()
 				.WithHttpTransport()
 				.WithTools<DatabaseTools>()
 				.WithTools<SessionTools>()

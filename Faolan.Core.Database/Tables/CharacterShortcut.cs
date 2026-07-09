@@ -11,12 +11,13 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(Slot))]
 	public class CharacterShortcut
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
-		public uint CharacterId { get; set; }
+		public uint TargetId { get; set; }
 		public uint ShortcutType { get; set; }
 		public uint Slot { get; set; }
-		public uint TargetId { get; set; }
 	}
 }

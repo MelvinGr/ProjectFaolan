@@ -10,6 +10,9 @@ namespace Faolan.Core.Database.Tables
 	// rendered humanoids bald (#243). Cascade-deletes with its NpcSpawn. Codec: NpcSpawnAppearanceCodec.
 	public class NpcSpawnMorph : BaseEntity
 	{
+		public uint MorphId { get; set; }
+		public uint NpcSpawnId { get; set; }
+
 		[ForeignKey(nameof(NpcSpawnId))]
 		public virtual NpcSpawn NpcSpawn { get; set; }
 
@@ -19,8 +22,5 @@ namespace Faolan.Core.Database.Tables
 		// The texscript / resource ref on the entries that carry one (else empty).
 		[MaxLength(128)]
 		public string Text { get; set; } = "";
-
-		public uint MorphId { get; set; }
-		public uint NpcSpawnId { get; set; }
 	}
 }

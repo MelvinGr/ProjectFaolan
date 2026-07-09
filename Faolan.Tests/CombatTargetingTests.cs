@@ -27,18 +27,15 @@ namespace Faolan.Tests
 		{
 			var zone = new Zone(4010);
 			var primary = Npc(1, 0, 0);
-			var player = new WorldEntity(2, 4010, true, "P", null) { Position = new Vector3(2, 0, 0) };
+			var player = new WorldEntity(2, 4010, true, "P", null)
+			{
+				Position = new Vector3(2, 0, 0)
+			};
 			var questGiver = Npc(3, 2, 0, false);
 			var corpse = Npc(4, 2, 0);
 			corpse.Vitals.ApplyHealthDelta(-100); // dead
 			Assert.True(corpse.IsDead);
-			foreach (var e in new[]
-			{
-				primary,
-				player,
-				questGiver,
-				corpse
-			})
+			foreach (var e in new[] { primary, player, questGiver, corpse })
 				zone.Add(e);
 
 			Assert.Empty(CombatTargeting.CleaveTargets(zone, primary, 5f, 4));
@@ -52,23 +49,12 @@ namespace Faolan.Tests
 			var near = Npc(2, 2, 0);
 			var farInRange = Npc(3, 4, 0);
 			var outOfRange = Npc(4, 50, 0);
-			foreach (var e in new[]
-			{
-				primary,
-				near,
-				farInRange,
-				outOfRange
-			})
+			foreach (var e in new[] { primary, near, farInRange, outOfRange })
 				zone.Add(e);
 
 			var targets = CombatTargeting.CleaveTargets(zone, primary, 5f, 4);
 
-			Assert.Equal(new uint[]
-				{
-					2,
-					3
-				},
-				targets.Select(t => t.Handle).ToArray()); // nearest-first, no primary, no #4
+			Assert.Equal(new uint[] { 2, 3 }, targets.Select(t => t.Handle).ToArray()); // nearest-first, no primary, no #4
 		}
 
 		private static WorldEntity Npc(uint handle, float x, float z, bool hostile = true)

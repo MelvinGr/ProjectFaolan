@@ -34,14 +34,18 @@ namespace Faolan.Core.Network.Server.GameServer
 		public void Unregister(IGameServerProvider provider)
 		{
 			lock (_lock)
+			{
 				_providers.Remove(provider);
+			}
 		}
 
 		public bool DisconnectCharacter(uint characterId)
 		{
 			IGameServerProvider[] providers;
 			lock (_lock)
+			{
 				providers = _providers.ToArray();
+			}
 
 			var disconnected = false;
 			foreach (var provider in providers)
@@ -53,7 +57,9 @@ namespace Faolan.Core.Network.Server.GameServer
 		{
 			IGameServerProvider[] providers;
 			lock (_lock)
+			{
 				providers = _providers.ToArray();
+			}
 
 			return providers.Select(p => p.GetCharacterLiveState(characterId)).FirstOrDefault(s => s != null);
 		}
@@ -62,7 +68,9 @@ namespace Faolan.Core.Network.Server.GameServer
 		{
 			IGameServerProvider[] providers;
 			lock (_lock)
+			{
 				providers = _providers.ToArray();
+			}
 
 			return providers.SelectMany(p => p.GetSessions()).ToArray();
 		}
@@ -71,7 +79,9 @@ namespace Faolan.Core.Network.Server.GameServer
 		{
 			IGameServerProvider[] providers;
 			lock (_lock)
+			{
 				providers = _providers.ToArray();
+			}
 
 			// The listeners share one world simulation, so the first non-empty view is THE view.
 			foreach (var provider in providers)
@@ -88,7 +98,9 @@ namespace Faolan.Core.Network.Server.GameServer
 		{
 			IGameServerProvider[] providers;
 			lock (_lock)
+			{
 				providers = _providers.ToArray();
+			}
 
 			foreach (var provider in providers)
 			{
@@ -103,7 +115,9 @@ namespace Faolan.Core.Network.Server.GameServer
 		{
 			IGameServerProvider[] providers;
 			lock (_lock)
+			{
 				providers = _providers.ToArray();
+			}
 
 			foreach (var provider in providers)
 			{

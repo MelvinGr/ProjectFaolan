@@ -13,8 +13,8 @@ namespace Faolan.Tests
 		private static readonly CharacterEquipmentSlot[] MappedSlots =
 		[
 			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Tokens, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon, CharacterEquipmentSlot.Belt,
-			CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing, CharacterEquipmentSlot.Cape, CharacterEquipmentSlot.Shoulder, CharacterEquipmentSlot.Boots,
-			CharacterEquipmentSlot.Hands, CharacterEquipmentSlot.Legs, CharacterEquipmentSlot.Wrist, CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo,
+			CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing, CharacterEquipmentSlot.Cape, CharacterEquipmentSlot.Shoulder,
+			CharacterEquipmentSlot.Boots, CharacterEquipmentSlot.Hands, CharacterEquipmentSlot.Legs, CharacterEquipmentSlot.Wrist, CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo,
 			CharacterEquipmentSlot.VanityHead, CharacterEquipmentSlot.VanityBelt, CharacterEquipmentSlot.VanityCape, CharacterEquipmentSlot.VanityBoots, CharacterEquipmentSlot.VanityWrist
 		];
 
@@ -42,7 +42,10 @@ namespace Faolan.Tests
 			// Every DEFINED CharacterEquipmentSlot maps to a column; a raw cast of an out-of-range wire Pos (here the
 			// bag slot 17, which the enum doesn't name) has no column and throws.
 			var e = new CharacterEquipment();
-			Assert.Throws<ArgumentOutOfRangeException>(() => e[(CharacterEquipmentSlot)17] = new Item { Id = 1 });
+			Assert.Throws<ArgumentOutOfRangeException>(() => e[(CharacterEquipmentSlot)17] = new Item
+			{
+				Id = 1
+			});
 		}
 
 		[Fact]

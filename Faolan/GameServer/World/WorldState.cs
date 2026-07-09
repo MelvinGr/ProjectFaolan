@@ -311,11 +311,9 @@ namespace Faolan.GameServer.World
 					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
 						// A caster NPC casts a spell on the same cadence; everyone else swings (#232).
 					{
-						effects.Add(new WorldTickEffect(entity,
-							entity.IsCaster
-								? WorldTickEffectType.NpcCast
-								: WorldTickEffectType.NpcAttack,
-							target));
+						effects.Add(new WorldTickEffect(entity, entity.IsCaster
+							? WorldTickEffectType.NpcCast
+							: WorldTickEffectType.NpcAttack, target));
 					}
 				}
 			}
@@ -331,11 +329,9 @@ namespace Faolan.GameServer.World
 					return;
 
 				e.InCombat = inCombat;
-				effects.Add(new WorldTickEffect(e,
-					inCombat
-						? WorldTickEffectType.NpcEnterCombat
-						: WorldTickEffectType.NpcExitCombat,
-					target));
+				effects.Add(new WorldTickEffect(e, inCombat
+					? WorldTickEffectType.NpcEnterCombat
+					: WorldTickEffectType.NpcExitCombat, target));
 			}
 
 			// Steps `e` toward (dx,dz) this tick and queues a move broadcast ONLY once it has travelled a retail-sized
@@ -396,8 +392,7 @@ namespace Faolan.GameServer.World
 		// The (mapId, instanceId) zone, minting it (with a fallback wire token) if it doesn't exist yet (#268).
 		public Zone ZoneFor(uint mapId, uint instanceId)
 		{
-			return _zones.GetOrAdd((mapId, instanceId),
-			key => new Zone(key.MapId)
+			return _zones.GetOrAdd((mapId, instanceId), key => new Zone(key.MapId)
 			{
 				InstanceId = key.InstanceId,
 				PlayfieldToken = NextPlayfieldToken()

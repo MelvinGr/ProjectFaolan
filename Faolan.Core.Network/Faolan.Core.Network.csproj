@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <OutputType>Library</OutputType>
-    </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+	</PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="protobuf-net" Version="3.2.56" />
-        <PackageReference Include="SharpZipLib" Version="1.4.2" />
-        <PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
-    </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+		<ProjectReference Include="..\Faolan.Core.Database\Faolan.Core.Database.csproj" />
+	</ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
-        <ProjectReference Include="..\Faolan.Core.Database\Faolan.Core.Database.csproj" />
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="protobuf-net" Version="3.2.56" />
+		<PackageReference Include="SharpZipLib" Version="1.4.2" />
+		<PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+	</ItemGroup>
 </Project>

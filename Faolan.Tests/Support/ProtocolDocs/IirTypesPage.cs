@@ -21,7 +21,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		{
 			var members = typeof(GameServer0X2000Opcodes)
 				.GetFields(BindingFlags.Public | BindingFlags.Static)
-				.Select(f => (Name: f.Name, Value: Convert.ToUInt32(f.GetRawConstantValue())))
+				.Select(f => (f.Name, Value: Convert.ToUInt32(f.GetRawConstantValue())))
 				.OrderBy(x => x.Value)
 				.ToList();
 			var notes = OpcodesSource.Notes("GameServer0X2000Opcodes");
@@ -80,29 +80,43 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				notes.TryGetValue(member, out var note);
 				var recCell = kind switch
 				{
-					"hash" => $"`{recovered}` ✓",
+					"hash"    => $"`{recovered}` ✓",
 					"command" => "— *(command opcode, not a hash)*",
-					_ => "— *(source string not reproduced)*"
+					_         => "— *(source string not reproduced)*"
 				};
 				sb.AppendLine($"| `0x{value:X8}` | {recCell} | `{member}` | {Escape(note)} |");
 			}
+
 			sb.AppendLine();
 			return sb.ToString();
+		}
+
+		private static string Escape(string note)
+		{
+			return string.IsNullOrEmpty(note)
+				? ""
+				: note.Replace("|", "\\|").Trim();
 		}
 
 		// Candidate client type strings, in the shapes observed in the exe (docs/aoc-opcode-ids.md): the member name,
 		// with/without a trailing "IIR", each ± "_c"/"_t", and with a leading "N3" lowercased to "n3".
 		private static bool TryRecoverName(string member, uint value, out string recovered)
 		{
-			var bases = new HashSet<string> { member };
+			var bases = new HashSet<string>
+			{
+				member
+			};
 			if (member.EndsWith("IIR", StringComparison.Ordinal))
 			{
 				bases.Add(member[..^3]);
 				bases.Add(member[..^3] + "IIR");
 			}
+
 			foreach (var b in bases.ToList())
+			{
 				if (b.StartsWith("N3", StringComparison.Ordinal))
 					bases.Add("n3" + b[2..]);
+			}
 
 			foreach (var b in bases)
 			foreach (var suffix in new[] { "", "_c", "_t" })
@@ -118,7 +132,5 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			recovered = "";
 			return false;
 		}
-
-		private static string Escape(string note) => string.IsNullOrEmpty(note) ? "" : note.Replace("|", "\\|").Trim();
 	}
 }

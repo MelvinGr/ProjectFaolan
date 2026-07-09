@@ -1,13 +1,13 @@
 using System;
-using Faolan.Core.Extensions;
 using System.IO;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer;
+using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Abstractions;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -41,20 +41,8 @@ namespace Faolan.Tests
 			var (prefix, root, _) = SplitBeach();
 			_o.WriteLine($"prefix = {Convert.ToHexString(prefix)} rootLen={root.Length}");
 			Assert.Equal(8, prefix.Length);
-			Assert.Equal(new byte[]
-				{
-					0x00,
-					0x00,
-					0x00,
-					0x02
-				},
-				prefix[..4]); // base IIR version 2
-			Assert.Equal(new byte[]
-				{
-					0x81,
-					0x06
-				},
-				prefix[6..]); // trailing varint (769)
+			Assert.Equal(new byte[] { 0x00, 0x00, 0x00, 0x02 }, prefix[..4]); // base IIR version 2
+			Assert.Equal(new byte[] { 0x81, 0x06 }, prefix[6..]); // trailing varint (769)
 		}
 
 		// (The byte-exact tails build is proven against this same template by BeachTailsFromScratchTests

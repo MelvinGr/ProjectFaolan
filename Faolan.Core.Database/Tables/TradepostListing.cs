@@ -14,11 +14,20 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(SaleId), IsUnique = true), Index(nameof(ItemId))]
 	public class TradepostListing : BaseEntity
 	{
+		// The catalog item (template id) the listing is filed/searched under (the row's itemId field). FK to Items:
+		// the filed item MUST exist - this guards against the 30000-placeholder import bug (#212) where every listing
+		// shared one bogus ItemId and the client collapsed them to a single "Torn Rags" row. NB this is the SEARCH
+		// key, still distinct from the listed instance's own Template/Data1..4 below (which is the specific item sold).
+		public uint ItemId { get; set; }
+
 		// Navigation to the filed catalog item (FK ItemId -> Items.Id, Restrict). Load with Include when needed.
 		// virtual so the lazy-loading-proxy DbContext used in tests (EquipmentPersistenceTests etc.) can build its
 		// model - UseLazyLoadingProxies requires every navigation to be virtual (the live app doesn't enable proxies).
 		[ForeignKey(nameof(ItemId))]
 		public virtual Item Item { get; set; }
+
+		// The unique listing id; the buy targets this, and it doubles as the entry's ProtoInventoryGameEntry.ItemId.
+		public ulong SaleId { get; set; }
 
 		[MaxLength(64)]
 		public string SellerName { get; set; }
@@ -41,12 +50,6 @@ namespace Faolan.Core.Database.Tables
 		public uint Handle { get; set; }
 		public uint ItemHandle { get; set; }
 		public uint ItemHash { get; set; }
-
-		// The catalog item (template id) the listing is filed/searched under (the row's itemId field). FK to Items:
-		// the filed item MUST exist - this guards against the 30000-placeholder import bug (#212) where every listing
-		// shared one bogus ItemId and the client collapsed them to a single "Torn Rags" row. NB this is the SEARCH
-		// key, still distinct from the listed instance's own Template/Data1..4 below (which is the specific item sold).
-		public uint ItemId { get; set; }
 		public uint ItemLevel { get; set; }
 
 		public uint Quantity { get; set; }
@@ -61,8 +64,5 @@ namespace Faolan.Core.Database.Tables
 
 		// Asking price in the wallet wire unit (tin). u64 on the wire; also mirrored into entry stat 258.
 		public ulong Price { get; set; }
-
-		// The unique listing id; the buy targets this, and it doubles as the entry's ProtoInventoryGameEntry.ItemId.
-		public ulong SaleId { get; set; }
 	}
 }

@@ -14,7 +14,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-
 		Task IWorldOutbound.ConvertCorpseToLoot(WorldEntity npc)
 		{
 			return _broadcaster.ConvertCorpseToLoot(npc);
@@ -28,7 +27,7 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
 			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathBcc(dyingHandle)))
 				.SendAsync(client);
 		}
@@ -36,7 +35,7 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendDeathEffect(INetworkClient client, uint dyingHandle)
 		{
 			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathEffect(dyingHandle)))
 				.SendAsync(client);
 		}
@@ -44,7 +43,7 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition)
 		{
 			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathPose(dyingHandle, deathPosition)))
 				.SendAsync(client);
 		}
@@ -52,7 +51,7 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
 		{
 			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint)))
 				.SendAsync(client);
 		}
@@ -76,7 +75,7 @@ namespace Faolan.GameServer
 		{
 			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
 			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildRevive(handle, respawnPointId)))
 				.SendAsync(client);
 		}
@@ -86,7 +85,7 @@ namespace Faolan.GameServer
 			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the res point - retail sends it right
 			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
 			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(TeleportCodec.BuildReviveDestination(handle, mapId, handle, position, facingX, facingZ)))
 				.SendAsync(client);
 		}
@@ -96,7 +95,7 @@ namespace Faolan.GameServer
 			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen res point on the SAME map (no
 			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
 			return new PacketStream()
-				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(TeleportCodec.BuildReviveTeleport(handle, mapId, handle, playfieldToken)))
 				.SendAsync(client);
 		}

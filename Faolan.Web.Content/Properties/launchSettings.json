@@ -1,12 +1,12 @@
 {
-  "profiles": {
-    "Faolan.Web.Content": {
-      "commandName": "Project",
-      "launchBrowser": true,
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "https://localhost:64978;http://localhost:64979"
-    }
-  }
+	"profiles": {
+		"Faolan.Web.Content": {
+			"commandName": "Project",
+			"launchBrowser": true,
+			"environmentVariables": {
+				"ASPNETCORE_ENVIRONMENT": "Development"
+			},
+			"applicationUrl": "https://localhost:64978;http://localhost:64979"
+		}
+	}
 }

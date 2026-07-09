@@ -4,13 +4,14 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Importer.Captures;
+using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {

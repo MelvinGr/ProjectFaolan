@@ -1,147 +1,137 @@
 .admin {
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 1rem;
+	margin: 0 auto;
+	max-width: 880px;
+	padding: 1rem;
 }
 
 .admin-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	justify-content: space-between;
+	margin-bottom: 1rem;
 }
 
 .admin-top h1 {
-    font-size: 1.7rem;
-    margin: 0;
+	font-size: 1.7rem;
+	margin: 0;
 }
 
-.admin .muted {
-    color: var(--muted);
-}
+.admin .muted { color: var(--muted); }
 
 .notice {
-    background: linear-gradient(180deg, #1f2a1f, #15171b);
-    border: 1px solid #3c5a3c;
-    color: #cfe6c6;
-    border-radius: 7px;
-    padding: .55rem .8rem;
-    font-size: .85rem;
-    margin-bottom: 1rem;
+	background: linear-gradient(180deg, #1f2a1f, #15171b);
+	border: 1px solid #3c5a3c;
+	border-radius: 7px;
+	color: #cfe6c6;
+	font-size: .85rem;
+	margin-bottom: 1rem;
+	padding: .55rem .8rem;
 }
 
 .acct-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: .85rem;
+	border-collapse: collapse;
+	font-size: .85rem;
+	width: 100%;
 }
 
 .acct-table th {
-    text-align: left;
-    color: var(--muted);
-    font-weight: 600;
-    font-size: .72rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    padding: .5rem .6rem;
-    border-bottom: 1px solid var(--stone);
+	border-bottom: 1px solid var(--stone);
+	color: var(--muted);
+	font-size: .72rem;
+	font-weight: 600;
+	letter-spacing: .06em;
+	padding: .5rem .6rem;
+	text-align: left;
+	text-transform: uppercase;
 }
 
 .acct-table td {
-    padding: .55rem .6rem;
-    border-bottom: 1px solid var(--stone-dark);
+	border-bottom: 1px solid var(--stone-dark);
+	padding: .55rem .6rem;
 }
 
-.acct-table tr.banned {
-    opacity: .65;
-}
+.acct-table tr.banned { opacity: .65; }
 
 .aname {
-    color: var(--gold-bright);
-    font-weight: 600;
+	color: var(--gold-bright);
+	font-weight: 600;
 }
 
 .aname a {
-    color: var(--gold-bright);
-    text-decoration: none;
+	color: var(--gold-bright);
+	text-decoration: none;
 }
 
-.aname a:hover {
-    text-decoration: underline;
-}
+.aname a:hover { text-decoration: underline; }
 
 .you {
-    font-size: .62rem;
-    color: var(--muted);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 0 .4em;
-    margin-left: .35rem;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	color: var(--muted);
+	font-size: .62rem;
+	margin-left: .35rem;
+	padding: 0 .4em;
 }
 
-.dim {
-    color: var(--muted);
-}
+.dim { color: var(--muted); }
 
 .acct-table select {
-    background: var(--field);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: .25rem .4rem;
-    font-size: .8rem;
+	background: var(--field);
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	color: var(--text);
+	font-size: .8rem;
+	padding: .25rem .4rem;
 }
 
-.acct-table select:disabled {
-    opacity: .5;
-}
+.acct-table select:disabled { opacity: .5; }
 
 .state {
-    font-size: .72rem;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    padding: .1rem .45em;
-    border-radius: 8px;
+	border-radius: 8px;
+	font-size: .72rem;
+	letter-spacing: .04em;
+	padding: .1rem .45em;
+	text-transform: uppercase;
 }
 
 .state.active {
-    color: #8fd08a;
-    background: #1f2a1f;
+	background: #1f2a1f;
+	color: #8fd08a;
 }
 
 .state.banned {
-    color: #e89a8a;
-    background: #2a1c1c;
+	background: #2a1c1c;
+	color: #e89a8a;
 }
 
 .state.unactivated {
-    color: var(--muted);
-    background: #222;
+	background: #222;
+	color: var(--muted);
 }
 
 .abtn {
-    border-radius: 5px;
-    padding: .3rem .7rem;
-    font-size: .78rem;
-    cursor: pointer;
-    border: 1px solid var(--line);
-    background: linear-gradient(var(--field), var(--field-2));
-    color: var(--text);
+	background: linear-gradient(var(--field), var(--field-2));
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	color: var(--text);
+	cursor: pointer;
+	font-size: .78rem;
+	padding: .3rem .7rem;
 }
 
 .abtn.ban:hover:not(:disabled) {
-    border-color: #a44;
-    color: #f0b3a6;
+	border-color: #a44;
+	color: #f0b3a6;
 }
 
 .abtn.unban {
-    border-color: #3c5a3c;
-    color: #cfe6c6;
+	border-color: #3c5a3c;
+	color: #cfe6c6;
 }
 
 .abtn:disabled {
-    opacity: .4;
-    cursor: default;
+	cursor: default;
+	opacity: .4;
 }

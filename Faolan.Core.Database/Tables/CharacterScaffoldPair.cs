@@ -14,19 +14,19 @@ namespace Faolan.Core.Database.Tables
 	// catalog + standing changes from quests/kills is #315.
 	public class CharacterScaffoldPair : BaseEntity
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
+
+		// For ListIndex 0: the FACTION id (10 Children of Yag-kosha, 20 Yellow Priests of Yun, 30 Shadows of Jade,
+		// 40 Brittle Blade, 50 Last Legion, 60 Scarlet Circle, 90 Wolves of the Steppes, ...).
+		public uint PairId { get; set; }
 
 		// 0 = the first ending pair list (FACTION standings, see class note); 1 = the second.
 		public byte ListIndex { get; set; }
 
 		// For ListIndex 0: the signed faction standing (out of +/-50000). Friendly > 0, Hostile < 0.
 		public int Value { get; set; }
-
-		public uint CharacterId { get; set; }
-
-		// For ListIndex 0: the FACTION id (10 Children of Yag-kosha, 20 Yellow Priests of Yun, 30 Shadows of Jade,
-		// 40 Brittle Blade, 50 Last Legion, 60 Scarlet Circle, 90 Wolves of the Steppes, ...).
-		public uint PairId { get; set; }
 	}
 }

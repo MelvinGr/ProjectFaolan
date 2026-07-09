@@ -13,12 +13,12 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(AbilityId))]
 	public class CharacterAbility
 	{
-		[ForeignKey(nameof(CharacterId))]
-		public virtual Character Character { get; set; }
-
 		// The ability id (Abilities.Id); the client resolves the ability's name/icon from this.
 		public uint AbilityId { get; set; }
 
 		public uint CharacterId { get; set; }
+
+		[ForeignKey(nameof(CharacterId))]
+		public virtual Character Character { get; set; }
 	}
 }

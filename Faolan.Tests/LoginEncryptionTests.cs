@@ -13,7 +13,8 @@ namespace Faolan.Tests
 		// A 32-byte client DH private (big-endian, unsigned). Arbitrary but fixed for determinism.
 		private static readonly byte[] ClientPrivate =
 		[
-			0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x42
+			0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC,
+			0xFE, 0x42
 		];
 
 		[Theory, InlineData(""), InlineData("nodash"), InlineData("-"), InlineData("abcd-"), InlineData("-abcd"), InlineData("abcd-0011"), InlineData("zzzz-00112233445566778899aabbccddeeff")]
@@ -33,7 +34,8 @@ namespace Faolan.Tests
 			// algorithm) encrypting faolan|deadbeef...|s3cr3t! against CELLAO_PUB with a fixed client private. If the
 			// C# port deviates in DH, the TEA-key derivation, CBC chaining, or endianness, this won't decode.
 			const string key = "21565c2774be9dc08df3786974ee6c293c45eb74311442c19969e0a8330bd7fdf5781c73b97808e94b416430b251bdc1" +
-			                   "0cd6b9b6f46870c715dc5c7bf476dba936364da6ee838f8e9185f857c2d626d6df1ef31995e8cd312d04209d114ae372" + "5f1ecbbf85cc91360b787ac3f7ed24c988ea38a0786bb43e71f5e33958d4ca96-" +
+			                   "0cd6b9b6f46870c715dc5c7bf476dba936364da6ee838f8e9185f857c2d626d6df1ef31995e8cd312d04209d114ae372" +
+			                   "5f1ecbbf85cc91360b787ac3f7ed24c988ea38a0786bb43e71f5e33958d4ca96-" +
 			                   "8ff7c0700737ee89ddb269c75fdb2b00543cadba8be0d0eb69e320d67033cf05579721b4b32fe19861b32fc0eda29a0a" + "c62ba35a0879c9413f33f06b7a3a7e5f";
 
 			var creds = LoginEncryption.Decrypt(key);
@@ -91,8 +93,9 @@ namespace Faolan.Tests
 		public void ServerPublic_IsCellaoPublicKey()
 		{
 			// g^ServerPrivate mod N must equal the documented CELLAO_PUB (the value patched into the client).
-			var expected = BigInteger.Parse("0" + "26b5a3b4ac1177f24a2d9de44bafef477ff23ef1cb5f646919b1be26516053030b65d5afb60cef6f49de539958ba0b79" +
-			                                "22a099319b8016a8673cb27a696ae4b60fdece25ddcdad42e7f0056b87fc35687fe033b242e17e960d79806fd46c4a79" + "cbc64f558660a50cabc1c242dace70de6af452e3433f97e30e202567f187de70",
+			var expected = BigInteger.Parse(
+				"0" + "26b5a3b4ac1177f24a2d9de44bafef477ff23ef1cb5f646919b1be26516053030b65d5afb60cef6f49de539958ba0b79" +
+				"22a099319b8016a8673cb27a696ae4b60fdece25ddcdad42e7f0056b87fc35687fe033b242e17e960d79806fd46c4a79" + "cbc64f558660a50cabc1c242dace70de6af452e3433f97e30e202567f187de70",
 				NumberStyles.HexNumber);
 
 			Assert.Equal(expected, LoginEncryption.ServerPublic);

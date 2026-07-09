@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using System.Text;
 using Faolan.Core.Extensions;
+using Faolan.Core.Helpers;
 using ProtoBuf;
 
 namespace Faolan.Core
@@ -272,11 +273,7 @@ namespace Faolan.Core
 		// emits 4 bytes; tokens are < 2^28, so 4 bytes always suffice.
 		public FaolanStream WritePlayfieldToken(uint token)
 		{
-			return WriteArray(
-				(byte)((token & 0x7F) | 0x80),
-				(byte)(((token >> 7) & 0x7F) | 0x80),
-				(byte)(((token >> 14) & 0x7F) | 0x80),
-				(byte)((token >> 21) & 0x7F));
+			return WriteArray((byte)((token & 0x7F) | 0x80), (byte)(((token >> 7) & 0x7F) | 0x80), (byte)(((token >> 14) & 0x7F) | 0x80), (byte)((token >> 21) & 0x7F));
 		}
 
 		public FaolanStream WriteProtobufByteLength(IExtensible proto)

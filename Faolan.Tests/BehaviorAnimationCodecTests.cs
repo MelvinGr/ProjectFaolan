@@ -12,7 +12,7 @@ namespace Faolan.Tests
 		[Theory, InlineData(false, "642cd3d60000c3500802e5d40004000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000000"),
 		 InlineData(true, "642cd3d60000c3500802e5d4000a000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000001")]
 		// frame#1657 begin
-			// frame#1658 complete
+		// frame#1658 complete
 		public void SpellweaveComponentAdd_MatchesCapture(bool complete, string expected)
 		{
 			// the add gesture for element[0] = Arcane Renewal 0x396AE9.

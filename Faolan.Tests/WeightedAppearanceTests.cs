@@ -25,7 +25,10 @@ namespace Faolan.Tests
 
 		// faolanx's editor resource-ref stream (Faolanx_mage-necromancer_create.json, in send order) and his spawn's
 		// weighted entry tags (Faolanx_mage-necromancer_login, idx 1-7, all weight 1.0).
-		private static readonly string[] FaolanxRefs = ["*beardmesh_3181870", "*hairmesh_566206", "*texscript_1136960", "*texscript_183875", "*texscript_202393", "*texscript_213934", "*texscript_3113027", "*texscript_3770894"];
+		private static readonly string[] FaolanxRefs =
+		[
+			"*beardmesh_3181870", "*hairmesh_566206", "*texscript_1136960", "*texscript_183875", "*texscript_202393", "*texscript_213934", "*texscript_3113027", "*texscript_3770894"
+		];
 
 		private static readonly ushort[] FaolanxWire = [0x02BB, 0x012C, 0x0193, 0x00E3, 0x0112, 0x01CF, 0x0323];
 
@@ -107,8 +110,7 @@ namespace Faolan.Tests
 
 		private static Dictionary<string, MorphTarget> RegistryDict()
 		{
-			return Registry.ToDictionary(r => r.Ref,
-			r => new MorphTarget
+			return Registry.ToDictionary(r => r.Ref, r => new MorphTarget
 			{
 				Id = r.Tag,
 				Name = r.Ref,

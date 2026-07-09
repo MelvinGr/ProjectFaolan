@@ -88,13 +88,7 @@ namespace Faolan.Importer.Rdb
 
 			foreach (var item in items)
 			{
-				var key = new[]
-				{
-					item.Data1,
-					item.Data2,
-					item.Data3,
-					item.Data4
-				};
+				var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
 
 				RdbReader.Entry entry = default;
 				uint matchedType = 0;
@@ -125,8 +119,8 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// Validate the 12-byte RDB-Id header: type + id must match what we asked for, marker == 1000000.
-				if (template.Length < 12 || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(0, 4)) != matchedType || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(4, 4)) != item.Id ||
-				    BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(8, 4)) != MarkerItem)
+				if (template.Length < 12 || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(0, 4)) != matchedType ||
+				    BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(4, 4)) != item.Id || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(8, 4)) != MarkerItem)
 				{
 					headerMismatch++;
 					continue;

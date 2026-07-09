@@ -1,14 +1,13 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -68,7 +67,10 @@ namespace Faolan.GameServer.Economy
 			}
 
 			var record = BuildBankIirRecord(charInstance, bank);
-			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(record)
+				.SendAsync(client);
 
 			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
 		}
@@ -108,12 +110,8 @@ namespace Faolan.GameServer.Economy
 				if (item is not { Hash: not 0 })
 					return;
 
-				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos,
-						FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
-						FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
-						row.Count,
-						item,
-						item.Hash)
+				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos, FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
+						FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos), row.Count, item, item.Hash)
 					.Item;
 				await _outbound.SendAddItem(client, 0x68u, (uint)dPos, entry);
 			}
@@ -123,7 +121,13 @@ namespace Faolan.GameServer.Economy
 		// against the captured bank (BankStorageTests).
 		public static byte[] BuildBankIirRecord(uint charInstance, ProtoInventoryGame containerBlob)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BankIIR).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteArrayUInt32Length(containerBlob.ToProtobuf()).ToArray();
+			return new FaolanStream()
+				.WriteUInt32(GameServer0X2000Opcodes.BankIIR)
+				.WriteUInt32(0x0000C350u)
+				.WriteUInt32(charInstance)
+				.WriteByte(0x01)
+				.WriteArrayUInt32Length(containerBlob.ToProtobuf())
+				.ToArray();
 		}
 
 		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]

@@ -13,10 +13,12 @@ namespace Faolan.Core.Database.Tables
 	// remainder (dissect_movetask.py). Position columns are inherited from Base3DEntity (rotation is unused).
 	public class PatrolPath : Base3DEntity
 	{
-		public virtual ICollection<PatrolWaypoint> Waypoints { get; set; } = new List<PatrolWaypoint>();
+		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; }
+
+		public virtual ICollection<PatrolWaypoint> Waypoints { get; set; } = new List<PatrolWaypoint>();
 
 		// The captured MoveTask record (bytes from the subop onward - the shape MoveTaskComposite.Parse accepts) so the
 		// runtime can REPLAY the exact captured patrol re-addressed to the live NPC (handle + from) instead of rebuilding
@@ -26,6 +28,5 @@ namespace Faolan.Core.Database.Tables
 
 		// Walk speed - the patrol move-block trailer's big-endian float.
 		public float Speed { get; set; }
-		public uint MapId { get; set; }
 	}
 }

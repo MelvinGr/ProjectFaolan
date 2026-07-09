@@ -15,7 +15,10 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class GameServerTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
+		private static readonly JsonSerializerOptions JsonOptions = new()
+		{
+			WriteIndented = true
+		};
 
 		private readonly IGameServerDispatcher _dispatcher;
 
@@ -36,7 +39,8 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		[McpServerTool(Name = "add_tag"), Description("Set a character tag (the Lua/dialogue state flags) on a connected character (wrapper over the .tag GM command). Current tags: see get_character.")]
+		[McpServerTool(Name = "add_tag"),
+		 Description("Set a character tag (the Lua/dialogue state flags) on a connected character (wrapper over the .tag GM command). Current tags: see get_character.")]
 		public async Task<string> AddTag([Description("Character id of a currently-connected player")] uint characterId, [Description("Numeric tag id")] uint tagId)
 		{
 			var ok = await _dispatcher.RunGmCommand(characterId, $".tag add {tagId}");
@@ -46,14 +50,14 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "adjust_money"),
-		 Description("Set or add to a connected character's wallet, in tin, the game's smallest coin (wrapper over the .money GM command; 100 tin = 1 copper, 1000000 tin = 1 gold). The client HUD updates live.")]
+		 Description(
+			 "Set or add to a connected character's wallet, in tin, the game's smallest coin (wrapper over the .money GM command; 100 tin = 1 copper, 1000000 tin = 1 gold). The client HUD updates live.")]
 		public async Task<string> AdjustMoney([Description("Character id of a currently-connected player")] uint characterId, [Description("Amount in tin")] ulong tin,
 			[Description("true = add to the balance, false = set the balance")] bool add = true)
 		{
-			var ok = await _dispatcher.RunGmCommand(characterId,
-				add
-					? $".money +{tin}"
-					: $".money {tin}");
+			var ok = await _dispatcher.RunGmCommand(characterId, add
+				? $".money +{tin}"
+				: $".money {tin}");
 			return ok
 				? $"{(add ? "Added" : "Set")} {tin} tin {(add ? "to" : "as")} character {characterId}'s wallet."
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
@@ -71,7 +75,8 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		[McpServerTool(Name = "kick_player"), Description("Force-disconnect a connected character from the live world (closes their world socket). Used by the web admin ban+kick. Returns whether a live session was closed.")]
+		[McpServerTool(Name = "kick_player"),
+		 Description("Force-disconnect a connected character from the live world (closes their world socket). Used by the web admin ban+kick. Returns whether a live session was closed.")]
 		public string KickPlayer([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId)
 		{
 			return _dispatcher.DisconnectCharacter(characterId)
@@ -112,7 +117,8 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "manage_quest"),
-		 Description("Add or remove a quest (by RDB quest id) in a connected character's journal (wrapper over the .quest GM command; quest text renders from the client's RDB). Current quests: see get_character.")]
+		 Description(
+			 "Add or remove a quest (by RDB quest id) in a connected character's journal (wrapper over the .quest GM command; quest text renders from the client's RDB). Current quests: see get_character.")]
 		public async Task<string> ManageQuest([Description("Character id of a currently-connected player")] uint characterId, [Description("\"add\" or \"remove\"")] string action,
 			[Description("RDB quest id (e.g. 13479)")] uint questId)
 		{
@@ -127,7 +133,8 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "run_gm_command"),
-		 Description("Run a GM command for a connected character on the LIVE server, exactly as if the player typed it in chat (e.g. \"teleport 5\", \"test\" to spawn the test NPC, \"help\" to list commands).")]
+		 Description(
+			 "Run a GM command for a connected character on the LIVE server, exactly as if the player typed it in chat (e.g. \"teleport 5\", \"test\" to spawn the test NPC, \"help\" to list commands).")]
 		public async Task<string> RunGmCommand([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId,
 			[Description("GM command text, with or without the leading '.' (e.g. \"teleport 5\")")] string command)
 		{

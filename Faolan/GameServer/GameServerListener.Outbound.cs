@@ -10,7 +10,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -29,7 +28,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-
 		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count)
 		{
 			return GrantItemToBackpack(client, itemTemplateId, count);
@@ -133,7 +131,8 @@ namespace Faolan.GameServer
 			var containerType = isQuestItem
 				? InventoryContainerQuest
 				: InventoryContainerBackpack;
-			var entry = SnapshotItemBuilder.BuildListEntry((ulong)slot.Value, 					FullCharSnapshotBuilder.ItemId(characterId, kind, (ulong)slot.Value), 					FullCharSnapshotBuilder.RecordId(characterId, kind, (ulong)slot.Value), 					count, 					item, 					item.Hash)
+			var entry = SnapshotItemBuilder.BuildListEntry((ulong)slot.Value, FullCharSnapshotBuilder.ItemId(characterId, kind, (ulong)slot.Value),
+					FullCharSnapshotBuilder.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
 				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 			return slot;
@@ -174,7 +173,7 @@ namespace Faolan.GameServer
 			var replyBody = TradeskillRecipeCodec.BuildReplyBody(records);
 
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.TradeskillReplyIIR)
 					.WriteUInt32(0x0000C350) // the ProtoID type marker (0xC350) preceding the target handle
@@ -216,7 +215,7 @@ namespace Faolan.GameServer
 		{
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.GameTimeIIR);
@@ -238,7 +237,9 @@ namespace Faolan.GameServer
 		internal static byte[] BuildGuildTag(INetworkClient client, uint characterId, string guildName)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => new GuildTagBody(characterId, guildName).Write(s));
+			ps
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => new GuildTagBody(characterId, guildName).Write(s));
 			return ps.WriteLengthHash().ToArray();
 		}
 
@@ -261,11 +262,13 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.PlayfieldFIIR);
-					s.WriteArray(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, 						character.PositionY, 						character.PositionZ, 						character.MapId, 						charInstance, 						count, 						playfieldToken, 						15.0f, 						BitConverter.UInt32BitsToSingle(0x40E3944Fu), 						flags, 						0x01000000u, 						fieldB));
+					s.WriteArray(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId, charInstance, count, playfieldToken,
+						15.0f,
+						BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB));
 				});
 			return ps.WriteLengthHash().ToArray();
 		}
@@ -362,7 +365,7 @@ namespace Faolan.GameServer
 		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(bodyWithLenPrefix);
+			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(bodyWithLenPrefix);
 			return ps.WriteLengthHash().ToArray();
 		}
 
@@ -415,7 +418,7 @@ namespace Faolan.GameServer
 			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.ASCII.GetBytes(xml));
 
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob);
+			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 		}
@@ -447,7 +450,8 @@ namespace Faolan.GameServer
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
+			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
 			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
 			return ps.SendAsync(client);
 		}
@@ -480,7 +484,7 @@ namespace Faolan.GameServer
 			var body = ChatTextCodec.Build(instance, Encoding.ASCII.GetBytes(xml));
 
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob);
+			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 		}
@@ -489,7 +493,7 @@ namespace Faolan.GameServer
 		private static Task SendWorldIir(INetworkClient client, byte[] body)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob);
+			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			return ps.SendAsync(client);
 		}

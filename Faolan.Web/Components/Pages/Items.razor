@@ -7,70 +7,72 @@
 <PageTitle>Armory — Project Faolan</PageTitle>
 
 <div class="armory">
-    <div class="armory-head">
-        <h1>Armory</h1>
-        <div class="armory-controls">
-            <input class="search" placeholder="Search items…" value="@_query"
-                   @oninput="e => _query = e.Value?.ToString() ?? string.Empty"
-                   @onkeyup="OnKey"/>
-            <select class="type" @bind="_type" @bind:after="Search">
-                <option value="">All types</option>
-                <option value="101">Equipped</option>
-                <option value="104">Normal</option>
-                <option value="112">Resource</option>
-                <option value="113">Quest</option>
-            </select>
-            <button class="btn primary" @onclick="Search">Search</button>
-        </div>
-    </div>
+	<div class="armory-head">
+		<h1>Armory</h1>
+		<div class="armory-controls">
+			<input class="search" placeholder="Search items…" value="@_query"
+			       @oninput="e => _query = e.Value?.ToString() ?? string.Empty"
+			       @onkeyup="OnKey"/>
+			<select class="type" @bind="_type" @bind:after="Search">
+				<option value="">All types</option>
+				<option value="101">Equipped</option>
+				<option value="104">Normal</option>
+				<option value="112">Resource</option>
+				<option value="113">Quest</option>
+			</select>
+			<button class="btn primary" @onclick="Search">Search</button>
+		</div>
+	</div>
 
-    @if (_loading)
-    {
-        <p class="armory-status">Searching…</p>
-    }
-    else if (_items.Count == 0)
-    {
-        <p class="armory-status">No items match.</p>
-    }
-    else
-    {
-        <p class="armory-status">@_total item@(_total == 1
-                                                     ? ""
-                                                     : "s") found · page @(_page + 1) of @PageCount</p>
-        <div class="item-grid">
-            @foreach (var it in _items)
-            {
-                <div class="icard slot" data-item="@it.Id" data-name="@it.Name" data-type="@it.Type"
-                     data-level="@it.Level" data-value="@it.Value" data-sell="@it.Sell" data-count="0">
-                    <div class="icard-thumb">
-                        <img class="slot-img" alt=""/>
-                        <span class="icard-ph">@Initials(it.Name)</span>
-                    </div>
-                    <div class="icard-name">@it.Name</div>
-                    <div class="icard-meta">
-                        @if (it.Type != "Normal")
-                        {
-                            <span>@it.Type</span>
-                        }
-                        @if (it.Level > 0)
-                        {
-                            <span>L.@it.Level</span>
-                        }
-                        @if (it.Sell > 0)
-                        {
-                            <span>@it.Sell t</span>
-                        }
-                    </div>
-                </div>
-            }
-        </div>
-        @if (PageCount > 1)
-        {
-            <div class="armory-pager">
-                <button class="btn ghost" disabled="@(_page == 0)" @onclick="() => Page(-1)">‹ Prev</button>
-                <span>@(_page + 1) / @PageCount</span>
-                <button class="btn ghost" disabled="@(_page >= PageCount - 1)" @onclick="() => Page(1)">Next ›</button>
-            </div>
-        }
-    }
+	@if (_loading)
+	{
+		<p class="armory-status">Searching…</p>
+	}
+	else if (_items.Count == 0)
+	{
+		<p class="armory-status">No items match.</p>
+	}
+	else
+	{
+		<p class="armory-status">
+			@_total item@(_total == 1
+				            ? ""
+				            : "s") found · page @(_page + 1) of @PageCount
+		</p>
+		<div class="item-grid">
+			@foreach (var it in _items)
+			{
+				<div class="icard slot" data-item="@it.Id" data-name="@it.Name" data-type="@it.Type"
+				     data-level="@it.Level" data-value="@it.Value" data-sell="@it.Sell" data-count="0">
+					<div class="icard-thumb">
+						<img class="slot-img" alt=""/>
+						<span class="icard-ph">@Initials(it.Name)</span>
+					</div>
+					<div class="icard-name">@it.Name</div>
+					<div class="icard-meta">
+						@if (it.Type != "Normal")
+						{
+							<span>@it.Type</span>
+						}
+						@if (it.Level > 0)
+						{
+							<span>L.@it.Level</span>
+						}
+						@if (it.Sell > 0)
+						{
+							<span>@it.Sell t</span>
+						}
+					</div>
+				</div>
+			}
+		</div>
+		@if (PageCount > 1)
+		{
+			<div class="armory-pager">
+				<button class="btn ghost" disabled="@(_page == 0)" @onclick="() => Page(-1)">‹ Prev</button>
+				<span>@(_page + 1) / @PageCount</span>
+				<button class="btn ghost" disabled="@(_page >= PageCount - 1)" @onclick="() => Page(1)">Next ›</button>
+			</div>
+		}
+	}
 </div>

@@ -87,7 +87,14 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 		private static FaolanStream Header(uint subOpcode, uint playerInstance, uint npcHandle, byte env)
 		{
-			return new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(playerInstance).WriteByte(env).WriteUInt16(Version).WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle);
+			return new FaolanStream()
+				.WriteUInt32(subOpcode)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(playerInstance)
+				.WriteByte(env)
+				.WriteUInt16(Version)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(npcHandle);
 		}
 
 		// Reads the carrier marker + player instance, then the KnubotBase header (env, version, marker, npc handle).

@@ -46,7 +46,11 @@ namespace Faolan.Core.Rdb.Assets
 					continue;
 
 				var lower = src.ToLowerInvariant();
-				var gender = lower.Contains("female") ? "Female" : lower.Contains("male") ? "Male" : "Unisex";
+				var gender = lower.Contains("female")
+					? "Female"
+					: lower.Contains("male")
+						? "Male"
+						: "Unisex";
 				var name = CleanName(m.Groups[2].Value);
 
 				var key = (number, gender);

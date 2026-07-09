@@ -61,7 +61,13 @@ namespace Faolan.Importer.Extractors
 		private static QuestDefinition GetOrAdd(Dictionary<uint, QuestDefinition> byQuest, uint questId)
 		{
 			if (!byQuest.TryGetValue(questId, out var def))
-				byQuest[questId] = def = new QuestDefinition { QuestId = questId };
+			{
+				byQuest[questId] = def = new QuestDefinition
+				{
+					QuestId = questId
+				};
+			}
+
 			return def;
 		}
 
@@ -219,7 +225,13 @@ namespace Faolan.Importer.Extractors
 
 			var existing = def.TextRefs.FirstOrDefault(r => r.Slot == slot);
 			if (existing == null)
-				def.TextRefs.Add(existing = new QuestTextRef { Slot = slot });
+			{
+				def.TextRefs.Add(existing = new QuestTextRef
+				{
+					Slot = slot
+				});
+			}
+
 			existing.RefId = rec.Id;
 			existing.Category = rec.Category;
 			existing.KeyText = rec.Key;

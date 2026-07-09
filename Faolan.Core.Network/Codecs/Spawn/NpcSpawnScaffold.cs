@@ -29,12 +29,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		// The minimal post-IIR length, in bytes (the constant freshly-spawned form).
 		public const int MinimalPostIirLength = 41;
-
-		// firstRecordLen = len(post) - 36 (the header's self-length of the first record group).
-		private const int RecordLenBias = 36;
-
-		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
-		private const uint HeaderWord0 = 0;
+		public const uint MinimalHumanoidRecordCount = 2;
 
 		// The record-group count in the minimal (no-morph) form: observed as 1 or 2. A TYPE-STABLE constant (no type
 		// ships both) whose meaning isn't decoded - NOT an animal-vs-humanoid split (both values carry people AND
@@ -42,7 +37,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// the no-morph humanoids 2). BuildMinimalPostIir(rc) reproduces either; the type's value is stored in
 		// NpcStatCore.MinimalPostIirRecordCount (#243).
 		public const uint MinimalRecordCount = 1;
-		public const uint MinimalHumanoidRecordCount = 2;
+
+		// firstRecordLen = len(post) - 36 (the header's self-length of the first record group).
+		private const int RecordLenBias = 36;
+
+		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
+		private const uint HeaderWord0 = 0;
 
 		// The minimal record body + the shared 0x3F1 terminators (everything after the 12-byte header). Constant
 		// across all 23 NPCs that carry the minimal form (verified single distinct value, dissect_npc_spawn.py).
@@ -84,54 +84,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			recordCount = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(8, 4));
 			return recordCount is MinimalRecordCount or MinimalHumanoidRecordCount;
-		}
-
-	}
-
-	// Typed, mutable view of the NPC post-IIR scaffold header (the stream after the embedded CoreCharacterIIR):
-	// [u32 word0][u32 firstRecordLen][u32 recordCount] followed by the per-record body. The header is decoded
-	// into typed fields; the record body is kept RAW because it is session runtime state (movement anchors /
-	// buff-timer pairs) the simulation re-derives at the tick, not template data (NpcSpawnScaffold above). The
-	// minimal freshly-spawned form (word0=0, recordCount=1, the constant 0x3F1-terminated body) is what a
-	// from-scratch construction emits; this typed view round-trips both that and the larger runtime-state forms
-	// byte-exact, so the from-DB path owns the header grammar in code (Gitea #185).
-	public sealed class NpcSpawnPostIir
-	{
-		// The 12-byte header ([u32 word0][u32 firstRecordLen][u32 recordCount]).
-		private const int HeaderLength = 12;
-		public byte[] Records { get; set; } = [];
-		public uint FirstRecordLen { get; set; }
-		public uint RecordCount { get; set; } = 1;
-
-		public uint Word0 { get; set; }
-
-		// Serializes the scaffold to its wire bytes (the 12-byte header + the raw record body).
-		public byte[] Encode()
-		{
-			return new FaolanStream().WriteUInt32(Word0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Records).ToArray();
-		}
-
-		// Decodes the post-IIR scaffold from an FA015807 body (the bytes after the embedded CoreCharacterIIR,
-		// located via PlayerSpawnReader). Returns false if no CharacterIIR is found or the post-IIR is too short
-		// to hold the header.
-		public static bool TryDecode(byte[] body, out NpcSpawnPostIir scaffold)
-		{
-			scaffold = null;
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-				return false;
-
-			var start = read.Offset + read.Length;
-			if (start + HeaderLength > body.Length)
-				return false;
-
-			scaffold = new NpcSpawnPostIir
-			{
-				Word0 = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start, 4)),
-				FirstRecordLen = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start + 4, 4)),
-				RecordCount = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start + 8, 4)),
-				Records = body[(start + HeaderLength)..]
-			};
-			return true;
 		}
 	}
 }

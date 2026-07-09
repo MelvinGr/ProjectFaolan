@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
@@ -22,11 +22,8 @@ namespace Faolan.CSPlayerAgent
 		// guild tag (0x2550C99A) onto a character's live GameServer connection on join/leave.
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(configuration.CsPlayerAgentPort,
-			logger,
-			configuration,
-			database,
-			new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceDispatchOpcodes)))
+		public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(
+			configuration.CsPlayerAgentPort, logger, configuration, database, new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceDispatchOpcodes)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
@@ -68,17 +65,13 @@ namespace Faolan.CSPlayerAgent
 					if (account.ClientInstance != characterId)
 					{
 						Logger.LogWarning("CsPlayerAgent Authenticate: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.",
-							accountId,
-							account.ClientInstance,
-							characterId);
+							accountId, account.ClientInstance, characterId);
 					}
 
 					if (character.Id != characterId)
 					{
 						Logger.LogInformation("CsPlayerAgent Authenticate: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8}.",
-							characterId,
-							character.Id,
-							accountId);
+							characterId, character.Id, accountId);
 					}
 
 					account.ClientInstance = characterId;
@@ -95,7 +88,10 @@ namespace Faolan.CSPlayerAgent
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
-					await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01]).WriteArray(0x00, 0x00, 0x03, 0xF1).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01])
+						.WriteArray(0x00, 0x00, 0x03, 0xF1)
+						.SendAsync(client);
 
 					//if(character.Name == null)
 					{

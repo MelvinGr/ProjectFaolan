@@ -25,7 +25,8 @@ namespace Faolan.Importer.Rdb
 		// Group 1 = Guid (the client resurrection-point id = the spawnPointId the 0x2024 release screen sends and the
 		// client echoes in RespawnMe; #214), 2 = name, 3 = discoverable, 4/5/6 = position. Guid precedes name in the XML.
 		private static readonly Regex PointRx =
-			new Regex("<resurrectionpoint\\b[^>]*?\\bGuid=\"([0-9]+)\"[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
+			new Regex(
+				"<resurrectionpoint\\b[^>]*?\\bGuid=\"([0-9]+)\"[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
 				RegexOptions.Compiled | RegexOptions.Singleline);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string cdnBase, string storeDir = null)

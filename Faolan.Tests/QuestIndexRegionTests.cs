@@ -1,8 +1,8 @@
 using System.IO;
-using Xunit;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -19,11 +19,7 @@ namespace Faolan.Tests
 			var region = QuestIndexRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart, RegionEnd);
 
 			Assert.Equal(0x7E2u, region.Marker);
-			Assert.Equal(new[]
-				{
-					10238u
-				},
-				region.QuestIds);
+			Assert.Equal(new[] { 10238u }, region.QuestIds);
 			Assert.Single(region.Blocks);
 			Assert.Equal(8, region.Blocks[0].GoalSteps.Count); // the eight goal-step ids (index 1..8)
 			Assert.Equal(10238u, region.Blocks[0].GoalSteps[0]);

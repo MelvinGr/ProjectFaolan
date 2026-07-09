@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			// Synthesize a runtime-bearing no-morph post-IIR: [0][frl=40][rc=2] + a 40-byte runtime record + terminators.
 			var runtime = new byte[40];
 			new Random(2).NextBytes(runtime);
-			var terminator = new byte[] { 0x00,0x00,0x03,0xF1, 0x00,0x00,0x03,0xF1, 0,0,0,0,0,0,0,0, 0x00,0x00,0x03,0xF1 };
+			var terminator = new byte[] { 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x03, 0xF1 };
 			var post = new FaolanStream().WriteUInt32(0u).WriteUInt32((uint)runtime.Length).WriteUInt32(2u).WriteArray(runtime).WriteArray(terminator).ToArray();
 			var body = new byte[postStart + post.Length];
 			Array.Copy(animal, body, postStart);

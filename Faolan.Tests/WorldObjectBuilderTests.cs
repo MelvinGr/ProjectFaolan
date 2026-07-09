@@ -43,7 +43,10 @@ namespace Faolan.Tests
 			}
 		}
 
-		private static float ReadLE(byte[] b, int offset) => BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
+		private static float ReadLE(byte[] b, int offset)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
+		}
 
 		// The playfield token: a 4-byte LEB128 varint at [0x18] right after the transform (offset 60).
 		private static uint ReadToken(byte[] body)

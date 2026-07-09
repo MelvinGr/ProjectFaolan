@@ -12,36 +12,38 @@
 <PageTitle>Live Map — Admin</PageTitle>
 
 <div class="radar-page">
-    <div class="radar-head">
-        <h1>Live Map</h1>
-        @if (_authorized)
-        {
-            <select class="map-select" @bind="MapId" @bind:after="OnMapChanged">
-                @foreach (var m in _maps)
-                {
-                    <option value="@m.Id">@m.Id — @m.Name</option>
-                }
-            </select>
-        }
-    </div>
+	<div class="radar-head">
+		<h1>Live Map</h1>
+		@if (_authorized)
+		{
+			<select class="map-select" @bind="MapId" @bind:after="OnMapChanged">
+				@foreach (var m in _maps)
+				{
+					<option value="@m.Id">@m.Id — @m.Name</option>
+				}
+			</select>
+		}
+	</div>
 
-    @if (!_authorized)
-    {
-        <p class="muted">Checking access…</p>
-    }
-    else
-    {
-        <div class="radar-wrap">
-            <canvas id="radar-canvas"></canvas>
-        </div>
-        <div class="radar-legend">
-            <span><i class="dot p"></i> Player</span>
-            <span><i class="dot h"></i> Hostile NPC</span>
-            <span><i class="dot n"></i> NPC</span>
-            <span><i class="dot l"></i> Loot</span>
-            <span id="radar-status" class="radar-status">Loading…</span>
-        </div>
-        <p class="hint">Auto-refreshes every 3s from the live server. Scale is real world coordinates where the map's
-            bounds are known, otherwise auto-fit to the entities (see the status line).</p>
-    }
+	@if (!_authorized)
+	{
+		<p class="muted">Checking access…</p>
+	}
+	else
+	{
+		<div class="radar-wrap">
+			<canvas id="radar-canvas"></canvas>
+		</div>
+		<div class="radar-legend">
+			<span><i class="dot p"></i> Player</span>
+			<span><i class="dot h"></i> Hostile NPC</span>
+			<span><i class="dot n"></i> NPC</span>
+			<span><i class="dot l"></i> Loot</span>
+			<span id="radar-status" class="radar-status">Loading…</span>
+		</div>
+		<p class="hint">
+			Auto-refreshes every 3s from the live server. Scale is real world coordinates where the map's
+			bounds are known, otherwise auto-fit to the entities (see the status line).
+		</p>
+	}
 </div>

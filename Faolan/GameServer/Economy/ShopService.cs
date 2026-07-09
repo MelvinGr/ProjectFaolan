@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
@@ -13,7 +13,6 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -81,7 +80,8 @@ namespace Faolan.GameServer.Economy
 			var price = VendorBuyPriceTin(wareItem?.Value ?? 0, ware.Count);
 			if (character.Money < price)
 			{
-				_logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).", character.Name, ware.ItemTemplateId, pos, price, character.Money);
+				_logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).", character.Name, ware.ItemTemplateId, pos, price,
+					character.Money);
 				return;
 			}
 
@@ -97,15 +97,8 @@ namespace Faolan.GameServer.Economy
 			await _database.SetCharacterMoney(character.Id, character.Money);
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			_logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).",
-				character.Name,
-				ware.ItemTemplateId,
-				ware.Count,
-				pos,
-				shop.VendorName,
-				price,
-				slot,
-				character.Money);
+			_logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).", character.Name,
+				ware.ItemTemplateId, ware.Count, pos, shop.VendorName, price, slot, character.Money);
 		}
 
 		// UL 0x2034 SellItem: validate the bag slot, price the item, remove it, credit the wallet, and confirm
@@ -150,14 +143,8 @@ namespace Faolan.GameServer.Economy
 			await ps.SendAsync(client);
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 
-			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).",
-				character.Name,
-				row.Item.Name,
-				row.Count,
-				container,
-				slot,
-				price,
-				character.Money);
+			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).", character.Name, row.Item.Name, row.Count,
+				container, slot, price, character.Money);
 		}
 
 		// UL 0x2035 UndoLastSoldItem: restore the last sale (item back to its slot, price debited).
@@ -177,7 +164,8 @@ namespace Faolan.GameServer.Economy
 			await _database.SetCharacterMoney(character.Id, character.Money);
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).", character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
+			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).", character.Name, sale.ItemId, sale.Slot, sale.PriceTin,
+				character.Money);
 		}
 
 		// The real shop-OPEN trigger (#134): the client clicked a vendor NPC (a TalkToNpc BCC Interact whose
@@ -185,7 +173,7 @@ namespace Faolan.GameServer.Economy
 		// a cold DispatchShopData never pops it. Retail's reply sequence (sell_items_to_trader frames 1189/1193,
 		// see ShopOpenBuilder): the 0x0D155695 trade-select echo, the bare (unpadded) BCC echo-ack, then the shop
 		// content. `rawPayload` is the inbound Interact exactly as received (the echo re-frames it).
-		public async Task HandleVendorTradeOpen(INetworkClient client, byte[] rawPayload, uint mode, Core.Database.Tables.Shop shop, uint npcHandle)
+		public async Task HandleVendorTradeOpen(INetworkClient client, byte[] rawPayload, uint mode, Shop shop, uint npcHandle)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			await SendWorldPacket(client, ShopOpenBuilder.BuildTradeSelectEcho(instance, npcHandle));
@@ -200,7 +188,7 @@ namespace Faolan.GameServer.Economy
 		// against it). NB: the window only OPENS in-client off the client's own NPC trade-initiation (the shop is
 		// KnubotStartTrade-gated, same family as the mid-session-spawn blocker); a cold push doesn't pop the
 		// window. This sets up the server-side state so the BUY round-trip is complete and exercisable.
-		public async Task SendShopData(INetworkClient client, Core.Database.Tables.Shop shop, uint npcHandle)
+		public async Task SendShopData(INetworkClient client, Shop shop, uint npcHandle)
 		{
 			// The codec's item resolver is synchronous; pre-resolve each ware's Items row up front.
 			var resolved = new Dictionary<uint, Item>();
@@ -218,9 +206,7 @@ namespace Faolan.GameServer.Economy
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
 			var ps = new PacketStream();
-			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58),
-				client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceDispatchOpcodes.DispatchShopData);
+			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchShopData);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 
@@ -261,7 +247,10 @@ namespace Faolan.GameServer.Economy
 		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
 		}
 
 		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).

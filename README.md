@@ -31,7 +31,7 @@ The server loads `faolan.json` and `faolan.db` from the current working director
 root — so run it **from the repo root** (running from `bin/Debug` fails with "faolan.json not found"):
 
 ```sh
-dotnet Faolan/bin/Debug/Faolan.dll
+dotnet run --project Faolan
 ```
 
 It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the per-session PlayerAgent,

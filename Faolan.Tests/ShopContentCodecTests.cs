@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
-using Xunit;
 using Faolan.Core.Network.Codecs.Economy;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -31,8 +31,7 @@ namespace Faolan.Tests
 				Stat356 = e.Stat356,
 				TailLevel = e.TailLevel
 			});
-			var byTemplate = parsed.Entries.ToDictionary(e => e.Template,
-			e => new Item
+			var byTemplate = parsed.Entries.ToDictionary(e => e.Template, e => new Item
 			{
 				Id = e.Template,
 				Hash = e.Hash,

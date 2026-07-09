@@ -19,9 +19,11 @@ namespace Faolan.GameServer.Combat
 			var amount = levelsGained == 0
 				? 1u
 				: levelsGained;
+
 			var gains = new List<(uint, uint)>(AttributeChangedFeedback.PrimaryAttributeIds.Length);
 			foreach (var id in AttributeChangedFeedback.PrimaryAttributeIds)
 				gains.Add((id, amount));
+
 			return gains;
 		}
 	}

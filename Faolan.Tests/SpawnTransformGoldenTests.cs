@@ -45,14 +45,20 @@ namespace Faolan.Tests
 
 		private static byte[] HandRolledQuat(float x, float y, float z, float w)
 		{
-			var b = new List<byte>(HandRolledVec3(x, y, z)) { 0x25 };
+			var b = new List<byte>(HandRolledVec3(x, y, z))
+			{
+				0x25
+			};
 			b.AddRange(BitConverter.GetBytes(w));
 			return b.ToArray();
 		}
 
 		private static byte[] HandRolledVec3(float x, float y, float z)
 		{
-			var b = new List<byte> { 0x0D };
+			var b = new List<byte>
+			{
+				0x0D
+			};
 			b.AddRange(BitConverter.GetBytes(x));
 			b.Add(0x15);
 			b.AddRange(BitConverter.GetBytes(y));

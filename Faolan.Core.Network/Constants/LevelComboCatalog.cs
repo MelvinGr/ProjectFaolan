@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Faolan.GameServer.Combat
+namespace Faolan.Core.Network.Constants
 {
 	// RETIRED from the live grant path - superseded by the class<->combo ACCESS map (ClassCombo). It was LEVEL-keyed
 	// and class-INDEPENDENT (every captured class got the SAME set at a level), which wrongly gave casters weapon

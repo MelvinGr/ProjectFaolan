@@ -64,13 +64,7 @@ namespace Faolan.Tests
 		private static List<(string Name, byte[] Body)> ExtractBurstCharRecords()
 		{
 			var burst = Golden.Bytes("InitialBurst");
-			var op = new byte[]
-			{
-				0xFA,
-				0x01,
-				0x58,
-				0x07
-			};
+			var op = new byte[] { 0xFA, 0x01, 0x58, 0x07 };
 			var result = new List<(string, byte[])>();
 			for (var i = 0; i + 16 < burst.Length;)
 			{

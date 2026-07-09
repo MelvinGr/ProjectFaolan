@@ -20,7 +20,8 @@ namespace Faolan.Core.Network.Codecs.World
 		// non-zero move-block header (e.g. 41200000/41007BF0) and a real trailer (40DDA1FD + two floats + 40C00000 pair)
 		// - so from-scratch rebuild is 0/62 byte-exact on them. Retiring this needs those fields decoded and added to
 		// PatrolPath + BuildPatrol (Gitea #316); until then re-addressing the captured body is the faithful path.
-		[Obsolete("Blocked on from-scratch patrol construction (#316): BuildPatrol only covers the canonical waypoint form; committed patrols carry undecoded header/trailer fields (0/62 byte-exact from scratch).")]
+		[Obsolete(
+			"Blocked on from-scratch patrol construction (#316): BuildPatrol only covers the canonical waypoint form; committed patrols carry undecoded header/trailer fields (0/62 byte-exact from scratch).")]
 		public static byte[] ReaddressPatrol(byte[] capturedBody, uint handle, Vector3 from)
 		{
 			var task = MoveTaskComposite.Parse(capturedBody);

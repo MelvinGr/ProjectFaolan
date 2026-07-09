@@ -10,96 +10,101 @@
 <PageTitle>Mail — Project Faolan</PageTitle>
 
 <div class="mail-page">
-    <h1>Mail</h1>
+	<h1>Mail</h1>
 
-    @if (!_ready)
-    {
-        <p class="muted">Loading…</p>
-    }
-    else if (_characters.Count == 0)
-    {
-        <p class="muted">This account has no characters with a mailbox.</p>
-    }
-    else
-    {
-        <div class="mailbox-tabs">
-            @foreach (var c in _characters)
-            {
-                <button class="mtab @(c == _active
-                                        ? "sel"
-                                        : "")" @onclick="() => SelectMailbox(c)">@c</button>
-            }
-        </div>
+	@if (!_ready)
+	{
+		<p class="muted">Loading…</p>
+	}
+	else if (_characters.Count == 0)
+	{
+		<p class="muted">This account has no characters with a mailbox.</p>
+	}
+	else
+	{
+		<div class="mailbox-tabs">
+			@foreach (var c in _characters)
+			{
+				<button class="mtab @(c == _active
+					                    ? "sel"
+					                    : "")" @onclick="() => SelectMailbox(c)">
+					@c
+				</button>
+			}
+		</div>
 
-        @if (_notice != null)
-        {
-            <p class="notice">@_notice</p>
-        }
+		@if (_notice != null)
+		{
+			<p class="notice">@_notice</p>
+		}
 
-        <div class="mail-cols">
-            <section class="panel inbox">
-                <h2>Inbox — @_active</h2>
-                @if (_mailbox.Count == 0)
-                {
-                    <p class="muted">No mail.</p>
-                }
-                else
-                {
-                    <ul class="mlist">
-                        @foreach (var m in _mailbox)
-                        {
-                            <li class="mitem @(m.IsRead
-                                                 ? ""
-                                                 : "unread") @(_openId == m.MailId
-                                                                 ? "open"
-                                                                 : "")">
-                                <button class="mhead" @onclick="() => Open(m)">
-                                    <span class="mfrom">@m.Sender</span>
-                                    <span class="mwhen">@m.Sent.ToString("yyyy-MM-dd")</span>
-                                    @if (m.Money > 0 || m.Items.Count > 0)
-                                    {
-                                        <span class="matt">📎</span>
-                                    }
-                                </button>
-                                @if (_openId == m.MailId)
-                                {
-                                    <div class="mbody">
-                                        @if (m.Money > 0)
-                                        {
-                                            <div class="mline">Money: @Money(m.Money)</div>
-                                        }
-                                        @foreach (var it in m.Items)
-                                        {
-                                            <div class="mline">Attached: @it.Qty× @it.Name</div>
-                                        }
-                                        <div class="mtext">@(string.IsNullOrWhiteSpace(m.Body)
-                                                ? "(no text)"
-                                                : m.Body)</div>
-                                    </div>
-                                }
-                            </li>
-                        }
-                    </ul>
-                }
-            </section>
+		<div class="mail-cols">
+			<section class="panel inbox">
+				<h2>Inbox — @_active</h2>
+				@if (_mailbox.Count == 0)
+				{
+					<p class="muted">No mail.</p>
+				}
+				else
+				{
+					<ul class="mlist">
+						@foreach (var m in _mailbox)
+						{
+							<li class="mitem @(m.IsRead
+								                 ? ""
+								                 : "unread") @(_openId == m.MailId
+									                             ? "open"
+									                             : "")">
+								<button class="mhead" @onclick="() => Open(m)">
+									<span class="mfrom">@m.Sender</span>
+									<span class="mwhen">@m.Sent.ToString("yyyy-MM-dd")</span>
+									@if (m.Money > 0 || m.Items.Count > 0)
+									{
+										<span class="matt">📎</span>
+									}
+								</button>
+								@if (_openId == m.MailId)
+								{
+									<div class="mbody">
+										@if (m.Money > 0)
+										{
+											<div class="mline">Money: @Money(m.Money)</div>
+										}
+										@foreach (var it in m.Items)
+										{
+											<div class="mline">Attached: @it.Qty× @it.Name</div>
+										}
+										<div class="mtext">
+											@(string.IsNullOrWhiteSpace(m.Body)
+												? "(no text)"
+												: m.Body)
+										</div>
+									</div>
+								}
+							</li>
+						}
+					</ul>
+				}
+			</section>
 
-            <section class="panel compose">
-                <h2>Compose</h2>
-                <p class="from">From <strong>@_active</strong></p>
-                <input class="ti" placeholder="Recipient character name" @bind="_to"/>
-                <textarea class="ti body" rows="4" placeholder="Message…" @bind="_body"></textarea>
-                @if (_isAdmin)
-                {
-                    <div class="attach">
-                        <span class="alabel">GM attach</span>
-                        <input class="ti small" placeholder="money (tin)" @bind="_money"/>
-                        <input class="ti small" placeholder="item id" @bind="_itemId"/>
-                        <input class="ti small" placeholder="qty" @bind="_qty"/>
-                    </div>
-                }
-                <button class="btn primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_to))" @onclick="Send">Send
-                </button>
-            </section>
-        </div>
-    }
+			<section class="panel compose">
+				<h2>Compose</h2>
+				<p class="from">From <strong>@_active</strong></p>
+				<input class="ti" placeholder="Recipient character name" @bind="_to"/>
+				<textarea class="ti body" rows="4" placeholder="Message…" @bind="_body"></textarea>
+				@if (_isAdmin)
+				{
+					<div class="attach">
+						<span class="alabel">GM attach</span>
+						<input class="ti small" placeholder="money (tin)" @bind="_money"/>
+						<input class="ti small" placeholder="item id" @bind="_itemId"/>
+						<input class="ti small" placeholder="qty" @bind="_qty"/>
+					</div>
+				}
+				<button class="btn primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_to))" @onclick="Send">
+					Send
+				</button>
+			</section>
+		</div>
+	}
 </div>

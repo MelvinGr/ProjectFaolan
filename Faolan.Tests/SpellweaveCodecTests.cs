@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.GameServer.Combat;
+using Faolan.Core.Network.Constants;
 using Xunit;
 
 namespace Faolan.Tests
@@ -12,12 +12,12 @@ namespace Faolan.Tests
 	// carrier's u32 length prefix (the golden hex is the frame body with that prefix stripped).
 	public class SpellweaveCodecTests
 	{
-		[Theory, InlineData(0x398u, "f98e10b30000c3500802e5d4010000039800007bd4"), InlineData(0x39Bu, "f98e10b30000c3500802e5d4010000039b00007bd4"), InlineData(0x39Au, "f98e10b30000c3500802e5d4010000039a00007bd4"),
-		 InlineData(0x39Du, "f98e10b30000c3500802e5d4010000039d00007bd4")]
+		[Theory, InlineData(0x398u, "f98e10b30000c3500802e5d4010000039800007bd4"), InlineData(0x39Bu, "f98e10b30000c3500802e5d4010000039b00007bd4"),
+		 InlineData(0x39Au, "f98e10b30000c3500802e5d4010000039a00007bd4"), InlineData(0x39Du, "f98e10b30000c3500802e5d4010000039d00007bd4")]
 		// frame#1843
 		// frame#1844
 		// frame#1845
-			// frame#1846
+		// frame#1846
 		public void BuildFireStage_Necro_MatchesCapture(uint fireId, string expected)
 		{
 			var bytes = SpellweaveCodec.BuildFireStage(0x0802E5D4, fireId);
@@ -46,7 +46,8 @@ namespace Faolan.Tests
 		{
 			// the "Spellweaving" health DoT gauge that hits when stamina empties (token 602395, delta -31705, scale 0x1B).
 			var bytes = SpellweaveCodec.BuildStatGauge(0x0802E5D4, 602395, -31705, SpellweaveCodec.DotGauge, SpellweaveCodec.DotScale);
-			Assert.Equal("e9f241840000c3500802e5d4000009311b0000000000000000000000000000001b00000002ffff8427000000000000c3500802e5d400000001000000000037e69000000050000000000000000000000000", Convert.ToHexStringLower(bytes));
+			Assert.Equal("e9f241840000c3500802e5d4000009311b0000000000000000000000000000001b00000002ffff8427000000000000c3500802e5d400000001000000000037e69000000050000000000000000000000000",
+				Convert.ToHexStringLower(bytes));
 		}
 
 		[Fact]
@@ -54,7 +55,8 @@ namespace Faolan.Tests
 		{
 			// frame#1654: the first "Spellweaving Cost" (stamina) gauge tick (token 0x22CE, delta -90).
 			var bytes = SpellweaveCodec.BuildStatGauge(0x0802E5D4, 0x22CE, -90, SpellweaveCodec.StaminaGauge, SpellweaveCodec.StaminaScale);
-			Assert.Equal("e9f241840000c3500802e5d400000022ce000000000000000000000000000f425c00000002ffffffa6000000000000c3500802e5d400000001000000000037e68c00000050000000000000000000000000", Convert.ToHexStringLower(bytes));
+			Assert.Equal("e9f241840000c3500802e5d400000022ce000000000000000000000000000f425c00000002ffffffa6000000000000c3500802e5d400000001000000000037e68c00000050000000000000000000000000",
+				Convert.ToHexStringLower(bytes));
 		}
 	}
 }

@@ -1,14 +1,13 @@
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -18,8 +17,8 @@ namespace Faolan.Tests
 	// region, so driving it from CharacterQuests is safe to feed the client (which rejects a malformed region).
 	public class BuildQuestPortionTests
 	{
-		private static readonly string DbPath = TestPaths.FaolanDb;
 		private const uint CaptureInstance = 0x021663DD; // Stihetfv's client instance (the goal records carry it)
+		private static readonly string DbPath = TestPaths.FaolanDb;
 
 		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
 		// starter) carries the empty quest region. Byte-exact across all 20 *-create captures (the starter quest is
@@ -78,21 +77,7 @@ namespace Faolan.Tests
 		{
 			var golden = Golden.Bytes("QuestPortion2QuestGolden");
 			// the 13479 record's signature in the region: [listKey=0x34A7][ver=1][questId=0x34A7]
-			var sig = new byte[]
-			{
-				0,
-				0,
-				0x34,
-				0xA7,
-				0,
-				0,
-				0,
-				1,
-				0,
-				0,
-				0x34,
-				0xA7
-			};
+			var sig = new byte[] { 0, 0, 0x34, 0xA7, 0, 0, 0, 1, 0, 0, 0x34, 0xA7 };
 			var off = IndexOf(golden, sig);
 			Assert.True(off >= 0, "13479 record signature present in the golden region");
 

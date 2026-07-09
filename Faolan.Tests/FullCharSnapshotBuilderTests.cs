@@ -5,8 +5,8 @@ using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
-using Xunit;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -16,7 +16,7 @@ namespace Faolan.Tests
 	// and are unique per item.
 	public class FullCharSnapshotBuilderTests
 	{
-		private static readonly Item Manacles = new Item
+		private static readonly Item Manacles = new()
 		{
 			Id = 3361557,
 			Data1 = 1,
@@ -26,7 +26,7 @@ namespace Faolan.Tests
 			Hash = 0x43555035
 		};
 
-		private static readonly Item Signet = new Item
+		private static readonly Item Signet = new()
 		{
 			Id = 3774542,
 			Data1 = 5,
@@ -59,35 +59,17 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildContainers_MatchesTheCapturedShape()
 		{
-			var equipped = new Dictionary<ulong, (Item, uint)> { [0x12] = (Manacles, Manacles.Hash) };
+			var equipped = new Dictionary<ulong, (Item, uint)>
+			{
+				[0x12] = (Manacles, Manacles.Hash)
+			};
 
 			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
 
-			Assert.Equal(new uint[]
-				{
-					101,
-					104,
-					112,
-					113
-				},
-				containers.Select(c => c.InventoryId.Type));
+			Assert.Equal(new uint[] { 101, 104, 112, 113 }, containers.Select(c => c.InventoryId.Type));
 			Assert.All(containers, c => Assert.Equal(0x02000005u, c.InventoryId.Instance));
-			Assert.Equal(new uint[]
-				{
-					1028,
-					24,
-					48,
-					48
-				},
-				containers.Select(c => c.MaxSize));
-			Assert.Equal(new uint[]
-				{
-					0,
-					0,
-					12,
-					0
-				},
-				containers.Select(c => c.DisabledSlotsCount));
+			Assert.Equal(new uint[] { 1028, 24, 48, 48 }, containers.Select(c => c.MaxSize));
+			Assert.Equal(new uint[] { 0, 0, 12, 0 }, containers.Select(c => c.DisabledSlotsCount));
 
 			var worn = Assert.Single(containers[0].Items);
 			Assert.Equal(0x12u, worn.Pos);
@@ -142,12 +124,7 @@ namespace Faolan.Tests
 			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Hash), rows);
 
 			var bag = containers[1].Items;
-			Assert.Equal(new uint[]
-				{
-					1,
-					3
-				},
-				bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
+			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
 			Assert.Equal(Signet.Id, bag[0].Item.ItemData.Template1);
 			Assert.Equal(Manacles.Id, bag[1].Item.ItemData.Template1);
 			Assert.Equal(2u, bag[1].Item.StatLists.Single(s => s.Stat == 26).Value); // stack count from the row

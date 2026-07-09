@@ -54,8 +54,7 @@ namespace Faolan.Importer.Tsv
 			// CastTime 0). Keep ONE id per full (rank-specific) NAME - the real cast (CastTime > 0), tie-break lowest id
 			// - so a class never learns the same spell twice or gets handed the wrong instant variant.
 			var reps = (await db
-					.Spells
-					.Where(s => s.Name != null && s.Name != "")
+					.Spells.Where(s => s.Name != null && s.Name != "")
 					.Select(s => new
 					{
 						s.Id,
@@ -75,8 +74,7 @@ namespace Faolan.Importer.Tsv
 			}
 
 			var existing = (await db
-					.ClassSpells
-					.Select(cs => new
+					.ClassSpells.Select(cs => new
 					{
 						cs.Class,
 						cs.SpellId
@@ -112,18 +110,19 @@ namespace Faolan.Importer.Tsv
 			// whose captured id differs from the wiki rep, or a name spanning both RDB id-ranges) to the real castable
 			// record (CastTime > 0, tie lowest id) - so a class never learns the same spell twice / the instant variant.
 			var joined = await db
-				.ClassSpells
-				.Join(db.Spells,
-				cs => cs.SpellId,
-				s => s.Id,
-				(cs, s) => new
+				.ClassSpells.Join(db.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new
 				{
 					cs,
 					s.Name,
 					s.CastTime
 				})
 				.ToListAsync();
-			var removed = joined.GroupBy(x => (x.cs.Class, x.Name)).Where(g => g.Count() > 1).SelectMany(g => g.OrderByDescending(x => x.CastTime > 0).ThenBy(x => x.cs.SpellId).Skip(1)).Select(x => x.cs).ToList();
+			var removed = joined
+				.GroupBy(x => (x.cs.Class, x.Name))
+				.Where(g => g.Count() > 1)
+				.SelectMany(g => g.OrderByDescending(x => x.CastTime > 0).ThenBy(x => x.cs.SpellId).Skip(1))
+				.Select(x => x.cs)
+				.ToList();
 			if (removed.Count > 0)
 			{
 				db.ClassSpells.RemoveRange(removed);

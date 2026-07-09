@@ -95,7 +95,10 @@ namespace Faolan.Importer.Extractors
 
 				yield return string.IsNullOrEmpty(rule.Condition)
 					? e // unmanaged NPC, or the OFFER fallback (empty condition)
-					: e with { ConditionScript = rule.Condition };
+					: e with
+					{
+						ConditionScript = rule.Condition
+					};
 			}
 		}
 	}

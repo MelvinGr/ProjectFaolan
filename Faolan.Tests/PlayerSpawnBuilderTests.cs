@@ -25,7 +25,10 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out _));
 
 			// A character with no scaffold rows -> the builder can't fill the frame and falls back (null).
-			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity, scaffold.CharacterIir, new Character { Id = 1 });
+			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity, scaffold.CharacterIir, new Character
+			{
+				Id = 1
+			});
 			Assert.Null(built);
 		}
 
@@ -83,7 +86,10 @@ namespace Faolan.Tests
 			};
 			var message = PlayerCharacterIir.Build(character, new CharacterEquipment());
 
-			var scaffoldCharacter = new Character { Id = 0x0A1B2C3D };
+			var scaffoldCharacter = new Character
+			{
+				Id = 0x0A1B2C3D
+			};
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
 
 			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message.ToProtobuf(), scaffoldCharacter);
@@ -97,15 +103,14 @@ namespace Faolan.Tests
 
 		private static Quaternion DecodeQuat(byte[] q)
 		{
-			return new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(1, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(6, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(11, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(16, 4)));
+			return new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(6, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(11, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(16, 4)));
 		}
 
 		private static Vector3 DecodeVec3(byte[] v)
 		{
-			return new Vector3(BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(6, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(11, 4)));
+			return new Vector3(BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(6, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(11, 4)));
 		}
 	}
 }

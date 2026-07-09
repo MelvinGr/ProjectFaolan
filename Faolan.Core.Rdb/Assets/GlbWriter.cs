@@ -48,67 +48,38 @@ namespace Faolan.Core.Rdb.Assets
 
 			foreach (var sub in subs)
 			{
-				var idxAcc = AddAccessor(bin,
-					bufferViews,
-					accessors,
-					ElementArrayBuffer,
-					UInt,
-					sub.Indices.Length,
-					"SCALAR",
-					w =>
-					{
-						foreach (var i in sub.Indices)
-							WriteU32(w, (uint)i);
-					});
+				var idxAcc = AddAccessor(bin, bufferViews, accessors, ElementArrayBuffer, UInt, sub.Indices.Length, "SCALAR", w =>
+				{
+					foreach (var i in sub.Indices)
+						WriteU32(w, (uint)i);
+				});
 
 				var attributes = new Dictionary<string, int>
 				{
-					["POSITION"] = AddAccessor(bin,
-						bufferViews,
-						accessors,
-						ArrayBuffer,
-						Float,
-						sub.VertexCount,
-						"VEC3",
-						w =>
-						{
-							foreach (var f in sub.Positions)
-								WriteF32(w, f);
-						},
-						Bounds(sub.Positions, 3))
+					["POSITION"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC3", w =>
+					{
+						foreach (var f in sub.Positions)
+							WriteF32(w, f);
+					}, Bounds(sub.Positions, 3))
 				};
 
 				// Always emit SMOOTH normals welded by position. The RDB's packed UByte4N normals are ambiguous (and the
 				// browser's computeVertexNormals() facets the mesh because skinned bodies split vertices at every UV-island
 				// seam). Welding by position re-fuses those seam-split vertices so curvature shades continuously.
 				var normals = SmoothNormals(sub.Positions, sub.Indices);
-				attributes["NORMAL"] = AddAccessor(bin,
-					bufferViews,
-					accessors,
-					ArrayBuffer,
-					Float,
-					sub.VertexCount,
-					"VEC3",
-					w =>
-					{
-						foreach (var f in normals)
-							WriteF32(w, f);
-					});
+				attributes["NORMAL"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC3", w =>
+				{
+					foreach (var f in normals)
+						WriteF32(w, f);
+				});
 
 				if (sub.Uvs != null)
 				{
-					attributes["TEXCOORD_0"] = AddAccessor(bin,
-						bufferViews,
-						accessors,
-						ArrayBuffer,
-						Float,
-						sub.VertexCount,
-						"VEC2",
-						w =>
-						{
-							foreach (var f in sub.Uvs)
-								WriteF32(w, f);
-						});
+					attributes["TEXCOORD_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC2", w =>
+					{
+						foreach (var f in sub.Uvs)
+							WriteF32(w, f);
+					});
 				}
 
 				if (skinned)
@@ -125,51 +96,37 @@ namespace Faolan.Core.Rdb.Assets
 							? ji
 							: 0)
 						.ToArray();
-					attributes["JOINTS_0"] = AddAccessor(bin,
-						bufferViews,
-						accessors,
-						ArrayBuffer,
-						UByte,
-						sub.VertexCount,
-						"VEC4",
-						w =>
+					attributes["JOINTS_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, UByte, sub.VertexCount, "VEC4", w =>
+					{
+						foreach (var b in bones)
 						{
-							foreach (var b in bones)
-							{
-								w.WriteByte((byte)(b >= 0 && b < local2joint.Length
-									? local2joint[b]
-									: 0));
-							}
-						});
-					attributes["WEIGHTS_0"] = AddAccessor(bin,
-						bufferViews,
-						accessors,
-						ArrayBuffer,
-						Float,
-						sub.VertexCount,
-						"VEC4",
-						w =>
+							w.WriteByte((byte)(b >= 0 && b < local2joint.Length
+								? local2joint[b]
+								: 0));
+						}
+					});
+					attributes["WEIGHTS_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC4", w =>
+					{
+						for (var i = 0; i < sub.VertexCount; i++)
 						{
-							for (var i = 0; i < sub.VertexCount; i++)
+							float w0 = wts[i * 4], w1 = wts[i * 4 + 1], w2 = wts[i * 4 + 2], w3 = wts[i * 4 + 3];
+							var sum = w0 + w1 + w2 + w3;
+							if (sum <= 1e-6f)
 							{
-								float w0 = wts[i * 4], w1 = wts[i * 4 + 1], w2 = wts[i * 4 + 2], w3 = wts[i * 4 + 3];
-								var sum = w0 + w1 + w2 + w3;
-								if (sum <= 1e-6f)
-								{
-									WriteF32(w, 1f);
-									WriteF32(w, 0f);
-									WriteF32(w, 0f);
-									WriteF32(w, 0f);
-								}
-								else
-								{
-									WriteF32(w, w0 / sum);
-									WriteF32(w, w1 / sum);
-									WriteF32(w, w2 / sum);
-									WriteF32(w, w3 / sum);
-								}
+								WriteF32(w, 1f);
+								WriteF32(w, 0f);
+								WriteF32(w, 0f);
+								WriteF32(w, 0f);
 							}
-						});
+							else
+							{
+								WriteF32(w, w0 / sum);
+								WriteF32(w, w1 / sum);
+								WriteF32(w, w2 / sum);
+								WriteF32(w, w3 / sum);
+							}
+						}
+					});
 				}
 
 				var png = sub.BaseColorPng ?? baseColorPng;
@@ -202,13 +159,7 @@ namespace Faolan.Core.Rdb.Assets
 					["name"] = "default",
 					["pbrMetallicRoughness"] = new Dictionary<string, object>
 					{
-						["baseColorFactor"] = new[]
-						{
-							0.78f,
-							0.74f,
-							0.7f,
-							1f
-						},
+						["baseColorFactor"] = new[] { 0.78f, 0.74f, 0.7f, 1f },
 						["metallicFactor"] = 0.0f,
 						["roughnessFactor"] = 1.0f
 					},
@@ -302,29 +253,28 @@ namespace Faolan.Core.Rdb.Assets
 						["mesh"] = 0,
 						["skin"] = 0
 					}
-					: new Dictionary<string, object> { ["mesh"] = 0 }
+					: new Dictionary<string, object>
+					{
+						["mesh"] = 0
+					}
 			};
 			object? skins = null;
-			var sceneNodes = new List<int> { 0 };
+			var sceneNodes = new List<int>
+			{
+				0
+			};
 			if (skinned)
 			{
 				var bones = skeleton!;
-				var ibmAcc = AddAccessor(bin,
-					bufferViews,
-					accessors,
-					-1,
-					Float,
-					bones.Count,
-					"MAT4",
-					w =>
+				var ibmAcc = AddAccessor(bin, bufferViews, accessors, -1, Float, bones.Count, "MAT4", w =>
+				{
+					foreach (var b in bones)
 					{
-						foreach (var b in bones)
-						{
-							Matrix4x4.Invert(b.World, out var inv);
-							foreach (var f in MatFields(inv))
-								WriteF32(w, f);
-						}
-					});
+						Matrix4x4.Invert(b.World, out var inv);
+						foreach (var f in MatFields(inv))
+							WriteF32(w, f);
+					}
+				});
 
 				for (var j = 0; j < bones.Count; j++)
 				{
@@ -332,22 +282,12 @@ namespace Faolan.Core.Rdb.Assets
 					var node = new Dictionary<string, object>
 					{
 						["name"] = b.Name,
-						["translation"] = new[]
-						{
-							b.LocalTranslation.X,
-							b.LocalTranslation.Y,
-							b.LocalTranslation.Z
-						},
-						["rotation"] = new[]
-						{
-							b.LocalRotation.X,
-							b.LocalRotation.Y,
-							b.LocalRotation.Z,
-							b.LocalRotation.W
-						}
+						["translation"] = new[] { b.LocalTranslation.X, b.LocalTranslation.Y, b.LocalTranslation.Z },
+						["rotation"] = new[] { b.LocalRotation.X, b.LocalRotation.Y, b.LocalRotation.Z, b.LocalRotation.W }
 					};
 					if (b.Children is { Length: > 0 })
 						node["children"] = b.Children.Where(c => c >= 0 && c < bones.Count).Select(c => 1 + c).ToArray();
+
 					nodes.Add(node);
 					if (b.Parent < 0)
 						sceneNodes.Add(1 + j); // a root bone hangs off the scene alongside the mesh node
@@ -376,17 +316,26 @@ namespace Faolan.Core.Rdb.Assets
 				["scene"] = 0,
 				["scenes"] = new[]
 				{
-					new Dictionary<string, object> { ["nodes"] = sceneNodes.ToArray() }
+					new Dictionary<string, object>
+					{
+						["nodes"] = sceneNodes.ToArray()
+					}
 				},
 				["nodes"] = nodes,
 				["meshes"] = new[]
 				{
-					new Dictionary<string, object> { ["primitives"] = primitives }
+					new Dictionary<string, object>
+					{
+						["primitives"] = primitives
+					}
 				},
 				["materials"] = materials,
 				["buffers"] = new[]
 				{
-					new Dictionary<string, object> { ["byteLength"] = binBytes.Length }
+					new Dictionary<string, object>
+					{
+						["byteLength"] = binBytes.Length
+					}
 				},
 				["bufferViews"] = bufferViews,
 				["accessors"] = accessors
@@ -498,13 +447,7 @@ namespace Faolan.Core.Rdb.Assets
 		// computed with System.Numerics serialises straight into a glTF inverseBindMatrices accessor.
 		private static IEnumerable<float> MatFields(Matrix4x4 m)
 		{
-			return
-			[
-				m.M11, m.M12, m.M13, m.M14,
-				m.M21, m.M22, m.M23, m.M24,
-				m.M31, m.M32, m.M33, m.M34,
-				m.M41, m.M42, m.M43, m.M44
-			];
+			return [m.M11, m.M12, m.M13, m.M14, m.M21, m.M22, m.M23, m.M24, m.M31, m.M32, m.M33, m.M34, m.M41, m.M42, m.M43, m.M44];
 		}
 
 		private static byte[] Pad(int len, byte fill)

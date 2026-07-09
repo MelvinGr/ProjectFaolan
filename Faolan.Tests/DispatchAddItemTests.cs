@@ -8,9 +8,9 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.GameServer;
 using Faolan.Importer.Captures;
+using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -29,9 +29,9 @@ namespace Faolan.Tests
 
 		// The bare ProtoInventoryGameEntry carried as i_cEntry (the InventoryListEntry.item without the Pos wrapper).
 		private const string CapturedEntry = "08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e6341204082e10071a530a140d99bf60dd15" +
-		                                     "f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c7ed8d1a140d99bf60dd15f67309761dca" + "ed497925d2c7ed8d25154b33002d154b330038014535505543";
+		                                     "f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c7ed8d1a140d99bf60dd15f67309761dca" +
+		                                     "ed497925d2c7ed8d25154b33002d154b330038014535505543";
 
-		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
 		private const uint CharId = 0x01316d8a;
 		private const uint ItemPos = 0;
 		private const uint SlaveManaclesId = 3361557;
@@ -40,6 +40,8 @@ namespace Faolan.Tests
 		// and the four extra stat records the live add carries (flags, stat8, recordId, level).
 		private const ulong ItemId = 2366689308843907890;
 		private const ulong RecordId = 865074;
+
+		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
 
 		[Fact]
 		public async Task AddItemBody_FromImportedItem_MatchesCapturedSlaveManacles()
@@ -62,15 +64,11 @@ namespace Faolan.Tests
 				Assert.NotEqual(0u, item!.Hash);
 
 				// 1) The entry blob: same template the snapshot builds, but the live add's per-instance stat set.
-				var entry = SnapshotItemBuilder.BuildInventoryEntry(ItemId,
-					item,
-					item.Hash,
-					[
-						new SnapshotItemBuilder.ItemStat(0, 1),
-						new SnapshotItemBuilder.ItemStat(8, 0xffffffff),
-						new SnapshotItemBuilder.ItemStat(23, (uint)RecordId),
-						new SnapshotItemBuilder.ItemStat(46, 7)
-					]);
+				var entry = SnapshotItemBuilder.BuildInventoryEntry(ItemId, item, item.Hash,
+				[
+					new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(8, 0xffffffff), new SnapshotItemBuilder.ItemStat(23, (uint)RecordId),
+					new SnapshotItemBuilder.ItemStat(46, 7)
+				]);
 				var entryBytes = AddItemBody.SerializeInventoryEntry(entry);
 				Assert.Equal(CapturedEntry, Convert.ToHexStringLower(entryBytes));
 

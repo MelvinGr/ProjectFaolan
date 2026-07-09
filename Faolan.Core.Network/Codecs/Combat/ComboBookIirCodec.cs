@@ -20,19 +20,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
 		private const ushort AddFlag = 0x0001;
 
-		public static byte[] Build(uint instance, uint comboId) => new Message(instance, comboId).ToArray();
+		public static byte[] Build(uint instance, uint comboId)
+		{
+			return new Message(instance, comboId).ToArray();
+		}
 
 		// The ComboBookIIR body as a self-serializing codec (ICodec): Write frames the whole
 		// [len][subop][marker][instance][addFlag][comboId]; Read recovers the (instance, comboId).
 		public sealed record Message(uint Instance, uint ComboId) : ICodec<Message>
 		{
-
-			public void Write(FaolanStream s)
-			{
-				s.WriteArrayUInt32Length(content =>
-					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId));
-			}
-
 			public static Message Read(FaolanStream s)
 			{
 				s.ReadUInt32(); // len
@@ -42,6 +38,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 				s.ReadUInt16(); // add flag 0x0001
 				var comboId = s.ReadUInt32();
 				return new Message(instance, comboId);
+			}
+
+			public void Write(FaolanStream s)
+			{
+				s.WriteArrayUInt32Length(content => content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId));
 			}
 		}
 	}

@@ -22,10 +22,9 @@ namespace Faolan.Core.Rdb.Assets
 		public static MonsterDataFile Parse(uint id, byte[] decompressed)
 		{
 			var text = Encoding.Latin1.GetString(decompressed);
-			var start = text.IndexOf('<',
-				text.IndexOf("<monsterdata", StringComparison.Ordinal) is var i && i >= 0
-					? i
-					: 0);
+			var start = text.IndexOf('<', text.IndexOf("<monsterdata", StringComparison.Ordinal) is var i && i >= 0
+				? i
+				: 0);
 			var end = text.LastIndexOf('>');
 			if (start < 0 || end <= start)
 				return new MonsterDataFile(id, null, null, []);
@@ -48,12 +47,9 @@ namespace Faolan.Core.Rdb.Assets
 				.Where(m => m != 0)
 				.ToList();
 
-			return new MonsterDataFile(id,
-				root.Attribute("name")?.Value,
-				uint.TryParse(root.Attribute("skeleton")?.Value, out var sk)
-					? sk
-					: null,
-				meshes);
+			return new MonsterDataFile(id, root.Attribute("name")?.Value, uint.TryParse(root.Attribute("skeleton")?.Value, out var sk)
+				? sk
+				: null, meshes);
 		}
 	}
 }

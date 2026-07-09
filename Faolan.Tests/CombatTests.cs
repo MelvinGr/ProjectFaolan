@@ -30,19 +30,17 @@ namespace Faolan.Tests
 			var state = new CombatState();
 			var created = 0;
 
-			var first = state.GetOrAdd(0x2C58,
-				() =>
-				{
-					created++;
-					return EntityVitals.FromMax(100, 0, 100);
-				});
+			var first = state.GetOrAdd(0x2C58, () =>
+			{
+				created++;
+				return EntityVitals.FromMax(100, 0, 100);
+			});
 			first.ApplyHealthDelta(-40);
-			var second = state.GetOrAdd(0x2C58,
-				() =>
-				{
-					created++;
-					return EntityVitals.FromMax(100, 0, 100);
-				});
+			var second = state.GetOrAdd(0x2C58, () =>
+			{
+				created++;
+				return EntityVitals.FromMax(100, 0, 100);
+			});
 
 			Assert.Equal(1, created); // factory ran once
 			Assert.Same(first, second); // same tracked entity

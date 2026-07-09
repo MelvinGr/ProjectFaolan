@@ -17,8 +17,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TotemOfOrigins_ClassifiesAsRecall()
 		{
-			Assert.Equal(ItemUseType.TotemRecall,
-			ItemUseClassifier.Classify(new Item
+			Assert.Equal(ItemUseType.TotemRecall, ItemUseClassifier.Classify(new Item
 			{
 				Id = 3514741,
 				Name = "Totem of Origins"
@@ -29,8 +28,7 @@ namespace Faolan.Tests
 		public void UnknownItem_IsNone_RegardlessOfName()
 		{
 			// A different item that merely mentions "totem" must NOT be treated as a recall - identity is the id.
-			Assert.Equal(ItemUseType.None,
-			ItemUseClassifier.Classify(new Item
+			Assert.Equal(ItemUseType.None, ItemUseClassifier.Classify(new Item
 			{
 				Id = 999,
 				Name = "Decorative Totem"

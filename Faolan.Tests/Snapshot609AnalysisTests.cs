@@ -5,11 +5,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -36,28 +37,9 @@ namespace Faolan.Tests
 			// The previously-assumed authoring path produces a 869 B block that starts [questId][1][questId][3]...,
 			// whereas the template region is 559 B starting [0x0BD3][1][9][instance]... - a different grammar.
 			var def = await LoadDefinition(10238);
-			var refs = new[]
-				{
-					QuestTextSlot.Title,
-					QuestTextSlot.Summary,
-					QuestTextSlot.AreaTitle,
-					QuestTextSlot.RegionName,
-					QuestTextSlot.MapName
-				}
-				.Select(s => Record(def, s))
-				.ToArray();
-			var full = WorldQuest.BuildQuestFullUpdate(0x02165EFF,
-				def.QuestId,
-				WorldQuest.FullUpdateStateActive,
-				def.AreaId,
-				refs,
-				def.GoalId,
-				WorldQuest.SnapshotQuestAcceptTime,
-				def.MapId,
-				def.MarkerX,
-				def.MarkerY,
-				Record(def, QuestTextSlot.Objective),
-				Record(def, QuestTextSlot.ObjectiveLocalized));
+			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }.Select(s => Record(def, s)).ToArray();
+			var full = WorldQuest.BuildQuestFullUpdate(0x02165EFF, def.QuestId, WorldQuest.FullUpdateStateActive, def.AreaId, refs, def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId,
+				def.MarkerX, def.MarkerY, Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
 			var block = full[WorldQuest.QuestFullUpdateContentOffset..^1];
 
 			var region = Template[RegionStart..IndexTag];

@@ -1,7 +1,6 @@
 using Faolan.Core;
-using Xunit;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -14,7 +13,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void Set_OverridesEveryOccurrence()
 		{
-			var list = new StatList { Pairs = [(0x36, 1), (0x1B, 9800), (0x36, 1)] };
+			var list = new StatList
+			{
+				Pairs = [(0x36, 1), (0x1B, 9800), (0x36, 1)]
+			};
 			list.Set(0x36, 40);
 			Assert.Equal(40u, list.Get(0x36));
 			Assert.All(list.Pairs.FindAll(p => p.Id == 0x36), p => Assert.Equal(40u, p.Value));

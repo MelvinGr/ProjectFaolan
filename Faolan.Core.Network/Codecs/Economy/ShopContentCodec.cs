@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		public static bool LooksLikeShopData(ReadOnlySpan<byte> body)
 		{
 			return body.Length > 20 && BinaryPrimitives.ReadUInt32BigEndian(body) == Shop.WireType && BinaryPrimitives.ReadUInt32BigEndian(body[8..]) == EntityClass.Character &&
-				   BinaryPrimitives.ReadUInt32BigEndian(body[16..]) == body.Length - 20;
+			       BinaryPrimitives.ReadUInt32BigEndian(body[16..]) == body.Length - 20;
 		}
 
 		public static ShopContent Parse(byte[] body)
@@ -63,6 +63,34 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// header + the ProtoInventoryGame built from Entries; Read recovers the header + per-slot wares.
 		public sealed record ShopContent(uint ShopInstance, uint NpcHandle, uint MaxSize, IReadOnlyList<ShopEntry> Entries) : ICodec<ShopContent>
 		{
+			public static ShopContent Read(FaolanStream s)
+			{
+				s.ReadUInt32(); // shop ID32 type (Shop.WireType)
+				var shopInstance = s.ReadUInt32();
+				s.ReadUInt32(); // char ID32 type (CharacterWireType)
+				var npcHandle = s.ReadUInt32();
+				var contentLength = s.ReadUInt32();
+				var proto = s.ReadArray(contentLength);
+
+				using var ms = new MemoryStream(proto);
+				var inv = Serializer.Deserialize<ProtoInventoryGame>(ms);
+
+				var entries = new List<ShopEntry>();
+				foreach (var slot in inv.Items)
+				{
+					var item = slot.Item;
+					var data = item?.ItemData;
+					if (data?.Key1 == null)
+						continue;
+
+					var stats = item.StatLists.ToDictionary(st => st.Stat, st => st.Value);
+					entries.Add(new ShopEntry(slot.Pos, data.Template1, stats.GetValueOrDefault(26u, 1u), stats.GetValueOrDefault(356u), data.Level, data.Hash, data.Key1.Key1, data.Key1.Key2,
+						data.Key1.Key3, data.Key1.Key4));
+				}
+
+				return new ShopContent(shopInstance, npcHandle, inv.MaxSize, entries);
+			}
+
 			public void Write(FaolanStream s)
 			{
 				var inv = new ProtoInventoryGame
@@ -132,33 +160,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 				s.WriteUInt32(EntityClass.Character);
 				s.WriteUInt32(NpcHandle);
 				s.WriteArrayUInt32Length(proto);
-			}
-
-			public static ShopContent Read(FaolanStream s)
-			{
-				s.ReadUInt32(); // shop ID32 type (Shop.WireType)
-				var shopInstance = s.ReadUInt32();
-				s.ReadUInt32(); // char ID32 type (CharacterWireType)
-				var npcHandle = s.ReadUInt32();
-				var contentLength = s.ReadUInt32();
-				var proto = s.ReadArray(contentLength);
-
-				using var ms = new MemoryStream(proto);
-				var inv = Serializer.Deserialize<ProtoInventoryGame>(ms);
-
-				var entries = new List<ShopEntry>();
-				foreach (var slot in inv.Items)
-				{
-					var item = slot.Item;
-					var data = item?.ItemData;
-					if (data?.Key1 == null)
-						continue;
-
-					var stats = item.StatLists.ToDictionary(st => st.Stat, st => st.Value);
-					entries.Add(new ShopEntry(slot.Pos, data.Template1, stats.GetValueOrDefault(26u, 1u), stats.GetValueOrDefault(356u), data.Level, data.Hash, data.Key1.Key1, data.Key1.Key2, data.Key1.Key3, data.Key1.Key4));
-				}
-
-				return new ShopContent(shopInstance, npcHandle, inv.MaxSize, entries);
 			}
 		}
 	}

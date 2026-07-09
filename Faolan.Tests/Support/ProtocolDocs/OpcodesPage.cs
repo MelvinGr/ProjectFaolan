@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Tests.Support.ProtocolDocs
@@ -20,36 +18,23 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	{
 		public const string RelativePath = "docs/protocol/gen/opcodes.md";
 
+		// Capture-verified RPC class ids (the dissector's table, resolved across ~109k endpoints).
+		private static readonly (string Class, uint Id)[] ExpectedClassIds =
+		[
+			("UniverseInterface", 0x0C384054), ("GameCharInterfaceProject", 0x28377648), ("TradepostAgent", 0x3D744981), ("GameCharAgentProject", 0x5B9756FC), ("UniverseAgent", 0x604DDBA0),
+			("GameInterface", 0x6C67C147), ("CSPlayerAgent", 0x6DD55614), ("PlayerInterface", 0x7D155738), ("PlayerAgent", 0x82F20484), ("GameCharInterface", 0x8B87F791),
+			("GameCharAgent", 0xA9ECB95D), ("GameAgent", 0xB171CE13), ("CSPlayerInterface", 0xBBD560C8), ("TradepostInterface", 0xF2C2D5B5)
+		];
+
 		// Enum -> the client RPC class whose methods it catalogs. The RpcHeader RECEIVER class picks the table:
 		// c2s receivers are *Agent classes, s2c receivers *Interface classes.
 		private static readonly (string Enum, string Class)[] EnumToClass =
 		[
-			("UniverseAgentOpcodes", "UniverseAgent"),
-			("UniverseAgentResponseOpcodes", "UniverseInterface"),
-			("PlayerAgentOpcodes", "PlayerAgent"),
-			("PlayerAgentResponseOpcodes", "PlayerInterface"),
-			("CsPlayerAgentOpcodes", "CSPlayerAgent"),
-			("CSPlayerInterfaceDispatchOpcodes", "CSPlayerInterface"),
-			("GameAgentOpcodes", "GameAgent"),
-			("GameInterfaceDispatchOpcodes", "GameInterface"),
-			("GameCharAgentOpcodes", "GameCharAgent"),
-			("GameCharInterfaceDispatchOpcodes", "GameCharInterface"),
-			("GameCharAgentProjectOpcodes", "GameCharAgentProject"),
-			("GameCharInterfaceProjectDispatchOpcodes", "GameCharInterfaceProject"),
-			("TradepostAgentOpcodes", "TradepostAgent"),
-			("TradepostInterfaceDispatchOpcodes", "TradepostInterface")
-		];
-
-		// Capture-verified RPC class ids (the dissector's table, resolved across ~109k endpoints).
-		private static readonly (string Class, uint Id)[] ExpectedClassIds =
-		[
-			("UniverseInterface", 0x0C384054), ("GameCharInterfaceProject", 0x28377648),
-			("TradepostAgent", 0x3D744981), ("GameCharAgentProject", 0x5B9756FC),
-			("UniverseAgent", 0x604DDBA0), ("GameInterface", 0x6C67C147),
-			("CSPlayerAgent", 0x6DD55614), ("PlayerInterface", 0x7D155738),
-			("PlayerAgent", 0x82F20484), ("GameCharInterface", 0x8B87F791),
-			("GameCharAgent", 0xA9ECB95D), ("GameAgent", 0xB171CE13),
-			("CSPlayerInterface", 0xBBD560C8), ("TradepostInterface", 0xF2C2D5B5)
+			("UniverseAgentOpcodes", "UniverseAgent"), ("UniverseAgentResponseOpcodes", "UniverseInterface"), ("PlayerAgentOpcodes", "PlayerAgent"),
+			("PlayerAgentResponseOpcodes", "PlayerInterface"), ("CsPlayerAgentOpcodes", "CSPlayerAgent"), ("CSPlayerInterfaceDispatchOpcodes", "CSPlayerInterface"),
+			("GameAgentOpcodes", "GameAgent"), ("GameInterfaceDispatchOpcodes", "GameInterface"), ("GameCharAgentOpcodes", "GameCharAgent"),
+			("GameCharInterfaceDispatchOpcodes", "GameCharInterface"), ("GameCharAgentProjectOpcodes", "GameCharAgentProject"),
+			("GameCharInterfaceProjectDispatchOpcodes", "GameCharInterfaceProject"), ("TradepostAgentOpcodes", "TradepostAgent"), ("TradepostInterfaceDispatchOpcodes", "TradepostInterface")
 		];
 
 		public static uint Bkdr31(string name)
@@ -73,11 +58,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var idByClass = ExpectedClassIds.ToDictionary(x => x.Class, x => x.Id);
 			var notes = OpcodesSource.AllNotes();
 
-			var enums = typeof(GameCharAgentOpcodes).Assembly
-				.GetTypes()
-				.Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Network.Constants")
-				.OrderBy(t => t.Name, StringComparer.Ordinal)
-				.ToList();
+			var enums = typeof(GameCharAgentOpcodes).Assembly.GetTypes().Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Network.Constants").OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
 
 			const string iirEnum = "GameServer0X2000Opcodes"; // the 32-bit IIR sub-opcodes live on iir-types.md
 			var tabled = enums.Where(e => e.Name != iirEnum).ToList();
@@ -119,13 +100,17 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 				if (classByEnum.TryGetValue(e.Name, out var cls))
 				{
-					var dir = cls.EndsWith("Interface", StringComparison.Ordinal) ? "S2C (server→client dispatch)" : "C2S (client→server call)";
+					var dir = cls.EndsWith("Interface", StringComparison.Ordinal)
+						? "S2C (server→client dispatch)"
+						: "C2S (client→server call)";
 					sb.AppendLine($"RPC class **{cls}** (id `0x{idByClass[cls]:X8}`) · {dir}");
 				}
 				else
 				{
 					// The AgentServer chat enums have no RpcHeader / no RPC class.
-					var dir = e.Name.Contains("Responds", StringComparison.Ordinal) ? "S2C" : "C2S";
+					var dir = e.Name.Contains("Responds", StringComparison.Ordinal)
+						? "S2C"
+						: "C2S";
 					sb.AppendLine($"AgentServer chat — **no RpcHeader** (raw opcode) · {dir}");
 				}
 
@@ -135,7 +120,9 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				foreach (var (name, value) in Members(e))
 				{
 					notes.TryGetValue((e.Name, name), out var note);
-					var width = e.GetEnumUnderlyingType() == typeof(uint) ? 8 : 4;
+					var width = e.GetEnumUnderlyingType() == typeof(uint)
+						? 8
+						: 4;
 					sb.AppendLine($"| `0x{value.ToString("X" + width)}` | `{name}` | {EscapeCell(note)} |");
 				}
 
@@ -143,6 +130,13 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			}
 
 			return sb.ToString();
+		}
+
+		private static string EscapeCell(string note)
+		{
+			return string.IsNullOrEmpty(note)
+				? ""
+				: note.Replace("|", "\\|").Trim();
 		}
 
 		// (name, value) of every named constant, distinct even when two names share a value, ordered by value.
@@ -155,7 +149,5 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				.ThenBy(x => x.Name, StringComparer.Ordinal)
 				.ToList();
 		}
-
-		private static string EscapeCell(string note) => string.IsNullOrEmpty(note) ? "" : note.Replace("|", "\\|").Trim();
 	}
 }

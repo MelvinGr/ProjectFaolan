@@ -53,14 +53,34 @@ namespace Faolan.GameServer
 
 			var mail = new Mail
 			{
-				MailId = await AllocateMailId(), 				RecipientClass = MailConstants.EndpointClass, 				RecipientName = buyer, 				SenderClass = MailConstants.EndpointClass, 				SenderName = "", 				BodyXml = TradepostMailBody.BuildItemBought(buyer, listing.SaleId, "", listing.SellerName, listing.Price.ToString()), 				FooterWord = MailConstants.FooterUnread, 				Money = 0, 				Timestamp1 = now, 				Timestamp2 = now + MailConstants.ExpirySeconds
+				MailId = await AllocateMailId(),
+				RecipientClass = MailConstants.EndpointClass,
+				RecipientName = buyer,
+				SenderClass = MailConstants.EndpointClass,
+				SenderName = "",
+				BodyXml = TradepostMailBody.BuildItemBought(buyer, listing.SaleId, "", listing.SellerName, listing.Price.ToString()),
+				FooterWord = MailConstants.FooterUnread,
+				Money = 0,
+				Timestamp1 = now,
+				Timestamp2 = now + MailConstants.ExpirySeconds
 			};
 
 			mail.Attachments.Add(new MailAttachment
 			{
-				ItemInstanceId = listing.SaleId, 				Quantity = listing.Quantity == 0
+				ItemInstanceId = listing.SaleId,
+				Quantity = listing.Quantity == 0
 					? 1
-					: listing.Quantity, 				Data1 = listing.Data1, 				Data2 = listing.Data2, 				Data3 = listing.Data3, 				Data4 = listing.Data4, 				Template = listing.Template, 				ItemLevel = listing.ItemLevel, 				ItemHash = listing.ItemHash, 				TrailerWord = MailConstants.AttachmentTrailerWord, 				TrailerClass = MailConstants.EndpointClass, 				TrailerTail = 0
+					: listing.Quantity,
+				Data1 = listing.Data1,
+				Data2 = listing.Data2,
+				Data3 = listing.Data3,
+				Data4 = listing.Data4,
+				Template = listing.Template,
+				ItemLevel = listing.ItemLevel,
+				ItemHash = listing.ItemHash,
+				TrailerWord = MailConstants.AttachmentTrailerWord,
+				TrailerClass = MailConstants.EndpointClass,
+				TrailerTail = 0
 			});
 
 			return mail;
@@ -125,7 +145,8 @@ namespace Faolan.GameServer
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
 			await TradepostResponses.SendMailMessage(client, mail, false, packet.Sender.Instance);
 
-			Logger.LogInformation("Tradepost BUY: {Char} bought listing 0x{Sale:X16} (item 0x{Item:X}) for {Price} tin -> mail 0x{Mail:X16} (wallet {Balance}).", 				character.Name, 				saleId, 				listing.ItemId, 				listing.Price, 				mail.MailId, 				character.Money);
+			Logger.LogInformation("Tradepost BUY: {Char} bought listing 0x{Sale:X16} (item 0x{Item:X}) for {Price} tin -> mail 0x{Mail:X16} (wallet {Balance}).", character.Name, saleId,
+				listing.ItemId, listing.Price, mail.MailId, character.Money);
 		}
 
 		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
@@ -193,7 +214,8 @@ namespace Faolan.GameServer
 			await Database.SetTradepostListingPrice(listing.SaleId, newPrice);
 			// Update the bank-slot overlay's price stat (capture F364).
 			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, (uint)newPrice);
-			Logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.", character.Name, listing.SaleId, bankSlot, listing.Price, newPrice);
+			Logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.", character.Name, listing.SaleId, bankSlot, listing.Price,
+				newPrice);
 		}
 
 		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
@@ -281,7 +303,8 @@ namespace Faolan.GameServer
 				{
 					var query = TradepostResponses.ParseSearch(packet.Body);
 					var listings = await Database.GetTradepostListings(query.ItemId);
-					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", TradepostCharName(client), query.Lang, query.ItemId, query.Page, listings.Count);
+					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", TradepostCharName(client), query.Lang, query.ItemId,
+						query.Page, listings.Count);
 
 					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no rows).
 					await TradepostResponses.SendSearchResults(client, packet, listings);
@@ -379,10 +402,26 @@ namespace Faolan.GameServer
 
 			var listing = new TradepostListing
 			{
-				SaleId = await AllocateSaleId(), 				Handle = 0, 				SellerName = character.Name, 				BankSlot = (uint)bankSlot, 				Price = price, 				Quantity = row.Count == 0
+				SaleId = await AllocateSaleId(),
+				Handle = 0,
+				SellerName = character.Name,
+				BankSlot = (uint)bankSlot,
+				Price = price,
+				Quantity = row.Count == 0
 					? 1u
-					: row.Count, 				ItemId = searchCategory, // #181: the item-type search category (was row.Item.Id, the template)
-				InstanceField = 0, 				ItemHandle = 0, 				EntryFlags = TradepostListingCodec.DefaultEntryFlags, 				Timestamp = 0, 				Data1 = row.Item.Data1, 				Data2 = row.Item.Data2, 				Data3 = row.Item.Data3, 				Data4 = row.Item.Data4, 				Template = row.Item.Id, 				ItemLevel = row.Item.Level, 				ItemHash = row.Item.Hash
+					: row.Count,
+				ItemId = searchCategory, // #181: the item-type search category (was row.Item.Id, the template)
+				InstanceField = 0,
+				ItemHandle = 0,
+				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
+				Timestamp = 0,
+				Data1 = row.Item.Data1,
+				Data2 = row.Item.Data2,
+				Data3 = row.Item.Data3,
+				Data4 = row.Item.Data4,
+				Template = row.Item.Id,
+				ItemLevel = row.Item.Level,
+				ItemHash = row.Item.Hash
 			};
 			await Database.CreateTradepostListing(listing);
 
@@ -399,7 +438,8 @@ namespace Faolan.GameServer
 			// the HUD stays in sync; no debit.
 			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.", 				character.Name, 				row.Item.Name, 				listing.Quantity, 				bankSlot, 				row.Item.Id, 				price, 				listing.SaleId);
+			Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.", character.Name, row.Item.Name,
+				listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
 		}
 
 		// SendMail (0x2002) [u16+recipient][u16+body][money:u64][0x7E2:u32][bankItemSlot:u32]: a player-composed mail, 		// optionally with a bank item attached (capture F499 = to "DemoL80", "Hello this is a test", slot 5, no COD).
@@ -427,8 +467,16 @@ namespace Faolan.GameServer
 
 			var mail = new Mail
 			{
-				MailId = await AllocateMailId(), 				RecipientClass = MailConstants.EndpointClass, 				RecipientName = recipient.Name, 				SenderClass = MailConstants.EndpointClass, 				SenderName = character.Name, // a player mail, NOT a system mail (sender name is set)
-				BodyXml = bodyText, 				FooterWord = MailConstants.FooterUnread, 				Money = money, 				Timestamp1 = Global.NowUnixTimeSeconds, 				Timestamp2 = Global.NowUnixTimeSeconds + MailConstants.ExpirySeconds
+				MailId = await AllocateMailId(),
+				RecipientClass = MailConstants.EndpointClass,
+				RecipientName = recipient.Name,
+				SenderClass = MailConstants.EndpointClass,
+				SenderName = character.Name, // a player mail, NOT a system mail (sender name is set)
+				BodyXml = bodyText,
+				FooterWord = MailConstants.FooterUnread,
+				Money = money,
+				Timestamp1 = Global.NowUnixTimeSeconds,
+				Timestamp2 = Global.NowUnixTimeSeconds + MailConstants.ExpirySeconds
 			};
 
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
@@ -441,9 +489,20 @@ namespace Faolan.GameServer
 				mail.SenderBankSlot = (uint)bankSlot;
 				mail.Attachments.Add(new MailAttachment
 				{
-					ItemInstanceId = (ulong)Random.Shared.NextInt64(1, long.MaxValue), 					Quantity = row.Count == 0
+					ItemInstanceId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
+					Quantity = row.Count == 0
 						? 1u
-						: row.Count, 					Data1 = row.Item.Data1, 					Data2 = row.Item.Data2, 					Data3 = row.Item.Data3, 					Data4 = row.Item.Data4, 					Template = row.Item.Id, 					ItemLevel = row.Item.Level, 					ItemHash = row.Item.Hash, 					TrailerWord = MailConstants.AttachmentTrailerWord, 					TrailerClass = MailConstants.EndpointClass, 					TrailerTail = 0
+						: row.Count,
+					Data1 = row.Item.Data1,
+					Data2 = row.Item.Data2,
+					Data3 = row.Item.Data3,
+					Data4 = row.Item.Data4,
+					Template = row.Item.Id,
+					ItemLevel = row.Item.Level,
+					ItemHash = row.Item.Hash,
+					TrailerWord = MailConstants.AttachmentTrailerWord,
+					TrailerClass = MailConstants.EndpointClass,
+					TrailerTail = 0
 				});
 			}
 
@@ -459,7 +518,8 @@ namespace Faolan.GameServer
 			// the HUD stays in sync (reflects any attached money debit elsewhere; the item attachment itself is free).
 			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			Logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
+			Logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText,
+				money, row?.Item != null);
 		}
 
 		// GetMailItem: grant the escrowed attachment into the bag, then drop it from the mail and re-send the
@@ -535,29 +595,42 @@ namespace Faolan.GameServer
 		{
 			var key = new ProtoDecryptionKey
 			{
-				Key1 = a.Data1, 				Key2 = a.Data2, 				Key3 = a.Data3, 				Key4 = a.Data4
+				Key1 = a.Data1,
+				Key2 = a.Data2,
+				Key3 = a.Data3,
+				Key4 = a.Data4
 			};
 			var qty = a.Quantity == 0
 				? 1u
 				: a.Quantity;
 			var entry = new ProtoInventoryGameEntry
 			{
-				ItemId = FullCharSnapshotBuilder.ItemId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot), 				ItemData = new ProtoAcgItem
+				ItemId = FullCharSnapshotBuilder.ItemId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot),
+				ItemData = new ProtoAcgItem
 				{
-					Key1 = key, 					Key2 = key, 					Key3 = key, 					Template1 = a.Template, 					Template2 = a.Template, 					Level = a.ItemLevel, 					Hash = a.ItemHash
+					Key1 = key,
+					Key2 = key,
+					Key3 = key,
+					Template1 = a.Template,
+					Template2 = a.Template,
+					Level = a.ItemLevel,
+					Hash = a.ItemHash
 				}
 			};
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				Stat = 0, 				Value = 1
+				Stat = 0,
+				Value = 1
 			});
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				Stat = 23, 				Value = (uint)FullCharSnapshotBuilder.RecordId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot)
+				Stat = 23,
+				Value = (uint)FullCharSnapshotBuilder.RecordId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot)
 			});
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				Stat = 26, 				Value = qty
+				Stat = 26,
+				Value = qty
 			});
 			return entry;
 		}

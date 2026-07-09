@@ -73,8 +73,8 @@ namespace Faolan.Importer.Captures
 					// epoch - parse it as a DateTimeOffset and use its 100ns UtcTicks. Falls back to the per-file
 					// sequence when absent/unparseable. (Used by CaptureCharacterStateImporter to take a character's
 					// LATEST-in-time saved hotbar/wallet when it appears in several captures.)
-					var tick = p.TryGetProperty("TimeUtc", out var tEl) && tEl.ValueKind == JsonValueKind.String &&
-					           DateTimeOffset.TryParse(tEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var timestamp)
+					var tick = p.TryGetProperty("TimeUtc", out var tEl) && tEl.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(tEl.GetString(), CultureInfo.InvariantCulture,
+						DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var timestamp)
 						? timestamp.UtcTicks
 						: seq;
 
@@ -103,7 +103,10 @@ namespace Faolan.Importer.Captures
 			if (!TryEndpoint(p, "ReceiverClass", "ReceiverInstance", out var receiver))
 				return null;
 
-			var header = new List<byte> { 0x0a };
+			var header = new List<byte>
+			{
+				0x0a
+			};
 			header.AddRange(Varint((ulong)sender.Length));
 			header.AddRange(sender);
 			header.Add(0x12);
@@ -139,7 +142,10 @@ namespace Faolan.Importer.Captures
 			if (!TryParseHexUInt(clsEl.GetString(), out var cls))
 				return false;
 
-			var bytes = new List<byte> { 0x0d };
+			var bytes = new List<byte>
+			{
+				0x0d
+			};
 			var clsLe = new byte[4];
 			BinaryPrimitives.WriteUInt32LittleEndian(clsLe, cls);
 			bytes.AddRange(clsLe);

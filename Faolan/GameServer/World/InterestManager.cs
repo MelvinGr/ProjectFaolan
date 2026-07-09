@@ -88,11 +88,9 @@ namespace Faolan.GameServer.World
 
 				if (mover.IsVisibleTo(viewer) && Vector3.Distance(viewer.Position, mover.Position) <= range)
 				{
-					events.Add(new InterestEvent(viewer,
-						mover,
-						viewer.Known.Add(mover.Handle)
-							? InterestEventType.Spawn
-							: InterestEventType.Move));
+					events.Add(new InterestEvent(viewer, mover, viewer.Known.Add(mover.Handle)
+						? InterestEventType.Spawn
+						: InterestEventType.Move));
 				}
 				else if (viewer.Known.Remove(mover.Handle) && viewer.Confirmed.Remove(mover.Handle))
 					// #245: same gate for a viewer losing sight of the mover - never despawn a handle the viewer's client

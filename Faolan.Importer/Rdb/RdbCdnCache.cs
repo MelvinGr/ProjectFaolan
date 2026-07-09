@@ -24,7 +24,10 @@ namespace Faolan.Importer.Rdb
 		{
 			_cdnBase = cdnBase.TrimEnd('/');
 			_storeDir = storeDir;
-			_http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
+			_http = new HttpClient
+			{
+				Timeout = TimeSpan.FromSeconds(40)
+			};
 			_http.DefaultRequestHeaders.AcceptEncoding.ParseAdd("identity");
 		}
 

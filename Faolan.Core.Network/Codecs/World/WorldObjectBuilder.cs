@@ -92,18 +92,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return row?.DisplayName ?? string.Empty;
 		}
 
-		// The wire typeTag (the 0x0000C8xx EntityClass ack in the object header) for a world-object CLASS. Class-stable
-		// (one distinct tag per SubOpcode across the whole capture set), so it is derived here rather than stored.
-		public static uint TypeTagForClass(uint subOpcode) => subOpcode switch
-		{
-			0x1FD6412Bu => 0x0000C87Du, // ClimbingDynel
-			0x33A56FB0u => 0x0000C748u, // ZoneLabel
-			0x66AEDD50u => 0x0000C878u, // SimpleDynel
-			0x6BD56736u => 0x0000C879u, // Destructible
-			0xF096251Eu => 0x0000C87Au, // Container
-			_ => 0x0000C878u
-		};
-
 		// Builds a world-object body from the row's TYPED COLUMNS + KdTreeTail (the retired Data blob is no longer read),
 		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
 		// Returns false when the row isn't lifted (no DisplayName / KdTreeTail).
@@ -118,5 +106,19 @@ namespace Faolan.Core.Network.Codecs.World
 			return TryBuild(row, handle, 0u, out body);
 		}
 
+		// The wire typeTag (the 0x0000C8xx EntityClass ack in the object header) for a world-object CLASS. Class-stable
+		// (one distinct tag per SubOpcode across the whole capture set), so it is derived here rather than stored.
+		public static uint TypeTagForClass(uint subOpcode)
+		{
+			return subOpcode switch
+			{
+				0x1FD6412Bu => 0x0000C87Du, // ClimbingDynel
+				0x33A56FB0u => 0x0000C748u, // ZoneLabel
+				0x66AEDD50u => 0x0000C878u, // SimpleDynel
+				0x6BD56736u => 0x0000C879u, // Destructible
+				0xF096251Eu => 0x0000C87Au, // Container
+				_           => 0x0000C878u
+			};
+		}
 	}
 }

@@ -14,27 +14,6 @@ namespace Faolan.Tests
 	public class NetworkHardeningTests
 	{
 		[Fact]
-		public void Framer_DecompressionBomb_IsDroppedNotInflatedToOom()
-		{
-			// ~20 MB of zeros compresses to a few KB. The framer must not inflate it: it skips the 9-byte marker, then
-			// reads the zlib payload's first 4 bytes as a length prefix (>16 MB / high-bit set) and rejects it - so no
-			// packet is produced and nothing is materialised (no OOM).
-			var bomb = new byte[20 * 1024 * 1024];
-			using var ms = new MemoryStream();
-			using (var z = new ZLibStream(ms, CompressionLevel.Optimal, true))
-				z.Write(bomb, 0, bomb.Length);
-			var compressed = ms.ToArray();
-
-			// The marker is a fixed 9-byte control frame [0x80 00 00 05][5 bytes]; the zlib data follows it.
-			byte[] input = [0x80, 0x00, 0x00, 0x05, 0, 0, 0, 0, 0, .. compressed];
-
-			var framer = new ConanMessageFramer();
-			var packets = framer.PushBytes(input, input.Length).ToList();
-
-			Assert.Empty(packets);
-		}
-
-		[Fact]
 		public void Framer_CompressionMarkerCoalescedWithPacket_KeepsThePacket()
 		{
 			// The regression: a recv that TCP-coalesced the client's 9-byte compression marker with the packet behind
@@ -63,6 +42,27 @@ namespace Faolan.Tests
 
 			Assert.Single(frames);
 			Assert.Equal([0x00, 0x00, 0x00, 0x04, 0xAA, 0xBB, 0xCC, 0xDD], frames[0]);
+		}
+
+		[Fact]
+		public void Framer_DecompressionBomb_IsDroppedNotInflatedToOom()
+		{
+			// ~20 MB of zeros compresses to a few KB. The framer must not inflate it: it skips the 9-byte marker, then
+			// reads the zlib payload's first 4 bytes as a length prefix (>16 MB / high-bit set) and rejects it - so no
+			// packet is produced and nothing is materialised (no OOM).
+			var bomb = new byte[20 * 1024 * 1024];
+			using var ms = new MemoryStream();
+			using (var z = new ZLibStream(ms, CompressionLevel.Optimal, true))
+				z.Write(bomb, 0, bomb.Length);
+			var compressed = ms.ToArray();
+
+			// The marker is a fixed 9-byte control frame [0x80 00 00 05][5 bytes]; the zlib data follows it.
+			byte[] input = [0x80, 0x00, 0x00, 0x05, 0, 0, 0, 0, 0, .. compressed];
+
+			var framer = new ConanMessageFramer();
+			var packets = framer.PushBytes(input, input.Length).ToList();
+
+			Assert.Empty(packets);
 		}
 
 		[Fact]

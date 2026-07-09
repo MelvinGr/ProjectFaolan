@@ -18,7 +18,7 @@ namespace Faolan.Tests
 		public void BuildFromScratch_Animal_ParsesAndCarriesMinimalPostIir()
 		{
 			var golden = Golden.Bytes("SpawnNpcCrocodile");
-			var body = BuildFromGolden(golden, out var handle, out var morphs, minimalRc: NpcSpawnScaffold.MinimalRecordCount);
+			var body = BuildFromGolden(golden, out var handle, out var morphs, NpcSpawnScaffold.MinimalRecordCount);
 
 			Assert.Empty(morphs); // an animal carries no appearance table
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		public void BuildFromScratch_Humanoid_ParsesAndCarriesAppearanceTable()
 		{
 			var golden = Golden.Bytes("SpawnNpcCasilda");
-			var body = BuildFromGolden(golden, out _, out var morphs, minimalRc: NpcSpawnScaffold.MinimalRecordCount);
+			var body = BuildFromGolden(golden, out _, out var morphs, NpcSpawnScaffold.MinimalRecordCount);
 
 			Assert.NotEmpty(morphs); // Casilda's appearance/morph table
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
@@ -49,9 +49,15 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(golden, out var read));
 			var x = NpcStatCoreCodec.ReadIirHeaderWord(golden)!.Value;
 			var pos = new Vector3(ReadLE(golden, SpawnPacketBuilder.PosXOffset), ReadLE(golden, SpawnPacketBuilder.PosYOffset), ReadLE(golden, SpawnPacketBuilder.PosZOffset));
-			var rot = new Quaternion(ReadLE(golden, SpawnPacketBuilder.RotXOffset), ReadLE(golden, SpawnPacketBuilder.RotYOffset), ReadLE(golden, SpawnPacketBuilder.RotZOffset), ReadLE(golden, SpawnPacketBuilder.RotWOffset));
+			var rot = new Quaternion(ReadLE(golden, SpawnPacketBuilder.RotXOffset), ReadLE(golden, SpawnPacketBuilder.RotYOffset), ReadLE(golden, SpawnPacketBuilder.RotZOffset),
+				ReadLE(golden, SpawnPacketBuilder.RotWOffset));
 			NpcSpawnAppearanceCodec.TryDecodeAppearance(golden, out morphs);
 			return NpcSpawnBuilder.BuildBody(handle, x, pos, rot, ReadPlayfieldToken(golden), read.Message, morphs, minimalRc);
+		}
+
+		private static float ReadLE(byte[] b, int offset)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
 		}
 
 		// The playfield token: a 4-byte LEB128 varint at [0x18] right after the constructed transform (offset 60).
@@ -61,7 +67,5 @@ namespace Faolan.Tests
 			Assert.Equal(0x18, body[o]);
 			return (uint)((body[o + 1] & 0x7F) | ((body[o + 2] & 0x7F) << 7) | ((body[o + 3] & 0x7F) << 14) | (body[o + 4] << 21));
 		}
-
-		private static float ReadLE(byte[] b, int offset) => BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
 	}
 }

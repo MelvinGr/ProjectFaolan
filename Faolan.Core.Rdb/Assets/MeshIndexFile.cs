@@ -58,7 +58,10 @@ namespace Faolan.Core.Rdb.Assets
 
 			var materials = (root.Element("Materials")?.Elements("Material") ?? []).Select(ParseMaterial).ToList();
 
-			return new MeshIndexFile(id, source, renderMeshId, bounds, collisionId, materials) { Skinned = skinned };
+			return new MeshIndexFile(id, source, renderMeshId, bounds, collisionId, materials)
+			{
+				Skinned = skinned
+			};
 		}
 
 		private static MeshMaterial ParseMaterial(XElement el)

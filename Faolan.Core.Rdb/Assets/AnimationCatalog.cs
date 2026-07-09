@@ -26,7 +26,7 @@ namespace Faolan.Core.Rdb.Assets
 		private const uint MasterId = 1; // the 3.6MB master catalog
 
 		// Per-skeleton clip lists are stable for the process; the master parse is ~3.6MB so cache it.
-		private static readonly ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>> _clipsBySkeleton = new ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>>();
+		private static readonly ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>> _clipsBySkeleton = new();
 
 		// Decode one clip's keyframe curves (type 1010003, by rdbname), or null if unavailable / a variant layout.
 		public static ClipData? DecodeClip(RdbReader rdb, uint rdbname)
@@ -65,42 +65,41 @@ namespace Faolan.Core.Rdb.Assets
 		// entry is unavailable. Deduped by name (the master lists a few clip aliases that share an rdbname).
 		public static IReadOnlyList<ClipInfo> ListClips(RdbReader rdb, uint skeletonId)
 		{
-			return _clipsBySkeleton.GetOrAdd(skeletonId,
-				sk =>
+			return _clipsBySkeleton.GetOrAdd(skeletonId, sk =>
+			{
+				if (!rdb.TryGet(AnimSysType, MasterId, out var e) || !rdb.CanRead(e))
+					return [];
+
+				var lmxb = new Lmxb(rdb.ReadDecompressed(e));
+				var skText = sk.ToString();
+				foreach (var animsys in lmxb.Children(lmxb.Root()))
 				{
-					if (!rdb.TryGet(AnimSysType, MasterId, out var e) || !rdb.CanRead(e))
-						return [];
+					if (lmxb.Attrs(animsys).GetValueOrDefault("skeleton") != skText)
+						continue;
 
-					var lmxb = new Lmxb(rdb.ReadDecompressed(e));
-					var skText = sk.ToString();
-					foreach (var animsys in lmxb.Children(lmxb.Root()))
+					var clips = new List<ClipInfo>();
+					var seen = new HashSet<string>();
+					foreach (var group in lmxb.Children(animsys))
 					{
-						if (lmxb.Attrs(animsys).GetValueOrDefault("skeleton") != skText)
-							continue;
-
-						var clips = new List<ClipInfo>();
-						var seen = new HashSet<string>();
-						foreach (var group in lmxb.Children(animsys))
+						foreach (var node in lmxb.Children(group))
 						{
-							foreach (var node in lmxb.Children(group))
-							{
-								if (lmxb.Name(node) != "animation")
-									continue;
+							if (lmxb.Name(node) != "animation")
+								continue;
 
-								var a = lmxb.Attrs(node);
-								if (a.TryGetValue("name", out var name) && a.TryGetValue("rdbname", out var rdbText) && uint.TryParse(rdbText, out var rid) && seen.Add(name))
-								{
-									float.TryParse(a.GetValueOrDefault("duration"), CultureInfo.InvariantCulture, out var dur);
-									clips.Add(new ClipInfo(name, rid, dur));
-								}
+							var a = lmxb.Attrs(node);
+							if (a.TryGetValue("name", out var name) && a.TryGetValue("rdbname", out var rdbText) && uint.TryParse(rdbText, out var rid) && seen.Add(name))
+							{
+								float.TryParse(a.GetValueOrDefault("duration"), CultureInfo.InvariantCulture, out var dur);
+								clips.Add(new ClipInfo(name, rid, dur));
 							}
 						}
-
-						return clips.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
 					}
 
-					return [];
-				});
+					return clips.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
+				}
+
+				return [];
+			});
 		}
 
 		// [u32 count][count f32 time][count x width f32 value] -> flat time[] + value[] (count*width). Bounds-checked:
@@ -193,11 +192,9 @@ namespace Faolan.Core.Rdb.Assets
 			{
 				var o = Base + (int)rel;
 				var end = Array.IndexOf(_d, (byte)0, o);
-				return Encoding.ASCII.GetString(_d,
-					o,
-					(end < 0
-						? _d.Length
-						: end) - o);
+				return Encoding.ASCII.GetString(_d, o, (end < 0
+					? _d.Length
+					: end) - o);
 			}
 
 			private ushort U16(int o)

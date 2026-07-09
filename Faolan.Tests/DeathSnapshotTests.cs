@@ -4,9 +4,9 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using Xunit;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -23,9 +23,9 @@ namespace Faolan.Tests
 	// the captured dead snapshot really has HealthCurrent==0, and the builder can produce that dead shape.
 	public class DeathSnapshotTests
 	{
-		private static readonly string CapturesDir = TestPaths.CapturesDir;
 		private const uint HealthCurrentStatId = 0x001B;
 		private const uint HealthMaxStatId = 0x0001;
+		private static readonly string CapturesDir = TestPaths.CapturesDir;
 
 		[Fact]
 		public void AliveLoginSnapshots_AllHaveNonZeroHealthCurrent()
@@ -33,9 +33,7 @@ namespace Faolan.Tests
 			// Every normal login snapshot carries full current health - the dead==0 signal is unambiguous.
 			foreach (var capture in new[]
 			{
-				"Strie_rogue-assassin_login.tshark.json",
-				"Stihetfv_soldier-conqueror_login.tshark.json",
-				"Fwfnwfjwk_soldier-guardian_login.tshark.json",
+				"Strie_rogue-assassin_login.tshark.json", "Stihetfv_soldier-conqueror_login.tshark.json", "Fwfnwfjwk_soldier-guardian_login.tshark.json",
 				"Faolanx_mage-necromancer_login.tshark.json"
 			})
 			{

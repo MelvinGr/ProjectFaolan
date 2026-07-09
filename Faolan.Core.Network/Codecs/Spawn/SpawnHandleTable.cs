@@ -26,14 +26,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public uint Allocate()
 		{
 			lock (_lock)
+			{
 				return _next++;
+			}
 		}
 
 		// True if a handle has been assigned to this key.
 		public bool Contains(string entityKey)
 		{
 			lock (_lock)
+			{
 				return _byKey.ContainsKey(entityKey);
+			}
 		}
 
 		// Returns the handle for the given entity key, allocating one on first use. Stable for the session.

@@ -20,15 +20,8 @@ namespace Faolan.Tests
 		public void Build_FromScratch_WithLiveStringEntry()
 		{
 			// Generate a screen with a live player-name parameter built from session data (no captured value).
-			var screen = new RemoteFormatXml.Screen("33600",
-				"50002",
-				"djaj!xgdVQpMtKta6Csp",
-				"0",
-				"0",
-				[
-					RemoteFormatXml.StringEntry("name", "Conan", "m"),
-					RemoteFormatXml.StringEntry("guildname", "Cimmerians")
-				]);
+			var screen = new RemoteFormatXml.Screen("33600", "50002", "djaj!xgdVQpMtKta6Csp", "0", "0",
+				[RemoteFormatXml.StringEntry("name", "Conan", "m"), RemoteFormatXml.StringEntry("guildname", "Cimmerians")]);
 
 			var xml = RemoteFormatXml.Build(screen);
 			Assert.Contains("string=&quot;Conan&quot; flags=&quot;m&quot;", xml);

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Attributes;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -9,8 +10,13 @@ namespace Faolan.Core.Database.Tables
 	// objective progress. The full accept/branch logic is the pinned RDB Lua quest VM (docs/archive/quests-and-combat.md).
 	public class CharacterQuest : BaseEntity
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
+
+		// The RDB quest id (e.g. 13479); the client renders the quest's text from this.
+		public uint QuestId { get; set; }
 
 		[ConstrainToEnumValues]
 		public QuestState State { get; set; } = QuestState.Active;
@@ -21,14 +27,9 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string GoalTargetName { get; set; }
 
-		public uint CharacterId { get; set; }
-
 		// Provisional single-objective progress (current/required). Multi-goal quests get richer modelling later.
 		public uint GoalProgress { get; set; }
 		public uint GoalRequired { get; set; }
-
-		// The RDB quest id (e.g. 13479); the client renders the quest's text from this.
-		public uint QuestId { get; set; }
 	}
 
 	public enum QuestState

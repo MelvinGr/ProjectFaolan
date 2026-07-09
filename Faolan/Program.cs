@@ -6,8 +6,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.AgentServer;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Extensions;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network.Server.AgentServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.CSPlayerAgent;
@@ -25,6 +27,14 @@ namespace Faolan
 {
 	public static class Program
 	{
+		public static byte[] LoadEmbeddedResource(string name)
+		{
+			using var stream = typeof(Program).Assembly.GetManifestResourceStream(name) ?? throw new InvalidOperationException($"embedded resource '{name}' not found");
+			using var buffer = new MemoryStream();
+			stream.CopyTo(buffer);
+			return buffer.ToArray();
+		}
+
 		[STAThread]
 		public static async Task Main(string[] args)
 		{
@@ -57,7 +67,8 @@ namespace Faolan
 			// Mirror the console log to a file. FAOLAN_LOG_FILE overrides the location (e.g. a mounted volume in a
 			// container); default is logs/<epoch>.log (epoch = process start, unix seconds) so each run is a
 			// distinct, retained file instead of overwriting one logs.txt every start (#282).
-			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ?? Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
+			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ??
+															   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
 
 			builder.Services.AddLogging();
 
@@ -94,24 +105,12 @@ namespace Faolan
 				if (realm == null)
 					throw new Exception("realm == null");
 
-				return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, realm.Port, agentServerDispatcher, gameServerDispatcher);
+				return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, realm.Port, agentServerDispatcher,
+					gameServerDispatcher);
 			});
-
-			// A single GameServer listener serves both the create-editor connection and the post-create world
-			// connection: the 0x2002 enter-world handoff (SendWorldHandoff) advertises this same port, so the
-			// client's fresh world connection lands back here. (Retail used a separate world port = creator + 1;
-			// since the handoff carries the address explicitly, the same port works and avoids a second listener.)
 
 			var host = builder.Build();
 			await host.RunAsync();
-		}
-
-		public static byte[] LoadEmbeddedResource(string name)
-		{
-			using var stream = typeof(Program).Assembly.GetManifestResourceStream(name) ?? throw new InvalidOperationException($"embedded resource '{name}' not found");
-			using var buffer = new MemoryStream();
-			stream.CopyTo(buffer);
-			return buffer.ToArray();
 		}
 	}
 }

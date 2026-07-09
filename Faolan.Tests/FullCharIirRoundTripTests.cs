@@ -9,9 +9,9 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
+using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Abstractions;
-using Faolan.Tests.Support;
 
 namespace Faolan.Tests
 {
@@ -62,20 +62,15 @@ namespace Faolan.Tests
 				Assert.False(decoded.ShouldSerializeFreeFeatRespecs(), $"{source}: unexpected free_feat_respecs");
 				Assert.False(decoded.ShouldSerializeFeatResets(), $"{source}: unexpected feat_resets");
 
-				var rebuilt = FullCharSnapshotBuilder.BuildRoot(decoded.CharacterTags,
-					decoded.ShouldSerializeExpansionFlags()
-						? decoded.ExpansionFlags
-						: null,
-					decoded.ShouldSerializeSubscriptionFlags()
-						? decoded.SubscriptionFlags
-						: null,
-					decoded.ShouldSerializeHasNewClaimItems()
-						? decoded.HasNewClaimItems
-						: null,
-					decoded.ShouldSerializeHasSpellbook()
-						? decoded.HasSpellbook
-						: null,
-					decoded.Inventories);
+				var rebuilt = FullCharSnapshotBuilder.BuildRoot(decoded.CharacterTags, decoded.ShouldSerializeExpansionFlags()
+					? decoded.ExpansionFlags
+					: null, decoded.ShouldSerializeSubscriptionFlags()
+					? decoded.SubscriptionFlags
+					: null, decoded.ShouldSerializeHasNewClaimItems()
+					? decoded.HasNewClaimItems
+					: null, decoded.ShouldSerializeHasSpellbook()
+					? decoded.HasSpellbook
+					: null, decoded.Inventories);
 
 				Assert.True(rootBytes.SequenceEqual(rebuilt.ToProtobuf()), $"{source}: BuildRoot did not reproduce the captured root ({rootBytes.Length} bytes)");
 				ok++;
@@ -129,11 +124,7 @@ namespace Faolan.Tests
 		// snapshot in the analyzer JSON captures.
 		private static IEnumerable<(string Source, byte[] Body)> SnapshotBodies()
 		{
-			foreach (var bin in new[]
-			{
-				"account-stricken997-character-Strie-login-randomActions-bigboy.bin",
-				"strie-login-inventory.bin"
-			})
+			foreach (var bin in new[] { "account-stricken997-character-Strie-login-randomActions-bigboy.bin", "strie-login-inventory.bin" })
 			{
 				var path = TestPaths.Asset(bin); // committed fixture - must exist (no silent skip)
 

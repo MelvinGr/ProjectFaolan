@@ -22,8 +22,15 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			foreach (var line in src.Split('\n'))
 			{
 				var em = EnumRe.Match(line);
-				if (em.Success) { currentEnum = em.Groups[1].Value; continue; }
-				if (currentEnum == null) continue;
+				if (em.Success)
+				{
+					currentEnum = em.Groups[1].Value;
+					continue;
+				}
+
+				if (currentEnum == null)
+					continue;
+
 				var mm = MemberRe.Match(line);
 				if (mm.Success)
 					map[(currentEnum, mm.Groups[1].Value)] = mm.Groups[2].Value;
@@ -37,8 +44,11 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		{
 			var map = new Dictionary<string, string>();
 			foreach (var ((e, m), note) in AllNotes())
+			{
 				if (e == enumName)
 					map[m] = note;
+			}
+
 			return map;
 		}
 	}

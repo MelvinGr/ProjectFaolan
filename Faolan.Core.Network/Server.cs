@@ -6,7 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Packets;
@@ -16,17 +16,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
-	public abstract class Server<TPacket, TPacketFactory, TMessageFramer> : BackgroundService where TPacket : Packet where TPacketFactory : IPacketFactory<TPacket>, new() where TMessageFramer : IMessageFramer, new()
+	public abstract class Server<TPacket, TPacketFactory, TMessageFramer> : BackgroundService
+		where TPacket : Packet where TPacketFactory : IPacketFactory<TPacket>, new() where TMessageFramer : IMessageFramer, new()
 	{
 		protected readonly IConfiguration Configuration;
 		protected readonly IDatabaseRepository Database;
 		protected readonly ILogger Logger;
+
 		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
 		private readonly IPacketLogger _outgoingPacketLogger;
 		private readonly TcpListener _tcpListener;
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
-
 		protected IEnumerable<INetworkClient> NetworkClients => _clients.Keys;
 
 		protected Server(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, IPacketLogger? outgoingPacketLogger = null)
@@ -138,6 +139,14 @@ namespace Faolan.Core.Network
 			return Task.CompletedTask;
 		}
 
+		// Called once after each recv batch's packets are all dispatched (see NetworkClient.ReceivedBatchComplete).
+		// Default no-op; the GameServer overrides it to fire the create-editor post-morph burst deterministically
+		// (#197) instead of the debounce timer. Other listeners are unaffected.
+		protected virtual Task ReceivedBatchComplete(INetworkClient client)
+		{
+			return Task.CompletedTask;
+		}
+
 		protected INetworkClient ClientForAccount(uint accountId)
 		{
 			return NetworkClients.FirstOrDefault(nc => nc.Session?.Account?.Id == accountId);
@@ -160,28 +169,9 @@ namespace Faolan.Core.Network
 				? opcode.ToString()
 				: "Unknown";
 
-			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
+			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
+				packet.Bytes?.Length ?? 0);
 			LogPacketBodyDebug($"=> [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
-		}
-
-		protected void LogPacketReceived(Packet packet, ushort opcode, string opcodeName = "Unknown")
-		{
-			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
-			LogPacketBodyDebug($"=> [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
-		}
-
-		protected void LogPacketReceived(Enum opcode)
-		{
-			var opcodeName = Enum.IsDefined(opcode.GetType(), opcode)
-				? opcode.ToString()
-				: "Unknown";
-
-			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})]", opcodeName, opcode.ToHex());
-		}
-
-		protected void LogPacketReceived(ushort opcode, string opcodeName = "Unknown")
-		{
-			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})]", opcodeName, opcode.ToHex());
 		}
 
 		protected void LogUnknownPacket(Packet packet, Enum opcode)
@@ -190,24 +180,18 @@ namespace Faolan.Core.Network
 				? opcode.ToString()
 				: "Unknown";
 
-			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
+			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
+				packet.Bytes?.Length ?? 0);
 			LogPacketBodyDebug($"Unhandled packet [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
 		}
 
 		protected void LogUnknownPacket(Packet packet, ushort opcode, string opcodeName = "Unknown")
 		{
-			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
+			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
+				packet.Bytes?.Length ?? 0);
 			LogPacketBodyDebug($"Unhandled packet [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, TPacket packet);
-
-		// Called once after each recv batch's packets are all dispatched (see NetworkClient.ReceivedBatchComplete).
-		// Default no-op; the GameServer overrides it to fire the create-editor post-morph burst deterministically
-		// (#197) instead of the debounce timer. Other listeners are unaffected.
-		protected virtual Task ReceivedBatchComplete(INetworkClient client)
-		{
-			return Task.CompletedTask;
-		}
 	}
 }

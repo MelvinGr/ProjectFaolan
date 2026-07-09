@@ -5,7 +5,7 @@ using Faolan.Core.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
-namespace Faolan.Core.Database
+namespace Faolan.Core.Database.Attributes
 {
 	// Marks an enum-typed entity property whose column must be constrained to the DEFINED values of its enum.
 	// DatabaseContext.OnModelCreating scans for this and emits a generated CHECK constraint - "<Column> IN (<enum

@@ -25,7 +25,8 @@ namespace Faolan.Core.Network.Codecs.Economy
 	{
 		// The captured item-name remoteformat (item 163118), already XML-escaped for embedding in a parameter value
 		// (note the double-escaped &amp;amp; in its key). The golden-test oracle and a sane default identity.
-		public const string CapturedItemNameEscaped = "&lt;remoteformat id=&quot;163118&quot; category=&quot;50200&quot; key=&quot;)tCcAdyb]L&amp;amp;Mn]6d[9EV&quot; knubot=&quot;0&quot;  &gt;&lt;/remoteformat&gt;";
+		public const string CapturedItemNameEscaped =
+			"&lt;remoteformat id=&quot;163118&quot; category=&quot;50200&quot; key=&quot;)tCcAdyb]L&amp;amp;Mn]6d[9EV&quot; knubot=&quot;0&quot;  &gt;&lt;/remoteformat&gt;";
 
 		// The price suffix: a leading space then the CurrencyTinSmall localized token (fixed RDB key, category 500),
 		// already in the XML-escaped form it takes inside a parameter value. Appended after the price number.

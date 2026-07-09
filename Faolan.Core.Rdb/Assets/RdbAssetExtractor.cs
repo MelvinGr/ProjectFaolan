@@ -30,7 +30,7 @@ namespace Faolan.Core.Rdb.Assets
 		// id -> the skeleton's bone names (built once from every local 1010002), to find rigs covering a mesh palette.
 		private static Dictionary<uint, HashSet<string>>? _skeletonNames;
 
-		private static readonly JsonSerializerOptions JsonOpts = new JsonSerializerOptions
+		private static readonly JsonSerializerOptions JsonOpts = new()
 		{
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -78,18 +78,15 @@ namespace Faolan.Core.Rdb.Assets
 		// texture (TexScript projecttexture) used as the eyeball mesh's diffuse. MonsterData lists [head, lashes, eyeball]
 		// but the order isn't guaranteed, so parts are identified by content: index 0 = head skin (largest), the eyeball
 		// is the OPAQUE small part (the lashes are an alpha cutout), and the iris goes there.
-		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyRenderMeshId, IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId, Tint? skinTint = null, Tint? hairTint = null,
-			uint? eyeTextureId = null, IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null, IReadOnlyList<uint>? equipmentMeshIndexIds = null, bool rig = false)
+		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyRenderMeshId, IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId, Tint? skinTint = null,
+			Tint? hairTint = null, uint? eyeTextureId = null, IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null, IReadOnlyList<uint>? equipmentMeshIndexIds = null,
+			bool rig = false)
 		{
 			// Static view uses the geometric morph here; the rig path reads the body un-morphed and applies the exact
 			// LBS morph (via the mesh skin weights + skeleton) once the skeleton is selected.
-			var body = ReadTexturedBody(rdb,
-				bodyRenderMeshId,
-				skinTint,
-				bodyDecals,
-				rig
-					? null
-					: morphs);
+			var body = ReadTexturedBody(rdb, bodyRenderMeshId, skinTint, bodyDecals, rig
+				? null
+				: morphs);
 			if (body == null)
 				return null;
 
@@ -169,7 +166,12 @@ namespace Faolan.Core.Rdb.Assets
 					for (var i = 0; i < all.Count; i++)
 					{
 						if (all[i] is { BlendBones: { } bbones, BlendWeights: { } bweights, BonePalette: { } bpal } s)
-							all[i] = s with { Positions = BodyMorphDeformer.ApplyLbs(s.Positions, bbones, bweights, bpal, boneWorld, m) };
+						{
+							all[i] = s with
+							{
+								Positions = BodyMorphDeformer.ApplyLbs(s.Positions, bbones, bweights, bpal, boneWorld, m)
+							};
+						}
 					}
 				}
 
@@ -285,7 +287,12 @@ namespace Faolan.Core.Rdb.Assets
 		public static object DescribeBodyUv(RdbReader rdb, uint bodyMeshIndexId)
 		{
 			if (!rdb.TryGet(MeshIndexFileType, bodyMeshIndexId, out var idx))
-				return new { found = false };
+			{
+				return new
+				{
+					found = false
+				};
+			}
 
 			var mesh = MeshIndexFile.Parse(bodyMeshIndexId, rdb.ReadDecompressed(idx));
 			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rm) || !rdb.CanRead(rm))
@@ -329,17 +336,9 @@ namespace Faolan.Core.Rdb.Assets
 				found = true,
 				submeshes = subs.Count,
 				leftXverts = lN,
-				leftU = new[]
-				{
-					lMinU,
-					lMaxU
-				},
+				leftU = new[] { lMinU, lMaxU },
 				rightXverts = rN,
-				rightU = new[]
-				{
-					rMinU,
-					rMaxU
-				},
+				rightU = new[] { rMinU, rMaxU },
 				uOverlap = overlap,
 				mirrored = overlap > 0.25f
 			};
@@ -377,12 +376,12 @@ namespace Faolan.Core.Rdb.Assets
 						textureRefs =
 						[
 							.. RenderMeshReader
-							.ReadHeaderTextureRefs(rdb.ReadDecompressed(rm))
-							.Select(r => (object)new
-							{
-								type = r.Type,
-								id = r.Id
-							})
+								.ReadHeaderTextureRefs(rdb.ReadDecompressed(rm))
+								.Select(r => (object)new
+								{
+									type = r.Type,
+									id = r.Id
+								})
 						];
 					}
 				}
@@ -452,18 +451,11 @@ namespace Faolan.Core.Rdb.Assets
 				}
 			}
 
-			var manifest = new Manifest(meshIndexId,
-				mesh.SourceFile,
-				mesh.Bounds?.ToString(),
-				renderMesh,
+			var manifest = new Manifest(meshIndexId, mesh.SourceFile, mesh.Bounds?.ToString(), renderMesh,
 				DescribeResource(rdb, 0, mesh.CollisionMeshId), // type unknown for collision; reported by id only
-				meshDump,
-				glb,
-				glb != null || glbVerts > 0
+				meshDump, glb, glb != null || glbVerts > 0
 					? new GeometryResult(glbVerts, glbTris)
-					: null,
-				mesh.Materials.Select(m => new MaterialResult(m.Name, m.Textures.Select(x => x.ToString()).ToList())).ToList(),
-				textures);
+					: null, mesh.Materials.Select(m => new MaterialResult(m.Name, m.Textures.Select(x => x.ToString()).ToList())).ToList(), textures);
 
 			if (outDir != null)
 				File.WriteAllText(Path.Combine(outDir, $"{meshIndexId}.manifest.json"), JsonSerializer.Serialize(manifest, JsonOpts));
@@ -475,11 +467,7 @@ namespace Faolan.Core.Rdb.Assets
 		public static uint? ItemDisplayMeshIndex(RdbReader rdb, uint itemId, uint[] key)
 		{
 			byte[]? template = null;
-			foreach (var type in new uint[]
-			{
-				1000020,
-				1000620
-			})
+			foreach (var type in new uint[] { 1000020, 1000620 })
 			{
 				if (rdb.TryGet(type, itemId, out var e) && e is { IsLocal: true, Size: > 0 })
 				{
@@ -999,29 +987,19 @@ namespace Faolan.Core.Rdb.Assets
 
 			if (type != 0 && rdb.TryGet(type, rid, out var e))
 			{
-				return new ResourceResult(rid,
-					type,
-					e.IsLocal
-						? "local"
-						: "cdn",
-					e.Size);
+				return new ResourceResult(rid, type, e.IsLocal
+					? "local"
+					: "cdn", e.Size);
 			}
 
 			// Collision (type unknown): probe the two known collision payload types so the report still says where it is.
-			foreach (var probe in new uint[]
-			{
-				1010034,
-				1000028
-			})
+			foreach (var probe in new uint[] { 1010034, 1000028 })
 			{
 				if (rdb.TryGet(probe, rid, out var ce))
 				{
-					return new ResourceResult(rid,
-						probe,
-						ce.IsLocal
-							? "local"
-							: "cdn",
-						ce.Size);
+					return new ResourceResult(rid, probe, ce.IsLocal
+						? "local"
+						: "cdn", ce.Size);
 				}
 			}
 
@@ -1217,7 +1195,8 @@ namespace Faolan.Core.Rdb.Assets
 		// manifest), with the skin tint and any projected body-tattoo decals baked in - the same texturing ReadTexturedModel
 		// does, but sourced from a RenderMesh id (the CHARACTERCREATOR body meshes are referenced this way, via
 		// ResolveBodyRenderMesh). Null if the RenderMesh is missing/non-local/empty.
-		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedBody(RdbReader rdb, uint renderMeshId, Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null, BodyMorphDeformer.Morphs? morphs = null)
+		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedBody(RdbReader rdb, uint renderMeshId, Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null,
+			BodyMorphDeformer.Morphs? morphs = null)
 		{
 			if (!rdb.TryGet(RenderMeshType, renderMeshId, out var rmEntry) || !rdb.CanRead(rmEntry))
 				return null;
@@ -1255,7 +1234,8 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each
 		// part (body skin, head) independently. Returns null when the mesh-index or its local geometry is missing.
-		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId, Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null, BodyMorphDeformer.Morphs? morphs = null)
+		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId, Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null,
+			BodyMorphDeformer.Morphs? morphs = null)
 		{
 			if (!rdb.TryGet(MeshIndexFileType, meshIndexId, out var idxEntry))
 				return null;
@@ -1297,6 +1277,7 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			if (rdb.TryGet(RenderMeshType, meshId, out var direct) && rdb.CanRead(direct))
 				return meshId;
+
 			if (rdb.TryGet(MeshIndexFileType, meshId, out var idx) && rdb.CanRead(idx))
 				return MeshIndexFile.Parse(meshId, rdb.ReadDecompressed(idx)).RenderMeshId;
 
@@ -1339,7 +1320,10 @@ namespace Faolan.Core.Rdb.Assets
 				p[i + 2] += dz;
 			}
 
-			return s with { Positions = p };
+			return s with
+			{
+				Positions = p
+			};
 		}
 
 		private static bool TryDecodeRgba(RdbReader rdb, uint type, uint id, out byte[] rgba, out int w, out int h)

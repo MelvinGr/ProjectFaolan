@@ -18,7 +18,10 @@ namespace Faolan.Core.Extensions
 			if (source == null)
 				return null;
 
-			return JsonSerializer.Serialize(source, new JsonSerializerOptions { WriteIndented = indented });
+			return JsonSerializer.Serialize(source, new JsonSerializerOptions
+			{
+				WriteIndented = indented
+			});
 		}
 
 		extension<TEnum>(TEnum value) where TEnum : struct, Enum

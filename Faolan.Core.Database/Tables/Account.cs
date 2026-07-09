@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,9 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(UserName), IsUnique = true)]
 	public class Account : BaseEntity
 	{
+		[NotMapped]
+		public ulong LongId => 0x0000271200000000u + Id; // As used by the client
+
 		public virtual ICollection<Character> Characters { get; set; }
 
 		[ConstrainToEnumValues]
@@ -50,9 +54,6 @@ namespace Faolan.Core.Database.Tables
 		// foreign key - it must hold the temp instance without a constraint violation (so db.SaveChanges
 		// works), and deleting a character must never cascade into deleting the account.
 		public uint ClientInstance { get; set; }
-
-		[NotMapped]
-		public ulong LongId => 0x0000271200000000u + Id; // As used by the client
 
 		/*public Account()
 		{

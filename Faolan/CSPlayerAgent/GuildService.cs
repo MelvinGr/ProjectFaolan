@@ -1,19 +1,18 @@
-using Faolan.Core.Network.Protobuf;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Guild;
-using Faolan.Core.Network.Packets;
-using Microsoft.Extensions.Logging;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Server.GameServer;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
@@ -41,13 +40,12 @@ namespace Faolan.CSPlayerAgent
 		private static readonly byte[] GuildCreatedTail = Convert.FromHexString(
 			"00000003f100000000000000000000000000000000000000000000000000000fc4000004100000081600000bea000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000373131310007a12800000000064ab1780000000009d5d338000000000000000001a93458");
 
-
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
 		// headers - those packets are not replies, so there is no incoming packet to echo.
-		private readonly ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)> _replyEndpoints = new ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)>();
+		private readonly ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)> _replyEndpoints = new();
 
-		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = new ConcurrentDictionary<uint, PendingGuildInvite>();
+		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = new();
 		private readonly Func<uint, INetworkClient> _clientForCharacter;
 		private readonly IDatabaseRepository _database;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
@@ -314,12 +312,9 @@ namespace Faolan.CSPlayerAgent
 
 			if (target == null || target.GuildId != null)
 			{
-				_logger.LogWarning("Guild invite to \"{Target}\" by {Inviter}: target {Reason}.",
-					targetLabel,
-					inviter.Name,
-					target == null
-						? "not found"
-						: "is already in a guild");
+				_logger.LogWarning("Guild invite to \"{Target}\" by {Inviter}: target {Reason}.", targetLabel, inviter.Name, target == null
+					? "not found"
+					: "is already in a guild");
 				return;
 			}
 
@@ -344,6 +339,13 @@ namespace Faolan.CSPlayerAgent
 		private bool IsCharacterOnline(uint characterId)
 		{
 			return _gameServerDispatcher.GetSessions().Any(s => s.CharacterId == characterId || s.ClientInstance == characterId);
+		}
+
+		private async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
+		{
+			var ps = new PacketStream().WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildCreated);
+			WriteGuildCreatedBody(ps, guild, creator, form, creator.MapId);
+			await ps.SendAsync(client);
 		}
 
 		// 0x203F full guild update - the packet that makes the client consider itself a guild member (guild
@@ -379,35 +381,6 @@ namespace Faolan.CSPlayerAgent
 			await ps.SendAsync(client);
 		}
 
-		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO
-		// RELOG (vs the 0x203F GuildUpdate, which only takes effect on the next login). Body decoded byte-exact
-		// (docs/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte tail].
-		// The header is the 0x203F head EXCEPT the post-cash byte carries the request's guild FORM (0x203F hardcodes
-		// 0x03). The creator is online (they just made it); `playfield` is their current map/playfield token.
-		internal static void WriteGuildCreatedBody(FaolanStream s, Guild guild, Character creator, byte form, uint playfield)
-		{
-			WriteGuildMemberRecord(s, creator, online: true, playfield: playfield, lastSeen: 0);
-			s
-				.WriteByte(CoreGuildStreamVersion)
-				.WriteUInt32(guild.Id)
-				.WriteByte(GuildGovernmentForm)
-				.WriteUInt64(guild.Cash)
-				.WriteByte(form)
-				.WriteUInt32(0)
-				.WriteByte(0x00)
-				.WriteString(guild.Name)
-				.WriteString(guild.Description ?? "")
-				.WriteString(guild.MessageOfTheDay ?? "")
-				.WriteArray(GuildCreatedTail);
-		}
-
-		private async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
-		{
-			var ps = new PacketStream().WriteHeader(sender, receiver, CSPlayerInterfaceDispatchOpcodes.DispatchGuildCreated);
-			WriteGuildCreatedBody(ps, guild, creator, form, creator.MapId);
-			await ps.SendAsync(client);
-		}
-
 		// 0x202F member joined: [member ID32][member record]. Retail fans this out to every online guild member
 		// (including the joiner, right after its 0x203F).
 		private Task SendGuildMemberJoined(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Character member)
@@ -425,13 +398,31 @@ namespace Faolan.CSPlayerAgent
 				? 0u
 				: (uint)member.LastConnection.Value.ToUnixTimeSeconds();
 
-			WriteGuildMemberRecord(s,
-				member,
-				online,
-				online
-					? member.MapId
-					: 0,
-				lastSeen);
+			WriteGuildMemberRecord(s, member, online, online
+				? member.MapId
+				: 0, lastSeen);
+		}
+
+		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO
+		// RELOG (vs the 0x203F GuildUpdate, which only takes effect on the next login). Body decoded byte-exact
+		// (docs/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte tail].
+		// The header is the 0x203F head EXCEPT the post-cash byte carries the request's guild FORM (0x203F hardcodes
+		// 0x03). The creator is online (they just made it); `playfield` is their current map/playfield token.
+		internal static void WriteGuildCreatedBody(FaolanStream s, Guild guild, Character creator, byte form, uint playfield)
+		{
+			WriteGuildMemberRecord(s, creator, true, playfield, 0);
+			s
+				.WriteByte(CoreGuildStreamVersion)
+				.WriteUInt32(guild.Id)
+				.WriteByte(GuildGovernmentForm)
+				.WriteUInt64(guild.Cash)
+				.WriteByte(form)
+				.WriteUInt32(0)
+				.WriteByte(0x00)
+				.WriteString(guild.Name)
+				.WriteString(guild.Description ?? "")
+				.WriteString(guild.MessageOfTheDay ?? "")
+				.WriteArray(GuildCreatedTail);
 		}
 
 		// 0x202A guild invite: [guild ID32][guildName s16][invitee ID32][inviterName s16]. Shows the client's

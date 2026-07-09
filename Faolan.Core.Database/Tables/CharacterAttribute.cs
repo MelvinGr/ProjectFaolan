@@ -10,13 +10,13 @@ namespace Faolan.Core.Database.Tables
 	// See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR" / [[CharacterSkill]].
 	public class CharacterAttribute : BaseEntity
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
 		// The entry's position in the wire table.
 		public int Sequence { get; set; }
-
-		public uint CharacterId { get; set; }
 
 		// The entry's index value carried IN the wire record (usually but not always ascending, 1-based). NOT a stat
 		// id despite the field's old name - the wire order is Sequence, this is the index written inside each entry.

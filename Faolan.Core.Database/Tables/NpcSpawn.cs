@@ -16,6 +16,20 @@ namespace Faolan.Core.Database.Tables
 	// accessors) is inherited from Base3DEntity, shared with the player Character and the world objects.
 	public class NpcSpawn : Base3DEntity
 	{
+		public uint? GuildId { get; set; }
+		public uint MapId { get; set; }
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
+
+		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
+		// on Npc now, reached via the Npc navigation. Nullable only for phantom rows with no resolvable type (none
+		// remain after the phantom-player scrub); a real spawn always has one.
+		public uint? NpcId { get; set; }
+
+		[ForeignKey(nameof(NpcId))]
+		public virtual Npc Npc { get; set; }
+
 		// The worn equipment (CharacterIIR f23) lifted from the captured spawn (#185) - empty for unarmed NPCs.
 		// When present, NpcSpawnBuilder rebuilds the spawn's inventory_entry list from these rows instead of the
 		// captured Data blob's (the NPC counterpart of the player's DB-sourced equipment, PlayerSpawnEquipment).
@@ -29,15 +43,9 @@ namespace Faolan.Core.Database.Tables
 		// keeping the captured blob's (the from-DB lift of the bald-fix's verbatim post-IIR, #243).
 		public virtual ICollection<NpcSpawnMorph> Morphs { get; set; } = new List<NpcSpawnMorph>();
 
-		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
-
-		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; }
-
 		public bool HasEquipment { get; set; }
+		public uint ApprenticeLevel { get; set; }
 		public uint CapturedHandle { get; set; }
-		public uint MapId { get; set; }
 
 		// Per-PLACEMENT stat values (#244), lifted from this spawn's capture, overriding the type-level Npc.StatCore
 		// when the spawn body is built. A spawn point carries its own LEVEL (the same template can be placed at a range
@@ -54,17 +62,15 @@ namespace Faolan.Core.Database.Tables
 		// sparse (set on a minority of types) and stay nullable = "unset on the wire, off the rebuilt body".
 		public uint HeadMesh { get; set; }
 		public uint Health { get; set; }
+		public uint Level { get; set; }
 		public uint Life { get; set; }
 		public uint Mana { get; set; }
 		public uint MaxMana { get; set; }
-		public uint Stamina { get; set; }
 		public uint MaxStamina { get; set; }
-		public uint Level { get; set; }
-		public uint ApprenticeLevel { get; set; }
 		public uint MonsterData { get; set; }
 		public uint MonsterScale { get; set; }
+		public uint Stamina { get; set; }
 		public uint VoiceSet { get; set; }
-		public uint? GuildId { get; set; }
 		public uint? HearingSkill { get; set; }
 		public uint? SightSkill { get; set; }
 		public uint? SmellingSkill { get; set; }
@@ -73,10 +79,5 @@ namespace Faolan.Core.Database.Tables
 		// (wire Health == wire Life for ~all creatures, both tracking the placement level). A few (e.g. Rocknose) fix
 		// wire Health to a distinct per-placement value; this captures it. Null = "wire Health == Life", use Life.
 		public uint? WireHealth { get; set; }
-
-		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
-		// on Npc now, reached via the Npc navigation. Nullable only for phantom rows with no resolvable type (none
-		// remain after the phantom-player scrub); a real spawn always has one.
-		public uint? NpcId { get; set; }
 	}
 }

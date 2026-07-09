@@ -10,8 +10,8 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer;
-using Xunit;
 using Faolan.Tests.Support;
+using Xunit;
 
 namespace Faolan.Tests
 {
@@ -23,7 +23,6 @@ namespace Faolan.Tests
 	// The old varint model (AdjustSnapshotPrefixRootLength) was byte-misaligned and corrupted this length on resize.
 	public class SnapshotBlobLengthTests
 	{
-
 		// The captured prefix's BE32 at offset 1 already equals field5Len + rootLen (the client's blob length), and
 		// the byte immediately after that many blob bytes is the 0x18 version — proven across both beach captures.
 		[Theory, InlineData("strie-login-inventory.bin", 686), InlineData("account-stricken997-character-Strie-login-randomActions-bigboy.bin", 681)]
@@ -48,7 +47,10 @@ namespace Faolan.Tests
 		{
 			var (prefix, verbatimRootLen, tails, instance, verbatimRoot) = SplitFull("strie-login-inventory.bin");
 
-			var equipped = new Dictionary<ulong, (Item, uint)> { { 0x12, (Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565), 1129664565) } };
+			var equipped = new Dictionary<ulong, (Item, uint)>
+			{
+				{ 0x12, (Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565), 1129664565) }
+			};
 			(Item, uint)? bagFirst = (Mk(3774542, 2515285418, 2815223308, 1368962356, 3023132244, 1347105359), 1347105359);
 			var rows = new[]
 			{
@@ -117,14 +119,7 @@ namespace Faolan.Tests
 		{
 			var (prefix, rootLen, _) = Split("strie-login-inventory.bin");
 
-			foreach (var newRoot in new[]
-			{
-				rootLen,
-				rootLen - 370,
-				65,
-				0,
-				rootLen + 2000
-			})
+			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
 			{
 				var p = GameServerListener.SetSnapshotBlobLength(prefix, newRoot);
 				Assert.Equal((uint)(prefix.Length - 5 + newRoot), BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));

@@ -46,12 +46,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildFromColumns_IsByteIdenticalToTheDataPath()
 		{
-			foreach (var recordHex in new[]
-			{
-				KnubotCodecTestData.AppendTextBody,
-				KnubotCodecTestData.AnswerListBody,
-				KnubotCodecTestData.CloseChatWindowBody
-			})
+			foreach (var recordHex in new[] { KnubotCodecTestData.AppendTextBody, KnubotCodecTestData.AnswerListBody, KnubotCodecTestData.CloseChatWindowBody })
 			{
 				var packet = WrapInPacket(Convert.FromHexString(recordHex));
 
@@ -166,11 +161,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TryConstructKnubotRecord_RebuildsAnswerListAndCloseChatWindow()
 		{
-			foreach (var recordHex in new[]
-			{
-				KnubotCodecTestData.AnswerListBody,
-				KnubotCodecTestData.CloseChatWindowBody
-			})
+			foreach (var recordHex in new[] { KnubotCodecTestData.AnswerListBody, KnubotCodecTestData.CloseChatWindowBody })
 			{
 				var record = Convert.FromHexString(recordHex);
 				var packet = WrapInPacket(record);

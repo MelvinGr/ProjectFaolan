@@ -20,12 +20,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Auction-house listings (0x2005 search results).";
 		public string Name => "listings";
@@ -43,13 +42,12 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert,
-				WriteMode.Overwrite
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
 
 		public string Description => "Cutscene stock-phrase subtitles ({stock_N}: 0x205E req -> 0x205D resp).";
 		public string Name => "stock-phrases";
@@ -68,12 +66,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Maps from MapChange packets (+ name sanitize).";
 		public string Name => "maps";
@@ -106,12 +103,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Spell ids from ApplySpell packets.";
 		public string Name => "spells";
@@ -129,12 +125,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["spells"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "DoT per-tick deltas from StatDamageIIR packets.";
 		public string Name => "dot-effects";
@@ -165,12 +160,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Ability grants (0x2052), incl. the rehomed slot seed.";
 		public string Name => "abilities";
@@ -202,12 +196,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Per-class spell access map (create 0x200A grants).";
 		public string Name => "class-spells";
@@ -226,7 +219,13 @@ namespace Faolan.Importer.Modules
 	{
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["class-spells"];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Upsert, WriteMode.Overwrite };
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
+
 		public string Description => "Pin create-granted spells to level 1, push other class level-1 rows above it.";
 		public string Name => "starter-spell-levels";
 
@@ -243,7 +242,12 @@ namespace Faolan.Importer.Modules
 	{
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Overwrite };
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Overwrite
+		};
+
 		public string Description => "NPC dialogue trees (per-capture condition-tagged, clean rebuild).";
 		public string Name => "conversations";
 
@@ -261,12 +265,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Wallet balances + hotbar slots from captures.";
 		public string Name => "character-state";
@@ -284,12 +287,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters", "spells"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Per-character learned spell sets (0x200A grants).";
 		public string Name => "learned-spells";
@@ -310,12 +312,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters", "abilities"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Per-character ability sets (0x2052) + combo books (ComboBookIIR).";
 		public string Name => "character-abilities";
@@ -342,12 +343,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters", "quests"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Per-character quest journals (QuestIIR/QuestGoal).";
 		public string Name => "character-quests";
@@ -367,12 +367,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters", "items"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Per-character bank contents (BankIIR, kind 105).";
 		public string Name => "character-bank";
@@ -394,12 +393,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Upsert,
-				WriteMode.Overwrite
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
 
 		public string Description => "NPC spawns/types/spells/patrol (burst-truth set, #266).";
 		public string Name => "npcs";
@@ -437,12 +435,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Static world objects (decor/containers/zones).";
 		public string Name => "world-objects";
@@ -461,7 +458,12 @@ namespace Faolan.Importer.Modules
 	{
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["items"];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Overwrite };
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Overwrite
+		};
+
 		public string Description => "Per-map loot pool from captured bag contents (#273).";
 		public string Name => "map-loot";
 
@@ -479,12 +481,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Quest definitions + beach/Casilda snapshot seeds.";
 		public string Name => "quests";
@@ -505,12 +506,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Summonable mount creatures (#27, opt-in).";
 		public string Name => "mounts";
@@ -533,12 +533,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Crafting recipes book (TradeskillReplyIIR 0x9062D559, opt-in).";
 		public string Name => "recipes";
@@ -558,12 +557,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Summonable pet creatures - type-level stat core (#307, opt-in).";
 		public string Name => "pets";

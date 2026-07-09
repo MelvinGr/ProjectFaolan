@@ -5,10 +5,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Codecs.Economy;
 
 namespace Faolan.Importer.Captures
 {
@@ -68,7 +68,10 @@ namespace Faolan.Importer.Captures
 				var shop = await db.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.VendorName == e.VendorName);
 				if (shop == null)
 				{
-					shop = new Shop { VendorName = e.VendorName };
+					shop = new Shop
+					{
+						VendorName = e.VendorName
+					};
 					db.Shops.Add(shop);
 					added++;
 				}
@@ -81,8 +84,7 @@ namespace Faolan.Importer.Captures
 
 				shop.MaxSize = e.MaxSize;
 				shop.Items = e
-					.Items
-					.Select(i => new ShopItem
+					.Items.Select(i => new ShopItem
 					{
 						Pos = i.Pos,
 						ItemTemplateId = i.Template,

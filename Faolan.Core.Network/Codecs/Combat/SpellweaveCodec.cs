@@ -31,7 +31,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The 0x7BD4 tail is constant across the captured burst.
 		public static byte[] BuildFireStage(uint caster, uint fireId)
 		{
-			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.StatIIR).WriteUInt32(EntityClass.Character).WriteUInt32(caster).WriteByte(0x01).WriteUInt32(fireId).WriteUInt32(0x00007BD4).ToArray();
+			return new FaolanStream()
+				.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(caster)
+				.WriteByte(0x01)
+				.WriteUInt32(fireId)
+				.WriteUInt32(0x00007BD4)
+				.ToArray();
 		}
 
 		// The reactive element list (CombatReactiveIIR 0x54C02089): declares to the client which weave elements the

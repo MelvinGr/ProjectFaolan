@@ -35,7 +35,7 @@ namespace Faolan.Core.Database.Tables
 		[NotMapped]
 		public Quaternion Rotation
 		{
-			get => new Quaternion(RotationX, RotationY, RotationZ, RotationW);
+			get => new(RotationX, RotationY, RotationZ, RotationW);
 			set
 			{
 				RotationX = value.X;
@@ -48,7 +48,7 @@ namespace Faolan.Core.Database.Tables
 		[NotMapped]
 		public Vector3 Position
 		{
-			get => new Vector3(PositionX, PositionY, PositionZ);
+			get => new(PositionX, PositionY, PositionZ);
 			set
 			{
 				PositionX = value.X;

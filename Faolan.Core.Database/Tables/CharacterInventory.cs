@@ -11,8 +11,12 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(Container), nameof(Slot))]
 	public class CharacterInventory
 	{
+		public uint CharacterId { get; set; }
+
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
+
+		public uint? ItemId { get; set; }
 
 		// The item definition in this slot (real p_items identity + Data1..4 visual quad). Null = empty slot.
 		[ForeignKey(nameof(ItemId))]
@@ -25,11 +29,7 @@ namespace Faolan.Core.Database.Tables
 		// Position within the container.
 		public int Slot { get; set; }
 
-		public uint CharacterId { get; set; }
-
 		// Stack size (1 for non-stackable gear).
 		public uint Count { get; set; } = 1;
-
-		public uint? ItemId { get; set; }
 	}
 }

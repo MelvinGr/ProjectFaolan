@@ -3,23 +3,23 @@
 <PageTitle>Project Faolan</PageTitle>
 
 <div class="landing">
-    <img class="crest-logo" src="logo.png" alt="Project Faolan"/>
-    <h1>Project Faolan</h1>
-    <p class="tag">An Age of Conan server emulator — explore characters, their gear, and 3D models.</p>
-    <div class="cta">
-        <AuthorizeView>
-            <Authorized>
-                <a class="btn primary" href="/characters">Open the viewer</a>
-                <a class="btn" href="/account">My account</a>
-                <form method="post" action="/auth/logout">
-                    <button class="btn ghost" type="submit">Log out (@context.User.Identity?.Name)</button>
-                </form>
-            </Authorized>
-            <NotAuthorized>
-                <a class="btn primary" href="/login">Log in</a>
-                <a class="btn" href="/register">Register</a>
-                <a class="btn ghost" href="/characters">Browse characters</a>
-            </NotAuthorized>
-        </AuthorizeView>
-    </div>
+	<img class="crest-logo" src="logo.png" alt="Project Faolan"/>
+	<h1>Project Faolan</h1>
+	<p class="tag">An Age of Conan server emulator — explore characters, their gear, and 3D models.</p>
+	<div class="cta">
+		<AuthorizeView>
+			<Authorized>
+				<a class="btn primary" href="/characters">Open the viewer</a>
+				<a class="btn" href="/account">My account</a>
+				<form method="post" action="/auth/logout">
+					<button class="btn ghost" type="submit">Log out (@context.User.Identity?.Name)</button>
+				</form>
+			</Authorized>
+			<NotAuthorized>
+				<a class="btn primary" href="/login">Log in</a>
+				<a class="btn" href="/register">Register</a>
+				<a class="btn ghost" href="/characters">Browse characters</a>
+			</NotAuthorized>
+		</AuthorizeView>
+	</div>
 </div>

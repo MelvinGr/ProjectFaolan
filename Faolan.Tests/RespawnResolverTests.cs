@@ -23,11 +23,7 @@ namespace Faolan.Tests
 		{
 			var beach = Point(1, 100, 0, true);
 			var nearButUnknown = Point(2, 1, 0); // closer, but NOT discovered
-			var points = new[]
-			{
-				beach,
-				nearButUnknown
-			};
+			var points = new[] { beach, nearButUnknown };
 
 			// Knows only the always-known beach -> respawns there despite the closer unknown point.
 			var target = RespawnResolver.ClosestKnown(new Vector3(0, 0, 0), points, new HashSet<uint>());
@@ -47,12 +43,11 @@ namespace Faolan.Tests
 		{
 			var beach = Point(1, 0, 0, true);
 			var nearDiscovered = Point(2, 10, 0);
-			var points = new[]
+			var points = new[] { beach, nearDiscovered };
+			var discovered = new HashSet<uint>
 			{
-				beach,
-				nearDiscovered
+				2
 			};
-			var discovered = new HashSet<uint> { 2 };
 
 			// Death at (12,0,0): the discovered point (id 2, dist 2) is closer than the beach (dist 12).
 			var target = RespawnResolver.ClosestKnown(new Vector3(12, 0, 0), points, discovered);

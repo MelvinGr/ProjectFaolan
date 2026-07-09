@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Importer.Captures;
 using Xunit;
-using Faolan.Core.Network.Codecs.Economy;
 
 namespace Faolan.Tests
 {
@@ -15,7 +15,8 @@ namespace Faolan.Tests
 		// The captured single-row search-results body (bytes after the 0x2005 opcode).
 		private const string CapturedBody = "000007e220d82b60902c95450c0457f300054a6f636b6f00000000000f4240000000010000755d000000000000000015" +
 		                                    "da16700000008008c5aab28189ec8aec201205080010a1081204081a1001120708820210c0843d12090889021085aa8c" +
-		                                    "d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" + "1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000";
+		                                    "d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" +
+		                                    "1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000";
 
 		[Fact]
 		public void Merge_DedupesBySaleId_LastWins()

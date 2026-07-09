@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Web.Services;
@@ -112,14 +116,7 @@ namespace Faolan.Web.Components.Pages
 
 		private string BuildPreviewUrl()
 		{
-			var tex = new[]
-			{
-				_eHairColor,
-				_eEyes,
-				_eSkin,
-				_eBodyTat,
-				_eFaceTat
-			}.Where(s => !string.IsNullOrEmpty(s));
+			var tex = new[] { _eHairColor, _eEyes, _eSkin, _eBodyTat, _eFaceTat }.Where(s => !string.IsNullOrEmpty(s));
 			var texJoined = string.Join(',', tex);
 			var hair = ParseRefId(_eHairStyle);
 			var head = _eHead; // already a head monsterdataid
@@ -257,17 +254,7 @@ namespace Faolan.Web.Components.Pages
 			if (_selected == null)
 				return;
 
-			var refs = new[]
-				{
-					_eHairStyle,
-					_eHairColor,
-					_eEyes,
-					_eSkin,
-					_eBodyTat,
-					_eFaceTat
-				}
-				.Where(s => !string.IsNullOrEmpty(s))
-				.ToList();
+			var refs = new[] { _eHairStyle, _eHairColor, _eEyes, _eSkin, _eBodyTat, _eFaceTat }.Where(s => !string.IsNullOrEmpty(s)).ToList();
 			// Persist HeadMesh in the stored editor-2x units (the editor works in monsterdataid = HeadMesh/2).
 			var spec = new CharacterModelService.AppearanceSpec(_eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg, _eHead * 2, refs);
 			_editStatus = Models.SaveAppearance(_selected.Id, spec)
@@ -309,11 +296,8 @@ namespace Faolan.Web.Components.Pages
 		private RenderFragment Slot(string slot, string extra = "")
 		{
 			return ItemSlot(_equipment.TryGetValue(slot, out var it)
-					? it
-					: null,
-				slot,
-				extra,
-				slot);
+				? it
+				: null, slot, extra, slot);
 		}
 
 		// Show/hide one equipped piece in the 3D render (per-slot paper-doll toggle). Keeps the camera so toggling doesn't

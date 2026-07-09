@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.GameServer.World;
-using Faolan.Importer.Extractors;
-using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
+using Faolan.Importer.Extractors;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
@@ -23,10 +23,16 @@ namespace Faolan.Importer.Captures
 		// Unique quest-NPC home FACING (#267): the burst-truth dedup can pick a session where she'd already turned, so
 		// her facing drifts from the chained-at-the-post pose. Pin Casilda's rotation to her create-dump FA015807
 		// transform (quaternion 0, 0.8661140, 0, -0.4998470) - the byte-exact facing she has while chained at x≈362.
-		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new Dictionary<string, Quaternion> { ["Casilda"] = new Quaternion(0f, 0.8661140203475952f, 0f, -0.4998469948768616f) };
+		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new()
+		{
+			["Casilda"] = new Quaternion(0f, 0.8661140203475952f, 0f, -0.4998469948768616f)
+		};
 
 		// Unique quest-NPC home positions (they move during their quest, so dedup must not strand them). #266
-		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new Dictionary<string, Vector3> { ["Casilda"] = new Vector3(361.64300537109375f, 153.34036254882813f, 717.66802978515625f) };
+		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new()
+		{
+			["Casilda"] = new Vector3(361.64300537109375f, 153.34036254882813f, 717.66802978515625f)
+		};
 
 		// Curated unique/no-random-drop item templates (#273). UNIQUE items are typed Normal and carry no wire-derivable
 		// "unique" flag (the RDB item-template property table has no decoded unique field, and SearchCategory mixes them
@@ -66,7 +72,8 @@ namespace Faolan.Importer.Captures
 		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
 		{
 			var perCap = captures
-				.Select(c => (All: DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets)), Burst: DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets)), Routes: PatrolPathExtractor.ExtractByHandle(c.Packets)))
+				.Select(c => (All: DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets)), Burst: DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets)),
+					Routes: PatrolPathExtractor.ExtractByHandle(c.Packets)))
 				.ToList();
 			var allMaps = perCap.SelectMany(p => p.All.Select(e => e.MapId)).Distinct().ToList();
 
@@ -103,7 +110,11 @@ namespace Faolan.Importer.Captures
 				burstNamesByMap[map] = burstSpawns.Select(e => e.Name ?? "").ToHashSet();
 			}
 
-			var nonBurstTypes = perCap.SelectMany(p => p.All).Select(e => (e.MapId, Name: e.Name ?? "")).Where(t => !(burstNamesByMap.TryGetValue(t.MapId, out var ns) && ns.Contains(t.Name))).Distinct();
+			var nonBurstTypes = perCap
+				.SelectMany(p => p.All)
+				.Select(e => (e.MapId, Name: e.Name ?? ""))
+				.Where(t => !(burstNamesByMap.TryGetValue(t.MapId, out var ns) && ns.Contains(t.Name)))
+				.Distinct();
 			foreach (var (map, name) in nonBurstTypes)
 			{
 				var best = perCap.OrderByDescending(p => p.All.Count(e => e.MapId == map && (e.Name ?? "") == name)).First();
@@ -143,7 +154,13 @@ namespace Faolan.Importer.Captures
 					}
 
 					if (e.Morphs.Count == 0 && morphsByName.TryGetValue(e.Name ?? "", out var backfillMorphs))
-						e = e with { Morphs = backfillMorphs };
+					{
+						e = e with
+						{
+							Morphs = backfillMorphs
+						};
+					}
+
 					if (equipByName.TryGetValue(e.Name ?? "", out var fullEquip) && fullEquip.Count > e.Equipment.Count)
 					{
 						e = e with
@@ -220,7 +237,10 @@ namespace Faolan.Importer.Captures
 
 			foreach (var e in spawns)
 			{
-				var existing = await db.NpcSpawns.Include(n => n.Morphs).Include(n => n.Equipment).FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
+				var existing = await db
+					.NpcSpawns.Include(n => n.Morphs)
+					.Include(n => n.Equipment)
+					.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
 
 				var row = existing ?? new NpcSpawn
 				{
@@ -281,7 +301,9 @@ namespace Faolan.Importer.Captures
 		{
 			foreach (var e in paths)
 			{
-				var existing = await db.PatrolPaths.Include(p => p.Waypoints).FirstOrDefaultAsync(p => p.MapId == e.MapId && p.PositionX == e.Position.X && p.PositionY == e.Position.Y && p.PositionZ == e.Position.Z);
+				var existing = await db
+					.PatrolPaths.Include(p => p.Waypoints)
+					.FirstOrDefaultAsync(p => p.MapId == e.MapId && p.PositionX == e.Position.X && p.PositionY == e.Position.Y && p.PositionZ == e.Position.Z);
 
 				if (existing == null)
 				{
@@ -373,13 +395,12 @@ namespace Faolan.Importer.Captures
 				if (existing == null)
 				{
 					db.WorldObjects.Add(PopulateObject(new WorldObject
-						{
-							MapId = e.MapId,
-							PositionX = e.X,
-							PositionY = e.Y,
-							PositionZ = e.Z
-						},
-						e));
+					{
+						MapId = e.MapId,
+						PositionX = e.X,
+						PositionY = e.Y,
+						PositionZ = e.Z
+					}, e));
 				}
 				else
 					PopulateObject(existing, e);
@@ -422,7 +443,9 @@ namespace Faolan.Importer.Captures
 				row.HearingSkill = core.HearingSkill;
 				row.SightSkill = core.SightSkill;
 				row.SmellingSkill = core.SmellingSkill;
-				row.WireHealth = core.Health != core.Life ? core.Health : null; // only when wire Health diverges from Life
+				row.WireHealth = core.Health != core.Life
+					? core.Health
+					: null; // only when wire Health diverges from Life
 			}
 
 			row.Morphs.Clear();
@@ -704,6 +727,7 @@ namespace Faolan.Importer.Captures
 			{
 				if (e.TemplateId == 0 || minimalRcByTemplate.ContainsKey(e.TemplateId))
 					continue;
+
 				var b = WorldObjectBuilder.ExtractBody(e.Data);
 				if (b != null && NpcSpawnScaffold.TryReadNoMorphRecordCount(b, out var rc))
 					minimalRcByTemplate[e.TemplateId] = rc;

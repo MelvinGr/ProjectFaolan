@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -31,7 +31,7 @@ namespace Faolan.GameServer.Combat
 
 		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
-		private readonly CombatState _combat = new CombatState();
+		private readonly CombatState _combat = new();
 
 		// The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
 		// it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
@@ -49,8 +49,8 @@ namespace Faolan.GameServer.Combat
 
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
-		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAddSpecialAbility = null,
-			Func<INetworkClient, uint, Task> learnSpell = null)
+		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
+			Func<INetworkClient, Ability, Task> announceAddSpecialAbility = null, Func<INetworkClient, uint, Task> learnSpell = null)
 		{
 			_sim = sim;
 			_database = database;
@@ -93,42 +93,6 @@ namespace Faolan.GameServer.Combat
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
-		}
-
-		// The generic "every behavior gets an echo-ack" reply (docs/combat.md rule 1) for an Interact request with no
-		// special result block - the air-swing path uses it, and so does a plain item-use (RightClickItem, e.g. the
-		// Totem of Origin #206). Phase = the request's Mode, or the legacy session counter when the caller didn't
-		// parse the args. No-op for a malformed (too-short) payload.
-		public static Task SendBehaviorEchoAck(INetworkClient client, byte[] rawPayload, uint mode)
-		{
-			if (rawPayload.Length < 26)
-				return Task.CompletedTask;
-
-			var instance = client.Session.Account.ClientInstance;
-			var phase = mode != 0
-				? mode
-				: (uint)(++client.Session.NormalAttackAckPhase);
-			return SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, phase));
-		}
-
-		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
-		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
-		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
-		// bar move. Byte-exact builder (CombatEffectBuilder), golden-tested vs the captured NPC->player hit. #274.
-		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
-		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, 2));
-		}
-
-		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
-		// prefix 0x65 + state = the destination equip slot for a move INTO a slot, prefix 0x68 + state 0 for a move
-		// OUT of one (combat capture frames 289-290/320-321/375-376).
-		public static async Task SendEquipMoveAck(INetworkClient client, byte[] rawPayload, uint mode, Item movedItem)
-		{
-			if (rawPayload.Length < 26)
-				return;
-
-			await SendWorldPacket(client, BehaviorAckBody.BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -189,7 +153,7 @@ namespace Faolan.GameServer.Combat
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 					.WriteUInt32(0x0000C350u)
@@ -236,40 +200,6 @@ namespace Faolan.GameServer.Combat
 			// 3) EnergyIIR - the player's stamina after the swing.
 			var player = GetOrAddPlayerVitals(client);
 			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
-		}
-
-		// Sends the NPC counter-attack ANIMATION ack to the player it hit: a BehaviorControlCenterIIR with actor = the
-		// NPC handle (the decoded "second BccAck", docs/combat.md), so the client plays the NPC's swing + the player's
-		// hit-react. Visual only - the authoritative HP move rides the world-tick StatUpdate, so the damage here is just
-		// the floating combat number. The animation/result params are capture-typical (not semantically decoded); the
-		// swingCounter increments per NPC swing to mirror the per-actor counter the capture carries.
-		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
-		{
-			var playerHandle = client.Session.Account.ClientInstance;
-			// args.f1 is the NormalAttack BEHAVIOR TypeId the client resolves to pick the swing animation - NOT an
-			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
-			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
-			// which played the player's hit-react + audio but left the NPC body un-animated.)
-			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(npcHandle, playerHandle, damage, 0xBEEC, swingCounter);
-			return SendWorldPacket(client, body);
-		}
-
-		// Sends a caster NPC's spell cast to the player it targets (#232): the ApplySpell (0x6B87E316) framed from the
-		// NPC handle (applyFrom = npc, applyTo = player), built from the NPC's NpcSpell row by NpcSpellCastBuilder -
-		// the construct-from-data counterpart of the melee SendNpcAttackAnimation. The HP move rides the caller's
-		// PushVitals; this is the cast packet/effect.
-		public static Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)
-		{
-			var playerHandle = client.Session.Account.ClientInstance;
-			var body = NpcSpellCastBuilder.Build(playerHandle, npcHandle, spell.SpellId, spell.Payload);
-			return SendWorldPacket(client, body);
-		}
-
-		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
-		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
-		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
-		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildStatDamage(targetHandle, statValue, delta, type, casterHandle, 1, spellBaseId));
 		}
 
 		// The unarmed swing (Interact action 0x11, empty main hand; behavior TypeIds 1089xx, ability id in the
@@ -381,14 +311,13 @@ namespace Faolan.GameServer.Combat
 		// not spawned via the burst (e.g. the built-NPC test).
 		private EntityVitals GetOrAddNpcVitals(INetworkClient client, uint targetHandle)
 		{
-			return _combat.GetOrAdd(targetHandle,
-				() =>
-				{
-					// NPCs spawned via the world burst get their real vitals from the simulation; this fallback only
-					// covers NPCs with no world entity (e.g. the built-NPC test), so a default max is correct.
-					var maxHealth = CombatResolver.DefaultNpcMaxHealth;
-					return EntityVitals.FromMax(maxHealth, 0, maxHealth);
-				});
+			return _combat.GetOrAdd(targetHandle, () =>
+			{
+				// NPCs spawned via the world burst get their real vitals from the simulation; this fallback only
+				// covers NPCs with no world entity (e.g. the built-NPC test), so a default max is correct.
+				var maxHealth = CombatResolver.DefaultNpcMaxHealth;
+				return EntityVitals.FromMax(maxHealth, 0, maxHealth);
+			});
 		}
 
 		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
@@ -415,12 +344,8 @@ namespace Faolan.GameServer.Combat
 
 				await AwardKillXp(killer, npcEntity.Level);
 
-				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.",
-					npcEntity.Name,
-					targetHandle,
-					cause,
-					WorldEntity.CorpseLingerSeconds,
-					npcEntity.NoRespawn
+				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.", npcEntity.Name, targetHandle, cause,
+					WorldEntity.CorpseLingerSeconds, npcEntity.NoRespawn
 						? "then fades (no respawn)"
 						: $"respawns in {npcEntity.RespawnDelaySeconds}s");
 				// Quest chain (#261): a kill advances/completes any matching kill goal. A chained stage (e.g. Casilda's
@@ -474,7 +399,11 @@ namespace Faolan.GameServer.Combat
 			vitals.Stamina = max.Stamina;
 			vitals.Mana = max.Mana;
 
-			var block = vitals.ToVitalsBlock().Set(CharacterStatId.Level, character.Level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+			var block = vitals
+				.ToVitalsBlock()
+				.Set(CharacterStatId.Level, character.Level)
+				.Set(CharacterStatId.Exp, character.Experience)
+				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 
 			// Level-gated ability unlocks (#209/#73): retail grants the abilities that unlock at the new level as
@@ -534,6 +463,76 @@ namespace Faolan.GameServer.Combat
 			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
 		}
 
+		// The generic "every behavior gets an echo-ack" reply (docs/combat.md rule 1) for an Interact request with no
+		// special result block - the air-swing path uses it, and so does a plain item-use (RightClickItem, e.g. the
+		// Totem of Origin #206). Phase = the request's Mode, or the legacy session counter when the caller didn't
+		// parse the args. No-op for a malformed (too-short) payload.
+		public static Task SendBehaviorEchoAck(INetworkClient client, byte[] rawPayload, uint mode)
+		{
+			if (rawPayload.Length < 26)
+				return Task.CompletedTask;
+
+			var instance = client.Session.Account.ClientInstance;
+			var phase = mode != 0
+				? mode
+				: (uint)(++client.Session.NormalAttackAckPhase);
+			return SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+		}
+
+		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
+		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
+		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
+		// bar move. Byte-exact builder (CombatEffectBuilder), golden-tested vs the captured NPC->player hit. #274.
+		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
+		{
+			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, 2));
+		}
+
+		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
+		// prefix 0x65 + state = the destination equip slot for a move INTO a slot, prefix 0x68 + state 0 for a move
+		// OUT of one (combat capture frames 289-290/320-321/375-376).
+		public static async Task SendEquipMoveAck(INetworkClient client, byte[] rawPayload, uint mode, Item movedItem)
+		{
+			if (rawPayload.Length < 26)
+				return;
+
+			await SendWorldPacket(client, BehaviorAckBody.BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
+		}
+
+		// Sends the NPC counter-attack ANIMATION ack to the player it hit: a BehaviorControlCenterIIR with actor = the
+		// NPC handle (the decoded "second BccAck", docs/combat.md), so the client plays the NPC's swing + the player's
+		// hit-react. Visual only - the authoritative HP move rides the world-tick StatUpdate, so the damage here is just
+		// the floating combat number. The animation/result params are capture-typical (not semantically decoded); the
+		// swingCounter increments per NPC swing to mirror the per-actor counter the capture carries.
+		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
+		{
+			var playerHandle = client.Session.Account.ClientInstance;
+			// args.f1 is the NormalAttack BEHAVIOR TypeId the client resolves to pick the swing animation - NOT an
+			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
+			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
+			// which played the player's hit-react + audio but left the NPC body un-animated.)
+			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(npcHandle, playerHandle, damage, 0xBEEC, swingCounter);
+			return SendWorldPacket(client, body);
+		}
+
+		// Sends a caster NPC's spell cast to the player it targets (#232): the ApplySpell (0x6B87E316) framed from the
+		// NPC handle (applyFrom = npc, applyTo = player), built from the NPC's NpcSpell row by NpcSpellCastBuilder -
+		// the construct-from-data counterpart of the melee SendNpcAttackAnimation. The HP move rides the caller's
+		// PushVitals; this is the cast packet/effect.
+		public static Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)
+		{
+			var playerHandle = client.Session.Account.ClientInstance;
+			var body = NpcSpellCastBuilder.Build(playerHandle, npcHandle, spell.SpellId, spell.Payload);
+			return SendWorldPacket(client, body);
+		}
+
+		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
+		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
+		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
+		{
+			return SendWorldPacket(client, CombatEffectBuilder.BuildStatDamage(targetHandle, statValue, delta, type, casterHandle, 1, spellBaseId));
+		}
+
 		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).
 		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
 		{
@@ -544,13 +543,19 @@ namespace Faolan.GameServer.Combat
 		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
 		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArray(feedbackBody).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArray(feedbackBody)
+				.SendAsync(client);
 		}
 
 		// Frames a raw 0x2000 body on the world conversation.
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(body)
+				.SendAsync(client);
 		}
 	}
 }

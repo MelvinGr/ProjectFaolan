@@ -37,13 +37,12 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert,
-				WriteMode.Overwrite
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
 
 		public string Description => "Read-only RDB resource-type inventory.";
 		public string Name => "rdb-inventory";
@@ -64,12 +63,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Morph-target registry from the RDB.";
 		public string Name => "rdb-morphs";
@@ -86,12 +84,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Character-creator appearance choices (per sex/race hair/colours/tattoos/heads + names) from the RDB.";
 		public string Name => "rdb-appearance";
@@ -108,12 +105,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Named spell records (cast time/name) from the RDB.";
 		public string Name => "rdb-spells";
@@ -131,12 +127,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => ["abilities"];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Ability names from the RDB 1000020 templates (TEA-decrypted with the 0x2052 key).";
 		public string Name => "rdb-abilities";
@@ -154,12 +149,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Combo catalog (name/level/featid/actions) from the RDB 1010206 plaintext XML.";
 		public string Name => "rdb-combos";
@@ -176,12 +170,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Map names + ids from the RDB playfield descriptions.";
 		public string Name => "rdb-maps";
@@ -198,12 +191,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "LuaArchive conversation/quest scripts from the RDB.";
 		public string Name => "rdb-lua";
@@ -222,12 +214,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Resurrection points (CDN-backed).";
 		public string Name => "rdb-respawns";
@@ -249,12 +240,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Decrypt keyed item RDB templates (names/categories/values).";
 		public string Name => "rdb-items";

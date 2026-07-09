@@ -18,8 +18,13 @@ namespace Faolan.Core.Database.Tables
 	// from Base3DEntity, shared with the player Character and the NPC spawns.
 	public class WorldObject : Base3DEntity
 	{
+		public uint MapId { get; set; }
+
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; }
+
+		public uint ObjectId { get; set; }
+		public uint? TemplateItemId { get; set; } // proto field 8 (present on ~25%)
 
 		public bool IsClosed { get; set; } // proto field 12
 
@@ -47,11 +52,8 @@ namespace Faolan.Core.Database.Tables
 		// keeps the rebuilt message byte-exact to the capture. Non-dynel object classes leave these null/default and
 		// keep using the Data slice. (Kdtree is always 0 on world dynels, emitted by the builder.)
 		public uint Kdtree { get; set; } // proto field 1 (nonzero on ~32% - a kd-tree node ref)
-		public uint MapId { get; set; }
-		public uint ObjectId { get; set; }
 		public uint SubOpcode { get; set; }
 		public uint? QuestItemEffect { get; set; } // proto field 6 (present on ~23%)
-		public uint? TemplateItemId { get; set; } // proto field 8 (present on ~25%)
 		public uint? WaypointType { get; set; } // proto field 7 (present on zone-label objects)
 	}
 }

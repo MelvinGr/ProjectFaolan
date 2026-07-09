@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -13,6 +14,8 @@ namespace Faolan.Core.Database.Tables
 	// harvested, client-validated hash); the live player name/guild are regenerated into it at send time.
 	public class ConversationPacket : BaseEntity
 	{
+		public uint ConversationNodeId { get; set; }
+
 		[ForeignKey(nameof(ConversationNodeId))]
 		public virtual ConversationNode Node { get; set; }
 
@@ -24,10 +27,8 @@ namespace Faolan.Core.Database.Tables
 
 		public int Sequence { get; set; }
 
-		[MaxLength(8192)]
+		[MaxLength(8192), Obsolete("Deserialize xml and store as columns, then build from scratch")]
 		public string ScreensJson { get; set; } // JSON array of the remoteformat XML screen(s); null for Open
-
-		public uint ConversationNodeId { get; set; }
 
 		// SetDialogueCamera (0x2015): the GameCharAgent sender instance (varies per conversation) + the 10 camera
 		// param bytes after the two endpoint handles. Body = [0xC350][npc][0xC350][player][CameraParams].

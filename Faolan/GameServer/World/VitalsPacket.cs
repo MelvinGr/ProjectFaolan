@@ -21,7 +21,7 @@ namespace Faolan.GameServer.World
 
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(StatUpdateCodec.BuildBody(handle, stats));
 			return ps.WriteLengthHash().ToArray();
 		}

@@ -9,8 +9,28 @@ namespace Faolan.Core.Database.Tables
 	// per-goal record byte-exact via QuestObjectiveGoal.BuildSingle.
 	public class QuestGoalDefinition : BaseEntity
 	{
+		public uint GoalId { get; set; }
+
+		public uint MapId { get; set; }
+
+		// The objective text (always a <remoteformat category=50304>).
+		public uint ObjectiveRefId { get; set; }
+
 		[ForeignKey(nameof(QuestDefinitionId))]
 		public virtual QuestDefinition Quest { get; set; }
+
+		public uint QuestDefinitionId { get; set; }
+
+		// For a LootFromNpc goal: the quest item (the "key") the TargetName NPC's corpse bag must contain, as an
+		// Items.Id (#261). 0 = no specific item (the goal still completes on looting the bag - it matches on the source
+		// NPC, not contents). When set, the bag-drop guarantees this item so the player can actually SEE and take the key
+		// (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's key item drops the same way.
+		public uint QuestItemId { get; set; }
+
+		public uint SubId { get; set; } // the trailing record's id echoed in the header (= TrailingRefId)
+
+		// The trailing text record: a <remoteformat category=51200> or a <localized category=51000 flags=..>.
+		public uint TrailingRefId { get; set; }
 
 		public bool TrailingLocalized { get; set; }
 
@@ -46,23 +66,9 @@ namespace Faolan.Core.Database.Tables
 		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.
 		public uint Extra5 { get; set; }
 		public uint Extra6 { get; set; }
-
-		public uint GoalId { get; set; }
-		public uint MapId { get; set; }
 		public uint MarkerX { get; set; }
 		public uint MarkerY { get; set; }
 		public uint ObjectiveCategory { get; set; }
-
-		// The objective text (always a <remoteformat category=50304>).
-		public uint ObjectiveRefId { get; set; }
-
-		public uint QuestDefinitionId { get; set; }
-
-		// For a LootFromNpc goal: the quest item (the "key") the TargetName NPC's corpse bag must contain, as an
-		// Items.Id (#261). 0 = no specific item (the goal still completes on looting the bag - it matches on the source
-		// NPC, not contents). When set, the bag-drop guarantees this item so the player can actually SEE and take the key
-		// (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's key item drops the same way.
-		public uint QuestItemId { get; set; }
 
 		// The goal's required amount - how many kills/collects/etc. complete it. Decoded from the QuestFullUpdate /
 		// snapshot @609 goal record (the word after goalIdRepeat; values 1/3/4/8/12/64 seen on the wire, #47). 0 = not
@@ -71,10 +77,6 @@ namespace Faolan.Core.Database.Tables
 
 		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
-		public uint SubId { get; set; } // the trailing record's id echoed in the header (= TrailingRefId)
 		public uint TrailingCategory { get; set; }
-
-		// The trailing text record: a <remoteformat category=51200> or a <localized category=51000 flags=..>.
-		public uint TrailingRefId { get; set; }
 	}
 }

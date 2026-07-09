@@ -25,15 +25,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			new Slider("CheekLow", 0x00, 6, b => b.CheekHeight, (b, v) => b.CheekHeight = v), new Slider("CheekWide", 0x00, 8, b => b.CheekWidth, (b, v) => b.CheekWidth = v),
 			new Slider("ChinShort", 0x00, 9, b => b.ChinLength, (b, v) => b.ChinLength = v), new Slider("ChinWide", 0x00, 12, b => b.ChinWidth, (b, v) => b.ChinWidth = v),
 			new Slider("EarsAngle", 0x00, 13, b => b.EarAngle, (b, v) => b.EarAngle = v), new Slider("EyeAngle1", 0x00, 14, b => b.EyesAngle, (b, v) => b.EyesAngle = v),
-			new Slider("EyesHigh", 0x00, 16, b => b.EyesVerticalPos, (b, v) => b.EyesVerticalPos = v), new Slider("EyesNarrow", 0x00, 19, b => b.EyesHorizontalPos, (b, v) => b.EyesHorizontalPos = v),
-			new Slider("EyesBack", 0x00, 20, b => b.EyesDepth, (b, v) => b.EyesDepth = v), new Slider("JawNarrow", 0x00, 22, b => b.JawWidth, (b, v) => b.JawWidth = v),
-			new Slider("FaceLenght", 0x00, 24, b => b.FaceLength, (b, v) => b.FaceLength = v), new Slider("MouthLow", 0x00, 26, b => b.MouthVerticalPos, (b, v) => b.MouthVerticalPos = v),
-			new Slider("MouthNarrow", 0x00, 28, b => b.MouthWidth, (b, v) => b.MouthWidth = v), new Slider("NoseAngleDown", 0x00, 30, b => b.NoseAngle, (b, v) => b.NoseAngle = v),
-			new Slider("NoseAngle1", 0x00, 31, b => b.NoseCurve, (b, v) => b.NoseCurve = v), new Slider("NoseCrookedRight", 0x00, 33, b => b.CrookedNose, (b, v) => b.CrookedNose = v),
-			new Slider("NoseLenght", 0x00, 35, b => b.NoseLength, (b, v) => b.NoseLength = v), new Slider("NoseWide", 0x00, 36, b => b.NoseWidth, (b, v) => b.NoseWidth = v),
-			new Slider("arm", 0x01, 0, b => b.Arm, (b, v) => b.Arm = v), new Slider("arse", 0x01, 4, b => b.Arse, (b, v) => b.Arse = v), new Slider("bosom", 0x01, 2, b => b.Bosom, (b, v) => b.Bosom = v),
-			new Slider("chest", 0x01, 1, b => b.Chest, (b, v) => b.Chest = v), new Slider("ears", 0x00, 0xFF, b => b.Ears, (b, v) => b.Ears = v), new Slider("leg", 0x01, 6, b => b.Leg, (b, v) => b.Leg = v),
-			new Slider("stomach", 0x01, 3, b => b.Stomach, (b, v) => b.Stomach = v), new Slider("thigh", 0x01, 5, b => b.Thigh, (b, v) => b.Thigh = v)
+			new Slider("EyesHigh", 0x00, 16, b => b.EyesVerticalPos, (b, v) => b.EyesVerticalPos = v),
+			new Slider("EyesNarrow", 0x00, 19, b => b.EyesHorizontalPos, (b, v) => b.EyesHorizontalPos = v), new Slider("EyesBack", 0x00, 20, b => b.EyesDepth, (b, v) => b.EyesDepth = v),
+			new Slider("JawNarrow", 0x00, 22, b => b.JawWidth, (b, v) => b.JawWidth = v), new Slider("FaceLenght", 0x00, 24, b => b.FaceLength, (b, v) => b.FaceLength = v),
+			new Slider("MouthLow", 0x00, 26, b => b.MouthVerticalPos, (b, v) => b.MouthVerticalPos = v), new Slider("MouthNarrow", 0x00, 28, b => b.MouthWidth, (b, v) => b.MouthWidth = v),
+			new Slider("NoseAngleDown", 0x00, 30, b => b.NoseAngle, (b, v) => b.NoseAngle = v), new Slider("NoseAngle1", 0x00, 31, b => b.NoseCurve, (b, v) => b.NoseCurve = v),
+			new Slider("NoseCrookedRight", 0x00, 33, b => b.CrookedNose, (b, v) => b.CrookedNose = v), new Slider("NoseLenght", 0x00, 35, b => b.NoseLength, (b, v) => b.NoseLength = v),
+			new Slider("NoseWide", 0x00, 36, b => b.NoseWidth, (b, v) => b.NoseWidth = v), new Slider("arm", 0x01, 0, b => b.Arm, (b, v) => b.Arm = v),
+			new Slider("arse", 0x01, 4, b => b.Arse, (b, v) => b.Arse = v), new Slider("bosom", 0x01, 2, b => b.Bosom, (b, v) => b.Bosom = v),
+			new Slider("chest", 0x01, 1, b => b.Chest, (b, v) => b.Chest = v), new Slider("ears", 0x00, 0xFF, b => b.Ears, (b, v) => b.Ears = v),
+			new Slider("leg", 0x01, 6, b => b.Leg, (b, v) => b.Leg = v), new Slider("stomach", 0x01, 3, b => b.Stomach, (b, v) => b.Stomach = v),
+			new Slider("thigh", 0x01, 5, b => b.Thigh, (b, v) => b.Thigh = v)
 		];
 
 		// Generates the spawn-scaffold morph entries for the body's non-default sliders, indexed from

@@ -15,14 +15,12 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Session;
-using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-
 		private async Task Handle0X2000(INetworkClient client, ConanPacket packet)
 		{
 			// Snapshot the entire 0x2000 sub-payload before consuming it, so every
@@ -33,9 +31,13 @@ namespace Faolan.GameServer
 			var pbLength = packet.Body.ReadUInt32();
 			var pbOpcode = packet.Body.ReadUInt32<GameServer0X2000Opcodes>();
 
-			Logger.LogInformation("GameServer 0x2000 subopcode {SubOpcodeName} ({SubOpcodeHex}), payloadLength={PayloadLength}, rawLength={RawLength}", pbOpcode, pbOpcode.ToHex(), pbLength, rawPayload.Length);
+			Logger.LogInformation("GameServer 0x2000 subopcode {SubOpcodeName} ({SubOpcodeHex}), payloadLength={PayloadLength}, rawLength={RawLength}", pbOpcode, pbOpcode.ToHex(), pbLength,
+				rawPayload.Length);
 			if (Logger.IsEnabled(LogLevel.Debug))
-				Logger.LogDebug("GameServer 0x2000 raw payload for {SubOpcodeName} ({SubOpcodeHex}) ({RawLength} bytes): {RawPayload}", pbOpcode, pbOpcode.ToHex(), rawPayload.Length, rawPayload.ToHex());
+			{
+				Logger.LogDebug("GameServer 0x2000 raw payload for {SubOpcodeName} ({SubOpcodeHex}) ({RawLength} bytes): {RawPayload}", pbOpcode, pbOpcode.ToHex(), rawPayload.Length,
+					rawPayload.ToHex());
+			}
 
 			// During the create-editor handshake the client echoes its own instance id as the 0x2000 subopcode.
 			// Retail used a fixed id (0x021662C8, or Strie's 0x02165EFF); we hand out the character's real id, so
@@ -77,7 +79,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.QueuePetCommand:
+				case (GameServer0X2000Opcodes)GameCharAgentOpcodes.QueuePetCommand: // TODO: dont think this should be here? client check if HandleGameCharAgentPacket receives 0x205B
 				{
 					await HandlePetCommand(client, packet);
 					break;
@@ -107,7 +109,8 @@ namespace Faolan.GameServer
 							if (sessionCharacter == null)
 							{
 								Logger.LogWarning(
-									"Ignoring movement packet {MovingType} because no resolved character is attached to the GameServer session yet. dataobjdec=0x{DataObject:X}, dataclientinst=0x{DataClientInstance:X}.", 									movingType, 									dataobjdec, 									dataclientinst);
+									"Ignoring movement packet {MovingType} because no resolved character is attached to the GameServer session yet. dataobjdec=0x{DataObject:X}, dataclientinst=0x{DataClientInstance:X}.",
+									movingType, dataobjdec, dataclientinst);
 								break;
 							}
 
@@ -149,7 +152,7 @@ namespace Faolan.GameServer
 							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
 							// nearby players is the next step.
 							await new PacketStream()
-								.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+								.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 								.WriteArrayUInt32Length(s => s
 									.WriteUInt32(pbOpcode)
 									.WriteUInt32(dataobjdec)
@@ -247,9 +250,9 @@ namespace Faolan.GameServer
 						await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 						var drawn = _broadcaster.TogglePlayerCombatStance(client);
 						await _broadcaster.BroadcastPlayerCombatMode(client, drawn);
-						Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}", 							drawn
-								? "drawn"
-								: "sheathed", 							args);
+						Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}", drawn
+							? "drawn"
+							: "sheathed", args);
 					}
 					else
 					{
@@ -284,9 +287,9 @@ namespace Faolan.GameServer
 								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
 								var playerEntity = PlayerWorldEntity(client);
 								var dismounting = playerEntity?.IsMounted ?? false;
-								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", 									from, 									mount.CreatureName, 									dismounting
-										? "dismount"
-										: "mount", 									args);
+								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
+									? "dismount"
+									: "mount", args);
 
 								var self = client.Session.Account.ClientInstance;
 								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode); // cast begin: bar + animation
@@ -314,27 +317,28 @@ namespace Faolan.GameServer
 								}
 
 								var mountCastPayload = (byte[])rawPayload.Clone();
-								Task.RunAfter(MountCatalog.SummonChannelMs, 									async () => // horse runs up during the channel, then mount
+								Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
+								{
+									if (client.Session?.Account == null)
+										return;
+
+									if (mountCastPayload.Length > 17)
 									{
-										if (client.Session?.Account == null)
-											return;
+										mountCastPayload[16] = 0x00;
+										mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
+									}
 
-										if (mountCastPayload.Length > 17)
-										{
-											mountCastPayload[16] = 0x00;
-											mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
-										}
-
-										await CombatService.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
-										await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
-										var mountStats = new CharacterStatBlock
-										{
-											[CharacterStatId.Mount] = mount.RideStat, 											[CharacterStatId.MountSpeed] = 100
-										}; // the mount StatUpd (frame 520)
-										await SendStatUpdate(client, mountStats, self);
-										if (playerEntity != null)
-											playerEntity.IsMounted = true;
-									}, 									Logger);
+									await CombatService.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
+									await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat (#26)
+									var mountStats = new CharacterStatBlock
+									{
+										[CharacterStatId.Mount] = mount.RideStat,
+										[CharacterStatId.MountSpeed] = 100
+									}; // the mount StatUpd (frame 520)
+									await SendStatUpdate(client, mountStats, self);
+									if (playerEntity != null)
+										playerEntity.IsMounted = true;
+								}, Logger);
 
 								break;
 							}
@@ -385,11 +389,11 @@ namespace Faolan.GameServer
 									await Resolve();
 								else
 								{
-									Task.RunAfter(castMs, 										async () => // resolve the effect after the cast time (#236)
-										{
-											if (client.Session?.Account != null)
-												await Resolve();
-										}, 										Logger);
+									Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
+									{
+										if (client.Session?.Account != null)
+											await Resolve();
+									}, Logger);
 								}
 
 								break;
@@ -418,15 +422,15 @@ namespace Faolan.GameServer
 									if (PetSummonCatalog.ForSpell(spellId) is { } petSummon)
 									{
 										var pet = await SummonPetForPlayer(client, petSummon.PetTemplate, petSummon.Combat);
-										Logger.LogInformation("CastSpell 0x{Spell:X} pet-summon '{Template}' -> {Result}.", 											spellId, 											petSummon.PetTemplate, 											pet != null
-												? $"0x{pet.Handle:X8}"
-												: "no spawnable template (pet-creature import needed)");
+										Logger.LogInformation("CastSpell 0x{Spell:X} pet-summon '{Template}' -> {Result}.", spellId, petSummon.PetTemplate, pet != null
+											? $"0x{pet.Handle:X8}"
+											: "no spawnable template (pet-creature import needed)");
 										return;
 									}
 
-									await ApplySpell(client, 										casterHandle, 										targetHandle == 0
-											? casterHandle
-											: targetHandle, 										spellId);
+									await ApplySpell(client, casterHandle, targetHandle == 0
+										? casterHandle
+										: targetHandle, spellId);
 									await _combat.SpendCasterMana(client, spellId);
 									if (targetHandle != 0 && targetHandle != casterHandle)
 										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
@@ -485,9 +489,8 @@ namespace Faolan.GameServer
 								// falls through to normal conversation below - do NOT break here, or the greeting is swallowed
 								// and dialogue never opens. (A vendor whose shop simply isn't imported yet is indistinguishable
 								// from a non-vendor here - both yield a null shop - so it too falls through to conversation.)
-								if (npcHandle != 0 && args.Field3 == 0
-									&& client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var vendorNpcName)
-									&& await Database.GetShopByVendorName(vendorNpcName) is { } vendorShop)
+								if (npcHandle != 0 && args.Field3 == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var vendorNpcName) &&
+								    await Database.GetShopByVendorName(vendorNpcName) is { } vendorShop)
 								{
 									await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
 									break;
@@ -514,7 +517,8 @@ namespace Faolan.GameServer
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
 										? rn
 										: "<unmapped handle>";
-									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", 										npcHandle, 										routedName, 										args.TypeId, 										args.Mode, 										args.Field3);
+									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.",
+										npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
 									await ConversationService.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
 								}
 
@@ -551,7 +555,8 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
 										await CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, movedItem);
-										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
+										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
+											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
 									}
@@ -571,7 +576,8 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack with null identity + a 0x201C entry
 										// (prefix 0x68, state 0). Capture frames 320-321.
 										await CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, null);
-										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
+										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
+											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
 									}
@@ -846,7 +852,8 @@ namespace Faolan.GameServer
 					if (resolvedCharacter?.Id != clientInstance)
 					{
 						Logger.LogInformation(
-							"GameServer Hello: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8} while preserving the retail temporary instance for create-flow traffic.", 							clientInstance, 							resolvedCharacter?.Id ?? 0, 							accountId);
+							"GameServer Hello: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8} while preserving the retail temporary instance for create-flow traffic.",
+							clientInstance, resolvedCharacter?.Id ?? 0, accountId);
 					}
 
 					Logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
@@ -889,7 +896,7 @@ namespace Faolan.GameServer
 							: WorldFraming.Sender;
 						var authReceiver = isNewCharacter
 							? CreateFlowService.Receiver(client)
-							: WorldFraming.Receiver(client);
+							: client.Endpoint(Endpoints.GameInterfaceType);
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
@@ -912,7 +919,9 @@ namespace Faolan.GameServer
 						// never went through CreateCharacter), so the live SpawnPlayer uses the right position.
 						var spawnRows = await Database.SetCreationSpawn(client.Session.Character);
 						Logger.LogInformation(
-							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.", 							clientInstance, 							client.Session.Character.Id, 							client.Session.Character.Name, 							spawnRows, 							client.Session.Character.PositionX, 							client.Session.Character.PositionY, 							client.Session.Character.PositionZ, 							client.Session.Character.MapId);
+							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
+							clientInstance, client.Session.Character.Id, client.Session.Character.Name, spawnRows, client.Session.Character.PositionX, client.Session.Character.PositionY,
+							client.Session.Character.PositionZ, client.Session.Character.MapId);
 						// #234 reconstruct (docs/archive/handoff-2026-06-22-create-flow-reconstruct.md): the verbatim
 						// SendCreateWorldSceneBurst delivers the captured `hoxxling` world (wrong char) -> after the
 						// cutscene the client drops the connection and the reconnect hangs. Send the PROVEN burst-less
@@ -943,7 +952,8 @@ namespace Faolan.GameServer
 						{
 							client.Session.HasPendingPost205FFollowUp = true;
 							Logger.LogInformation(
-								"Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).", 								clientInstance);
+								"Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).",
+								clientInstance);
 						}
 					}
 
@@ -1048,7 +1058,8 @@ namespace Faolan.GameServer
 					}
 
 					client.Session.HasPendingPost205FFollowUp = true;
-					Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0, characterId, characterId);
+					Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0,
+						characterId, characterId);
 
 					break;
 				}
@@ -1079,7 +1090,8 @@ namespace Faolan.GameServer
 							await SendSpawnCheckResponse(client, requestId);
 
 						Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
-						Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", 							ack0, 							requestId, 							ack1, 							characterId, 							client.Session.HasPendingPost205FFollowUp);
+						Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId,
+							ack1, characterId, client.Session.HasPendingPost205FFollowUp);
 						await FlushPendingPost205FFollowUp(client);
 						packet.Body.Position = 0;
 					}

@@ -1,15 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <OutputType>Library</OutputType>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    </PropertyGroup>
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
-    </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+	</ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="SkiaSharp" Version="4.148.0"/>
-        <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0" Condition="$([MSBuild]::IsOSPlatform('Linux'))"/>
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="SkiaSharp" Version="4.150.0" />
+		<PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.150.0" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+	</ItemGroup>
 </Project>

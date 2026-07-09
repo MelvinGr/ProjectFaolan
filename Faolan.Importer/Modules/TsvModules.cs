@@ -15,12 +15,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Spell levels from the ellatha scrape (ellatha_spells.tsv).";
 		public string Name => "ellatha-levels";
@@ -42,12 +41,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Class<->spell access map from the AoC fandom wiki (aoc_wiki_class_spells.tsv).";
 		public string Name => "wiki-class-spells";
@@ -69,12 +67,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Spell base levels from the AoC fandom wiki (aoc_wiki_spell_levels.tsv).";
 		public string Name => "wiki-spell-levels";
@@ -96,12 +93,11 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Insert,
-				WriteMode.Upsert
-			};
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
 
 		public string Description => "Combo level+cooldown from the ellatha scrape (ellatha_combos.tsv).";
 		public string Name => "ellatha-combos";

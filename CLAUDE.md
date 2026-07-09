@@ -25,12 +25,10 @@ dotnet test Faolan.Tests --filter "FullyQualifiedName~Shop" # by substring
 
 # Run the server (cwd MUST be the repo root: Program.cs loads faolan.json + faolan.db from the CWD,
 # and both live at the repo root). Running from bin/Debug fails with "faolan.json not found".
-dotnet Faolan/bin/Debug/Faolan.dll
+dotnet run --project Faolan
 
 # Drive the retail client unattended against the local server (auto-login -> world)
 dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>
-# On client failures grab AgeOfConan.log (look for: stream bad, Dispatcher call ... failed,
-# invalid camera path, does not exist in any RDB). Restore `git checkout -- faolan.db` after runs.
 
 # Rebuild DB content from captures. The importer is MODULE-BASED (docs/importer-plan.md): each subsystem
 # is a selectable module; `--dry-run` writes nothing (runs in a rolled-back txn, prints the per-table delta).
@@ -44,7 +42,6 @@ dotnet run --project Faolan.Importer -- --report burst-coverage       # read-onl
 
 # Wireshark plugin: full Conan+chat dissection (auto-follows the session from port 7010);
 # build+install once, then open captures in Wireshark (filter: faolan) or dump to JSON.
-# (The old C# Faolan.PacketAnalyzer + its --dump CLI were retired in #82 - tshark is the only source now.)
 cmake -S Faolan.Wireshark -B Faolan.Wireshark/build && cmake --build Faolan.Wireshark/build -j \
   && cmake --build Faolan.Wireshark/build --target install-faolan-plugin
 Captures/scripts/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshark.json the importer reads:
@@ -52,8 +49,6 @@ Captures/scripts/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.ts
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
 # EF migrations (context lives in Faolan.Core.Database, migrations in Faolan/Migrations).
-# The 130 historical migrations were SQUASHED into a single InitialCreate; the committed faolan.db has only
-# that one in __EFMigrationsHistory. New migrations stack on top as normal.
 dotnet ef migrations add <Name> --project Faolan
 # GOTCHA: plain `database update` runs with CWD = Faolan/ and creates a stray Faolan/faolan.db.
 # Use the absolute connection override (or just start the server - DatabaseMigrator migrates at startup):
@@ -69,7 +64,7 @@ service as a hosted service: `UniverseAgentListener`, `PlayerAgentListener`, `Cs
 (guilds/teams/groupfinder), `AgentServerListener` (chat), `GameServerListener` (the world; one listener
 serves both the create-editor and world connections).
 
-**Projects:** the old monolithic `Faolan.Core` was split (#290) into layered projects. `Faolan/` server
+**Projects:** `Faolan/` server
 host · `Faolan.Core/` BASE shared types + crypto (the layer everything builds on) · `Faolan.Core.Database/`
 EF Core DB — `DatabaseContext`, `Tables/`, `DatabaseRepository` · `Faolan.Core.Network/` networking +
 protobuf + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World/`, …) + `Constants/Opcodes.cs`
@@ -120,12 +115,8 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
 
 - `PacketStream.WriteHeader(...)` + `SendAsync(...)` computes length + CRC; build packets with
   `PacketStream`/`FaolanStream` helpers. Integers are big-endian; protobuf fixed32 floats are
-  little-endian while raw-body floats are big-endian (`WriteFloat` LE / `WriteFloatBigEndian` are both
+  little-endian while raw-body floats are big-endian (`WriteFloatLittleEndian` / `WriteFloat` BE are both
   intentional).
-- The GameServer connection multiplexes ~4 RPC class-pairs; the dispatch key is **(endpoint class id,
-  16-bit opcode)** — the same opcode means different methods per class. Any GameServer opcode >= 0x2014
-  is unambiguously GameCharAgent. Tradepost routes class-first (`TradepostProtocol.IsInbound`); add
-  class guards surgically, don't rewrite the opcode switch.
 - 16-bit RPC opcodes are **method indices**: `wire = 0x2000 + registration index`, per interface, base
   0x2000 for every interface except PlayerAgent/PlayerInterface (32-bit hash dispatch — login, still open).
   Both directions are recovered from the client (`docs/aoc-rpc-method-opcodes.md`, scripts in
@@ -137,7 +128,7 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
   the stable key is the NPC/vendor NAME (conversations, shops) or the character id.
 
 **Capture workflow for protocol work:** decode first, implement second. Each decoded subsystem gets a
-Python dissector in `Captures/decode_*.py` that parses the relevant packets out of the capture JSONs and
+Python dissector in `Captures/scripts/decode_*.py` that parses the relevant packets out of the capture JSONs and
 validates the grammar to the packet end, then a C# builder proven by a byte-exact golden test in
 `Faolan.Tests` against the captured bytes. Direction is "construct, don't replay": structured DB rows +
 builders replace verbatim blob replay subsystem by subsystem; remaining verbatim blobs are deliberate

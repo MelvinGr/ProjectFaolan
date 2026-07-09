@@ -14,7 +14,10 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class SessionTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
+		private static readonly JsonSerializerOptions JsonOptions = new()
+		{
+			WriteIndented = true
+		};
 
 		private readonly IAgentServerDispatcher _dispatcher;
 
@@ -23,7 +26,8 @@ namespace Faolan.Mcp.Tools
 			_dispatcher = dispatcher;
 		}
 
-		[McpServerTool(Name = "list_sessions"), Description("List the clients currently connected to the live Faolan agent server, with account/character identity and source ip. Read-only snapshot of the running server.")]
+		[McpServerTool(Name = "list_sessions"),
+		 Description("List the clients currently connected to the live Faolan agent server, with account/character identity and source ip. Read-only snapshot of the running server.")]
 		public string ListSessions()
 		{
 			var sessions = _dispatcher.GetSessions();
@@ -33,8 +37,10 @@ namespace Faolan.Mcp.Tools
 			return JsonSerializer.Serialize(sessions, JsonOptions);
 		}
 
-		[McpServerTool(Name = "send_system_message"), Description("Send an in-game system message (the yellow server text) to one connected character. Supports basic HTML like <br /> and <span style=\"color: red;\">.")]
-		public async Task<string> SendSystemMessage([Description("Character id of a currently-connected player (see list_sessions)")] uint characterId, [Description("The message text")] string message)
+		[McpServerTool(Name = "send_system_message"),
+		 Description("Send an in-game system message (the yellow server text) to one connected character. Supports basic HTML like <br /> and <span style=\"color: red;\">.")]
+		public async Task<string> SendSystemMessage([Description("Character id of a currently-connected player (see list_sessions)")] uint characterId,
+			[Description("The message text")] string message)
 		{
 			if (string.IsNullOrWhiteSpace(message))
 				return "Message is empty; nothing sent.";

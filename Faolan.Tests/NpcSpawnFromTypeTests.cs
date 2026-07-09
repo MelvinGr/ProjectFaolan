@@ -15,7 +15,11 @@ namespace Faolan.Tests
 	public class NpcSpawnFromTypeTests
 	{
 		private readonly ITestOutputHelper _out;
-		public NpcSpawnFromTypeTests(ITestOutputHelper o) => _out = o;
+
+		public NpcSpawnFromTypeTests(ITestOutputHelper o)
+		{
+			_out = o;
+		}
 
 		[Fact]
 		public void EveryLiftedType_BuildsFromType_WithItsEquipmentAndAppearance()
@@ -25,16 +29,18 @@ namespace Faolan.Tests
 			using var ctx = new DatabaseContext(options);
 			// The summon-only types: those carrying their own equipment/morphs (a plain map-NPC type has none - its
 			// placements do). Covers the pet family; mounts too when that opt-in module is imported.
-			var types = ctx.Npcs
-				.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs)
+			var types = ctx
+				.Npcs.Include(n => n.StatCore)
+				.Include(n => n.Equipment)
+				.Include(n => n.Morphs)
 				.Where(n => n.StatCore != null && n.StatCore.IirHeader != null && (n.Equipment.Any() || n.Morphs.Any()))
-				.AsNoTracking().ToList();
+				.AsNoTracking()
+				.ToList();
 
 			Assert.NotEmpty(types); // the necro pet family is imported by default in the shipped DB
 			foreach (var npc in types)
 			{
-				Assert.True(NpcSpawnBuilder.TryBuildFromType(npc, handle: 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity, out var body),
-					$"{npc.Name} failed to build from type");
+				Assert.True(NpcSpawnBuilder.TryBuildFromType(npc, 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity, out var body), $"{npc.Name} failed to build from type");
 				Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read), $"{npc.Name} body did not parse");
 
 				// The built body carries the type's worn equipment and (for a humanoid) its appearance table.

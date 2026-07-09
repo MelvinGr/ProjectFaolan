@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using ModelContextProtocol.Server;
 
 namespace Faolan.Mcp.Tools
@@ -17,7 +17,7 @@ namespace Faolan.Mcp.Tools
 	{
 		// EF entities carry navigation properties (the Core context uses lazy-loading proxies), so guard against
 		// reference cycles and cap depth. Tools return detached/no-tracking results, so no lazy load fires here.
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+		private static readonly JsonSerializerOptions JsonOptions = new()
 		{
 			WriteIndented = true,
 			ReferenceHandler = ReferenceHandler.IgnoreCycles,
@@ -72,7 +72,8 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "search_items"),
-		 Description("Search items by name substring (case-insensitive). Returns id/name/level/type/archetype (type = Normal/Quest/Resource/Equipped classification) - use get_item for the full record, add_item to grant one.")]
+		 Description(
+			 "Search items by name substring (case-insensitive). Returns id/name/level/type/archetype (type = Normal/Quest/Resource/Equipped classification) - use get_item for the full record, add_item to grant one.")]
 		public async Task<string> SearchItems([Description("Name substring to match, e.g. \"potion\"")] string name, [Description("Max results (default 25)")] int limit = 25)
 		{
 			var items = await _db.SearchItems(name, limit);
@@ -88,7 +89,8 @@ namespace Faolan.Mcp.Tools
 				}));
 		}
 
-		[McpServerTool(Name = "search_npc_spawns"), Description("Search captured NPC spawn rows by name substring (case-insensitive), across all maps. Spawnable=true rows can be spawned at a player with spawn_npc.")]
+		[McpServerTool(Name = "search_npc_spawns"),
+		 Description("Search captured NPC spawn rows by name substring (case-insensitive), across all maps. Spawnable=true rows can be spawned at a player with spawn_npc.")]
 		public async Task<string> SearchNpcSpawns([Description("Name substring to match, e.g. \"croc\"")] string name, [Description("Max results (default 50)")] int limit = 50)
 		{
 			var spawns = await _db.SearchNpcSpawns(name, limit);

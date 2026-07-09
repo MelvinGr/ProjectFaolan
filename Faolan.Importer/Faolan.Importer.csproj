@@ -1,18 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- Faolan: the importers (CaptureItemImporter) + EF model. Captures are read from the tshark dumps
-             (TsharkCaptureReader); the C# PacketAnalyzer pipeline was retired (#82). -->
         <ProjectReference Include="..\Faolan\Faolan.csproj"/>
         <ProjectReference Include="..\Faolan.Core.Network\Faolan.Core.Network.csproj"/>
         <ProjectReference Include="..\Faolan.Core.Rdb\Faolan.Core.Rdb.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9"/>
     </ItemGroup>
 </Project>

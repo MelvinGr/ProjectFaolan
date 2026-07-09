@@ -21,13 +21,8 @@ namespace Faolan.Tests
 			var tsv = Path.Combine(Path.GetTempPath(), $"ella-{Guid.NewGuid():N}.tsv");
 			try
 			{
-				File.WriteAllText(tsv,
-					string.Join("\n",
-						"# name\trank\tlevel\tmana\tcast",
-						"Smite\t1\t1\t35\t",
-						"Smite\t2\t20\t79\t",
-						"Chill\t5\t15\t33\t1s", // exact match exists
-						"Mystery Spell\t1\t40\t\t")); // no DB row -> ignored
+				File.WriteAllText(tsv, string.Join("\n", "# name\trank\tlevel\tmana\tcast", "Smite\t1\t1\t35\t", "Smite\t2\t20\t79\t", "Chill\t5\t15\t33\t1s", // exact match exists
+					"Mystery Spell\t1\t40\t\t")); // no DB row -> ignored
 
 				await using (var db = NewContext(dbPath))
 				{

@@ -6,6 +6,8 @@ namespace Faolan.Core.Database.Tables
 	// walk order (the order the waypoints appear in the MoveTask body). Cascade-deletes with its PatrolPath.
 	public class PatrolWaypoint : BaseEntity
 	{
+		public uint PatrolPathId { get; set; }
+
 		[ForeignKey(nameof(PatrolPathId))]
 		public virtual PatrolPath PatrolPath { get; set; }
 
@@ -15,6 +17,5 @@ namespace Faolan.Core.Database.Tables
 		public float PositionZ { get; set; }
 
 		public int Ordinal { get; set; }
-		public uint PatrolPathId { get; set; }
 	}
 }

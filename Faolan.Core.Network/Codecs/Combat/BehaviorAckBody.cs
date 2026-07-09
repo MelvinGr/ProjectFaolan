@@ -15,16 +15,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// null identity filler.
 		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
 
-		// Decoupled relay: acks the raw behaviour request for `instance` (was BehaviorAckBody.BuildBehaviorRelayBody
-		// taking the live client). Null when the payload is too short. The phase is the request's own mode (or 1).
-		public static byte[] BuildBehaviorRelayBody(uint instance, byte[] rawPayload, uint mode)
-		{
-			if (rawPayload.Length < 26)
-				return null;
-
-			return BuildBehaviorEchoAckBody(rawPayload, instance, mode != 0 ? mode : 1u);
-		}
-
 		// The echo-ack for air swings: echoes the request with field3 (phase) spliced in + 12 zero bytes (or the tail
 		// override / bare tail for the vendor trade-open ack, padTail=false).
 		public static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null, bool padTail = true)
@@ -49,6 +39,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 			if (padTail)
 				s.WriteArray(new byte[12]);
 			return s.ToArray();
+		}
+
+		// Decoupled relay: acks the raw behaviour request for `instance` (was BehaviorAckBody.BuildBehaviorRelayBody
+		// taking the live client). Null when the payload is too short. The phase is the request's own mode (or 1).
+		public static byte[] BuildBehaviorRelayBody(uint instance, byte[] rawPayload, uint mode)
+		{
+			if (rawPayload.Length < 26)
+				return null;
+
+			return BuildBehaviorEchoAckBody(rawPayload, instance, mode != 0
+				? mode
+				: 1u);
 		}
 
 		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity

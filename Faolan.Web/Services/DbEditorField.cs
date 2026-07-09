@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 
 namespace Faolan.Web.Services
@@ -11,10 +14,9 @@ namespace Faolan.Web.Services
 		private readonly object _entity;
 		private readonly PropertyInfo _prop;
 
-		public Array EnumValues =>
-			IsEnum
-				? Enum.GetValues(Type)
-				: Array.Empty<object>();
+		public Array EnumValues => IsEnum
+			? Enum.GetValues(Type)
+			: Array.Empty<object>();
 
 		public bool BoolValue
 		{
@@ -84,9 +86,9 @@ namespace Faolan.Web.Services
 		public static bool IsEditableType(Type type)
 		{
 			type = Nullable.GetUnderlyingType(type) ?? type;
-			return type == typeof(string) || type == typeof(bool) || type == typeof(Guid) || type == typeof(DateTime) || type == typeof(DateTimeOffset) || type.IsEnum || type == typeof(byte) || type == typeof(sbyte) ||
-			       type == typeof(short) || type == typeof(ushort) || type == typeof(int) || type == typeof(uint) || type == typeof(long) || type == typeof(ulong) || type == typeof(float) || type == typeof(double) ||
-			       type == typeof(decimal);
+			return type == typeof(string) || type == typeof(bool) || type == typeof(Guid) || type == typeof(DateTime) || type == typeof(DateTimeOffset) || type.IsEnum || type == typeof(byte) ||
+			       type == typeof(sbyte) || type == typeof(short) || type == typeof(ushort) || type == typeof(int) || type == typeof(uint) || type == typeof(long) || type == typeof(ulong) ||
+			       type == typeof(float) || type == typeof(double) || type == typeof(decimal);
 		}
 	}
 }

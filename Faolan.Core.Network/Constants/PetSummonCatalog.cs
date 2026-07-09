@@ -1,8 +1,7 @@
 using System.Collections.Generic;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 
-namespace Faolan.GameServer.World
+namespace Faolan.Core.Network.Constants
 {
 	// Maps a SUMMON-PET spell id (the id the client casts via ActionType.CastSpell) to the pet it produces — the
 	// pet counterpart of MountCatalog (#307). When a cast's spell id is in here, the server summons the pet
@@ -12,10 +11,9 @@ namespace Faolan.GameServer.World
 	// NOT a world placement. The pet-creature types must be imported (Npc row + Data) for the summon to render.
 	public sealed record PetSummon(uint SummonSpellId, string PetTemplate, bool Combat)
 	{
-		public (uint F1, uint F2, uint F3) Kind =>
-			Combat
-				? PetIirCodec.CombatKind
-				: PetIirCodec.SocialKind;
+		public (uint F1, uint F2, uint F3) Kind => Combat
+			? PetIirCodec.CombatKind
+			: PetIirCodec.SocialKind;
 	}
 
 	public static class PetSummonCatalog

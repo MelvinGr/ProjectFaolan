@@ -1,5 +1,4 @@
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Faolan.Tests.Support
@@ -10,20 +9,29 @@ namespace Faolan.Tests.Support
 	// broke 27 test files. Never hardcode an absolute path in a test; go through here (or Golden).
 	public static class TestPaths
 	{
-		// Faolan.Tests/Assets - capture blobs + render templates used as test INPUTS (Golden/ holds the expected
-		// OUTPUTS). The four strie-login-*/bigboy captures live here because only the test suite reads them.
-		public static string Asset(string fileName) => Path.Combine(TestProjectDir(), "Assets", fileName);
-
-		public static byte[] AssetBytes(string fileName) => File.ReadAllBytes(Asset(fileName));
-
 		// Captures/ - the packet-trace corpus. The *.tshark.json files are read at TEST time (the whole-corpus
 		// round-trip gates), so they are fixtures, not regenerable build artifacts.
 		public static string CapturesDir => Path.Combine(RepoRoot(), "Captures");
 
-		public static string Capture(string fileName) => Path.Combine(CapturesDir, fileName);
-
 		// The committed game database at the repo root.
 		public static string FaolanDb => Path.Combine(RepoRoot(), "faolan.db");
+
+		// Faolan.Tests/Assets - capture blobs + render templates used as test INPUTS (Golden/ holds the expected
+		// OUTPUTS). The four strie-login-*/bigboy captures live here because only the test suite reads them.
+		public static string Asset(string fileName)
+		{
+			return Path.Combine(TestProjectDir(), "Assets", fileName);
+		}
+
+		public static byte[] AssetBytes(string fileName)
+		{
+			return File.ReadAllBytes(Asset(fileName));
+		}
+
+		public static string Capture(string fileName)
+		{
+			return Path.Combine(CapturesDir, fileName);
+		}
 
 		// Any repo-relative path, e.g. Repo("docs", "protocol", "gen", "opcodes.md").
 		public static string Repo(params string[] parts)
@@ -34,10 +42,16 @@ namespace Faolan.Tests.Support
 			return Path.Combine(all);
 		}
 
-		private static string TestProjectDir([CallerFilePath] string thisFile = "")
-			=> Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!; // Support/ -> Faolan.Tests/
-
 		private static string RepoRoot([CallerFilePath] string thisFile = "")
-			=> Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!)!; // -> repo root
+		{
+			return Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!)!;
+			// -> repo root
+		}
+
+		private static string TestProjectDir([CallerFilePath] string thisFile = "")
+		{
+			return Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!;
+			// Support/ -> Faolan.Tests/
+		}
 	}
 }

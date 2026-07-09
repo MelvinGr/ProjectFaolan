@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,9 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(Class), nameof(AbilityId))]
 	public class ClassAbility
 	{
+		// FK into the Abilities catalog (Ability.Id). The catalog row always exists (harvested from the 0x2052 grants).
+		public uint AbilityId { get; set; }
+
 		[ForeignKey(nameof(AbilityId))]
 		public virtual Ability Ability { get; set; }
 
@@ -22,8 +26,5 @@ namespace Faolan.Core.Database.Tables
 
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }
-
-		// FK into the Abilities catalog (Ability.Id). The catalog row always exists (harvested from the 0x2052 grants).
-		public uint AbilityId { get; set; }
 	}
 }
