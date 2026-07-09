@@ -164,7 +164,10 @@ rather than guessed.
       byte-identical after the extraction). The field-level layout lives in the linked codec source — the authoritative
       spec — so the remaining hand-fill is lifting the highest-traffic layouts into tagged prose + absorbing the
       scattered decode docs, incrementally.
-- [ ] **P6 — `gaps.md`.** Every V0 gets a Gitea issue.
+- [x] **P6 — `gaps.md`.** The register exists (landed with P4) and every open V0 is now a tracked Gitea issue:
+      #318 (compression-marker bytes 4..7), #319 (RpcHeader trailing headerData), #320 (PlayerAgent 32-bit hash
+      dispatch), #321 (ChatText trailer word); the FeedbackIIR/RegenIIR verbatim residue rides #223. Each gap links
+      its issue, so an unknown lives on the backlog, not just in a doc.
 - [ ] **P7 — Regroup the residue** into `subsystems/` / `rdb/` / `tooling/`.
 
 **Expectation to set now:** the finished reference contains *every piece of information we actually have, each
