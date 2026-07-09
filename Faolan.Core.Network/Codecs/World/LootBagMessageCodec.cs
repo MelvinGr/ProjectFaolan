@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class LootBagMessageCodec
 	{
 		// LootBagFullUpdateIIR sub-opcode.
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // 0xF096251E
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // 0xF096251E
 
 		// Serializes a typed ProtoLootBagIIR to the on-wire trailing blob: [u32 BE len][protobuf].
 		public static byte[] BuildContents(ProtoLootBagIIR contents)

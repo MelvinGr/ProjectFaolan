@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// CombatShieldIIR_c (0xCFFD0519) - a single u32 shield value on the target (FUN_0113e000).
 	public static class CombatShieldCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
 
 		public static byte[] Build(uint handle, uint value, byte env = 0x00)
 		{
@@ -38,7 +38,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			public void Write(FaolanStream s)
 			{
-				s.WriteArrayUInt32Length(body => body.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Value));
+				s.WriteArrayUInt32Length(body => body.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Value));
 			}
 		}
 	}

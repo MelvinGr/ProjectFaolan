@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//     [30 00]  (field 6 = 0)
 	public static class BehaviorHeartbeatCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
 		private const uint IdleBehaviorId = 7;
 
 		public static byte[] Build(uint actor, uint tick)
@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.ToArray();
 
 			return new FaolanStream()
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(Opcode)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(actor)
 				.WriteUInt16(0x0004)

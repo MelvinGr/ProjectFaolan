@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// hates.
 	public static class HateListCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.HateListUpdateIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.HateListUpdateIIR;
 
 		public static byte[] Build(uint handle, uint target, uint count = 1, byte flag = 0x00, byte env = 0x00)
 		{
@@ -35,7 +35,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			public void Write(FaolanStream s)
 			{
 				s.WriteArrayUInt32Length(body => body
-					.WriteUInt32(SubOpcode)
+					.WriteUInt32(Opcode)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(Handle)
 					.WriteByte(Env)

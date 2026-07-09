@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			var xml = Encoding.ASCII.GetBytes("<remoteformat id=\"0\" ></remoteformat>");
 			var body = ChatTextCodec.Build(0x00ABCDEFu, xml);
 
-			Assert.Equal(ChatTextCodec.SubOpcode, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)));
+			Assert.Equal(ChatTextCodec.Opcode, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)));
 			Assert.Equal((uint)(body.Length - 4), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4)));
 			Assert.Equal(0x00ABCDEFu, ChatTextCodec.Parse(body).Instance);
 		}

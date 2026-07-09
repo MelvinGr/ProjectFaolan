@@ -14,8 +14,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class WorldDeath
 	{
 		public const uint DeathEffectSpellId = 0x0009F000;
-		public const uint SimpleCharKilledBySubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR; // 0xB066AFC2
+		public const uint SimpleCharKilledByOpcode = (uint)GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR; // 0xB066AFC2
 		private const byte DeadMovementType = 0x06;
+
+		// The death sequence is four distinct IIR records, so this builder declares the SET it emits rather than a
+		// single Opcode (same contract as DynelFullUpdateCodec/SimpleDynelMessageCodec).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR,
+			GameServer0X2000Opcodes.BehaviorControlCenterIIR,
+			GameServer0X2000Opcodes.MagicBuffIIR,
+			GameServer0X2000Opcodes.MoveTaskIIR,
+		];
 
 		// The revive action retail sends on RespawnMe — a BehaviorControlCenterIIR (0x642CD3D6) on the player that
 		// transitions bcc_state 29→1 (alive), which CLOSES the release window and revives in place. Decoded from the
@@ -24,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// verbatim except the player handle + the chosen resurrection-point id. Retail follows it with a vitals
 		// restore (we ride PushVitals) and an IntendedTeleport to the point (deferred - the beach point is adjacent so
 		// we revive in place). docs/archive/handoff-2026-06-20-death-window.md.
-		private const uint BccIirSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR; // 0x642CD3D6
+		private const uint BccIirOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR; // 0x642CD3D6
 
 		// The self-applied "you are dead" effect retail sends right after the 0x2024 release screen (ApplySpell
 		// MagicBuff 0x6B87E316, spell 0x0009F000, applyTo == applyFrom == the dying player). SimpleCharKilledBy +
@@ -32,14 +42,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// the dead/release visual state. Decoded from AssassinL23_..._resurect pkt#4051: applyTo/applyFrom rewritten to
 		// the live handle, payload kept verbatim (capture-derived interim, like the starting shield buff - the
 		// effect's magnitude/duration fields aren't decoded yet).
-		private const uint DeathEffectSubOpcode = 0x6B87E316; // ApplySpell / MagicBuff
+		private const uint DeathEffectOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR; // 0x6B87E316 - ApplySpell / MagicBuff
 
 		// The death-pose MoveTask retail forces onto the dying PLAYER's own handle right before the kill record
 		// (AssassinL23_..._resurect pkt#4048): a minimal MoveTask (0x96C46740) with movement-type 0x06 and NO waypoint/
 		// speed payload - just [class][handle][u16 0][pos X,Y,Z big-endian][0x06] - at the death position. Normal
 		// movement is type 0x07 followed by a full waypoint list; 0x06 is the "stopped/incapacitated" dead state. The
 		// SimpleCharKilledBy + 0x2024 + death effect alone left the avatar standing and the release UI closed (#214).
-		private const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
+		private const uint MoveTaskOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
 
 		// The in-session DEATH action retail sends to put the player into the dead state (bcc_state 29) - the inverse
 		// of BuildRevive. Decoded from the retail beach death (Stihetfv #1292, right after the death-effect ApplySpell):
@@ -59,7 +69,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public static byte[] BuildDeathBcc(uint handle)
 		{
 			return new FaolanStream()
-				.WriteUInt32(BccIirSubOpcode)
+				.WriteUInt32(BccIirOpcode)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0004) // form
@@ -72,7 +82,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public static byte[] BuildDeathEffect(uint dyingHandle)
 		{
 			return new FaolanStream()
-				.WriteUInt32(DeathEffectSubOpcode)
+				.WriteUInt32(DeathEffectOpcode)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(dyingHandle) // applyTo = the dying player
 				.WriteUInt16(0x0000)
@@ -85,13 +95,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] BuildDeathPose(uint dyingHandle, Vector3 position)
 		{
-			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(0x0000C350).WriteUInt32(dyingHandle).WriteUInt16(0x0000).WriteVector3(position).WriteByte(DeadMovementType).ToArray();
+			return new FaolanStream().WriteUInt32(MoveTaskOpcode).WriteUInt32(0x0000C350).WriteUInt32(dyingHandle).WriteUInt16(0x0000).WriteVector3(position).WriteByte(DeadMovementType).ToArray();
 		}
 
 		public static byte[] BuildKilledBy(uint dyingHandle, uint killerEndpoint)
 		{
 			return new FaolanStream()
-				.WriteUInt32(SimpleCharKilledBySubOpcode)
+				.WriteUInt32(SimpleCharKilledByOpcode)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(dyingHandle)
 				.WriteByte(0x00)
@@ -104,7 +114,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public static byte[] BuildRevive(uint handle, uint respawnPointId)
 		{
 			return new FaolanStream()
-				.WriteUInt32(BccIirSubOpcode)
+				.WriteUInt32(BccIirOpcode)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0004) // form

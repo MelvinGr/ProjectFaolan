@@ -11,12 +11,12 @@ namespace Faolan.Core.Network.Codecs.World
 	// + construct golden tests in DeadReckoningCodecTests.
 	public static class CharDCMoveCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR;
 
 		public static byte[] Build(CharDCMove r)
 		{
 			var c = new FaolanStream();
-			c.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(r.Handle).WriteByte(r.Env).WriteByte(r.Flag1).WriteVector3(r.Position);
+			c.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(r.Handle).WriteByte(r.Env).WriteByte(r.Flag1).WriteVector3(r.Position);
 			if (r.Bit4)
 				c.WriteFloat(r.FacingX);
 			else
@@ -62,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			var s = new FaolanStream(body);
 			s.ReadUInt32(); // len
-			if (s.ReadUInt32() != SubOpcode)
+			if (s.ReadUInt32() != Opcode)
 				throw new InvalidOperationException("not a CharDCMoveIIR record");
 
 			s.ReadUInt32(); // 0xC350 marker

@@ -29,7 +29,7 @@ namespace Faolan.Tests
 				total++;
 				var row = new WorldObject
 				{
-					SubOpcode = SimpleDynelMessageCodec.SubOpcode,
+					SubOpcode = SimpleDynelMessageCodec.Opcode,
 					Name = r.GetString(0),
 					DisplayName = r.GetString(1),
 					CarsGroup = (uint)r.GetInt64(2),

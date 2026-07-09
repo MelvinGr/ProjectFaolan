@@ -107,7 +107,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			var chain = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o =>
-				o.SubOpcode == SimpleDynelMessageCodec.SubOpcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
+				o.SubOpcode == SimpleDynelMessageCodec.Opcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
 			if (chain == null)
 				return;
 

@@ -5,7 +5,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// ThreatLevelIIR_c (0x1745EF6C) - a threat/aggro level (u32) plus a bool (FUN_007a8fd0).
 	public record ThreatLevelCodec(uint Handle, byte Env, uint Threat, byte Flag) : ICodec<ThreatLevelCodec>
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ThreatLevelIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.ThreatLevelIIR;
 
 		public static ThreatLevelCodec Read(FaolanStream s)
 		{
@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteArrayUInt32Length(body => body.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag));
+			s.WriteArrayUInt32Length(body => body.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag));
 		}
 
 		public static byte[] Build(uint handle, uint threat, byte flag, byte env = 0x00)

@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	{
 		// typeFlags value of the GenericDisplayAreaName / FIFO-banner messages (the top-of-screen overlay).
 		public const uint FifoBannerTypeFlags = 0x00000000;
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
 		private const byte LeadFlag = 0x01;
 
 		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml)
@@ -65,7 +65,7 @@ namespace Faolan.Core.Network.Codecs.Text
 			{
 				s.WriteArrayUInt32Length(content =>
 					content
-						.WriteUInt32(SubOpcode)
+						.WriteUInt32(Opcode)
 						.WriteUInt32(EntityClass.Character)
 						.WriteUInt32(Instance)
 						.WriteByte(LeadFlag)

@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Byte-exact against a captured NPC cast (NpcSpellCastBuilderTests / Golden NpcSpellCast.bin).
 	public static class NpcSpellCastBuilder
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
 
 		public static byte[] Build(uint applyTo, uint applyFrom, uint spellId, byte[] payload)
 		{
@@ -48,7 +48,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			public void Write(FaolanStream s)
 			{
 				s
-					.WriteUInt32(SubOpcode)
+					.WriteUInt32(Opcode)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(ApplyTo)
 					.WriteUInt16(0)

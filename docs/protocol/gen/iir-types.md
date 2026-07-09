@@ -15,13 +15,11 @@ recomputing the hash over candidates derived from our member name (± `_c`/`_t`,
 so a filled cell is a self-contained proof: `BKDR-31(name) == id`. This holds without parsing any
 external doc; the enum + the hash function are the whole source.
 
-- **73** ids: client type name recovered + BKDR-31-verified.
+- **74** ids: client type name recovered + BKDR-31-verified.
 - **1** ids: 32-bit hash (V1-recovered from the client) whose exact source string our name doesn't reproduce.
-- **1** entries are carrier COMMAND opcodes (< 0x10000), not type-name hashes — flagged in the table.
 
 | Type id | Recovered client name | Our enum name | Note |
 |---------|-----------------------|---------------|------|
-| `0x0000205B` | — *(command opcode, not a hash)* | `QueuePetCommand` | NOT an IIR hash: the pet command bar (#307) rides the 0x2000 carrier carrying the 16-bit GameCharAgentOpcodes.QueuePetCommand; kept here for Handle0X2000's switch |
 | `0x045B0B0F` | `KnubotOpenChatWindowIIR_c` ✓ | `KnubotOpenChatWindowIIR` | KnubotOpenChatWindowIIR_c  (x43) |
 | `0x04B80B24` | `SetPosIIR_c` ✓ | `SetPosIIR` | SetPosIIR_c  (x29) |
 | `0x04B82B2D` | `n3ToClientQuitIIR_t` ✓ | `N3ToClientQuitIIR` | n3ToClientQuitIIR_t  (x3249) |
@@ -62,6 +60,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x6BA10936` | `SpellBookIIR_t` ✓ | `SpellBookIIR` | SpellBookIIR_t  (x1) |
 | `0x6BD56736` | `DestructibleFullUpdateIIR_c` ✓ | `DestructibleFullUpdateIIR` | DestructibleFullUpdateIIR_c  (x189) |
 | `0x6C300937` | `TemplateActionIIR_t` ✓ | `TemplateActionIIR` | TemplateActionIIR_t  (x7) |
+| `0x6D314743` | `NewLevelIIR_t` ✓ | `NewLevelIIR` | NewLevelIIR_t - level-up notification (built by NewLevelIirCodec) |
 | `0x70010162` | `LootRemoveItemsIIR_c` ✓ | `LootRemoveItemsIIR` | LootRemoveItemsIIR_c  (x42) |
 | `0x72491DE9` | `DeleteItemIIR_t` ✓ | `DeleteItemIIR` | DeleteItemIIR_t - "DropItem" |
 | `0x737A6DF9` | `FullPlayerCharacterIIR` ✓ | `FullPlayerCharacterIIR` | FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below |

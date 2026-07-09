@@ -41,7 +41,7 @@ namespace Faolan.Tests
 
 			var row = new WorldObject
 			{
-				SubOpcode = SimpleDynelMessageCodec.SubOpcode
+				SubOpcode = SimpleDynelMessageCodec.Opcode
 			};
 			SimpleDynelMessageCodec.ApplyColumns(row, msg); // importer side
 			Assert.Equal("Acheronian Ruins", row.Name);

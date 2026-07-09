@@ -7,12 +7,12 @@ namespace Faolan.Core.Network.Codecs.World
 	// 7 big-endian floats). The trailing rotation is a unit 2D heading embedded in 4 floats.
 	public static class StopCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.StopIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.StopIIR;
 
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte env = 0x00)
 		{
 			var c = new FaolanStream();
-			c.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(env).WriteVector3(position).WriteFloat(r0).WriteFloat(r1).WriteFloat(r2).WriteFloat(r3);
+			c.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(env).WriteVector3(position).WriteFloat(r0).WriteFloat(r1).WriteFloat(r2).WriteFloat(r3);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 

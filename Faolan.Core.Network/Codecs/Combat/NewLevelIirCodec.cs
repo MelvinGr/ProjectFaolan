@@ -25,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class NewLevelIirCodec
 	{
 		public const int DeltaCount = 6;
-		public const uint SubOpcode = 0x6D314743; // TODO: Move to enum
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.NewLevelIIR; // 0x6D314743
 		private const byte LeadFlag = 0x00;
 
 		// Full-control build (the golden test reproduces the captured deltas). `deltas` is padded/truncated to 6.
@@ -65,7 +65,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			{
 				s.WriteArrayUInt32Length(content =>
 				{
-					content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt32(NewLevel);
+					content.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteByte(LeadFlag).WriteUInt32(NewLevel);
 					for (var i = 0; i < DeltaCount; i++)
 					{
 						content.WriteUInt32(i < Deltas.Length

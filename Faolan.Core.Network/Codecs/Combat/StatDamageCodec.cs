@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class StatDamageCodec
 	{
 		public const int WordCount = 17;
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.StatDamageIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.StatDamageIIR;
 
 		public static byte[] Build(uint handle, uint[] words, byte env = 0x00)
 		{
@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			{
 				s.WriteArrayUInt32Length(c =>
 				{
-					c.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env);
+					c.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env);
 					foreach (var w in Words)
 						c.WriteUInt32(w);
 				});

@@ -7,13 +7,13 @@ namespace Faolan.Core.Network.Codecs.World
 	// (FUN_00a33770; the client finite-checks the pos & rot).
 	public static class SetPosCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.SetPosIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.SetPosIIR;
 
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte flag = 0x00, byte env = 0x00)
 		{
 			var c = new FaolanStream();
 			c
-				.WriteUInt32(SubOpcode)
+				.WriteUInt32(Opcode)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(handle)
 				.WriteByte(env)

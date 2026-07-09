@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
@@ -18,16 +19,24 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class SimpleDynelMessageCodec
 	{
 		// SimpleDynelFullUpdateIIR sub-opcode (the object class that carries a ProtoSimpleDynelIIR identity).
-		public const uint SubOpcode = 0x66AEDD50; // TODO: Move to enum
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR; // 0x66AEDD50
 
 		// SimpleDynelVisualChangeIIR (0xE7F4F8F8): flips a SimpleDynel's visual/collision STATE. Retail sends it to the
 		// Casilda chain decor (this class) the instant she's freed on the beach, switching it to state 5 - which drops the
 		// chain's COLLISION = the "invisible wall" (#267; the hangingwoman mesh doesn't render for us, so the dynel reads
 		// as an invisible barrier). Decoded byte-exact from Hoxxling gameplay idx 2053 (21 B):
 		//   [subop 0xE7F4F8F8][typeTag 0xC878][u32 handle][u32 0][u8 state][u32 0]
-		public const uint VisualChangeSubOpcode = 0xE7F4F8F8; // TODO: Move to enum
+		public const uint VisualChangeOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR; // 0xE7F4F8F8
 
 		public const uint VisualChangeTypeTag = 0x0000C878;
+
+		// Every IIR type this codec constructs or parses (Opcode is the primary). Declared for the same reason
+		// DynelFullUpdateCodec does: a grep for the opcode member finds its emitter, and the coverage matrix reads it.
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR,
+			GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR,
+		];
 
 		// The record header before the transform: [u32 type][u32 handle][u32 0].
 		private const int HeaderLength = 12;
@@ -68,7 +77,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		public static byte[] BuildVisualChange(uint handle, byte state)
 		{
-			return new FaolanStream().WriteUInt32(VisualChangeSubOpcode).WriteUInt32(VisualChangeTypeTag).WriteUInt32(handle).WriteUInt32(0).WriteByte(state).WriteUInt32(0).ToArray();
+			return new FaolanStream().WriteUInt32(VisualChangeOpcode).WriteUInt32(VisualChangeTypeTag).WriteUInt32(handle).WriteUInt32(0).WriteByte(state).WriteUInt32(0).ToArray();
 		}
 
 		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0

@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	//   [u8 0x00][u32 0x40000001]           trailer (constant; semantics loose, like FormatFeedback's footer)
 	public static class ChatTextCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ChatTextIIR; // 0xE0B51102
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.ChatTextIIR; // 0xE0B51102
 		private const byte LeadFlag = 0x00;
 
 		// The 5-byte trailer after the XML (constant in the capture: 0x00 then u32 0x40000001). Carried verbatim
@@ -60,7 +60,7 @@ namespace Faolan.Core.Network.Codecs.Text
 			{
 				s.WriteArrayUInt32Length(content =>
 					content
-						.WriteUInt32(SubOpcode)
+						.WriteUInt32(Opcode)
 						.WriteUInt32(EntityClass.Character)
 						.WriteUInt32(Instance)
 						.WriteByte(LeadFlag)

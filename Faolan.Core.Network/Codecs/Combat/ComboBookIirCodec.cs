@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   [u32 comboId]      the combo id granted
 	public static class ComboBookIirCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
 		private const ushort AddFlag = 0x0001;
 
 		public static byte[] Build(uint instance, uint comboId)
@@ -42,7 +42,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			public void Write(FaolanStream s)
 			{
-				s.WriteArrayUInt32Length(content => content.WriteUInt32(SubOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId));
+				s.WriteArrayUInt32Length(content => content.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Instance).WriteUInt16(AddFlag).WriteUInt32(ComboId));
 			}
 		}
 	}

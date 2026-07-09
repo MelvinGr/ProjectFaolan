@@ -80,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.World
 				return string.Empty;
 
 			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(carrierBody.Slice(4, 4));
-			return subOpcode == SimpleDynelMessageCodec.SubOpcode && SimpleDynelMessageCodec.TryParse(carrierBody.Slice(8), out var message, out _, out _)
+			return subOpcode == SimpleDynelMessageCodec.Opcode && SimpleDynelMessageCodec.TryParse(carrierBody.Slice(8), out var message, out _, out _)
 				? message.DisplayName ?? string.Empty
 				: string.Empty;
 		}

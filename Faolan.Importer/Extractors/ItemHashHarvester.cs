@@ -223,7 +223,7 @@ namespace Faolan.Importer.Extractors
 
 			var payload = packet.Body.ReadArrayUInt32Length();
 			var s = new FaolanStream(payload);
-			if (s.ReadUInt32() != LootBagMessageCodec.SubOpcode)
+			if (s.ReadUInt32() != LootBagMessageCodec.Opcode)
 				return;
 
 			if (!LootBagMessageCodec.TryParse(payload.AsSpan(4), out var contents, out _) || contents?.Inventory?.Items == null)

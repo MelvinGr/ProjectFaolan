@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// assembles header/transform + identity-from-columns + this tail; SpliceLootContents then splices the live items + cash.
 	public static class LootBagTemplate
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // LootBagFullUpdateIIR
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // LootBagFullUpdateIIR
 		public const uint TypeTag = 0x0000C87A; // the loot typetag (WorldLoot.LootTypeTag)
 		private const uint DefaultMaxSize = 10;
 
@@ -55,7 +55,7 @@ namespace Faolan.Core.Network.Codecs.World
 			return new WorldObject
 			{
 				Name = "Bag of loot",
-				SubOpcode = SubOpcode,
+				SubOpcode = Opcode,
 				DisplayName = "<remoteformat id=\"13782\" category=\"50200\" key=\"!,1%VZc#)*ctk-zNFNxI\" knubot=\"0\"  ></remoteformat>",
 				TemplateItemId = 13782,
 				CarsGroup = 1,
