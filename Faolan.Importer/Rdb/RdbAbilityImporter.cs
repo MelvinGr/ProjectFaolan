@@ -34,7 +34,7 @@ namespace Faolan.Importer.Rdb
 				byte[] body;
 				try
 				{
-					body = rdb.ReadDecrypted(e, [a.Data1, a.Data2, a.Data3, a.Data4]);
+					body = rdb.ReadDecrypted(e, [a.Key.Key1, a.Key.Key2, a.Key.Key3, a.Key.Key4]);
 				}
 				catch
 				{

@@ -69,7 +69,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			if (item != null)
 			{
 				for (var i = 0; i < 2; i++)
-					tail.WriteUInt32(item.Data1).WriteUInt32(item.Data2).WriteUInt32(item.Data3).WriteUInt32(item.Data4);
+					tail.WriteUInt32(item.Key.Key1).WriteUInt32(item.Key.Key2).WriteUInt32(item.Key.Key3).WriteUInt32(item.Key.Key4);
 
 				tail.WriteArray(NullIdentityFiller).WriteArray(NullIdentityFiller);
 			}

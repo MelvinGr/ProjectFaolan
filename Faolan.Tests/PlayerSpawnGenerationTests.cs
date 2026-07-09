@@ -107,19 +107,13 @@ namespace Faolan.Tests
 				Head = new Item
 				{
 					Id = 0x00308E19,
-					Data1 = 0x4C95E6E3,
-					Data2 = 0xDF665726,
-					Data3 = 0x09000E2A,
-					Data4 = 0x892A0B17,
+					Key = new ProtoDecryptionKey { Key1 = 0x4C95E6E3, Key2 = 0xDF665726, Key3 = 0x09000E2A, Key4 = 0x892A0B17 },
 					Hash = 0x1234
 				},
 				Chest = new Item
 				{
 					Id = 0x000035F9,
-					Data1 = 0x6B18BD73,
-					Data2 = 0xCCEBE6CF,
-					Data3 = 0xED8B315D,
-					Data4 = 0x1E1E835F,
+					Key = new ProtoDecryptionKey { Key1 = 0x6B18BD73, Key2 = 0xCCEBE6CF, Key3 = 0xED8B315D, Key4 = 0x1E1E835F },
 					Hash = 0x5678
 				},
 				Belt = new Item
@@ -155,31 +149,31 @@ namespace Faolan.Tests
 				MainHandLeft = new Item
 				{
 					Id = 1,
-					Data1 = 1,
+					Key = new ProtoDecryptionKey { Key1 = 1 },
 					Hash = 1
 				},
 				OffHandLeft = new Item
 				{
 					Id = 2,
-					Data1 = 2,
+					Key = new ProtoDecryptionKey { Key1 = 2 },
 					Hash = 2
 				},
 				MainHandRight = new Item
 				{
 					Id = 3,
-					Data1 = 3,
+					Key = new ProtoDecryptionKey { Key1 = 3 },
 					Hash = 3
 				},
 				OffHandRight = new Item
 				{
 					Id = 4,
-					Data1 = 4,
+					Key = new ProtoDecryptionKey { Key1 = 4 },
 					Hash = 4
 				},
 				Tokens = new Item
 				{
 					Id = 5,
-					Data1 = 5,
+					Key = new ProtoDecryptionKey { Key1 = 5 },
 					Hash = 5
 				}
 			};

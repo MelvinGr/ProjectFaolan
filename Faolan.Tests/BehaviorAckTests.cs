@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Combat;
@@ -17,10 +18,7 @@ namespace Faolan.Tests
 		private static readonly Item Oar = new()
 		{
 			Id = 23246,
-			Data1 = 0x8B2978E3,
-			Data2 = 0xAE53830B,
-			Data3 = 0x0D5B7D66,
-			Data4 = 0x2985A0FE
+			Key = new ProtoDecryptionKey { Key1 = 0x8B2978E3, Key2 = 0xAE53830B, Key3 = 0x0D5B7D66, Key4 = 0x2985A0FE }
 		};
 
 		[Fact]

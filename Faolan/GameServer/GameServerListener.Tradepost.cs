@@ -71,10 +71,7 @@ namespace Faolan.GameServer
 				Quantity = listing.Quantity == 0
 					? 1
 					: listing.Quantity,
-				Data1 = listing.Data1,
-				Data2 = listing.Data2,
-				Data3 = listing.Data3,
-				Data4 = listing.Data4,
+				Key = (ProtoDecryptionKey)listing.Key.Clone(),
 				Template = listing.Template,
 				ItemLevel = listing.ItemLevel,
 				ItemHash = listing.ItemHash,
@@ -415,10 +412,7 @@ namespace Faolan.GameServer
 				ItemHandle = 0,
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
 				Timestamp = 0,
-				Data1 = row.Item.Data1,
-				Data2 = row.Item.Data2,
-				Data3 = row.Item.Data3,
-				Data4 = row.Item.Data4,
+				Key = (ProtoDecryptionKey)row.Item.Key.Clone(),
 				Template = row.Item.Id,
 				ItemLevel = row.Item.Level,
 				ItemHash = row.Item.Hash
@@ -493,10 +487,7 @@ namespace Faolan.GameServer
 					Quantity = row.Count == 0
 						? 1u
 						: row.Count,
-					Data1 = row.Item.Data1,
-					Data2 = row.Item.Data2,
-					Data3 = row.Item.Data3,
-					Data4 = row.Item.Data4,
+					Key = (ProtoDecryptionKey)row.Item.Key.Clone(),
 					Template = row.Item.Id,
 					ItemLevel = row.Item.Level,
 					ItemHash = row.Item.Hash,
@@ -593,13 +584,7 @@ namespace Faolan.GameServer
 		// the template via its RDB, so this renders even for items we don't have as Items rows.
 		private static ProtoInventoryGameEntry BuildMailItemEntry(MailAttachment a, uint charId, int slot)
 		{
-			var key = new ProtoDecryptionKey
-			{
-				Key1 = a.Data1,
-				Key2 = a.Data2,
-				Key3 = a.Data3,
-				Key4 = a.Data4
-			};
+			var key = a.Key;
 			var qty = a.Quantity == 0
 				? 1u
 				: a.Quantity;

@@ -3,8 +3,10 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Protobuf;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Faolan.Core.Database
 {
@@ -161,6 +163,12 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Recipe>().Property(r => r.Id).ValueGeneratedNever();
 			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Recipe).WithMany(r => r.Items).HasForeignKey(ri => ri.RecipeId).OnDelete(DeleteBehavior.Cascade);
 
+			modelBuilder.Entity<Item>().OwnsOne(i => i.Key, OwnKey);
+			modelBuilder.Entity<Ability>().OwnsOne(a => a.Key, OwnKey);
+			modelBuilder.Entity<MailAttachment>().OwnsOne(m => m.Key, OwnKey);
+			modelBuilder.Entity<RecipeItem>().OwnsOne(r => r.Key, OwnKey);
+			modelBuilder.Entity<TradepostListing>().OwnsOne(t => t.Key, OwnKey);
+
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
 			// characters with their map/realm; a map or realm with characters cannot be deleted instead.
@@ -310,7 +318,19 @@ namespace Faolan.Core.Database
 				})
 				.IsUnique();
 
-			// One world burst per map; its structured IIR records cascade-delete.
+			return;
+
+			// The 128-bit TEA DecryptionKey (ProtoAcgItem.key1) is an EF OWNED type, shared by every table that carries an
+			// item/ability identity. Mapped to FLAT columns Key1..Key4 on the owner's table (no "Key_" prefix), matching
+			// the wire ProtoDecryptionKey.Key1..4. Reflection-scans keep coverage.md honest; this keeps ONE definition of
+			// "these four words are a key" instead of five copies of Data1..4.
+			static void OwnKey<T>(OwnedNavigationBuilder<T, ProtoDecryptionKey> k) where T : class
+			{
+				k.Property(p => p.Key1).HasColumnName("Key1");
+				k.Property(p => p.Key2).HasColumnName("Key2");
+				k.Property(p => p.Key3).HasColumnName("Key3");
+				k.Property(p => p.Key4).HasColumnName("Key4");
+			}
 		}
 	}
 }

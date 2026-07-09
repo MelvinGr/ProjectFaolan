@@ -103,10 +103,7 @@ namespace Faolan.Tests
 				return new Item
 				{
 					Id = id,
-					Data1 = d1,
-					Data2 = d2,
-					Data3 = d3,
-					Data4 = d4,
+					Key = new ProtoDecryptionKey { Key1 = d1, Key2 = d2, Key3 = d3, Key4 = d4 },
 					Hash = arch
 				};
 			}

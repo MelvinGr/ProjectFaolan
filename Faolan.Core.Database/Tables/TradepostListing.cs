@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Protobuf;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -38,10 +39,8 @@ namespace Faolan.Core.Database.Tables
 		public uint BankSlot { get; set; }
 
 		// --- the listed item INSTANCE identity (the entry's ProtoAcgItem) ------------------------------------
-		public uint Data1 { get; set; }
-		public uint Data2 { get; set; }
-		public uint Data3 { get; set; }
-		public uint Data4 { get; set; }
+		// The listed item's 128-bit TEA DecryptionKey (owned -> flat columns Key1..Key4). virtual: see Item.Key.
+		public virtual ProtoDecryptionKey Key { get; set; } = new();
 
 		// Entry stat 0 (a flag word, 0x421 in the capture) and stat 265 (a timestamp/expiry-like value).
 		public uint EntryFlags { get; set; }

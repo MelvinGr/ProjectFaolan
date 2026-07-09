@@ -252,8 +252,8 @@ namespace Faolan.Importer.Extractors
 			var mail = MailMessageCodec.Parse(packet.Body.ToArray());
 			foreach (var a in mail.Attachments)
 			{
-				if (a.Template != 0 && (a.Data1 | a.Data2 | a.Data3 | a.Data4) != 0)
-					into.TryAdd(a.Template, new CapturedItem(a.Data1, a.Data2, a.Data3, a.Data4, a.ItemHash));
+				if (a.Template != 0 && (a.Key.Key1 | a.Key.Key2 | a.Key.Key3 | a.Key.Key4) != 0)
+					into.TryAdd(a.Template, new CapturedItem(a.Key.Key1, a.Key.Key2, a.Key.Key3, a.Key.Key4, a.ItemHash));
 			}
 		}
 

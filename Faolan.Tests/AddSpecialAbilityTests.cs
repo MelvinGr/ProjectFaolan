@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Combat;
 using Xunit;
@@ -26,10 +27,7 @@ namespace Faolan.Tests
 				Id = id,
 				Slot = slot,
 				Data0 = data0,
-				Data1 = data1,
-				Data2 = data2,
-				Data3 = data3,
-				Data4 = data4
+				Key = new ProtoDecryptionKey { Key1 = data1, Key2 = data2, Key3 = data3, Key4 = data4 }
 			};
 
 			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(ability);
@@ -48,10 +46,7 @@ namespace Faolan.Tests
 				Id = 769094u,
 				Slot = 108u,
 				Data0 = 1263352118u,
-				Data1 = 3236668225u,
-				Data2 = 2153842419u,
-				Data3 = 314062142u,
-				Data4 = 3015939650u
+				Key = new ProtoDecryptionKey { Key1 = 3236668225u, Key2 = 2153842419u, Key3 = 314062142u, Key4 = 3015939650u }
 			};
 
 			var announced = ToHex(AbilityGrantBody.BuildAddSpecialAbilityBody(ability));
@@ -71,10 +66,7 @@ namespace Faolan.Tests
 				Id = 769094u,
 				Slot = 108u,
 				Data0 = 1u,
-				Data1 = 2u,
-				Data2 = 3u,
-				Data3 = 4u,
-				Data4 = 5u
+				Key = new ProtoDecryptionKey { Key1 = 2u, Key2 = 3u, Key3 = 4u, Key4 = 5u }
 			};
 			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(ability);
 
@@ -98,10 +90,7 @@ namespace Faolan.Tests
 				Id = id,
 				Slot = slot,
 				Data0 = data0,
-				Data1 = data1,
-				Data2 = data2,
-				Data3 = data3,
-				Data4 = data4
+				Key = new ProtoDecryptionKey { Key1 = data1, Key2 = data2, Key3 = data3, Key4 = data4 }
 			};
 			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(original, announce);
 
@@ -110,10 +99,10 @@ namespace Faolan.Tests
 			Assert.Equal(original.Id, parsed.Id);
 			Assert.Equal(original.Slot, parsed.Slot);
 			Assert.Equal(original.Data0, parsed.Data0);
-			Assert.Equal(original.Data1, parsed.Data1);
-			Assert.Equal(original.Data2, parsed.Data2);
-			Assert.Equal(original.Data3, parsed.Data3);
-			Assert.Equal(original.Data4, parsed.Data4);
+			Assert.Equal(original.Key.Key1, parsed.Key.Key1);
+			Assert.Equal(original.Key.Key2, parsed.Key.Key2);
+			Assert.Equal(original.Key.Key3, parsed.Key.Key3);
+			Assert.Equal(original.Key.Key4, parsed.Key.Key4);
 		}
 
 		private static string ToHex(byte[] bytes)

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Rdb
 {
 	// Decrypts the client RDB item-template for every item we hold a key for. The TEA key is the item's
-	// ProtoDecryptionKey - the same 4 u32 the server streams in inventory and we store as Item.Data1..4 (see
+	// ProtoDecryptionKey - the same 4 u32 the server streams in inventory and we store as Item.Key (Key1..4) (see
 	// docs/archive/rdb-extraction-plan.md "RDBH cracked"). RDB type 1000020 (item) / 1000620 (recipe), id = Item.Id.
 	// The decrypted payload is the full canonical template (12-byte RDB-Id header + binary fields); reversing those
 	// fields into stat columns is the next step, so for now this validates the decrypt end-to-end and (optionally)
@@ -78,7 +78,7 @@ namespace Faolan.Importer.Rdb
 					byTypeId[(type, e.Id)] = e;
 			}
 
-			var items = await db.Items.Where(i => i.Data1 != 0 || i.Data2 != 0 || i.Data3 != 0 || i.Data4 != 0).ToListAsync();
+			var items = await db.Items.Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).ToListAsync();
 
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
@@ -88,7 +88,7 @@ namespace Faolan.Importer.Rdb
 
 			foreach (var item in items)
 			{
-				var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
+				var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
 
 				RdbReader.Entry entry = default;
 				uint matchedType = 0;

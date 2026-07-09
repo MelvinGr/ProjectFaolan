@@ -110,7 +110,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// (one distinct tag per SubOpcode across the whole capture set), so it is derived here rather than stored.
 		public static uint TypeTagForClass(uint subOpcode)
 		{
-			return subOpcode switch
+			return subOpcode switch // TODO: We have contsts for these somehwere right? Use those
 			{
 				0x1FD6412Bu => 0x0000C87Du, // ClimbingDynel
 				0x33A56FB0u => 0x0000C748u, // ZoneLabel

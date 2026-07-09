@@ -1,4 +1,5 @@
 using Faolan.Core.Database.Attributes;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -22,12 +23,9 @@ namespace Faolan.Core.Database.Tables
 		[ConstrainToEnumValues]
 		public RecipeItemRole Role { get; set; } // ingredient (input) or result (output)
 
-		// The referenced item's TEA DecryptionKey (element words [5..8]); mirrors Item.Data1..4.
-		// TODO: Rename Key1..4
-		public uint Data1 { get; set; }
-		public uint Data2 { get; set; }
-		public uint Data3 { get; set; }
-		public uint Data4 { get; set; }
+		// The referenced item's 128-bit TEA DecryptionKey (element words [5..8]; owned -> flat columns Key1..Key4).
+		// virtual: see Item.Key. Same key RequestRecipeInfo (0x2090) uses to fetch the item's details.
+		public virtual ProtoDecryptionKey Key { get; set; } = new();
 
 		public uint Flag { get; set; } // element field [3] (small enum-ish; 0x14/0x28/...)
 		public uint Hash { get; set; } // element field [4]

@@ -77,13 +77,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// the attachment row, not the Items template table (same convention as TradepostListingCodec.BuildEntry).
 		public static ProtoInventoryGameEntry BuildEntry(MailAttachment a)
 		{
-			var key = new ProtoDecryptionKey
-			{
-				Key1 = a.Data1,
-				Key2 = a.Data2,
-				Key3 = a.Data3,
-				Key4 = a.Data4
-			};
+			var key = a.Key;
 			var entry = new ProtoInventoryGameEntry
 			{
 				ItemId = a.ItemInstanceId,
@@ -146,10 +140,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				{
 					ItemInstanceId = instanceId,
 					Quantity = qty,
-					Data1 = key.Key1,
-					Data2 = key.Key2,
-					Data3 = key.Key3,
-					Data4 = key.Key4,
+					Key = key,
 					Template = item.Template1,
 					ItemLevel = item.Level,
 					ItemHash = item.Hash,

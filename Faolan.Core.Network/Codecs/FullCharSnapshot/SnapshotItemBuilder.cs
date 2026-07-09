@@ -23,13 +23,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// to the world-entry snapshot; there the slot rides separately as i_nItemPos, so no Pos wrapper.
 		public static ProtoInventoryGameEntry BuildInventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, ulong level = 1)
 		{
-			var key = new ProtoDecryptionKey
-			{
-				Key1 = item.Data1,
-				Key2 = item.Data2,
-				Key3 = item.Data3,
-				Key4 = item.Data4
-			};
+			var key = item.Key;
 
 			var entry = new ProtoInventoryGameEntry
 			{

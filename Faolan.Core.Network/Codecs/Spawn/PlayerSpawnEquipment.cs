@@ -16,13 +16,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(CharacterEquipmentSlot pos, Item item)
 		{
-			var key = new ProtoDecryptionKey
-			{
-				Key1 = item.Data1,
-				Key2 = item.Data2,
-				Key3 = item.Data3,
-				Key4 = item.Data4
-			};
+			var key = item.Key;
 
 			return new ProtoCoreCharacterIIR.InventoryEntry
 			{

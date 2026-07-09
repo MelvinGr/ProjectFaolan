@@ -91,11 +91,7 @@ namespace Faolan.Importer.Captures
 					Level = (byte)Math.Min(src.ItemLevel, byte.MaxValue),
 					Type = ItemType.Normal,
 					Hash = src.ItemHash, // 0 for AH listings - rendered by-template via the live add, not the snapshot
-					Data0 = 0,
-					Data1 = src.Data1,
-					Data2 = src.Data2,
-					Data3 = src.Data3,
-					Data4 = src.Data4
+					Key = (ProtoDecryptionKey)src.Key.Clone()
 				});
 				harvested++;
 			}
@@ -137,10 +133,10 @@ namespace Faolan.Importer.Captures
 					existing.ItemHandle = e.ItemHandle;
 					existing.EntryFlags = e.EntryFlags;
 					existing.Timestamp = e.Timestamp;
-					existing.Data1 = e.Data1;
-					existing.Data2 = e.Data2;
-					existing.Data3 = e.Data3;
-					existing.Data4 = e.Data4;
+					existing.Key.Key1 = e.Key.Key1;
+					existing.Key.Key2 = e.Key.Key2;
+					existing.Key.Key3 = e.Key.Key3;
+					existing.Key.Key4 = e.Key.Key4;
 					existing.Template = e.Template;
 					existing.ItemLevel = e.ItemLevel;
 					existing.ItemHash = e.ItemHash;
@@ -190,10 +186,7 @@ namespace Faolan.Importer.Captures
 				ItemHandle = row.ItemHandle,
 				EntryFlags = flags,
 				Timestamp = timestamp,
-				Data1 = key.Key1,
-				Data2 = key.Key2,
-				Data3 = key.Key3,
-				Data4 = key.Key4,
+				Key = key,
 				Template = item.Template1,
 				ItemLevel = item.Level,
 				ItemHash = item.Hash

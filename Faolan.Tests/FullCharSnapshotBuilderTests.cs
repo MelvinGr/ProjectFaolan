@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,20 +20,14 @@ namespace Faolan.Tests
 		private static readonly Item Manacles = new()
 		{
 			Id = 3361557,
-			Data1 = 1,
-			Data2 = 2,
-			Data3 = 3,
-			Data4 = 4,
+			Key = new ProtoDecryptionKey { Key1 = 1, Key2 = 2, Key3 = 3, Key4 = 4 },
 			Hash = 0x43555035
 		};
 
 		private static readonly Item Signet = new()
 		{
 			Id = 3774542,
-			Data1 = 5,
-			Data2 = 6,
-			Data3 = 7,
-			Data4 = 8,
+			Key = new ProtoDecryptionKey { Key1 = 5, Key2 = 6, Key3 = 7, Key4 = 8 },
 			Hash = 0x12345678
 		};
 

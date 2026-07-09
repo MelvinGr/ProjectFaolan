@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 	// (RefId, Category) against its RDB.
 	public class QuestTextRef : BaseEntity
 	{
-		[Column("QuestDefinitionId")]
+		[Column("QuestDefinitionId")] // TODO: Remove attribute so that sql is updated
 		public uint QuestId { get; set; }
 
 		[ForeignKey(nameof(QuestId))]

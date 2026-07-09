@@ -35,7 +35,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				if (item == null)
 					continue;
 
-				entries.Add(new ShopEntry(row.Pos, item.Id, row.Count, row.Stat356, row.TailLevel, item.Hash, item.Data1, item.Data2, item.Data3, item.Data4));
+				entries.Add(new ShopEntry(row.Pos, item.Id, row.Count, row.Stat356, row.TailLevel, item.Hash, item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4));
 			}
 
 			return new ShopContent(shopInstance, npcHandle, maxSize, entries).ToArray();

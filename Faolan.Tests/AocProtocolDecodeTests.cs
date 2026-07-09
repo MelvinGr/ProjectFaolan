@@ -70,10 +70,10 @@ namespace Faolan.Tests
 				}
 
 				Assert.NotNull(item);
-				Assert.Equal(item!.Data1, acg.Key1.Key1);
-				Assert.Equal(item.Data2, acg.Key1.Key2);
-				Assert.Equal(item.Data3, acg.Key1.Key3);
-				Assert.Equal(item.Data4, acg.Key1.Key4);
+				Assert.Equal(item!.Key.Key1, acg.Key1.Key1);
+				Assert.Equal(item.Key.Key2, acg.Key1.Key2);
+				Assert.Equal(item.Key.Key3, acg.Key1.Key3);
+				Assert.Equal(item.Key.Key4, acg.Key1.Key4);
 			}
 			finally
 			{

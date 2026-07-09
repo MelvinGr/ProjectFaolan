@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -29,14 +30,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(0x00000000)
 				.WriteUInt32(0x00000001)
 				.WriteUInt32(ability.Data0)
-				.WriteUInt32(ability.Data1)
-				.WriteUInt32(ability.Data2)
-				.WriteUInt32(ability.Data3)
-				.WriteUInt32(ability.Data4)
-				.WriteUInt32(ability.Data1)
-				.WriteUInt32(ability.Data2)
-				.WriteUInt32(ability.Data3)
-				.WriteUInt32(ability.Data4)
+				.WriteUInt32(ability.Key.Key1)
+				.WriteUInt32(ability.Key.Key2)
+				.WriteUInt32(ability.Key.Key3)
+				.WriteUInt32(ability.Key.Key4)
+				.WriteUInt32(ability.Key.Key1)
+				.WriteUInt32(ability.Key.Key2)
+				.WriteUInt32(ability.Key.Key3)
+				.WriteUInt32(ability.Key.Key4)
 				.WriteUInt32(AddSpecialAbilityConstantA)
 				.WriteUInt32(AddSpecialAbilityConstantB)
 				.WriteUInt32(AddSpecialAbilityConstantA)
@@ -94,10 +95,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				Slot = slot,
 				Id = id,
 				Data0 = data0,
-				Data1 = data1,
-				Data2 = data2,
-				Data3 = data3,
-				Data4 = data4
+				Key = new ProtoDecryptionKey { Key1 = data1, Key2 = data2, Key3 = data3, Key4 = data4 }
 			};
 			announce = announceByte == 1;
 			return true;

@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,10 +45,10 @@ namespace Faolan.Importer.Captures
 					inserted++;
 				}
 
-				item.Data1 = ci.Data1;
-				item.Data2 = ci.Data2;
-				item.Data3 = ci.Data3;
-				item.Data4 = ci.Data4;
+				item.Key.Key1 = ci.Data1;
+				item.Key.Key2 = ci.Data2;
+				item.Key.Key3 = ci.Data3;
+				item.Key.Key4 = ci.Data4;
 				item.Hash = ci.Hash;
 
 				// Classify Quest/Resource items by the container they were captured in; only ever UPGRADE from the

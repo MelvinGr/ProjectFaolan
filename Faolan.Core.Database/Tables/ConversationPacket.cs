@@ -23,6 +23,7 @@ namespace Faolan.Core.Database.Tables
 		public byte? Flag { get; set; } // OpenChatWindow/AppendText trailing flag (null otherwise)
 		public byte[] CameraParams { get; set; }
 
+		[Obsolete("FROM SCRATCH")]
 		public byte[] Data { get; set; }
 
 		public int Sequence { get; set; }
@@ -39,6 +40,6 @@ namespace Faolan.Core.Database.Tables
 		// SubOpcode is the Knubot dialogue IIR (0x045B0B0F / 0x4A3D899A / 0xF164A4A5 / 0xC4AF39EB) OR the dialogue
 		// camera (0x2015 DispatchSetDialogueCamera). Knubot uses Env/Field/Flag/ScreensJson; the camera uses
 		// CameraAgentInstance + CameraParams. The npc/player handles are always the live ones at send time.
-		public uint? SubOpcode { get; set; }
+		public uint? SubOpcode { get; set; } // TODO: Use enum
 	}
 }

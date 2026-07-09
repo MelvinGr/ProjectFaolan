@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -11,18 +12,16 @@ namespace Faolan.Core.Database.Tables
 	public class MailAttachment : BaseEntity
 	{
 		// The item instance id, repeated as the entry's ProtoInventoryGameEntry.ItemId.
-		public ulong ItemInstanceId { get; set; }
+		public ulong ItemInstanceId { get; set; } // TODO: Rename to ItemId?
 
 		public uint MailId { get; set; } // FK -> Mail.Id (the row key, not the wire MailId)
 
 		[ForeignKey(nameof(MailId))]
 		public virtual Mail Mail { get; set; }
 
-		// --- the item INSTANCE identity (the entry's ProtoAcgItem) -------------------------------------------
-		public uint Data1 { get; set; }
-		public uint Data2 { get; set; }
-		public uint Data3 { get; set; }
-		public uint Data4 { get; set; }
+		// --- the item INSTANCE identity (the entry's ProtoAcgItem)
+		public virtual ProtoDecryptionKey Key { get; set; } = new();
+
 		public uint ItemHash { get; set; }
 		public uint ItemLevel { get; set; }
 

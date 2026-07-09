@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -205,10 +206,10 @@ namespace Faolan.Importer.Captures
 
 				a.Slot = g.Slot;
 				a.Data0 = g.D0;
-				a.Data1 = g.D1;
-				a.Data2 = g.D2;
-				a.Data3 = g.D3;
-				a.Data4 = g.D4;
+				a.Key.Key1 = g.D1;
+				a.Key.Key2 = g.D2;
+				a.Key.Key3 = g.D3;
+				a.Key.Key4 = g.D4;
 				if (string.IsNullOrEmpty(a.Name) && KnownNames.TryGetValue(id, out var n))
 					a.Name = n;
 			}

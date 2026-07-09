@@ -164,7 +164,7 @@ namespace Faolan.Importer.Cli
 			using var rdb = new RdbReader(rdbDir);
 			foreach (var a in db.Abilities.OrderBy(x => x.Slot).ToList())
 			{
-				var key = new[] { a.Data1, a.Data2, a.Data3, a.Data4 };
+				var key = new[] { a.Key.Key1, a.Key.Key2, a.Key.Key3, a.Key.Key4 };
 				if (!rdb.TryGet(1000020, a.Id, out var e) || e.File == 0xff || e.Size == 0)
 				{
 					Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} (no 1000020 entry)");
@@ -273,9 +273,9 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			Console.WriteLine($"item {itemId} \"{item.Name}\" type={item.Type} cat={item.SearchCategory} key={item.Data1:X8},{item.Data2:X8},{item.Data3:X8},{item.Data4:X8}");
+			Console.WriteLine($"item {itemId} \"{item.Name}\" type={item.Type} cat={item.SearchCategory} key={item.Key.Key1:X8},{item.Key.Key2:X8},{item.Key.Key3:X8},{item.Key.Key4:X8}");
 			using var rdb = new RdbReader(rdbDir);
-			var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
+			var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
 			byte[] template = null;
 			foreach (var type in new uint[] { 1000020, 1000620 })
 			{

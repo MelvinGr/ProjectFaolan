@@ -59,13 +59,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// listing row, not the Items template table.
 		public static ProtoInventoryGameEntry BuildEntry(TradepostListing listing)
 		{
-			var key = new ProtoDecryptionKey
-			{
-				Key1 = listing.Data1,
-				Key2 = listing.Data2,
-				Key3 = listing.Data3,
-				Key4 = listing.Data4
-			};
+			var key = listing.Key;
 
 			var entry = new ProtoInventoryGameEntry
 			{

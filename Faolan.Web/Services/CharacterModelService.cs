@@ -496,7 +496,7 @@ namespace Faolan.Web.Services
 				var item = db.Items.AsNoTracking().FirstOrDefault(i => i.Id == itemId);
 				return item == null
 					? null
-					: RdbAssetExtractor.BuildItemModelGlb(Reader(), itemId, item.Data1, item.Data2, item.Data3, item.Data4);
+					: RdbAssetExtractor.BuildItemModelGlb(Reader(), itemId, item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4);
 			});
 		}
 
@@ -803,10 +803,10 @@ namespace Faolan.Web.Services
 		// when the item has no key / no local template entry.
 		private static byte[]? DecryptTemplate(RdbReader rdb, Item? item)
 		{
-			if (item == null || item is { Data1: 0, Data2: 0, Data3: 0, Data4: 0 })
+			if (item == null || item is { Key.Key1: 0, Key.Key2: 0, Key.Key3: 0, Key.Key4: 0 })
 				return null;
 
-			var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
+			var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
 			foreach (var type in new uint[] { 1000020, 1000620 })
 			{
 				if (rdb.TryGet(type, item.Id, out var e) && e.File != 0xff && e.Size > 0)

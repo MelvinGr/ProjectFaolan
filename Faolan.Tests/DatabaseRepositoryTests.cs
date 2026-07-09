@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using System;
 using System.IO;
 using System.Linq;
@@ -59,10 +60,7 @@ namespace Faolan.Tests
 						Id = itemId,
 						Name = "Ape King's Treasure",
 						Hash = 1497905484,
-						Data1 = 1,
-						Data2 = 2,
-						Data3 = 3,
-						Data4 = 4
+						Key = new ProtoDecryptionKey { Key1 = 1, Key2 = 2, Key3 = 3, Key4 = 4 }
 					});
 					ctx.Maps.Add(new Map
 					{

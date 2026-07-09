@@ -6,6 +6,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,10 +53,7 @@ namespace Faolan.Importer.Captures
 							ItemId = e.ItemId,
 							Flag = e.Flag,
 							Hash = e.Hash,
-							Data1 = e.Data1,
-							Data2 = e.Data2,
-							Data3 = e.Data3,
-							Data4 = e.Data4,
+							Key = new ProtoDecryptionKey { Key1 = e.Data1, Key2 = e.Data2, Key3 = e.Data3, Key4 = e.Data4 },
 							Trailing = e.Trailing
 						});
 					}

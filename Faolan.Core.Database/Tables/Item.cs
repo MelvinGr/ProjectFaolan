@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -30,17 +31,13 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(256)]
 		public string Name { get; set; }
 
-		// The item's stable identity QUAD (Data1..Data4) - the per-template 16-byte ProtoDecryptionKey repeated in
-		// the inventory snapshot tail and the add-item packet, and the TEA key for the item's encrypted RDB template.
-		// The client REJECTS an item whose quad isn't a template it knows (the add/remove stall). Sourced from the
-		// old C++ `p_items` (Archive/) AND harvested from real captured inventories (every item a player has held)
-		// AND from AH listings (the listing carries the per-template quad). Data0 is a separate leading word (0 for
-		// quad-only sources like AH listings). See docs/archive/spawn-dissection-plan.md Phase 5.
-		public uint Data0 { get; set; }
-		public uint Data1 { get; set; }
-		public uint Data2 { get; set; }
-		public uint Data3 { get; set; }
-		public uint Data4 { get; set; }
+		// The item's stable identity - the per-template 128-bit TEA key (4 words) that unlocks the item's encrypted
+		// RDB template. On the wire it is exactly ProtoAcgItem.key1, repeated in the inventory-snapshot tail and the
+		// add-item packet; the client REJECTS an item whose key isn't a template it knows (the add/remove stall).
+		// Sourced from the old C++ `p_items` (Archive/), real captured inventories, and AH listings. Stored as an EF
+		// owned type -> flat columns Key1..Key4. virtual for the lazy-loading-proxy test context (owned types load
+		// eagerly regardless; virtual only satisfies the proxy's all-navigations-virtual rule). See docs/archive/spawn-dissection-plan.md Phase 5.
+		public virtual ProtoDecryptionKey Key { get; set; } = new();
 
 		// Per-TEMPLATE hash the client needs (alongside the Data quad) to fully realize/render the item from its RDB.
 		// On the wire it is ProtoAcgItem.Hash (and the FullChar snapshot tail's f8 field). It is NOT in the old C++

@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -95,10 +96,7 @@ namespace Faolan.Web.Services
 					Quantity = count == 0
 						? 1u
 						: count,
-					Data1 = item.Data1,
-					Data2 = item.Data2,
-					Data3 = item.Data3,
-					Data4 = item.Data4,
+					Key = (ProtoDecryptionKey)item.Key.Clone(),
 					Template = item.Id,
 					ItemLevel = item.Level,
 					ItemHash = item.Hash,

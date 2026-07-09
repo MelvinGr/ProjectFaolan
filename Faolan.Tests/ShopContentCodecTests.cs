@@ -1,3 +1,4 @@
+using Faolan.Core.Protobuf;
 using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
@@ -35,10 +36,7 @@ namespace Faolan.Tests
 			{
 				Id = e.Template,
 				Hash = e.Hash,
-				Data1 = e.Data1,
-				Data2 = e.Data2,
-				Data3 = e.Data3,
-				Data4 = e.Data4
+				Key = new ProtoDecryptionKey { Key1 = e.Data1, Key2 = e.Data2, Key3 = e.Data3, Key4 = e.Data4 }
 			});
 
 			var rebuilt = ShopContentCodec.Build(parsed.ShopInstance, parsed.NpcHandle, parsed.MaxSize, items, t => byTemplate[t]);
