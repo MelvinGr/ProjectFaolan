@@ -32,6 +32,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
         public List<byte[]> BuffRecords { get; } = [];
         public List<ScaffoldEntry> Entries { get; } = [];
         public List<ScaffoldIdEntry> IdList { get; } = [];
+        // EndPairs (the first ending list) IS the FACTION-REPUTATION block: Id = faction id, Value = signed standing
+        // (+/-50000) shown in the client's Factions window. See CharacterScaffoldPair / Gitea #315.
         public List<ScaffoldPair> EndPairs { get; } = [];
         public List<ScaffoldPair> EndPairs2 { get; } = [];
         public uint Ack { get; set; } = EntityClass.Character;
