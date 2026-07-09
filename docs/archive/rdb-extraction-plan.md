@@ -330,7 +330,7 @@ note above; do not read it as a u32.)
 - **Done into `Item`:** `Name` (143 filled). **Remaining:** level/stats once the struct field map is reversed.
 
 ### Typed protobuf decoding (docs/aoc-client-protos.proto → C#)
-The recovered schema is generated to **`Faolan.Core/Network/Protobuf/AocProtocol.g.cs`** (protobuf-net, the
+The recovered schema is generated to **`Faolan.Core/Protobuf/AocProtocol.g.cs`** (protobuf-net, the
 project's existing protobuf runtime). Test `AocProtocolDecodeTests` decodes a **real captured** inventory entry
 (Slave Manacles) with the generated `ProtoInventoryGame.InventoryListEntry` and asserts the decoded
 `ProtoAcgItem.key1` (a `ProtoDecryptionKey`) == the item's `Data1..4` and `template1` == the item id — proving the

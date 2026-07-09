@@ -18,7 +18,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Proves the protobuf schema reverse-engineered from AgeOfConan.exe (docs/aoc-client-protos.proto, generated to
-	// Faolan.Core/Network/Protobuf/AocProtocol.g.cs) decodes the REAL captured inventory wire bytes - and that the
+	// Faolan.Core/Protobuf/AocProtocol.g.cs) decodes the REAL captured inventory wire bytes - and that the
 	// decoded ProtoAcgItem.key1 (a ProtoDecryptionKey) is exactly the item's Data1..4 quad, i.e. the per-item TEA
 	// key that unlocks its RDBH item template. Ties capture -> typed protobuf -> decryption key together.
 	public class AocProtocolDecodeTests

@@ -5,7 +5,7 @@ using Faolan.Core.Protobuf;
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
 	// Builds a 0x737A6DF9 inventory container-entry (ProtoInventoryGame.items, field 4) from a DB Item template,
-	// using the typed protobuf schema recovered from the client exe (Faolan.Core/Network/Protobuf, see
+	// using the typed protobuf schema recovered from the client exe (Faolan.Core/Protobuf, see
 	// docs/aoc-client-protos.proto). The layout is the client's own:
 	//   entry  = InventoryListEntry { pos = slot, item = ProtoInventoryGameEntry }
 	//   item   = ProtoInventoryGameEntry { item_id, stat_list[ (0,flags),(23,recordId),(26,count) ], item_data }

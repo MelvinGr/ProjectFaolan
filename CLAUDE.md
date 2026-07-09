@@ -65,9 +65,9 @@ service as a hosted service: `UniverseAgentListener`, `PlayerAgentListener`, `Cs
 serves both the create-editor and world connections).
 
 **Projects:** `Faolan/` server
-host · `Faolan.Core/` BASE shared types + crypto (the layer everything builds on) · `Faolan.Core.Database/`
-EF Core DB — `DatabaseContext`, `Tables/`, `DatabaseRepository` · `Faolan.Core.Network/` networking +
-protobuf + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World/`, …) + `Constants/Opcodes.cs`
+host · `Faolan.Core/` BASE shared types + crypto + the `Protobuf/` schema (the layer everything builds on) ·
+`Faolan.Core.Database/` EF Core DB — `DatabaseContext`, `Tables/`, `DatabaseRepository` · `Faolan.Core.Network/`
+networking + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World/`, …) + `Constants/Opcodes.cs`
 · `Faolan.Core.Rdb/` client RDB extraction · `Faolan.Importer/` tshark-dump+RDB -> DB CLI ·
 `Faolan.ClientLauncher/` unattended retail client · `Faolan.Mcp/` in-process MCP server (DB + live-session +
 GM-command tools) · `Faolan.Web/` + `Faolan.Web.Content/` Blazor armory/3D-viewer + GM tools + CDN proxy ·

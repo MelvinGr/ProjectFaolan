@@ -50,7 +50,7 @@ must never be presented as "the message is decoded." Today that difference is in
 |------|----------------|---------|
 | `gen/opcodes.md` | `Faolan.Core.Network/Constants/Opcodes.cs` | 17 interfaces × 791 entries, direction + class |
 | `gen/iir-types.md` | same | 74 32-bit sub-opcodes, each with its **BKDR-31 hash recomputed from the type name as proof** |
-| `gen/protobuf.md` | `Protobuf/aoc-client-protos.proto` | 56 messages, **with `ZigZag`/`Default` field flags surfaced** |
+| `gen/protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` | 56 messages, **with `ZigZag`/`Default` field flags surfaced** |
 | `gen/coverage.md` | the repo | the coverage matrix (below) |
 
 Surfacing the ZigZag flags is not cosmetic: field 3 of `ProtoScryScriptIIR` is ZigZag, and reading it as a

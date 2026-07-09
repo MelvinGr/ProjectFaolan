@@ -135,7 +135,7 @@ These are dev/GM tooling, not normal gameplay traffic — recovered for complete
 
 The 17 `Proto*` catalog entries (and their nested submessages) are **protobuf message types**, fully
 specified by the recovered client schema at
-[`Faolan.Core/Network/Protobuf/aoc-client-protos.proto`](../Faolan.Core/Network/Protobuf/aoc-client-protos.proto)
+[`Faolan.Core/Protobuf/aoc-client-protos.proto`](../Faolan.Core/Protobuf/aoc-client-protos.proto)
 — so they are "decoded" by the schema, not by a hand-rolled `ReadSubClass`. (Their vtable slot 8 is the
 generated protobuf serialize/parse virtual, not the IIR stream reader.) Covered there:
 
