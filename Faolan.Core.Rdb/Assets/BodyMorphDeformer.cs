@@ -5,7 +5,7 @@ namespace Faolan.Core.Rdb.Assets
 {
 	// Body-proportion morphs for the 3D character viewer (#275), reverse-engineered from AgeOfConan.exe
 	// ApplyMorph (FUN_00fede10) plus a live gdb capture of the char-create deform-node array
-	// (docs/body-morph-re.md, data in docs/morph-capture/body_morphs_aqf.json).
+	// (docs/body-morph-re.md, data in docs/re/body_morphs_aqf.json).
 	//
 	// AoC body morphs are NOT vertex blend shapes — each slider scales a weighted set of deform JOINTS, and
 	// the skinned mesh follows. We approximate the skinning with a radial soft-deform about each joint's

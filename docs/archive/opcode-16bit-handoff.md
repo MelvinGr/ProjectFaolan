@@ -96,7 +96,7 @@ The recovered `GameInterface`/`GameCharInterface` ordinals reproduce the known a
 `extract_rpc_catalog.py`) so it's reproducible.
 
 ## Paste-ready prompt
-> Recover the 16-bit RPC method opcodes from AgeOfConan.exe (read `docs/opcode-16bit-handoff.md`). This is the
+> Recover the 16-bit RPC method opcodes from AgeOfConan.exe (read `docs/archive/opcode-16bit-handoff.md`). This is the
 > parked Stage 3b gap (`docs/archive/opcode-re-plan.md`): the wire opcode `0x2000..0x20FF` = `0x2000 +` the
 > method's RPC registration index, which is assigned by registration ORDER (not a literal/hash/jump-table), so it
 > needs the Ghidra analysis already sitting at `/home/melvin/Development/Ghidra/Aoc` (reuse with `-process -noanalysis`; re-import

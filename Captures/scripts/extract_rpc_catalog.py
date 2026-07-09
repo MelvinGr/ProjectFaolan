@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 1 of docs/opcode-re-plan.md: extract the client's RPC method catalog from AgeOfConan.exe strings.
+"""Stage 1 of docs/archive/opcode-re-plan.md: extract the client's RPC method catalog from AgeOfConan.exe strings.
 
 Two evidence sources in the binary:
   - proxy  (client->server): "<Class>Proxy_t::Method(<typed sig>) streamed payload of size "
@@ -81,7 +81,7 @@ tot_c2s = sum(len(v["client_to_server"]) for v in result.values())
 tot_s2c = sum(len(v["server_to_client"]) for v in result.values())
 out = []
 out.append("# AoC client RPC method catalog (extracted from AgeOfConan.exe)\n")
-out.append("Stage 1 of `docs/opcode-re-plan.md`. Recovered from the client's own log strings - method **names**,\n"
+out.append("Stage 1 of `docs/archive/opcode-re-plan.md`. Recovered from the client's own log strings - method **names**,\n"
            "**param names/types**, and **direction**. (Numeric ids: opcodes are framework-assigned - see\n"
            "`docs/aoc-opcode-ids.md`; the IIR/message + endpoint ids are BKDR-31 name hashes, decoded there.)\n")
 out.append(f"\n**{len(result)} interfaces, {tot_c2s} client->server (proxy) methods, {tot_s2c} server->client (dispatch) methods.**\n")

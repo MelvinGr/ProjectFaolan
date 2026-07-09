@@ -72,7 +72,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
         // scripts: profession feat = class*100, always first/ascending). The four captured-at-L1 archetypes use
         // their exact retail fresh list; the rest fall back to the profession feat + the base feats common to every
         // captured fresh list. NOTE: the in-world *displayed class* is NOT derived from this feat tree - it reads
-        // player stat 0x43 (see PostReadyFollowUp / docs/class-display-239.md, #239). The earlier "client derives the
+        // player stat 0x43 (see PostReadyFollowUp / docs/archive/class-display-239.md, #239). The earlier "client derives the
         // profession from the feat tree" claim was DISPROVEN in-client (a spawn carrying feat 4100 still showed
         // Barbarian); this list still matters for the actual feat/AA content, just not the class label.
         private static readonly uint[] CommonFreshSkillIds = [6900, 8100, 8305, 8400, 13600, 14600, 328900, 331300];

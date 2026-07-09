@@ -87,7 +87,7 @@ frame name).
   Necromancer).
 
 ## Paste-ready prompt
-> Continue the Age of Conan NPC spawn work (read `docs/npc-spawn-handoff.md` and TODO §3 first). Beach NPCs
+> Continue the Age of Conan NPC spawn work (read `docs/archive/npc-spawn-handoff.md` and TODO §3 first). Beach NPCs
 > on map 4010 don't render like retail: Casilda (chained captive) is invisible and NPCs lack floating
 > name+healthbar tags. We proved Casilda's spawn bytes match retail and content isn't the issue. Start with
 > task #1: fix the burst-vs-interest double-spawn (Known-seeding in BroadcastPlayerEntry) so the first move

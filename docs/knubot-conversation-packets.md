@@ -19,7 +19,7 @@ zero raw replay. The remoteformat XML itself is parsed/rebuilt byte-exact by `Re
 player name/guild are regenerated** into each screen (`RemoteFormatXml.WithLivePlayer`) so the NPC greets the
 real character — the captured player's name is gone. **Remaining:** the screen TEXT (`id`/`category`/`key`)
 is still the captured template; generating it from RDB text + the Lua/tag VM is blocked on the harvested,
-client-validated content `key` (non-computable, same as the item TEA keys — see `docs/quest-log-handover.md`).
+client-validated content `key` (non-computable, same as the item TEA keys).
 
 `AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 197/197 +
 48/48): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. CloseChatWindow
@@ -56,7 +56,7 @@ Every Knubot packet begins with this base (the subclasses call it first).
 A dialogue SCREEN on the wire = `OpenChatWindow` (opens) → `AppendText` (NPC text) → `AnswerList` (the
 option list). Each text/option slot is a `<remoteformat id=.. category=.. key=..>` token the client resolves
 against its RDB — same deterministic-`key` mechanism as the quest journal
-(`docs/quest-log-handover.md`); so building a screen = emit base + the OpenChatWindow/AppendText/AnswerList
+; so building a screen = emit base + the OpenChatWindow/AppendText/AnswerList
 records with the right `(id, category, key)` refs.
 
 ## The non-dialogue packets in a node (`SetDialogueCamera`)

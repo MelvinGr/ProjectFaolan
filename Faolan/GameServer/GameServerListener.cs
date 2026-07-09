@@ -379,7 +379,7 @@ namespace Faolan.GameServer
 		protected override Task ReceivedPacket(INetworkClient client, ConanPacket packet)
 		{
 			// This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes, 			// so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
-			// class route consumes the packet. See docs/protocol_gameserver_rpc_multiplexing.md + tradepost-protocol.md.
+			// class route consumes the packet. See CLAUDE.md (wire-protocol essentials) + docs/tradepost-protocol.md.
 			// The two sub-0x2014 opcodes 0x2002/0x2003 are the ONLY ones that also arrive on GameCharAgent (there they
 			// are RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
 			return packet.Receiver.Type switch

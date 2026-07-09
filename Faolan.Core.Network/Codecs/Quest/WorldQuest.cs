@@ -77,7 +77,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		// The fixed u64 the QuestFullUpdate carries at its `acceptTime` slot inside the snapshot tails (NOT a live
 		// timestamp - it is the same constant in the live grant packet and the in-progress login snapshot; decoded as
-		// a structural header field, docs/quest-log-handover.md).
+		// a structural header field).
 		public const ulong SnapshotQuestAcceptTime = 0x000111D354375554UL;
 		private const string RrlMagic = "RRL3"; // record-list magic that precedes the per-quest entries
 		private const uint ChapterTag = 0x00000BD3; // per-quest grouping word, constant across Tortage quests

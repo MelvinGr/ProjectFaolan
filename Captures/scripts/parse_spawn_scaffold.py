@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Player-spawn scaffold parser/regenerator prototype (docs/player-spawn-generation-plan.md).
+"""Player-spawn scaffold parser/regenerator prototype (docs/archive/player-spawn-generation-plan.md).
 
 Validates that the documented scaffold wire format (everything in the FA015807 body that is NOT the
 ProtoCoreCharacterIIR) parses structurally and regenerates BYTE-EXACT across the capture set. This is the

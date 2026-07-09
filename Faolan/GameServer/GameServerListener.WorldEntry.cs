@@ -264,7 +264,7 @@ namespace Faolan.GameServer
 
 				// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
 				// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
-				// CLIENT-SIDE from the char data we already deliver (docs/class-display-239.md). Verified in-client
+				// CLIENT-SIDE from the char data we already deliver (docs/archive/class-display-239.md). Verified in-client
 				// with the force-feed DISABLED on BOTH paths: an existing lvl80 login read stat 0x43 = Necromancer, // and a freshly-created char read stat 0x43 = HeraldOfXotli - both displayed correctly. The earlier
 				// interim predated the client-derivation working; no server-side class stat is needed.
 

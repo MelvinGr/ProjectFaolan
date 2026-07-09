@@ -900,7 +900,7 @@ namespace Faolan.GameServer.World
 
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
 		// from the first definition. The trailing "tracked quest" pointer is the captured no-track block; pinning the
-		// multi-quest tracked variant needs more decode (docs/quest-log-handover.md).
+		// multi-quest tracked variant needs more decode.
 		public static Task SendQuestJournal(INetworkClient client, IReadOnlyList<QuestDefinition> definitions)
 		{
 			var first = definitions[0];
@@ -918,8 +918,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
-		// appears in the log even though the client got its QuestFullUpdate detail (decoded from the grant capture;
-		// docs/quest-log-handover.md). trackedDef is the highlighted (just-accepted) quest; activeQuestIds are all the
+		// appears in the log even though the client got its QuestFullUpdate detail (decoded from the grant capture). trackedDef is the highlighted (just-accepted) quest; activeQuestIds are all the
 		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
 		public static Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{

@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 	// The journal CONTENT of a quest: the text refs + objective marker the server ships so the client's J-panel
 	// renders a real title/description/objective. Harvested from captures by the importer (QuestDefinitionExtractor)
 	// - construct, don't replay. Text is never literal: each ref is a (RefId, Category) the client resolves against
-	// its RDB; KeyText is the deterministic per-(id,category) content hash (see docs/quest-log-handover.md).
+	// its RDB; KeyText is the deterministic per-(id,category) content hash.
 	// CharacterQuest persists a character's STATE (active/progress); this is the shared, character-independent
 	// definition looked up by the RDB quest id.
 	public class QuestDefinition : BaseEntity

@@ -2,7 +2,7 @@
 """Compare OUR create-world beach cutscene against retail, packet-by-packet.
 
 The beach destiny cutscene is a call-and-RESPONSE on the world GameServer connection (see
-docs/handoff-2026-06-22-create-flow-reconstruct.md): the client REQUESTS each script group by id and the
+docs/archive/handoff-2026-06-22-create-flow-reconstruct.md): the client REQUESTS each script group by id and the
 server must ECHO back a matching StartGroup. This script extracts the ScryScriptIIR (0xA36D3B74) sequence in
 BOTH directions from a tshark.json and prints the interleave, so a test run can be diffed against retail.
 

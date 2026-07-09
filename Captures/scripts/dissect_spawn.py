@@ -4,7 +4,7 @@
 Early dissection workbench (Phase 0/1): pulls every Spawn body from one or more captures, annotates the
 transform/name, and diffs two spawns byte-for-byte. SUPERSEDED for the full player-spawn format by
 Captures/scripts/parse_spawn_scaffold.py (the validated grammar - parses + regenerates every captured player spawn
-byte-exact; see docs/player-spawn-generation-plan.md). Kept for quick NPC-spawn poking.
+byte-exact; see docs/archive/player-spawn-generation-plan.md). Kept for quick NPC-spawn poking.
 
 Layout discovered so far:
   [u32 len][u32 0xFA015807][u32 0x0000C350][u32 handle][u32 fieldA]

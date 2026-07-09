@@ -78,7 +78,7 @@ mesh, skinned to those nodes, follows. The 7 body morphs and their exact data (c
 **Node world positions** dumped live (`FUN_00fede10` node loop: array at `*(*(model+0x16c)+0x1a0)`, count
 `+0x1a4` = 109 nodes, stride `0x50`, **world xyz at node+0x30**, morph scale at node+0x40). Validated vs
 anatomy (arm sweeps shoulder y1.58→elbow y1.13; bosom y1.4 z+0.05 front; leg hip1.08→ankle0.07; etc.). Full
-data with positions: `docs/morph-capture/body_morphs_aqf.json`. gdb scripts: `Captures/ghidra/dump_morph.gdb`
+data with positions: `docs/re/body_morphs_aqf.json`. gdb scripts: `Captures/ghidra/dump_morph.gdb`
 (delta lists), `dump_nodes.gdb` (node array).
 
 DB slider [-100,100] → `t=slider/100` → client weight `= t × (t≥0 ? max : |min|)`. The viewer's

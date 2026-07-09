@@ -6,7 +6,7 @@ Goal (ACHIEVED for the tails, see Status): replace the captured `BeachTailsTempl
 generated grammar so the `.bin` can be retired and the character's **class/progression** authored instead of
 inherited from Strie. `BeachTailsBuilder.BuildFromScratch` now reproduces the whole tails byte-for-byte from
 generated quest + a game-static access-window asset + the code stat skeleton; what remains is wiring it into
-the production world-entry + the in-client chat-connect check. See `docs/quest-log-handover.md` and the memory
+the production world-entry + the in-client chat-connect check. See the memory
 `snapshot_tails_construction_scope`.
 
 ## Status & handover (2026-06-17, updated)

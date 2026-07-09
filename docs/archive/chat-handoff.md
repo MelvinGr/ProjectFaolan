@@ -71,7 +71,7 @@ So the chat (AgentServer) connection is never established. Chat connects only AF
   connected.
 
 ## Paste-ready prompt
-> Fix in-game chat (read `docs/chat-handoff.md` + TODO §2 "Chat broken again"). After world entry the client never
+> Fix in-game chat (read `docs/archive/chat-handoff.md` + TODO §2 "Chat broken again"). After world entry the client never
 > connects to AgentServer (7012); UniverseAgent/PlayerAgent/GameServer connect, chat doesn't. The `CoreClaimIIR
 > 0x06EC1255` (the historical "channels-missing" cause) IS still sent, so it's a different cause. Start by getting
 > the exact symptom + an `AgeOfConan.log` and a fresh loopback at the moment chat should connect, then bisect this

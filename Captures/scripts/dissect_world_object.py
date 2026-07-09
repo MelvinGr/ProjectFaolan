@@ -5,7 +5,7 @@ These are the per-map static world build records (props, zone/city labels, resou
 0x2000 channel alongside the entity spawns. They share the FA015807 header + 0x2C transform group, but instead
 of a CharacterIIR they carry a length-prefixed object message, and there is NO 228-byte pre-IIR float block -
 the message length prefix immediately follows the transform. Goal: lift these into a MapObjects table so the
-static world is BUILT from data, retiring the MapWorldBurst blob (docs/spawn-dissection-plan.md Phase 6).
+static world is BUILT from data, retiring the MapWorldBurst blob (docs/archive/spawn-dissection-plan.md Phase 6).
 
 Body layout (offsets body-relative):
   [0:20]    header: bodyLen, subOp, ack, handle, fieldA

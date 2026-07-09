@@ -69,4 +69,4 @@ Both are new GM commands. Server from `Faolan/bin/Debug` (`dotnet Faolan.dll`), 
 ## If anything looks wrong
 - Everything is local commits on `development`; `git reset --hard 787ec31` rewinds the whole session.
 - Each feature is its own commit (table above) — revert individually if needed.
-- The Night log in `docs/autonomous-session-handoff.md` has the per-milestone trail.
+- The per-milestone Night log this referenced was deleted; the git history is the record.
