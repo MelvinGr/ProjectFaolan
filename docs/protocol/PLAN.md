@@ -52,12 +52,16 @@ must never be presented as "the message is decoded." Today that difference is in
 | `gen/iir-types.md` | same | 74 32-bit sub-opcodes, each with its **BKDR-31 hash recomputed from the type name as proof** |
 | `gen/protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` | 56 messages, **with `ZigZag`/`Default` field flags surfaced** |
 | `gen/coverage.md` | the repo | the coverage matrix (below) |
+| `gen/messages.md` | the repo | per-message index: each IIR type → its codec + a cited golden (P5) |
 
 Surfacing the ZigZag flags is not cosmetic: field 3 of `ProtoScryScriptIIR` is ZigZag, and reading it as a
 plain varint silently halves every identity value in the character editor.
 
-These three hand-written docs are **drift factories** and are superseded by `gen/opcodes.md`; delete them
-once it lands: `aoc-opcode-ids.md`, `aoc-rpc-method-opcodes.md`, `aoc-client-rpc-methods.md`.
+This plan originally called `aoc-opcode-ids.md`, `aoc-rpc-method-opcodes.md` and `aoc-client-rpc-methods.md`
+"drift factories" to delete once `gen/opcodes.md` landed. **P7 reversed that:** they are referenced from CODE
+(`Opcodes.cs`, `Endpoints.cs`, `IirTypesPage.cs`) as the RE-*derivation* source — the staged writeup of *how*
+the opcode scheme was recovered, which the generated catalog doesn't carry. So they were moved to `re/` (RE
+methodology), not deleted. The generated `gen/opcodes.md` supersedes their *catalog* role only.
 
 ---
 
