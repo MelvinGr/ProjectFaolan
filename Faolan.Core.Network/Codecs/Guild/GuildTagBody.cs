@@ -13,6 +13,9 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// (WriteHeader with the world endpoints) and the live send.
 	public sealed record GuildTagBody(uint CharacterId, string GuildName) : ICodec<GuildTagBody>
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.GuildUpdateIIR;
+
 		public static GuildTagBody Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // subop

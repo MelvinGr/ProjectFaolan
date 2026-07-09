@@ -14,6 +14,9 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// premise, confirmed 2026-06-17). Byte-exact goldens: ShopOpenBuilderTests.
 	public static class ShopOpenBuilder
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.LookAtIIR;
+
 		// Frame 1189: [subop 0x0D155695][C350][playerInstance][u8 0][C350][vendorHandle][u32 0][u32 2]. The
 		// trailing 2 is the select MODE observed on the trade open (a plain click select carries different
 		// trailers; only the trade-open form is built here).

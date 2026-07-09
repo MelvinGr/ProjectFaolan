@@ -12,6 +12,9 @@ namespace Faolan.Core.Network.Codecs.World
 	// raw u32 bits so float values round-trip exactly.
 	public sealed class MoveTaskComposite : ICodec<MoveTaskComposite>
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
+
 		public MoveTaskNode Task { get; set; } = new MoveTaskNode();
 
 		public uint FromX { get; set; }

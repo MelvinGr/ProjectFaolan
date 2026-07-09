@@ -13,6 +13,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   EnergyIIR       0x40749B8A: [subop][0000C350][actor:4][01][stamina:4]                                     (17 b)
 	public static class CombatPacketCodec
 	{
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.BehaviorControlCenterIIR,
+			GameServer0X2000Opcodes.DamageResultIIR,
+			GameServer0X2000Opcodes.EnergyIIR,
+		];
+
 		public const int DamageResultBodyLength = 37;
 		public const int EnergyBodyLength = 17;
 

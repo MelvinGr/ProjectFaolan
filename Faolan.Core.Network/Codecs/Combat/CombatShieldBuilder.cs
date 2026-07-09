@@ -16,6 +16,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// via the .shield GM command.
 	public static class CombatShieldBuilder
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
+
 		// The retail default distribution the client's own clamp resets to: one shield on each arc.
 		public const uint DefaultDistribution = 111;
 

@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
@@ -18,12 +19,21 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// text, so nothing to structure; they (plus the interleaved quest-grant packets) replay from Data re-addressed.
 	public static class ConversationScreenDecoder
 	{
-		public const uint AnswerList = 0xF164A4A5;
-		public const uint AppendText = 0x4A3D899A;
-		public const uint CloseChatWindow = 0xC4AF39EB;
-		public const uint OpenChatWindow = 0x045B0B0F;
+		public const uint AnswerList = (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR; // 0xF164A4A5
+		public const uint AppendText = (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR; // 0x4A3D899A
+		public const uint CloseChatWindow = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR; // 0xC4AF39EB
+		public const uint OpenChatWindow = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR; // 0x045B0B0F
 		public const uint SetDialogueCamera = 0x2015; // GameCharAgent -> GameCharInterface (a 16-bit opcode, not an IIR sub)
 		private const uint Marker = 0x0000C350;
+
+		// The four Knubot screen IIR types this decoder recognizes (SetDialogueCamera is an RPC opcode, not an IIR).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.KnubotAnswerListIIR,
+			GameServer0X2000Opcodes.KnubotAppendTextIIR,
+			GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
+			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR,
+		];
 
 		public static Columns Decode(byte[] data)
 		{

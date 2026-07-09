@@ -10,6 +10,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// against the captured records (CombatEffectBuilderTests).
 	public static class CombatEffectBuilder
 	{
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.DamageResultIIR,
+			GameServer0X2000Opcodes.StatDamageIIR,
+		];
+
 		public static byte[] BuildDamageResult(uint target, uint attacker, uint damage, uint type)
 		{
 			return new DamageResult(target, attacker, damage, type).ToArray();

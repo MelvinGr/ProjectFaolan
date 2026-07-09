@@ -11,6 +11,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// in BehaviorAckTests / BehaviorPhaseFieldTests. CombatService keeps the FSM/send; this is the pure wire body.
 	public static class BehaviorAckBody
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
+
 		// The 8-byte constant category/owner pair (== the 0x2052 grant's ConstantA/B halves) used as the equip-ack's
 		// null identity filler.
 		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];

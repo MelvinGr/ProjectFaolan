@@ -12,6 +12,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// that are genuinely spellweave: the reactive element LIST, the FIRE burst, and the stat GAUGE ticks.
 	public static class SpellweaveCodec
 	{
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.CombatReactiveIIR,
+			GameServer0X2000Opcodes.StatDamageIIR,
+			GameServer0X2000Opcodes.StatIIR,
+		];
+
 		public const uint DotGauge = 0x37E690; // "Spellweaving" -> the health DoT when stamina is empty
 		public const uint DotScale = 0x0000001B; // v@33 for the DoT gauge
 

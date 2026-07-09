@@ -15,6 +15,9 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	//   f6 = sub-message {f1=0, f2=0}.
 	public static class ScryScript
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR;
+
 		// The no-token form: a StartScriptGroupOnClient (type 0) callback that runs a script group by id, with no
 		// step-token/resources (f4/f5 omitted) - the post-morph "nudge" the create-world handshake sends. protobuf
 		// = {f1=5 version, f2=0 type, f3=scriptGroupId, f6={0,0}}.

@@ -13,6 +13,9 @@ namespace Faolan.Core.Network.Codecs.World
 	// actually send (TryExtractPlayfieldToken), so the despawn token matches what the client learned, by construction.
 	public static class WorldDespawn
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR;
+
 		public const int BodyLength = 17; // [subop][typeTag][handle][marker][token] = 4+4+4+1+4
 		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
 

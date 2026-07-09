@@ -12,6 +12,16 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// is the pinned RDB Lua quest VM.
 	public static class WorldQuest
 	{
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.QuestFullUpdateIIR,
+			GameServer0X2000Opcodes.QuestGoalIIR,
+			GameServer0X2000Opcodes.QuestIIR,
+			GameServer0X2000Opcodes.QuestJournalIIR,
+			GameServer0X2000Opcodes.QuestLogListIIR,
+		];
+
 		// BuildQuestFullUpdate emits [subop 4][ack 4][player 4][u32 0 = 4][0x01 = 1] = 17 bytes before `questId`; the
 		// per-quest snapshot-tails content is that output from `questId` onward (used by the snapshot-shape tests).
 		public const int QuestFullUpdateContentOffset = 17;

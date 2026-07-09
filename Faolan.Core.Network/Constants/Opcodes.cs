@@ -1,5 +1,6 @@
 using System;
 
+// ReSharper disable InconsistentNaming
 namespace Faolan.Core.Network.Constants
 {
 	public enum AgentServerOpcodes : ushort

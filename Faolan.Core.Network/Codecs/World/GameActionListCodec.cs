@@ -19,6 +19,9 @@ namespace Faolan.Core.Network.Codecs.World
 	// usually 0 (a small id in some captures, undecoded); the 0x7E2 / 4 / 1 words are constant across all 570 captures.
 	public static class GameActionListCodec
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
+
 		public const uint ConstFour = 4;
 		public const uint Head = 0x000007E2;
 		public const ulong ConstOne = 1;

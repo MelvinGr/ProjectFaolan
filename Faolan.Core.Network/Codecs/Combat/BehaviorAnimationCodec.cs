@@ -13,6 +13,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// and trailer are behavior-specific.
 	public static class BehaviorAnimationCodec
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
+
 		public const ushort SeqBegin = 0x0004;
 		public const ushort SeqComplete = 0x000A;
 

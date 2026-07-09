@@ -16,6 +16,9 @@ namespace Faolan.Core.Network.Codecs.World
 	//   [u32 bodyLen=27][u32 0x96C46740][u32 ack=0xC350][u32 handle][00 00][vec3 pos (3x BE f32)][06]
 	public static class MoveTaskBuilder
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
+
 		private const int BodyLength = 31;
 
 		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is

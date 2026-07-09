@@ -127,6 +127,24 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
 - Session-volatile values (entity handles, shop ids, conversation ids) must never be persistence keys;
   the stable key is the NPC/vendor NAME (conversations, shops) or the character id.
 
+**Codec conventions** (`Faolan.Core.Network/Codecs/`, enforced by `Faolan.Tests/CodecConventionTests.cs`):
+
+- Codecs come in **two shapes** — don't try to unify them under one interface (a C# `static class` cannot
+  implement one, and most codecs are static):
+  - **Wire value (DTO):** an instance `record`/`class` that knows its own layout → implements `ICodec<T>`
+    (`Write(stream)` + `static Read(stream)`, a matched round-trip pair).
+  - **Codec module:** a `static class` of stateless ops → `Build(...)` / `Parse(...)` / `TryParse(...)`.
+    No interface.
+- **Every codec that emits an IIR declares which one**, in one uniform place: `public const uint Opcode =
+  (uint)GameServer0X2000Opcodes.<Type>;` (single type) or `public static readonly GameServer0X2000Opcodes[]
+  HandledTypes` (more than one). An IIR opcode must **never** appear as a bare hex literal in `Codecs/` —
+  the test fails on it. This is what makes `grep GameServer0X2000Opcodes.<Type>` find every emitter, and it
+  is what `docs/protocol/gen/coverage.md` reads to attribute each type to its builder.
+- Codecs with no opcode (sub-record helpers: `CharacterStatBlock`, `StatList`, `SnapshotItemBuilder`) declare
+  nothing — that's fine and expected.
+- Files are one-type-per-file named after that type (plural `*Codecs.cs` for a cohesive group, e.g.
+  `DeadReckoningCodecs.cs`), filed under their domain folder.
+
 **Capture workflow for protocol work:** decode first, implement second. Each decoded subsystem gets a
 Python dissector in `Captures/scripts/decode_*.py` that parses the relevant packets out of the capture JSONs and
 validates the grammar to the packet end, then a C# builder proven by a byte-exact golden test in

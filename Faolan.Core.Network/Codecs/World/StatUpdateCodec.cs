@@ -14,6 +14,9 @@ namespace Faolan.Core.Network.Codecs.World
 	// byte-exact by the round-trip in CharacterStatBlockTests.
 	public static class StatUpdateCodec
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.StatUpdateIIR;
+
 		// The bare StatUpdateIIR body for an entity's stat change.
 		public static byte[] BuildBody(uint entityHandle, CharacterStatBlock stats)
 		{

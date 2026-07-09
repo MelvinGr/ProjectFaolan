@@ -1,27 +1,26 @@
 namespace Faolan.Core.Network.Codecs
 {
-	// The base contract for anything that serializes itself onto the wire: it can write into an existing stream
-	// (Write, for composing into a larger body) or produce a fresh buffer (ToArray). Write-only types - packet
-	// sub-records that are built but never parsed back - implement just this.
-	public interface IWireWritable
+	// A self-serializing wire VALUE: a decoded message (record/class/struct) that knows its own byte layout, so
+	// Write(stream) and the static Read(stream) are a matched pair - Read(stream over x.ToArray()) == x.
+	//
+	// This is deliberately NOT the contract for the ~40 static `*Codec`/`*Builder` module classes. A C# static class
+	// cannot implement an interface, and those codecs are stateless operations over domain inputs (Build(instance,
+	// xml), Parse(record), ...) rather than instances that serialize themselves. Their uniform contract is the
+	// `Opcode` / `HandledTypes` constant instead, enforced by CodecConventionTests. Trying to make one interface
+	// span both shapes is what motivated #317 - see docs/protocol/PLAN.md.
+	public interface ICodec<out T>
 	{
 		void Write(FaolanStream s);
-		//byte[] ToArray();
-	}
-
-	// A bidirectional wire type: IWireWritable plus a static factory that reads one back. Read/Write are a matched
-	// pair - Read(stream over x.ToArray()) == x.
-	public interface ICodec<out T> : IWireWritable
-	{
 		static abstract T Read(FaolanStream stream);
 	}
 
 	public static class CodecExtensions
 	{
-		public static byte[] ToArray(this IWireWritable writable)
+		// Produce a fresh buffer for a wire value; composing into a larger body uses Write(stream) directly.
+		public static byte[] ToArray<T>(this ICodec<T> codec)
 		{
 			using var s = new FaolanStream();
-			writable.Write(s);
+			codec.Write(s);
 			return s.ToArray();
 		}
 	}

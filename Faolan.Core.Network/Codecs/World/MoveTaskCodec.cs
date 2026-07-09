@@ -15,6 +15,9 @@ namespace Faolan.Core.Network.Codecs.World
 	//   [subop 0x96C46740][0x0000C350][handle][u16 0][from: 3 floats][u8 0x02][to: 3 floats][quat: 4 floats][u16 0]
 	public static class MoveTaskCodec
 	{
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
+
 		public const byte ModeApproachTarget = 0x08;
 
 		// The MoveTask "mode" byte (at body offset 26, after the from-position) selects the form (decoded from the
