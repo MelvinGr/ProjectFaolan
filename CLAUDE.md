@@ -9,7 +9,8 @@ are the deep-dive (architecture, protocol notes, RE methodology); `README.md` is
 (overview + build/run). Open work is tracked as **Gitea issues** (`melvin/projectfaolan` on
 `git.groenendaal.io`), grouped by `area:*` labels — NOT in a TODO file. Create/close issues there as work
 lands (see the agent memory `issue_tracking_in_gitea` for the API recipe). Inline `TODO §N` / `TODO.md`
-mentions still scattered through code comments and docs are historical pointers (left as-is, not a live file).
+mentions still scattered through **code comments** are historical pointers (left as-is, not a live file); the
+`docs/` ones were repointed at Gitea.
 
 ## Commands
 
@@ -50,11 +51,14 @@ Captures/scripts/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.ts
 # TCP-reassembled, one record per packet, includes the compressed DL packets.
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
-# EF migrations (context lives in Faolan.Core.Database, migrations in Faolan/Migrations)
+# EF migrations (context lives in Faolan.Core.Database, migrations in Faolan/Migrations).
+# The 130 historical migrations were SQUASHED into a single InitialCreate; the committed faolan.db has only
+# that one in __EFMigrationsHistory. New migrations stack on top as normal.
 dotnet ef migrations add <Name> --project Faolan
 # GOTCHA: plain `database update` runs with CWD = Faolan/ and creates a stray Faolan/faolan.db.
 # Use the absolute connection override (or just start the server - DatabaseMigrator migrates at startup):
 dotnet ef database update --project Faolan --connection "Data Source=$PWD/faolan.db"
+# For pure DATA changes (no schema change) just UPDATE faolan.db directly and commit it - no migration.
 ```
 
 ## Architecture
@@ -139,7 +143,8 @@ validates the grammar to the packet end, then a C# builder proven by a byte-exac
 builders replace verbatim blob replay subsystem by subsystem; remaining verbatim blobs are deliberate
 interims (marked as such) awaiting decode or in-client validation. Worked example: NPC spawns build
 WHOLE from typed columns (the three-tier `Npc` type / `NpcSpawn` placement / live `WorldEntity` model —
-`docs/npc-three-tier-architecture.md`), `NpcSpawn.Data` reduced to a fallback for the un-decoded tail.
+`docs/npc-three-tier-architecture.md`); the captured `NpcSpawn.Data` blob is now **retired** — `TryBuildLive`
+is the sole spawn-body path.
 
 **GM commands** (`Faolan/GameServer/GameServerListener.GmCommands.cs`, account type >= GameMaster, typed as `.cmd` in chat)
 are the standard test bootstrap for features whose retail trigger isn't wired yet (`.ah`, `.shop`,
@@ -155,5 +160,6 @@ are the standard test bootstrap for features whose retail trigger isn't wired ye
 - Don't "refactor away" magic packet constants or verbatim payloads unless the replacement is proven
   byte-for-byte against a capture. Wrong-looking values are often capture-derived; check the comment
   and the referenced capture first.
-- Protocol knowledge lives in `docs/` (per-subsystem .md files + `docs/archive/` for resolved plans);
+- Protocol knowledge lives in `docs/` (per-subsystem .md files + `docs/archive/` for resolved plans and
+  superseded session handoffs — move `handoff-*.md` there once its work has landed, and fix the referrers);
   update the relevant doc and the corresponding **Gitea issue** when a subsystem's status changes.

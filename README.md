@@ -103,6 +103,8 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - ✅ Login / auth — Diffie–Hellman + TEA-CBC handshake (any password is accepted until the client is key-patched)
 - ✅ Character roster, selection, and existing-character world entry
 - ✅ Character creation — the create-editor flow (appearance/morphs, race/sex gating, the Casilda tableau)
+- 🟡 Intermittent wrong appearance on a new character (hair/mustache/size) — late appearance edits were not
+  persisted; fixed, awaits in-client confirm (#314)
 - 🟡 Create→world intro cutscene — plays, and Kalanthes speaks (stock-phrase response decoded); some scene
   actors are still verbatim capture bytes (blocked on clean per-type captures, #234 / #185)
 
@@ -111,8 +113,8 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
   client-side movement jitter (#272)
-- 🟡 Per-map playfield token — one consistent token works everywhere; the *authentic* per-instance id is
-  session-dynamic runtime state and not reproducible (#305)
+- 🟡 Per-map playfield token — sourced per-map from `Map.PlayfieldToken` (seeded with a captured token per map);
+  the tokens are session-minted instance ids pooled by region, so the seed is a representative value (#305)
 - 🟡 Playfield instancing — world keyed by `(mapId, instanceId)`; no per-map Solo instance yet (#268)
 
 ### Combat
@@ -130,7 +132,8 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - 🟡 Combos persist across relog — fixed, awaits in-client confirm (#299)
 - 🟡 XP curve — provisional ramp; real thresholds only partially harvested (#297)
 - 🟡 Class spell/combo catalog data — sparse (#296) · abilities panel completeness — mount/travel/class-inherent
-  abilities are client-RDB-derived (#303) · a few spellbook entries render nameless (granted variant id, #300)
+  abilities are client-RDB-derived (#303) · a few spellbook entries render nameless — legit `0x200A` grants whose
+  names live in the LDB string index, so blocked on #291 (#300)
 - ⬜ Feat trees / talent system — the spell↔feat map is server-GDB-only, not in the RDB (#251, blocks #298)
 - ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144) ·
   ranger tracking (#145)
@@ -147,7 +150,8 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 ### Social & guilds
 - ✅ Chat — local say, channels, system, whisper (plus a live "Claude" MCP channel)
 - ✅ Guild create, invite/accept, tag, renown
-- 🟡 Guild-create no-relog window (`DispatchGuildCreated 0x2044`) (#306) · member kick/promote/demote fan-out (#104)
+- 🟡 Guild-create no-relog window (`DispatchGuildCreated 0x2044`) — decoded + built byte-exact, awaits in-client
+  confirm (#306) · member kick/promote/demote fan-out — bodies uncaptured (#104)
 - ⬜ Friends list + presence (#99, #100) · player↔player trade, quest sharing, team quests (#101)
 
 ### Quests & dialogue
@@ -169,7 +173,9 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
   scripting; #309)
 - ⬜ Factions & reputation — the Khitai / *Rise of the Godslayer* system: faction ranks, faction vendors, and
-  faction companions (#310)
+  faction companions (#310). The client's **Factions window already populates** for imported characters: the
+  per-faction standings ride the player-spawn scaffold's first ending pair list (faction id → signed standing).
+  What's missing is the semantic layer — a faction catalog and standing *changes* from quests/kills (#315)
 
 ### Guild base & large-scale (not started)
 - ⬜ Guild base — player-built **guild cities** and **battlekeeps** in the Border Kingdoms: the central keep, walls
@@ -201,7 +207,7 @@ captures against the local server (no root needed) and retail-session captures a
 
 **Captures that would directly unblock currently-blocked features:**
 - A **spell cast of a known-cooldown spell** → the `SetSpellRecastTime` GameAction (#271)
-- **Guild-bank** deposit/withdraw, and **guild** member kick/promote/demote + the create window (#132, #104, #306)
+- **Guild-bank** deposit/withdraw, and **guild** member kick/promote/demote (#132, #104)
 - A **progressed quest journal** (non-empty objective/progress lists) → the opaque `WTHD` block (#304)
 - **Clean per-type** NPC/character captures (not bloated session logins) → retire the verbatim spawn scaffolds
   (#185, and thereby #304 / #234)
