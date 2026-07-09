@@ -155,7 +155,9 @@ rather than guessed.
       repo: `[V3:]` → a real `[Fact]`/`[Theory]` method, `[V2:]` → a real file under `Captures/`, `[V1:]` → a real
       path, `[V0:]` → an entry in `gaps.md`. Proven to fail on a bogus citation at each level. Prose can now claim
       verification. (It caught its first three on day one — PLAN.md's own examples were all stale.)
-- [ ] **P4 — Layer pages** (§4), each fact tagged.
+- [x] **P4 — Layer pages** (§4), each fact tagged. `00-transport` … `05-identity` + `README.md` (index) +
+      `gaps.md` (the V0 register, pulled forward from P6 so unproven facts have a home). Every tag resolves through
+      the P3 linter — ~30 citations across the six pages, all V3/V2/V1 backed or listed in `gaps.md`.
 - [ ] **P5 — Per-message layouts** (§5), V3 first; absorb + delete the superseded docs as we go.
 - [ ] **P6 — `gaps.md`.** Every V0 gets a Gitea issue.
 - [ ] **P7 — Regroup the residue** into `subsystems/` / `rdb/` / `tooling/`.
