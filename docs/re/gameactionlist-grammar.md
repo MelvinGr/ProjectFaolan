@@ -62,10 +62,10 @@ pulls keys `0x463` (caster/line) and `0x2f9` (recast centiseconds).
 
 - Header/list framing fully decoded + validated 925/925; `GameActionListCodec` round-trips element bytes verbatim.
 - The full element grammar is now recovered (positional, type-descriptor-driven; string vs u32 by key).
-- **Remaining to emit SetSpellRecastTime (#271) from scratch:** enumerate the SetSpellRecastTime **type id** and
-  its descriptor **key list** (order of values — includes `0x463`, `0x2f9`) out of `FUN_008c3910` / the type
-  registration + the `DAT_025073c0` stat-key table. With those, the element is fully constructible (no capture
-  needed) — the grammar itself is no longer the blocker.
+- **Type id + key list: RECOVERED** (2026-07-11 live Frida dump — see the RESOLVED section below).
+  `Captures/re/gameaction_types.json` holds all 68 types' value orders, so any element (recast included) is
+  byte-constructible. The grammar is no longer a blocker; #271's residue is an in-client base-cooldown check +
+  an optional low-prio override emit.
 
 ## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
 
@@ -119,3 +119,49 @@ Chased the per-class registration to confirm whether the typeId+keyList can be r
   inlined/data-driven factory Ghidra can't resolve, so the recast typeId + keyList are **not statically
   recoverable**. The runtime tables (`DAT_025077c8` / `DAT_025073c0`) are the only source ⇒ a **live client
   memory dump is the sole remaining path**. Scripts: `Captures/ghidra/DumpRecastReg.java`, `DumpRecastDescriptor.java`.
+
+## RESOLVED 2026-07-11 — live Frida dump of the runtime descriptor table (#271)
+
+Attached Frida to the running client (frida-server-under-Wine, no ASLR ⇒ Ghidra VAs == runtime — see the
+`frida_under_wine_client_re` memory) and read the two runtime tables directly. Scripts committed:
+`Captures/frida/dump_gameaction_types.py` (walks the descriptor table) + `dump_gameaction_names.py` (resolves
+each descriptor's name pointer). Full catalog: **`Captures/re/gameaction_types.json`** (68 named types).
+
+**Descriptor layout — confirmed from live memory** (stride corrected: **`0x41` BYTES per slot**, not `0x104`;
+consecutive named types' `descriptor+8` enum ids increment by exactly 1, which only holds at a 0x41-byte stride):
+```
+descriptor = 0x025077c8 + (wireTypeId - 0xcf09) * 0x41        # wireTypeId is the SLOT id (0xcf09-based)
+  +0x00  char*  name        # "e_Type_GC_GameAction_<Name>"
+  +0x08  u32    enumId       # compact GC enum (0xcf0a..0xcf50); the SLOT id != this
+  +0x0c  u32[]  keyList      # low byte of each entry = index into statKeyTable; ends at entry == 0xFF
+```
+`statKeyTable` (`DAT_025073c0`) read live = the linear map `[i] = 0x2d2 + i` (confirmed indices 0..255).
+
+**The 68 real GameAction types (enumId 0xcf0a..0xcf50) with their wire-value order** are in the JSON. The
+recast-relevant ones:
+
+| wireTypeId | name | keyList (value order after the 4 fixed ints) |
+|---|---|---|
+| `0xcf51` | `e_Type_GC_GameAction_Spell` | `0x2f9` (recast) |
+| `0xcf81` | `e_Type_GC_GameAction_ChangeRecastTime` | `0x4c3`, `0x2f9` |
+| `0xd019` | `e_Type_GC_GameAction_ChangeLineRecastTime` | `0x2d3`(line), `0x2f9` |
+| `0xcfdd` | `e_Type_GC_GameAction_SpellStatModifier` | `0x463`(spell), `0x2d2`, `0x2f9`, `0x4b7` |
+| `0xd009` | `e_Type_GC_GameAction_CoreSpellStatModifier` | `0x463`(spell), `0x2d2`, `0x2f9`, `0x4b7`, `0x2eb` |
+
+The handler `FUN_008b0f50` (log `GameCode/GameAction/SetSpellRecastTime`) reads spell `0x463` + recast `0x2f9`;
+it is the `Apply` of the SpellStatModifier family (`0xcfdd`/`0xd009` — the only slots carrying *both* keys; the
+vtable at `0x1fd7aac` is non-RTTI so the C++ class name isn't recoverable, but the keyList match is decisive).
+A direct per-spell recast override is `ChangeRecastTime` (`0xcf81`); per-line is `ChangeLineRecastTime` (`0xd019`).
+
+**Construction is now fully specified** — the wire is positional and every type's value order is known, so any
+GameAction element is byte-constructible from the grammar above + the JSON. The element is
+`[wireTypeId][field][4][subCount][sub-records][0x2d5,0x2d6,0x2f2,0x2f5 ints][keyList values]`, string for keys
+`0x4d9`/`0x4da` else u32. This removes the "typeId + keyList unknown" blocker permanently for `GameActionListIIR`
+construction (#190, #271).
+
+**Not shipping a recast builder yet, deliberately:** the capture set still contains no recast GameAction, and
+the gameplay-capture analysis (#271 comment 2026-06-22) showed retail does **not** push a recast on a normal
+cast — base cooldowns are client-side (the client reads recast from its own RDB on cast). So the remaining
+`#271` scope is (a) an in-client confirmation that a granted spell goes on cooldown with no server emit, and
+(b) an *optional*, low-priority server override emit (cooldown resets / AA reductions) — now constructible via
+`ChangeRecastTime` the moment it's wanted.
