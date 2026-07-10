@@ -53,7 +53,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<RespawnPoint> GetDefaultSpawn(uint mapId);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task<Guild> GetGuild(uint id);
-		Task<Guild> GetGuildByName(string name);
+		Task<Guild> GetGuildByName(string name, uint realmId);
 		Task<Item> GetItem(uint id);
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<LuaScript> GetLuaScript(uint scriptId);
@@ -257,16 +257,18 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Guild> CreateGuild(string name, uint leaderCharacterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			if (await ctx.Guilds.AnyAsync(g => g.Name == name))
-				return null;
-
 			var leader = await ctx.Characters.FirstOrDefaultAsync(c => c.Id == leaderCharacterId);
 			if (leader == null || leader.GuildId != null)
+				return null;
+
+			// #324: guild names are unique per REALM (the founder's), not globally.
+			if (await ctx.Guilds.AnyAsync(g => g.RealmId == leader.RealmId && g.Name == name))
 				return null;
 
 			var guild = new Guild
 			{
 				Name = name,
+				RealmId = leader.RealmId,
 				CreationDate = DateTimeOffset.UtcNow
 			};
 			ctx.Guilds.Add(guild);
@@ -680,10 +682,10 @@ namespace Faolan.Core.Database.Repositories
 			return await LoadGuild(ctx, id);
 		}
 
-		public async Task<Guild> GetGuildByName(string name)
+		public async Task<Guild> GetGuildByName(string name, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var id = await ctx.Guilds.Where(g => g.Name == name).Select(g => g.Id).FirstOrDefaultAsync();
+			var id = await ctx.Guilds.Where(g => g.RealmId == realmId && g.Name == name).Select(g => g.Id).FirstOrDefaultAsync();
 
 			return id == 0
 				? null

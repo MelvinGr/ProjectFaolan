@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -8,11 +9,20 @@ namespace Faolan.Core.Database.Tables
 	// A player guild. Wire identity is ID32 [type 0x0000DEB7][instance = Id]; members are Characters with
 	// GuildId set (rank lives on the Character). Protocol: Captures/scripts/decode_guild.py / the hoxxling
 	// guild_invite_accepted capture.
-	[Index(nameof(Name), IsUnique = true)]
+	// Guild names are unique PER REALM, not globally (#324): realm Crom and realm Fury may each have a "Knights".
+	[Index(nameof(RealmId), nameof(Name), IsUnique = true)]
 	public class Guild : BaseEntity
 	{
 		// The ID32 type word for guilds on the wire (characters use 0x0000C350).
 		public const uint WireType = 0x0000DEB7;
+
+		// The realm this guild belongs to (#324). Pinned at creation from the founder's realm - NOT derived from
+		// members (a just-created or emptied guild has no member to infer from). Every guild query is realm-scoped so
+		// two realm processes on the shared DB never cross-read. Backfilled to the existing single realm on migration.
+		public uint RealmId { get; set; }
+
+		[ForeignKey(nameof(RealmId))]
+		public virtual Realm Realm { get; set; }
 
 		public virtual ICollection<Character> Members { get; set; }
 
