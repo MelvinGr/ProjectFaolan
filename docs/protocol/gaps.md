@@ -26,23 +26,14 @@ only signed-division magic numbers) — it is detected by the **high bit of the 
 parameter (a length/id for the inflate setup). Full decode needs the high-bit dispatch path in the receive loop
 or a capture carrying a live stream (the login captures on hand don't) — deferred as low-ROI since we skip it.
 
-### RpcHeader trailing headerData
-**Tracked: Gitea #319.** `PacketStream.WriteHeader` accepts an optional `headerData` blob appended after the u16
-opcode, inside the header-length. Characterized across all captures (2026-07) — it is exactly **four** cases, not
-a single mystery grammar:
-- **1-byte `0x01`** — the overwhelming majority (7366 packets), and it is a **constant** `0x01`. Rides the latency
-  ping/pong (`0x2085` c2s on GameCharAgent / `0x2082` `DispatchPong` s2c on GameCharInterface) and a handful of
-  CSPlayerInterface dispatches (`0x20A5`/`0x20C5`/`0x20D0`). Emitted verbatim; its *meaning* (a flag? a fixed
-  marker?) is the only real remaining unknown here, and it's a single constant byte.
-- **4-byte** — the PlayerAgent/PlayerInterface **32-bit method id** (DECODED via #320; see
-  `docs/re/aoc-rpc-method-opcodes.md`, `PlayerAgentMethodIds`). This interface uniquely carries it.
-- **3-byte `0x94A760`** — PlayerInterface `SmallCharList` (0x20A5), a constant (88/88 captures).
-- **13-byte** — PlayerInterface `Ox1A07` (OverrideGameTweaks), a per-session block on the ServiceConnection
-  endpoint; still emitted verbatim (its internal structure is the residual undecoded part).
+### RpcHeader trailing headerData — residual sub-fields
+**Tracked: Gitea #319.** The blob's GRAMMAR is decoded — it is four per-opcode/constant cases, not a generic
+grammar (see [`02-rpc.md`](02-rpc.md) and `Captures/scripts/decode_rpc_headerdata.py`, which tallies them across
+every capture). Two sub-fields remain emitted verbatim, and only these:
+- the **meaning** of the constant 1-byte `0x01` latency marker (a flag? a fixed sentinel?), and
+- the **internal structure** of the 13-byte PlayerInterface `OverrideGameTweaks` (`0x1A07`) per-session block.
 
-So `headerData` is NOT a generic per-opcode grammar: it is the PlayerInterface method-id (decoded) plus a constant
-`0x01` latency marker plus two PlayerInterface specials. Residual: the semantics of the `0x01` marker and the
-13-byte `Ox1A07` block.
+Both are client-reader-decodable (Ghidra) if the fidelity ever matters; neither is on any path we send.
 
 ---
 

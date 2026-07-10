@@ -14,7 +14,18 @@ Immediately after the packet's `[length][crc32][hdrlen]` head, and inside `hdrle
 ```
 
 `0x0A` and `0x12` are protobuf field tags (fields 1 and 2, length-delimited). The optional `headerData` after the
-opcode is reproduced verbatim per call-site; its grammar is not decoded. [V0: RpcHeader trailing headerData]
+opcode is **not a generic grammar** — across every capture it is exactly four per-opcode / constant cases
+(`Captures/scripts/decode_rpc_headerdata.py` tallies them: 7366 / 1425 / 340 / 89 packets):
+
+| bytes | what | notes |
+|---|---|---|
+| 1 (`0x01`) | latency marker | constant; rides the ping/pong (`0x2085` c2s / `0x2082` `DispatchPong` s2c) and a few CSPlayerInterface dispatches — the vast majority of packets. |
+| 4 | PlayerAgent/PlayerInterface **32-bit method id** | present ONLY here (empty for all 16 other interfaces); keyed by (opcode, direction), not opcode alone — two 16-bit indices are reused by a c2s method and its s2c twin with different ids. See #320 / [`../re/aoc-rpc-method-opcodes.md`](../re/aoc-rpc-method-opcodes.md). |
+| 3 (`0x94A760`) | PlayerInterface `SmallCharList` (`0x20A5`) | constant. |
+| 13 | PlayerInterface `OverrideGameTweaks` (`0x1A07`) | a per-session block on the ServiceConnection endpoint; its internal fields are the one part still emitted verbatim. |
+
+So it is the PlayerInterface method id (decoded) plus a constant latency marker plus two PlayerInterface specials —
+not a mystery appended to arbitrary packets. [V1: Captures/scripts/decode_rpc_headerdata.py]
 
 ## ProtoEndpoint
 
