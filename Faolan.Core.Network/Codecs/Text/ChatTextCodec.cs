@@ -19,16 +19,22 @@ namespace Faolan.Core.Network.Codecs.Text
 	//   [u32 instance]     the target GameInterface object (= the receiver endpoint instance / ClientInstance)
 	//   [u8  0x00]         lead flag (constant in the sole capture)
 	//   [u16 xmlLen][remoteformat XML]      the message (no null terminator)
-	//   [u8 0x00][u32 0x40000001]           trailer (constant; semantics loose, like FormatFeedback's footer)
+	//   [u8  chatTextType] NPCChatTextType_e — the chat-text type enum (0 in our capture; the client reader rejects
+	//                      values > 5). Decoded from the client #321: writer FUN_006a4c70 emits byte(this+0x4c) then
+	//                      the u32 below; reader FUN_006a4c00 stores the byte into +0x4c after a `<= 5` bounds check.
+	//   [u32 typeFlags]    big-endian flags/format word (client field this+0x2c; 0x40000001 in our capture). Read as
+	//                      a u32 by FUN_0048f900; same bit-30 (0x40000000) family as FormatFeedbackIIR.typeFlags —
+	//                      exact bit meanings still loose, but it is a real field, not padding.
 	public static class ChatTextCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.ChatTextIIR; // 0xE0B51102
 		private const byte LeadFlag = 0x00;
 
-		// The 5-byte trailer after the XML (constant in the capture: 0x00 then u32 0x40000001). Carried verbatim
-		// until a second sample lets the two halves be field-named.
-		private const byte TrailerByte = 0x00;
-		private const uint TrailerWord = 0x40000001;
+		// The two fields after the XML, decoded from the client (de)serializer (#321), no longer an opaque "trailer":
+		// the chat-text TYPE selector (NPCChatTextType_e, one byte) then a big-endian flags/format word. Defaults are
+		// the values in our sole capture (type 0, flags 0x40000001).
+		public const byte DefaultChatTextType = 0x00;
+		public const uint DefaultTypeFlags = 0x40000001;
 
 		public static byte[] Build(uint instance, byte[] xml)
 		{
@@ -42,7 +48,7 @@ namespace Faolan.Core.Network.Codecs.Text
 
 		// The decoded ChatTextIIR body as a self-serializing codec (ICodec): Write frames the whole
 		// [len][subop][marker][instance][lead][xmlLen][xml][trailer]; Read recovers the (instance, xml).
-		public sealed record Message(uint Instance, byte[] Xml) : ICodec<Message>
+		public sealed record Message(uint Instance, byte[] Xml, byte ChatTextType = DefaultChatTextType, uint TypeFlags = DefaultTypeFlags) : ICodec<Message>
 		{
 			public static Message Read(FaolanStream s)
 			{
@@ -53,7 +59,9 @@ namespace Faolan.Core.Network.Codecs.Text
 				s.ReadArray(1); // lead flag 0x00
 				var xmlLen = s.ReadUInt16();
 				var xml = s.ReadArray(xmlLen);
-				return new Message(instance, xml);
+				var chatTextType = s.ReadByte();  // NPCChatTextType_e
+				var typeFlags = s.ReadUInt32();   // flags/format word (big-endian)
+				return new Message(instance, xml, chatTextType, typeFlags);
 			}
 
 			public void Write(FaolanStream s)
@@ -66,8 +74,8 @@ namespace Faolan.Core.Network.Codecs.Text
 						.WriteByte(LeadFlag)
 						.WriteUInt16(Xml.Length)
 						.WriteArray(Xml)
-						.WriteByte(TrailerByte)
-						.WriteUInt32(TrailerWord));
+						.WriteByte(ChatTextType)
+						.WriteUInt32(TypeFlags));
 			}
 		}
 	}

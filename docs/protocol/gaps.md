@@ -58,11 +58,6 @@ values we observed; the hashing function has not been recovered, so we cannot en
 
 ## IIR bodies
 
-### ChatTextIIR trailer word 0x40000001
-**Tracked: Gitea #321.** `ChatTextCodec` writes a constant 5-byte trailer (`0x00` then u32 `0x40000001`) after the XML. It is constant in
-the single capture we have, so we emit it verbatim. A second sample with a different value would let the two
-halves be field-named.
-
 ### FeedbackIIR and RegenIIR are still verbatim blobs
 Both are replayed from captured bytes rather than constructed (they show **V1** in the coverage matrix, correctly).
 Tracked as the create-burst verbatim residue in Gitea #223.

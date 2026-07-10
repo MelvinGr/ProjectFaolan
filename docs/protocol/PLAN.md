@@ -170,7 +170,8 @@ rather than guessed.
       scattered decode docs, incrementally.
 - [x] **P6 — `gaps.md`.** The register exists (landed with P4) and every open V0 is now a tracked Gitea issue:
       #318 (compression-marker bytes 4..7), #319 (RpcHeader trailing headerData), #320 (PlayerAgent 32-bit hash
-      dispatch), #321 (ChatText trailer word); the FeedbackIIR/RegenIIR verbatim residue rides #223. Each gap links
+      dispatch); #321 (ChatText trailer) is now decoded — the two halves are the NPCChatTextType_e selector + a
+      flags word (see ChatTextCodec). The FeedbackIIR/RegenIIR verbatim residue rides #223. Each gap links
       its issue, so an unknown lives on the backlog, not just in a doc.
 - [x] **P7 — Regroup the residue.** The ~50 flat docs are now sorted into the converged tree: `rdb/` (7 client-asset
       docs), `tooling/` (5 launcher/capture/importer docs), `subsystems/` (22 our-implementation docs), and `re/` (16
