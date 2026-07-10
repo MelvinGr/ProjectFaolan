@@ -532,6 +532,39 @@ the 26 tree constants. Two hard facts about those login ids:
   13/13 in `[0x02,0x0F]`) — statistically impossible for a uniform hash, so the id is structured
   `[24-bit hash][small tag byte]`, not a raw hash.
 
-**Next:** find the pre-auth dispatcher / the id-computation function (xref where `PlayerAgentProxy_t::Authenticate`
-registers, or the login-connection receive handler for class `0x82F20484`) and read the algorithm + tag directly,
-rather than brute-forcing it. Until then the login opcodes+ids stay behavior-derived in `Opcodes.cs` (they work).
+**c2s catalog + dispatch MECHANISM recovered** (Ghidra 2026-07, `DumpPlayerAgentProxy.java` +
+`DumpPlayerAgentCtor.java`). The `PlayerAgentProxy_t` constructor (`FUN_00493c40`) registers all **25** c2s
+methods, each as `key = 0x…; register(); setName("Method", len)`:
+
+| method | internal key | | method | internal key |
+|---|---|---|---|---|
+| Authenticate | `0x9CB2CB03` | | RequestSuggestNickname | `0xDBE172E5` |
+| AuthenticateLoggedIn | `0x9D991E6C` | | GetStartupData | `0x6A546D41` |
+| LoginFromCrash | `0xCBDE126E` | | LoadFacebookToken | `0xD3907026` |
+| CreateCharacter | `0xBE735486` | | SaveFacebookToken | `0xD8AD362B` |
+| CreateCharacterWithData | `0xCA2C4E5E` | | UpdateFacebookFriends | `0x3A96B2B3` |
+| LoginCharacter | `0xEF616EB6` | | RecruitFacebookFriends | `0x5B51044B` |
+| RenameCharacter | `0x1B2CF268` | | UpdateSubscriptionSettings | `0x516C9EF5` |
+| RequestDeleteCharacter | `0xC3C5C31D` | | UpdateCharacterSettings | `0x01035784` |
+| VerifyLanguageSetting | `0x9847AED6` | | UpdateCharacterPreview | `0x4D661656` |
+| AddOfflineLevel | `0x2976E1B7` | | FinishGetStartupData | `0xDFD8518E` |
+| UnlockCharacter | `0x9C370D1E` | | ReceivedCharacterSettings | `0x3C7C926C` |
+| SetHardcoreLevel | `0x6A6B621C` | | ClientReplyKeepCookie | `0x43D90C1B` |
+| GetDimensionList | `0x43476328` | | | |
+
+(Full JSON: `/home/melvin/Development/Ghidra/Aoc/playeragent_c2s_catalog.json`.) The **mechanism**: `register`
+(`FUN_00487900`) inserts the method into a **binary tree keyed by that internal key**; the proxy send passes the
+key to `rpc::Proxy_t::SendMethodInvocation` (`FUN_0046c910`), which builds the `RpcHeader`. The **internal key is
+what each proxy method passes at its send call** (matches the constants dumped from the method bodies).
+
+**The wire (opcode, id) ← key/name transform is the ONE remaining unknown, and it is genuinely obscured:**
+- The internal **key is itself not a standard name-hash** (25 clean name→key anchors tested against crc32/djb2±/
+  sdbm/fnv1(a)/jenkins/oat/elf/bkdr(11 seeds) × 5 string forms — 0 matches, not even 2/25).
+- The **wire id is neither the key nor a name-hash**, is not stored in the exe, and carries the small tag byte;
+  it is assembled inside `SendMethodInvocation`/`RpcHeader` construction from the tree-node data, not a one-liner.
+- So enumerating the *unobserved* methods' wire (opcode, id) needs a deeper trace of `RpcHeader` construction
+  (`FUN_0046c910` → the tree-node fields it reads), or a per-method in-client capture. The **observed** wire
+  (opcode, id) pairs are already in `Opcodes.cs` / `PlayerAgentMethodIds` (capture-verified, what we use).
+
+Until the transform is cracked the login opcodes+ids stay behavior-derived (they work); the names above are the
+proven client method set but their name↔opcode link is not yet established (so no rename — #320).
