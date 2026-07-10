@@ -8,8 +8,8 @@
 ## Headline
 
 - **823** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **75** IIR carrier types: **48 V3** (byte-exact builder), **16 V2** (built, no golden), **11 V1** (no builder found).
-- **40** codec classes, **36** with a byte-exact test.
+- **75** IIR carrier types: **48 V3** (byte-exact builder), **19 V2** (built, no golden), **8 V1** (no builder found).
+- **43** codec classes, **36** with a byte-exact test.
 - **36** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -84,6 +84,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `TombStoneFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
 | V2 | `BankIIR` | `BankService` *(inline)* |
+| V2 | `ChainKillIIR` | `ChainKillCodec` |
 | V2 | `CharInPlayIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `CharacterActionIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `CoreClaimIIR` | `GameServerListener.PostReadyBurst` *(inline)* |
@@ -91,22 +92,21 @@ the margins, but never invents a golden that isn't there.
 | V2 | `FullPlayerCharacterIIR` | `GameServerListener.Outbound` *(inline)* |
 | V2 | `GameTimeIIR` | `GameServerListener.GmCommands` *(inline)* |
 | V2 | `KnubotAnswerIIR` | `GameServerListener.Inbound` *(inline)* |
+| V2 | `LockedToChangedIIR` | `LockedToChangedCodec` |
 | V2 | `LookAtIIR` | `ShopOpenBuilder` |
 | V2 | `MoveInventoryItemIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `N3ToClientQuitIIR` | `WorldDespawn` |
 | V2 | `PlayfieldFIIR` | `GameServerListener.Outbound` *(inline)* |
+| V2 | `RegenIIR` | `RegenCodec` |
 | V2 | `SetMorphValueIIR` | `CreateFlowService` *(inline)* |
 | V2 | `SetNameIIR` | `CreateFlowService` *(inline)* |
 | V2 | `TradeskillReplyIIR` | `GameServerListener.Outbound` *(inline)* |
 | V2 | `TradeskillRequestIIR` | `GameServerListener.Inbound` *(inline)* |
 | V1 | `AreaFormulaIIR` | — |
-| V1 | `ChainKillIIR` | — |
 | V1 | `CrimeIIR` | — |
 | V1 | `FeedbackIIR` | — |
 | V1 | `KnubotFinishTradeIIR` | — |
 | V1 | `KnubotStartTradeIIR` | — |
-| V1 | `LockedToChangedIIR` | — |
-| V1 | `RegenIIR` | — |
 | V1 | `SpellBookIIR` | — |
 | V1 | `TemplateActionIIR` | — |
 | V1 | `UpdateInventoryIIR` | — |
