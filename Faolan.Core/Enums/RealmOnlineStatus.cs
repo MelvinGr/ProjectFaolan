@@ -1,23 +1,18 @@
 namespace Faolan.Core.Enums
 {
-	// Realm availability shown on the client's realm-select screen (2nd uint32 per realm in SendRealmList; the
-	// crowding indicator is the SEPARATE LoadStatus field). CLIENT-DERIVED: AgeOfConan.exe renders this through a
-	// switch (FUN_011f4500) that wraps each realm's label in colored HTML, and one caller (FUN_011f4490) gates on
-	// `status == 2` as its "is up" test - which is why 2, not 1, is our "online" value. In our captures retail only
-	// ever sent ONE realm, so only 0 and 2 were observed on the wire; 1 is a real client-accepted state we simply
-	// never emit (documented here so the gap isn't a mystery, not because we send it).
+	// Realm reachability shown on the client's realm-select screen (2nd uint32 per realm in SendRealmList).
+	// CLIENT-DERIVED and effectively BINARY: AgeOfConan.exe's realm-row renderer (FUN_011f4490) tests this field
+	// `== 2` as its sole "is this realm up?" check - 2 means online, ANY other value falls through to the Offline
+	// branch. So there is no distinct third state here; the multi-colour realm-list gradient the client draws is the
+	// SEPARATE LoadStatus/population field (Offline + 5 load levels), not this one. See RealmLoadStatus.
 	public enum RealmOnlineStatus : byte
 	{
-		// Down. Client renders the realm name bright red (#FF1010, the ServerOffline label).
+		// Down / unreachable. The client renders the realm name bright red (#FF1010, the ServerOffline label). This
+		// is the value for anything that isn't the exact "online" sentinel below.
 		Offline = 0,
 
-		// Up but restricted - reachable yet not fully open (the client's ServerCannotAcceptNewCharacters / lighter
-		// "Recommended" state; renders green like Online). Inferred from the client's status switch, NOT observed in
-		// our single-realm captures - we don't emit it today; kept to document the client's real value range.
-		Locked = 1,
-
-		// Up and open. The value the client's `== 2` "is online" gate expects; renders green (#5B933D). This is what
-		// RealmStatusService writes while a realm's game host is running.
+		// Up. The exact value the client's `== 2` gate expects; the realm then renders in its load colour (green →
+		// orange → red by LoadStatus). This is what RealmStatusService writes while a realm's game host is running.
 		Online = 2
 	}
 }
