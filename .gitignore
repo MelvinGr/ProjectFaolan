@@ -285,3 +285,9 @@ Faolan.Web/faolan.json
 
 # Ghidra project + headless dump outputs (677MB local RE workspace; never commit)
 Captures/ghidra/output/
+
+# Local classic .sln for csharp-ls (the LSP Claude Code uses): csharp-ls 0.25.0 can't load
+# the committed ProjectFaolan.slnx (new XML format), so without a .sln it analyses projects in
+# isolation and cross-project edits go stale. This local .sln gives it the full project graph.
+# Regenerate: dotnet new sln -n Faolan.lsp -f sln && dotnet sln Faolan.lsp.sln add $(find . -name '*.csproj' -not -path '*/obj/*' -not -path '*/bin/*')
+Faolan.lsp.sln
