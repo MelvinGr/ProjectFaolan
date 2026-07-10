@@ -444,6 +444,21 @@ namespace Faolan.GameServer.World
 
 		// An NPC arrived home and stopped moving: send a StopIIR (final position + facing) to every viewer that sees it,
 		// closing the MoveTask stream it was emitting while it chased/returned (#190). Faces the direction it travelled.
+		public async Task BroadcastNpcHeartbeat(WorldEntity npc)
+		{
+			// The short-form BehaviorControlCenterIIR idle pulse (#225), carrying the NPC's monotonic per-entity tick. The
+			// codec output is the bare IIR record (no length prefix), so it rides SendWorldIir - the same framing as the
+			// MoveTask above - which adds the carrier's [u32 length]. Gated on CONFIRMED (not Known) so a still-loading
+			// viewer - which has the handle in Known but not Confirmed - is never sent a pulse for an unbuilt dynel.
+			var record = BehaviorHeartbeatCodec.Build(npc.Handle, ++npc.HeartbeatTick);
+
+			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
+					await SendWorldIir(viewer.Client, record);
+			}
+		}
+
 		public async Task BroadcastNpcStop(WorldEntity npc)
 		{
 			var facing = npc.MoveFrom.FaceTowards(npc.Position);

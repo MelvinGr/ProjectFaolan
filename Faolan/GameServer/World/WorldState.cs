@@ -84,6 +84,14 @@ namespace Faolan.GameServer.World
 
 		private uint _nextPlayfieldToken = 0x00A00000;
 
+		// The idle-heartbeat cadence (#225): every live NPC (re-)asserts its short-form BehaviorControlCenterIIR this
+		// often so the client keeps playing its idle animation instead of freezing. Retail streams it faster (~10/s
+		// aggregate in the mount capture; the per-entity rate isn't pinned from captures), so this is a deliberately
+		// conservative, single-place-tunable interval - dial it in the in-client pass. The broadcast is gated to
+		// Confirmed viewers, so it never fires at a still-loading client (the hang the earlier experiment hit).
+		private const double HeartbeatIntervalSeconds = 1.0;
+		private readonly TickAccumulator _heartbeat = new(HeartbeatIntervalSeconds);
+
 		// Mints the next playfield-instance token. Thread-safe (zones can be created from any connection).
 		public uint NextPlayfieldToken()
 		{
@@ -145,6 +153,10 @@ namespace Faolan.GameServer.World
 		{
 			List<WorldTickEffect> effects = [];
 
+			// #225: fire the idle heartbeat for every live NPC on its own cadence (once per HeartbeatIntervalSeconds),
+			// not every base tick. Computed once per Tick, then applied inside the entity loop below.
+			var heartbeatDue = _heartbeat.Advance(deltaSeconds, out _);
+
 			foreach (var zone in _zones.Values) // Parralell?
 			{
 				foreach (var entity in zone.Entities)
@@ -179,6 +191,11 @@ namespace Faolan.GameServer.World
 
 						continue;
 					}
+
+					// #225: past here the entity is a LIVE NPC. Pulse its idle heartbeat when due, independent of whether
+					// it also moves this tick (retail streams the heartbeat continuously alongside any MoveTask).
+					if (heartbeatDue)
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcHeartbeat));
 
 					// #262 companion-follow: a "released" NPC (e.g. Casilda after her rescue) follows its leading player -
 					// step toward them and broadcast a MoveTask each step (UNGATED; not combat), the server-driven

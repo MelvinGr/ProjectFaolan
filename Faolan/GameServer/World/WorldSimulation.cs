@@ -33,6 +33,11 @@ namespace Faolan.GameServer.World
 		// finishes loading). Kept on to exercise real combat death + the death/release screen (#214).
 		private const bool NpcAutoAttackEnabled = true;
 
+		// #225: stream the continuous idle heartbeat (short-form BehaviorControlCenterIIR) for live NPCs so they keep
+		// playing their idle animation instead of freezing. Confirmed-gated in the broadcaster (never hits a loading
+		// client). A kill-switch for the in-client pass in case the cadence needs disabling rather than just tuning.
+		private const bool NpcHeartbeatEnabled = true;
+
 		// Base game-loop cadence: 10 Hz. Continuous systems run every base tick with the real elapsed dt so they stay
 		// smooth; slower rate-based systems run via a TickAccumulator at their own interval. The loop measures
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
@@ -604,6 +609,15 @@ namespace Faolan.GameServer.World
 								// The NPC arrived home and stopped; close its move with a StopIIR (#190).
 								if (NpcAutoAttackEnabled)
 									await _output.BroadcastNpcStop(effect.Entity);
+								break;
+							}
+
+							case WorldTickEffectType.NpcHeartbeat:
+							{
+								// The idle-behavior pulse - ungated (fidelity, not combat), like NpcPatrol/NpcFollow; the
+								// Confirmed gate in the broadcaster keeps it off a still-loading client (#225).
+								if (NpcHeartbeatEnabled)
+									await _output.BroadcastNpcHeartbeat(effect.Entity);
 								break;
 							}
 						}

@@ -144,6 +144,11 @@ namespace Faolan.GameServer.World
 		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
 		public HashSet<uint> Known { get; } = [];
 
+		// The monotonic per-entity counter carried in field 3 of the continuous idle heartbeat (short-form
+		// BehaviorControlCenterIIR, #225). Incremented once per emitted pulse so the client sees a steadily rising tick,
+		// as retail's stream does.
+		public uint HeartbeatTick;
+
 		// The owning connection for a player (so the broadcaster can send packets to it); null for NPCs.
 		public INetworkClient Client { get; }
 
