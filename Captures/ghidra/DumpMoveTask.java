@@ -12,7 +12,7 @@ public class DumpMoveTask extends GhidraScript {
         return currentProgram.getMemory().findBytes(currentProgram.getMinAddress(), s.getBytes("US-ASCII"), null, true, monitor);
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/movetask.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/movetask.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         ReferenceManager rm = currentProgram.getReferenceManager();
         Set<Long> dumped = new HashSet<>();

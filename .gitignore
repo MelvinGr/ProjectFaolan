@@ -282,3 +282,6 @@ Faolan.ClientHook/*.lib
 # dev symlinks for running Faolan.Web from its project dir
 Faolan.Web/faolan.db
 Faolan.Web/faolan.json
+
+# Ghidra project + headless dump outputs (677MB local RE workspace; never commit)
+Captures/ghidra/output/

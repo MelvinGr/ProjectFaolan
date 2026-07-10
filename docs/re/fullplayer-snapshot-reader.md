@@ -356,7 +356,7 @@ Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin
   the captured region, no per-character generation (identical for every char). This closes the #193
   construct-don't-replay purity goal for the tails.
 
-Dumps: `/home/melvin/Development/Ghidra/Aoc/fullchar_reader.txt`, `/home/melvin/Development/Ghidra/Aoc/fullchar_records.txt` (regenerate with the two
+Dumps: `Captures/ghidra/output/fullchar_reader.txt`, `Captures/ghidra/output/fullchar_records.txt` (regenerate with the two
 scripts above).
 
 ## Per-character CLASS identity still open; class-derived stats now authored (2026-06-17, #239/#4/#186)

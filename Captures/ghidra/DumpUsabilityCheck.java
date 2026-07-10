@@ -2,7 +2,7 @@
 // Strategy: locate the requirement strings (RequiredLevel / MinLevel / GameAction_MinLevel / LevelReq),
 // find every function that references them, decompile those + their direct callers to see which PLAYER
 // value (which stat / entity field) the level requirement is compared against.
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpUsabilityCheck.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -17,7 +17,7 @@ public class DumpUsabilityCheck extends GhidraScript {
     static final String[] NEEDLES = {"RequiredLevel", "MinLevel", "GameAction_MinLevel", "LevelReq", "IndexMinLevel"};
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/usability_check.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/usability_check.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -50,6 +50,6 @@ public class DumpUsabilityCheck extends GhidraScript {
             }
         }
         out.close();
-        println("wrote /home/melvin/Development/Ghidra/Aoc/usability_check.txt");
+        println("wrote Captures/ghidra/output/usability_check.txt");
     }
 }

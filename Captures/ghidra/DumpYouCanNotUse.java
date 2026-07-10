@@ -7,7 +7,7 @@ import java.io.PrintWriter;
 import java.util.*;
 public class DumpYouCanNotUse extends GhidraScript {
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/youcannotuse.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/youcannotuse.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         long[] targets = {0x01fc1324L, 0x01fc0ab8L}; // YouCanNotUseYet, YouCanNotUse
         Set<String> seen = new HashSet<>();

@@ -5,7 +5,7 @@
 //   FUN_005d1ae0  n3TeleportIIR_t::ReadSubClass       (0x5A32F0D7, "destination announce")
 //   FUN_00a6a600  PlayfieldProxy stream reader
 // Run:
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpTeleportReaders.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -23,7 +23,7 @@ public class DumpTeleportReaders extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        java.io.PrintWriter out = new java.io.PrintWriter("/home/melvin/Development/Ghidra/Aoc/teleport_readers.txt");
+        java.io.PrintWriter out = new java.io.PrintWriter("Captures/ghidra/output/teleport_readers.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         for (long p : FNS) {
@@ -34,6 +34,6 @@ public class DumpTeleportReaders extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpTeleportReaders done -> /home/melvin/Development/Ghidra/Aoc/teleport_readers.txt");
+        println("DumpTeleportReaders done -> Captures/ghidra/output/teleport_readers.txt");
     }
 }

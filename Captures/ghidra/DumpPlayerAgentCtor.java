@@ -47,7 +47,7 @@ public class DumpPlayerAgentCtor extends GhidraScript {
         di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
-        out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/playeragent_ctor.txt");
+        out = new PrintWriter("Captures/ghidra/output/playeragent_ctor.txt");
 
         // The PlayerAgentProxy_t "too low id" C-string is at 01f81730 with an 8-byte prefix -> real text at 01f81738.
         decompReferencers(0x01f81738L, "PlayerAgentProxy too-low-id ref");
@@ -59,6 +59,6 @@ public class DumpPlayerAgentCtor extends GhidraScript {
         decompAt(0x0046c250L, "base too-low-id/register");
 
         out.flush(); out.close();
-        println("WROTE /home/melvin/Development/Ghidra/Aoc/playeragent_ctor.txt (" + dumped.size() + " functions)");
+        println("WROTE Captures/ghidra/output/playeragent_ctor.txt (" + dumped.size() + " functions)");
     }
 }

@@ -9,7 +9,7 @@ import java.io.PrintWriter;
 public class DumpQuestcHelpers extends GhidraScript {
     static final long[] FNS = { 0x00cc0540L, 0x0048f840L, 0x0091ff80L };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/questc_helpers.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/questc_helpers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : FNS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -25,6 +25,6 @@ public class DumpQuestcHelpers extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpQuestcHelpers done -> /home/melvin/Development/Ghidra/Aoc/questc_helpers.txt");
+        println("DumpQuestcHelpers done -> Captures/ghidra/output/questc_helpers.txt");
     }
 }

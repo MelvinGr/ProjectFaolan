@@ -1,5 +1,5 @@
 {
-	"DatabasePath": "/home/melvin/Development/C#/Project Faolan/faolan.db",
+	"DatabasePath": "faolan.db",
 
 	"ServerIpAddress": "127.0.0.1",
 	"UniverseAgentPort": 7010,

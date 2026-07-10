@@ -97,8 +97,9 @@ stack**, and **winedbg isn't shipped by Proton**. **Frida works**, but only via 
    "<Proton - Experimental>/files/bin/wine" frida-server.exe -l 127.0.0.1:27042
    ```
    (WINEESYNC/FSYNC=0 MUST match the game's PROTON_NO_ESYNC/FSYNC=1 or it won't share the wineserver.)
-2. Linux side: use `/home/melvin/.pyenv/versions/3.10.18/bin/{python,frida,frida-ps}` (the pyenv `frida` shim
-   is a stub). `frida-ps -H 127.0.0.1:27042` lists Windows pids; `dev=frida.get_device_manager().
+2. Linux side: run `frida`/`frida-ps` from a Python env with the matching frida version installed (the distro
+   `frida` shim is often a stub - use the one in your pyenv/venv). `frida-ps -H 127.0.0.1:27042` lists Windows
+   pids; `dev=frida.get_device_manager().
    add_remote_device('127.0.0.1:27042'); dev.attach(<winpid>)`. The AoC win-pid changes every launch.
 3. Module base = **0x400000** (no ASLR) → Ghidra addresses == runtime addresses; hook `ptr('0x....')` directly.
    **Only hook function ENTRIES** — mid-function return-address hooks CRASHED the client. Backscan a return
@@ -108,8 +109,8 @@ stack**, and **winedbg isn't shipped by Proton**. **Frida works**, but only via 
 Frida probe scripts are in `Captures/frida/` (frida_stack.py = RequestResource full stack; frida_write.py =
 Preview.bin write backtrace; frida_add.py = AddSkinnedMesh; frida_attr.py = attr-getter+builder; frida_up.py =
 RequestResource caller; frida_entry.py/frida_capture.py = generic). Ghidra decompile:
-`FNS=<hexaddr,hexaddr> /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process
-AgeOfConan.exe -noanalysis -scriptPath /home/melvin/Development/Ghidra/Aoc/scripts -postScript DecompileFns.java`.
+`FNS=<hexaddr,hexaddr> /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process
+AgeOfConan.exe -noanalysis -scriptPath Captures/ghidra/output/scripts -postScript DecompileFns.java`.
 
 ## Architecture found (the call graph)
 

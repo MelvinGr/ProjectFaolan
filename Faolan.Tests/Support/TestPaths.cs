@@ -4,9 +4,9 @@ using System.Runtime.CompilerServices;
 namespace Faolan.Tests.Support
 {
 	// Repo-relative fixture paths, resolved from THIS file's compile-time location ([CallerFilePath]) - the same
-	// trick Golden uses. Tests previously hardcoded "/home/melvin/Development/C#/Project Faolan/...", which pinned
-	// the whole suite to one machine at one path: renaming the checkout (or cloning it anywhere else) silently
-	// broke 27 test files. Never hardcode an absolute path in a test; go through here (or Golden).
+	// trick Golden uses. Tests previously hardcoded an absolute checkout path, which pinned the whole suite to one
+	// machine at one path: renaming the checkout (or cloning it anywhere else) silently broke 27 test files. Never
+	// hardcode an absolute path in a test; go through here (or Golden).
 	public static class TestPaths
 	{
 		// Captures/ - the packet-trace corpus. The *.tshark.json files are read at TEST time (the whole-corpus

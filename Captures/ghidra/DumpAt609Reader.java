@@ -31,7 +31,7 @@ public class DumpAt609Reader extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/at609_reader.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/at609_reader.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address kv = vtableAddr(KNOWN_VTABLE);
@@ -65,6 +65,6 @@ public class DumpAt609Reader extends GhidraScript {
         out.println("\n################## List B record FUN_00922c90");
         dump(di, out, getFunctionContaining(toAddr(0x00922c90L)));
         out.close();
-        println("DumpAt609Reader done -> /home/melvin/Development/Ghidra/Aoc/at609_reader.txt");
+        println("DumpAt609Reader done -> Captures/ghidra/output/at609_reader.txt");
     }
 }

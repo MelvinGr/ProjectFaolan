@@ -6,7 +6,7 @@ round-trips the **beach create template** byte-exact, but the beach template is 
 from the client reader (Ghidra) + validated against NecroL80's lvl80 login (27 quests, real progress), so the
 generator can eventually emit arbitrary journals.
 
-## Readers (Ghidra `AgeOfConan.exe`, project `/home/melvin/Development/Ghidra/Aoc`)
+## Readers (Ghidra `AgeOfConan.exe`, project `Captures/ghidra/output`)
 
 - `FUN_0091f5c0` — **List-A driver**: reads `u32 count = 0x3F1*(records+1)`, then loops `records` times, each
   iteration reading one `u32` (the record's listKey) + calling the per-record reader.

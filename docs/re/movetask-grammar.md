@@ -1,6 +1,6 @@
 # MoveTaskIIR_c (0x96C46740) wire grammar — RECURSIVE move tasks
 
-Recovered from `AgeOfConan.exe` (Ghidra `/home/melvin/Development/Ghidra/Aoc`; scripts `Captures/ghidra/DumpMoveTask.java`
+Recovered from `AgeOfConan.exe` (Ghidra `Captures/ghidra/output`; scripts `Captures/ghidra/DumpMoveTask.java`
 + `DumpMoveTaskTypeReaders.java`, the vtable-slot method). The MoveTask is a **recursive composite**: a move
 can be a *list* of nested moves, which is why the captured bodies span 49–370 B. Gitea #53.
 

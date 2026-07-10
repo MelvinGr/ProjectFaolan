@@ -3,7 +3,7 @@
 // handler via its assert string ("...DispatchGuildUpdate() not possible, stream bad after 'i_pcGuild'!" @
 // 0x1c68c00), decompile it + the functions it calls (one reads the guild object -> the renown stat-list).
 // Run:
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpGuildDispatch.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -26,7 +26,7 @@ public class DumpGuildDispatch extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/guild_dispatch.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/guild_dispatch.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         // Locate the assert string by its bytes (the file offset 0x1c68c00 is not a virtual address).
@@ -59,6 +59,6 @@ public class DumpGuildDispatch extends GhidraScript {
             out.println(decomp(c));
         }
         out.close();
-        println("DumpGuildDispatch done -> /home/melvin/Development/Ghidra/Aoc/guild_dispatch.txt");
+        println("DumpGuildDispatch done -> Captures/ghidra/output/guild_dispatch.txt");
     }
 }

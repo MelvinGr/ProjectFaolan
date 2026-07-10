@@ -2,7 +2,7 @@
 
 The 11 IIR types the coverage matrix flagged **V1** ("nothing builds or parses it") are all s2c types the client
 parses via its `ReadSubClass` (vtable slot 8). Recovered them without captures via the vtable-xref method
-(`Captures/ghidra/DumpV1IirReaders.java` → `/home/melvin/Development/Ghidra/Aoc/v1_readers.txt`), then validated
+(`Captures/ghidra/DumpV1IirReaders.java` → `Captures/ghidra/output/v1_readers.txt`), then validated
 each against the captured body lengths. `FUN_0048f900` = read u32; `FUN_0048f720` = read u64; `FUN_0048f840` =
 read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then the reader bytes below.
 

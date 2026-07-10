@@ -11,7 +11,7 @@ public class DumpFeatLoader extends GhidraScript {
     static final String[] STR = {"FeatClassTable_c::LoadStaticData","No RDB FeatClass data found for FeatID",
         "GDB and RDB data for feat","FeatPointsTable_c","pcFeat->GetCategory","LoadStaticData"};
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/feat_loader.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/feat_loader.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Set<Address> addrs = new HashSet<>();
         DataIterator data = currentProgram.getListing().getDefinedData(true);

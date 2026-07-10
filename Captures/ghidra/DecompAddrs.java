@@ -11,7 +11,7 @@ public class DecompAddrs extends GhidraScript {
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/decomp_addrs.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/decomp_addrs.txt");
         for (String s : System.getenv("ADDRS").split(",")) {
             long off = Long.parseLong(s.trim(), 16);
             Function f = getFunctionAt(toAddr(off));
@@ -24,6 +24,6 @@ public class DecompAddrs extends GhidraScript {
             out.println();
         }
         out.flush(); out.close();
-        println("WROTE /home/melvin/Development/Ghidra/Aoc/decomp_addrs.txt");
+        println("WROTE Captures/ghidra/output/decomp_addrs.txt");
     }
 }

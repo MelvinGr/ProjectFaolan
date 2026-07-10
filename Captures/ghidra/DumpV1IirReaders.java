@@ -39,7 +39,7 @@ public class DumpV1IirReaders extends GhidraScript {
         return -1;
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/v1_readers.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/v1_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Address knownVt = vtableAddr(KNOWN_VTABLE);
         int slot = knownVt == null ? -1 : findSlot(knownVt, KNOWN_READER);
@@ -60,6 +60,6 @@ public class DumpV1IirReaders extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpV1IirReaders done -> /home/melvin/Development/Ghidra/Aoc/v1_readers.txt");
+        println("DumpV1IirReaders done -> Captures/ghidra/output/v1_readers.txt");
     }
 }

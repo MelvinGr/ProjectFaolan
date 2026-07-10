@@ -2,7 +2,7 @@
 // function, so we can find the GameAction_MinLevel usability check (reads MinLevel, compares to a player level).
 // Also decompile the small functions that read a param AND reference a "level"/"Level"/requirement so we can see
 // which player field the requirement is compared against.
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpGameActionParams.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -35,7 +35,7 @@ public class DumpGameActionParams extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/gameaction_params.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/gameaction_params.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -77,6 +77,6 @@ public class DumpGameActionParams extends GhidraScript {
             out.println();
         }
         out.close();
-        println("wrote /home/melvin/Development/Ghidra/Aoc/gameaction_params.txt");
+        println("wrote Captures/ghidra/output/gameaction_params.txt");
     }
 }

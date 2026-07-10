@@ -2,7 +2,7 @@
 // from a field that is NOT stat 0x36. Find the "CanUse" / requirement-check functions and decompile them (+ the
 // functions that read the GameAction MinLevel param via the known param-reader FUN_0089bd80) to see which player
 // field/stat the level requirement is compared against.
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpCanUse.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -18,7 +18,7 @@ public class DumpCanUse extends GhidraScript {
     static final long PARAM_READER = 0x0089bd80L; // GameAction param getter (from #271 recast RE)
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/can_use.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/can_use.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -66,6 +66,6 @@ public class DumpCanUse extends GhidraScript {
             }
         }
         out.close();
-        println("wrote /home/melvin/Development/Ghidra/Aoc/can_use.txt");
+        println("wrote Captures/ghidra/output/can_use.txt");
     }
 }

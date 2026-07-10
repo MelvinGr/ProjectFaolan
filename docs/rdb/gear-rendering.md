@@ -43,7 +43,7 @@ on this mapping.
 
 ### Ghidra investigation (2026-06-30) — subsystems mapped, resolution is templated client code
 
-Static RE of `AgeOfConan.exe` (Ghidra project `/home/melvin/Development/Ghidra/Aoc`, no-ASLR base 0x400000 =
+Static RE of `AgeOfConan.exe` (Ghidra project `Captures/ghidra/output`, no-ASLR base 0x400000 =
 Ghidra image base, so FUN_ addresses are live runtime addresses) confirmed the architecture but not (yet) the
 exact resolution function — the item/visual code is fcVector/template-heavy and string-cached, so the look→mesh
 lookup has no clean static anchor:

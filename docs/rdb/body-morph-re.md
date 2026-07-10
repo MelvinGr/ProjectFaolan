@@ -2,7 +2,7 @@
 
 Status of the attempt to recover AoC's *exact* body-proportion morph deformation from `AgeOfConan.exe`
 (so the viewer can apply authentic morphs instead of the geometric approximation in
-`Faolan.Core.Rdb/Assets/BodyMorphDeformer.cs`). Ghidra project: `/home/melvin/Development/Ghidra/Aoc`
+`Faolan.Core.Rdb/Assets/BodyMorphDeformer.cs`). Ghidra project: `Captures/ghidra/output`
 (scripts in `Captures/ghidra/`, exe PE32 i386 stripped).
 
 ## What was recovered (solid)

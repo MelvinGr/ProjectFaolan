@@ -7,7 +7,7 @@ public class DumpMoveTaskLeafReaders extends GhidraScript {
     static final String[] TARGETS = { "PathMoveTask::vftable","BallisticMoveTask::vftable","AnimatedMoveTask::vftable","FormationMoveTask::vftable" };
     Address vt(String n){ for (Symbol s: currentProgram.getSymbolTable().getAllSymbols(false)) if (s.getName(true).equals(n)) return s.getAddress(); return null; }
     @Override public void run() throws Exception {
-        java.io.PrintWriter out=new java.io.PrintWriter("/home/melvin/Development/Ghidra/Aoc/movetask_leaf_readers.txt");
+        java.io.PrintWriter out=new java.io.PrintWriter("Captures/ghidra/output/movetask_leaf_readers.txt");
         DecompInterface di=new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (String t: TARGETS){
             Address v=vt(t); out.println("###### "+t+" -> "+v);

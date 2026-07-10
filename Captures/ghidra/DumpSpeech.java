@@ -2,7 +2,7 @@
 // playstockphraseassubtitle (60s timeout) and how the cinematic camera enters
 // "cinematic state" (the BCC-error path). Mirrors DumpCutscene: byte-scan needles,
 // walk to string start, list referencing functions.
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe \
 //     -noanalysis -scriptPath Captures/ghidra -postScript DumpSpeech.java
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;

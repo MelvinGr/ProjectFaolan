@@ -19,7 +19,7 @@ decode; values from `Spell.Cooldown` (combos) + `Captures/spell_cooldowns_observ
 
 
 **Why this exists:** an accurate emulator needs the *formulas*, not per-value lookups. Reverse-engineered from
-`AgeOfConan.exe` (Ghidra project `/home/melvin/Development/Ghidra/Aoc`, scripts in `Captures/ghidra/` +
+`AgeOfConan.exe` (Ghidra project `Captures/ghidra/output`, scripts in `Captures/ghidra/` +
 `Captures/scripts/`). Status: **foundation decoded; per-property completion is incremental.**
 
 ## Headline finding

@@ -2,7 +2,7 @@
 // gates the create-flow drowning cutscene (CC_Drowning_*) and the "invalid camera path" error.
 // Byte-scans .rdata for each needle (mirrors DumpRpcTables), walks to the string start, then lists
 // the functions that reference that string address.
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe \
 //     -noanalysis -scriptPath Captures/ghidra -postScript DumpCutscene.java
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;

@@ -1,7 +1,7 @@
 // Decompile every function referencing the ability/item requirement fields _requiredLevel / RequiredLevel and the
 // level stats CurrentLevel / CharacterLevel - to find the usability check (item._requiredLevel vs player.<level>)
 // and which PLAYER level field/stat is read.
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpRequiredLevel.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -16,7 +16,7 @@ public class DumpRequiredLevel extends GhidraScript {
         "GetLevel", "m_nLevel", "e_Level", "GetCharacterLevel", "e_CurrentLevel"};
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/required_level.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/required_level.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -52,6 +52,6 @@ public class DumpRequiredLevel extends GhidraScript {
             }
         }
         out.close();
-        println("wrote /home/melvin/Development/Ghidra/Aoc/required_level.txt");
+        println("wrote Captures/ghidra/output/required_level.txt");
     }
 }

@@ -15,7 +15,7 @@ public class DumpMoveTaskTypeReaders extends GhidraScript {
         return null;
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/movetask_type_readers.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/movetask_type_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (String t : TARGETS) {
             Address vt = vtableAddr(t);

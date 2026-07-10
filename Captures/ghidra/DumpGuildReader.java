@@ -4,7 +4,7 @@
 // GuildUpdateIIR_c::vftable -> the guild reader. Decompile it + its directly-called functions (the
 // counter-region framing is likely a sub-reader), so the 220-byte renown counter region can be decoded.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpGuildReader.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -47,7 +47,7 @@ public class DumpGuildReader extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/guild_reader.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/guild_reader.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = symbolAddr(KNOWN_VTABLE);
@@ -87,6 +87,6 @@ public class DumpGuildReader extends GhidraScript {
             out.println(decomp(c));
         }
         out.close();
-        println("DumpGuildReader done -> /home/melvin/Development/Ghidra/Aoc/guild_reader.txt");
+        println("DumpGuildReader done -> Captures/ghidra/output/guild_reader.txt");
     }
 }

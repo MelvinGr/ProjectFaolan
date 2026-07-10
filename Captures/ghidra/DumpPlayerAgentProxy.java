@@ -31,7 +31,7 @@ public class DumpPlayerAgentProxy extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/playeragent_proxy.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/playeragent_proxy.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -70,6 +70,6 @@ public class DumpPlayerAgentProxy extends GhidraScript {
         }
         out.flush();
         out.close();
-        println("WROTE /home/melvin/Development/Ghidra/Aoc/playeragent_proxy.txt (" + dumped.size() + " methods)");
+        println("WROTE Captures/ghidra/output/playeragent_proxy.txt (" + dumped.size() + " methods)");
     }
 }

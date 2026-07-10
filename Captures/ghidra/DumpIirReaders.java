@@ -18,7 +18,7 @@ public class DumpIirReaders extends GhidraScript {
         return currentProgram.getMemory().findBytes(currentProgram.getMinAddress(), s.getBytes("US-ASCII"), null, true, monitor);
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/iir_readers.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/iir_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         ReferenceManager rm = currentProgram.getReferenceManager();
         Set<Long> dumped = new HashSet<>();
@@ -37,6 +37,6 @@ public class DumpIirReaders extends GhidraScript {
                 if (++g>3) break;
             }
         }
-        out.close(); println("done -> /home/melvin/Development/Ghidra/Aoc/iir_readers.txt");
+        out.close(); println("done -> Captures/ghidra/output/iir_readers.txt");
     }
 }

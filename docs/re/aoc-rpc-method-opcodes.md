@@ -512,7 +512,7 @@ on the 32-bit id.
 **s2c POST-AUTH table recovered** (`PlayerInterfaceDispatch_t::DispatchMethod` = `FUN_00484270`, a binary-search
 tree over 32-bit constants; `DumpDispatch.java` + `DumpHandlerNames.java`). 26 methods, e.g. `0x5DC18991`
 DispatchAuthenticateAck, `0xA7C86A29` DispatchSetStats, `0xF899B14C` DispatchSetDimensionList. Full table:
-`/home/melvin/Development/Ghidra/Aoc/playerinterface_postauth_s2c.json` (external, not committed).
+`Captures/ghidra/output/playerinterface_postauth_s2c.json` (external, not committed).
 
 **c2s method list recovered** (`PlayerAgentProxy_t`, registration order, `DumpRpcTables.java`): 25 methods —
 Authenticate, AuthenticateLoggedIn, LoginFromCrash, CreateCharacter, LoginCharacter (= our EnterWorld),
@@ -552,7 +552,7 @@ methods, each as `key = 0x…; register(); setName("Method", len)`:
 | SetHardcoreLevel | `0x6A6B621C` | | ClientReplyKeepCookie | `0x43D90C1B` |
 | GetDimensionList | `0x43476328` | | | |
 
-(Full JSON: `/home/melvin/Development/Ghidra/Aoc/playeragent_c2s_catalog.json`.) The **mechanism**: `register`
+(Full JSON: `Captures/ghidra/output/playeragent_c2s_catalog.json`.) The **mechanism**: `register`
 (`FUN_00487900`) inserts the method into a **binary tree keyed by that internal key**; the proxy send passes the
 key to `rpc::Proxy_t::SendMethodInvocation` (`FUN_0046c910`), which builds the `RpcHeader`. The **internal key is
 what each proxy method passes at its send call** (matches the constants dumped from the method bodies).

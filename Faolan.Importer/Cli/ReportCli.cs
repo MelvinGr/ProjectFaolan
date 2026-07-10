@@ -24,7 +24,7 @@ namespace Faolan.Importer.Cli
 	// These inspect captures or the DB and print; they never write, so they bypass the import runner entirely.
 	public static class ReportCli
 	{
-		private const string RepoRoot = "/home/melvin/Development/C#/Project Faolan";
+		private static readonly string RepoRoot = Faolan.Core.RepoPaths.Root;
 
 		public static async Task<int> RunAsync(string[] args, string report)
 		{

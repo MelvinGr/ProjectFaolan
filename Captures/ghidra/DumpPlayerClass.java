@@ -1,7 +1,7 @@
 // How does the client determine the LOCAL player's class/profession (for GameAction_Profession usability)?
 // Find refs to CharacterClass / RDBPlayerClassData_c / GameAction_Profession and decompile the functions that
 // READ a player class/profession field, to see which stat/packet field the class comes from.
-//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpPlayerClass.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -18,7 +18,7 @@ public class DumpPlayerClass extends GhidraScript {
     };
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/player_class.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/player_class.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -55,6 +55,6 @@ public class DumpPlayerClass extends GhidraScript {
             }
         }
         out.close();
-        println("wrote /home/melvin/Development/Ghidra/Aoc/player_class.txt");
+        println("wrote Captures/ghidra/output/player_class.txt");
     }
 }
