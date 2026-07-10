@@ -26,7 +26,7 @@ namespace Faolan.Tests
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-charimp-{Guid.NewGuid():N}.db");
 			try
 			{
-				var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options;
+				var options = TestDb.Options(dbPath);
 				await using var db = new DatabaseContext(options);
 				await db.Database.EnsureCreatedAsync();
 				db.Accounts.Add(new Account

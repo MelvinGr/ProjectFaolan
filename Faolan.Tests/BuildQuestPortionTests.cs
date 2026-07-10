@@ -126,7 +126,7 @@ namespace Faolan.Tests
 
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath}").Options;
+			var options = TestDb.Options(DbPath);
 			await using var ctx = new DatabaseContext(options);
 			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 		}

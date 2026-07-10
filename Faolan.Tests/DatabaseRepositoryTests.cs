@@ -741,7 +741,7 @@ namespace Faolan.Tests
 
 		private static (DatabaseRepository repo, IDbContextFactory<DatabaseContext> factory) NewRepo(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}").Options;
+			var options = TestDb.Options(path);
 			var factory = new TestContextFactory(options);
 			return (new DatabaseRepository(factory), factory);
 		}

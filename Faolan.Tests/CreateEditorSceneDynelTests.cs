@@ -62,7 +62,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={FaolanDbPath()};Mode=ReadOnly").Options;
+			var options = TestDb.ReadOnly(FaolanDbPath());
 			var repo = new DatabaseRepository(new SingleOptionsContextFactory(options));
 			var client = new RecordingNetworkClient(0x02000001); // the instance the golden was recorded with
 
@@ -136,7 +136,7 @@ namespace Faolan.Tests
 
 		private static Dictionary<string, WorldObject> LoadMap4000ObjectsByDisplayName()
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={FaolanDbPath()};Mode=ReadOnly").Options;
+			var options = TestDb.ReadOnly(FaolanDbPath());
 			using var ctx = new DatabaseContext(options);
 			var map = new Dictionary<string, WorldObject>();
 			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayName != null).AsNoTracking())

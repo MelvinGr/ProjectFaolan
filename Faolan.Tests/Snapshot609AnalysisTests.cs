@@ -74,7 +74,7 @@ namespace Faolan.Tests
 
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath}").Options;
+			var options = TestDb.Options(DbPath);
 			var repo = new DatabaseRepository(new Factory(options));
 			return await repo.GetQuestDefinition(questId);
 		}

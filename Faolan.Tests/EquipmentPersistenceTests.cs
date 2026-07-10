@@ -100,7 +100,7 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).UseLazyLoadingProxies().Options;
+			var options = TestDb.Options(path, lazyLoadingProxies: true);
 			return new DatabaseContext(options);
 		}
 	}

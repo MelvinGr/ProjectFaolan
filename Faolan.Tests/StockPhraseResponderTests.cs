@@ -58,7 +58,7 @@ namespace Faolan.Tests
 
 		private static DatabaseRepository Repo()
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath()};Mode=ReadOnly").Options;
+			var options = TestDb.ReadOnly(DbPath());
 			return new DatabaseRepository(new Factory(options));
 		}
 

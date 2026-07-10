@@ -50,7 +50,7 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).Options;
+			var options = TestDb.Options(path);
 			return new DatabaseContext(options);
 		}
 	}

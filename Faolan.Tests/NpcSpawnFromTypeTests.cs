@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		public void EveryLiftedType_BuildsFromType_WithItsEquipmentAndAppearance()
 		{
 			var db = Path.Combine(FindRepoRoot(), "faolan.db");
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={db};Mode=ReadOnly").Options;
+			var options = TestDb.ReadOnly(db);
 			using var ctx = new DatabaseContext(options);
 			// The summon-only types: those carrying their own equipment/morphs (a plain map-NPC type has none - its
 			// placements do). Covers the pet family; mounts too when that opt-in module is imported.

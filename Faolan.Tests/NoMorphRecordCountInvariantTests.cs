@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		public void EveryShippedSpawn_BuildsFromColumns()
 		{
 			var db = Path.Combine(FindRepoRoot(), "faolan.db");
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={db};Mode=ReadOnly").Options;
+			var options = TestDb.ReadOnly(db);
 			using var ctx = new DatabaseContext(options);
 			var rows = ctx.NpcSpawns.Include(s => s.Npc).ThenInclude(n => n.StatCore).Include(s => s.Morphs).Where(s => s.Npc != null && s.Npc.StatCore != null && s.Life > 0).AsNoTracking().ToList();
 
