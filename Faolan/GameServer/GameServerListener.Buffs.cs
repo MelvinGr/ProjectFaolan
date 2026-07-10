@@ -173,18 +173,19 @@ namespace Faolan.GameServer
 		// BCC cast (#69/#274). Offensive casts (applyTo != applyFrom) are damage, handled by ResolveOffensiveCast.
 		private async Task SendMagicBuffIir(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] payload)
 		{
+			// The ApplySpell carrier body - the SAME layout for player and NPC casts, byte-exact via NpcSpellCastBuilder
+			// (NpcSpellCastBuilderTests). Built once so the identical bytes go to the caster AND to nearby viewers below.
+			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
+
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(applyTo)
-					.WriteUInt16(0x0000)
-					.WriteUInt32(spellId)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(applyFrom)
-					.WriteArray(payload))
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
+
+			// #48-analogue: nearby players see the cast EFFECT, not just the gesture. Retail streams the actor's
+			// ApplySpell to observers who see the caster (other_playersvisible capture: other-player self-buffs +
+			// offensive casts, framed to our endpoint). Reframe the same body to each viewer who already sees the caster.
+			await _broadcaster.BroadcastSpellToViewers(client, body);
 
 			if (applyTo == applyFrom)
 			{

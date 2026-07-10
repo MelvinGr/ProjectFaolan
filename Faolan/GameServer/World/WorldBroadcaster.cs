@@ -285,6 +285,37 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// Relays a player's ApplySpell (the MagicBuffIIR spell EFFECT - a buff applied, or an offensive cast) to every
+		// other player who can already see the caster, so the effect renders on their clients too. This is the EFFECT
+		// analogue of BroadcastBehaviorToViewers, which relays only the cast GESTURE (the BCC animation): retail streams
+		// BOTH to nearby observers. `body` is the same ApplySpell carrier the caster's own client receives - it already
+		// carries the acting player's handle as applyFrom (and, for a self-buff, applyTo); retail relays that exact body
+		// to nearby players, only the frame receiver differs. Ground truth: the other-players-visible capture
+		// (Hoxxling ...other_playersvisible) shows s2c ApplySpell (0x6B87E316) for other-player handles 0x1316xxx framed
+		// to our endpoint - both self-buffs (e.g. player 0x01316e68 at frame 3809) and offensive casts (player
+		// 0x01316cee on NPC targets). Gated on the viewer's Known set (#245: never relay for a handle the viewer's
+		// client hasn't built). No-op solo / when the caster is unseen.
+		public async Task BroadcastSpellToViewers(INetworkClient caster, byte[] body)
+		{
+			var entity = _sim.PlayerWorldEntity(caster);
+			if (entity == null || body == null)
+				return;
+
+			var zone = _sim.World.ZoneForEntity(entity);
+			if (zone == null)
+				return;
+
+			foreach (var viewer in zone.Entities)
+			{
+				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
+					continue;
+				if (!viewer.Known.Contains(entity.Handle))
+					continue; // only players who already see the caster (their client has the handle)
+
+				await SendWorldIir(viewer.Client, body);
+			}
+		}
+
 		// Despawn a world-owned entity (a killed NPC, an expired loot bag) for every nearby player THAT ACTUALLY HAS IT
 		// in their Known set. The Known guard is the #245 invariant: an n3ToClientQuit for a handle the recipient was
 		// never sent crashes the client (`pcDynel == null`) - a still-loading player in range of an entity it never

@@ -219,6 +219,21 @@ expected duration/clear-point is pinned. The wire grammar is validated against t
 the shape is sound, but **"Shield of the Risen" is in no capture** — its exact id/payload is unknown.
 **Blocked on #221** (buff expiry) before re-enabling.
 
+## Cross-player action visibility (#48 + spell effects)
+A player's combat/cast packets are framed to the **actor** only, so without relaying they are invisible to
+other players in range. Retail relays them: the `Hoxxling …_other_playersvisible` capture shows s2c packets for
+other-player handles (the `0x01316xxx` char-id range, distinct from the `0x000xxxxx` NPC range) — the **same
+body** the actor's own client receives, only the frame receiver differs. Two relays run off the interest
+`Known` set (so a still-loading viewer is never sent an action for a handle it hasn't built — the `#245`
+invariant):
+- **The cast/attack GESTURE** — the `BehaviorControlCenter` animation (`#48`, `BroadcastBehaviorToViewers`),
+  fired for `NormalAttack` / `UnarmedAttack` / `CastSpell` in `GameServerListener.Inbound.cs`.
+- **The spell EFFECT** — the `ApplySpell` (`0x6B87E316`) itself (`BroadcastSpellToViewers`, from
+  `SendMagicBuffIir`), so the buff/effect that lands renders on nearby clients, not just the gesture. The capture
+  streams both other-player **self-buffs** (e.g. player `0x01316e68`) and **offensive casts** (player
+  `0x01316cee` on NPC targets) to the observer, framed to the observer's endpoint. Verbatim-relay + Known-gating
+  locked by `CrossPlayerSpellRelayTests` against the captured body. **2-client in-client confirmation pending.**
+
 ## Starting gear (#220)
 A brand-new beach character is seeded its slave outfit in `EnsureBeachStarterEquipment`
 (`GameServerListener.WorldEntry.cs`), from the `StartingData` constants harvested from the `*create*` captures
