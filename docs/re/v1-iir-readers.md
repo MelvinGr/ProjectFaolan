@@ -37,13 +37,14 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 
 ## Status
 
-Grammar SHAPE decoded + capture-length-validated for all 11 (the "genuinely undecoded" V1 tag is now only about
-the absence of a codec, not the wire format). **Seven now HAVE byte-exact codecs with captured round-trips**
-(`V1IirCodecTests`) — `RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`, `SpellBookCodec`, `FeedbackIirCodec`,
-`CrimeCodec`, and `UpdateInventoryCodec` (which frames `[handle][env][u32 pbLen][ProtoInventoryGame protobuf]`).
-Coverage dropped **11 V1 → 4 V1**.
+Grammar decoded + a byte-exact codec with a captured round-trip for **all eleven** (`V1IirCodecTests`) — the IIR
+coverage matrix is now **0 V1** (48 V3 / 27 V2). Codecs: `RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`,
+`SpellBookCodec`, `FeedbackIirCodec`, `CrimeCodec`, `UpdateInventoryCodec` (frames `[handle][env][u32 pbLen]
+[ProtoInventoryGame protobuf]`), `TemplateActionCodec` (`[68-B item struct][u32×6]`), `KnubotFinishTradeCodec`,
+`AreaFormulaCodec` (the two `0x3F1` ref+position lists, fully modelled), and `KnubotStartTradeCodec`.
 
-The remaining four each need more than a fixed-field parse: `KnubotStartTradeIIR` is the variable shop list of
-`std::string`-named items and `KnubotFinishTradeIIR` shares its version-gated base prefix (`FUN_009a7e00`);
-`AreaFormulaIIR` has two `0x3F1` sub-lists; `TemplateActionIIR` a 68-B struct (`FUN_005d5150`). Their SHAPE is
-documented above; each needs its element/field grammar filled in before a codec.
+Two carry an inner structure verbatim rather than re-modelling an existing subsystem: `UpdateInventoryCodec`
+carries the item **protobuf** (deserialize with `ProtoInventoryGame`/`ProtoAcgItem`), and `KnubotStartTradeCodec`
+carries the Knubot **XML `<remoteformat>` shop dialogue** payload (the conversation-packet grammar) — both
+byte-exact, both with the frame constructed. `TemplateActionCodec` carries its 68-B item-identity struct verbatim
+(name + item keys) with the six trailing u32 typed. The rest are fully field-typed.

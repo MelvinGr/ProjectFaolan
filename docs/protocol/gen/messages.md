@@ -66,6 +66,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
 | V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V2 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormulaCodec` |  |
 | V2 | `BankIIR` | `0x0BA1C1CB` | `BankService` *(inline)* |  |
 | V2 | `ChainKillIIR` | `0x0EED7068` | `ChainKillCodec` |  |
 | V2 | `CharInPlayIIR` | `0x864CFEF8` | `GameServerListener.Inbound` *(inline)* |  |
@@ -77,6 +78,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `GameServerListener.Outbound` *(inline)* |  |
 | V2 | `GameTimeIIR` | `0x4F57DC08` | `GameServerListener.GmCommands` *(inline)* |  |
 | V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `GameServerListener.Inbound` *(inline)* |  |
+| V2 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTradeCodec` |  |
+| V2 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTradeCodec` |  |
 | V2 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` |  |
 | V2 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `GameServerListener.Inbound` *(inline)* |  |
@@ -86,13 +89,10 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateFlowService` *(inline)* |  |
 | V2 | `SetNameIIR` | `0xADCE0CDA` | `CreateFlowService` *(inline)* |  |
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
+| V2 | `TemplateActionIIR` | `0x6C300937` | `TemplateActionCodec` |  |
 | V2 | `TradeskillReplyIIR` | `0x9062D559` | `GameServerListener.Outbound` *(inline)* |  |
 | V2 | `TradeskillRequestIIR` | `0x06B9CD94` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` |  |
-| V1 | `AreaFormulaIIR` | `0xCE30BE4E` | — |  |
-| V1 | `KnubotFinishTradeIIR` | `0x7446F3FA` | — |  |
-| V1 | `KnubotStartTradeIIR` | `0x4B2A47BF` | — |  |
-| V1 | `TemplateActionIIR` | `0x6C300937` | — |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
 [`gaps.md`](../gaps.md)). A V3 row with an empty golden column is byte-exact via a codec whose test the
