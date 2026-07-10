@@ -57,7 +57,7 @@ namespace Faolan.Core.Network.Packets.Conan
 				_logger.LogInformation("<= [{Channel} {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}", _channelName, opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length);
 				LogDebugDetails(opcodeName, packet);
 
-				if (opcode == (ushort)GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker && packet.Body?.Length >= sizeof(uint) * 2 + sizeof(byte))
+				if (opcode == (ushort)GameCharInterfaceOpcodes.DispatchSetQuestMarker && packet.Body?.Length >= sizeof(uint) * 2 + sizeof(byte))
 				{
 					var data = new FaolanStream(packet.Body.ToArray());
 					var unk0 = data.ReadUInt32();

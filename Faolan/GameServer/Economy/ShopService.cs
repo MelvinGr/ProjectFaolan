@@ -138,7 +138,7 @@ namespace Faolan.GameServer.Economy
 			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
 
 			var ps = new PacketStream();
-			ps.WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceDispatchOpcodes.DispatchItemSoldToShop);
+			ps.WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchItemSoldToShop);
 			WriteItemSoldBody(ps, container, sellerId, slot);
 			await ps.SendAsync(client);
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
@@ -206,7 +206,7 @@ namespace Faolan.GameServer.Economy
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
 			var ps = new PacketStream();
-			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchShopData);
+			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchShopData);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 
@@ -248,7 +248,7 @@ namespace Faolan.GameServer.Economy
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
 		}

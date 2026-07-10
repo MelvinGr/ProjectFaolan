@@ -42,7 +42,151 @@ AgentServer chat — **no RpcHeader** (raw opcode) · S2C
 | `0x0041` | `ChannelChat` | a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000] |
 | `0x0064` | `Ox0064` | echo of the client's chat-init handshake |
 
-## CSPlayerInterfaceDispatchOpcodes
+## CSPlayerAgentOpcodes
+
+RPC class **CSPlayerAgent** (id `0x6DD55614`) · C2S (client→server call)
+
+| Opcode | Name | Note |
+|--------|------|------|
+| `0x2000` | `Authenticate` |  |
+| `0x2001` | `CharacterAuthenticated` |  |
+| `0x2002` | `CharacterDisconnected` |  |
+| `0x2003` | `TeamInvite` |  |
+| `0x2004` | `TeamInviteByName` |  |
+| `0x2005` | `TeamApply` |  |
+| `0x2006` | `TeamSetLootOption` |  |
+| `0x2007` | `TeamSetMasterLooter` |  |
+| `0x2008` | `AcceptTeamInvite` |  |
+| `0x2009` | `DeclineTeamInvite` |  |
+| `0x200A` | `CharacterSearch` |  |
+| `0x200B` | `SearchForTeam` |  |
+| `0x200C` | `SetNewTeamLeader` |  |
+| `0x200D` | `SummonCharacters` |  |
+| `0x200E` | `AcceptSummon` |  |
+| `0x200F` | `DeclineSummon` |  |
+| `0x2010` | `GetExtendedCharacterInfo` |  |
+| `0x2011` | `GetExtendedCharacterInfoByName` |  |
+| `0x2012` | `SetLookingForTeamStatus` |  |
+| `0x2013` | `SetLookingForMemberStatus` |  |
+| `0x2014` | `GetLookingForTeamStatus` |  |
+| `0x2015` | `GetLookingForMemberStatus` |  |
+| `0x2016` | `SetCommunityServerOptions` |  |
+| `0x2017` | `StartVoteKick` |  |
+| `0x2018` | `VoteKickAnswer` |  |
+| `0x2019` | `StartVoteRetreat` | observed body [u32 0xC350][u32 clientInstance] at login - semantics unconfirmed |
+| `0x201A` | `VoteRetreatAccept` |  |
+| `0x201B` | `VoteRetreatReject` |  |
+| `0x201C` | `AcceptGuildInvitation` |  |
+| `0x201D` | `DeclineGuildInvitation` |  |
+| `0x201E` | `ClientRequestGuildInfo` |  |
+| `0x201F` | `ClientRequestGuildName` |  |
+| `0x2020` | `ClientRequestCharIDByName` |  |
+| `0x2021` | `CreateGuild` |  |
+| `0x2022` | `GuildInviteByName` |  |
+| `0x2023` | `GuildInvite` |  |
+| `0x2024` | `RemoveGuildInvitationCooldown` |  |
+| `0x2025` | `GuildPromote` |  |
+| `0x2026` | `GuildDemote` |  |
+| `0x2027` | `GuildKick` |  |
+| `0x2028` | `GuildLeave` |  |
+| `0x2029` | `GuildTax` |  |
+| `0x202A` | `GuildGovernmentForm` |  |
+| `0x202B` | `GuildRecruitmentMode` |  |
+| `0x202C` | `GuildName` |  |
+| `0x202D` | `GuildDescription` |  |
+| `0x202E` | `GuildMessageOfTheDay` |  |
+| `0x202F` | `GuildRequestMemberList` |  |
+| `0x2030` | `GuildApplication` |  |
+| `0x2031` | `GuildRejectApplication` |  |
+| `0x2032` | `SetLookingForGuild` |  |
+| `0x2033` | `GuildMergeRequest` |  |
+| `0x2034` | `GuildMergeReply` |  |
+| `0x2035` | `GuildWithdrawMoney` |  |
+| `0x2036` | `GetPvpPointsInfo` |  |
+| `0x2037` | `AddPvpPoints` |  |
+| `0x2038` | `RemovePvpPoints` |  |
+| `0x2039` | `ClearPvpPoints` |  |
+| `0x203A` | `GetGuildRenownInfo` |  |
+| `0x203B` | `AddGuildRenown` |  |
+| `0x203C` | `RemoveGuildRenown` |  |
+| `0x203D` | `SetGuildRenown` |  |
+| `0x203E` | `CalculateRankings` |  |
+| `0x203F` | `UnlockGuildRenown` |  |
+| `0x2040` | `RequestRenownHistory` |  |
+| `0x2041` | `RequestRenownRankings` |  |
+| `0x2042` | `RequestBattleKeepInformation` |  |
+| `0x2043` | `SearchForGuilds` |  |
+| `0x2044` | `GMGuildName` |  |
+| `0x2045` | `RequestGuildCitySpot` |  |
+| `0x2046` | `ApplyForMassivePVPBattleQueue` |  |
+| `0x2047` | `WithdrawFromMassivePVPBattleQueue` |  |
+| `0x2048` | `MassivePvPBattleQueueGMCommand` |  |
+| `0x2049` | `MassivePvpBattleQueueStatusRequest` |  |
+| `0x204A` | `PvPMatchMakingCreateMatch` |  |
+| `0x204B` | `PvPMatchMakingJoinMatch` |  |
+| `0x204C` | `PvPMatchMakingSetSide` |  |
+| `0x204D` | `PvPMatchMakingMatchSay` |  |
+| `0x204E` | `PvPMatchMakingLeaveMatch` |  |
+| `0x204F` | `PvPMatchMakingSearchForMatches` |  |
+| `0x2050` | `PvPMatchMakingGetMatchInfo` |  |
+| `0x2051` | `PvPMatchMakingTeleportToMinigame` |  |
+| `0x2052` | `PvPMatchMakingPutIntoMatchMaking` |  |
+| `0x2053` | `PvPMatchMakingRemoveFromMatchMaking` |  |
+| `0x2054` | `PvPMatchMakingRequestInfo` |  |
+| `0x2055` | `PvPMatchMakingIsInMatchMaking` |  |
+| `0x2056` | `PvPMatchMakingKickPlayer` |  |
+| `0x2057` | `PvPMatchMakingBanPlayer` |  |
+| `0x2058` | `PvPMatchMakingMakePlayerMatchOwner` |  |
+| `0x2059` | `PvPMatchMakingForceSide` |  |
+| `0x205A` | `PvPMatchMakingStartMatch` |  |
+| `0x205B` | `DebugPvPMatchMakingShowDebugInfo` |  |
+| `0x205C` | `DebugPvPMatchMakingStopAllMatches` |  |
+| `0x205D` | `DebugPvPMatchMakingStopCurrentMatch` |  |
+| `0x205E` | `DebugPvPMatchMakingSetNewTimeLimit` |  |
+| `0x205F` | `DebugPvPMatchMakingRestart` |  |
+| `0x2060` | `DebugPvPMatchForcePlayerIntoCurrentMatch` |  |
+| `0x2061` | `DebugPvPMatchMakingDoMatchMaking` |  |
+| `0x2062` | `DebugPvPMatchForceStartMatch` |  |
+| `0x2063` | `DebugPvPMatchForceEnterAll` |  |
+| `0x2064` | `DebugCommunityServerModuleStart` |  |
+| `0x2065` | `DebugCommunityServerModuleStop` |  |
+| `0x2066` | `SetAsyncEnabled` |  |
+| `0x2067` | `SetNumWorkerThreads` |  |
+| `0x2068` | `RaidCreate` |  |
+| `0x2069` | `RaidLeave` |  |
+| `0x206A` | `RaidInviteTeam` |  |
+| `0x206B` | `RaidInviteTeamAccept` |  |
+| `0x206C` | `RaidInviteTeamDecline` |  |
+| `0x206D` | `RaidKickTeam` |  |
+| `0x206E` | `RaidKickCharacter` |  |
+| `0x206F` | `RaidMoveTeamMember` |  |
+| `0x2070` | `RaidSwapCharacters` |  |
+| `0x2071` | `RaidInviteCharacter` |  |
+| `0x2072` | `RaidInviteCharacterByName` |  |
+| `0x2073` | `RaidAcceptInvite` |  |
+| `0x2074` | `RaidDeclineInvite` |  |
+| `0x2075` | `RaidSetLootOption` |  |
+| `0x2076` | `RaidSetMasterLooter` |  |
+| `0x2077` | `MassivePvpInfoRequest` |  |
+| `0x2078` | `SendTeamInfo` |  |
+| `0x2079` | `GMRequestGuildInfoFromChar` |  |
+| `0x207A` | `QueueGroupFinder` |  |
+| `0x207B` | `SelectGroupFinderRoles` |  |
+| `0x207C` | `LeaveGroupFinder` |  |
+| `0x207D` | `ReadyGroupFinder` |  |
+| `0x207E` | `RequestRaidQueueInfo` |  |
+| `0x207F` | `UpdateDefaultRaid` |  |
+| `0x2080` | `SetFeaturedRaid` |  |
+| `0x2081` | `RequestFeaturedRaidNeededRole` |  |
+| `0x2082` | `RequestNeededRole` |  |
+| `0x2083` | `RequestRotatingActivityChildInfo` |  |
+| `0x2084` | `GetWorldStat` |  |
+| `0x2085` | `RequestItemSalesBalance` |  |
+| `0x2086` | `RequestItemSalesCoupons` |  |
+| `0x20C5` | `Ox20C5` | GroupFinder remoteformat echo |
+| `0x20D0` | `Ox20D0` |  |
+
+## CSPlayerInterfaceOpcodes
 
 RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispatch)
 
@@ -260,150 +404,6 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x20D1` | `DispatchReturnWorldStat` |  |
 | `0x20D2` | `DispatchInvalidWorldStat` |  |
 
-## CsPlayerAgentOpcodes
-
-RPC class **CSPlayerAgent** (id `0x6DD55614`) · C2S (client→server call)
-
-| Opcode | Name | Note |
-|--------|------|------|
-| `0x2000` | `Authenticate` |  |
-| `0x2001` | `CharacterAuthenticated` |  |
-| `0x2002` | `CharacterDisconnected` |  |
-| `0x2003` | `TeamInvite` |  |
-| `0x2004` | `TeamInviteByName` |  |
-| `0x2005` | `TeamApply` |  |
-| `0x2006` | `TeamSetLootOption` |  |
-| `0x2007` | `TeamSetMasterLooter` |  |
-| `0x2008` | `AcceptTeamInvite` |  |
-| `0x2009` | `DeclineTeamInvite` |  |
-| `0x200A` | `CharacterSearch` |  |
-| `0x200B` | `SearchForTeam` |  |
-| `0x200C` | `SetNewTeamLeader` |  |
-| `0x200D` | `SummonCharacters` |  |
-| `0x200E` | `AcceptSummon` |  |
-| `0x200F` | `DeclineSummon` |  |
-| `0x2010` | `GetExtendedCharacterInfo` |  |
-| `0x2011` | `GetExtendedCharacterInfoByName` |  |
-| `0x2012` | `SetLookingForTeamStatus` |  |
-| `0x2013` | `SetLookingForMemberStatus` |  |
-| `0x2014` | `GetLookingForTeamStatus` |  |
-| `0x2015` | `GetLookingForMemberStatus` |  |
-| `0x2016` | `SetCommunityServerOptions` |  |
-| `0x2017` | `StartVoteKick` |  |
-| `0x2018` | `VoteKickAnswer` |  |
-| `0x2019` | `StartVoteRetreat` | observed body [u32 0xC350][u32 clientInstance] at login - semantics unconfirmed |
-| `0x201A` | `VoteRetreatAccept` |  |
-| `0x201B` | `VoteRetreatReject` |  |
-| `0x201C` | `AcceptGuildInvitation` |  |
-| `0x201D` | `DeclineGuildInvitation` |  |
-| `0x201E` | `ClientRequestGuildInfo` |  |
-| `0x201F` | `ClientRequestGuildName` |  |
-| `0x2020` | `ClientRequestCharIDByName` |  |
-| `0x2021` | `CreateGuild` |  |
-| `0x2022` | `GuildInviteByName` |  |
-| `0x2023` | `GuildInvite` |  |
-| `0x2024` | `RemoveGuildInvitationCooldown` |  |
-| `0x2025` | `GuildPromote` |  |
-| `0x2026` | `GuildDemote` |  |
-| `0x2027` | `GuildKick` |  |
-| `0x2028` | `GuildLeave` |  |
-| `0x2029` | `GuildTax` |  |
-| `0x202A` | `GuildGovernmentForm` |  |
-| `0x202B` | `GuildRecruitmentMode` |  |
-| `0x202C` | `GuildName` |  |
-| `0x202D` | `GuildDescription` |  |
-| `0x202E` | `GuildMessageOfTheDay` |  |
-| `0x202F` | `GuildRequestMemberList` |  |
-| `0x2030` | `GuildApplication` |  |
-| `0x2031` | `GuildRejectApplication` |  |
-| `0x2032` | `SetLookingForGuild` |  |
-| `0x2033` | `GuildMergeRequest` |  |
-| `0x2034` | `GuildMergeReply` |  |
-| `0x2035` | `GuildWithdrawMoney` |  |
-| `0x2036` | `GetPvpPointsInfo` |  |
-| `0x2037` | `AddPvpPoints` |  |
-| `0x2038` | `RemovePvpPoints` |  |
-| `0x2039` | `ClearPvpPoints` |  |
-| `0x203A` | `GetGuildRenownInfo` |  |
-| `0x203B` | `AddGuildRenown` |  |
-| `0x203C` | `RemoveGuildRenown` |  |
-| `0x203D` | `SetGuildRenown` |  |
-| `0x203E` | `CalculateRankings` |  |
-| `0x203F` | `UnlockGuildRenown` |  |
-| `0x2040` | `RequestRenownHistory` |  |
-| `0x2041` | `RequestRenownRankings` |  |
-| `0x2042` | `RequestBattleKeepInformation` |  |
-| `0x2043` | `SearchForGuilds` |  |
-| `0x2044` | `GMGuildName` |  |
-| `0x2045` | `RequestGuildCitySpot` |  |
-| `0x2046` | `ApplyForMassivePVPBattleQueue` |  |
-| `0x2047` | `WithdrawFromMassivePVPBattleQueue` |  |
-| `0x2048` | `MassivePvPBattleQueueGMCommand` |  |
-| `0x2049` | `MassivePvpBattleQueueStatusRequest` |  |
-| `0x204A` | `PvPMatchMakingCreateMatch` |  |
-| `0x204B` | `PvPMatchMakingJoinMatch` |  |
-| `0x204C` | `PvPMatchMakingSetSide` |  |
-| `0x204D` | `PvPMatchMakingMatchSay` |  |
-| `0x204E` | `PvPMatchMakingLeaveMatch` |  |
-| `0x204F` | `PvPMatchMakingSearchForMatches` |  |
-| `0x2050` | `PvPMatchMakingGetMatchInfo` |  |
-| `0x2051` | `PvPMatchMakingTeleportToMinigame` |  |
-| `0x2052` | `PvPMatchMakingPutIntoMatchMaking` |  |
-| `0x2053` | `PvPMatchMakingRemoveFromMatchMaking` |  |
-| `0x2054` | `PvPMatchMakingRequestInfo` |  |
-| `0x2055` | `PvPMatchMakingIsInMatchMaking` |  |
-| `0x2056` | `PvPMatchMakingKickPlayer` |  |
-| `0x2057` | `PvPMatchMakingBanPlayer` |  |
-| `0x2058` | `PvPMatchMakingMakePlayerMatchOwner` |  |
-| `0x2059` | `PvPMatchMakingForceSide` |  |
-| `0x205A` | `PvPMatchMakingStartMatch` |  |
-| `0x205B` | `DebugPvPMatchMakingShowDebugInfo` |  |
-| `0x205C` | `DebugPvPMatchMakingStopAllMatches` |  |
-| `0x205D` | `DebugPvPMatchMakingStopCurrentMatch` |  |
-| `0x205E` | `DebugPvPMatchMakingSetNewTimeLimit` |  |
-| `0x205F` | `DebugPvPMatchMakingRestart` |  |
-| `0x2060` | `DebugPvPMatchForcePlayerIntoCurrentMatch` |  |
-| `0x2061` | `DebugPvPMatchMakingDoMatchMaking` |  |
-| `0x2062` | `DebugPvPMatchForceStartMatch` |  |
-| `0x2063` | `DebugPvPMatchForceEnterAll` |  |
-| `0x2064` | `DebugCommunityServerModuleStart` |  |
-| `0x2065` | `DebugCommunityServerModuleStop` |  |
-| `0x2066` | `SetAsyncEnabled` |  |
-| `0x2067` | `SetNumWorkerThreads` |  |
-| `0x2068` | `RaidCreate` |  |
-| `0x2069` | `RaidLeave` |  |
-| `0x206A` | `RaidInviteTeam` |  |
-| `0x206B` | `RaidInviteTeamAccept` |  |
-| `0x206C` | `RaidInviteTeamDecline` |  |
-| `0x206D` | `RaidKickTeam` |  |
-| `0x206E` | `RaidKickCharacter` |  |
-| `0x206F` | `RaidMoveTeamMember` |  |
-| `0x2070` | `RaidSwapCharacters` |  |
-| `0x2071` | `RaidInviteCharacter` |  |
-| `0x2072` | `RaidInviteCharacterByName` |  |
-| `0x2073` | `RaidAcceptInvite` |  |
-| `0x2074` | `RaidDeclineInvite` |  |
-| `0x2075` | `RaidSetLootOption` |  |
-| `0x2076` | `RaidSetMasterLooter` |  |
-| `0x2077` | `MassivePvpInfoRequest` |  |
-| `0x2078` | `SendTeamInfo` |  |
-| `0x2079` | `GMRequestGuildInfoFromChar` |  |
-| `0x207A` | `QueueGroupFinder` |  |
-| `0x207B` | `SelectGroupFinderRoles` |  |
-| `0x207C` | `LeaveGroupFinder` |  |
-| `0x207D` | `ReadyGroupFinder` |  |
-| `0x207E` | `RequestRaidQueueInfo` |  |
-| `0x207F` | `UpdateDefaultRaid` |  |
-| `0x2080` | `SetFeaturedRaid` |  |
-| `0x2081` | `RequestFeaturedRaidNeededRole` |  |
-| `0x2082` | `RequestNeededRole` |  |
-| `0x2083` | `RequestRotatingActivityChildInfo` |  |
-| `0x2084` | `GetWorldStat` |  |
-| `0x2085` | `RequestItemSalesBalance` |  |
-| `0x2086` | `RequestItemSalesCoupons` |  |
-| `0x20C5` | `Ox20C5` | GroupFinder remoteformat echo |
-| `0x20D0` | `Ox20D0` |  |
-
 ## GameAgentOpcodes
 
 RPC class **GameAgent** (id `0xB171CE13`) · C2S (client→server call)
@@ -618,7 +618,7 @@ RPC class **GameCharAgentProject** (id `0x5B9756FC`) · C2S (client→server cal
 | `0x200B` | `ToggleVanityArmorFilter` |  |
 | `0x200C` | `SetSprintInputState` |  |
 
-## GameCharInterfaceDispatchOpcodes
+## GameCharInterfaceOpcodes
 
 RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispatch)
 
@@ -806,7 +806,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x20B3` | `DispatchRequestGetEffect` |  |
 | `0x20B4` | `DispatchSignalWorldStatChanged` |  |
 
-## GameCharInterfaceProjectDispatchOpcodes
+## GameCharInterfaceProjectOpcodes
 
 RPC class **GameCharInterfaceProject** (id `0x28377648`) · C2S (client→server call)
 
@@ -829,7 +829,7 @@ RPC class **GameCharInterfaceProject** (id `0x28377648`) · C2S (client→server
 | `0x200E` | `DispatchUpdateSprintBar` |  |
 | `0x200F` | `DispatchOpenSiteInBrowserOnClient` |  |
 
-## GameInterfaceDispatchOpcodes
+## GameInterfaceOpcodes
 
 RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 
@@ -873,7 +873,7 @@ RPC class **PlayerAgent** (id `0x82F20484`) · C2S (client→server call)
 | `0x20DE` | `CreateCharacter` | id 0x9CB1D10C |
 | `0x20EC` | `ReceivedCharacterSettings` | id 0xA4F2E303 |
 
-## PlayerAgentResponseOpcodes
+## PlayerInterfaceOpcodes
 
 RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch)
 
@@ -917,7 +917,7 @@ RPC class **TradepostAgent** (id `0x3D744981`) · C2S (client→server call)
 | `0x2012` | `SetAsyncEnabled` |  |
 | `0x2013` | `SetNumWorkerThreads` |  |
 
-## TradepostInterfaceDispatchOpcodes
+## TradepostInterfaceOpcodes
 
 RPC class **TradepostInterface** (id `0xF2C2D5B5`) · S2C (server→client dispatch)
 
@@ -942,7 +942,7 @@ RPC class **UniverseAgent** (id `0x604DDBA0`) · C2S (client→server call)
 | `0x2001` | `AnswerChallenge` |  |
 | `0x2002` | `ClientDisconnected` |  |
 
-## UniverseAgentResponseOpcodes
+## UniverseInterfaceOpcodes
 
 RPC class **UniverseInterface** (id `0x0C384054`) · S2C (server→client dispatch)
 

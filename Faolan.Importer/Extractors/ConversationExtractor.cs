@@ -44,7 +44,7 @@ namespace Faolan.Importer.Extractors
 		private const uint InteractSubOpcode = 0x642CD3D6;
 		private const uint KnubotAnswerSubOpcode = 0x4D7D9123;
 		private const uint Opcode2000 = 0x2000;
-		private const uint Opcode2015 = 0x2015; // GameCharInterfaceDispatchOpcodes.DispatchSetDialogueCamera
+		private const uint Opcode2015 = 0x2015; // GameCharInterfaceOpcodes.DispatchSetDialogueCamera
 
 		// A quest GRANT signal seen mid-conversation: the full journal record (0x63268258) the retail server sends when
 		// the player accepts a quest. (QuestIIR-add 0x97E02314 also adds the quest but the full-update is the

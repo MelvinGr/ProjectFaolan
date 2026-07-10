@@ -15,13 +15,13 @@ namespace Faolan.Tests
 
 		[Theory]
 		// The exact literals that were hand-rolled at the send sites before the refactor.
-		[InlineData(PlayerAgentResponseOpcodes.InitAuth, new byte[] { 0x93, 0x86, 0xee, 0x05 })]
-		[InlineData(PlayerAgentResponseOpcodes.SendCharacterRealmData, new byte[] { 0xcb, 0xc6, 0xfc, 0x04 })]
-		[InlineData(PlayerAgentResponseOpcodes.Ox209C, new byte[] { 0x99, 0x95, 0x92, 0x05 })]
-		[InlineData(PlayerAgentResponseOpcodes.SendCharacterList, new byte[] { 0x8b, 0xd3, 0xa0, 0x0c })]
-		[InlineData(PlayerAgentResponseOpcodes.SendRealmList, new byte[] { 0xe2, 0xe6, 0xc4, 0x0f })]
-		[InlineData(PlayerAgentResponseOpcodes.Ox20B9, new byte[] { 0x8b, 0xd8, 0x99, 0x02 })]
-		public void HeaderId_MatchesTheOldHandRolledArray(PlayerAgentResponseOpcodes opcode, byte[] expected)
+		[InlineData(PlayerInterfaceOpcodes.InitAuth, new byte[] { 0x93, 0x86, 0xee, 0x05 })]
+		[InlineData(PlayerInterfaceOpcodes.SendCharacterRealmData, new byte[] { 0xcb, 0xc6, 0xfc, 0x04 })]
+		[InlineData(PlayerInterfaceOpcodes.Ox209C, new byte[] { 0x99, 0x95, 0x92, 0x05 })]
+		[InlineData(PlayerInterfaceOpcodes.SendCharacterList, new byte[] { 0x8b, 0xd3, 0xa0, 0x0c })]
+		[InlineData(PlayerInterfaceOpcodes.SendRealmList, new byte[] { 0xe2, 0xe6, 0xc4, 0x0f })]
+		[InlineData(PlayerInterfaceOpcodes.Ox20B9, new byte[] { 0x8b, 0xd8, 0x99, 0x02 })]
+		public void HeaderId_MatchesTheOldHandRolledArray(PlayerInterfaceOpcodes opcode, byte[] expected)
 		{
 			Assert.Equal(expected, PlayerAgentMethodIds.HeaderId((ushort)opcode));
 		}
@@ -29,8 +29,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void WriteHeader_AutoIdOverload_IsByteIdenticalToTheExplicitArray()
 		{
-			var auto = new PacketStream().WriteHeader(Sender, Receiver, PlayerAgentResponseOpcodes.InitAuth).ToArray();
-			var explicitArray = new PacketStream().WriteHeader(Sender, Receiver, PlayerAgentResponseOpcodes.InitAuth, [0x93, 0x86, 0xee, 0x05]).ToArray();
+			var auto = new PacketStream().WriteHeader(Sender, Receiver, PlayerInterfaceOpcodes.InitAuth).ToArray();
+			var explicitArray = new PacketStream().WriteHeader(Sender, Receiver, PlayerInterfaceOpcodes.InitAuth, [0x93, 0x86, 0xee, 0x05]).ToArray();
 
 			Assert.Equal(explicitArray, auto);
 		}
@@ -39,8 +39,8 @@ namespace Faolan.Tests
 		public void TheTwoSpecialCases_CarryNoStandardId()
 		{
 			// SmallCharList sends a 3-byte 0x94A760; Ox1A07 rides the ServiceConnection with a session header-extra.
-			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerAgentResponseOpcodes.SmallCharList));
-			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerAgentResponseOpcodes.Ox1A07));
+			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.SmallCharList));
+			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.Ox1A07));
 		}
 	}
 }

@@ -24,13 +24,13 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(CoreClaimCodec.Build(client.Session.Account.ClientInstance))
 				.SendAsync(client);
 
 			// record 0: 0x00002000, 17-byte body
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50)
 				.WriteUInt32(instance)
 				.WriteArray(0x00)
@@ -39,7 +39,7 @@ namespace Faolan.GameServer
 			// record 1: 0x0000200C, 1-byte body
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance),
-					GameInterfaceDispatchOpcodes.DispatchReportServerID)
+					GameInterfaceOpcodes.DispatchReportServerID)
 				.WriteArray(0x01)
 				.SendAsync(client);
 
@@ -52,7 +52,7 @@ namespace Faolan.GameServer
 			{
 				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteUInt32(startFixed3d.Length)
 					.WriteArray(startFixed3d)
 					.SendAsync(client);
@@ -74,7 +74,7 @@ namespace Faolan.GameServer
 			if (false)
 			{
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(instance)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)
@@ -84,7 +84,7 @@ namespace Faolan.GameServer
 				// verbatim; byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture).
 				var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteUInt32(welcomeTutorial.Length)
 					.WriteArray(welcomeTutorial)
 					.SendAsync(client);

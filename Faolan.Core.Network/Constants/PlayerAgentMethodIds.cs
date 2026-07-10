@@ -12,9 +12,9 @@ namespace Faolan.Core.Network.Constants
 	//
 	// TWO methods are deliberately absent because retail does NOT send the standard 4-byte id for them (confirmed in
 	// the dumps):
-	//   - PlayerAgentResponseOpcodes.SmallCharList (0x20A5): a 3-byte header-extra `94 A7 60` (88/88 captures), not a
+	//   - PlayerInterfaceOpcodes.SmallCharList (0x20A5): a 3-byte header-extra `94 A7 60` (88/88 captures), not a
 	//     4-byte id — sent verbatim at its call site.
-	//   - PlayerAgentResponseOpcodes.Ox1A07 (OverrideGameTweaks): not on the PlayerInterface endpoint at all — it rides
+	//   - PlayerInterfaceOpcodes.Ox1A07 (OverrideGameTweaks): not on the PlayerInterface endpoint at all — it rides
 	//     the ServiceConnection with a 13-byte session-specific header-extra — sent verbatim at its call site.
 	public static class PlayerAgentMethodIds
 	{
@@ -32,14 +32,14 @@ namespace Faolan.Core.Network.Constants
 			[(ushort)PlayerAgentOpcodes.ReceivedCharacterSettings] = 0xA4F2E303,
 
 			// s2c PlayerInterface (sent by the server)
-			[(ushort)PlayerAgentResponseOpcodes.SendCharacterRealmData] = 0xCBC6FC04,
-			[(ushort)PlayerAgentResponseOpcodes.InitAuth] = 0x9386EE05,
-			[(ushort)PlayerAgentResponseOpcodes.Ox2093] = 0xF2A5E705,
-			[(ushort)PlayerAgentResponseOpcodes.Ox209C] = 0x99959205,
-			[(ushort)PlayerAgentResponseOpcodes.Ox20B9] = 0x8BD89902,
-			[(ushort)PlayerAgentResponseOpcodes.SendRealmList] = 0xE2E6C40F,
-			[(ushort)PlayerAgentResponseOpcodes.Ox20E5] = 0xDDAD8302,
-			[(ushort)PlayerAgentResponseOpcodes.SendCharacterList] = 0x8BD3A00C
+			[(ushort)PlayerInterfaceOpcodes.SendCharacterRealmData] = 0xCBC6FC04,
+			[(ushort)PlayerInterfaceOpcodes.InitAuth] = 0x9386EE05,
+			[(ushort)PlayerInterfaceOpcodes.Ox2093] = 0xF2A5E705,
+			[(ushort)PlayerInterfaceOpcodes.Ox209C] = 0x99959205,
+			[(ushort)PlayerInterfaceOpcodes.Ox20B9] = 0x8BD89902,
+			[(ushort)PlayerInterfaceOpcodes.SendRealmList] = 0xE2E6C40F,
+			[(ushort)PlayerInterfaceOpcodes.Ox20E5] = 0xDDAD8302,
+			[(ushort)PlayerInterfaceOpcodes.SendCharacterList] = 0x8BD3A00C
 		};
 
 		// The 4-byte big-endian header id for `opcode`, or null if it carries none (the two special-case methods

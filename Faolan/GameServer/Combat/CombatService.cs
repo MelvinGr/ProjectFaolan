@@ -153,7 +153,7 @@ namespace Faolan.GameServer.Combat
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 					.WriteUInt32(0x0000C350u)
@@ -544,7 +544,7 @@ namespace Faolan.GameServer.Combat
 		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArray(feedbackBody)
 				.SendAsync(client);
 		}
@@ -553,7 +553,7 @@ namespace Faolan.GameServer.Combat
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}

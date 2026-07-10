@@ -49,7 +49,7 @@ namespace Faolan.GameServer.Dialogue
 			var id = client.Session.Account.ClientInstance;
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText)
+					GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText)
 				.WriteArray(BuildReceivedStockPhraseBody(threadContext, textBytes))
 				.SendAsync(client);
 

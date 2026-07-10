@@ -24,7 +24,7 @@ namespace Faolan.CSPlayerAgent
 		// `port` is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
 		// realm-local service ports, #324), passed in at registration rather than read from global config.
 		public CsPlayerAgentListener(ushort port, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(
-			port, logger, configuration, database, new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceDispatchOpcodes)))
+			port, logger, configuration, database, new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceOpcodes)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
@@ -38,12 +38,12 @@ namespace Faolan.CSPlayerAgent
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
 		{
-			var opcode = (CsPlayerAgentOpcodes)packet.Opcode;
+			var opcode = (CSPlayerAgentOpcodes)packet.Opcode;
 			LogPacketReceived(packet, opcode);
 
 			switch (opcode)
 			{
-				case CsPlayerAgentOpcodes.Authenticate:
+				case CSPlayerAgentOpcodes.Authenticate:
 				{
 					var characterId = packet.Body.ReadUInt32();
 					if (packet.Body.Position == packet.Body.Length)
@@ -83,21 +83,21 @@ namespace Faolan.CSPlayerAgent
 					// pushed to it later without an incoming packet to echo.
 					_guild.RememberReplyEndpoints(client, packet.Receiver, packet.Sender);
 
-					await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchAuthenticateAck).WriteUInt32(authReply).SendAsync(client);
+					await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck).WriteUInt32(authReply).SendAsync(client);
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
 					await new PacketStream()
-						.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01])
+						.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01])
 						.WriteArray(0x00, 0x00, 0x03, 0xF1)
 						.SendAsync(client);
 
 					//if(character.Name == null)
 					{
 						await new PacketStream()
-							.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceDispatchOpcodes.DispatchGroupFinderRemoved, [0x01])
+							.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderRemoved, [0x01])
 							.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
 							.WriteByte(0x01)
 							.SendAsync(client);
@@ -106,7 +106,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.StartVoteRetreat:
+				case CSPlayerAgentOpcodes.StartVoteRetreat:
 				{
 					var unk0 = packet.Body.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
 					var nClientInst = packet.Body.ReadUInt32();
@@ -116,48 +116,48 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.RaidInviteCharacterByName:
+				case CSPlayerAgentOpcodes.RaidInviteCharacterByName:
 				{
 					// Logger.LogInformation("Opcodes.Ox2072");
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.GuildGovernmentForm:
+				case CSPlayerAgentOpcodes.GuildGovernmentForm:
 				{
 					// Logger.LogInformation("Opcodes.Ox202a");
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.AddGuildRenown:
+				case CSPlayerAgentOpcodes.AddGuildRenown:
 				{
 					// Logger.LogInformation("Opcodes.Ox203b");
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.RemoveGuildRenown:
+				case CSPlayerAgentOpcodes.RemoveGuildRenown:
 				{
 					// Logger.LogInformation("Opcodes.Ox203c");
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.ClientRequestGuildInfo:
+				case CSPlayerAgentOpcodes.ClientRequestGuildInfo:
 				{
 					await _guild.HandleClientRequestGuildInfo(client, packet);
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.AcceptGuildInvitation:
+				case CSPlayerAgentOpcodes.AcceptGuildInvitation:
 				{
 					await _guild.HandleAcceptGuildInvitation(client, packet);
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.DeclineGuildInvitation:
+				case CSPlayerAgentOpcodes.DeclineGuildInvitation:
 				{
 					var characterId = client.Session.Character?.Id ?? 0;
 					var declinedGuild = _guild.DeclineGuildInvitation(characterId);
@@ -167,42 +167,42 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.CreateGuild:
+				case CSPlayerAgentOpcodes.CreateGuild:
 				{
 					await _guild.HandleCreateGuild(client, packet);
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.GuildInviteByName:
+				case CSPlayerAgentOpcodes.GuildInviteByName:
 				{
 					await _guild.HandleGuildInviteByName(client, packet);
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.GuildInvite:
+				case CSPlayerAgentOpcodes.GuildInvite:
 				{
 					await _guild.HandleGuildInvite(client, packet);
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.GuildLeave:
+				case CSPlayerAgentOpcodes.GuildLeave:
 				{
 					await _guild.HandleGuildLeave(client);
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.GuildMessageOfTheDay:
+				case CSPlayerAgentOpcodes.GuildMessageOfTheDay:
 				{
 					await _guild.HandleGuildMessageOfTheDay(client, packet);
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.MassivePvpInfoRequest:
+				case CSPlayerAgentOpcodes.MassivePvpInfoRequest:
 				{
 					// The client polls GroupFinder activity summaries with 0x2077; retail answers each with a 0x20A5
 					// (verified in the login dump: four 0x2077 -> four 0x20A5). Same response body as 0x202F.
@@ -211,7 +211,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.GuildRequestMemberList:
+				case CSPlayerAgentOpcodes.GuildRequestMemberList:
 				{
 					// Retail answers the member-list request with a fresh 0x203F full update plus the 0x20A5 summary.
 					await _guild.SendGuildStateOnLogin(client, packet);
@@ -220,14 +220,14 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.RequestRenownHistory:
+				case CSPlayerAgentOpcodes.RequestRenownHistory:
 				{
 					// Logger.LogInformation("Opcodes.Ox2040");
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox20C5:
+				case CSPlayerAgentOpcodes.Ox20C5:
 				{
 					// The client echoes a GroupFinder remoteformat back to us (e.g.
 					// token="GroupFinderCharacterLeftPlayfield") - a notification the server consumes; no response
@@ -236,7 +236,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox20D0:
+				case CSPlayerAgentOpcodes.Ox20D0:
 				{
 					var unk0 = packet.Body.ReadUInt32();
 					// { 0x00, 0x00, 0x03, 0xF1 } // Same data that we send in Authenticate
@@ -246,7 +246,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.RemovePvpPoints:
+				case CSPlayerAgentOpcodes.RemovePvpPoints:
 				{
 					var data = packet.Body.ReadRemainingArray();
 
@@ -258,7 +258,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.RequestRenownRankings:
+				case CSPlayerAgentOpcodes.RequestRenownRankings:
 				{
 					await SendGuildList(client, packet);
 

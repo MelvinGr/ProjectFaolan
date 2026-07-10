@@ -584,7 +584,7 @@ namespace Faolan.GameServer.Dialogue
 		{
 			return new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, senderInstance), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, liveInstance),
-					GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArray(record)
 				.SendAsync(client);
 		}

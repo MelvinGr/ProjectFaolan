@@ -24,19 +24,19 @@ import sys
 # way. The AgentServer chat enums are excluded: chat packets carry no RpcHeader.
 ENUM_TO_CLASS = {
     "UniverseAgentOpcodes": "UniverseAgent",
-    "UniverseAgentResponseOpcodes": "UniverseInterface",
+    "UniverseInterfaceOpcodes": "UniverseInterface",
     "PlayerAgentOpcodes": "PlayerAgent",
-    "PlayerAgentResponseOpcodes": "PlayerInterface",
-    "CsPlayerAgentOpcodes": "CSPlayerAgent",
-    "CSPlayerInterfaceDispatchOpcodes": "CSPlayerInterface",
+    "PlayerInterfaceOpcodes": "PlayerInterface",
+    "CSPlayerAgentOpcodes": "CSPlayerAgent",
+    "CSPlayerInterfaceOpcodes": "CSPlayerInterface",
     "GameAgentOpcodes": "GameAgent",
-    "GameInterfaceDispatchOpcodes": "GameInterface",
+    "GameInterfaceOpcodes": "GameInterface",
     "GameCharAgentOpcodes": "GameCharAgent",
-    "GameCharInterfaceDispatchOpcodes": "GameCharInterface",
+    "GameCharInterfaceOpcodes": "GameCharInterface",
     "GameCharAgentProjectOpcodes": "GameCharAgentProject",
-    "GameCharInterfaceProjectDispatchOpcodes": "GameCharInterfaceProject",
+    "GameCharInterfaceProjectOpcodes": "GameCharInterfaceProject",
     "TradepostAgentOpcodes": "TradepostAgent",
-    "TradepostInterfaceDispatchOpcodes": "TradepostInterface",
+    "TradepostInterfaceOpcodes": "TradepostInterface",
 }
 
 # Standalone (non-class-keyed) tables: the IIR type-name catalog carried inside the

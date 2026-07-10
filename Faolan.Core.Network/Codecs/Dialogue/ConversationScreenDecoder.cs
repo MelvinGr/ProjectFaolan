@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		public const uint AppendText = (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR; // 0x4A3D899A
 		public const uint CloseChatWindow = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR; // 0xC4AF39EB
 		public const uint OpenChatWindow = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR; // 0x045B0B0F
-		public const uint SetDialogueCamera = (uint)GameCharInterfaceDispatchOpcodes.DispatchSetDialogueCamera; // GameCharAgent -> GameCharInterface (a 16-bit opcode, not an IIR sub)
+		public const uint SetDialogueCamera = (uint)GameCharInterfaceOpcodes.DispatchSetDialogueCamera; // GameCharAgent -> GameCharInterface (a 16-bit opcode, not an IIR sub)
 		private const uint Marker = 0x0000C350;
 
 		// The four Knubot screen IIR types this decoder recognizes (SetDialogueCamera is an RPC opcode, not an IIR).

@@ -154,7 +154,7 @@ namespace Faolan.GameServer
 							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
 							// nearby players is the next step.
 							await new PacketStream()
-								.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+								.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 								.WriteArrayUInt32Length(s => s
 									.WriteUInt32(pbOpcode)
 									.WriteUInt32(dataobjdec)
@@ -893,7 +893,7 @@ namespace Faolan.GameServer
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
-						await new PacketStream().WriteHeader(authSender, authReceiver, GameInterfaceDispatchOpcodes.DispatchAckAuthenticate).WriteUInt32(1).SendAsync(client);
+						await new PacketStream().WriteHeader(authSender, authReceiver, GameInterfaceOpcodes.DispatchAckAuthenticate).WriteUInt32(1).SendAsync(client);
 					}
 
 					client.Session.LastGameServer2020RequestId = null;
@@ -1304,7 +1304,7 @@ namespace Faolan.GameServer
 					var nClientInst = packet.Data.ReadUInt32();
 
 					new PacketStream()
-						.WriteHeader(Sender9, Receiver9, null, GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+						.WriteHeader(Sender9, Receiver9, null, GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 						.WriteUInt32(part1)
 						.WriteUInt32(spawnId)
 						.WriteByte(0)
@@ -1443,7 +1443,7 @@ namespace Faolan.GameServer
 				category = 1;
 
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteUInt32(targetType)
 				.WriteUInt32(targetInstance)
 				.WriteUInt32(category) // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
@@ -1472,7 +1472,7 @@ namespace Faolan.GameServer
 			if (character?.BindRespawnPointId is uint bindPointId)
 				bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 
-			await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);
+			await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);
 			Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
 		}
 	}

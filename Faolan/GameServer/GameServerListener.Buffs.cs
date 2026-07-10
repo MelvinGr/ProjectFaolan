@@ -60,7 +60,7 @@ namespace Faolan.GameServer
 			var owner = client.Session.Account.ClientInstance;
 			entity.OwnerHandle = owner;
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildAssign(owner, entity.Handle, combat
 					? PetIirCodec.CombatKind
 					: PetIirCodec.SocialKind)))
@@ -146,7 +146,7 @@ namespace Faolan.GameServer
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
 
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, [])))
 				.SendAsync(client);
 		}
@@ -160,7 +160,7 @@ namespace Faolan.GameServer
 		private Task SendLearnSpell(INetworkClient client, uint spellId)
 		{
 			return new PacketStream()
-				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchLearnSpell)
+				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchLearnSpell)
 				.WriteArray(AbilityGrantBody.BuildLearnSpellBody(spellId))
 				.SendAsync(client);
 		}
@@ -178,7 +178,7 @@ namespace Faolan.GameServer
 			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
 
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
 
@@ -208,7 +208,7 @@ namespace Faolan.GameServer
 		{
 			return new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType),
-					GameCharInterfaceProjectDispatchOpcodes.DispatchUpdateSprintBar)
+					GameCharInterfaceProjectOpcodes.DispatchUpdateSprintBar)
 				.WriteUInt32(energy)
 				.WriteByte(0x01)
 				.SendAsync(client);
@@ -232,7 +232,7 @@ namespace Faolan.GameServer
 		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, byte[] sender = null)
 		{
 			return new PacketStream()
-				.WriteHeader(sender ?? LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility)
+				.WriteHeader(sender ?? LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchAddSpecialAbility)
 				.WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce))
 				.SendAsync(client);
 		}

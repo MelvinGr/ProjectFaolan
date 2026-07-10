@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Constants
 	// is a METHOD INDEX (0x2000 + position) into docs/re/aoc-client-rpc-methods.json; alignment verified against
 	// the hoxxling guild capture (0x2000 Authenticate, 0x201C AcceptGuildInvitation fired exactly once on the
 	// accept, 0x201E/0x202F/0x2040/0x2041/0x2077 all behave as named). See Captures/scripts/decode_guild.py.
-	public enum CsPlayerAgentOpcodes : ushort
+	public enum CSPlayerAgentOpcodes : ushort
 	{
 		Authenticate = 0x2000,
 		CharacterAuthenticated = 0x2001,
@@ -173,7 +173,7 @@ namespace Faolan.Core.Network.Constants
 	// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
-	public enum CSPlayerInterfaceDispatchOpcodes : ushort
+	public enum CSPlayerInterfaceOpcodes : ushort
 	{
 		DispatchAuthenticateAck = 0x2000,
 		DispatchTeamInvite = 0x2001,
@@ -712,7 +712,7 @@ namespace Faolan.Core.Network.Constants
 		ReceivedCharacterSettings = 0x20EC
 	}
 
-	public enum PlayerAgentResponseOpcodes : ushort
+	public enum PlayerInterfaceOpcodes : ushort
 	{
 		Ox1A07 = 0x1A07, // OverrideGameTweaks - rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim
 		SendCharacterRealmData = 0x208C,
@@ -736,7 +736,7 @@ namespace Faolan.Core.Network.Constants
 
 	// UniverseInterface server->client: the recovered table aligns here (0x2000 is the DH challenge,
 	// 0x2005 sets the region state - both match observed behavior), unlike the bigger drifting interfaces.
-	public enum UniverseAgentResponseOpcodes : ushort
+	public enum UniverseInterfaceOpcodes : ushort
 	{
 		DispatchChallenge = 0x2000, // (was "InitiateAuthentication" - it carries the DH challenge reply)
 		DispatchAckAuthenticate = 0x2001, // carries the PlayerAgent realm handoff (was "SendPlayerAgentRealm")
@@ -749,7 +749,7 @@ namespace Faolan.Core.Network.Constants
 	// GameInterface server->client dispatch table (16 methods; +3 inserted no-arg).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
-	public enum GameInterfaceDispatchOpcodes : ushort
+	public enum GameInterfaceOpcodes : ushort
 	{
 		DispatchPassBlob = 0x2000,
 		DispatchAckAuthenticate = 0x2001,
@@ -772,7 +772,7 @@ namespace Faolan.Core.Network.Constants
 	// GameCharInterfaceProject server->client dispatch table (16 methods; +1 inserted).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
-	public enum GameCharInterfaceProjectDispatchOpcodes : ushort
+	public enum GameCharInterfaceProjectOpcodes : ushort
 	{
 		DispatchUpdateAggroStatus = 0x2000,
 		DispatchGuildBankData = 0x2001,
@@ -824,7 +824,7 @@ namespace Faolan.Core.Network.Constants
 	// TradepostInterface server->client dispatch table (8 methods; mail + tradepost search).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
-	public enum TradepostInterfaceDispatchOpcodes : ushort
+	public enum TradepostInterfaceOpcodes : ushort
 	{
 		DispatchOpenTradepost = 0x2000,
 		DispatchClose = 0x2001, // no-arg; the string catalog missed it (recovered from the TradepostInterface RE)
@@ -839,7 +839,7 @@ namespace Faolan.Core.Network.Constants
 	// GameCharInterface server->client dispatch table (181 methods; +24 inserted no-arg). The main world s2c surface: inventory (DispatchAddItem 0x2020), shop, loot, quests, trade, spells/feats, formations.
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
-	public enum GameCharInterfaceDispatchOpcodes : ushort
+	public enum GameCharInterfaceOpcodes : ushort
 	{
 		DispatchUpdateAggroStatus = 0x2000,
 		DispatchUpdateName = 0x2001,

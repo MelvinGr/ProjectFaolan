@@ -60,7 +60,7 @@ namespace Faolan.Core.Network.Packets
 		// hand-roll the 4-byte array. Byte-identical to WriteHeader(sender, receiver, opcode,
 		// PlayerAgentMethodIds.HeaderId((ushort)opcode)). (SmallCharList / Ox1A07 carry a non-standard header-extra
 		// and keep passing it explicitly via the generic overload.)
-		public PacketStream WriteHeader(byte[] sender, byte[] receiver, PlayerAgentResponseOpcodes opcode)
+		public PacketStream WriteHeader(byte[] sender, byte[] receiver, PlayerInterfaceOpcodes opcode)
 		{
 			return WriteHeader(sender, receiver, opcode, PlayerAgentMethodIds.HeaderId((ushort)opcode));
 		}

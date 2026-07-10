@@ -14,7 +14,7 @@ namespace Faolan.PlayerAgent
 	public partial class PlayerAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
 	{
 		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.PlayerAgentPort, logger, configuration,
-			database, new ConanOutgoingPacketLogger(logger, "PlayerAgent", typeof(PlayerAgentResponseOpcodes)))
+			database, new ConanOutgoingPacketLogger(logger, "PlayerAgent", typeof(PlayerInterfaceOpcodes)))
 		{
 			//
 		}
@@ -43,7 +43,7 @@ namespace Faolan.PlayerAgent
 					await Database.SaveAccount(client.Session.Account);
 
 					await new PacketStream()
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.InitAuth)
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.InitAuth)
 						.WriteUInt32(client.Session.Account.AuthStatus)
 						.SendAsync(client);
 
@@ -75,7 +75,7 @@ namespace Faolan.PlayerAgent
 					await SendRealmList(client);
 
 					await new PacketStream()
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendCharacterRealmData)
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterRealmData)
 						.WriteUInt32(1)
 						.SendAsync(client);
 
@@ -85,7 +85,7 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentOpcodes.LoadFacebookToken:
 				{
 					await new PacketStream() // headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox209C)
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox209C)
 						.WriteUInt16(0)
 						.WriteByte(0)
 						.SendAsync(client);
@@ -132,7 +132,7 @@ namespace Faolan.PlayerAgent
 
 					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on
 					// login. Body is built inline from the named-tweak list below; the wire format is locked byte-for-byte by GameTweaksTests.cs.
-					var gameTweaks = new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07,
+					var gameTweaks = new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
 						[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07]);
 
 					// The PlayerInterface OverrideGameTweaks (0x1A07) payload: the server's "dynamic game tweaks" the client

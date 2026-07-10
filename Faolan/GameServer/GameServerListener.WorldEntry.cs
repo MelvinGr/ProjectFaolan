@@ -304,7 +304,7 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Sending deferred new-character AccessWindow/SetDayTime after the post-0x205F follow-up.");
 
 				await new PacketStream() // AccessWindow packet
-					.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x0E), [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x0E), [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteArray(0x00, 0x00, 0x1F, 0x93, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(client.Session.Account.ClientInstance)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x49, 0x20, 0x81, 0x80, 0x30, 0x28, 0x81, 0x83, 0x06, 0x32, 0x0E, 0x0A, 0x07, 0x08, 0x65, 0x10, 0xF4, 0xF0, 0xC1, 0x09, 0x10, 0x84, 0x08, 0x18,
@@ -665,7 +665,7 @@ namespace Faolan.GameServer
 			foreach (var comboId in comboIds)
 			{
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteArray(ComboBookIirCodec.Build(instance, comboId))
 					.SendAsync(client);
 			}
@@ -887,7 +887,7 @@ namespace Faolan.GameServer
 			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor) })
 			{
 				await new PacketStream()
-					.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))
 					.SendAsync(client);
 			}
@@ -935,7 +935,7 @@ namespace Faolan.GameServer
 				: client.Endpoint(Endpoints.GameCharInterfaceType);
 
 			using var newPs = new PacketStream();
-			newPs.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
+			newPs.WriteHeader(sender, receiver, GameCharInterfaceOpcodes.DispatchValidResurrectionSpots);
 
 			if (character?.Name == null)
 			{
@@ -970,7 +970,7 @@ namespace Faolan.GameServer
 			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
 
 			await new PacketStream()
-				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(handle)
 				.WriteByte(status)
@@ -1013,7 +1013,7 @@ namespace Faolan.GameServer
 			var address = $"{realm.IpAddress}:{realm.Port}";
 
 			await new PacketStream()
-				.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceDispatchOpcodes.DispatchRedirectToServer)
+				.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchRedirectToServer)
 				.WriteByte(0x00)
 				.WriteStringByteLength(address)
 				.SendAsync(client);
@@ -1077,13 +1077,13 @@ namespace Faolan.GameServer
 
 		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender, byte[] receiver)
 		{
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportDimesionID).WriteString(realmId.ToString()).SendAsync(client);
+			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchReportDimesionID).WriteString(realmId.ToString()).SendAsync(client);
 		}
 
 		private static Task ReportServerId(INetworkClient client, uint value, byte[] sender, byte[] receiver)
 		{
 			// Body: [u32 0x54 (fixed header)][u32 value]. The create-flow auth handshake reports value 1.
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchReportServerID).WriteUInt32(0x54u).WriteUInt32(value).SendAsync(client);
+			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchReportServerID).WriteUInt32(0x54u).WriteUInt32(value).SendAsync(client);
 		}
 
 		private static async Task Send0X201C(INetworkClient client)
@@ -1105,7 +1105,7 @@ namespace Faolan.GameServer
 		private static Task Send0X201CEntry(INetworkClient client, byte[] sender, byte[] receiver, uint prefix, uint state, uint ticket)
 		{
 			return new PacketStream()
-				.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchSetItemStat)
+				.WriteHeader(sender, receiver, GameCharInterfaceOpcodes.DispatchSetItemStat)
 				.WriteUInt32(prefix)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteUInt32(state)
@@ -1117,7 +1117,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -1131,7 +1131,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FSpawnCheck(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteByte(0)

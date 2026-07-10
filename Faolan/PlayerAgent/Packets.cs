@@ -35,7 +35,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realm = await ResolveActiveRealm(client);
 			await new PacketStream()
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07,
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02])
 				.WriteUInt32(IpToLong(realm.IpAddress))
 				.WriteUInt16(realm.AgentServerPort)
@@ -50,7 +50,7 @@ namespace Faolan.PlayerAgent
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
 			var aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendCharacterList);
+			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterList);
 			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteUInt32((characters.Length + 1) * 1009); // number of characters
 
@@ -107,7 +107,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realm = await ResolveActiveRealm(client);
 			await new PacketStream() // send CSPlayerAgent
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07,
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05])
 				.WriteUInt32(IpToLong(realm.IpAddress))
 				.WriteUInt16(realm.CsPlayerAgentPort)
@@ -123,7 +123,7 @@ namespace Faolan.PlayerAgent
 			var realm = await ResolveActiveRealm(client);
 
 			await new PacketStream()
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07,
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D])
 				.WriteString($"{realm.IpAddress}:{realm.Port}")
 				.WriteUInt32(account.Id)
@@ -140,7 +140,7 @@ namespace Faolan.PlayerAgent
 			var realms = await Database.GetRealms();
 
 			var aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendRealmList);
+			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendRealmList);
 
 			aBuffer.WriteUInt32(realms.Length);
 			foreach (var realm in realms)
@@ -173,7 +173,7 @@ namespace Faolan.PlayerAgent
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
 			var buffer = new PacketStream();
-			buffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SmallCharList, [0x94, 0xa7, 0x60]);
+			buffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SmallCharList, [0x94, 0xa7, 0x60]);
 			buffer.WriteUInt32((characters.Length + 1) * 1009);
 
 			foreach (var character in characters)
@@ -188,7 +188,7 @@ namespace Faolan.PlayerAgent
 		private static Task SendOx20B9(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox20B9)
+				.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox20B9)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteUInt32(0)

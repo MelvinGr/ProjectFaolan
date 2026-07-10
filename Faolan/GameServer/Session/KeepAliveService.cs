@@ -27,7 +27,7 @@ namespace Faolan.GameServer.Session
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
 			return new PacketStream()
-				.WriteHeader(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
+				.WriteHeader(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong, [0x01])
 				.WriteUInt32(counter)
 				.WriteUInt32(0x00000012)
 				.WriteUInt32(tick)
@@ -40,7 +40,7 @@ namespace Faolan.GameServer.Session
 		public static Task HandlePing(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchGameServerStats)
+				.WriteHeader(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchGameServerStats)
 				.WriteUInt32(0x42B32A07)
 				.WriteUInt32(0)
 				.WriteUInt32(0)

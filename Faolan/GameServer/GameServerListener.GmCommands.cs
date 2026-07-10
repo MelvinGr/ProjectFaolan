@@ -268,7 +268,7 @@ namespace Faolan.GameServer
 			if (command == PetCommand.Dismiss)
 			{
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildRemove(owner, petHandle)))
 					.SendAsync(client);
 
@@ -679,7 +679,7 @@ namespace Faolan.GameServer
 			var receiver0 = client.Endpoint(Endpoints.GameInterfaceType);
 
 			return new PacketStream()
-				.WriteHeader(sender0, receiver0, GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(sender0, receiver0, GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameTimeCodec.Opcode)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0x59, 0x92, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x6C, 0xD7, 0x60, 0x32, 0xDC, 0x20, 0x3F, 0x80, 0x00,
