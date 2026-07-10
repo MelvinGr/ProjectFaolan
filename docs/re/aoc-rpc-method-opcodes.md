@@ -568,3 +568,13 @@ what each proxy method passes at its send call** (matches the constants dumped f
 
 Until the transform is cracked the login opcodes+ids stay behavior-derived (they work); the names above are the
 proven client method set but their name↔opcode link is not yet established (so no rename — #320).
+
+**PARKED 2026-07.** Headless static analysis is exhausted for this transform — the mapping is buried across deep
+generic RPC-serialization functions (`SendMethodInvocation` `FUN_0046c910` → `RpcHeader` build → `FUN_00cbf4e0`
+buffer writes) whose calling conventions/struct layouts Ghidra can't infer from a headless pass, so reading more
+decompiles does not converge. The efficient way to finish is **not** more static RE: hook `SendMethodInvocation`
+(`0x46C910`) with Frida-under-Wine ([[frida_under_wine_client_re]]) during a driven login and log each call's
+`(internal key → wire opcode, wire id)` — that harvests the whole table directly. Deferred because the
+operationally-used methods are already covered (`Opcodes.cs` / `PlayerAgentMethodIds`); the remainder are methods
+the server doesn't implement (Facebook/offline-levels/hardcore/rename/…), so this is documentation-completeness
+(close the V0, cover all 17 interfaces in `gen/opcodes.md`), not function.
