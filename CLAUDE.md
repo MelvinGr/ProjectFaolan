@@ -190,5 +190,8 @@ are the standard test bootstrap for features whose retail trigger isn't wired ye
   - `docs/subsystems/` — how OUR server implements a domain (combat, chat, guilds, inventory, economy, …).
   - `docs/rdb/` — client asset formats · `docs/tooling/` — launcher/capture/importer · `docs/re/` — Ghidra
     methodology + raw decode artifacts.
-  Two tests keep this honest: a `[Vn: …]` claim must cite a real artifact (`ProtocolCitationTests`), and a
-  change to `Opcodes.cs` must regenerate the `gen/` pages in the same commit (`ProtocolDocsTests`).
+  Three tests keep this honest: a `[Vn: …]` claim must cite a real artifact (`ProtocolCitationTests`); a
+  change to `Opcodes.cs` must regenerate the `gen/` pages in the same commit (`ProtocolDocsTests`); and across
+  ALL of `docs/`, every backtick type-name (`FooService`, `BarTests`, …) and repo-relative file path must
+  resolve to something that exists (`DocReferenceTests` — the prose-citation analogue of the `[Vn:]` linter;
+  add a retired reference to its allowlist with a reason rather than leaving it dangling).
