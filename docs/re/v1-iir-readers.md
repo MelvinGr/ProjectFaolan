@@ -16,8 +16,8 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 | **SpellBookIIR** | `0x6BA10936` | `FUN_00795ba0` | `[u32]` (triggers a spellbook refresh on the handle) | 8/8 = 4 B ✓ |
 | **KnubotFinishTradeIIR** | `0x7446F3FA` | `FUN_009a7c20` | base-prefix + `[u32 flag][u64 id]` | 3/3 = 22 B (base reads 10) |
 | **KnubotStartTradeIIR** | `0x4B2A47BF` | `FUN_009a63a0` | `[u64][u32 count][ count × { std::string name, u32, u32, u32, u32 } ][std::string …]` — the **shop item list** | 1676–1772 B (variable) ✓ |
-| **AreaFormulaIIR** | `0xCE30BE4E` | `FUN_0079e330` | `[0x3F1-list][u32][0x3F1-list][u32]` (two `0x3F1`-framed lists, à la GameActionList) | 28/36/44/52 B (variable) ✓ |
-| **TemplateActionIIR** | `0x6C300937` | `FUN_007a0b00` | `[68-B struct (FUN_005d5150)][u32 × 6]` | 10/10 = 92 B ✓ |
+| **AreaFormulaIIR** | `0xCE30BE4E` | `FUN_0079e330` | `[0x3F1-list {u32 class, u32 instance}][u32][0x3F1-list {float x, y, z}][u32]` — an entity ref + a world **position** (the AoE centre); `0x3F1` list framing à la GameActionList | 28–52 B (variable) ✓ |
+| **TemplateActionIIR** | `0x6C300937` | `FUN_007a0b00` | `[item-template struct (FUN_005d5150)][u32 × 6]` — the struct embeds item **keys** (the `B2 90 80 5C 29 E6 27 CA` equip-identity pattern + TEA-key-like blocks), so it's an item record, not a flat struct | 10/10 = 92 B ✓ |
 | **UpdateInventoryIIR** | `0xA74D2814` | `FUN_005b9230` (stub) | the body is **protobuf** — repeated `ProtoAcgItem` entries, each carrying **3× `ProtoDecryptionKey`** (the item's 4×fixed32 TEA keys, `0d/15/1d/25`-tagged; the `0a14/1214/1a14` sub-messages). Same item schema as the snapshot (`ProtoInventoryGame`). The slot-8 reader is a `return 0` stub because the client parses it as protobuf, not fixed fields — reuse `ProtoInventoryGame`/`ProtoAcgItem`, don't hand-roll | 25–1137 B protobuf ✓ |
 
 ## Notes
