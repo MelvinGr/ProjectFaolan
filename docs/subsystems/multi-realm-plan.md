@@ -102,11 +102,24 @@ host. One login process + N realm processes, all against the shared DB.
   cross-realm leakage (dispatch, name/handle lookups, DB queries missing the realm filter); confirm a player on
   realm A never sees realm B. Config/orchestration for launching the fleet (one login + N realm hosts).
 
-  **Character names per realm (surfaced during P3):** `Character.Name` is still `[Index(Name, IsUnique)]` **globally**
-  — two realms can't both have a "Bob", which is wrong. It must become composite `(RealmId, Name)`, and every
-  by-name lookup scoped by realm: `GetCharacterByName` (global today), the tradepost seller / mail recipient
-  resolution, guild invites by name, chat whispers by name, friends. Bigger surface than guild/AH/mail (P3), so it's
-  its own P4 sub-task. (P3 already realm-scopes the AH-seller / mail-recipient *queries*, so those are ready for it.)
+  **Character names per realm (P4, DONE):** `Character.Name` is now composite `(RealmId, Name)` unique, and
+  `GetCharacterByName(name, realmId)` is realm-scoped with all 6 callers passing their realm (guild invite, GM
+  resolve, tradepost seller/recipient/sender, create-flow name check). Whispers address by ID, not name.
+
+  **Cross-realm-leak audit (P4, DONE — CLEAN):** every query on a realm-scoped table (`Guilds`/`TradepostListings`/
+  `Mails`/`Characters`) was checked. No leaks: the by-name/search queries are realm-scoped (P3/P4); the rest are
+  by-unique-id lookups (`GetCharacter(id)`, `GetGuild(id)`, `GetMailByWireId`, `GetTradepostListingBySaleId`),
+  intentionally-global (character-id allocation over the shared id space; the login tier's cross-realm char list),
+  or realm-agnostic static metadata (the AH item-search-category inference). Runtime isolation also holds by
+  construction: a realm process only holds its own connected sessions/zones (P2).
+
+  **Fleet compose (P4, DONE):** verified 1 login + 2 realm processes run concurrently against the shared DB, each
+  binding its own realm's ports from its `Realm` row (login 7010/7011; realm 2 → 7014/7012/7001; realm 3 →
+  7024/7022/7021), no collisions. So the process-per-realm topology composes.
+
+  **Remaining (P4, needs a client):** the end-to-end in-client check — a character on realm 2 vs realm 3 routes to
+  the right process and sees only its realm's world/chat/guild/AH — plus the P0 gate (does the client accept a >1
+  realm list). Both need the retail client, so they're deferred to an in-client session.
 
 - **Phase 5 (optional) — Per-realm DBs.** If shared-DB contention or stronger isolation warrants it, give each realm
   process its own DB (static content cloned/shared read-only, dynamic per-realm) instead of `RealmId` columns.
