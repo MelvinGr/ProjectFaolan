@@ -26,7 +26,12 @@ namespace Faolan.GameServer.World
 		// zone streams the NPCs it comes into range of and is sent despawns for the ones it leaves. NPCs already in
 		// the mover's Known set - the ones the world-burst replay rendered at entry, seeded by the caller - are
 		// skipped so they are never double-spawned. Off at entry (the burst already populated the load), on for moves.
-		public static List<InterestEvent> ResolveMove(Zone zone, WorldEntity mover, float range, bool includeNonPlayers = false)
+		// `isEntry` marks the mover (re)joining the world rather than moving within it: the caller dispatches entry with
+		// no Move payload (move=null), so part (2) must SPAWN the mover to every viewer, never forward a Move. Without
+		// this, a viewer still carrying the mover's handle in a stale Known set (a prior map-change / re-enter that
+		// didn't clean-remove it) gets a Move that entry drops - the re-entrant stays invisible until the viewer next
+		// moves (#323). At entry we forget the mover on each viewer first, forcing a fresh Spawn + client re-poll.
+		public static List<InterestEvent> ResolveMove(Zone zone, WorldEntity mover, float range, bool includeNonPlayers = false, bool isEntry = false)
 		{
 			var events = new List<InterestEvent>();
 
@@ -88,6 +93,14 @@ namespace Faolan.GameServer.World
 
 				if (mover.IsVisibleTo(viewer) && Vector3.Distance(viewer.Position, mover.Position) <= range)
 				{
+					// #323: on entry, forget any stale build of the mover on this viewer so the mover is SPAWNED (not
+					// forwarded as a Move the null-move entry dispatch would drop); the viewer re-polls the fresh spawn.
+					if (isEntry)
+					{
+						viewer.Known.Remove(mover.Handle);
+						viewer.Confirmed.Remove(mover.Handle);
+					}
+
 					events.Add(new InterestEvent(viewer, mover, viewer.Known.Add(mover.Handle)
 						? InterestEventType.Spawn
 						: InterestEventType.Move));
@@ -108,7 +121,13 @@ namespace Faolan.GameServer.World
 			var events = new List<InterestEvent>();
 			foreach (var viewer in zone.Entities)
 			{
-				if (viewer.IsPlayer && viewer.Handle != leaver.Handle && viewer.Known.Remove(leaver.Handle))
+				// #322: the SAME #245 gate ResolveMove applies (:95) - never send an n3ToClientQuit for a handle the
+				// viewer's client hasn't CONFIRMED building (polled via 0x2020). A viewer still loading when the leaver
+				// disconnects has the leaver in Known but not Confirmed; despawning that unbuilt handle crashes it
+				// (pcDynel == null). Drop it from Known silently instead (Known.Remove runs; the despawn is gated on
+				// Confirmed.Remove). Repro: A in zone, B connects + is sent A's spawn (Known) but hasn't polled yet, A
+				// disconnects -> without this gate B gets a despawn for A's unbuilt handle.
+				if (viewer.IsPlayer && viewer.Handle != leaver.Handle && viewer.Known.Remove(leaver.Handle) && viewer.Confirmed.Remove(leaver.Handle))
 					events.Add(new InterestEvent(viewer, leaver, InterestEventType.Despawn));
 			}
 

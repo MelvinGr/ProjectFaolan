@@ -508,7 +508,7 @@ namespace Faolan.GameServer.World
 			// NPC here at entry (includeNonPlayers), each as its own FA015807 + name registration via DispatchInterest.
 			// No burst NPCs means no Known-seeding and no double-spawn. KNOWN: streams the cross-session model union
 			// (~4x retail density) - cross-session mob dedup / interest tuning is a follow-up.
-			var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, true);
+			var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, true, isEntry: true);
 			await DispatchInterest(npcEvents, null);
 		}
 
