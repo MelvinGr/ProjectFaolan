@@ -15,21 +15,6 @@ Every gap below is a tracked Gitea issue (`melvin/projectfaolan`), so it lives o
 
 ## Transport
 
-### compression marker bytes 4..7
-**Tracked: Gitea #318.** The stream-compression control frame is `[80 00 00 05][4 bytes][flag]` — 9 bytes at a packet boundary. The tag and
-the trailing flag are understood (`flag == 0` ⇒ the rest of the direction is one zlib deflate stream). The four
-bytes between them are copied/skipped without interpretation. Our server never opens a compression stream, so
-nothing depends on them; a client-side reader (`Captures/ghidra/DumpFns.java` territory) would settle it.
-**Ghidra note (2026-07):** the `0x80000005` tag is NOT a literal constant in the client (a `FindConst` scan hit
-only signed-division magic numbers) — it is detected by the **high bit of the u32 length field** (`length &
-0x80000000` ⇒ control frame; low bits `= 5` ⇒ compression-stream-open). So the 4 bytes are the stream's
-parameter (a length/id for the inflate setup). Full decode needs the high-bit dispatch path in the receive loop
-or a capture carrying a live stream (the login captures on hand don't) — deferred as low-ROI since we skip it.
-**Decompressor confirmed (2026-07):** the client statically links **zlib 1.2.5** — inflate core `FUN_01c2c440`
-(carries "incorrect header check"/"invalid window size"/"unknown compression method"), wrappers `FUN_00cbc880`/
-`FUN_00cbc3c0`. So the 4 bytes feed a zlib inflate setup; identifying which field (uncompressed length? window?)
-means tracing the receive loop → those wrappers, and can only be *validated* against a live stream we don't have.
-
 ### RpcHeader trailing headerData — residual sub-fields
 **Tracked: Gitea #319.** The blob's GRAMMAR is decoded — it is four per-opcode/constant cases, not a generic
 grammar (see [`02-rpc.md`](02-rpc.md) and `Captures/scripts/decode_rpc_headerdata.py`, which tallies them across

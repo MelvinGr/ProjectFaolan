@@ -42,12 +42,14 @@ The AgentServer (chat) service is the exception: its packets carry a raw u16 opc
 ## Compression
 
 Compression is a property of the **direction**, not of a packet. At a packet boundary either side may emit a
-fixed 9-byte control frame:
+9-byte control frame — which is just an ordinary `[u32 length BE][u32 crc32 BE][body]` packet:
 
 ```
-[80 00 00 05][4 bytes][flag]
+[80 00 00 05][crc32][flag]
 ```
 
+The length `0x80000005` has the **high bit** (`0x80000000`) set to mark a compression control frame; its low bits
+(`5`) are the byte count that follows the length field — 4 (crc32) + 1 (body) — exactly as in normal framing.
 `flag == 0` means everything after it in that direction is a single zlib deflate stream; non-zero means the
 stream stays plaintext. Retail only ever sends this server→client, to open the GameServer download stream.
 [V2: Barbarian-login.tshark.json]
@@ -66,7 +68,10 @@ Two consequences that have each caused a real bug:
 2. **Inflating attacker-controlled input is bounded.** A deflate stream that expands without limit is dropped
    rather than inflated. [V3: NetworkHardeningTests.Framer_DecompressionBomb_IsDroppedNotInflatedToOom]
 
-The four bytes between the tag and the flag are not decoded. [V0: compression marker bytes 4..7]
+The four bytes between the tag and the flag are the standard **CRC32 header field** — `crc32(body)`, in the exact
+position every packet carries its crc — not a compression parameter. Confirmed across 1310 control frames in the
+raw pcaps (`crc32(0x00)=0xd202ef8d`, `crc32(0x01)=0xa505df1b`, `crc32(0x02)=0x3c0c8ea1`, all matching).
+[V1: Captures/scripts/decode_compression_frame.py]
 
 ## Reading captures
 

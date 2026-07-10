@@ -11,8 +11,11 @@ namespace Faolan.Core.Network.Packets.Conan
 		private const int HeaderSize = sizeof(int);
 		private const int MaxPacketSize = 16 * 1024 * 1024;
 
-		// The compression-stream marker: a fixed 9-byte control frame = this 4-byte tag (0x80000005) + 5 trailing
-		// bytes. Retail only ever sends it SERVER->CLIENT to open the download compression stream; our server does not
+		// The compression-stream marker: a 9-byte control frame that is just an ordinary [u32 length][u32 crc32][body]
+		// packet - length 0x80000005 (high bit = control-frame marker, low bits 5 = crc(4)+body(1)), then crc32(body),
+		// then a 1-byte flag body (0 = open a zlib stream). The "4 trailing bytes" before the flag are the standard
+		// CRC32 field = crc32(body), decoded #318 (Captures/scripts/decode_compression_frame.py), not a stream param.
+		// Retail only ever sends it SERVER->CLIENT to open the download compression stream; our server does not
 		// compress, and our client emits a standalone 9-byte marker with NO compressed payload (plaintext packets
 		// surround it). We do not decompress inbound, so we SKIP the whole marker and keep parsing. This is deliberate:
 		// the old code decoded/decompressed on this tag (and the NetworkClient read loop dropped the whole recv buffer
