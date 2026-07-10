@@ -22,9 +22,22 @@ bytes between them are copied/skipped without interpretation. Our server never o
 nothing depends on them; a client-side reader (`Captures/ghidra/DumpFns.java` territory) would settle it.
 
 ### RpcHeader trailing headerData
-**Tracked: Gitea #319.** `PacketStream.WriteHeader` accepts an optional `headerData` blob appended after the u16 opcode, inside the
-header-length. Several captured packets carry it; we reproduce it verbatim per call-site. Its grammar is not
-decoded, and it is not obviously per-opcode.
+**Tracked: Gitea #319.** `PacketStream.WriteHeader` accepts an optional `headerData` blob appended after the u16
+opcode, inside the header-length. Characterized across all captures (2026-07) — it is exactly **four** cases, not
+a single mystery grammar:
+- **1-byte `0x01`** — the overwhelming majority (7366 packets), and it is a **constant** `0x01`. Rides the latency
+  ping/pong (`0x2085` c2s on GameCharAgent / `0x2082` `DispatchPong` s2c on GameCharInterface) and a handful of
+  CSPlayerInterface dispatches (`0x20A5`/`0x20C5`/`0x20D0`). Emitted verbatim; its *meaning* (a flag? a fixed
+  marker?) is the only real remaining unknown here, and it's a single constant byte.
+- **4-byte** — the PlayerAgent/PlayerInterface **32-bit method id** (DECODED via #320; see
+  `docs/re/aoc-rpc-method-opcodes.md`, `PlayerAgentMethodIds`). This interface uniquely carries it.
+- **3-byte `0x94A760`** — PlayerInterface `SmallCharList` (0x20A5), a constant (88/88 captures).
+- **13-byte** — PlayerInterface `Ox1A07` (OverrideGameTweaks), a per-session block on the ServiceConnection
+  endpoint; still emitted verbatim (its internal structure is the residual undecoded part).
+
+So `headerData` is NOT a generic per-opcode grammar: it is the PlayerInterface method-id (decoded) plus a constant
+`0x01` latency marker plus two PlayerInterface specials. Residual: the semantics of the `0x01` marker and the
+13-byte `Ox1A07` block.
 
 ---
 
