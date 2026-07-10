@@ -39,13 +39,13 @@ namespace Faolan.GameServer.Inventory
 
 			var kind = (int)move.SourceContainerId.Type;
 			var pos = move.SourceItemPos;
-			if (kind == (int)FullCharSnapshotBuilder.EquippedKind)
+			if (kind == (int)FullPlayerCharacterBuilder.EquippedKind)
 				return; // equipped items are unequipped, not dropped, through this path
 
 			try
 			{
-				const int bag = (int)FullCharSnapshotBuilder.BagKind;
-				const int firstBagPos = 1; // FullCharSnapshotBuilder.BagFirstPos
+				const int bag = (int)FullPlayerCharacterBuilder.BagKind;
+				const int firstBagPos = 1; // FullPlayerCharacterBuilder.BagFirstPos
 
 				// Dropping the legacy seeded FirstPosBag (no row backs it) clears the equipment nav instead.
 				if (kind == bag && pos == firstBagPos)
@@ -104,8 +104,8 @@ namespace Faolan.GameServer.Inventory
 				// Consume the bag row the item came from (no-op when the source was the seeded FirstPosBag or a
 				// captured-only entry).
 				var bagRows = await _database.GetCharacterInventory(character.Id);
-				if (bagRows.Any(r => r.Container == (int)FullCharSnapshotBuilder.BagKind && r.Slot == fromBagSlot && r.ItemId == item.Id))
-					await _database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, fromBagSlot, null);
+				if (bagRows.Any(r => r.Container == (int)FullPlayerCharacterBuilder.BagKind && r.Slot == fromBagSlot && r.ItemId == item.Id))
+					await _database.SetCharacterInventorySlot(character.Id, (int)FullPlayerCharacterBuilder.BagKind, fromBagSlot, null);
 
 				_logger.LogInformation("Persisted EQUIP: {Name} ({Id}) bag[{BagSlot}] -> {Slot} for character {CharacterId}.", item.Name, item.Id, fromBagSlot, targetSlot, character.Id);
 			}
@@ -117,7 +117,7 @@ namespace Faolan.GameServer.Inventory
 
 		// Persists a within-inventory item move (MoveItemInInventory / ProtoMoveInventoryItemIIR) so bag slot
 		// positions survive logout - the world-entry snapshot rebuilds the bag from these CharacterInventory rows
-		// (FullCharSnapshotBuilder.BuildContainers), so without this the client's re-arrangement reverts on relog.
+		// (FullPlayerCharacterBuilder.BuildContainers), so without this the client's re-arrangement reverts on relog.
 		// Handles the non-equipped grid containers (bag 104 / resource 112 / quest 113); equip/unequip moves go
 		// through MoveEquippedToFromInventory (PersistEquip/PersistUnequip). Swaps when the destination cell is
 		// occupied; a move onto an empty cell clears the source. The legacy seeded FirstPosBag (a CharacterEquipment
@@ -134,14 +134,14 @@ namespace Faolan.GameServer.Inventory
 			var sPos = move.SourceItemPos;
 			var dPos = move.DestinationItemPos;
 
-			const int equipped = (int)FullCharSnapshotBuilder.EquippedKind;
+			const int equipped = (int)FullPlayerCharacterBuilder.EquippedKind;
 			if (sKind == equipped || dKind == equipped)
 				return; // equip/unequip is persisted via the MoveEquippedToFromInventory path
 
 			try
 			{
-				const int bag = (int)FullCharSnapshotBuilder.BagKind;
-				const int firstBagPos = 1; // FullCharSnapshotBuilder.BagFirstPos - the legacy FirstPosBag cell
+				const int bag = (int)FullPlayerCharacterBuilder.BagKind;
+				const int firstBagPos = 1; // FullPlayerCharacterBuilder.BagFirstPos - the legacy FirstPosBag cell
 
 				var rows = await _database.GetCharacterInventory(character.Id);
 				var equipment = await _database.GetCharacterEquipment(character.Id);
@@ -201,7 +201,7 @@ namespace Faolan.GameServer.Inventory
 
 			try
 			{
-				const int bag = (int)FullCharSnapshotBuilder.BagKind;
+				const int bag = (int)FullPlayerCharacterBuilder.BagKind;
 				var rows = await _database.GetCharacterInventory(character.Id);
 				var src = rows.FirstOrDefault(r => r.Container == bag && r.Slot == sourceSlot);
 				if (src?.ItemId == null || src.Count <= splitSize)
@@ -245,7 +245,7 @@ namespace Faolan.GameServer.Inventory
 
 				equipment[fromSlot] = null;
 				await _database.SaveCharacterEquipment(equipment);
-				await _database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, targetBagSlot, current.Id);
+				await _database.SetCharacterInventorySlot(character.Id, (int)FullPlayerCharacterBuilder.BagKind, targetBagSlot, current.Id);
 
 				_logger.LogInformation("Persisted UNEQUIP: {Name} ({Id}) from {Slot} -> bag[{BagSlot}] for character {CharacterId}.", current.Name, current.Id, fromSlot, targetBagSlot, character.Id);
 			}

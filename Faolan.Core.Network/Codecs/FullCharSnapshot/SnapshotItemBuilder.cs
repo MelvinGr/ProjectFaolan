@@ -52,7 +52,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return entry;
 		}
 
-		// The typed form, used directly by FullCharSnapshotBuilder's generated containers. The world-entry snapshot
+		// The typed form, used directly by FullPlayerCharacterBuilder's generated containers. The world-entry snapshot
 		// entry carries the fixed (flags, recordId, count) stat triple.
 		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1)
 		{

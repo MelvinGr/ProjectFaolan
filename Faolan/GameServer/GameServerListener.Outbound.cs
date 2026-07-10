@@ -66,7 +66,7 @@ namespace Faolan.GameServer
 		{
 			var equipment = await Database.GetCharacterEquipment(characterId);
 			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind).Select(r => r.Slot).ToHashSet();
+			var taken = rows.Where(r => r.Container == (int)FullPlayerCharacterBuilder.BagKind).Select(r => r.Slot).ToHashSet();
 			if (equipment?.FirstPosBag is { Hash: not 0 })
 				taken.Add(1);
 			return Enumerable.Range(0, 24).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
@@ -78,7 +78,7 @@ namespace Faolan.GameServer
 		{
 			var rows = await Database.GetCharacterInventory(characterId);
 			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
-			if (container == (int)FullCharSnapshotBuilder.BagKind)
+			if (container == (int)FullPlayerCharacterBuilder.BagKind)
 			{
 				var equipment = await Database.GetCharacterEquipment(characterId);
 				if (equipment?.FirstPosBag is { Hash: not 0 })
@@ -91,7 +91,7 @@ namespace Faolan.GameServer
 		// Grants an item to the player's backpack: persists it to a free CharacterInventory bag cell (so it
 		// survives relog via the world-entry snapshot) AND pushes the live DispatchAddItem so it appears
 		// immediately. The entry is the proven snapshot entry (SnapshotItemBuilder.BuildListEntry().Item - the
-		// 3-stat form that renders in-client), and itemId/recordId use FullCharSnapshotBuilder's deterministic
+		// 3-stat form that renders in-client), and itemId/recordId use FullPlayerCharacterBuilder's deterministic
 		// formula so the live add and the next login's snapshot agree on the entry's identity. Returns the bag
 		// slot it landed in, or null when the item isn't snapshot-buildable or the bag is full.
 		// `pushLiveAdd`: send the live DispatchAddItem so the item appears immediately. LOOT passes false: retail sends
@@ -114,8 +114,8 @@ namespace Faolan.GameServer
 				return null;
 
 			var kind = isQuestItem
-				? FullCharSnapshotBuilder.QuestKind
-				: FullCharSnapshotBuilder.BagKind;
+				? FullPlayerCharacterBuilder.QuestKind
+				: FullPlayerCharacterBuilder.BagKind;
 			var capacity = isQuestItem
 				? 48
 				: 24; // quest tab holds 48 (NewContainer(QuestKind, 48)); bag 24
@@ -132,8 +132,8 @@ namespace Faolan.GameServer
 			var containerType = isQuestItem
 				? InventoryContainerQuest
 				: InventoryContainerBackpack;
-			var entry = SnapshotItemBuilder.BuildListEntry((ulong)slot.Value, FullCharSnapshotBuilder.ItemId(characterId, kind, (ulong)slot.Value),
-					FullCharSnapshotBuilder.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
+			var entry = SnapshotItemBuilder.BuildListEntry((ulong)slot.Value, FullPlayerCharacterBuilder.ItemId(characterId, kind, (ulong)slot.Value),
+					FullPlayerCharacterBuilder.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
 				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 			return slot;
@@ -149,14 +149,14 @@ namespace Faolan.GameServer
 			var present = false;
 			foreach (var r in rows)
 			{
-				if (r.Container == (int)FullCharSnapshotBuilder.BagKind && r.Slot == slot)
+				if (r.Container == (int)FullPlayerCharacterBuilder.BagKind && r.Slot == slot)
 					present = true;
 			}
 
 			if (!present)
 				return false;
 
-			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot, null);
+			await Database.SetCharacterInventorySlot(characterId, (int)FullPlayerCharacterBuilder.BagKind, slot, null);
 			await SendRemoveItem(client, InventoryContainerBackpack, (uint)slot, amountToRemove);
 			return true;
 		}
@@ -202,7 +202,7 @@ namespace Faolan.GameServer
 		// byte-exact to the capture by TradepostBankStatTests.
 		internal static byte[] BuildBankSlotStatBody(uint charInstance, uint slot, uint statId, uint value)
 		{
-			return new FaolanStream().WriteUInt32(FullCharSnapshotBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
+			return new FaolanStream().WriteUInt32(FullPlayerCharacterBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
 		}
 
 		// 0x4F57DC08 GameTime - the world clock. Global (no map/player data); the client advances it locally, so a
@@ -320,7 +320,7 @@ namespace Faolan.GameServer
 			using var body = new FaolanStream();
 			body.WriteArrayUInt32Length(s =>
 			{
-				s.WriteUInt32(FullCharSnapshotBuilder.Opcode);
+				s.WriteUInt32(FullPlayerCharacterBuilder.Opcode);
 				s.WriteUInt32(SnapshotTypeTag);
 				s.WriteUInt32(instance);
 				s.WriteArray(prefix);

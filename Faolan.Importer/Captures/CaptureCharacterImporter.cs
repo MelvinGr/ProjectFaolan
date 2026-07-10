@@ -496,7 +496,7 @@ namespace Faolan.Importer.Captures
 			var total = 0;
 			foreach (var container in root.Inventories)
 			{
-				if (container.InventoryId.Type == FullCharSnapshotBuilder.EquippedKind)
+				if (container.InventoryId.Type == FullPlayerCharacterBuilder.EquippedKind)
 					continue;
 
 				foreach (var entry in container.Items)

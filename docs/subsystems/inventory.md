@@ -31,7 +31,7 @@ all **big-endian**:
   `FullCharSnapshotSubClass.BuildFromScratch`, proven byte-exact against the captured `BeachTailsTemplate.bin`
   oracle (golden tests `BeachSnapshotConstructionTests`).
 
-Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContainers`:
+Containers are built wholesale from the DB (`FullPlayerCharacterBuilder.BuildContainers`:
 `CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItemBuilder.BuildListEntry`, identity =
 the `Item.Key` (Data1..4) quad + `Item.Hash`, buildable via the hash-gated snapshot iff `Hash != 0`).
 

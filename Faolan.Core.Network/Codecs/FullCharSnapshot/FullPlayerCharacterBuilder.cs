@@ -18,7 +18,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	//     record ids (stat 23) another counter. Generated ids derive deterministically from instance+slot so
 	//     they are unique within the character and stable across logins (equip persistence keys on template
 	//     handle + slot, never on these instance ids).
-	public static class FullCharSnapshotBuilder
+	public static class FullPlayerCharacterBuilder
 	{
 		// The FullChar snapshot IIR (0x737A6DF9); the listener assembles [subop][typeTag][instance][prefix][root][tails].
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;

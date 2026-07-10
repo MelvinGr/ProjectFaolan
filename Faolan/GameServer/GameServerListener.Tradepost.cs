@@ -136,7 +136,7 @@ namespace Faolan.GameServer
 			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
 			var seller = await Database.GetCharacterByName(listing.SellerName);
 			if (seller != null && seller.Id != character.Id)
-				await Database.SetCharacterInventorySlot(seller.Id, (int)FullCharSnapshotBuilder.BankKind, (int)listing.BankSlot, null);
+				await Database.SetCharacterInventorySlot(seller.Id, (int)FullPlayerCharacterBuilder.BankKind, (int)listing.BankSlot, null);
 
 			// Push the mail (base, no attachment): it carries its own MailId, which the client then targets with the
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
@@ -385,7 +385,7 @@ namespace Faolan.GameServer
 			var price = packet.Body.ReadUInt64();
 
 			var rows = await Database.GetCharacterInventory(character.Id);
-			var row = rows.FirstOrDefault(r => r.Container == (int)FullCharSnapshotBuilder.BankKind && r.Slot == bankSlot);
+			var row = rows.FirstOrDefault(r => r.Container == (int)FullPlayerCharacterBuilder.BankKind && r.Slot == bankSlot);
 			if (row?.Item == null)
 			{
 				Logger.LogWarning("Tradepost SELL: {Char} has no bank item at slot {Slot}.", character.Name, bankSlot);
@@ -477,7 +477,7 @@ namespace Faolan.GameServer
 			// sender's bank with a "mail-pending" overlay (it does NOT leave on send) - it only leaves when the
 			// recipient TAKES it (GetMailItem), and the overlay clears if the sender cancels the mail.
 			var rows = await Database.GetCharacterInventory(character.Id);
-			var row = rows.FirstOrDefault(r => r.Container == (int)FullCharSnapshotBuilder.BankKind && r.Slot == bankSlot);
+			var row = rows.FirstOrDefault(r => r.Container == (int)FullPlayerCharacterBuilder.BankKind && r.Slot == bankSlot);
 			if (row?.Item != null)
 			{
 				mail.SenderBankSlot = (uint)bankSlot;
@@ -550,7 +550,7 @@ namespace Faolan.GameServer
 				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
 				// holds), letting the bought item persist. Hash-0 items the world-entry snapshot drops are
 				// re-rendered on relog by RedeliverNonSnapshotBagItems via the live add path.
-				await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, slot.Value, attachment.Template, qty);
+				await Database.SetCharacterInventorySlot(character.Id, (int)FullPlayerCharacterBuilder.BagKind, slot.Value, attachment.Template, qty);
 			else
 				Logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).", attachment.Template, character.Name);
 
@@ -561,7 +561,7 @@ namespace Faolan.GameServer
 			{
 				var sender = await Database.GetCharacterByName(mail.SenderName);
 				if (sender != null)
-					await Database.SetCharacterInventorySlot(sender.Id, (int)FullCharSnapshotBuilder.BankKind, (int)mail.SenderBankSlot, null);
+					await Database.SetCharacterInventorySlot(sender.Id, (int)FullPlayerCharacterBuilder.BankKind, (int)mail.SenderBankSlot, null);
 			}
 
 			await Database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
@@ -590,7 +590,7 @@ namespace Faolan.GameServer
 				: a.Quantity;
 			var entry = new ProtoInventoryGameEntry
 			{
-				ItemId = FullCharSnapshotBuilder.ItemId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot),
+				ItemId = FullPlayerCharacterBuilder.ItemId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot),
 				ItemData = new ProtoAcgItem
 				{
 					Key1 = key,
@@ -610,7 +610,7 @@ namespace Faolan.GameServer
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
 				Stat = 23,
-				Value = (uint)FullCharSnapshotBuilder.RecordId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot)
+				Value = (uint)FullPlayerCharacterBuilder.RecordId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot)
 			});
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{

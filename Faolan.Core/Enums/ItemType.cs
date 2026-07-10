@@ -1,7 +1,7 @@
 namespace Faolan.Core.Enums
 {
 	// Broad classification of an item template. The values ARE the protocol inventory-container kinds the item
-	// lives in (FullCharSnapshotBuilder / ProtoInventoryGame inventory_id.type), so the enum doubles as a routing
+	// lives in (FullPlayerCharacterBuilder / ProtoInventoryGame inventory_id.type), so the enum doubles as a routing
 	// hint: Normal items go in the backpack (104; also worn in equipped 101), Resource/tradeskill items in the
 	// resource container (112), Quest items in the quest container (113). Harvested from captures by the container
 	// an item was seen in (ItemHashHarvester); items never seen in a quest/resource container default to Normal.

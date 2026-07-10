@@ -15,7 +15,7 @@ namespace Faolan.Tests
 	// 4 containers in kind order 101/104/112/113 with max_size 1028/24/48/48 and disabled_slots_count
 	// 0/0/12/0, owner = the client instance; entry ids follow the retail scheme (0x20D82B63 epoch high32)
 	// and are unique per item.
-	public class FullCharSnapshotBuilderTests
+	public class FullPlayerCharacterBuilderTests
 	{
 		private static readonly Item Manacles = new()
 		{
@@ -40,8 +40,8 @@ namespace Faolan.Tests
 				[0x12] = (Manacles, Manacles.Hash)
 			};
 
-			var first = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
-			var second = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
+			var first = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
+			var second = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
 
 			var ids = first.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList();
 			var recordIds = first.SelectMany(c => c.Items).SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23)).Select(s => s.Value).ToList();
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 				[0x12] = (Manacles, Manacles.Hash)
 			};
 
-			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
+			var containers = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
 
 			Assert.Equal(new uint[] { 101, 104, 112, 113 }, containers.Select(c => c.InventoryId.Type));
 			Assert.All(containers, c => Assert.Equal(0x02000005u, c.InventoryId.Instance));
@@ -116,7 +116,7 @@ namespace Faolan.Tests
 				} // not buildable
 			};
 
-			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Hash), rows);
+			var containers = FullPlayerCharacterBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Hash), rows);
 
 			var bag = containers[1].Items;
 			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending

@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// [u8 flag][u32 BE blobLen][field5] (RetailLoginReplay.SetSnapshotBlobLength / n3InfoItemRemote::Construct):
 	// the client reads exactly blobLen bytes = field5 + root, so rootLength = blobLen - field5Len. A pure structural
 	// read - no byte scanning, and robust to a resized/re-lengthed prefix (unlike the earlier varint model).
-	// Test/RE tooling only: production BUILDS snapshots typed via FullCharSnapshotBuilder.
+	// Test/RE tooling only: production BUILDS snapshots typed via FullPlayerCharacterBuilder.
 	public static class FullCharSnapshotReader
 	{
 		private const uint PrefixField5Bytes = 3;

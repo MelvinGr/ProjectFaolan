@@ -44,8 +44,8 @@ namespace Faolan.GameServer.Economy
 		{
 			var characterId = client.Session.Character.Id;
 			var rows = await _database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind).ToList();
-			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, BankMaxSize, BankDisabledSlots, characterId, bankRows);
+			var bankRows = rows.Where(r => r.Container == (int)FullPlayerCharacterBuilder.BankKind).ToList();
+			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, BankMaxSize, BankDisabledSlots, characterId, bankRows);
 			await SendBank(client, bank);
 		}
 
@@ -71,7 +71,7 @@ namespace Faolan.GameServer.Economy
 				.WriteArrayUInt32Length(record)
 				.SendAsync(client);
 
-			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
+			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullPlayerCharacterBuilder.BankKind);
 		}
 
 		// Live-renders a MoveItemInInventory that touches the personal bank (kind 105). PersistInventoryMove has
@@ -88,8 +88,8 @@ namespace Faolan.GameServer.Economy
 
 			var sKind = (int)move.SourceContainerId.Type;
 			var dKind = (int)move.DestinationContainerId.Type;
-			const int bank = (int)FullCharSnapshotBuilder.BankKind;
-			const int bag = (int)FullCharSnapshotBuilder.BagKind;
+			const int bank = (int)FullPlayerCharacterBuilder.BankKind;
+			const int bag = (int)FullPlayerCharacterBuilder.BagKind;
 			if (sKind != bank && dKind != bank)
 				return; // not a bank move - nothing to refresh
 
@@ -109,8 +109,8 @@ namespace Faolan.GameServer.Economy
 				if (item is not { Hash: not 0 })
 					return;
 
-				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos, FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
-						FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos), row.Count, item, item.Hash)
+				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos, FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, (ulong)dPos),
+						FullPlayerCharacterBuilder.RecordId(character.Id, FullPlayerCharacterBuilder.BagKind, (ulong)dPos), row.Count, item, item.Hash)
 					.Item;
 				await _outbound.SendAddItem(client, 0x68u, (uint)dPos, entry);
 			}

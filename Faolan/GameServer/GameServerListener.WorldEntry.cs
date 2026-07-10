@@ -696,7 +696,7 @@ namespace Faolan.GameServer
 		// Re-delivers, via the proven live DispatchAddItem (0x2020) path, the persisted BAG items the world-entry
 		// snapshot DROPPED because they carry no hash (Hash == 0 - e.g. an AH-bought item whose template
 		// we harvested from a listing, which has no hash). The snapshot only renders Hash != 0 rows
-		// (FullCharSnapshotBuilder), and embedding a half-identified item in the chat-critical 0x737A6DF9 root is
+		// (FullPlayerCharacterBuilder), and embedding a half-identified item in the chat-critical 0x737A6DF9 root is
 		// risky, so these ride the mid-session add-item mechanism (which renders by template / Hash 0) once at login.
 		// Items WITH an hash already rode the snapshot, so this only touches the dropped ones (no duplication).
 		private async Task RedeliverNonSnapshotBagItems(INetworkClient client)
@@ -707,12 +707,12 @@ namespace Faolan.GameServer
 
 			var rows = await Database.GetCharacterInventory(character.Id);
 			var pushed = 0;
-			foreach (var row in rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind && r.ItemId != null && r.Item is { Hash: 0 }))
+			foreach (var row in rows.Where(r => r.Container == (int)FullPlayerCharacterBuilder.BagKind && r.ItemId != null && r.Item is { Hash: 0 }))
 			{
 				var slot = (ulong)row.Slot;
-				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, slot), row.Item, 0,
+				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, slot), row.Item, 0,
 				[
-					new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, slot)),
+					new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(character.Id, FullPlayerCharacterBuilder.BagKind, slot)),
 					new SnapshotItemBuilder.ItemStat(26, row.Count)
 				], row.Item.Level);
 				await SendAddItem(client, InventoryContainerBackpack, (uint)row.Slot, entry);
@@ -1067,8 +1067,8 @@ namespace Faolan.GameServer
 				? (equipment.FirstPosBag, equipment.FirstPosBag.Hash)
 				: null;
 
-			var typedRoot = FullCharSnapshotBuilder.BuildRoot(characterTags, FullCharSnapshotBuilder.FullExpansionFlags, FullCharSnapshotBuilder.FullSubscriptionFlags, false, true,
-				FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
+			var typedRoot = FullPlayerCharacterBuilder.BuildRoot(characterTags, FullPlayerCharacterBuilder.FullExpansionFlags, FullPlayerCharacterBuilder.FullSubscriptionFlags, false, true,
+				FullPlayerCharacterBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
 			return typedRoot.ToProtobuf();
 		}
 

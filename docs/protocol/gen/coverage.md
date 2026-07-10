@@ -50,7 +50,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `DoorFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `EnergyIIR` | `CombatPacketCodec` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
-| V3 | `FullPlayerCharacterIIR` | `FullCharSnapshotBuilder` |
+| V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterBuilder` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
 | V3 | `GuildUpdateIIR` | `GuildTagBody` |
 | V3 | `HateListUpdateIIR` | `HateListCodec` |

@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			_output = output;
 		}
 
-		// The AUTHORING oracle (#57): FullCharSnapshotBuilder.BuildRoot, fed a captured root's own field values,
+		// The AUTHORING oracle (#57): FullPlayerCharacterBuilder.BuildRoot, fed a captured root's own field values,
 		// must re-encode that root byte-identically - so the snapshot path can author the root from typed inputs
 		// (DB containers + account flags + tag/spell state) instead of carrying the captured protobuf root.
 		[Fact]
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 				Assert.False(decoded.ShouldSerializeFreeFeatRespecs(), $"{source}: unexpected free_feat_respecs");
 				Assert.False(decoded.ShouldSerializeFeatResets(), $"{source}: unexpected feat_resets");
 
-				var rebuilt = FullCharSnapshotBuilder.BuildRoot(decoded.CharacterTags, decoded.ShouldSerializeExpansionFlags()
+				var rebuilt = FullPlayerCharacterBuilder.BuildRoot(decoded.CharacterTags, decoded.ShouldSerializeExpansionFlags()
 					? decoded.ExpansionFlags
 					: null, decoded.ShouldSerializeSubscriptionFlags()
 					? decoded.SubscriptionFlags

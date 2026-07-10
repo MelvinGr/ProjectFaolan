@@ -393,8 +393,8 @@ namespace Faolan.GameServer
 			// The window's first/default tab is the BANK (personal storage), a separate channel: container kind 105
 			// delivered via a BankIIR (decoded, protocol_bank_storage). Populate it from the character's Container=105 rows.
 			var rows = await Database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind).ToList();
-			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, 50, 30, characterId, bankRows);
+			var bankRows = rows.Where(r => r.Container == (int)FullPlayerCharacterBuilder.BankKind).ToList();
+			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, 50, 30, characterId, bankRows);
 
 			// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content
 			// (the 0x201c slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already

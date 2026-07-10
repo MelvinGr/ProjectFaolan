@@ -190,7 +190,7 @@ The same playbook applied to the FullChar/inventory snapshot:
   max_size 1028/24/48/48 (24 = starter bag, grows with upgrades), disabled_slots_count 0/0/12/0, owner =
   instance. Entry ids: itemId = epoch **0x20D82B63**<<32 | server-counter; record id (stat 23) another
   counter; stat 0 = flags (1 / 0x4000001), stat 26 = stack.
-- **Container generation WIRED & PROVEN IN-CLIENT**: `FullCharSnapshotBuilder` builds the 4 containers
+- **Container generation WIRED & PROVEN IN-CLIENT**: `FullPlayerCharacterBuilder` builds the 4 containers
   entirely from the character's DB items (typed; deterministic instance+slot-derived ids); the world-entry
   snapshot now replaces the captured player's containers wholesale — entry count included (smoke test
   16/16 with a 2-entry Equipped container vs the capture's 4; the old in-place swap survives only as the
@@ -200,7 +200,7 @@ The same playbook applied to the FullChar/inventory snapshot:
   (tails header), current HP/mana/stamina (`TailsPostAccessBlock`, ×100 slots 54/64/68) and XP
   (`CurrentXp`, slot 80, ×10) into the snapshot tails before sending — the captured player's values no
   longer ride along. Best-effort with the captured values as fallback; locked by the bigboy round-trip in
-  `FullCharSnapshotBuilderTests` (the stat table MUST be recognized on the reference fixture).
+  `FullPlayerCharacterBuilderTests` (the stat table MUST be recognized on the reference fixture).
   Smoke-verified in-client 16/16: generated containers + patched tails live in the same session, no
   fallback warnings in the server log.
 

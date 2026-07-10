@@ -72,7 +72,7 @@ namespace Faolan.Tests
 
 			var typed = ((ReadOnlySpan<byte>)verbatimRoot).FromProtobuf<ProtoFullCharacterIIR>();
 			typed.Inventories.Clear();
-			foreach (var c in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, rows))
+			foreach (var c in FullPlayerCharacterBuilder.BuildContainers(instance, equipped, bagFirst, rows))
 				typed.Inventories.Add(c);
 			var genRoot = typed.ToProtobuf();
 			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
