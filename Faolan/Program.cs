@@ -144,13 +144,6 @@ namespace Faolan
 					throw new Exception(selectedRealmId.HasValue
 						? $"--role realm={selectedRealmId}: no such realm in the DB (migrate + seed a Realm row first)."
 						: "--role realm: no realm seeded in the DB.");
-
-				// Bind the realm-local chat/guild listeners (they read config) to THIS realm's ports.
-				builder.Configuration.AddInMemoryCollection(new Dictionary<string, string>
-				{
-					["AgentServerPort"] = hostRealm.AgentServerPort.ToString(CultureInfo.InvariantCulture),
-					["CsPlayerAgentPort"] = hostRealm.CsPlayerAgentPort.ToString(CultureInfo.InvariantCulture)
-				});
 			}
 
 			Console.WriteLine($"[role] login={runLogin} realm={runRealm}" +
@@ -169,11 +162,16 @@ namespace Faolan
 
 			if (runRealm)
 			{
-				builder.Services.AddScopedHostedService<CsPlayerAgentListener>();
+				// The realm-local listeners bind THIS realm's ports straight from its Realm row (single source of truth,
+				// #324) - factory-registered so the port is injected, not read from global config.
+				builder.Services.AddScopedHostedService(provider => new CsPlayerAgentListener(hostRealm.CsPlayerAgentPort, provider.GetRequiredService<ILogger<CsPlayerAgentListener>>(),
+					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IGameServerDispatcher>()));
 
 				builder.Services.AddSingleton<IAgentServerDispatcher, AgentServerDispatcher>();
 				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
-				builder.Services.AddScopedHostedService<AgentServerListener>();
+				builder.Services.AddScopedHostedService(provider => new AgentServerListener(hostRealm.AgentServerPort, provider.GetRequiredService<ILogger<AgentServerListener>>(),
+					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IAgentServerDispatcher>(),
+					provider.GetRequiredService<IGameServerDispatcher>(), provider.GetRequiredService<ClaudeChannel>()));
 
 				// Live seam into the GameServer listener: aggregates world sessions and routes
 				// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.

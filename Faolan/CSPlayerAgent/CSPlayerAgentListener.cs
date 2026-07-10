@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
@@ -22,8 +21,10 @@ namespace Faolan.CSPlayerAgent
 		// guild tag (0x2550C99A) onto a character's live GameServer connection on join/leave.
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(
-			configuration.CsPlayerAgentPort, logger, configuration, database, new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceDispatchOpcodes)))
+		// `port` is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
+		// realm-local service ports, #324), passed in at registration rather than read from global config.
+		public CsPlayerAgentListener(ushort port, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(
+			port, logger, configuration, database, new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceDispatchOpcodes)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);

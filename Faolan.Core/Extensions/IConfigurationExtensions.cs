@@ -23,9 +23,8 @@ namespace Faolan.Core.Extensions
 
 			public uint ServerIpAddressLong => BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(config.ServerIpAddress).GetAddressBytes());
 
-			public ushort AgentServerPort => Convert.ToUInt16(config["AgentServerPort"]);
-			public ushort CsPlayerAgentPort => Convert.ToUInt16(config["CsPlayerAgentPort"]);
-
+			// #324: the realm-local service ports (world/chat/guild) live on the Realm row, not global config - the
+			// realm host binds them from its Realm row. Only the shared login tier's ports stay in config below.
 			public ushort McpPort => Convert.ToUInt16(config["McpPort"]);
 
 			public ushort PlayerAgentPort => Convert.ToUInt16(config["PlayerAgentPort"]);

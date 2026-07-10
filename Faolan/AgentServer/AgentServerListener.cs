@@ -26,8 +26,10 @@ namespace Faolan.AgentServer
 		private readonly IAgentServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher,
-			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(configuration.AgentServerPort, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
+		// `port` is the hosting realm's AgentServerPort (from its Realm row - the single source of truth for the
+		// realm-local service ports, #324), passed in at registration rather than read from global config.
+		public AgentServerListener(ushort port, ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher,
+			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(port, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
 		{
 			_dispatcher = dispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
