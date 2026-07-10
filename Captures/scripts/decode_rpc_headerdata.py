@@ -5,15 +5,17 @@
 plugin surfaces it per packet as `HeaderExtraHex`. This scans every `Captures/*.tshark.json` and proves the blob is
 NOT a generic per-packet grammar — it is exactly four per-opcode/constant cases:
 
-  1 byte  0x01            constant latency marker; rides the ping/pong (0x2085 c2s / 0x2082 DispatchPong s2c) and a
-                          few CSPlayerInterface dispatches. The overwhelming majority of packets.
+  1 byte  0x01            constant marker; rides the ping/pong (0x2085 c2s / 0x2082 DispatchPong s2c) and a few
+                          CSPlayerInterface dispatches. Always 0x01 across every capture; the overwhelming majority
+                          of packets. Its *semantic* (flag? version?) is the one micro-residual left on #319.
   4 bytes <method id>     PlayerAgent/PlayerInterface ONLY — the 32-bit method id (Gitea #320,
                           docs/re/aoc-rpc-method-opcodes.md). Keyed by (opcode, DIRECTION), not opcode alone: a
                           couple of 16-bit opcode indices are reused by a c2s method and its s2c twin, which carry
                           different 32-bit ids (expected — the 16-bit value is a plain index, dispatch is on the hash).
   3 bytes 0x94A760        PlayerInterface SmallCharList (0x20A5), constant.
-  13 bytes                PlayerInterface OverrideGameTweaks (0x1A07) — a per-session block on the ServiceConnection
-                          endpoint; still emitted verbatim (its internal fields are the one residual undecoded part).
+  13 bytes                PlayerInterface OverrideGameTweaks (0x1A07) — a protobuf endpoint reference, NOT an opaque
+                          block: 0x0D <fixed32 class id 0x7D155738 = PlayerInterface> 0x10 <varint 1> 0x20 <varint
+                          per-session instance id>. Decoded here (parse_endpoint13), consumes all 13 bytes.
 
 Anything else printed under "UNEXPECTED" is a parser artifact, not a new grammar (e.g. a 60-byte record on opcode
 0x0005 is the ServiceConnection handshake mis-attributed to HeaderExtraHex — its bytes are ProtoEndpoint-shaped).
@@ -33,6 +35,39 @@ def flat_fields(node, acc):
     elif isinstance(node, list):
         for v in node:
             flat_fields(v, acc)
+
+
+def _rd_varint(b, i):
+    v = s = 0
+    while True:
+        x = b[i]
+        i += 1
+        v |= (x & 0x7F) << s
+        s += 7
+        if not x & 0x80:
+            return v, i
+
+
+def parse_endpoint13(hx):
+    """Parse a 13-byte OverrideGameTweaks headerData as a protobuf endpoint reference; None if it doesn't fit."""
+    try:
+        b = bytes.fromhex(hx)
+        i = 0
+        assert b[i] == 0x0D  # field 1, fixed32
+        i += 1
+        classid = int.from_bytes(b[i:i + 4], 'little')
+        i += 4
+        assert b[i] == 0x10  # field 2, varint
+        i += 1
+        f2, i = _rd_varint(b, i)
+        assert b[i] == 0x20  # field 4, varint
+        i += 1
+        f4, i = _rd_varint(b, i)
+        if i != len(b):
+            return None
+        return classid, f2, f4
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def scan(node, out):
@@ -75,6 +110,16 @@ def main(argv):
     print(f"  opcodes carrying >1 id (c2s/s2c reuse of one index): {len(ambiguous)}")
     for op, vs in sorted(ambiguous.items()):
         print(f"    {op}: {sorted(vs)}")
+
+    thirteen = sorted({hx for L, hx, _ in recs if L == 13})
+    print(f"\n13-byte (OverrideGameTweaks) as protobuf endpoint: {len(thirteen)} distinct")
+    for hx in thirteen:
+        p = parse_endpoint13(hx)
+        if p:
+            classid, f2, f4 = p
+            print(f"  {hx}  -> class 0x{classid:08X} (PlayerInterface), field2={f2}, instance(field4)={f4}")
+        else:
+            print(f"  {hx}  -> does not parse as the endpoint form")
 
     ok = set(bylen) <= KNOWN
     print(f"\nAll lengths within the 4 known cases: {ok}")

@@ -15,14 +15,14 @@ Every gap below is a tracked Gitea issue (`melvin/projectfaolan`), so it lives o
 
 ## Transport
 
-### RpcHeader trailing headerData — residual sub-fields
-**Tracked: Gitea #319.** The blob's GRAMMAR is decoded — it is four per-opcode/constant cases, not a generic
-grammar (see [`02-rpc.md`](02-rpc.md) and `Captures/scripts/decode_rpc_headerdata.py`, which tallies them across
-every capture). Two sub-fields remain emitted verbatim, and only these:
-- the **meaning** of the constant 1-byte `0x01` latency marker (a flag? a fixed sentinel?), and
-- the **internal structure** of the 13-byte PlayerInterface `OverrideGameTweaks` (`0x1A07`) per-session block.
-
-Both are client-reader-decodable (Ghidra) if the fidelity ever matters; neither is on any path we send.
+### RpcHeader trailing headerData — the `0x01` marker's meaning
+**Tracked: Gitea #319.** The blob's grammar is decoded — four per-opcode/constant cases (see [`02-rpc.md`](02-rpc.md)
+and `Captures/scripts/decode_rpc_headerdata.py`). The 13-byte `OverrideGameTweaks` case, previously called an opaque
+block, is now decoded too: it is a protobuf endpoint reference to PlayerInterface (class `0x7D155738`) + a per-session
+instance id. The **only** thing left is the *semantic* of the constant 1-byte `0x01` marker (a flag? a version?
+present on ping/pong `0x2085`/`0x2082` and a few CSPlayerInterface dispatches, always exactly `0x01`). We emit it
+correctly (`KeepAliveService`); its label needs the client's generic RPC-header parser (Ghidra) — low ROI, on no
+send path that depends on the meaning.
 
 ---
 

@@ -22,10 +22,13 @@ opcode is **not a generic grammar** — across every capture it is exactly four 
 | 1 (`0x01`) | latency marker | constant; rides the ping/pong (`0x2085` c2s / `0x2082` `DispatchPong` s2c) and a few CSPlayerInterface dispatches — the vast majority of packets. |
 | 4 | PlayerAgent/PlayerInterface **32-bit method id** | present ONLY here (empty for all 16 other interfaces); keyed by (opcode, direction), not opcode alone — two 16-bit indices are reused by a c2s method and its s2c twin with different ids. See #320 / [`../re/aoc-rpc-method-opcodes.md`](../re/aoc-rpc-method-opcodes.md). |
 | 3 (`0x94A760`) | PlayerInterface `SmallCharList` (`0x20A5`) | constant. |
-| 13 | PlayerInterface `OverrideGameTweaks` (`0x1A07`) | a per-session block on the ServiceConnection endpoint; its internal fields are the one part still emitted verbatim. |
+| 13 | PlayerInterface `OverrideGameTweaks` (`0x1A07`) | a **protobuf endpoint reference**, not an opaque block: `0x0D <fixed32 class id 0x7D155738 = PlayerInterface> 0x10 <varint 1> 0x20 <varint per-session instance id>` — consumes all 13 bytes. |
 
-So it is the PlayerInterface method id (decoded) plus a constant latency marker plus two PlayerInterface specials —
+So it is the PlayerInterface method id (decoded) plus a constant `0x01` marker plus two PlayerInterface specials —
 not a mystery appended to arbitrary packets. [V1: Captures/scripts/decode_rpc_headerdata.py]
+
+(The `0x01` marker is always exactly `0x01` in every capture; only its *semantic* — a flag? a version? — is unproven,
+the sole micro-residual on #319. The 13-byte endpoint above is decoded.)
 
 ## ProtoEndpoint
 
