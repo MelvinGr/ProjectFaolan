@@ -18,7 +18,7 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 | **KnubotStartTradeIIR** | `0x4B2A47BF` | `FUN_009a63a0` | `[u64][u32 count][ count × { std::string name, u32, u32, u32, u32 } ][std::string …]` — the **shop item list** | 1676–1772 B (variable) ✓ |
 | **AreaFormulaIIR** | `0xCE30BE4E` | `FUN_0079e330` | `[0x3F1-list][u32][0x3F1-list][u32]` (two `0x3F1`-framed lists, à la GameActionList) | 28/36/44/52 B (variable) ✓ |
 | **TemplateActionIIR** | `0x6C300937` | `FUN_007a0b00` | `[68-B struct (FUN_005d5150)][u32 × 6]` | 10/10 = 92 B ✓ |
-| **UpdateInventoryIIR** | `0xA74D2814` | `FUN_005b9230` (stub) | the body is **protobuf** (`08 0a …` field tags; repeated item entries with 16-B GUIDs — the inventory item schema). The slot-8 reader is a `return 0` stub because the client parses it as protobuf, not fixed fields — reuse `ProtoInventoryGame`, don't hand-roll | 25–1137 B protobuf ✓ |
+| **UpdateInventoryIIR** | `0xA74D2814` | `FUN_005b9230` (stub) | the body is **protobuf** — repeated `ProtoAcgItem` entries, each carrying **3× `ProtoDecryptionKey`** (the item's 4×fixed32 TEA keys, `0d/15/1d/25`-tagged; the `0a14/1214/1a14` sub-messages). Same item schema as the snapshot (`ProtoInventoryGame`). The slot-8 reader is a `return 0` stub because the client parses it as protobuf, not fixed fields — reuse `ProtoInventoryGame`/`ProtoAcgItem`, don't hand-roll | 25–1137 B protobuf ✓ |
 
 ## Notes
 
