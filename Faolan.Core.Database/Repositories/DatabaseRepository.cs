@@ -75,6 +75,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Item[]> GetRandomLootExcludedItems();
 		Task<Realm> GetRealm(uint id);
 		Task<Realm[]> GetRealms();
+		Task SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status);
 		Task<ChatMessage[]> GetRecentChatMessages(int limit = 100, uint? channelId = null);
 		Task<Recipe[]> GetRecipes();
 		Task<RespawnPoint> GetRespawnPoint(uint id);
@@ -932,6 +933,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Realms.OrderBy(r => r.Id).ToArrayAsync();
+		}
+
+		// #324: a realm game host flips its own row's online status as it starts (Online) / stops (Offline), so the
+		// login tier's realm list (SendRealmList) reflects which realms are actually up. Bulk update - no entity load.
+		public async Task SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Realms.Where(r => r.Id == realmId).ExecuteUpdateAsync(s => s.SetProperty(r => r.OnlineStatus, status));
 		}
 
 		// Recent chat history newest-first, optionally for a single channel (#95). For the web/MCP log + moderation.
