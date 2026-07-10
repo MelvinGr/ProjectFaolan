@@ -101,6 +101,10 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 
 ## The architectural gap (the core thing)
 
+> Historical snapshot (the original 2026-06-11 problem statement), kept for the before/after narrative — the
+> progress above supersedes it. Some symbols named below are since gone (e.g. `SpawnedNpcMaxHealthByHandle`,
+> `LoginWorldReceiver`); read this as "where we started", not the current code.
+
 From the code as it stands:
 
 - **No game loop / tick.** `Server<...>` is purely reactive — work happens only when a packet arrives. There is no

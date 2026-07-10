@@ -22,7 +22,7 @@ Run:  python3 Captures/scripts/decode_listb.py [tails.bin] [start_offset]
 """
 import struct, sys, re
 
-TEMPLATE = "Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin"
+TEMPLATE = "Faolan.Tests/Assets/BeachTailsTemplate.bin"
 FRAME = 0x3F1
 
 
