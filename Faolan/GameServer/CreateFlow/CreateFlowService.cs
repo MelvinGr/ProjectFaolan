@@ -23,10 +23,10 @@ namespace Faolan.GameServer.CreateFlow
 {
 	// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted out of the
 	// GameServerListener god-class. The listener holds this as
-	// _createFlow and forwards the inbound create-flow callbacks to it; the flow's outbound packet builders live on
-	// the other partials in this folder (CreateWorldHandshake / CreateWorldCutsceneScripts / RetailNpcConversationBurst
-	// / the Retail*Burst files). Verbatim/byte-exact burst builders stay `static` so the golden tests reach them
-	// unchanged (CreateFlowService.SendWorldPrepBurst / .BuildKalanthesIntroMove / ...).
+	// _createFlow and forwards the inbound create-flow callbacks to it; the flow's outbound packet builders
+	// (the create-world handshake, the destiny-cutscene Scry scripts, and the Retail*Burst editor bursts) all
+	// live in this file. Verbatim/byte-exact burst builders stay `static` so the golden tests reach them
+	// unchanged (CreateFlowService.SendRetailCreateEditorInitialBurst / .BuildKalanthesIntroMove / ...).
 	//
 	// Cross-cutting deps follow the house pattern (CLAUDE.md "composed collaborators"): the world model comes in by
 	// ctor, and the one listener-owned outbound op the cutscene needs (SendBurstlessWorldEntry, also used by the
@@ -79,7 +79,7 @@ namespace Faolan.GameServer.CreateFlow
 		private static readonly Vector3 KalanthesIntroPos = new Vector3(333.20001220703125f, 146.29666137695312f, 706.0260009765625f);
 		private static readonly Vector3 KalanthesWalkTarget = new Vector3(324.7233581542969f, 145.43357849121094f, 705.1339721679688f);
 
-		// The listener's burst-less world entry (Login/BurstlessWorldEntry.cs) - the constructed live-char world the
+		// The listener's burst-less world entry (GameServerListener.WorldEntry.cs) - the constructed live-char world the
 		// create-flow enters before the destiny cutscene overlay. Injected as a seam (shared with the login replay).
 		private readonly Func<INetworkClient, uint, Task> _sendBurstlessWorldEntry;
 		private readonly IDatabaseRepository _database;
@@ -165,9 +165,9 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					if (character != null)
 					{
-						// Same 2x editor convention as race/class: the halved value is the wire sex-code 2=MALE / 3=FEMALE
-						// (anchored on Hoxxling, male: ChangeSex 4 -> 2). The Sex enum is Male=0/Female=1, so subtract the
-						// 2 base to land on the enum: (numericValue/2 - 2) => 4->0 Male, 6->1 Female. No magic ==.
+						// Same 2x editor convention as race/class: the halved (zigzag-decoded) value is the wire sex-code
+						// 2=MALE / 3=FEMALE (anchored on Hoxxling, male: ChangeSex 4 -> 2). The Sex enum is Male=2/Female=3,
+						// so the decoded value casts straight to the enum: 4->2 Male, 6->3 Female. No magic ==.
 						character.Sex = (Sex)value;
 					}
 

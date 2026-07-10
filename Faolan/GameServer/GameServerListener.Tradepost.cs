@@ -281,7 +281,7 @@ namespace Faolan.GameServer
 		}
 
 		// Inbound Tradepost (auction house) + mail dispatch, routed here by receiver class (TradepostAgentType) from
-		// ReceivedPacket. Mutating ops are folded onto the listener (TradepostOps.cs); ItemSearch parses + replies via
+		// ReceivedPacket. Mutating ops are folded onto the listener (GameServerListener.Tradepost.cs); ItemSearch parses + replies via
 		// TradepostResponses. Grammar in docs/subsystems/tradepost-protocol.md.
 		private async Task HandleTradepostPacket(INetworkClient client, ConanPacket packet)
 		{

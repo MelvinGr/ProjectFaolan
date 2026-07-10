@@ -8,7 +8,7 @@ namespace Faolan.Tests
 {
 	// Byte-exact gates for the typed 277-byte guild renown block codec (Gitea #219). The grammar was recovered
 	// from Ghidra (CoreGuild_c::Read, govForm 1) and validated against both 0x203F snapshots in the guild_invite
-	// capture; SpawnGuildRenownBlock.bin is the captured "Sepulchra Invictus" block. The round-trip + the
+	// capture; Golden/GuildRenownBlock.bin is the captured "Sepulchra Invictus" block. The round-trip + the
 	// structured CapturedPlaceholder both reproduce it, which is how the from-DB path replaces the old verbatim
 	// blob (which had been hand-transcribed 3 bytes short -> 274 not 277, misaligning the roster after it).
 	public class GuildRenownBlockTests

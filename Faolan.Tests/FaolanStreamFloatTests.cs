@@ -6,8 +6,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks in the deliberate float-endianness contract (see FaolanStream / docs note + protocol_float_endianness):
-	// protobuf fixed32 floats are LITTLE-endian (WriteFloat), raw packet-body floats are BIG-endian
-	// (WriteFloat / ReadFloat). The WriteFloat(LE) vs ReadFloat(BE) asymmetry is intentional - this guards
+	// protobuf fixed32 floats are LITTLE-endian (WriteFloatLittleEndian), raw packet-body floats are BIG-endian
+	// (WriteFloat / ReadFloat). The WriteFloatLittleEndian(LE) vs WriteFloat/ReadFloat(BE) asymmetry is intentional - this guards
 	// against "fixing" it back into a single endianness (which corrupts one of the two contexts).
 	public class FaolanStreamFloatTests
 	{

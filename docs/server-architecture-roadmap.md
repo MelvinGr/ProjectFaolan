@@ -76,8 +76,10 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   `TryLootAll` (`0x2043`) and single-drag `TryLootItem` (`0x2046`) route through `LootService` →
 >   `GrantItemToBackpack` (persist + live `DispatchAddItem`) + `LootRemoveItems` (`0x70010162`); in-client
 >   confirmation of the delivery is still pending.
-> **NEXT:** the loot item-grant (live ContainerAddItem); then NPC AI movement (the pinned MoveTask patrol grammar) so
-> the tick drives motion and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
+> **NEXT:** quests — the quest/tag state machine (the same Lua-VM effort dialogue branching needs), plus in-client
+> confirmation of the pieces still gated above (2-client interest/despawn, loot delivery). (The loot item-grant and NPC
+> AI movement that were next here have since shipped — see above: `LootService` grants live and the tick drives motion
+> via `BroadcastNpcMove`/`BroadcastNpcPatrol`, so the burst is now a pure seed.)
 
 ## What we already have (strong foundation)
 
@@ -142,7 +144,8 @@ So today it behaves like **single-player instances stitched from captures**, not
   NormalAttack BehaviorControlCenter FSM also needs the NPC's own counter-attack ack — see `docs/re/quests-and-combat.md`.)
 
 ### 5. Progression + quests
-- XP / leveling (`CharacterMaxStats.CreateDefaults` is a stub). The quest/tag state machine — the **same Lua-VM**
+- XP / leveling (kill-XP + level-up now ship, above; `CharacterMaxStats.CreateDefaults` is retail-anchored at L1 for
+  all 12 classes, with per-level growth still rough — no longer a stub). The quest/tag state machine — the **same Lua-VM**
   effort dialogue branching needs (pinned in `protocol_conversation_routing` / `docs/rdb/rdb-extraction-plan.md`).
 
 ### 6. State/persistence discipline & scaling (later)

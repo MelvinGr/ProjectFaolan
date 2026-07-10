@@ -279,7 +279,7 @@ namespace Faolan.GameServer
 				await RedeliverNonSnapshotBagItems(client);
 
 				// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
-				// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot, // see BuildBeachInventoryPacket.)
+				// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot, // see BuildBurstlessSnapshotRoot.)
 
 				// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
 				// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
@@ -791,8 +791,7 @@ namespace Faolan.GameServer
 
 			// Mark this connection as having entered the world. The conversation system (ConversationService), the
 			// 0x2020 -> 0x2008 spawn-check (GameServerListener), and the dialogue-close fallback (Handle0x2000) are
-			// all gated on this - without it NPC dialogue silently never opens. The internal burst fallback below
-			// sets it via ReplayMapWorldBurst.
+			// all gated on this - without it NPC dialogue silently never opens.
 			client.Session.WorldEntered = true;
 
 			// Retail split (proven byte-exact in the *-create vs *-login captures): a CREATE-world entry carries NO quests
@@ -1052,8 +1051,8 @@ namespace Faolan.GameServer
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 
-		// The FullCharacterIIR root (containers) as protobuf bytes - the same typed authoring BuildBeachInventoryPacket
-		// does, but produced standalone (no captured packet to splice into).
+		// The FullCharacterIIR root (containers) as protobuf bytes - typed authoring produced standalone (no captured
+		// packet to splice into).
 		private static byte[] BuildBurstlessSnapshotRoot(uint instance, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags)
 		{
 			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();

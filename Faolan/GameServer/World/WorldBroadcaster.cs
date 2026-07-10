@@ -542,13 +542,6 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: {Name} closed loot bag 0x{Handle:X8}; faded + removed.", player.Name, bag.Handle);
 		}
 
-		// On a kill, MAYBE turn the dead NPC's corpse into a lootable bag (LootResolver coin-flip + a map loot
-		// template). The bag REUSES the NPC's own handle: the client already renders the corpse, so the
-		// LootBagFullUpdateIIR (0xF096251E) is an UPDATE it accepts - introducing a brand-new world object
-		// mid-session does NOT render (the client only takes world objects at playfield-load; confirmed against
-		// captures where every loot bag is introduced in the world-entry burst, never mid-session). The entity
-		// stays dead in the model and respawns off the tick (which clears the loot). Returns true if the corpse
-		// became a bag, so the caller skips the despawn.
 		// A dead NPC's death-animation linger elapsed (driven by the world tick): turn its corpse into a lootable bag
 		// IN PLACE. Every kill leaves a lootable corpse - the drop ROLL decides only whether it carries items/cash, not
 		// whether it's lootable (retail leaves a lootable corpse on every kill; empty corpses are fine). Falls back to a

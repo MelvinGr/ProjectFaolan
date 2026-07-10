@@ -45,8 +45,8 @@ The fields earlier carried as "loose" are now placed precisely: **`0x9C50` and t
 
 `destPlayfieldToken` (`0x00503570` for map 2010 in the capture) is the **destination playfield-INSTANCE
 token** — and it is **not a per-map constant**: it differs between captures of the same map (the changemap
-capture's map-2010 token `0x00503570` vs our DB burst's `0x0050360F`), because the retail server mints a token
-per playfield instance. So the dest-announce only matches the destination world-entry if **both come from the
+capture's map-2010 token `0x00503570` vs our DB's stored map-2010 token `0x005045E6`, `Maps.PlayfieldToken`),
+because the retail server mints a token per playfield instance. So the dest-announce only matches the destination world-entry if **both come from the
 same burst**. The live change-map path now sources it via
 `WorldBroadcaster.ResolveMapPlayfieldToken(destMapId)`, which reads the destination map's stored
 `Map.PlayfieldToken` column (falling back to `WorldState.DefaultPlayfieldToken` for a map with no captured
@@ -63,8 +63,8 @@ is not yet derivable from the data; it stays a parameter with the capture defaul
 
 Both bodies are built by the named `TeleportCodec` (was inline spliced templates in `GMCommands`), now fully
 **reader-structural** — the `begin` / PlayfieldProxy / `dest` readers are decompiled (`Captures/ghidra/
-DumpTeleportReaders.java` → `FUN_005bfce0` / `FUN_00a6a600` / `FUN_005d1ae0`, plus `FUN_00cbf5d0` for the
-position blob) and every dest byte is accounted for. Sibling lift under #219 — the **guild renown block** — is
+DumpTeleportReaders.java` → `FUN_005bfce0` / `FUN_00a6a600` / `FUN_005d1ae0`; the position-blob reader
+`FUN_00cbf5d0` is dumped in `Captures/ghidra/out/helpers.txt`) and every dest byte is accounted for. Sibling lift under #219 — the **guild renown block** — is
 likewise a typed builder (`Faolan.Core.Network/Codecs/Guild/GuildRenownBlock.cs`, `GuildRenownBlockTests`; full reader walk
 documented in `docs/subsystems/guilds.md`). Remaining: in-client verification of the GM teleport path, and the semantic
 meaning of `destDescriptor`.

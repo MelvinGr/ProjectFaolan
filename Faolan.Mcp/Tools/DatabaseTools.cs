@@ -15,8 +15,8 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class DatabaseTools
 	{
-		// EF entities carry navigation properties (the Core context uses lazy-loading proxies), so guard against
-		// reference cycles and cap depth. Tools return detached/no-tracking results, so no lazy load fires here.
+		// EF entities carry navigation properties (populated via Include; the context does not enable lazy-loading
+		// proxies), so guard against reference cycles and cap depth. Tools return detached/no-tracking results.
 		private static readonly JsonSerializerOptions JsonOptions = new()
 		{
 			WriteIndented = true,

@@ -65,10 +65,11 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
   (idx616/idx4050, 57 B, both deaths identical bar the death pos). The client shows the release screen, the player
   picks → `RespawnMe` (c2s `0x2024`) = `[u32 spawnPointId]` (the chosen spot echoed back). NOTE: the same `0x2024` is
   sent at LOGIN (the misnamed `SendReadyForPlayScreen`) to set the spawn anchor - it only renders the release UI when
-  the client is in the dead state (which needs a real combat killing-blow, not a raw health=0 push). Builder +
-  golden test shipped (commits 6d7df27/e6961d1); see Gitea #214/#215.
+  the client is in the dead state (which needs a real combat killing-blow, not a raw health=0 push). Builder
+  (`Faolan.Core.Network/Codecs/Combat/ResurrectionSpotsBody.cs`) + golden test
+  (`Faolan.Tests/DispatchValidResurrectionSpotsTests.cs`) shipped; see Gitea #214/#215.
 
-### strickenbla — create, combat, levelup, questcomplete
+### Blablabla — create, combat, levelup, questcomplete
 `...create-random-actions-combat-levelup-questcomplete.json`
 - **Quest dialogue tree** (the beach Casilda/combat NPC): `4A3D899A` 12493→12490→20018→20019→20020→19919→
   26909→12492→12494 with `F164A4A5` remoteformats 7615/12621/12622/12623/13444/12548/7617. (This is the tree

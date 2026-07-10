@@ -73,10 +73,8 @@ namespace Faolan.GameServer.World
 		// A transient loot bag (expires + despawns) rather than a player/NPC.
 		public bool IsLoot { get; private init; }
 
-		// True when this entity can be looted: a standalone loot bag, OR a DEAD NPC whose corpse was turned into a
-		// lootable bag in place (the kill-drop path reuses the NPC's own handle so the client - which already
-		// renders the corpse - just updates it, rather than introducing a brand-new world object mid-session that
-		// the client won't render). Loot is cleared when the NPC respawns (TickRespawn).
+		// True when this entity can be looted: a standalone loot bag, OR a DEAD NPC still carrying rolled loot (items
+		// or cash). Loot is cleared when the NPC respawns (TickRespawn).
 		public bool IsLootable => IsLoot || (IsDead && (LootItems.Count > 0 || CashTin > 0));
 
 		// True while this player is riding a mount (#27). Pressing the SummonMount action toggles it: mount when false

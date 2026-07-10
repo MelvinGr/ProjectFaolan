@@ -22,9 +22,9 @@ Tracked as **Gitea #141** (`needs-testing`). Full session write-up is in the #14
 | Other-caster profiles (Demo / PoM / ToS)                                | ❌ TODO (need per-class captures)               |
 | **Melee wire decode** (cid → combo, animByte → direction) + execution   | ⚠️ BLOCKED on client Ghidra RE (§3)             |
 
-All wire builders are **byte-exact** (16 golden tests: `SpellweaveCodecTests` + `BehaviorAnimationCodecTests`).
-Latest commit: `5298919d` (energy/DoT/Exhausted/cancel/stacking). The activate/adds/fire base is in `03d26328` /
-`4a9fe3c9`. Melee `ClassCombo` work is in the earlier `5f1efb2a`-and-before series.
+All wire builders are **byte-exact** (12 golden tests: `SpellweaveCodecTests` + `BehaviorAnimationCodecTests`).
+Latest commit: `54e5c428` (energy/DoT/Exhausted/cancel/stacking). The activate/adds/fire base is in `f3d80f9b` /
+`87ecff3e`. Melee `ClassCombo` work is in the earlier `91c6ffba`-and-before series.
 
 ## 1. The two mechanics (recap)
 
@@ -51,10 +51,10 @@ Both build an outcome from a sequence of player inputs; a class does ONE of them
 - **Grant** — `IDatabaseRepository.GetClassCombos(level, class)` returns the combos RANK-SUPERSEDED by family
   (`ComboFamilyKey` in `DatabaseRepository.cs`, the combo twin of `GetStartingBarSpells`): one per line at the
   highest qualifying rank (lvl-24 HoX → Hell Strikes II not I+II, matching the `0x2076` book). Emitted by
-  `GrantCharacterCombos` (`GrantAbilitiesBuilder.cs`) + the two level-up ding paths (CombatService,
-  FormatFeedbackSender). This REPLACED the class-independent `LevelComboCatalog` (retired to a data reference) —
+  `GrantCharacterCombos` (`GameServerListener.WorldEntry.cs`) + the two level-up ding paths (CombatService,
+  `SendLevelUpDings` in `GameServerListener.WorldEntry.cs`). This REPLACED the class-independent `LevelComboCatalog` (retired to a data reference) —
   which was the bug where a Necromancer re-"learned" Sweep/Slam/Hell Strikes every login.
-- **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboInput.cs`) — normalises all 33 `Actions` tokens into the
+- **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboActionParser.cs`) — normalises all 33 `Actions` tokens into the
   `ComboInput` enum (UpperLeft/Right, LowerLeft/Right, Up, Head, Thrust); returns false for non-directional markers
   (`action`, `MagicCombo`, `*_Reactive` = spellweaving/reactive). Validated: 130 distinct Actions, 0 unknown tokens.
 - **`ComboService`** (`Faolan/GameServer/Combat/ComboService.cs`) — `GetPerformableCombosAsync(class, level)` =
@@ -93,13 +93,13 @@ potions/food, then wove **Arcane Renewal, Arcane Surge, Death God**, then stoppe
 Timeline (clean dump): potions (BCC `RightClickItem` 0x0e) at 82.5/87.0/97.7s → **activate 103.3s** → adds
 105.8/115.5/131.1s (~10-15s apart) → **deactivate 141.4s** → fire 141.6s.
 
-- **Activate / deactivate = a TOGGLE**: c2s opcode **`0x205A`** (`GameServerOpcodes.PerformSpecialAction`), body
+- **Activate / deactivate = a TOGGLE**: c2s opcode **`0x205A`** (`GameCharAgentOpcodes.PerformSpecialAction`), body
   `[u32 0x000000FC]`. SAME value both presses (like the mount toggle) — first opens the trance, second fires+closes.
 - **Activate RESPONSE (s2c, ~103.8s)** — the currently-MISSING part that stalls our client at "started":
   - **3× trance buffs**: `ApplySpell` (`0x6B87E316`), wire ids **`0x37F29800`, `0x37E5A800`, `0x3969D000`** (the
     `(base<<8)|rank` form; base 0x37F298 etc., rank 0x00). ApplySpell body =
     `[len][6b87e316][EntityClass 0x0000c350][applyTo][u16 0][u32 spellId][EntityClass][applyFrom][data tail]`;
-    duration lives at `data+8` in centiseconds (see `ApplySpell` in `PostReadyFollowUp.cs` + `ActiveBuff`). First
+    duration lives at `data+8` in centiseconds (see `ApplySpell` in `GameServerListener.Buffs.cs` + `ActiveBuff`). First
     buff verbatim: `000000506b87e3160000c3500802e5d4000037f298000000c3500802e5d40000…`.
   - a **`CombatReactiveIIR`** (`0x54C02089`) s2c reactive element LIST (the addable weave elements), and a trance-pose
     **BCC** animation (`0x642CD3D6`, action 42041 — `BehaviorAnimationCodec.SpellweaveTrance`).
@@ -108,7 +108,7 @@ Timeline (clean dump): potions (BCC `RightClickItem` 0x0e) at 82.5/87.0/97.7s �
   anyway). TWO packets per tick, same token:
   - **`DispatchUpdateSprintbar` (`0x200E`)** — the packet that actually MOVES the bar. Body `[u32 energy][u8 01]`,
     sender `GameCharAgentProject/0x54` → `GameCharInterfaceProject/instance`. Energy full = **8910** for the necro,
-    draining with an accelerating rate (`-90 → -270`). (`SendSprintBar` in `HandleGameCharAgentProject.cs`.)
+    draining with an accelerating rate (`-90 → -270`). (`SendSprintBar` in `GameServerListener.Buffs.cs`.)
   - **`e9f24184` StatDamageIIR** — parallel "Spellweaving Cost" gauge (`0x37E68C`, scale `v@33`=`0x0F425C`); the
     accounting twin (`SpellweaveCodec.BuildStatGauge`).
 - **DoT when energy empties**: the `Exhausted` debuff (spell `0xB90`, 100s) + the **`0x37E690` "Spellweaving"** gauge
@@ -142,7 +142,7 @@ The whole necro flow is built and (except the energy bar) **works in-client**, b
 - `BehaviorAnimationCodec` — the trance/component/exit BCC animations (BCC `0x642CD3D6` is the generic behaviour
   channel; shared home with combat, NOT weave-specific).
 - `SpellweaveCatalog` — per-class `SpellweaveProfile` (ONLY Necromancer so far) + `EnergyMaxForClass`.
-- `HandleGameCharAgentProject.cs` — `SendSprintBar` (0x200E) + the persistent energy loop (`RunEnergyMirror`:
+- `GameServerListener.Buffs.cs` — `SendSprintBar` (0x200E) + the persistent energy loop (`RunEnergyMirror`:
   drain-on-sprint / regen-when-idle / step-aside-while-weaving; sprint drain itself is CLIENT-side, we only mirror).
 
 LEFT (in rough priority):
@@ -176,16 +176,16 @@ LEFT (in rough priority):
 - `Faolan.Core.Database/Tables/ClassCombo.cs`, `Combo.cs`, `CharacterCombo.cs`
 - `Faolan.Core.Database/Repositories/DatabaseRepository.cs` — `GetClassCombos` + `ComboFamilyKey`/`IsRomanNumeral`
 - `Faolan.Importer/Captures/CaptureAbilityImporter.cs` — `DeriveClassCombosAsync` + `ClassComboPrefixes`
-- `Faolan/GameServer/Combat/ComboInput.cs` (parser), `ComboService.cs`
+- `Faolan/GameServer/Combat/ComboActionParser.cs` (parser), `ComboInput.cs` (the `ComboInput` enum), `ComboService.cs`
 - `Faolan/GameServer/Combat/SpellweaveService.cs` — the FSM + trance-meter/energy-drain loop
 - `Faolan.Core.Network/Codecs/Combat/SpellweaveCodec.cs` — reactive-list / stat-gauge / buff-data / fire-stage builders
 - `Faolan.Core.Network/Codecs/Combat/BehaviorAnimationCodec.cs` — trance / component / EXIT BCC animations (0x642CD3D6)
 - `Faolan.Core.Network/Constants/SpellweaveCatalog.cs` — per-class `SpellweaveProfile` + `EnergyMaxForClass` (Necro only)
 - `Faolan/GameServer/GameServerListener.Buffs.cs` — `SendSprintBar` (0x200E) + the persistent energy loop
 - `Faolan/GameServer/GameServerListener.Buffs.cs` — `ApplySpellweaveBuff` (54-byte blob) + `SendBuffRemoval`
-- `Faolan.Tests/SpellweaveCodecTests.cs` + `BehaviorAnimationCodecTests.cs` — 16 golden tests · `Captures/scripts/decode_spellweave.py`
-- `Faolan/GameServer/GameServerListener.cs` — `_spellweave` ctor seams + `PerformSpecialAction` (0x205A) handler
-- `Faolan/GameServer/GameServerListener.Inbound.cs` — `CombatReactiveIIR` add case
+- `Faolan.Tests/SpellweaveCodecTests.cs` + `BehaviorAnimationCodecTests.cs` — 12 golden tests · `Captures/scripts/decode_spellweave.py`
+- `Faolan/GameServer/GameServerListener.cs` — `_spellweave` ctor seams
+- `Faolan/GameServer/GameServerListener.Inbound.cs` — `CombatReactiveIIR` add case + `PerformSpecialAction` (0x205A) handler
 - `Faolan.Core.Network/NetworkClientSession.cs` — weave + energy session state
 - `Faolan.Core.Network/Constants/LevelComboCatalog.cs` — RETIRED (kept as capture-derived level→combo reference)
 

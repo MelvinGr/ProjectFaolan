@@ -83,7 +83,7 @@ spawn/own/command subsystem for ALL pets; combat pets stack the buff + combat-AI
 
 Wired end-to-end. Melvin's steer: `NpcSpawns` are world PLACEMENTS — wrong for a summon-on-demand pet — so
 pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift):
-- `Npc.Data` + `Npc.Level`: the type-level captured stat core, so a creature can be built standalone.
+- `Npc.StatCore` (the `NpcStatCore` side table, incl. `.Level`): the type-level captured stat core, so a creature can be built standalone (the `Npc.Data` blob is retired — the body builds from typed columns).
 - `NpcSpawnBuilder.TryBuildFromType(Npc, handle, pos, rot)`: builds the `FA015807` from the type + a
   caller transform — no `NpcSpawn` instance.
 - `WorldBroadcaster.SpawnPetForPlayer` + `IDatabaseRepository.GetNpcByName`: the spawn-from-type path.

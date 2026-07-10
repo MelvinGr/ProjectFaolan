@@ -211,7 +211,7 @@ namespace Faolan.GameServer.Dialogue
 			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
 			// count (QuestGoalDefinition.RequiredCount), GoalTargetName = the seeded kill target (QuestGoalDefinition.
 			// TargetName - server-side, sourced per quest since it's not on the wire). With both set,
-			// CombatService.AdvanceKillQuests matches a kill of that NPC and advances/completes the quest (e.g. Casilda's
+			// QuestProgressionService.AdvanceKillGoals matches a kill of that NPC and advances/completes the quest (e.g. Casilda's
 			// 13479 = kill 1 "Scavenger Tuut"). A talk/collect goal leaves TargetName null - no kill matching, count 0.
 			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 			var goalRequired = firstGoal is { RequiredCount: > 0 }

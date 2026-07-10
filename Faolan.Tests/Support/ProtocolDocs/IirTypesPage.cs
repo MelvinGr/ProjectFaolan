@@ -33,7 +33,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				if (value < 0x10000)
 				{
 					// A small value can't be a 32-bit name hash - it is a carrier command/method opcode that lives
-					// in this enum for routing (e.g. QueuePetCommand). Flagged, not counted as an IIR type.
+					// in this enum for routing. Flagged, not counted as an IIR type.
 					rows.Add((value, name, "", "command"));
 					commandOps++;
 				}

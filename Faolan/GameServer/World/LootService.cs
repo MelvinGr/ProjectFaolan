@@ -11,9 +11,9 @@ namespace Faolan.GameServer.World
 {
 	// Loot-window interaction flow (loot-all / single-drag / cash / close), decoded in protocol_loot_interaction:
 	//   UL 0x2043 TryLootAll   [loot typetag 0xC87A][bag handle]              -> grant every bag item, then fade
-	//   UL 0x2044 TryLootItem  [typetag][bag handle][display index]           -> grant the one dragged item
+	//   UL 0x2044 CloseLootBag [typetag][bag handle]                          -> drop the window without taking
 	//   UL 0x2045 TryLootCash  [typetag][bag handle]                          -> credit the bag's coins to the wallet
-	//   UL ...    CloseLootBag [typetag][bag handle]                          -> drop the window without taking
+	//   UL 0x2046 TryLootItem  [typetag][bag handle][display index]           -> grant the one dragged item
 	// The bag STATE + the take/fade/close wire side live on WorldBroadcaster (loot bags are world entities); this
 	// service is the orchestration the dispatch switch used to carry inline - it pulls items off the bag via the
 	// broadcaster and grants them through the IEconomyOutbound port (the listener implements both). Extracted out of
@@ -88,7 +88,7 @@ namespace Faolan.GameServer.World
 				_logger.LogDebug("TryLootCash for bag 0x{Bag:X8}: no coins to grant.", bagHandle);
 		}
 
-		// 0x2044 TryLootItem: a single drag of one item out of the loot window.
+		// 0x2046 TryLootItem: a single drag of one item out of the loot window.
 		public async Task HandleLootItem(INetworkClient client, ConanPacket packet)
 		{
 			packet.Body.ReadUInt32(); // loot typetag (0xC87A)

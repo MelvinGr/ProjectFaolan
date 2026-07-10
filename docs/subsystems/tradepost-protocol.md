@@ -1,8 +1,8 @@
 # Tradepost (auction house) + mail protocol
 
 > **STATUS (2026-06-12): ⛔ PINNED — awaiting an in-client render check.** The protocol below is decoded
-> byte-exact and the open + search replies are wired + golden-tested (`Faolan/GameServer/Economy/Tradepost/`,
-> `TradepostResponseTests`). What's unverified is whether the client actually renders the AH window/listings —
+> byte-exact and the open + search replies are wired + golden-tested (`Faolan/GameServer/GameServerListener.Tradepost.cs`
+> + `Faolan.Core.Network/Codecs/Economy/`, `TradepostResponseTests`). What's unverified is whether the client actually renders the AH window/listings —
 > test with the `.ah` GM command (sends `DispatchOpenTradepost` at the player's position). Once it renders,
 > proceed to Step 3 (DB-backed listings + the `Mail`/`MailAttachment` model + buy→mail). Tracked as Gitea issues under `area:economy`.
 
@@ -30,16 +30,17 @@ connection. Mail rides the **same** agent, and a bought item is delivered to the
 
 `DispatchOpenTradepost` is **not** a reply to `TradepostOpen` — the capture shows the opposite order: the player
 **interacts with the auctioneer NPC** (`Interact 0x642CD3D6`) → the server sends `DispatchOpenTradepost` (+ a
-`BankIIR 0x0BA1C1CB`) → *then* the client opens the window and sends `TradepostOpen`, then searches. So the open is
+`BankIIR 0x0BA1C1CB`) → *then* the client opens the window and sends `UpdateItemTimeouts` (`0x2011`, empty body — the
+AH-window-open op; the nominal `TradepostOpen 0x200F` is **not** observed in the captures), then searches. So the open is
 triggered by the NPC interaction (PoC: the `.ah` GM command sends it at the player's position); replying to
-`TradepostOpen` would be circular and never bootstraps the window. The access-point `maxRadius` (15.0) is a
+the client's window-open op would be circular and never bootstraps the window. The access-point `maxRadius` (15.0) is a
 client-side proximity check, so the access position must be within 15 units of the player.
 
 ## Method map
 
 | dir | method | name | body |
 |-----|--------|------|------|
-| C→S | `0x2011` | TradepostOpen | empty |
+| C→S | `0x2011` | **UpdateItemTimeouts** (the AH-window-open op; `TradepostOpen 0x200F` is not observed) | empty |
 | C→S | `0x200D` | **TradepostItemSearch** | the query (below) |
 | C→S | `0x200E` | **TradepostBuyItem** | `[saleId:u64][searchResultId:u64]` |
 | C→S | `0x2010` | TradepostClose | empty |
@@ -141,7 +142,8 @@ itemInstanceId, stat_list = `{26: qty}`, item_data = the item's `ProtoAcgItem`) 
 search results, the AH window, and the mail item.
 
 **Status (2026-06-13):** the `Mail` + `MailAttachment` DB model and the **`DispatchMailMessage` builder are DONE +
-byte-exact** (`MailMessageCodec.Build`, `Faolan/Migrations/*AddMail`). Full wire grammar decoded from the get-mail
+byte-exact** (`MailMessageCodec.Build`; `Mail`/`MailAttachment` tables in `Faolan.Core.Database/Tables/`, now folded
+into the squashed `InitialCreate` migration). Full wire grammar decoded from the get-mail
 capture (the 629 B base #1604/#1611 and the 754 B attachment #1607):
 ```
 [mailId:u64]
@@ -183,7 +185,7 @@ given price/qty + the origin **bank slot**). The listed item **STAYS in its bank
 the seller's bank cell by `(SellerName, BankSlot)`). There is NO direct tradepost reply (the client re-polls).
 
 The seller addresses their own listing by the **origin bank slot** (NOT the saleId - that's for buying), so the
-listing carries a `BankSlot` (migration `AddTradepostListingBankSlot`).
+listing carries a `BankSlot` (`TradepostListing.BankSlot`; schema now in the squashed `InitialCreate` migration).
 
 | dir | method | name | body | behaviour |
 |-----|--------|------|------|-----------|
@@ -201,7 +203,7 @@ lack the retail item-type search id), so a normal item-type search won't necessa
 `Items.Id` (`OnDelete Restrict`) so a listing can't be filed under a non-existent item. This fixed an import bug
 where 242 of 243 captured listings carried a placeholder `ItemId=30000` (sharing one `ItemHandle`), which the
 client collapsed into a single "Torn Rags" row in every category — those broken listings were deleted and the FK
-added (commit `2887e17`). NOTE the instance identity (`Template`/`Data1..4`) still lives on the row and is distinct
+added (`DatabaseContext` `TradepostListing` → `Items` FK, `DeleteBehavior.Restrict`). NOTE the instance identity (`Template`/`Data1..4`) still lives on the row and is distinct
 from the `ItemId` search key. (Open: the in-client "Torn Rags in every category" browse persisted after the DB fix —
 likely a client AH cache or a non-listings category-browse path, not the listing data.)
 
@@ -210,7 +212,7 @@ likely a client AH cache or a non-listings category-browse path, not the listing
 **mail-pending overlay** (`0x201c` stat 0 = flags **`0x8001`**, capture F500), it only leaves the sender's bank when
 the recipient TAKES it (and the overlay clears if the sender CancelMails it - F404 flag → `1`). Replies
 `DispatchSendMailResult`; an unknown recipient is rejected (success=0). The mail remembers the sender's origin bank
-slot (`Mail.SenderBankSlot`, migration `AddMailSenderBankSlot`). Grammar:**
+slot (`Mail.SenderBankSlot`; schema now in the squashed `InitialCreate` migration). Grammar:**
 ```
 [u16+recipientName ascii][u16+bodyText ascii][money:u64][0x000007E2:u32][bankItemSlot:u32]
 ```

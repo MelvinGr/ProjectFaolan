@@ -687,7 +687,7 @@ namespace Faolan.Importer.Cli
 
 		// Decode a skeleton (RDB type 1010002) and print key bone world positions (#275 Phase 3 skeleton validation).
 		// Emit a SKINNED glb for a skinned model (body/equipment): geometry + the character skeleton as a glTF skin.
-		// --report-arg <meshIndexId>  --out <dir>  [--skeleton <id>, default 14853].
+		// --report-arg <meshIndexId>  --out <dir>  [--skeleton <id>, default auto-select by bone palette].
 		private static void RdbRig(string rdbDir, string arg, string? outDir, string? skelArg)
 		{
 			using var rdb = new RdbReader(rdbDir);

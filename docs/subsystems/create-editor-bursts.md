@@ -16,12 +16,15 @@ verbatim. **Status: `InitialBurst` is fully constructed, and all structured `*II
 > as it stood while the burst existed — kept as the record of what those record types are.
 
 The remaining
-verbatim bursts are the Knubot conversation (#188) and the intro-cutscene world-entry
+verbatim burst is the intro-cutscene world-entry
 `RetailCreateWorldEntryBurst`, whose construction is now tracked separately under **#234** (its ScryScript +
 despawn + regen + BehaviorCC records — 146 in all — are already constructed; the FA015807 spawns + MoveTask/AI
-choreography remain, gated on #185/#190). This doc is the decode that makes the construction possible.
+choreography remain, gated on #185/#190). The former verbatim beach NPC intro conversation
+(`RetailNpcConversationBurst`/`SendNpcIntroConversation`) has since been retired — the beach click now routes
+through the live constructed `ConversationService` (#188, `d208fc82`). This doc is the decode that makes the
+construction possible.
 
-Dissector: `Captures/scripts/decode_create_editor.py` (validated across all seven `*create*.tshark.json` captures).
+Dissector: `Captures/scripts/decode_create_editor.py` (default-globs and validates across every `*create*.tshark.json` capture).
 
 ## 1. `0x2000` is multiplexed — split by endpoint-class pair first
 
@@ -74,7 +77,7 @@ create-specific to decode, only builder wiring to do:
 - **Key finding for #189:** the editor avatar is just a `SimpleCharFullUpdate` spawn of the player with the
   chosen looks — `NpcSpawnBuilder` + the appearance work ([[character_appearance_morphs_unused]]) already
   cover its construction. The remaining work is **wiring**, not new decoders.
-- **Fixed editor pose:** the avatar's transform is **byte-identical in all seven captures** —
+- **Fixed editor pose:** the avatar's transform is **byte-identical across the create captures** —
   `pos=(262.931, 6.014, 280.970)`, `rot=(0, 0.98769, 0, 0.15643)` (≈18° about Y). The editor always spawns
   the avatar on the same pedestal; only `playfield_instance` (session) and the embedded looks differ.
 
@@ -156,10 +159,13 @@ create-specific to decode, only builder wiring to do:
      `CreateWorldCutsceneScripts`; plus the 3 `id`-frame `GameActionListIIR` (0xF508F4C1) via
      `GameActionListCodec` and `CharInPlayIIR` in `PostReadyBurst`. **Correction:** an earlier claim of "no
      StatIIR/… verbatim carrier remains in ANY burst" was WRONG — it was blind to the byte-per-line carriers.
-     `WorldEntryBurst` still emits **34 verbatim decoded-record carriers with capture-specific NPC/dynel handles**
-     (27× GameActionListIIR + 7× StatUpdateIIR, frames 0x00017E0x/2x/3x/D0); those belong to the **#234
-     intro-cutscene reconstruction** (they must be re-addressed to live entities, not merely reframed), not this
-     header-residue cleanup, so they are left as-is.
+     `RetailCreateWorldEntryBurst` (now a test-support replay under `Faolan.Tests/Support/`) still emits
+     **decoded-record carriers with capture-specific NPC/dynel handles** — 7× StatUpdateIIR (frames
+     0x00017E2x/ED0, built via `CreateEditorRecordBuilder.BuildStatUpdateIir`) — plus the larger verbatim
+     FA015807-spawn / MoveTask blobs; those belong to the **#234 intro-cutscene reconstruction** (they must be
+     re-addressed to live entities, not merely reframed), not this header-residue cleanup, so they are left
+     as-is. (The lone `WorldEntryBurst` GameActionListIIR is now the constructed `id`-frame record counted
+     above, not a capture-handle carrier.)
 
    **`ScryScriptIIR` now CONSTRUCTED (#223):** the two CreationScript records (the "Slave Galley" PreloadAssets
    step + "PlayOrSkip") are built by `ScryScript.BuildStep`, and the post-morph `StartScriptGroupOnClient`
@@ -167,7 +173,9 @@ create-specific to decode, only builder wiring to do:
    built by `SendA36DCallback`). All byte-exact (`ScryScriptCreateBurstTests`). With `BehaviorControlCenterIIR`
    long form + `RegenIIR` (already done), **no `*IIR` record type in the create-editor bursts is verbatim**.
 
-   **Still verbatim** (non-IIR / deferred): `ApplySpell` and `RetailNpcConversationBurst` (the Knubot dialogue
-   blobs — the #188 conversation-VM track). The intro-cutscene `RetailCreateWorldEntryBurst` is now constructed
+   **Still verbatim** (deferred): `ApplySpell` (the `MagicBuffIIR` setup blob still emitted verbatim in the
+   CreationScript burst, `CreateFlowService` line 930). (The former verbatim beach NPC intro conversation,
+   `RetailNpcConversationBurst`/`SendNpcIntroConversation`, was retired — the beach click now routes through the
+   live constructed `ConversationService`, #188/`d208fc82`.) The intro-cutscene `RetailCreateWorldEntryBurst` is now constructed
    record-by-record under **#234** (ScryScript + despawn + regen + BehaviorCC done; FA015807 spawns + MoveTask/AI
    remain, gated on #185/#190) — end-to-end in-client validation still pends the cutscene arming (#1).

@@ -228,9 +228,9 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// Applies an aggroed NPC's swing to the target player: reduce the player's live vitals and push a 0x96B8DC59
-		// update so their HP bar drops. The NPC's attack ANIMATION packet isn't decoded yet (see
-		// protocol_stats_and_combat), so this delivers the damage effect only.
+		// Applies an aggroed NPC's swing to the target player: play the decoded attack-animation ack
+		// (SendNpcAttackAnimation), then reduce the player's live vitals and push a 0x96B8DC59 update so their HP bar
+		// drops.
 		private async Task ApplyNpcAttack(WorldEntity npc, WorldEntity target)
 		{
 			var client = target?.Client;

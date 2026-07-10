@@ -176,7 +176,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TryConstructKnubotRecord_ReturnsFalseForUnhandledSubOpcode()
 		{
-			// a non-constructed sub-opcode (here a quest MainQuestUpdate 0x504B7924) must stay on the substitution path
+			// a non-constructed sub-opcode (here a quest QuestLogList 0x504B7924) must stay on the substitution path
 			var record = Convert.FromHexString("0000000c504b79240000c350110099bd00");
 			var packet = WrapInPacket(record);
 			Assert.False(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out _));

@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Importer.Captures
 {
 	// Harvests the summonable PET creatures (#307) out of the captures so a player-cast pet-summon spell renders.
-	// Unlike mounts (CaptureMountImporter, which parks a creature as an NpcSpawn PLACEMENT under a sentinel map), a
+	// Like mounts (CaptureMountImporter, which is also lifted onto the creature TYPE since #307/#244), a
 	// pet is done the RIGHT way (#244): its captured FA015807 stat core + equipment + morphs are lifted onto the creature TYPE,
 	// and the server spawns it FROM THE TYPE at the summoner's position (NpcSpawnBuilder.TryBuildFromType) - no world
 	// placement at all. Resolved at summon time by NAME (SummonPetForPlayer -> GetNpcByName), the name PetSummonCatalog

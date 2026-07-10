@@ -63,7 +63,8 @@ namespace Faolan.Tests
 			Assert.Equal("96c467400000c3500002324d00004385599a40bd91694392cccd024385599a40bd91694392cccd00000000bf3504f2000000003f3504f40000", Convert.ToHexStringLower(body));
 		}
 
-		// The live overload computes the trailer path-length as the from->last-waypoint distance.
+		// The live overload computes the trailer path-length as the total distance walked (the sum of the segments;
+		// for this straight 2-point path that equals the from->last-waypoint distance).
 		[Fact]
 		public void PathBody_LiveOverload_ComputesPathLengthAndStaysWellFormed()
 		{

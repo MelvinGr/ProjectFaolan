@@ -131,7 +131,7 @@ namespace Faolan.PlayerAgent
 					await SendGameServer(client);
 
 					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on
-					// login. Body is built from the named GameTweaks catalog; see GameTweaks.cs for the wire format.
+					// login. Body is built inline from the named-tweak list below; the wire format is locked byte-for-byte by GameTweaksTests.cs.
 					var gameTweaks = new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07,
 						[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07]);
 
@@ -177,7 +177,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Character = newCharacter;
 					// The character's real DB id IS the client instance for the whole create flow: the client
 					// opens both the creator and the world GameServer connections with it, and the editor/world
-					// bursts are constructed with it at send time (see Burst + SendBurst in PacketBurstHelper).
+					// bursts are constructed with it at send time (see the burst builders in CreateFlowService).
 					// This mirrors retail, where the create session uses one generated instance throughout
 					// (there is no temporary const). ClientInstance is no longer a Character FK, so handing out
 					// the real id is safe.

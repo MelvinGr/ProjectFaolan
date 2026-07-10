@@ -289,11 +289,8 @@ namespace Faolan.Importer.Extractors
 			return map;
 		}
 
-		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
-		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
-		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
-		// the hash). PlayerSpawnReader scans the body for the character message, so this works on any packet
-		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
+		// Recovers (template -> CapturedItem) from a vendor window (DispatchShopData 0x2033). Each ware carries the
+		// same ProtoAcgItem identity (quad + template + hash); ShopContentCodec.Parse yields the stock entries.
 		private static void ExtractFromShopData(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			if (packetBytes.Length < 12 + 32)
@@ -312,6 +309,11 @@ namespace Faolan.Importer.Extractors
 				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Hash));
 		}
 
+		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
+		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
+		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
+		// the hash). PlayerSpawnReader scans the body for the character message, so this works on any packet
+		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
 		private static void ExtractFromSpawnEquipment(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			if (packetBytes == null || packetBytes.Length < 12)

@@ -45,8 +45,8 @@ namespace Faolan.Core.Network.Constants
 
 		// Per-class starting WEAPON (main-hand-left slot 0x06), harvested from the *create* captures (#220/#276/#286).
 		// Coverage is only the classes a create dump actually shows armed - the rest start unarmed until more create
-		// captures land. Casters deliberately start unarmed (the earlier Necromancer=Broken Bottle was a login-capture
-		// mis-harvest, absent from every create dump); Assassin is the one create-verified entry (Strie).
+		// captures land. The create-verified armed entries are Assassin (Strie), Necromancer and Tempest of Set, each
+		// with the class's create-capture main-hand (see the per-entry notes below).
 		public static readonly ImmutableDictionary<Class, uint> StartingWeapon = new Dictionary<Class, uint>
 		{
 			[Class.Assassin] = 3735601, // Marlin Spike

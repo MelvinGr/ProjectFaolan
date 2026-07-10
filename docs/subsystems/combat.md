@@ -43,19 +43,21 @@ world tick (`WorldState.Tick`) drives two independent timers off the death:
 1. **corpse linger** (`WorldEntity.CorpseLingerSeconds`, ~3s): the corpse stays the dying creature so the
    client plays its death animation. When it elapses the tick emits `NpcCorpseLootable` ->
    `WorldBroadcaster.ConvertCorpseToLoot`, which (decoupled, #246) rolls the drop, spawns a **SEPARATE** loot bag
-   (its own handle, via `SpawnLootBagAt` - the same standalone-bag path as `.spawnbag`) at the death spot, then
+   (its own handle, via `SpawnLootBagAt` - the standalone-bag path) at the death spot, then
    despawns the corpse. The bag lives/loots/expires independently (a `ForLoot` entity, tick-expired) and SURVIVES
    the NPC's respawn. (Old `MakeCorpseLootable` reused the NPC handle in place - removed; it pinned the respawn to
    the death spot, #246.) Empty drops just despawn the corpse.
 2. **respawn** (`RespawnDelaySeconds`, ~15s): revives the NPC at its spawn point and re-renders it
-   (`NpcRespawned`, which re-adds the handle to the viewers' Known set, #246/#245). **EXCEPT** summoned `.spawnnpc` NPCs
-   (`WorldEntity.NoRespawn`, set in `SpawnNpcForPlayer`): once dead they don't revive — the post-death timer runs
+   (`NpcRespawned`, which re-adds the handle to the viewers' Known set, #246/#245). **EXCEPT** summoned NPCs
+   (`WorldEntity.NoRespawn`, set in `SpawnNpcForPlayer` — the pet-summon / test-spawn path): once dead they don't
+   revive — the post-death timer runs
    as a despawn (`TickPostDeathDespawn` → `LootExpired` fade+remove) so a test mob fades out instead of coming
    back (commit `df8f90d`, a GM QoL Melvin asked for).
 
-`.delete <handle|selected>` (GM): the DURABLE removal — despawns the selected entity live AND deletes its
-`NpcSpawns` row(s) (`IDatabaseRepository.DeleteNpcSpawns`) so it never re-renders, unlike `.despawnnpc` (live-only,
-comes back on relog). The tool for scrubbing captured import artifacts (phantom players baked into the pcap). A
+`.delete [<handle>]` (GM, `DeleteCommand`): the DURABLE removal — despawns the selected entity live AND deletes its
+`NpcSpawns` row(s) (`IDatabaseRepository.DeleteNpcSpawns`) so it never re-renders, unlike a plain live despawn
+(`DespawnEntityForPlayer`, which comes back on relog). The tool for scrubbing captured import artifacts (phantom
+players baked into the pcap). A
 neutral named entity deletes every same-name row on the map; a faction mob only the rows at its spot (commit `576c007`).
 
 Death trigger (#204 NPC death anim + #214 player release screen) — **WIRED 2026-06-19 (commit f5bcb5e).** A
@@ -108,7 +110,7 @@ swing actually animates.
 ## NPC chase / aggro movement (#190, 2026-06-15)
 
 A hostile NPC with a player inside `NpcAggroRange` (20u) chases it: `WorldState.Tick` steps the NPC toward
-the target (horizontal, `NpcMoveSpeed` 12u/s, keeping terrain Y) and `WorldBroadcaster.BroadcastNpcMove`
+the target (horizontal, `NpcMoveSpeed` 7u/s, keeping terrain Y) and `WorldBroadcaster.BroadcastNpcMove`
 sends a per-tick **MoveTask transform** (`MoveTaskCodec.BuildBody`, the 61-byte `0x02` "orient" form:
 origin->this-tick position, facing travel direction) so nearby viewers watch it move. In melee range
 (`NpcMeleeRange` 3u) it swings (the attack-animation ack above). **Leash:** past `NpcLeashRange` (40u) from
@@ -172,17 +174,20 @@ how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-c
 Two distinct mid-session grant packets, both on the GameCharInterface conversation (same class pair), each
 byte-exact:
 - **`0x2052 DispatchAddSpecialAbility`** — grants a catalog **ability** (the melee/utility kit). Body = the 81-byte
-  ability struct. `SendAbilityGrant`/`BuildAbilityGrantBody`, used by login `GrantStartingAbilities`. GM:
-  `.grantability <id>` (catalog via `.abilitylist`).
+  ability struct. `SendAddSpecialAbility`/`AbilityGrantBody.BuildAddSpecialAbilityBody`, used by login
+  `GrantCharacterAbilities` (post-0x2024, from `FlushPendingPost205FFollowUp`).
 - **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
-  invariant across all 68 captured packets. `SendLearnSpell`/`BuildLearnSpellBody` (decode
-  `Captures/scripts/decode_learn_spell.py`, golden `LearnSpellTests`). GM: `.learnspell <id>`.
+  invariant across all 68 captured packets. `SendLearnSpell`/`AbilityGrantBody.BuildLearnSpellBody` (decode
+  `Captures/scripts/decode_learn_spell.py`, golden `LearnSpellTests`).
+
+(The GM test commands `.grantability`/`.abilitylist`/`.learnspell` were removed in the "remove 25 GM test commands"
+cleanup — 2026-07-05; the underlying wire builders above are still live.)
 
 **Spell granting / persistence (#74).** Spells are learned per-character: the captures show a caster's whole
 learned set is re-sent on every world entry (NecroL80 always relearns her 5, DemoL80 his 9), so it is modelled like
 the ability re-grant. The set lives in the per-character `CharacterSpell` table (CharacterId, SpellId);
-`GrantStartingSpells` replays it on login (after `GrantStartingAbilities`, via `SendLearnSpell`), `.learnspell`
-persists into it, and `CaptureSpellImporter.ImportLearnedSpellsAsync` seeds captured characters from the grants in
+`GrantCharacterSpells` replays it on world entry (BEFORE the FullChar snapshot, via `SendLearnSpell`, so the
+client absorbs them silently — see `SendWorldEntry`), and `CaptureSpellImporter.ImportLearnedSpellsAsync` seeds captured characters from the grants in
 the pcaps (attributed via the grant's RpcHeader **receiver instance** = the character id; the GameCharAgent→
 GameCharInterface class pair disambiguates the 0x200A opcode collisions). Level-up auto-grant is NOT implemented —
 captures don't say which spell is learned at which level. **In-client verification pending** (needs-testing on #74).
@@ -194,9 +199,9 @@ oracle; deferred under #73.
 ## Buffs: ApplySpell self-buffs, the mount buff, the login shield (#26 / #221)
 Buffs ride **`0x6B87E316` ApplySpell (MagicBuff)**, the same op as a combat cast. A **self-buff** is
 `applyTo == applyFrom == the entity's own handle`:
-`[subop][0000C350][applyTo][u16 seq][spellId u32][0000C350][applyFrom][data]`. `PostReadyFollowUp.ApplySpell`
-builds it and registers `applyTo == applyFrom` casts in `WorldEntity.ActiveBuffs` (so `.buffs` / `CancelBuff`
-`0x201E` / the expiry tick track them). The **wire spell id is `(baseId << 8) | rank`** — apply uses rank `00`,
+`[subop][0000C350][applyTo][u16 seq][spellId u32][0000C350][applyFrom][data]`. `ApplySpell`
+builds it (via `SendMagicBuffIir`, which registers `applyTo == applyFrom` casts in `WorldEntity.ActiveBuffs` so
+the client-initiated `CancelBuff` `0x201E` and the expiry tick can track them). The **wire spell id is `(baseId << 8) | rank`** — apply uses rank `00`,
 remove uses rank `01`; the payload embeds the same `baseId` at offset **[22..26]**.
 
 **Mount buff — fully captured** (`NecroL80_mage-necromancer_login_mount_move_dismount`, the only 2
@@ -205,24 +210,26 @@ ApplySpell packets in it): mount up = self ApplySpell **`0x31EB1500`** + a **54-
 **buff** apply/remove is a real oracle now — distinct from the demol80 `0x3BAD7D` summon. The mount **entity
 spawn** is still gated on the mid-session-spawn blocker (#26), so the buff renders but the horse model does not.
 
-**Persistent login shield (#221).** `GrantStartingBuffs` re-applies a shield self-buff to **every** character
-(class-agnostic) in `FlushPendingPost205FFollowUp`, right after the ability/spell re-grants. That flush is also
-re-armed on teleport/changemap re-entry, so the buff is re-asserted on **each playfield change** as well.
-**INTERIM content:** spell `0x02387E00` (Scythe Shield — the buff our existing ApplySpell payload already encodes;
-base `0x02387E`, apply rank `00`). The wire grammar is validated against the captured mount buff above, so the
-shape is sound, but **"Shield of the Risen" is in no capture** — its exact id/payload is unknown. **In-client
-verification pending** (needs-testing on #221): confirm a server-pushed self-buff renders the intended shield.
+**Persistent login shield (#221) — CURRENTLY DISABLED.** The `GrantStartingBuffs` call in
+`FlushPendingPost205FFollowUp` (which re-applied a class-agnostic shield self-buff to every character, right after
+the ability/spell re-grants, and re-armed on each teleport/changemap re-entry) is **commented out as of
+2026-06-19** (`GameServerListener.WorldEntry.cs`): the capture-proven id `0x000B9000` renders in-client as the
+"Exhausted" DEBUFF and, applied persistently with no working expiry, never clears. It stays off until the
+expected duration/clear-point is pinned. The wire grammar is validated against the captured mount buff above, so
+the shape is sound, but **"Shield of the Risen" is in no capture** — its exact id/payload is unknown.
+**Blocked on #221** (buff expiry) before re-enabling.
 
 ## Starting gear (#220)
-A brand-new beach character is seeded its slave outfit in `RetailLoginReplay.EnsureBeachStarterEquipment`, all
-harvested from the `*create*` captures (one row, only if absent — an existing equipment row is left as the player
-left it):
-- **Wrist:** Slave Manacles (3361557, universal).
-- **Clothing by sex** (`Character.Sex`: 0 = male, 1 = female): male = bare chest + loincloth (legs); female = gown
-  (chest) + matching bottom (legs). Garment colour is randomised per character in retail, so one representative set
-  is used per sex.
-- **Weapon by class** (main-hand-**left** slot 0x06, `StarterClassWeapon`): Necromancer → Broken Bottle (2 create
-  dumps), Assassin → Marlin Spike. **Per-class, NOT per-archetype** (Conqueror + Guardian are both Soldiers and do
+A brand-new beach character is seeded its slave outfit in `EnsureBeachStarterEquipment`
+(`GameServerListener.WorldEntry.cs`), from the `StartingData` constants harvested from the `*create*` captures
+(one row, only if absent — an existing equipment row is left as the player left it):
+- **Wrist:** Slave Manacles (`StartingData.StartingWristItem` = 3361557, universal).
+- **Clothing by sex** (`Character.Sex`): male = bare chest + Red Loincloth (legs, `StartingMaleLegsItem`); female =
+  gown (chest) + matching bottom (legs), one of `StartingFemaleOutfits`. Garment colour is randomised per character
+  in retail, so one representative set is picked at random per female character.
+- **Weapon by class** (main-hand-**left** slot 0x06, `StartingData.StartingWeapon`): Assassin → Marlin Spike,
+  Necromancer → Broken Bottle (0x33D0A0), Tempest of Set → Broken Bottle (215711, the other bottle). **Per-class,
+  NOT per-archetype** (Conqueror + Guardian are both Soldiers and do
   not share a weapon). Coverage is only the classes the create dumps contain; the rest start unarmed. The Fleshy
   Club (a level-2 char) and Broken Oar (a login capture) are NOT create-flow starters and are excluded. In-client
   verification pending (needs-testing on #220).

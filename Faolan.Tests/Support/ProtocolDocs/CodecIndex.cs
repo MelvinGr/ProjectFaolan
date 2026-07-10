@@ -15,7 +15,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	public sealed class CodecIndex
 	{
 		// byte-exact test signals: golden loads + hex/byte asserts. "ToHex" covers both Convert.ToHexString and the
-		// local ToHex() helpers several test classes define (CharacterStatBlockTests, WorldDespawnTests, ...).
+		// local ToHex() helpers several test classes define (CharacterStatBlockTests, CombatTests, ...).
 		private static readonly string[] ByteExactMarkers = { "Golden.Bytes", "ToHex", "TestPaths.Asset", "SequenceEqual" };
 
 		// A [Fact]/[Theory] method: the attribute(s), then a public (async) returntype Name(.

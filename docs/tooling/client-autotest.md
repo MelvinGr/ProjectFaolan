@@ -10,7 +10,7 @@ Read by the **`LauncherWindow_c` constructor** (`FUN_011cf290`, which references
 `FUN_010d0c60`, up to 100 records of stride 0x20); each record's first field is matched against **`Server`**,
 **`Login`**, **`Character`** and drives the auto-login → character-enter flow (the `Character` value is stashed
 at `*(DAT_0297d210 + 0x60)`). So `autotest.txt` does the same job as `Faolan.ClientLauncher`'s
-`-username`/`-password`/`-charname`/`-charpf` flags — get the client into the world unattended — just via a
+`--username`/`--password`/`--charname` flags — get the client into the world unattended — just via a
 file instead of command-line flags. (`-nautotest` disables it.) **It is not a place to put assertions.**
 
 ## 2. The TEST-RESULT channel: `<testreportscriptcommand>`

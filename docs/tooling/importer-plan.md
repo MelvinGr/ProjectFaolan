@@ -10,7 +10,7 @@ server carries no embedded data blobs). It is **module-based**: every importable
 per-table delta).
 
 One tracked follow-up remains (the `TODO(importer step 2a)` markers): `WriteMode` is honoured at the
-orchestration level (npcs/world-bursts/conversations) but the leaf `CaptureX` importers still do their
+orchestration level (npcs/conversations/map-loot) but the leaf `CaptureX` importers still do their
 inherent upsert for `insert`/`upsert` — threading `ctx.Mode` into each is the open item (modules advertise
 their `SupportedModes` + warn).
 
@@ -24,10 +24,9 @@ the folders are organisational):
 | `Cli/` | `ImportCli` (parse + load + migrate), `ImportRunner` (transactional run + delta), `ModuleRegistry`, `ImportModule`/`ImportContext` abstractions, `ReportCli`, `TableSnapshot`. |
 | `Modules/` | The `IImportModule` definitions (one class per `--only`/`--skip` token). |
 | `Captures/` | Capture reading (`TsharkCaptureReader`, `NamedCapture`), the shared `ImportOps` orchestration, and the per-subsystem `CaptureX` importers. |
-| `Extractors/` | Packet-grammar extractors (conversations, NPC spawns/spells, patrol paths, quests, world objects, world bursts, archetypes). |
+| `Extractors/` | Packet-grammar extractors (conversations, NPC spawns/spells, patrol paths, quests, world objects, per-map loot pools, item-hash harvesting). |
 | `Rdb/` | Client-RDB readers/importers (opt-in, require `--rdb`). |
-| `Tsv/` | Ellatha scrape backfills (spell levels/combos). |
-| `Reports/` | Read-only diagnostics (burst coverage). |
+| `Tsv/` | Ellatha + AoC-wiki scrape backfills (spell/combo levels, class↔spell access). |
 
 ## Module abstraction
 
@@ -64,27 +63,35 @@ Capture-sourced (default group, run in dependency order):
 | Module | Depends on |
 |---|---|
 | `listings` | — |
+| `stock-phrases` | — |
 | `items` | — |
 | `maps` | — |
 | `spells` | — |
+| `dot-effects` | `spells` |
 | `abilities` (+ the rehomed ability-slot seed) | — |
-| `starting-spells` | — |
+| `class-spells` | — |
 | `characters` | `items` |
-| `conversations` | — |
+| `conversations` (clean rebuild, overwrite-only) | — |
 | `character-state` (wallets, hotbar) | `characters` |
 | `learned-spells` | `characters`, `spells` |
+| `character-abilities` (+ combo books) | `characters`, `abilities` |
+| `character-quests` | `characters`, `quests` |
+| `character-bank` | `characters`, `items` |
 | `shops` | — |
-| `npcs` (spawns + types + patrol + npc-spells + spell links) | — |
+| `npcs` (spawns + types + patrol + npc-spells + spell links) | `characters` |
 | `world-objects` | — |
-| `world-bursts` | — |
+| `map-loot` (per-map loot pool, overwrite-only) | `items` |
 | `quests` (definitions + the hand-decoded seed steps) | — |
-| `mounts` (opt-in via `--only mounts`) | — |
+
+Opt-in capture-sourced (run only when named via `--only`): `mounts`, `pets`, `recipes`.
 
 RDB-sourced (require `--rdb`, **not** in the default group — opt-in via `--only`):
-`rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-spells`, `rdb-maps`, `rdb-lua`,
-`rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt).
+`rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-appearance`, `rdb-spells`, `rdb-abilities`,
+`rdb-combos`, `rdb-maps`, `rdb-lua`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt).
 
-TSV-sourced (run if the file exists): `ellatha-levels`, `ellatha-combos`.
+TSV-sourced (default group; each self-skips if its `.tsv` is absent): `ellatha-levels`, `ellatha-combos`,
+`wiki-class-spells`, `wiki-spell-levels`. Plus `starter-spell-levels` — capture-sourced but registered late
+so it overrides the scraped spell levels with the level-1 create truth.
 
 ### Seed data has an explicit home
 
@@ -108,8 +115,9 @@ Rules and edge cases:
 
 - **Per-module support.** Not every module supports every mode (`SupportedModes`). Conversations are *always*
   a clean rebuild (handle-keyed stale rows must be purged), so it advertises `overwrite` only. Characters
-  support `insert`/`upsert`; `overwrite` is dangerous (cascades to 12 child tables incl. live player
-  progress) — gated behind `--force`.
+  are **insert-only** today (`SupportedModes = {insert}`, existing names never overwritten); adding
+  `upsert` and an `overwrite` guarded by `--force` (it cascades to 12 child tables incl. live player
+  progress) is the tracked step-2a follow-up.
 - **Scope of `overwrite` = the module's own tables only.** It must never touch another module's data. The NPC
   reseed models this (it wipes only `NpcSpawns`/morphs/equipment/patrol, leaving the Tortage prune and
   `NpcSpells` intact). The committed seeds (beach burst 4010, pruned world set) stay exempt.
@@ -127,8 +135,9 @@ Paths
   --captures <dir>     default: <repo>/Captures
   --rdb <dir>          client RDB dir (enables rdb-* modules)
 
-Selection (mutually exclusive; default = all capture + tsv modules)
-  --all                every module whose input is present (capture + tsv; rdb only if --rdb given)
+Selection (mutually exclusive; default = every capture + tsv module)
+  (no flag)            the default set: every InDefaultSet module (capture + tsv). RDB and the opt-in
+                       capture modules (mounts/pets/recipes) are NEVER auto-included — name them with --only.
   --only a,b,c         run just these modules (+ their dependencies), comma-separated
   --skip a,b,c         run the default set minus these
   --list               print every module name + description, then exit
@@ -138,12 +147,14 @@ Modifiers
   --mode <m>           insert | upsert (default) | overwrite — global write strategy
                        per-module override: --mode npcs=overwrite,items=insert
   --force              permit overwrite on guarded modules (e.g. characters)
+                       (parsed onto ImportContext.Force; no module consumes it yet — step-2a)
   --cdn <url>          rdb-respawns CDN base (module-specific)
   --store <dir>        rdb-respawns blob archive (module-specific)
   --dump-templates <d> rdb-items: dump decrypted templates (module-specific)
 
 Reports (read-only, bypass the import runner)
-  --report conversation-states | burst-coverage | anim <Name> | worldobj <name>
+  --report <name>      e.g. conversation-states | anim | worldobj | spell-fields | rdb-assets
+  --report-arg <v>     the target a report needs (NPC name / id / ...), e.g. --report anim --report-arg Casilda
 ```
 
 ## The `--dry-run` mechanism
@@ -162,18 +173,18 @@ else        await tx.CommitAsync();
 ```
 
 - SQLite honours the rollback across every module, including the `ExecuteSqlRaw` DELETEs used by the NPC
-  reseed, so `--dry-run --only npcs` accurately shows "removed N, added M" then reverts.
+  reseed, so `--dry-run --only npcs --mode npcs=overwrite` accurately shows "removed N, added M" then reverts.
 - `TableSnapshot` counts **all** EF-mapped tables (so new tables are picked up automatically) — the delta is
   complete.
-- The CDN-fetching `rdb-respawns` module has a side effect outside the DB (writing blobs to `--store`); under
-  `--dry-run` it guards on `ctx.DryRun` and skips the disk write. This is the one place a module reads the
-  dry-run flag.
+- The two modules with a side effect outside the DB guard on `ctx.DryRun` and skip the disk write under
+  `--dry-run`: the CDN-fetching `rdb-respawns` (writing blobs to `--store`) and `rdb-items` (dumping decrypted
+  templates to `--dump-templates`). These are the only two places a module reads the dry-run flag.
 
 ## Diagnostics (`--report`)
 
-Read-only inspection modes are **not** imports and don't share the import runner. They are grouped under
-`--report <name>` (`conversation-states`, `burst-coverage`, `anim <Name>`, `worldobj <name>`), open the DB
-read-only, and never write — independent of `--dry-run`.
+Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
+`--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`, … — the report's
+target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions
 

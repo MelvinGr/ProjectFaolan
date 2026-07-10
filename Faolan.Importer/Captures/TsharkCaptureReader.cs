@@ -17,7 +17,7 @@ namespace Faolan.Importer.Captures
 	// here - byte-exact, validated against the dump's own Crc32 (memory protocol_conversation_routing).
 	//
 	// On-wire packet = [u32 totalLen][u32 crc32][u32 headerLen][header][body], header =
-	//   0x0a <vlq len> <sender endpoint> 0x12 <vlq len> <receiver endpoint> 0x20 0x00
+	//   0x0a <vlq len> <sender endpoint> 0x12 <vlq len> <receiver endpoint> <opcode : u16 big-endian>
 	// endpoint = 0x0d <class : u32 LITTLE-endian> 0x10 <instance : varint>   (instance omitted when absent)
 	// crc32 = CRC32 over [headerLen][header][body].
 	public static class TsharkCaptureReader

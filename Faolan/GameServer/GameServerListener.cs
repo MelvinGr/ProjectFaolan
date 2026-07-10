@@ -54,7 +54,7 @@ namespace Faolan.GameServer
 													 "key=&quot;^4L2&amp;#36;dU5AGjcTX_xJ[*Q&quot; &gt;\" /><parameter value=\"7;&lt;localized id=&quot;700&quot; " +
 													 "category=&quot;55200&quot; flags=&quot;&quot; key=&quot;MpRf.Cx.%^MGdFXT&amp;quot;9X(&quot; &gt;\" /></remoteformat>";
 		// Tradepost (auction house) + mail state-mutating ops, folded off the former TradepostService onto the
-		// listener. HandleTradepostPacket (Inbound/HandleTradepost.cs) dispatches to these. They use Database /
+		// listener. HandleTradepostPacket (GameServerListener.Tradepost.cs) dispatches to these. They use Database /
 		// Logger and the listener's own SendUpdateCash / SendAddItem (its IEconomyOutbound impl) directly.
 
 		// Mail wire/DB constants (MailConstants.EndpointClass / FooterUnread / AttachmentTrailerWord / ExpirySeconds) live in
@@ -76,7 +76,7 @@ namespace Faolan.GameServer
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
 		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
 		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
-		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest / WorldQuest.BeachStarterQuestId.
+		// see snapshot_embeds_strie_quest). See CommitCharacterName / WorldQuest.BeachStarterQuestId.
 		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
 
 		// Receiver for the create-editor (clientInstance=0x021662C8) conversation family.
@@ -155,7 +155,7 @@ namespace Faolan.GameServer
 		private static int _spellweaveEffectSeq;
 
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
-		// See Economy/Bank/BankService.cs.
+		// See Economy/BankService.cs.
 		private readonly BankService _bank;
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
@@ -179,7 +179,7 @@ namespace Faolan.GameServer
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
 		// Connection keep-alive / latency replies (LatencyCheck 0x2085 -> Pong, Ping 0x2005 -> GameServerStats).
-		// See World/KeepAliveService.cs.
+		// See Session/KeepAliveService.cs.
 		private readonly KeepAliveService _keepAlive;
 
 		// Loot-window flow (loot-all/single-drag/cash/close): orchestrates the broadcaster's bag state + the
@@ -196,10 +196,10 @@ namespace Faolan.GameServer
 		private readonly QuestProgressionService _questProgression;
 
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
-		// outbound ops are injected as seams (shared with other subsystems). See Economy/Shop/ShopService.cs.
+		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
 		private readonly ShopService _shop;
 
-		// The player action bar / hotbar persistence + login restore (#71). See World/ShortcutBarService.cs.
+		// The player action bar / hotbar persistence + login restore (#71). See Inventory/ShortcutBarService.cs.
 		private readonly ShortcutBarService _shortcutBar;
 
 		private readonly SpellweaveService _spellweave;

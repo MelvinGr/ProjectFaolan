@@ -13,10 +13,10 @@ Ground truth from `Captures/NecroL80_mage-necromancer_login_sell_items_to_trader
   `0x2005` sizes (1272 / 2246 / 14500 B …) are a different class on the same 16-bit opcode.
 - The reason=3 (gain) balance sequence is 19 / 42 / 134 / 526 / 573 / 594 / 658 → **deltas = sell prices
   19, 23, 92, 392, 47, 21, 64 tin** (the issue's anchors).
-- Each sale's `0x2034` sell request (`UP`, 20 B) = `[handle][0x1e7e][container 0x68=backpack][0x8006f31][u32 slot]`
-  — the last u32 is the inventory slot.
+- Each sale's `0x2034` sell request (`UP`, 20 B) = `[0xc75b shop-type][shopId 0x1e7e][container 0x68=backpack][0x8006f31 seller][u32 slot]`
+  — the last u32 is the inventory slot (verified against frames 1282/1291/1301/1325/1339/1365/1369, body e.g. `0000c75b00001e7e0000006808006f3100000005`).
 - slot → (template, count) comes from the FullChar snapshot (`0x737A6DF9`, frame 66) via the C#
-  `InventorySnapshotInspector` (`ParseInventoryPacketBody` → `GetContainer(root, ContainerKind.Bag)` →
+  `FullCharSnapshotReader` (`ParseInventoryPacketBody` → `GetContainer(root, ContainerKind.Bag)` →
   `GetEntrySlot/GetEntryTemplateId/GetEntryCount`). NecroL80 isn't in the DB inventory, so it must be read
   from the capture.
 
@@ -54,8 +54,9 @@ header (same grammar as `Captures/scripts/decode_item_template.py`). The value i
 `Items.SearchCategory` (= `template[12..16]`) was already mapped; field 74 is the second mapped property.
 
 ## Implemented
-- `Item.Value` column (migration `AddItemValue`); `RdbItemImporter.TryReadPropertyField` extracts field 74
-  (~1677/1970 keyed items populated).
+- `Item.Value` column (part of the squashed `InitialCreate` migration; the standalone `AddItemValue`
+  migration no longer exists); `RdbItemImporter.TryReadPropertyField` extracts field 74
+  (1677/2453 keyed items populated).
 - `ShopService`: `VendorPriceTin(value, count) = round(value/10)×count`; `VendorBuyPriceTin = ×4 markup`;
   **value 0 ⇒ unsellable** (`HandleSellItemToShop` refuses). Golden tests = the anchors above (`ShopTests`).
 - `stat 356` (in the shop window) is a CONSTANT `0x394E0034`, **not** a price.
@@ -66,5 +67,6 @@ The BUY markup (×4) has no captured anchor — it's a stand-in over the now-rea
 ## Reproduce
 - RDB install: `/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB/` (see the
   `client_rdb_install_path` agent memory).
-- Dump decrypted templates: `dotnet run --project Faolan.Importer -- --captures /tmp/none --rdb "<RDB>" --rdb-items --dump-templates /tmp/itpl`
-  (stop the server first — it holds `faolan.db`).
+- Dump decrypted templates: `dotnet run --project Faolan.Importer -- --only rdb-items --rdb "<RDB>" --dump-templates /tmp/itpl`
+  (`rdb-items` is an opt-in module; `--dump-templates` is its disk-write sub-option — stop the server first,
+  it holds `faolan.db`).

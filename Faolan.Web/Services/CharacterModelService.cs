@@ -36,9 +36,9 @@ namespace Faolan.Web.Services
 
 	// Builds a character's 3D model (glTF/glb) on demand from the client RDB, reusing the Faolan.Core asset pipeline
 	// (#275). Holds one RdbReader for the process (it memory-maps the index + keeps the data files open). Race/sex ->
-	// mesh-index ids is an interim hardcoded table; the proper source is the CHARACTERCREATOR tables (1010700) +
-	// per-character head/equipment selection - tracked in #275. Bodies that are CDN-only fall back to a local one so the
-	// viewer always renders something.
+	// body monsterdata id is a hardcoded table (BodyMonster) resolved via the CHARACTERCREATOR data (1010700, replacing
+	// the old mesh-index table); per-character head/equipment is resolved from the stored appearance (#275). Bodies that
+	// are CDN-only fall back to a local one so the viewer always renders something.
 	public sealed class CharacterModelService
 	{
 		// Head base mesh by sex. The 3 European starting races (Aquilonian/Cimmerian/Stygian) share one head mesh and

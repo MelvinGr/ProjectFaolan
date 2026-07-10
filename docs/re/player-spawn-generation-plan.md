@@ -112,7 +112,7 @@ replayed from the burst).
 ## Morph mapping — CRACKED & WIRED (2026-06-10, third session)
 
 The editor morph sliders ARE in the spawn (the float-valued scaffold entries), and the mapping is now fully
-cracked and implemented (`CharacterMorphs`, used by `ApplyMorph` and `EnsureFreshRows`):
+cracked and implemented (`CharacterMorphs.TryApply`, driven by the create-flow `SetMorphValue` handler and `EnsureFreshRows`):
 
 - **The editor's `SetMorphValue` numeric value is a ZIGZAG-encoded signed slider value** ("arse"=31 means
   −16, "arm"=200 means +100). `CharacterBody` stores the decoded signed value.
@@ -153,7 +153,7 @@ The weighted (1.0) entries at the top of the entry table are the character's **c
   the **client's own registry** (it's the table this client ships) with the retail-proven morph table kept
   for the sliders.
 - Implementation: `Faolan.Importer --rdb` imports the registry → `MorphTarget` (Id = wire tag);
-  `ApplyMorph` records the editor's refs → `CharacterBodyResource` (send order); world-entry seeding
+  the create-flow `RecordBodyResource` records the editor's refs → `CharacterBodyResource` (send order); world-entry seeding
   resolves refs → `PlayerSpawnScaffoldRows.BuildWeightedEntries` (falls back to Dikketest's set when
   nothing resolves). Locked by `WeightedAppearanceTests` (faolanx 7/7).
 - **The closing record is session state, not character data**: its tag is always a multiple of **0x3F1**
@@ -183,7 +183,7 @@ The same playbook applied to the FullChar/inventory snapshot:
 - **Frame grammar**: body after `[subop][c350][instance]` = `[u32 X][u8 Y]` + the **ProtoFullCharacterIIR
   root** (fields: 1 packed character_tag, 4 expansion_flags ≈0xC0001 (expansion accounts only),
   5 subscription_flags, 4× field-6 containers in kind order 101/104/112/113, 7, 8) + the tails
-  (`BigboyTailsFile`). NOTE: the inspector's `Prefix` currently lumps `[u32 X][u8 Y]` + the leading root
+  (`FullCharSnapshotSubClass`, formerly `BigboyTailsFile`/`SnapshotTails`). NOTE: the inspector's `Prefix` currently lumps `[u32 X][u8 Y]` + the leading root
   fields 1/4/5 (its root finder starts at the first container) — harmless, they ride verbatim.
   `X` is a progression counter (0 fresh; necrol80 15→43, demol80 70; quest-ish), `Y` session-varying
   (fresh chars: 0x44 base accounts / 0x49 expansion accounts). Container constants (all captures):
@@ -216,22 +216,22 @@ The same playbook applied to the FullChar/inventory snapshot:
 The post-load DB backpack snapshot and a from-scratch **beach** snapshot landed (see
 memory `snapshot_tails_construction_scope`):
 
-- **The "prefix" is decoded and built from scratch** (`BeachSnapshotPrefix`). The 8 bytes are
-  `[u32 X][varint root-length][trailing 0x81 0x06]`, NOT `[u32 X][u8 Y]` — the old "Y session-varying" byte
-  was actually the first byte of a **root-length varint** at prefix offset 4 (= const `4483` + rootLength) that
-  the client uses to delimit the protobuf root from the trailing subclass (tails). Regenerating the root (a
-  different length) requires adjusting that varint or the client misframes (`ReadSubClass Wrong IIR_t version`);
-  `AdjustSnapshotPrefixRootLength` (burst path) / `BeachSnapshotPrefix.Build` (from-scratch) handle it. The
-  leading `[u32 X]` (Strie's `00 00 00 02`) is still the **quest count** per the evidence above — pinned to the
-  template value for now; generate it with the quest system. (NB: `BeachSnapshotPrefix` currently labels it
-  "base version 2"; treat as X=quest-count pending the quest wiring.)
-- **The tails are built from scratch for beach** (`FullCharSnapshotSubClass` + server-owned `BeachTailsTemplate.bin`):
+- **The "prefix" is decoded and built from scratch** (`GameServerListener.BuildSnapshotPrefix`). This
+  paragraph's original byte model — `[u32 X][varint root-length][trailing 0x81 0x06]` with the length as a
+  protobuf varint at offset 4 (= const `4483` + rootLength) — was a **misread that was later Ghidra-corrected**
+  (`n3InfoItemRemote::Construct`, see `GameServerListener.Outbound.cs`): the 8 bytes are actually
+  `[u8 flag=0][u32 BE blobLen][field5 = 28 81 06]` where `blobLen = field5.Length + rootLength` (a plain
+  big-endian blob length, NOT a varint, NOT `4483`-based). Regenerating the root (a different length) requires
+  rewriting that length or the client misframes (`ReadSubClass Wrong IIR_t version`); `SetSnapshotBlobLength`
+  (burst path, superseding the byte-misaligned `AdjustSnapshotPrefixRootLength`) / `BuildSnapshotPrefix`
+  (from-scratch) handle it, locked by `SnapshotBlobLengthTests` (BE32 length) and `BeachSnapshotConstructionTests` (from-scratch prefix).
+- **The tails are built from scratch for beach** (`FullCharSnapshotSubClass`; the captured `BeachTailsTemplate.bin` has since been retired to a test oracle at `Faolan.Tests/Assets/` — the game-static regions now bake in via `AccessWindowCatalog`, #186/#258):
   level/vitals generated, instance re-addressed, the rest a content template. The `UnknownBefore` progression
   block was DECODED — a sequence of `[u32 field-block][length-prefixed <remoteformat> XML]` records; for beach
   it's byte-identical across characters EXCEPT the instance (proven), so the only per-character tails data is
   {level, vitals, instance}. Default on (`FAOLAN_SCRATCH_BEACH_SNAPSHOT=0` to disable). Other maps still carry
   the burst prefix/tails + delta-adjust.
-- Bag **moves/drops/splits persist** now (`EquipmentPersistence.cs`).
+- Bag **moves/drops/splits persist** now (`Faolan/GameServer/Inventory/EquipmentService.cs`, locked by `EquipmentPersistenceTests`).
 
 Remaining: **progressed-character** tails (the `UnknownBefore` block grows to 100s of KB of feat/spell/quest
 records — generate from server-side progression when those systems exist); bag capacity upgrades; the quest-count
