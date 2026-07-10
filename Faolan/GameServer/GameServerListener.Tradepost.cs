@@ -129,6 +129,7 @@ namespace Faolan.GameServer
 			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			var mail = await BuildPurchaseMail(character.Name, listing);
+			mail.RealmId = character.RealmId; // #324: no cross-realm mail (recipient = buyer)
 			await Database.CreateMail(mail);
 			await Database.DeleteTradepostListing(saleId);
 
@@ -177,7 +178,7 @@ namespace Faolan.GameServer
 
 			var bankSlot = packet.Body.ReadUInt32();
 
-			var listing = await Database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
+			var listing = await Database.GetTradepostListingBySellerSlot(character.Name, bankSlot, character.RealmId);
 			if (listing == null)
 			{
 				Logger.LogWarning("Tradepost CANCELSELL: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
@@ -201,7 +202,7 @@ namespace Faolan.GameServer
 			var bankSlot = packet.Body.ReadUInt32();
 			var newPrice = packet.Body.ReadUInt64();
 
-			var listing = await Database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
+			var listing = await Database.GetTradepostListingBySellerSlot(character.Name, bankSlot, character.RealmId);
 			if (listing == null)
 			{
 				Logger.LogWarning("Tradepost CHANGEPRICE: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
@@ -229,7 +230,7 @@ namespace Faolan.GameServer
 			{
 				case TradepostAgentOpcodes.GetAllMails:
 				{
-					var mails = await Database.GetMailsForRecipient(character.Name);
+					var mails = await Database.GetMailsForRecipient(character.Name, character.RealmId);
 					foreach (var m in mails)
 						await TradepostResponses.SendMailMessage(client, m, false, inst);
 					await TradepostResponses.SendRetrieveMailResult(client, inst);
@@ -299,7 +300,7 @@ namespace Faolan.GameServer
 				case TradepostAgentOpcodes.ItemSearch:
 				{
 					var query = TradepostResponses.ParseSearch(packet.Body);
-					var listings = await Database.GetTradepostListings(query.ItemId);
+					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character?.RealmId ?? 0); // #324: realm-local market
 					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", TradepostCharName(client), query.Lang, query.ItemId,
 						query.Page, listings.Count);
 
@@ -401,6 +402,7 @@ namespace Faolan.GameServer
 			{
 				SaleId = await AllocateSaleId(),
 				Handle = 0,
+				RealmId = character.RealmId, // #324: the AH is realm-local (the seller's realm)
 				SellerName = character.Name,
 				BankSlot = (uint)bankSlot,
 				Price = price,
@@ -462,6 +464,7 @@ namespace Faolan.GameServer
 			var mail = new Mail
 			{
 				MailId = await AllocateMailId(),
+				RealmId = recipient.RealmId, // #324: no cross-realm mail (recipient's realm)
 				RecipientClass = MailConstants.EndpointClass,
 				RecipientName = recipient.Name,
 				SenderClass = MailConstants.EndpointClass,

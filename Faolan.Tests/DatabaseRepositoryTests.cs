@@ -309,6 +309,7 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync())
 				{
 					await ctx.Database.EnsureCreatedAsync();
+					ctx.Realms.Add(new Realm { Id = 1, Name = "R", IpAddress = "127.0.0.1", Port = 1 }); // #324: RealmId FK
 					// ItemId is FK-restricted to Items.Id (#212), so seed the referenced catalog items first.
 					ctx.Items.Add(new Item
 					{
@@ -323,6 +324,7 @@ namespace Faolan.Tests
 					ctx.TradepostListings.Add(new TradepostListing
 					{
 						SaleId = 1,
+						RealmId = 1,
 						ItemId = 0x7530,
 						Price = 5000,
 						SellerName = "b"
@@ -330,6 +332,7 @@ namespace Faolan.Tests
 					ctx.TradepostListings.Add(new TradepostListing
 					{
 						SaleId = 2,
+						RealmId = 1,
 						ItemId = 0x7530,
 						Price = 25,
 						SellerName = "a"
@@ -337,6 +340,7 @@ namespace Faolan.Tests
 					ctx.TradepostListings.Add(new TradepostListing
 					{
 						SaleId = 3,
+						RealmId = 1,
 						ItemId = 0x9999,
 						Price = 1,
 						SellerName = "c"
@@ -344,7 +348,7 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync();
 				}
 
-				var listings = await repo.GetTradepostListings(0x7530);
+				var listings = await repo.GetTradepostListings(0x7530, 1);
 
 				Assert.Equal(2, listings.Count); // only the matching item
 				Assert.Equal(25ul, listings[0].Price); // cheapest first
@@ -660,6 +664,7 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync())
 				{
 					await ctx.Database.EnsureCreatedAsync();
+					ctx.Realms.Add(new Realm { Id = 1, Name = "R", IpAddress = "127.0.0.1", Port = 1 }); // #324: RealmId FK
 					// The listing's ItemId is FK-restricted to Items.Id (#212), so the referenced catalog item must exist.
 					ctx.Items.Add(new Item
 					{
@@ -670,6 +675,7 @@ namespace Faolan.Tests
 					{
 						SaleId = 0x20d82b62d02b198b,
 						Handle = 1,
+						RealmId = 1,
 						SellerName = "Ponakin",
 						Price = 25,
 						Quantity = 1,
@@ -691,6 +697,7 @@ namespace Faolan.Tests
 				var mail = new Mail
 				{
 					MailId = 0x20d82b631c0c578f,
+					RealmId = 1,
 					RecipientClass = 0x08006F31,
 					RecipientName = "AssassinL23",
 					SenderClass = 0x08006F31,
@@ -707,7 +714,7 @@ namespace Faolan.Tests
 				await repo.CreateMail(mail);
 
 				// Retrieve by recipient + by wire id (attachments eager-loaded).
-				var inbox = await repo.GetMailsForRecipient("AssassinL23");
+				var inbox = await repo.GetMailsForRecipient("AssassinL23", 1);
 				Assert.Single(inbox);
 				var byId = await repo.GetMailByWireId(0x20d82b631c0c578f);
 				Assert.NotNull(byId);

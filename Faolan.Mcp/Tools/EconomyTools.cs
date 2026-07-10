@@ -82,7 +82,7 @@ namespace Faolan.Mcp.Tools
 			if (character?.Name == null)
 				return $"No character with id {characterId}.";
 
-			var mails = await _db.GetMailsForRecipient(character.Name);
+			var mails = await _db.GetMailsForRecipient(character.Name, character.RealmId);
 			return JsonSerializer.Serialize(new
 			{
 				Owner = character.Name,

@@ -15,6 +15,13 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(SaleId), IsUnique = true), Index(nameof(ItemId))]
 	public class TradepostListing : BaseEntity
 	{
+		// The realm this listing belongs to (#324) - the seller's realm; the auction house is realm-local, so every
+		// AH search/list is realm-scoped. Backfilled from the seller character on migration.
+		public uint RealmId { get; set; }
+
+		[ForeignKey(nameof(RealmId))]
+		public virtual Realm Realm { get; set; }
+
 		// The catalog item (template id) the listing is filed/searched under (the row's itemId field). FK to Items:
 		// the filed item MUST exist - this guards against the 30000-placeholder import bug (#212) where every listing
 		// shared one bogus ItemId and the client collapsed them to a single "Torn Rags" row. NB this is the SEARCH

@@ -102,6 +102,12 @@ host. One login process + N realm processes, all against the shared DB.
   cross-realm leakage (dispatch, name/handle lookups, DB queries missing the realm filter); confirm a player on
   realm A never sees realm B. Config/orchestration for launching the fleet (one login + N realm hosts).
 
+  **Character names per realm (surfaced during P3):** `Character.Name` is still `[Index(Name, IsUnique)]` **globally**
+  — two realms can't both have a "Bob", which is wrong. It must become composite `(RealmId, Name)`, and every
+  by-name lookup scoped by realm: `GetCharacterByName` (global today), the tradepost seller / mail recipient
+  resolution, guild invites by name, chat whispers by name, friends. Bigger surface than guild/AH/mail (P3), so it's
+  its own P4 sub-task. (P3 already realm-scopes the AH-seller / mail-recipient *queries*, so those are ready for it.)
+
 - **Phase 5 (optional) — Per-realm DBs.** If shared-DB contention or stronger isolation warrants it, give each realm
   process its own DB (static content cloned/shared read-only, dynamic per-realm) instead of `RealmId` columns.
 

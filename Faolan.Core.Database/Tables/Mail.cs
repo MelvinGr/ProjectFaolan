@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -12,6 +13,13 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(MailId), IsUnique = true), Index(nameof(RecipientName))]
 	public class Mail : BaseEntity
 	{
+		// The realm this mail belongs to (#324) - the recipient's realm; no cross-realm mail, so a realm process only
+		// reads its own inbox rows. Backfilled from the recipient character on migration.
+		public uint RealmId { get; set; }
+
+		[ForeignKey(nameof(RealmId))]
+		public virtual Realm Realm { get; set; }
+
 		// The unique wire mail id (the client's GetMailByID / GetMailItem target).
 		public ulong MailId { get; set; }
 

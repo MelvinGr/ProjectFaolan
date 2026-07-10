@@ -58,7 +58,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<LuaScript> GetLuaScript(uint scriptId);
 		Task<Mail> GetMailByWireId(ulong mailId);
-		Task<List<Mail>> GetMailsForRecipient(string recipientName);
+		Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId);
 		Task<Map> GetMap(uint id);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
@@ -86,8 +86,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
 		Task<Dictionary<string, byte[]>> GetStockPhrases();
 		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
-		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot);
-		Task<List<TradepostListing>> GetTradepostListings(uint itemId);
+		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
+		Task<List<TradepostListing>> GetTradepostListings(uint itemId, uint realmId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
@@ -735,10 +735,10 @@ namespace Faolan.Core.Database.Repositories
 
 		// All mail addressed to a character (newest first), attachments eager-loaded so the codec can build the
 		// item preview/grant without a second round-trip. Recipient NAME is the stable key (the wire id is volatile).
-		public async Task<List<Mail>> GetMailsForRecipient(string recipientName)
+		public async Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Mails.Include(m => m.Attachments).Where(m => m.RecipientName == recipientName).OrderByDescending(m => m.Id).ToListAsync();
+			return await ctx.Mails.Include(m => m.Attachments).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).OrderByDescending(m => m.Id).ToListAsync();
 		}
 
 		public async Task<Map> GetMap(uint id)
@@ -1057,18 +1057,19 @@ namespace Faolan.Core.Database.Repositories
 
 		// The seller's active listing for a given origin bank slot - how the seller's own change-price / cancel ops
 		// address their listing (they carry nBankItemSlot, not the saleId). Keyed by (seller, slot).
-		public async Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot)
+		public async Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.SellerName == sellerName && l.BankSlot == bankSlot);
+			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.RealmId == realmId && l.SellerName == sellerName && l.BankSlot == bankSlot);
 		}
 
 		// Auction-house listings for a searched item template, cheapest first (the order the grid renders). Price is
 		// a ulong (tin), which SQLite can't ORDER BY in SQL, so fetch the (small) match set and sort client-side.
-		public async Task<List<TradepostListing>> GetTradepostListings(uint itemId)
+		// Realm-scoped (#324): the AH is realm-local, so only this realm's listings.
+		public async Task<List<TradepostListing>> GetTradepostListings(uint itemId, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var rows = await ctx.TradepostListings.Where(l => l.ItemId == itemId).ToListAsync();
+			var rows = await ctx.TradepostListings.Where(l => l.RealmId == realmId && l.ItemId == itemId).ToListAsync();
 			return rows.OrderBy(l => l.Price).ToList();
 		}
 
