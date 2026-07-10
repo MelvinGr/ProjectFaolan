@@ -881,12 +881,12 @@ RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x1A07` | `Ox1A07` | OverrideGameTweaks; carries no 32-bit id (not seen with a header-extra) |
+| `0x1A07` | `Ox1A07` | OverrideGameTweaks - rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim |
 | `0x208C` | `SendCharacterRealmData` | id 0xCBC6FC04 |
 | `0x2091` | `InitAuth` | id 0x9386EE05 |
 | `0x2093` | `Ox2093` | id 0xF2A5E705 |
 | `0x209C` | `Ox209C` | id 0x99959205 |
-| `0x20A5` | `SmallCharList` | not observed in any capture (behavior-derived; unverified) |
+| `0x20A5` | `SmallCharList` | retail sends a 3-byte header-extra 0x94A760 (88/88 captures), not the 4-byte id; sent verbatim |
 | `0x20B9` | `Ox20B9` | id 0x8BD89902 |
 | `0x20CC` | `SendRealmList` | id 0xE2E6C40F |
 | `0x20E5` | `Ox20E5` | id 0xDDAD8302 |

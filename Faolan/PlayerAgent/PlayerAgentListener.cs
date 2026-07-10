@@ -43,7 +43,7 @@ namespace Faolan.PlayerAgent
 					await Database.SaveAccount(client.Session.Account);
 
 					await new PacketStream()
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.InitAuth, [0x93, 0x86, 0xee, 0x05])
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.InitAuth)
 						.WriteUInt32(client.Session.Account.AuthStatus)
 						.SendAsync(client);
 
@@ -75,7 +75,7 @@ namespace Faolan.PlayerAgent
 					await SendRealmList(client);
 
 					await new PacketStream()
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendCharacterRealmData, [0xcb, 0xc6, 0xfc, 0x04])
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendCharacterRealmData)
 						.WriteUInt32(1)
 						.SendAsync(client);
 
@@ -85,7 +85,7 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentOpcodes.Ox20A6:
 				{
 					await new PacketStream() // headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox209C, [0x99, 0x95, 0x92, 0x05])
+						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox209C)
 						.WriteUInt16(0)
 						.WriteByte(0)
 						.SendAsync(client);

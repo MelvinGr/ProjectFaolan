@@ -120,6 +120,13 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				foreach (var (name, value) in Members(e))
 				{
 					notes.TryGetValue((e.Name, name), out var note);
+
+					// PlayerAgent/PlayerInterface carries a 32-bit method id in the header; it lives in
+					// PlayerAgentMethodIds (the single source), not a trailing comment - surface it as the note here.
+					if ((e.Name == "PlayerAgentOpcodes" || e.Name == "PlayerAgentResponseOpcodes")
+						&& PlayerAgentMethodIds.ById.TryGetValue((ushort)value, out var methodId))
+						note = $"id 0x{methodId:X8}";
+
 					var width = e.GetEnumUnderlyingType() == typeof(uint)
 						? 8
 						: 4;

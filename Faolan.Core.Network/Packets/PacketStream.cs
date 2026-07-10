@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Packets
@@ -52,6 +53,16 @@ namespace Faolan.Core.Network.Packets
 				WriteArray(headerData);
 
 			return this;
+		}
+
+		// PlayerInterface s2c: this interface uniquely carries a 32-bit method id in the header after the opcode.
+		// This overload appends it automatically from PlayerAgentMethodIds (the single source), so senders never
+		// hand-roll the 4-byte array. Byte-identical to WriteHeader(sender, receiver, opcode,
+		// PlayerAgentMethodIds.HeaderId((ushort)opcode)). (SmallCharList / Ox1A07 carry a non-standard header-extra
+		// and keep passing it explicitly via the generic overload.)
+		public PacketStream WriteHeader(byte[] sender, byte[] receiver, PlayerAgentResponseOpcodes opcode)
+		{
+			return WriteHeader(sender, receiver, opcode, PlayerAgentMethodIds.HeaderId((ushort)opcode));
 		}
 
 		// Typed header: build the sender/receiver ProtoEndpoints (type + instance) instead of hand-rolled byte
