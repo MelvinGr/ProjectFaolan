@@ -690,33 +690,41 @@ namespace Faolan.Core.Network.Constants
 		// container blocks, 83-byte item tails): the RE notes live in docs/re/fullplayer-snapshot-reader.md.
 	}
 
-	// PlayerAgent opcodes do NOT map onto the recovered PlayerAgent/PlayerInterface tables (25 methods, max
-	// 0x2018) - the observed wire values run 0x2083..0x20F5, so the live build's table is much larger than
-	// the recovered one in both directions. These stay behavior-derived names.
+	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface that carries a 32-bit method id in the
+	// header, right after the 16-bit opcode (`ConanPacket.HeaderData` - empty for every other interface). The
+	// client dispatches on that 32-bit id; the 16-bit opcode is a normal 0x2000+index value carried alongside.
+	// The `// id 0x...` after each entry is that wire id, capture-verified (the opcode->id pair was observed on
+	// the wire; the count is how many captures carried it). See docs/re/aoc-rpc-method-opcodes.md, #320.
+	// Names stay behavior-derived: the login methods are PRE-auth, so they are absent from the recovered post-auth
+	// PlayerInterfaceDispatch table (the name<->opcode link is not proven). The id is not yet a real associated
+	// value here - senders still pass it as a literal 4-byte array in WriteHeader (#320 follow-up).
 	public enum PlayerAgentOpcodes : ushort
 	{
-		RequestAuth = 0x2083,
-		RequestSmallCharList = 0x20C1, //0xDAD1D206,
-		RequestCharRealmData = 0x208E, //0xA3E1FE0D
-		Ox20A6 = 0x20A6,
-		EnterWorld = 0x20B6, //0xDD85FB0E
-		Ox20D6 = 0x20D6, //0xDD9EC209
-		CreateCharacter = 0x20DE,
-		Ox20EC = 0x20EC,
-		DeleteCharacter = 0x209D // 0x86979E0C:
+		RequestAuth = 0x2083, // id 0x96CBE509
+		RequestCharRealmData = 0x208E, // id 0xA3E1FE0D
+		DeleteCharacter = 0x209D, // id 0x86979E0C
+		Ox209E = 0x209E, // id 0x9ADCE109
+		Ox20A6 = 0x20A6, // id 0xE0C19C0D
+		EnterWorld = 0x20B6, // id 0xDD85FB0E
+		RequestSmallCharList = 0x20C1, // id 0xDAD1D206
+		Ox20D6 = 0x20D6, // id 0xDD9EC209
+		CreateCharacter = 0x20DE, // id 0x9CB1D10C
+		Ox20EC = 0x20EC, // id 0xA4F2E303
+		Ox20F5 = 0x20F5 // id 0xBDB28B05
 	}
 
 	public enum PlayerAgentResponseOpcodes : ushort
 	{
-		Ox20B9 = 0x20B9,
-		Ox209C = 0x209C,
-		InitAuth = 0x2091,
-		SmallCharList = 0x20A5,
-		SendCharacterList = 0x20EF,
-		SendRealmList = 0x20CC,
-		SendCharacterRealmData = 0x208C,
-
-		Ox1A07 = 0x1A07
+		Ox1A07 = 0x1A07, // OverrideGameTweaks; carries no 32-bit id (not seen with a header-extra)
+		SendCharacterRealmData = 0x208C, // id 0xCBC6FC04
+		InitAuth = 0x2091, // id 0x9386EE05
+		Ox2093 = 0x2093, // id 0xF2A5E705
+		Ox209C = 0x209C, // id 0x99959205
+		SmallCharList = 0x20A5, // not observed in any capture (behavior-derived; unverified)
+		Ox20B9 = 0x20B9, // id 0x8BD89902
+		SendRealmList = 0x20CC, // id 0xE2E6C40F
+		Ox20E5 = 0x20E5, // id 0xDDAD8302
+		SendCharacterList = 0x20EF // id 0x8BD3A00C
 	}
 
 	// UniverseAgent client->server: matches the recovered table exactly (3 methods).

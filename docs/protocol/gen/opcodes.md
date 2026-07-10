@@ -4,7 +4,7 @@
 > `Faolan.Core.Network/Constants/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 819 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 823 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -863,15 +863,17 @@ RPC class **PlayerAgent** (id `0x82F20484`) · C2S (client→server call)
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x2083` | `RequestAuth` |  |
-| `0x208E` | `RequestCharRealmData` | 0xA3E1FE0D |
-| `0x209D` | `DeleteCharacter` | 0x86979E0C: |
-| `0x20A6` | `Ox20A6` |  |
-| `0x20B6` | `EnterWorld` | 0xDD85FB0E |
-| `0x20C1` | `RequestSmallCharList` | 0xDAD1D206, |
-| `0x20D6` | `Ox20D6` | 0xDD9EC209 |
-| `0x20DE` | `CreateCharacter` |  |
-| `0x20EC` | `Ox20EC` |  |
+| `0x2083` | `RequestAuth` | id 0x96CBE509 |
+| `0x208E` | `RequestCharRealmData` | id 0xA3E1FE0D |
+| `0x209D` | `DeleteCharacter` | id 0x86979E0C |
+| `0x209E` | `Ox209E` | id 0x9ADCE109 |
+| `0x20A6` | `Ox20A6` | id 0xE0C19C0D |
+| `0x20B6` | `EnterWorld` | id 0xDD85FB0E |
+| `0x20C1` | `RequestSmallCharList` | id 0xDAD1D206 |
+| `0x20D6` | `Ox20D6` | id 0xDD9EC209 |
+| `0x20DE` | `CreateCharacter` | id 0x9CB1D10C |
+| `0x20EC` | `Ox20EC` | id 0xA4F2E303 |
+| `0x20F5` | `Ox20F5` | id 0xBDB28B05 |
 
 ## PlayerAgentResponseOpcodes
 
@@ -879,14 +881,16 @@ RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x1A07` | `Ox1A07` |  |
-| `0x208C` | `SendCharacterRealmData` |  |
-| `0x2091` | `InitAuth` |  |
-| `0x209C` | `Ox209C` |  |
-| `0x20A5` | `SmallCharList` |  |
-| `0x20B9` | `Ox20B9` |  |
-| `0x20CC` | `SendRealmList` |  |
-| `0x20EF` | `SendCharacterList` |  |
+| `0x1A07` | `Ox1A07` | OverrideGameTweaks; carries no 32-bit id (not seen with a header-extra) |
+| `0x208C` | `SendCharacterRealmData` | id 0xCBC6FC04 |
+| `0x2091` | `InitAuth` | id 0x9386EE05 |
+| `0x2093` | `Ox2093` | id 0xF2A5E705 |
+| `0x209C` | `Ox209C` | id 0x99959205 |
+| `0x20A5` | `SmallCharList` | not observed in any capture (behavior-derived; unverified) |
+| `0x20B9` | `Ox20B9` | id 0x8BD89902 |
+| `0x20CC` | `SendRealmList` | id 0xE2E6C40F |
+| `0x20E5` | `Ox20E5` | id 0xDDAD8302 |
+| `0x20EF` | `SendCharacterList` | id 0x8BD3A00C |
 
 ## TradepostAgentOpcodes
 
