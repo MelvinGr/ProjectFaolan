@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Mcp.Tools;
 using Microsoft.AspNetCore.Builder;
@@ -18,7 +18,7 @@ namespace Faolan.Mcp
 	///     Hosts an MCP server (streamable HTTP) on a localhost port from inside the live Faolan process.
 	///     It runs a nested ASP.NET Core / Kestrel app whose DI shares Faolan's live singletons by instance,
 	///     so MCP tools observe the exact same <see cref="IDatabaseRepository" /> and
-	///     <see cref="IAgentServerDispatcher" /> the running server uses — that's what makes the tools able to
+	///     <see cref="IChatServerDispatcher" /> the running server uses — that's what makes the tools able to
 	///     inspect and (later) drive the live server rather than just the database file.
 	///     Connect Claude with:  claude mcp add --transport http faolan http://127.0.0.1:&lt;McpPort&gt;/mcp
 	/// </summary>
@@ -52,7 +52,7 @@ namespace Faolan.Mcp
 			// Share the parent process's live singletons *by instance*. Both are registered as singletons in
 			// Faolan's root container, so the tools resolve the same objects the server is actively using.
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<IDatabaseRepository>());
-			builder.Services.AddSingleton(_parentServices.GetRequiredService<IAgentServerDispatcher>());
+			builder.Services.AddSingleton(_parentServices.GetRequiredService<IChatServerDispatcher>());
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<IGameServerDispatcher>());
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<ClaudeChannel>());
 

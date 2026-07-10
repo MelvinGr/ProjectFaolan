@@ -37,7 +37,7 @@ Wired into both ding paths: GM `.level` and the XP-driven `CombatService.PushLev
 provisional (`Combat.AttributeGrowth`) pending real per-class tables.
 
 This is the same `FormatFeedback` retail sends as the (textual) reply to `CancelBuff` — it is the general
-"show feedback text" channel, distinct from the AgentServer chat/system-message path.
+"show feedback text" channel, distinct from the ChatServer chat/system-message path.
 
 ## Wire grammar (big-endian)
 
@@ -71,6 +71,6 @@ from the session** — not just a verbatim replay.
 - ⬜ **Arbitrary literal text**: the FIFO templates reference a localized RDB string id (the area-name points at
   string 3474586), so showing custom text needs either a literal-text FIFO template or injecting an RDB string id.
   The plain-token lines (`AttributeChanged`, ...) are also token-driven. A literal-text path is the remaining
-  decode (compare how the AgentServer system-message remoteformat embeds literal text).
+  decode (compare how the ChatServer system-message remoteformat embeds literal text).
 - ⬜ Once confirmed, replace the chat-routed `"Resurrection point discovered: X"` (`WorldSimulation`, currently
   `SendSystemMessage`) and similar notices with on-screen FIFO banners.

@@ -3,20 +3,20 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Faolan.Core.Network.Server.AgentServer
+namespace Faolan.Core.Network.Server.ChatServer
 {
-	public interface IAgentServerDispatcher : IAgentServerProvider
+	public interface IChatServerDispatcher : IChatServerProvider
 	{
-		void Register(IAgentServerProvider provider);
-		void Unregister(IAgentServerProvider provider);
+		void Register(IChatServerProvider provider);
+		void Unregister(IChatServerProvider provider);
 	}
 
-	public class AgentServerDispatcher : IAgentServerDispatcher
+	public class ChatServerDispatcher : IChatServerDispatcher
 	{
 		private readonly Lock _lock = new Lock();
-		private IAgentServerProvider? _provider;
+		private IChatServerProvider? _provider;
 
-		public void Register(IAgentServerProvider provider)
+		public void Register(IChatServerProvider provider)
 		{
 			lock (_lock)
 			{
@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Server.AgentServer
 			}
 		}
 
-		public void Unregister(IAgentServerProvider provider)
+		public void Unregister(IChatServerProvider provider)
 		{
 			lock (_lock)
 			{

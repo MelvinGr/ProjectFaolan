@@ -11,25 +11,25 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.AgentServer;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Packets.ChatServer;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.AgentServer
+namespace Faolan.ChatServer
 {
-	public partial class AgentServerListener : Server<AgentServerPacket, AgentServerPacketFactory, AgentServerMessageFramer>, IAgentServerProvider
+	public partial class ChatServerListener : Server<ChatServerPacket, ChatServerPacketFactory, ChatServerMessageFramer>, IChatServerProvider
 	{
 		private readonly ClaudeChannel _claudeChannel;
-		private readonly IAgentServerDispatcher _dispatcher;
+		private readonly IChatServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		// `port` is the hosting realm's AgentServerPort (from its Realm row - the single source of truth for the
+		// `port` is the hosting realm's ChatServerPort (from its Realm row - the single source of truth for the
 		// realm-local service ports, #324), passed in at registration rather than read from global config.
-		public AgentServerListener(ushort port, ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher,
-			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(port, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
+		public ChatServerListener(ushort port, ILogger<ChatServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IChatServerDispatcher dispatcher,
+			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(port, logger, configuration, database, new ChatServerOutgoingPacketLogger(logger))
 		{
 			_dispatcher = dispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -60,13 +60,13 @@ namespace Faolan.AgentServer
 			return base.StopAsync(cancellationToken);
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, AgentServerPacket packet)
+		protected override async Task ReceivedPacket(INetworkClient client, ChatServerPacket packet)
 		{
 			LogPacketReceived(packet, packet.Opcode);
 
 			switch (packet.Opcode)
 			{
-				case AgentServerOpcodes.Hello:
+				case ChatServerOpcodes.Hello:
 				{
 					var unk0 = packet.Body.ReadUInt32();
 					var clientInstance = packet.Body.ReadUInt32();
@@ -78,7 +78,7 @@ namespace Faolan.AgentServer
 
 					if (client.Session.Account.ClientInstance != clientInstance)
 					{
-						Logger.LogWarning("AgentServer hello: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.", accountId,
+						Logger.LogWarning("ChatServer hello: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.", accountId,
 							client.Session.Account.ClientInstance, clientInstance);
 					}
 
@@ -86,7 +86,7 @@ namespace Faolan.AgentServer
 					client.Session.Account.ClientInstance = clientInstance;
 					client.Session.Character = resolvedCharacter;
 
-					Logger.LogInformation("AgentServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
+					Logger.LogInformation("ChatServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
 
 					// Retail sends the full chat-channel subscription list FIRST (one 0x003C per channel), then the
 					// 0x0005 ready marker, the 0x0014 character info, and finally the welcome message. Verified from
@@ -111,7 +111,7 @@ namespace Faolan.AgentServer
 					await new FaolanStream().WriteUInt32(0x00050000).SendAsync(client);
 
 					await new FaolanStream()
-						.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+						.WriteUInt16(ChatServerInterfaceOpcodes.Ox0014)
 						.WriteArrayUInt16Length(s => s
 							.WriteUInt32(client.Session.Account.ClientInstance)
 							.WriteUInt32(0x00000000)
@@ -126,7 +126,7 @@ namespace Faolan.AgentServer
 					break;
 				}
 
-				case AgentServerOpcodes.ChannelChat:
+				case ChatServerOpcodes.ChannelChat:
 				{
 					// The client posted a message to a chat channel: [byte type][u32 channelId][string][0000].
 					// Relay it to every connected client as the sender's identity (0x0014) + the message (0x0041
@@ -138,7 +138,7 @@ namespace Faolan.AgentServer
 					var channelId = packet.Body.ReadUInt32();
 					var message = packet.Body.ReadString();
 
-					Logger.LogInformation("AgentServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}", client.Session.Character?.Name ?? "?", channelType, channelId, message);
+					Logger.LogInformation("ChatServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}", client.Session.Character?.Name ?? "?", channelType, channelId, message);
 
 					// A '.command' (not '..') from a GM runs as a GM command in ANY channel, just like in /say -
 					// routed to the player's world session via the GameServer dispatcher. The command line is NOT
@@ -165,7 +165,7 @@ namespace Faolan.AgentServer
 					break;
 				}
 
-				case AgentServerOpcodes.Whisper:
+				case ChatServerOpcodes.Whisper:
 				{
 					// A tell: [u32 targetCharacterId][string text][00 01 00] - op 0x001E both directions (whisper
 					// capture 2026-06-12, Hoxxling <-> Settuc). Deliver to the target as the sender's identity
@@ -178,7 +178,7 @@ namespace Faolan.AgentServer
 						? client.Session.Character.Name
 						: $"Character{senderId}";
 
-					Logger.LogInformation("AgentServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
+					Logger.LogInformation("ChatServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
 
 					// #95: persist the whisper to chat history (channelType/id 0 for a tell; recipient in TargetId).
 					await PersistChat(client, 0, 0, targetCharacterId, true, message);
@@ -203,7 +203,7 @@ namespace Faolan.AgentServer
 					}
 
 					await new FaolanStream()
-						.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+						.WriteUInt16(ChatServerInterfaceOpcodes.Ox0014)
 						.WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName))
 						.SendAsync(target);
 					await target.SendAsync(BuildWhisper(senderId, message));
@@ -211,10 +211,10 @@ namespace Faolan.AgentServer
 					break;
 				}
 
-				case AgentServerOpcodes.ChatReady:
+				case ChatServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
-					await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox0064).WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray())).SendAsync(client);
+					await new FaolanStream().WriteUInt16(ChatServerInterfaceOpcodes.Ox0064).WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray())).SendAsync(client);
 
 					break;
 				}

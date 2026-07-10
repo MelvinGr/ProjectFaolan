@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Network.Interfaces;
 
-namespace Faolan.Core.Network.Packets.AgentServer
+namespace Faolan.Core.Network.Packets.ChatServer
 {
-	public sealed class AgentServerMessageFramer : IMessageFramer
+	public sealed class ChatServerMessageFramer : IMessageFramer
 	{
 		private byte[] _buffer = [];
 

@@ -31,14 +31,14 @@ namespace Faolan.PlayerAgent
 			return System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(System.Net.IPAddress.Parse(ip).GetAddressBytes());
 		}
 
-		private async Task SendAgentServer(INetworkClient client)
+		private async Task SendChatServer(INetworkClient client)
 		{
 			var realm = await ResolveActiveRealm(client);
 			await new PacketStream()
 				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02])
 				.WriteUInt32(IpToLong(realm.IpAddress))
-				.WriteUInt16(realm.AgentServerPort)
+				.WriteUInt16(realm.ChatServerPort)
 				.WriteUInt32(client.Session.Account.Id)
 				.WriteUInt32(0x0000c350)
 				.WriteUInt32(client.Session.Account.ClientInstance)

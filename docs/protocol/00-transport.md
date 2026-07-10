@@ -36,7 +36,7 @@ Inside the frame, every Conan service packet has the same head:
 - `hdrlen` counts the `RpcHeader` bytes only, not the body.
 - `RpcHeader` is decoded in [`02-rpc.md`](02-rpc.md).
 
-The AgentServer (chat) service is the exception: its packets carry a raw u16 opcode and **no RpcHeader**.
+The ChatServer (chat) service is the exception: its packets carry a raw u16 opcode and **no RpcHeader**.
 [V1: Captures/ghidra/DumpRpcTables.java]
 
 ## Compression

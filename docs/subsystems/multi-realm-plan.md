@@ -24,7 +24,7 @@ Single-instance hardcoding (the gaps):
 4. **Dynamic data is GLOBAL** — `Guild`, `TradepostListing` (AH), `Mail` have **no `RealmId`**; guilds/AH/mail are
    shared across (what would be) realms. Character-owned data (`CharacterInventory`, quests, …) is transitively
    realm-scoped via the character.
-5. **Chat + guild services are global singletons** — one `AgentServerListener` (chat) and one
+5. **Chat + guild services are global singletons** — one `ChatServerListener` (chat) and one
    `CsPlayerAgentListener` (guilds/teams) for the whole process; no realm dimension.
 
 ## Target architecture
@@ -52,7 +52,7 @@ process/resources and couples realm lifecycles. `Realm.IpAddress` already exists
   realm list, the character list, and the **EnterWorld routing** that hands the client to the selected character's
   realm. Owns NO world. Reads `faolan.db` for accounts/characters/realms.
 - **Realm game process (one per realm):** `GameServerListener` + `WorldSimulation` **+ the realm-local chat/guild
-  services** (`AgentServerListener` chat, `CsPlayerAgentListener` guilds/teams) — because chat and guilds are
+  services** (`ChatServerListener` chat, `CsPlayerAgentListener` guilds/teams) — because chat and guilds are
   realm-local, they move OUT of the shared tier and INTO each realm process. Bound to that realm's `IpAddress:Port`
   (+ the per-realm chat/cs ports); reads its own realm id from config/CLI (`--role realm=<id>`). Shares `faolan.db`,
   scoping every dynamic query by realm.
@@ -70,13 +70,13 @@ host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), b
 - **Phase 1 — Realm-routed handoff + realm-scoped char list** *(client-free to build; the smallest visible slice)*.
   Replace the static `Program.GameServerPort` (Inbound.cs:1264) + the `Configuration.ServerIpAddress` handoff sends
   with the *selected character's* `Realm.IpAddress:Port` — look the character's realm up at `EnterWorld` and thread
-  it into the GameServer/CsPlayerAgent/AgentServer handoff addresses. Scope `SendSmallCharList` (and the char-realm
+  it into the GameServer/CsPlayerAgent/ChatServer handoff addresses. Scope `SendSmallCharList` (and the char-realm
   counts) to the client's selected realm. Two realm rows pointing at the SAME process proves routing before the
   process is actually split.
 
 - **Phase 2 — Process role split** *(the heart of B)*. `Program.cs` gains a role: `--role login` (default) starts
   ONLY `UniverseAgent` + `PlayerAgent` (+ the DB); `--role realm=<id>` starts a realm game host — `GameServerListener` +
-  `WorldSimulation` + the realm-local `AgentServerListener` + `CsPlayerAgentListener` — bound to that realm's ports,
+  `WorldSimulation` + the realm-local `ChatServerListener` + `CsPlayerAgentListener` — bound to that realm's ports,
   with the realm id threaded through the whole world (simulation, dispatcher, MCP). The login tier no longer owns a
   world; the realm host no longer owns login. Run one login process + one realm process locally to validate.
 
@@ -163,7 +163,7 @@ See the `TestDb` doc-comment for the full rationale.
 ## Risks / unknowns
 
 - **Multi-realm list bytes** not capture-verified (only ever sent 1 realm) — Phase 0 gate.
-- **Chat/guild/AH realm-scoping is the invasive part** (touches `AgentServer` / `CsPlayerAgent` / economy) — the
+- **Chat/guild/AH realm-scoping is the invasive part** (touches `ChatServer` / `CsPlayerAgent` / economy) — the
   bulk of Phase 3.
 - **DB model**: shared `faolan.db` + `RealmId` columns (simplest, recommended) vs per-realm DBs (stronger isolation,
   more ops). Recommend shared + `RealmId`.

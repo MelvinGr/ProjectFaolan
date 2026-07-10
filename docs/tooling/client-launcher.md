@@ -118,7 +118,7 @@ repo root (running from `bin/Debug` fails with "faolan.json not found"):
 ```
 dotnet run --project Faolan
 ```
-Listens: UniverseAgent 7010, PlayerAgent 7011, AgentServer 7012, CSPlayerAgent 7001, GameServer 7014 (from the
+Listens: UniverseAgent 7010, PlayerAgent 7011, ChatServer 7012, CSPlayerAgent 7001, GameServer 7014 (from the
 realm row; the world connection shares this same port — the handoff advertises it, it is not port+1), MCP 7099.
 
 ### Capture the loopback session (no root needed)

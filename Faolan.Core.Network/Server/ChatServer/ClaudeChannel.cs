@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace Faolan.Core.Network.Server.AgentServer
+namespace Faolan.Core.Network.Server.ChatServer
 {
 	/// <summary>
 	///     One message on the Claude chat channel. <see cref="Sequence" /> is monotonic, for cursor-style polling.
@@ -15,8 +15,8 @@ namespace Faolan.Core.Network.Server.AgentServer
 	public sealed record ClaudeChannelMessage(ulong Sequence, DateTime TimestampUtc, uint SenderId, string SenderName, string Message, bool FromClaude, bool ViaWhisper = false);
 
 	/// <summary>
-	///     The "Claude" chat channel: a server-defined channel every client is subscribed to on AgentServer login,
-	///     bridged to Claude through the MCP server. Player posts are recorded here (the AgentServer listener appends
+	///     The "Claude" chat channel: a server-defined channel every client is subscribed to on ChatServer login,
+	///     bridged to Claude through the MCP server. Player posts are recorded here (the ChatServer listener appends
 	///     them as they arrive); Claude reads the log and posts replies via the MCP chat tools, which broadcast
 	///     in-game under the synthetic <see cref="SenderId" /> identity. Purely in-memory - the log does not persist
 	///     across server restarts.

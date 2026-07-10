@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One persisted chat line (#95). The AgentServer records every channel post and whisper here so chat history
+	// One persisted chat line (#95). The ChatServer records every channel post and whisper here so chat history
 	// survives a restart and can be served back (web/MCP log, moderation, a "recent chat" read on rejoin). This is a
 	// HISTORY table, not part of the wire protocol - the live relay (BroadcastChannelChat / whisper) is unchanged;
 	// persistence is a write-behind side effect. Keyed by the auto-increment Id; queried newest-first by channel.

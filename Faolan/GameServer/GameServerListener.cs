@@ -12,7 +12,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
@@ -175,7 +175,7 @@ namespace Faolan.GameServer
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
 		private readonly EquipmentService _equipment;
 
-		private readonly IAgentServerDispatcher _agentServerDispatcher;
+		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
 		// Connection keep-alive / latency replies (LatencyCheck 0x2085 -> Pong, Ping 0x2005 -> GameServerStats).
@@ -223,7 +223,7 @@ namespace Faolan.GameServer
 		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts;
 
-		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher,
+		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IChatServerDispatcher agentServerDispatcher,
 			IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes)))
 		{

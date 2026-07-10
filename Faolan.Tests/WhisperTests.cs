@@ -1,5 +1,5 @@
 using System;
-using Faolan.AgentServer;
+using Faolan.ChatServer;
 using Xunit;
 
 namespace Faolan.Tests
@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		{
 			var expected = Convert.FromHexString("001e000e01313438000568656c6c6f000100");
 
-			Assert.Equal(expected, AgentServerListener.BuildWhisper(0x01313438, "hello"));
+			Assert.Equal(expected, ChatServerListener.BuildWhisper(0x01313438, "hello"));
 		}
 
 		[Fact]
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		{
 			var expected = Convert.FromHexString("001e000c01313438000348492100" + "0100");
 
-			Assert.Equal(expected, AgentServerListener.BuildWhisper(0x01313438, "HI!"));
+			Assert.Equal(expected, ChatServerListener.BuildWhisper(0x01313438, "HI!"));
 		}
 	}
 }

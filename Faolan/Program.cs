@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.AgentServer;
+using Faolan.ChatServer;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
@@ -14,7 +14,7 @@ using Faolan.Core.Database.Tables;
 using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Extensions;
 using Faolan.Core.Helpers;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.CSPlayerAgent;
 using Faolan.GameServer;
@@ -94,7 +94,7 @@ namespace Faolan
 			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
 			//   --role login       -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
 			//   --role realm=<id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
-			//                         realm's ports; the login tier routes players to it (SendGameServer/AgentServer/CsPlayerAgent).
+			//                         realm's ports; the login tier routes players to it (SendGameServer/ChatServer/CsPlayerAgent).
 			//   --role realm       -> the same, for the first realm (id omitted).
 			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical dev run).
 			// At most ONE realm role per process: co-hosting several realms in one process would share the chat/world
@@ -132,7 +132,7 @@ namespace Faolan
 
 			// The realm this process hosts (realm role). Resolved from the DB up front - the Realm row is the single
 			// source of truth for the bind ports, so the world/chat/guild listeners bind exactly what the login tier
-			// advertises for this realm (SendGameServer/AgentServer/CsPlayerAgent). Needs a migrated + seeded DB.
+			// advertises for this realm (SendGameServer/ChatServer/CsPlayerAgent). Needs a migrated + seeded DB.
 			Realm hostRealm = null;
 			if (runRealm)
 			{
@@ -147,7 +147,7 @@ namespace Faolan
 			}
 
 			Console.WriteLine($"[role] login={runLogin} realm={runRealm}" +
-							  (hostRealm != null ? $" — hosting '{hostRealm.Name}' (id {hostRealm.Id}): world {hostRealm.Port} / chat {hostRealm.AgentServerPort} / cs {hostRealm.CsPlayerAgentPort}" : ""));
+							  (hostRealm != null ? $" — hosting '{hostRealm.Name}' (id {hostRealm.Id}): world {hostRealm.Port} / chat {hostRealm.ChatServerPort} / cs {hostRealm.CsPlayerAgentPort}" : ""));
 
 			builder.Services.AddLogging();
 
@@ -167,10 +167,10 @@ namespace Faolan
 				builder.Services.AddScopedHostedService(provider => new CsPlayerAgentListener(hostRealm.CsPlayerAgentPort, provider.GetRequiredService<ILogger<CsPlayerAgentListener>>(),
 					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IGameServerDispatcher>()));
 
-				builder.Services.AddSingleton<IAgentServerDispatcher, AgentServerDispatcher>();
+				builder.Services.AddSingleton<IChatServerDispatcher, ChatServerDispatcher>();
 				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
-				builder.Services.AddScopedHostedService(provider => new AgentServerListener(hostRealm.AgentServerPort, provider.GetRequiredService<ILogger<AgentServerListener>>(),
-					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IAgentServerDispatcher>(),
+				builder.Services.AddScopedHostedService(provider => new ChatServerListener(hostRealm.ChatServerPort, provider.GetRequiredService<ILogger<ChatServerListener>>(),
+					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IChatServerDispatcher>(),
 					provider.GetRequiredService<IGameServerDispatcher>(), provider.GetRequiredService<ClaudeChannel>()));
 
 				// Live seam into the GameServer listener: aggregates world sessions and routes
@@ -178,7 +178,7 @@ namespace Faolan
 				builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
 
 				// In-process MCP server (Claude tooling) on a localhost Kestrel port; shares the live singletons above.
-				// When disabled the AgentServer also skips the Claude chat-channel subscription (nothing reads the log).
+				// When disabled the ChatServer also skips the Claude chat-channel subscription (nothing reads the log).
 				if (builder.Configuration.McpEnabled)
 					builder.Services.AddFaolanMcp();
 
@@ -189,7 +189,7 @@ namespace Faolan
 					var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
 					var configuration = provider.GetRequiredService<IConfiguration>();
 					var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
-					var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
+					var agentServerDispatcher = provider.GetRequiredService<IChatServerDispatcher>();
 					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
 					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealmId}"), configuration, dataRepository, hostRealmPort, agentServerDispatcher,

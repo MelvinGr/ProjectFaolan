@@ -42,7 +42,7 @@ Wireshark without the JSON dump + Python dissector pipeline.
   or the binary `[u32 ip][u16 port]` form in the 0x1A07 handoffs). Advertised ports are
   registered automatically, so a whole session dissects from just the fixed UniverseAgent
   port (7010, the default binding).
-- **AgentServer chat**: connections that fail Conan validation (first-packet CRC) but walk
+- **ChatServer chat**: connections that fail Conan validation (first-packet CRC) but walk
   cleanly as `[u16 opcode][u16 bodyLen][body]` framing are re-framed from their first byte
   and dissected as chat packets (`faolan.chat.opcode` / `len` / `body`, raw values).
 - **Robust delivery**: per-direction TCP sequence tracking deduplicates retransmissions and
@@ -94,7 +94,7 @@ Useful fields:
 | `faolan.pkt.sender_class` / `receiver_class`                      | ProtoEndpoint class id, resolved to class name                   |
 | `faolan.pkt.sender_instance` / `receiver_instance`                | character/zone instance                                          |
 | `faolan.pkt.len` / `crc` / `header_len` / `header_extra` / `body` | packet layout fields                                             |
-| `faolan.chat.opcode` / `method` / `direction` / `len` / `body`    | AgentServer chat packets (names per direction)                   |
+| `faolan.chat.opcode` / `method` / `direction` / `len` / `body`    | ChatServer chat packets (names per direction)                   |
 | `faolan.compression_state`                                        | Plain / TransitionHeader / Compressed / Failed / Chat / Skipped  |
 | `faolan.stream_note`                                              | retransmission / out-of-order / capture-gap diagnostics          |
 | `faolan.decompressed`                                             | inflated bytes produced in this frame (own data source)          |

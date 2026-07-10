@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Mcp;
 using Xunit;
 

@@ -81,7 +81,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("- **A named opcode does NOT mean the message BODY is decoded.** Body layouts are documented");
 			sb.AppendLine("  per-message (and gated by golden tests) elsewhere; see [`coverage.md`](coverage.md) for which have one.");
 			sb.AppendLine("- **Direction** is the RpcHeader receiver's role: `*Agent` classes receive client→server calls (C2S),");
-			sb.AppendLine("  `*Interface` classes receive server→client dispatches (S2C). AgentServer chat carries no RpcHeader.");
+			sb.AppendLine("  `*Interface` classes receive server→client dispatches (S2C). ChatServer chat carries no RpcHeader.");
 			sb.AppendLine("- **Class id** = BKDR-31 hash of the client class name, recomputed + asserted here.");
 			sb.AppendLine();
 
@@ -107,11 +107,11 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 				else
 				{
-					// The AgentServer chat enums have no RpcHeader / no RPC class.
-					var dir = e.Name.Contains("Responds", StringComparison.Ordinal)
+					// The ChatServer chat enums have no RpcHeader / no RPC class.
+					var dir = e.Name.Contains("Interface", StringComparison.Ordinal)
 						? "S2C"
 						: "C2S";
-					sb.AppendLine($"AgentServer chat — **no RpcHeader** (raw opcode) · {dir}");
+					sb.AppendLine($"ChatServer chat — **no RpcHeader** (raw opcode) · {dir}");
 				}
 
 				sb.AppendLine();

@@ -1,22 +1,22 @@
-# Chat (AgentServer + local say) — PINNED 2026-06-11
+# Chat (ChatServer + local say) — PINNED 2026-06-11
 
 Status: the chat paths below are **implemented and byte-matched against the captures**; cross-player relay
 (channel chat reaching a second player, proximity say between two players) is **not yet verified in-client** —
 it needs two connected clients. Pinned here until then. Memory: `protocol_agentserver_chat`,
 `protocol_stats_and_combat` (the local-say dispatch). Workbench: any `*gameplay*` / `*guild_invite*` capture
-(`ProtocolName == "AgentServer"`).
+(`ProtocolName == "ChatServer"`).
 
 ## Two chat systems (different connections)
 
 | chat | connection | how |
 |---|---|---|
-| **Channels** (~Global/~LFG/~Trial/~GlobalEnglish/~Playfield/~NewbieHelp/~Guild) | **AgentServer** (port `realm+...`) | `0x0041` |
-| **Local "say"** (the default chat box) | **GameServer** receives it, **AgentServer** delivers it | `0x2002` in → `0x0022` out |
+| **Channels** (~Global/~LFG/~Trial/~GlobalEnglish/~Playfield/~NewbieHelp/~Guild) | **ChatServer** (port `realm+...`) | `0x0041` |
+| **Local "say"** (the default chat box) | **GameServer** receives it, **ChatServer** delivers it | `0x2002` in → `0x0022` out |
 | **World/system chat** (remoteformat XML) | GameServer | `ChatTextIIR 0xE0B51102` (out; `.syschat` GM cmd) |
 
-The AgentServer wire format is `[u16 opcode][u16 bodyLen][body]` (`AgentServerMessageFramer`).
+The ChatServer wire format is `[u16 opcode][u16 bodyLen][body]` (`ChatServerMessageFramer`).
 
-## AgentServer opcodes
+## ChatServer opcodes
 
 - **`0x0000` Hello** (in): `[u32 unk0][u32 clientInstance][u32 accountId]`. On receipt the server sends the channel
   subscription list, a `0x00050000` ready, `0x0014` char-info, and the welcome `SystemMessage`s.
@@ -42,7 +42,7 @@ The AgentServer wire format is `[u16 opcode][u16 bodyLen][body]` (`AgentServerMe
 A server-defined channel **"Claude"** (`04/0x00C1A0DE/flag 0x8044`, id far outside the retail range) is
 appended to the login subscription list. The whole bridge is gated on `"McpEnabled"` in `faolan.json`
 (default true): disabled = no MCP host, no channel subscription, no log capture. Player posts on it broadcast normally AND are recorded in the
-in-memory `ClaudeChannel` log (`Faolan.Core.Network/Server/AgentServer/ClaudeChannel.cs`, ring of 500, monotonic
+in-memory `ClaudeChannel` log (`Faolan.Core.Network/Server/ChatServer/ClaudeChannel.cs`, ring of 500, monotonic
 sequence numbers). The MCP tools `read_claude_channel` (poll by `afterSequence`) and
 `send_claude_channel_message` bridge it to Claude; Claude's replies broadcast in-game as the synthetic
 sender `0xC1A0DE05`/"Claude" via the standard `0x0014`+`0x0041` relay pair. Log is not persisted across
@@ -54,9 +54,9 @@ restarts. In-client render of the channel is not yet verified (needs a live clie
    GM is a GM command instead.)
 2. The GameServer computes the **proximity recipients** (`SayRecipients`): connected players on the **same map**
    within `SayRangeUnits` (~50 world units ≈ metres) + the **sender** (always hears their own say). Positions are
-   live only on the GameServer (Move updates `Session.Character.Position`); the AgentServer loads its own Character
+   live only on the GameServer (Move updates `Session.Character.Position`); the ChatServer loads its own Character
    per connection and has no live position, which is why the scope is computed GameServer-side.
-3. → `dispatcher.CharacterSay(senderId, text, recipientIds)` → AgentServer delivers `0x0022` to only those clients
+3. → `dispatcher.CharacterSay(senderId, text, recipientIds)` → ChatServer delivers `0x0022` to only those clients
    (`recipientCharacterIds = null` would mean server-wide; kept for any non-proximity caller).
 
 ## Not done / next (when revisited)
@@ -74,7 +74,7 @@ Capture `Hoxxling_mage-heraldofxotli_login_move-from-night-to-day_send-and-recei
 op **0x001E both directions**, same body shape: `[u32 peerCharId][string][00 01 00]` (peer = the TARGET in the
 client's request, the SENDER on delivery). Delivery is preceded by a `0x0014` sender info, like channel chat;
 retail echoes nothing back to the sender (the client renders its own outgoing tell locally). Golden tests:
-`WhisperTests` (byte-exact both captured packets). Implemented in `AgentServerListener` (`BuildWhisper`);
+`WhisperTests` (byte-exact both captured packets). Implemented in `ChatServerListener` (`BuildWhisper`);
 offline target -> system message (uncaptured fallback). A tell to Claude's synthetic identity
 (`/tell Claude`, id learned from the channel's 0x0014) lands in the MCP bridge log as a private message.
 LIMIT: the client whispers by character ID it already knows (from a 0x0014 it has seen); whispering a name the
@@ -88,7 +88,7 @@ client has never seen chat may involve a name-lookup exchange that is NOT in thi
 
 ## The in-game Claude channel and the Claude Code channel bridge
 
-Every client is subscribed to the server-defined **"Claude" chat channel** (04/0x00C1A0DE) on AgentServer
+Every client is subscribed to the server-defined **"Claude" chat channel** (04/0x00C1A0DE) on ChatServer
 login. Player posts on it land in the in-memory `ClaudeChannel` log; the MCP tools `read_claude_channel`
 (cursor by sequence) and `send_claude_channel_message` (broadcast in-game as "Claude") bridge it to Claude.
 
@@ -107,7 +107,7 @@ game-server restarts and skips the pre-launch backlog. SDK note: the experimenta
 JsonElement - a boxed Dictionary breaks the SDK's source-generated initialize serialization.)
 
 **Reply in the addressed mode (#97):** each message carries the inbound MODE structurally — `ClaudeChannelMessage.ViaWhisper`
-is set at ingestion (true for a `/tell Claude`, false for a channel post; `AgentServerListener` `Whisper` vs channel-chat
+is set at ingestion (true for a `/tell Claude`, false for a channel post; `ChatServerListener` `Whisper` vs channel-chat
 cases), *not* encoded as a `"(whisper) "` text prefix. The bridge surfaces it on the channel event as
 `mode="whisper|channel"`, and the server instructions tell Claude to answer in kind: whisper back (`whisper_to` =
 `sender_id`) for a whisper, broadcast (omit `whisper_to`) for a channel post. So a private tell stays private and a

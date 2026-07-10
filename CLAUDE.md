@@ -61,7 +61,7 @@ dotnet ef database update --project Faolan --connection "Data Source=$PWD/faolan
 **Server flow:** `UniverseAgent (7010, the only fixed port) -> PlayerAgent -> GameServer`. Each service
 hands the client the next address in its payload. `Faolan/Program.cs` runs the protocol services as hosted
 services: `UniverseAgentListener`, `PlayerAgentListener` (the login/router tier), `CsPlayerAgentListener`
-(guilds/teams/groupfinder), `AgentServerListener` (chat), `GameServerListener` (the world; one listener
+(guilds/teams/groupfinder), `ChatServerListener` (chat), `GameServerListener` (the world; one listener
 serves both the create-editor and world connections). **Process role (multi-realm, #324 —
 `docs/subsystems/multi-realm-plan.md`):** by default `dotnet run --project Faolan` is *all-in-one* (login +
 a game host for the first realm — the historical single-process dev run); `--role login` runs ONLY the
@@ -111,7 +111,7 @@ wire side). Do NOT pass the listener itself — that re-introduces the circular 
 removed. (See Gitea #200 for the remaining extraction backlog.)
 
 Listeners inherit `Server<TPacket,...>` (`Faolan.Core.Network/Server.cs`); per-connection state lives on
-`INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IAgentServerDispatcher` for
+`INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IChatServerDispatcher` for
 chat/system messages, `IGameServerDispatcher` for world actions), never direct references.
 
 **Database:** SQLite via EF Core (`Faolan.Core.Database`: `DatabaseContext` + `Tables/`), pooled

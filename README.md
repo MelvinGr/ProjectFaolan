@@ -134,7 +134,7 @@ dotnet run --project Faolan
 ```
 
 It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the PlayerAgent,
-CsPlayerAgent, AgentServer and GameServer listeners the client is handed off to in turn), migrates the
+CsPlayerAgent, ChatServer and GameServer listeners the client is handed off to in turn), migrates the
 database schema, and hosts an in-process MCP endpoint on `http://127.0.0.1:7099/mcp`.
 
 For a **multi-realm** deployment (#324), split the process by role — one login/router tier and one game host

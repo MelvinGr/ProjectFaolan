@@ -36,7 +36,7 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 
 ### hoxxling — guild_invite_accepted, gameplay, other players visible
 `...guild_invite_accepted-random-gameplay-other_playersvisible.json`
-- **Guild chat / broadcast**: `0x203f` carries guild text ("Please put in guild bank", "Full Info on ALL items/quests"). (Full chat protocol — AgentServer channels + local say — is in `docs/subsystems/chat.md`.)
+- **Guild chat / broadcast**: `0x203f` carries guild text ("Please put in guild bank", "Full Info on ALL items/quests"). (Full chat protocol — ChatServer channels + local say — is in `docs/subsystems/chat.md`.)
 - **Loot**: `0x2038` "Loot Goblins"; `0xF096251E` "Bag of loot"; `0x642CD3D6` "lootbag_open" (open a loot bag).
 - **Other players**: many `FA015807` spawns + `4517AA81` Move (678) - other player entities streaming in.
 - Guild-invite accept packet itself not yet isolated (no distinct "guild invite" sub-op found; likely an Interact/

@@ -204,7 +204,7 @@ server sends:
 - The only novel pre-burst packet, frame 41's **`0x1a07` from class `0x1d359116:0x57`**, is NOT a world-conversation
   registration: its bodies decode to the **multi-agent address handoff** (ASCII `gs013-nj4.ageofconan.com:7028`) +
   per-char init stats + global game config (`AAPointsPerLevel`, `AlternateAdvancement_*`). Our own opcode enum
-  even labels `0x1A07` as `Send{CsPlayerAgent,AgentServer,GameServer}` — the agent-address advert, which we already
+  even labels `0x1A07` as `Send{CsPlayerAgent,ChatServer,GameServer}` — the agent-address advert, which we already
   perform (the client connects to our agents). So it's a red herring for the remote-resolution gate.
 
 **So the handshake diff finds NO discrete packet we omit** — corroborating the earlier byte-level loopback

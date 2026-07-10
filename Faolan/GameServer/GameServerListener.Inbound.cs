@@ -1390,7 +1390,7 @@ namespace Faolan.GameServer
 		// the playfield is built the client polls the server for the aggro state between the player and each nearby
 		// hostile NPC, and will NOT finish the loading screen until each poll is answered. Retail answers every one
 		// (~17 over a login); we answered none, so the live client retried the same poll 450+ times and sat on the
-		// loading screen forever - which is why it never opened the AgentServer/CommunityServer (chat) connection.
+		// loading screen forever - which is why it never opened the ChatServer/CommunityServer (chat) connection.
 		// Decoded from the kalantes_chat retail capture (port 7015):
 		//   req  C->S: recv=GameCharAgentProject, send=GameCharInterfaceProject/<player>, op 0x2000, 		//              body [u32 0xC350][u32 charInstance][u32 0xC350][u32 targetInstance]   (two ProtoID32s)
 		//   resp S->C: send=GameCharAgentProject/<zone handle 0x58>, recv=GameCharInterfaceProject/<player>, op 0x2000, 		//              body [u32 0xC350][u32 targetInstance][u32 cCategory]

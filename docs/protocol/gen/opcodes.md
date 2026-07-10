@@ -14,33 +14,8 @@
 - **A named opcode does NOT mean the message BODY is decoded.** Body layouts are documented
   per-message (and gated by golden tests) elsewhere; see [`coverage.md`](coverage.md) for which have one.
 - **Direction** is the RpcHeader receiver's role: `*Agent` classes receive client→server calls (C2S),
-  `*Interface` classes receive server→client dispatches (S2C). AgentServer chat carries no RpcHeader.
+  `*Interface` classes receive server→client dispatches (S2C). ChatServer chat carries no RpcHeader.
 - **Class id** = BKDR-31 hash of the client class name, recomputed + asserted here.
-
-## AgentServerOpcodes
-
-AgentServer chat — **no RpcHeader** (raw opcode) · C2S
-
-| Opcode | Name | Note |
-|--------|------|------|
-| `0x0000` | `Hello` |  |
-| `0x001E` | `Whisper` | client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12) |
-| `0x0041` | `ChannelChat` | client posts a message to a chat channel: [byte type][u32 channelId][string][0000] |
-| `0x0064` | `ChatReady` | small chat-init handshake the client sends after the channel subscriptions (000102) |
-
-## AgentServerRespondsOpcodes
-
-AgentServer chat — **no RpcHeader** (raw opcode) · S2C
-
-| Opcode | Name | Note |
-|--------|------|------|
-| `0x0014` | `Ox0014` | sender id + name; also sent before a ChannelChat so the client can show the speaker |
-| `0x001E` | `Whisper` | incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info |
-| `0x0022` | `CharacterChat` |  |
-| `0x0023` | `SystemMessage` |  |
-| `0x003C` | `Ox003C` |  |
-| `0x0041` | `ChannelChat` | a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000] |
-| `0x0064` | `Ox0064` | echo of the client's chat-init handshake |
 
 ## CSPlayerAgentOpcodes
 
@@ -403,6 +378,31 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x20D0` | `DispatchGroupFinderUpdateFeaturedActivities` |  |
 | `0x20D1` | `DispatchReturnWorldStat` |  |
 | `0x20D2` | `DispatchInvalidWorldStat` |  |
+
+## ChatServerInterfaceOpcodes
+
+ChatServer chat — **no RpcHeader** (raw opcode) · S2C
+
+| Opcode | Name | Note |
+|--------|------|------|
+| `0x0014` | `Ox0014` | sender id + name; also sent before a ChannelChat so the client can show the speaker |
+| `0x001E` | `Whisper` | incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info |
+| `0x0022` | `CharacterChat` |  |
+| `0x0023` | `SystemMessage` |  |
+| `0x003C` | `Ox003C` |  |
+| `0x0041` | `ChannelChat` | a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000] |
+| `0x0064` | `Ox0064` | echo of the client's chat-init handshake |
+
+## ChatServerOpcodes
+
+ChatServer chat — **no RpcHeader** (raw opcode) · C2S
+
+| Opcode | Name | Note |
+|--------|------|------|
+| `0x0000` | `Hello` |  |
+| `0x001E` | `Whisper` | client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12) |
+| `0x0041` | `ChannelChat` | client posts a message to a chat channel: [byte type][u32 channelId][string][0000] |
+| `0x0064` | `ChatReady` | small chat-init handshake the client sends after the channel subscriptions (000102) |
 
 ## GameAgentOpcodes
 

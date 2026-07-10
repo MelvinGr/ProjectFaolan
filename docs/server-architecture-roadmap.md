@@ -5,7 +5,7 @@
 > shared world model, no game loop, and no cross-player visibility. Becoming a "proper" server means putting an
 > authoritative, ticking, in-memory world on top of the wire layer that already works.
 
-Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see also
+Written 2026-06-11. Grounds: the GameServer/ChatServer code as it stands; see also
 `world_packets_construct_not_replay`, `protocol_stats_and_combat`, `docs/subsystems/chat.md`, `docs/re/quests-and-combat.md`.
 
 > ## PROGRESS (2026-06-11) — the milestone-1 foundation is in (harness-verified; the in-client payoff is pending)
@@ -96,8 +96,8 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
   from tables vs still replayed.
 - **Combat scaffolding** — `CombatState` (in-memory vitals per handle), `CombatResolver` (provisional damage), NPC
   max HP now seeded from the spawn's `CharacterStats.health`.
-- **Chat** — AgentServer channels (`0x0041`) + proximity local say (`0x0022`). See `docs/subsystems/chat.md`.
-- **Login/auth + the 5-connection handshake** (UniverseAgent/PlayerAgent/GameServer/AgentServer/CsPlayerAgent).
+- **Chat** — ChatServer channels (`0x0041`) + proximity local say (`0x0022`). See `docs/subsystems/chat.md`.
+- **Login/auth + the 5-connection handshake** (UniverseAgent/PlayerAgent/GameServer/ChatServer/CsPlayerAgent).
 
 ## The architectural gap (the core thing)
 
@@ -111,7 +111,7 @@ From the code as it stands:
   per-zone `Update(dt)`. Nothing moves, regenerates, respawns, or thinks on its own.
 - **No shared world model.** State is **per-session**: each connection has its own `Session.Character`, its own
   `SpawnedNpcNamesByHandle` / `SpawnedNpcMaxHealthByHandle`, its own `CombatState`. There is no per-map registry of
-  "all entities here". The AgentServer even loads a *separate* `Character` per connection (why say-proximity is
+  "all entities here". The ChatServer even loads a *separate* `Character` per connection (why say-proximity is
   computed GameServer-side — only it has live positions).
 - **No cross-player visibility.** A player's Move is echoed back to **only the mover**
   (`LoginWorldReceiver(client)`; the handler comment says *"single client for now"*). Other players arrive as

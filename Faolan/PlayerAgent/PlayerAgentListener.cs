@@ -125,9 +125,9 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.ReceivedCharacterSettings: // after 0x20B9
 				{
-					// Retail order (login dump): CsPlayerAgent, then AgentServer, then GameServer, then gametweaks.
+					// Retail order (login dump): CsPlayerAgent, then ChatServer, then GameServer, then gametweaks.
 					await SendCsPlayerAgent(client);
-					await SendAgentServer(client);
+					await SendChatServer(client);
 					await SendGameServer(client);
 
 					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on

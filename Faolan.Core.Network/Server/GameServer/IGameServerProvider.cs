@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.Core.Network.Server.GameServer
 {
 	/// <summary>
-	///     Seam into a live GameServer listener, mirroring <see cref="IAgentServerProvider" /> but for the
+	///     Seam into a live GameServer listener, mirroring <see cref="IChatServerProvider" /> but for the
 	///     world connection: enumerating connected world sessions and driving server-side actions (spawns,
 	///     teleports, …) by issuing the same GM commands a game master would. Implemented by the listener;
 	///     reached through <see cref="IGameServerDispatcher" />.

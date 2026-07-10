@@ -45,7 +45,7 @@ namespace Faolan.Importer.Captures
 				foreach (var p in packets.EnumerateArray())
 				{
 					seq++;
-					// Conan = the game/agent connections (the conversation lives here); skip the AgentServer chat stream.
+					// Conan = the game/agent connections (the conversation lives here); skip the ChatServer chat stream.
 					if (!p.TryGetProperty("Protocol", out var proto) || proto.GetString() != "Conan")
 						continue;
 					if (!p.TryGetProperty("BodyHex", out var bodyHex) || bodyHex.ValueKind != JsonValueKind.String)

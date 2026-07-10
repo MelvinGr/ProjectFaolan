@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using ModelContextProtocol.Server;
 
 namespace Faolan.Mcp.Tools
@@ -9,7 +9,7 @@ namespace Faolan.Mcp.Tools
 	/// <summary>
 	///     The Claude chat channel bridge: every client is subscribed to the in-game "Claude" channel on login;
 	///     player posts on it land in the <see cref="ClaudeChannel" /> log, and these tools let Claude read that
-	///     log and reply in-game (broadcast via <see cref="IAgentServerDispatcher" /> under the Claude identity).
+	///     log and reply in-game (broadcast via <see cref="IChatServerDispatcher" /> under the Claude identity).
 	/// </summary>
 	[McpServerToolType]
 	public sealed class ClaudeChannelTools
@@ -20,9 +20,9 @@ namespace Faolan.Mcp.Tools
 		};
 
 		private readonly ClaudeChannel _channel;
-		private readonly IAgentServerDispatcher _dispatcher;
+		private readonly IChatServerDispatcher _dispatcher;
 
-		public ClaudeChannelTools(ClaudeChannel channel, IAgentServerDispatcher dispatcher)
+		public ClaudeChannelTools(ClaudeChannel channel, IChatServerDispatcher dispatcher)
 		{
 			_channel = channel;
 			_dispatcher = dispatcher;
@@ -49,7 +49,7 @@ namespace Faolan.Mcp.Tools
 
 			var delivered = await _dispatcher.SendClaudeChannelMessage(message);
 			return delivered == 0
-				? "No clients are currently connected to the AgentServer; the message was logged on the channel but reached nobody."
+				? "No clients are currently connected to the ChatServer; the message was logged on the channel but reached nobody."
 				: $"Posted to the Claude channel; delivered to {delivered} connected client(s).";
 		}
 

@@ -2,14 +2,14 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using ModelContextProtocol.Server;
 
 namespace Faolan.Mcp.Tools
 {
 	/// <summary>
 	///     Tools that observe the live running server (not just the database). Backed by
-	///     <see cref="IAgentServerDispatcher" />, the existing seam into the registered agent-server provider.
+	///     <see cref="IChatServerDispatcher" />, the existing seam into the registered agent-server provider.
 	/// </summary>
 	[McpServerToolType]
 	public sealed class SessionTools
@@ -19,9 +19,9 @@ namespace Faolan.Mcp.Tools
 			WriteIndented = true
 		};
 
-		private readonly IAgentServerDispatcher _dispatcher;
+		private readonly IChatServerDispatcher _dispatcher;
 
-		public SessionTools(IAgentServerDispatcher dispatcher)
+		public SessionTools(IChatServerDispatcher dispatcher)
 		{
 			_dispatcher = dispatcher;
 		}
@@ -46,7 +46,7 @@ namespace Faolan.Mcp.Tools
 				return "Message is empty; nothing sent.";
 
 			if (_dispatcher.GetSessions().All(s => s.CharacterId != characterId))
-				return $"Character {characterId} is not currently connected to the AgentServer; nothing sent.";
+				return $"Character {characterId} is not currently connected to the ChatServer; nothing sent.";
 
 			await _dispatcher.SendSystemMessage(characterId, message);
 			return $"Sent the system message to character {characterId}.";

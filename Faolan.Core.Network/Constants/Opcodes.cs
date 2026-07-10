@@ -3,7 +3,7 @@ using System;
 // ReSharper disable InconsistentNaming
 namespace Faolan.Core.Network.Constants
 {
-	public enum AgentServerOpcodes : ushort
+	public enum ChatServerOpcodes : ushort
 	{
 		Hello = 0x0000,
 		Whisper = 0x001E, // client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12)
@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Constants
 		ChatReady = 0x0064 // small chat-init handshake the client sends after the channel subscriptions (000102)
 	}
 
-	public enum AgentServerRespondsOpcodes : ushort
+	public enum ChatServerInterfaceOpcodes : ushort
 	{
 		CharacterChat = 0x0022,
 		SystemMessage = 0x0023,

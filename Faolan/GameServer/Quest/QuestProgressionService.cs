@@ -5,7 +5,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Quest;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Quest
@@ -26,12 +26,12 @@ namespace Faolan.GameServer.Quest
 	// Replaces the single-stage #47 turn-in for chained quests.
 	public sealed class QuestProgressionService
 	{
-		private readonly IAgentServerDispatcher _agents;
+		private readonly IChatServerDispatcher _agents;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly IQuestOutbound _outbound;
 
-		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IAgentServerDispatcher agents, ILogger logger)
+		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IChatServerDispatcher agents, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Server.AgentServer;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
 
@@ -69,7 +69,7 @@ namespace Faolan.GameServer.World
 
 		// Per-map resurrection points + per-character discovered sets, cached to keep the discovery tick off the DB.
 		private readonly ConcurrentDictionary<uint, RespawnPoint[]> _respawnPointsByMap = new ConcurrentDictionary<uint, RespawnPoint[]>();
-		private readonly IAgentServerDispatcher _agents;
+		private readonly IChatServerDispatcher _agents;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
@@ -81,7 +81,7 @@ namespace Faolan.GameServer.World
 		// The live world model + the connected players' authoritative world entities (transform + vitals).
 		public WorldState World { get; } = new WorldState();
 
-		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IAgentServerDispatcher agents, ILogger logger)
+		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger)
 		{
 			_output = output;
 			_database = database;

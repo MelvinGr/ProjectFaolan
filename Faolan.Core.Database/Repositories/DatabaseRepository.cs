@@ -1247,7 +1247,7 @@ namespace Faolan.Core.Database.Repositories
 					.SetProperty(c => c.MapId, mapId));
 		}
 
-		// Persists one chat line (#95): a channel post or a whisper, recorded write-behind by the AgentServer so chat
+		// Persists one chat line (#95): a channel post or a whisper, recorded write-behind by the ChatServer so chat
 		// history survives a restart. Never throws back into the chat relay - a persistence hiccup must not drop the
 		// live message - so the caller wraps it defensively.
 		public async Task SaveChatMessage(ChatMessage message)

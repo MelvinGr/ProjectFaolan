@@ -3,7 +3,7 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Text
 {
 	// Builds/parses the ChatTextIIR (sub-opcode 0xE0B51102) body - a WORLD/SYSTEM chat line the server pushes into
-	// the client's chat window (distinct from FormatFeedbackIIR's on-screen FIFO overlay and from the AgentServer
+	// the client's chat window (distinct from FormatFeedbackIIR's on-screen FIFO overlay and from the ChatServer
 	// channel chat). The text is a `remoteformat` (localized tokens + parameters), the same XML shape the feedback
 	// and Knubot packets use, so the server can emit a localized system line without literal strings.
 	//

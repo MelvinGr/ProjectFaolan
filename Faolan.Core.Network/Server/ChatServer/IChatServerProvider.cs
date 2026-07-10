@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Faolan.Core.Network.Server.AgentServer
+namespace Faolan.Core.Network.Server.ChatServer
 {
-	public interface IAgentServerProvider
+	public interface IChatServerProvider
 	{
-		// Delivers a character's "say" to AgentServer clients as a CharacterChat (0x0022). `recipientCharacterIds`
+		// Delivers a character's "say" to ChatServer clients as a CharacterChat (0x0022). `recipientCharacterIds`
 		// scopes it to those characters (proximity say - the GameServer computes who is in range, since it holds the
 		// live positions); null = every connected client (server-wide).
 		Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint> recipientCharacterIds = null);
@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Server.AgentServer
 
 		/// <summary>
 		///     Whispers (0x001E tell) a single character as the synthetic "Claude" sender. Returns false when the
-		///     character has no connected AgentServer client.
+		///     character has no connected ChatServer client.
 		/// </summary>
 		Task<bool> SendClaudeWhisper(uint targetCharacterId, string message);
 

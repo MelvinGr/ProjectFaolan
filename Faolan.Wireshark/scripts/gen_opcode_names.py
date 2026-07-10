@@ -44,8 +44,8 @@ ENUM_TO_CLASS = {
 # (chat packets have no RpcHeader, so they can't ride the class-keyed tables).
 STANDALONE_ENUMS = {
     "GameServer0X2000Opcodes": "faolan_iir_names",
-    "AgentServerOpcodes": "faolan_chat_c2s_names",
-    "AgentServerRespondsOpcodes": "faolan_chat_s2c_names",
+    "ChatServerOpcodes": "faolan_chat_c2s_names",
+    "ChatServerInterfaceOpcodes": "faolan_chat_s2c_names",
 }
 
 # Capture-verified class ids (the dissector's faolan_class_names table, 109k endpoints).
