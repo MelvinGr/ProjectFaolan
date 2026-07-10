@@ -8,8 +8,8 @@
 ## Headline
 
 - **823** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **75** IIR carrier types: **57 V3** (byte-exact builder), **18 V2** (built, no golden), **0 V1** (no builder found).
-- **59** codec classes, **40** with a byte-exact test.
+- **75** IIR carrier types: **58 V3** (byte-exact builder), **17 V2** (built, no golden), **0 V1** (no builder found).
+- **59** codec classes, **41** with a byte-exact test.
 - **38** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -52,6 +52,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
 | V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterBuilder` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
+| V3 | `GameTimeIIR` | `GameTimeCodec` |
 | V3 | `GuildUpdateIIR` | `GuildTagBody` |
 | V3 | `HateListUpdateIIR` | `HateListCodec` |
 | V3 | `IntendedTeleportIIR` | `TeleportCodec` |
@@ -98,7 +99,6 @@ the margins, but never invents a golden that isn't there.
 | V2 | `CrimeIIR` | `CrimeCodec` |
 | V2 | `DeleteItemIIR` | `InventoryMoveCodec` |
 | V2 | `FeedbackIIR` | `FeedbackIirCodec` |
-| V2 | `GameTimeIIR` | `GameTimeCodec` |
 | V2 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |
 | V2 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
 | V2 | `LockedToChangedIIR` | `LockedToChangedCodec` |
