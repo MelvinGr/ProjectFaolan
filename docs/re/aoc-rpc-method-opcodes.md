@@ -496,13 +496,42 @@ but its name is not recoverable from strings (catalog also missed it). These are
 0x20D2  DispatchInvalidWorldStat
 ```
 
-### PlayerInterface / PlayerAgent — DIFFERENT dispatch scheme (hash, not index)
-`PlayerInterfaceDispatch_t::DispatchMethod` is **not** a `switch(0x2000+index)` like the others — it is a
-binary-search tree comparing the method id against **32-bit constants** (e.g. `0x5dc18991` →
-`DispatchAuthenticateAck`, `0x233605b9` → `DispatchSendCharacterSettings`, `0x1562ce84` →
-`DispatchHardcoreLevelSet`; handler→name confirmed from the handlers' own strings). This is why
-PlayerAgent/PlayerInterface is the lone interface whose wire ids don't fit the `0x2000 + index` model
-(observed c2s wire `0x2083..0x20F5`) — it uses hashed method ids. The hash is **not** plain BKDR-31 or
-CRC32 of the (Dispatch-)name (checked), so the exact function is still open. Until it's cracked the login
-opcodes stay behavior-derived in `Opcodes.cs` (and they already work). Follow-up: identify the hash fn —
-the handler→name pairs above are known plaintext↔hash anchors to solve it.
+### PlayerInterface / PlayerAgent — DIFFERENT dispatch scheme (hash id ON THE WIRE), #320
+
+**Corrected 2026-07 (verified against the wire + Ghidra; supersedes the earlier "hash not recovered" note).**
+
+Unlike every other interface, PlayerAgent/PlayerInterface carries **two** ids in its header:
+`[endpoints][u16 opcode][u32 method-id]`. That trailing `u32` is `ConanPacket.HeaderData` — **empty for all 16
+other interfaces**, and present only here. Confirmed on all 13 PlayerAgent/PlayerInterface packets (both
+directions) of `Barbarian-login` — e.g. EnterWorld = opcode `0x20B6` + id `0xDD85FB0E`; RequestSmallCharList =
+`0x20C1` + `0xDAD1D206`. The server already emits it (`WriteHeader(..., InitAuth, [0x93,0x86,0xee,0x05])` =
+`0x9386ee05`). So the `//0x…`-style comments in `Opcodes.cs` are the **wire** id, not a client-internal value.
+The 16-bit opcode is a normal `0x2000+index` value (indices 0x83..0xEF) carried alongside; the client dispatches
+on the 32-bit id.
+
+**s2c POST-AUTH table recovered** (`PlayerInterfaceDispatch_t::DispatchMethod` = `FUN_00484270`, a binary-search
+tree over 32-bit constants; `DumpDispatch.java` + `DumpHandlerNames.java`). 26 methods, e.g. `0x5DC18991`
+DispatchAuthenticateAck, `0xA7C86A29` DispatchSetStats, `0xF899B14C` DispatchSetDimensionList. Full table:
+`/home/melvin/Development/Ghidra/Aoc/playerinterface_postauth_s2c.json` (external, not committed).
+
+**c2s method list recovered** (`PlayerAgentProxy_t`, registration order, `DumpRpcTables.java`): 25 methods —
+Authenticate, AuthenticateLoggedIn, LoginFromCrash, CreateCharacter, LoginCharacter (= our EnterWorld),
+RenameCharacter, RequestDeleteCharacter, … The per-method opcode/hash are NOT inline in the proxy send
+(`DumpPlayerAgentProxy.java` shows the send only marshals params) — they come from the RPC registration.
+
+**The login (pre-auth) id encoding is the remaining open piece.** The 26-method tree above is **post-auth only**
+(`DispatchMethod` gates on an is-authenticated flag and errors `"not possible before being authenticated"`
+otherwise), so the login methods we actually use (Authenticate/EnterWorld/InitAuth/SendCharacterList/…) are
+dispatched by a separate pre-auth path and their wire ids (`0x9386EE05`, `0xDAD1D206`, …) appear in **none** of
+the 26 tree constants. Two hard facts about those login ids:
+- They are **not stored anywhere in `AgeOfConan.exe`** — absent as instruction immediates (`FindConst.java`,
+  0 hits) and as static data in either endianness (raw byte scan, 0 hits). So they are **computed at runtime**.
+- They are **not a plain name-hash**: 25 clean (name→id) anchors from the post-auth table were tested against
+  crc32 / djb2(±xor) / sdbm / fnv1(a) / jenkins / elf / bkdr(9 seeds) over 5 string forms — **zero** matches
+  (not even 2/25). And every login id has a **small final wire byte** (`…09,…06,…0d,…0e,…05,…0c,…0f,…04,…02`;
+  13/13 in `[0x02,0x0F]`) — statistically impossible for a uniform hash, so the id is structured
+  `[24-bit hash][small tag byte]`, not a raw hash.
+
+**Next:** find the pre-auth dispatcher / the id-computation function (xref where `PlayerAgentProxy_t::Authenticate`
+registers, or the login-connection receive handler for class `0x82F20484`) and read the algorithm + tag directly,
+rather than brute-forcing it. Until then the login opcodes+ids stay behavior-derived in `Opcodes.cs` (they work).
