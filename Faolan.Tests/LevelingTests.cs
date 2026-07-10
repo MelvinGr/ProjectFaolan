@@ -18,10 +18,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void Apply_MultiLevelInOneAward()
 		{
-			// from level 1: 100 (->2) + 200 (->3) = 300 consumed; 350 -> +2 levels, 50 left.
-			var (gained, remaining) = LevelingResolver.Apply(1, 350);
+			// real curve: level 1->2 = 100, 2->3 = 340. 500 -> +2 levels (100+340 = 440 consumed), 60 left.
+			var (gained, remaining) = LevelingResolver.Apply(1, 500);
 			Assert.Equal(2u, gained);
-			Assert.Equal(50u, remaining);
+			Assert.Equal(60u, remaining);
 		}
 
 		[Fact]
@@ -44,16 +44,35 @@ namespace Faolan.Tests
 		[Fact]
 		public void Apply_StopsExactlyAtMaxLevel()
 		{
-			var (gained, _) = LevelingResolver.Apply(LevelingResolver.MaxLevel - 1, 999999);
-			Assert.Equal(1u, gained); // only the one level up to the cap
+			// L79->L80 is ~47M on the real curve, so award well past it; still only the one level to the cap.
+			var (gained, _) = LevelingResolver.Apply(LevelingResolver.MaxLevel - 1, 999_999_999);
+			Assert.Equal(1u, gained);
+		}
+
+		[Theory]
+		// The captured retail anchors (MaxExp stat paired with the character's Level) — these MUST be exact.
+		[InlineData(1u, 100u)]
+		[InlineData(2u, 340u)]
+		[InlineData(4u, 1440u)]
+		[InlineData(5u, 3940u)]
+		[InlineData(23u, 263640u)]
+		[InlineData(24u, 298040u)]
+		[InlineData(80u, 47907140u)]
+		public void XpForNextLevel_MatchesTheCapturedRetailAnchors(uint level, uint expected)
+		{
+			Assert.Equal(expected, LevelingResolver.XpForNextLevel(level));
 		}
 
 		[Fact]
-		public void XpForNextLevel_RampsWithLevel()
+		public void XpForNextLevel_InterpolatesMonotonicallyBetweenAnchors()
 		{
-			Assert.Equal(100u, LevelingResolver.XpForNextLevel(1));
-			Assert.Equal(200u, LevelingResolver.XpForNextLevel(2));
 			Assert.Equal(LevelingResolver.XpForNextLevel(1), LevelingResolver.XpForNextLevel(0)); // 0 treated as 1
+			// L3 sits between the L2 (340) and L4 (1440) anchors.
+			var l3 = LevelingResolver.XpForNextLevel(3);
+			Assert.InRange(l3, 340u, 1440u);
+			// strictly increasing across the whole 1..80 range.
+			for (uint l = 1; l < 80; l++)
+				Assert.True(LevelingResolver.XpForNextLevel(l) <= LevelingResolver.XpForNextLevel(l + 1));
 		}
 	}
 }
