@@ -42,6 +42,7 @@ namespace Faolan.Core.Database
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<Guild> Guilds { get; }
 		DbSet<Item> Items { get; }
+		DbSet<ItemStat> ItemStats { get; }
 		DbSet<LuaScript> LuaScripts { get; }
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
@@ -107,6 +108,7 @@ namespace Faolan.Core.Database
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<Guild> Guilds { get; set; }
 		public DbSet<Item> Items { get; set; }
+		public DbSet<ItemStat> ItemStats { get; set; }
 		public DbSet<LuaScript> LuaScripts { get; set; }
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }

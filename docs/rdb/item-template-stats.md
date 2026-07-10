@@ -44,10 +44,16 @@ In practice only Str (178) and Dex (75) appear as the *primary* attribute.
 
 ## Status / next step
 
-- Decoded + validated: primary-attribute modifier (`972`/`971`). Importable, but on its own it does NOT fix
-  the bar-fill bug (that needs the HP/vital bonus, still open).
-- Nothing imported yet (decode-first): no `ItemStat` table, no change to `faolan.db`.
-- To unblock: grab a capture/screenshot of an item tooltip with known stats (ideally one carrying +HP and a
-  secondary attribute), use it to pin the secondary-modifier-list semantics and find the vital-bonus field,
-  then add an `ItemStat` table + a `MaxStatAggregator` (base from `CharacterMaxStats` + summed equipped-gear
-  bonuses + attribute contributions) and feed it into `RegenerateMaxStats` / the vitals path.
+- Decoded + validated: primary-attribute modifier (`972`/`971`).
+- **IMPORTED (2026-07-10):** the `ItemStat` table (`ItemId`, `WireStatId`, `Amount`) is populated by `RdbItemImporter`
+  from field 972/971 - **359 rows** across 2412 decrypted templates, all clean: `WireStatId` only ever Str (804, 248)
+  or Dex (814, 111), `Amount` only +1/+2/+3 (matching this doc). `MaxStatAggregator.AggregateGearBonuses` sums a
+  character's equipped `ItemStat` rows by wire stat id (unit-tested). This is the decode-first-clean foundation.
+- **STILL OPEN (reference-gated, needs an item tooltip):**
+  1. the **secondary-modifier list** semantics + the **vital/HP bonus** field - not decoded, so not in `ItemStat`
+     (they slot into the same table + aggregator sum when a known-tooltip reference pins them);
+  2. the **wire application** - adding the gear bonus onto the character's base attribute IN the stat block. The
+     base attributes are currently the fixed baseline (`SubClassStatBlock`, e.g. `Strength = 0xA`), and the exact
+     ×10 scale a +N modifier displays as isn't proven without a reference, so the aggregator's total is not yet
+     patched into the sent stats. That last hop is what makes the +Str/+Dex visible in-client (and, with the vital
+     field, fixes the health-bar-fill bug).

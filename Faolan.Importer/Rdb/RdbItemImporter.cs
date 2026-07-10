@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,10 @@ namespace Faolan.Importer.Rdb
 		// leave their captured (empty) name untouched.
 		private const uint StringTag = 0x21;
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
+
+		// The 5 primary-attribute wire stat ids field 972 is validated to hold (Str/Con/Int/Wis/Dex) - the guard that
+		// keeps the ItemStat import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
+		private static readonly HashSet<uint> AttributeStatIds = [804u, 806u, 808u, 810u, 814u];
 
 		public static string ExtractName(ReadOnlySpan<byte> template)
 		{
@@ -85,6 +90,7 @@ namespace Faolan.Importer.Rdb
 
 			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0;
 			var firstSampleShown = false;
+			var parsedStats = new List<ItemStat>();
 
 			foreach (var item in items)
 			{
@@ -148,6 +154,15 @@ namespace Faolan.Importer.Rdb
 					valuesAdded++;
 				}
 
+				// The VALIDATED primary-attribute modifier (docs/rdb/item-template-stats.md, #3): field 972 = the wire
+				// stat id (only ever 804/806/808/810/814 = Str/Con/Int/Wis/Dex across all 1964 templates), field 971 =
+				// the amount (+1/+2/+3). Recorded as an ItemStat - the (statId, amount) foundation the MaxStatAggregator
+				// sums over equipped gear. Same property-table parse as field 74. (The secondary-modifier list + the
+				// vital/HP bonus need a reference tooltip to decode, so they are deliberately NOT imported here.)
+				if (TryReadPropertyField(template.AsSpan(12), 972, out var statId) && AttributeStatIds.Contains(statId)
+				    && TryReadPropertyField(template.AsSpan(12), 971, out var amount) && amount is > 0 and <= 100)
+					parsedStats.Add(new ItemStat { ItemId = item.Id, WireStatId = statId, Amount = (int)amount });
+
 				// Fill the display name only when we don't already have one (captured names are authoritative).
 				if (string.IsNullOrWhiteSpace(item.Name))
 				{
@@ -170,10 +185,21 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0)
+			// Idempotent: replace the ItemStat rows for every item we parsed a modifier for (re-import overwrites, so a
+			// changed/removed modifier doesn't leave a stale row). Items with no modifier keep whatever they had.
+			var statsAdded = parsedStats.Count;
+			if (statsAdded > 0)
+			{
+				var statItemIds = parsedStats.Select(s => s.ItemId).Distinct().ToList();
+				var stale = await db.ItemStats.Where(s => statItemIds.Contains(s.ItemId)).ToListAsync();
+				db.ItemStats.RemoveRange(stale);
+				db.ItemStats.AddRange(parsedStats);
+			}
+
+			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || statsAdded > 0)
 				await db.SaveChangesAsync();
 
-			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded);
+			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, statsAdded);
 		}
 
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
@@ -245,6 +271,6 @@ namespace Faolan.Importer.Rdb
 				: s;
 		}
 
-		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded);
+		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded, int StatsAdded);
 	}
 }
