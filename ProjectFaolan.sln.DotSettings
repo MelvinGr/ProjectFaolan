@@ -401,4 +401,5 @@
   &lt;/TypePattern&gt;&#xD;
 &lt;/Patterns&gt;</s:String>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Kalanthes/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=Scry/@EntryIndexedValue">True</s:Boolean>
 </wpf:ResourceDictionary>
