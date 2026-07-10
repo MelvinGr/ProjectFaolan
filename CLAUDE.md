@@ -59,10 +59,15 @@ dotnet ef database update --project Faolan --connection "Data Source=$PWD/faolan
 ## Architecture
 
 **Server flow:** `UniverseAgent (7010, the only fixed port) -> PlayerAgent -> GameServer`. Each service
-hands the client the next address in its payload. One host (`Faolan/Program.cs`) runs every protocol
-service as a hosted service: `UniverseAgentListener`, `PlayerAgentListener`, `CsPlayerAgentListener`
+hands the client the next address in its payload. `Faolan/Program.cs` runs the protocol services as hosted
+services: `UniverseAgentListener`, `PlayerAgentListener` (the login/router tier), `CsPlayerAgentListener`
 (guilds/teams/groupfinder), `AgentServerListener` (chat), `GameServerListener` (the world; one listener
-serves both the create-editor and world connections).
+serves both the create-editor and world connections). **Process role (multi-realm, #324 —
+`docs/subsystems/multi-realm-plan.md`):** by default `dotnet run --project Faolan` is *all-in-one* (login +
+a game host for the first realm — the historical single-process dev run); `--role login` runs ONLY the
+router tier; `--realm <id>` runs ONE realm's game host (GameServer + realm-local chat + guilds, bound to
+that `Realm` row's ports). So one login + N realm processes compose a multi-realm deployment against the
+shared DB; guild/AH/mail/character-name are realm-scoped (`RealmId`), routed by the character's realm.
 
 **Projects:** `Faolan/` server
 host · `Faolan.Core/` BASE shared types + crypto + the `Protobuf/` schema (the layer everything builds on) ·

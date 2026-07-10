@@ -31,6 +31,13 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - 🟡 Create→world intro cutscene — plays, and Kalanthes speaks (stock-phrase response decoded); some scene
   actors are still verbatim capture bytes (blocked on clean per-type captures, #234 / #185)
 
+### Realms & deployment
+- 🟡 Multiple realms (game servers) — **process-per-realm**: `dotnet run --project Faolan` is all-in-one (dev),
+  `--role login` runs the shared login/router tier, and `--realm <id>` runs one realm's isolated world (its own
+  GameServer + chat + guilds, bound to that `Realm` row's `IpAddress`/ports). Guilds, auction house, mail, and
+  character names are all `RealmId`-scoped; the client is routed to its selected character's realm. Server-side
+  complete and fleet-verified (1 login + N realm processes on a shared DB); awaits an in-client 2-realm shakedown (#324)
+
 ### World & simulation
 - ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
 - ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes
@@ -65,7 +72,8 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 - ✅ Inventory (DB containers, equip, move, starting gear)
 - ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
 - 🟡 Shop-OPEN trigger — decoded flow implemented, awaits in-client confirm (#134)
-- 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — grammar decoded, one disambiguation left (#3)
+- 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — item attribute modifiers imported + summed
+  (`ItemStat` + `MaxStatAggregator`); the vital/HP field + wire scale still need a reference tooltip (#3)
 - 🟡 Data-driven item-use categorization — currently a per-id map (#207) · guild bank — bodies uncaptured (#132)
 - ⬜ Tradeskills: gathering nodes + crafting professions (#148) · worn-only "bag-poison" item rendering (#14)
 - ⬜ Gems / item socketing — gem slots that grant attribute bonuses (#311)
@@ -128,6 +136,15 @@ dotnet run --project Faolan
 It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the PlayerAgent,
 CsPlayerAgent, AgentServer and GameServer listeners the client is handed off to in turn), migrates the
 database schema, and hosts an in-process MCP endpoint on `http://127.0.0.1:7099/mcp`.
+
+For a **multi-realm** deployment (#324), split the process by role — one login/router tier and one game host
+per realm (each bound to its `Realm` row's `IpAddress`/ports), all against the shared DB:
+
+```sh
+dotnet run --project Faolan -- --role login   # the shared login/router tier (UniverseAgent + PlayerAgent)
+dotnet run --project Faolan -- --realm 2       # one realm's game host (GameServer + realm-local chat + guilds)
+dotnet run --project Faolan -- --realm 3       # another realm, on that Realm row's ports
+```
 
 ## Test
 
