@@ -66,8 +66,10 @@ serves both the create-editor and world connections). **Process role (multi-real
 `docs/subsystems/multi-realm-plan.md`):** by default `dotnet run --project Faolan` is *all-in-one* (login +
 a game host for the first realm — the historical single-process dev run); `--role login` runs ONLY the
 router tier; `--role realm=<id>` runs ONE realm's game host (GameServer + realm-local chat + guilds, bound to
-that `Realm` row's ports). So one login + N realm processes compose a multi-realm deployment against the
-shared DB; guild/AH/mail/character-name are realm-scoped (`RealmId`), routed by the character's realm.
+that `Realm` row's ports). `--role` is **repeatable** — `--role login --role realm=<id>` co-hosts both in one
+process — but **at most one realm role per process** (co-hosting realms would leak chat/session state across
+them). So one login + N realm processes compose a multi-realm deployment against the shared DB;
+guild/AH/mail/character-name are realm-scoped (`RealmId`), routed by the character's realm.
 
 **Projects:** `Faolan/` server
 host · `Faolan.Core/` BASE shared types + crypto + the `Protobuf/` schema (the layer everything builds on) ·

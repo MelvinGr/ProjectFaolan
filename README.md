@@ -141,10 +141,14 @@ For a **multi-realm** deployment (#324), split the process by role — one login
 per realm (each bound to its `Realm` row's `IpAddress`/ports), all against the shared DB:
 
 ```sh
-dotnet run --project Faolan -- --role login   # the shared login/router tier (UniverseAgent + PlayerAgent)
-dotnet run --project Faolan -- --role realm=2       # one realm's game host (GameServer + realm-local chat + guilds)
-dotnet run --project Faolan -- --role realm=3       # another realm, on that Realm row's ports
+dotnet run --project Faolan -- --role login          # the shared login/router tier (UniverseAgent + PlayerAgent)
+dotnet run --project Faolan -- --role realm=2        # one realm's game host (GameServer + realm-local chat + guilds)
+dotnet run --project Faolan -- --role realm=3        # another realm, on that Realm row's ports
 ```
+
+`--role` is repeatable, so a single process can compose roles — e.g. `--role login --role realm=2` runs the
+login tier and realm 2 together. At most one `realm` role per process (co-hosting realms would share chat/session
+state across them); run one process per realm for isolation.
 
 ## Test
 

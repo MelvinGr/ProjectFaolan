@@ -39,6 +39,22 @@ namespace Faolan
 			return buffer.ToArray();
 		}
 
+		// All --role values from argv (the option is repeatable: `--role login --role realm=2`). The config binder keeps
+		// only the LAST value for a repeated key, so the roles are parsed straight from argv. Handles `--role X` and `--role=X`.
+		private static List<string> CollectRoleArgs(string[] args)
+		{
+			var roles = new List<string>();
+			for (var i = 0; i < args.Length; i++)
+			{
+				if (args[i].Equals("--role", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+					roles.Add(args[++i]);
+				else if (args[i].StartsWith("--role=", StringComparison.OrdinalIgnoreCase))
+					roles.Add(args[i]["--role=".Length..]);
+			}
+
+			return roles;
+		}
+
 		[STAThread]
 		public static async Task Main(string[] args)
 		{
@@ -74,35 +90,44 @@ namespace Faolan
 			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ??
 															   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
 
-			// Process ROLE (multi-realm / process-per-realm, #324) via a single --role option:
+			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
+			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
 			//   --role login       -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
 			//   --role realm=<id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
 			//                         realm's ports; the login tier routes players to it (SendGameServer/AgentServer/CsPlayerAgent).
 			//   --role realm       -> the same, for the first realm (id omitted).
-			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical single-process dev run).
-			var roleArg = builder.Configuration["role"];
+			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical dev run).
+			// At most ONE realm role per process: co-hosting several realms in one process would share the chat/world
+			// dispatchers + session aggregation across realms (a cross-realm leak) - that's what separate processes avoid.
+			var roles = CollectRoleArgs(args); // repeated --role values, parsed from argv (config binding keeps only the last)
 			uint? selectedRealmId = null;
-			bool runLogin, runRealm;
-			if (string.IsNullOrWhiteSpace(roleArg))
+			bool runLogin = false, runRealm = false;
+			if (roles.Count == 0)
 			{
 				runLogin = runRealm = true; // default: all-in-one (dev)
 			}
-			else if (roleArg.Equals("login", StringComparison.OrdinalIgnoreCase))
-			{
-				runLogin = true;
-				runRealm = false;
-			}
-			else if (roleArg.Equals("realm", StringComparison.OrdinalIgnoreCase) || roleArg.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
-			{
-				runRealm = true;
-				runLogin = false;
-				var eq = roleArg.IndexOf('=');
-				if (eq >= 0)
-					selectedRealmId = uint.Parse(roleArg[(eq + 1)..], CultureInfo.InvariantCulture);
-			}
 			else
 			{
-				throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{roleArg}'.");
+				foreach (var role in roles)
+				{
+					if (role.Equals("login", StringComparison.OrdinalIgnoreCase))
+					{
+						runLogin = true;
+					}
+					else if (role.Equals("realm", StringComparison.OrdinalIgnoreCase) || role.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
+					{
+						if (runRealm)
+							throw new Exception("at most one 'realm' role per process - co-hosting realms would leak chat/session state across them; run one process per realm.");
+						runRealm = true;
+						var eq = role.IndexOf('=');
+						if (eq >= 0)
+							selectedRealmId = uint.Parse(role[(eq + 1)..], CultureInfo.InvariantCulture);
+					}
+					else
+					{
+						throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{role}'.");
+					}
+				}
 			}
 
 			// The realm this process hosts (realm role). Resolved from the DB up front - the Realm row is the single

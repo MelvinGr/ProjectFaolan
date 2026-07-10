@@ -58,7 +58,8 @@ process/resources and couples realm lifecycles. `Realm.IpAddress` already exists
   scoping every dynamic query by realm.
 
 So `Program.cs` gains a **role**: `--role login` (or default) runs the router tier; `--role realm=<id>` runs a realm game
-host. One login process + N realm processes, all against the shared DB.
+host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), but at most one realm role per process
+(co-hosting realms would share chat/session state across them). One login process + N realm processes, shared DB.
 
 ## Phased plan (each phase test-gated; no wire regressions)
 
