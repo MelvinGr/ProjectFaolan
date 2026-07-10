@@ -1,9 +1,15 @@
 namespace Faolan.GameServer.Combat
 {
 	/// <summary>
-	///     Provisional combat math. Spell/ability power, mitigation and the ApplySpell magnitude sign/scale aren't
-	///     decoded from captures yet (see docs/re/quests-and-combat.md), so damage is a simple level-scaled value and
-	///     <paramref name="spellId" /> is accepted for future per-spell power but not yet used.
+	///     Provisional combat math. Spell/ability power and mitigation aren't decoded from captures yet (see
+	///     docs/re/quests-and-combat.md), so damage is a simple level-scaled value and <paramref name="spellId" /> is
+	///     accepted for future per-spell power but not yet used.
+	///     NB (2026-07 investigation): the ApplySpell wire magnitude (`NpcSpellEffect` @29) is a single BYTE rank/scale,
+	///     NOT raw damage — the real HP change is the server-computed vitals push (`StatUpdate` health), a GDB formula
+	///     of spell-power × rank × mitigation × gear. So it is neither in the client exe nor a plain wire field; closing
+	///     it means correlating captured vitals deltas with attacks across the combat captures (gear-dependent, sizable),
+	///     not a clean decode. The level-scaled placeholders below are the honest interim, like the (now capture-anchored)
+	///     HP and XP curves.
 	/// </summary>
 	public static class CombatResolver
 	{
