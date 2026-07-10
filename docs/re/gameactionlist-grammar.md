@@ -66,3 +66,41 @@ pulls keys `0x463` (caster/line) and `0x2f9` (recast centiseconds).
   its descriptor **key list** (order of values — includes `0x463`, `0x2f9`) out of `FUN_008c3910` / the type
   registration + the `DAT_025073c0` stat-key table. With those, the element is fully constructible (no capture
   needed) — the grammar itself is no longer the blocker.
+
+## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
+
+Decompiled the actual (de)serializer + tables (scripts `Captures/ghidra/DumpRecastDescriptor.java`,
+`DumpDescriptorInit.java`; `DecompileFns` on `FUN_00899a60`/`FUN_008c3910`/`FUN_008b0f50`/`FUN_00897bd0`).
+
+**Element wire layout — confirmed byte-for-byte from the deserializer `FUN_00899a60`:**
+```
+[u32 typeId]            # obj+0x10; must be 0xcf09..0xd026 (e_Type_GC_GameAction .. _End)
+[u32 field]            # obj+0x14
+[u32 == 4]             # version, validated (else "Invalid GameAction data version")
+[u32 subCount]         # < 1001; then subCount × { FUN_006e9f20 + FUN_006e70e0 } sub-records
+[u32 v(0x2d5)][u32 v(0x2d6)][u32 v(0x2f2)][u32 v(0x2f5)]   # four ALWAYS-present positional int values
+--- then per the type's descriptor keyList (each entry a u32, low byte = index, list ends at u32 == 0xFF):
+    idx = entry & 0xFF ; key = statKeyTable[idx]
+    key in {0x4d9,0x4da} -> std::string value ; else -> u32 value
+```
+Cursor stride is 4 (`local_114 += 4`), terminator is the full u32 `== 0xFF`.
+
+**`FUN_008c3910` (descriptor lookup):** `descriptor = &DAT_025077c8 + (typeId-0xcf09)*0x41` dwords → base
+`0x025077c8`, stride `0x104` bytes; keyList at `descriptor+0xc`; `descriptor+8 == 0` ⇒ "unknown type".
+
+**stat-key table `DAT_025073c0` — recovered from its runtime initializer `FUN_00897bd0`:** a linear map,
+`statKeyTable[i] = 0x2d2 + i` for the low range, so the two keys the handler reads are at
+**`statKeyTable[0x27] = 0x2f9`** (recast, centiseconds) and **`statKeyTable[0x58] = 0x463`** (spell id). So the
+recast type's descriptor keyList must contain the byte indices `0x27` and `0x58`.
+
+**BLOCKER (new, corrects the assumption above):** BOTH `DAT_025073c0` (stat-key table) AND `DAT_025077c8` (the
+descriptor table itself) are **zero in the static exe** — runtime-built (`FUN_00897bd0` lazily fills the stat-key
+table on first use; the descriptor table is populated per-type from each GameAction class's own registration
+data). `FUN_00899440` is the serializer and `FUN_00898890` a by-name accessor — both CONSUME the runtime
+descriptor; neither is the populator, which is per-class and not yet located. So the recast **typeId + keyList
+cannot be read statically** from the descriptor table.
+
+**Cleanest way to finish:** a LIVE memory dump of the running client (gdb/frida attach, no ASLR so Ghidra
+addresses == runtime — see the live-debug memory) reading `DAT_025073c0` + walking `DAT_025077c8` for the type
+whose keyList contains indices `0x27`+`0x58` → that slot's index gives the recast typeId and its full keyList
+order. Alternatively keep tracing the per-class registration statically, or capture a real retail recast cast.
