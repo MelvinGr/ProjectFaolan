@@ -125,6 +125,24 @@ host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), b
 - **Phase 5 (optional) — Per-realm DBs.** If shared-DB contention or stronger isolation warrants it, give each realm
   process its own DB (static content cloned/shared read-only, dynamic per-realm) instead of `RealmId` columns.
 
+## Database provider (SQLite → server DB, when Docker-deployed)
+
+SQLite is fine for dev and a single process, but a **shared DB across N realm containers** wants a real server DB
+(Postgres): SQLite's single-writer file locking is awkward for concurrent container access. The swap is **~half a
+day**, not a rewrite — EF Core is code-first and provider-agnostic, and `faolan.db` is *built by the importer*, so
+there's no manual data migration:
+- Add the provider package, swap `UseSqlite` → `UseNpgsql` at the ~4 production call sites (`DatabaseServiceCollectionExtensions`,
+  the `Program.cs` realm probe, the design-time factory, the importer CLI); `DatabasePath` becomes a connection string.
+- **Regenerate migrations** for the new provider (they don't port; squash to one initial migration).
+- **Re-run the importer** against the new DB (it's the source of truth - no export/import).
+- Watch-outs: `ulong` columns → Postgres `bigint` is *signed* (audit large ids; most are already capped to
+  `long.MaxValue`); one SQLite-ism to fix (`INSERT OR IGNORE` at `DatabaseRepository.cs`, → `ON CONFLICT DO NOTHING`).
+
+**Tests stay on SQLite regardless** - they validate code-builds-from-data, not the storage engine. The golden
+tests keep an embedded SQLite fixture (`Faolan.Tests/TestDb.ReadOnly`, the single seam); provider-specific fidelity
+(the ulong/`ON CONFLICT` cases) is a *small* separate Testcontainers-Postgres suite, not the whole golden suite.
+See the `TestDb` doc-comment for the full rationale.
+
 ## Retail constraints (retail is leading)
 
 - The realm-select flow (`RequestCharRealmData` → realm list → char-realm-data) already matches retail for 1 realm.
