@@ -43,19 +43,21 @@ schema since squashed into the `InitialCreate` migration), seeded on creation vi
 rough class/level defaults anchored on assassinl23 (Assassin lvl 23 ≈ 1281/1143/73 vs sheet 1270/1148/74); legacy
 characters with no row fall back to computed defaults in-memory. The create-editor commits the chosen class
 before naming, so `CommitCharacterName` calls `Character.RegenerateMaxStats()` (updates the seeded row in place)
-to replace the level-1 rogue baseline with the chosen class's vitals. GM commands: `.vitals` (no args → character's
-own stats; or `.vitals <h> [st] [m]`) and `.setstat <statIdHex> <value>` for live testing. Round-trip tests
+to replace the level-1 rogue baseline with the chosen class's vitals. GM command `.setstat <statIdHex> <value>`
+(and `.setstatrange`) for live testing (the earlier `.vitals` command has since been removed). Round-trip tests
 (`CharacterStatBlockTests`, `CharacterMaxStatsTests`, `DatabaseRepositoryTests.CreateCharacter_SeedsDefaultMaxStats`)
-cover bytes, defaults, and cascade. `ApplySpell` (0x6B87E316) was already correctly implemented in `Packets.cs`
-(caster + `0000` + spellId + `0000C350` + target + data).
+cover bytes, defaults, and cascade. `ApplySpell` (0x6B87E316) was already implemented (caster + `0000` + spellId +
+`0000C350` + target + data); its builders now live in `Faolan.Core.Network/Codecs/Combat/` (`SelfBuffCodec`,
+`NpcSpellCastBuilder`, `WorldDeath`).
 
 **Combat loop implemented** (2026-06-08): `Faolan/GameServer/Combat/` — `EntityVitals` (live current+max HP/
 Mana/Stamina, clamped deltas), `CombatState` (in-memory per-handle vitals store; world-authoritative, never
 persisted), `CombatResolver` (provisional level-scaled damage; spell power/mitigation TBD). The client's
 `CastSpell` interact (`ActionType 0x4`) now broadcasts the `0x6B87E316` ApplySpell and, for a cast at another
 entity, calls `ResolveOffensiveCast` → applies damage to the target's vitals → pushes a `0x96B8DC59` update so
-its health bar moves. Death is detected (HP→0) but despawn + XP are TODO (packet not decoded). GM test commands:
-`.hurt [n]` / `.heal [n]` (adjust own vitals + push update), `.spelltest <id>` (self-cast). Tests: `CombatTests`.
+its health bar moves. Death is detected (HP→0) but despawn + XP are TODO (packet not decoded). GM test commands
+`.hurt [n]` / `.heal [n]` / `.spelltest <id>` have since been removed (the `.kill` command now drives the death
+path). Tests: `CombatTests`.
 
 **Melee auto-attack — a BehaviorControlCenter FSM** (2026-06-11). NormalAttack = `0x642CD3D6` Interact actionType
 **0xf**, not a one-shot: the client sends one swing per press (args field2 = swing counter; the attack direction
@@ -66,9 +68,11 @@ splice (`InsertBehaviorPhaseField`) reproduces the captured swing-1 ack args byt
 - **Fixed 2026-06-11:** the ack was reading argsLen as a u16 at offset 22 (it's a u32 → high half 0), so it echoed
   EMPTY args and desynced the FSM after one swing ("attack runs once, then random / hits self"). Now reads u32@22,
   args@26.
-- **NPC combat HP** is now seeded from the NPC's spawn `CharacterStats.health` (÷100; recorded per live handle in
-  `Session.SpawnedNpcMaxHealthByHandle` during the burst replay, used by `GetOrAddNpcVitals`) instead of the flat
-  placeholder, so a damaged mob's bar matches the HP the client rendered.
+- **NPC combat HP** now comes from the NPC's live world entity: a burst/interest-spawned NPC carries its real
+  vitals in the simulation (`WorldEntity.Vitals`, seeded in `WorldBroadcaster` from the spawn's `npc.Health`,
+  falling back to `CombatResolver.NpcMaxHealthForLevel`), so a damaged mob's bar matches the HP the client
+  rendered; `GetOrAddNpcVitals` only falls back to `CombatResolver.DefaultNpcMaxHealth` for an NPC with no world
+  entity (the built-NPC test).
 - **Still TODO (needs in-client + a multi-swing capture):** retail also sends a SECOND ack for the NPC's OWN
   behaviour (actor = target handle) that drives the mob's counter-attack, plus a multi-result block — not yet
   reproduced, so mobs may not visibly fight back. The phase counter's absolute start is also unconfirmed (the
@@ -84,9 +88,9 @@ first mounted move at idx 787):
   "Fading Black Horse", "Armored Rabicano Horse", handles `0x0004xxxx`);
 - then the player's Move switches to MountedRun.
 
-So the mount spell is **`0x3BAD7D`** (present in the `Spells` table; names are client-side). GM command
-**`.mount [spellIdHex]`** broadcasts that ApplySpell on the player (default `0x3BAD7D`). NOTE: full mounting also
-needs the mount entity spawn (`0xFA015807`) + the MountedRun transition; only the cast broadcast is wired so far.
+So the mount spell is **`0x3BAD7D`** (present in the `Spells` table; names are client-side). A GM command
+`.mount [spellIdHex]` (since removed) broadcast that ApplySpell on the player (default `0x3BAD7D`). NOTE: full mounting also
+needs the mount entity spawn (`0xFA015807`) + the MountedRun transition; only the cast broadcast was wired.
 `0x96B8DC59` is NOT the mount packet (it's the vitals update). NOTE: the "Black Horse" strings in `0x2038` are
 **guild names** ("Black Horse Company"), not mounts - a red herring.
 
@@ -167,12 +171,13 @@ Quest state is driven by four IIR records (decoded from `hoxxling-login-gameplay
   server only sends ids + state, never the text.
 
 **Built:** `WorldQuest` (byte-exact `QuestIIR`/`QuestGoal` builders) + a `CharacterQuest` table (per-character
-quest id + state + goal progress, migration `AddCharacterQuests`) + repo upsert/remove + restore-on-login
-(`RestorePlayerQuests`) + a `.quest add|remove|list` GM command. This is the quest STATE foundation. **Objective auto-tracking on kill is wired**: `CharacterQuest.GoalTargetName`
-(+ `GoalProgress`/`GoalRequired`) holds a kill objective; the NPC-death path calls `AdvanceKillQuests`, which
-(`QuestProgress.AdvancesOnKill`) bumps any active quest whose target matches the slain NPC, pushes `QuestGoal`,
-persists, and completes at the required count (state + system message). The objective target/count is set when the
-quest is added (`.quest add <id> [count] [target...]`) since the real definitions are the pinned RDB Lua quest VM.
+quest id + state + goal progress; schema since squashed into the `InitialCreate` migration) + repo upsert/remove +
+restore-on-login (`RestorePlayerQuests`). This is the quest STATE foundation. **Objective auto-tracking on kill is
+wired**: `CharacterQuest.GoalTargetName` (+ `GoalProgress`/`GoalRequired`) holds a kill objective; the NPC-death
+path calls `QuestProgressionService.AdvanceKillGoals`, which (via `QuestProgress.Advances`) bumps any active quest
+whose target matches the slain NPC, pushes `QuestGoal`, persists, and completes at the required count (state +
+system message). The objective target/count now comes from the imported `QuestDefinition`/`QuestGoalDefinition`
+tables (the quest engine has since grown loot/talk goals and multi-stage chains — `QuestProgressionService`).
 Remaining VM pieces: accept-from-dialogue trigger, rewards/turn-in (`0xA36D3B74 QuestRewards`), branching,
 QuestFullUpdate replay ([[protocol_conversation_routing]]).
 
@@ -181,7 +186,10 @@ QuestFullUpdate replay ([[protocol_conversation_routing]]).
 id** — `0x34A7` appears nowhere in it. So the server grants the quest from data it already holds (this NPC's
 conversation grants quest X) = the quest-giver→quest definition, which is the pinned RDB Lua quest VM. Wiring accept
 without the VM would require a capture-mined NPC→quest map (yields only the 1–2 captured quests) — low value. The quest
-ENGINE (state + kill-objective tracking + `.quest`) is done; the CONTENT (accept/branch/reward defs) needs the VM.
+ENGINE (state + kill-objective tracking) is done. **Update:** accept-from-dialogue has since been wired *without* the
+live Lua VM — a per-node `ConversationNode.GrantQuestId` column (the data-mined NPC→quest map above) is granted when
+its branch is reached (`ConversationService`), and objectives/turn-in run off the imported `QuestDefinition` /
+`QuestGoalDefinition` tables.
 
 ## Next steps
 - Confirm ApplySpell magnitude sign/scale and whether damage is in the cast or only in the following vitals

@@ -1,9 +1,9 @@
 # Inventory: the FullChar snapshot, delivery model, and equip moves
 
 Status 2026-06-13: **solved end-to-end in-client** (bag renders, equipment doll renders, equip/unequip
-persists and survives relog). Commits `20f2cc1` (delivery), `226b16f` (equip/unequip protocol), `24fbed6`
-(the socket partial-write fix that masked everything), `135b06f` (dead-path cleanup),
-`85c2886` (the BE32 root-length framing recovered via Ghidra — the final fix).
+persists and survives relog). Commits `eb776cdf` (delivery), `2ea23c33` (equip/unequip protocol), `d73fe78a`
+(the socket partial-write fix that masked everything), `7c83d2df` (dead-path cleanup),
+`ae5a3cb4` (the BE32 root-length framing recovered via Ghidra — the final fix).
 
 ## The snapshot (0x737A6DF9 FullPlayerCharacterIIR)
 
@@ -26,19 +26,22 @@ all **big-endian**:
   retired; `4483` was a coincidence of two near-equal-length captures.)
 - Root = `ProtoFullCharacterIIR` (recovered schema, byte-exact round-trip on the captured snapshots):
   field 6 × N = the containers (Equipped 101 / Bag 104 / Resource 112 / Quest 113), then fields 7, 8.
-- Tails = the 9282-byte record/XML region starting `00 00 00 18` (subclass version 24). Carried from the
-  capture with live level/vitals/XP patched (`BigboyTailsFile`); a from-scratch template build exists
-  (`FullCharSnapshotSubClass`, golden tests `BeachSnapshotConstructionTests`) for the construct direction.
+- Tails = the 9282-byte record/XML region starting `00 00 00 18` (subclass version 24). The live world-entry
+  path builds them from scratch with this character's live level/vitals/XP via
+  `FullCharSnapshotSubClass.BuildFromScratch`, proven byte-exact against the captured `BeachTailsTemplate.bin`
+  oracle (golden tests `BeachSnapshotConstructionTests`).
 
 Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContainers`:
 `CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItemBuilder.BuildListEntry`, identity =
-`Item.Data1..4` quad + `Item.Archetype`, buildable iff `Archetype != 0`).
+the `Item.Key` (Data1..4) quad + `Item.Hash`, buildable via the hash-gated snapshot iff `Hash != 0`).
 
 ## Delivery model (the hard-won facts)
 
 1. **The world-entry snapshot is THE inventory delivery** - it feeds both the bag window and the equipment
-   doll, and nothing re-feeds them later. `BuildBeachInventoryPacket` substitutes the player's DB containers
-   into the (instance-rewritten) captured snapshot unconditionally (and rewrites the BE32 blob length).
+   doll, and nothing re-feeds them later. `SendBurstlessWorldEntry` builds the snapshot from scratch — the
+   player's DB containers become the FullCharacterIIR root (`BuildBurstlessSnapshotRoot`) — and writes the
+   BE32 blob length to match (`SetSnapshotBlobLength`). (No captured snapshot is spliced into any more; the
+   old `BuildBeachInventoryPacket` substitution path is retired.)
 2. **The old "any container mutation stalls world-load/chat" rule is obsolete.** That bisect pre-dated the
    ContentMirror: the stall was the client thrashing on item resources it couldn't fetch from the dead
    retail CDN. With the mirror serving resources, substitution is in-client verified safe.

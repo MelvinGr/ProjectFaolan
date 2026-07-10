@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The pre-IIR frame between the transform and the CharacterIIR length prefix: a near-constant skeleton
 		// with per-character value islands (228 bytes editor-constant / 239 normal / 339 geared+table). Kept raw;
-		// PlayerSpawnPreFrame builds the fresh-character variant.
+		// PlayerSpawnScaffoldRows.FreshPreFrame builds the fresh-character variant.
 		public byte[] PreFrame { get; set; }
 
 		public byte[] Quat { get; set; } // Todo: convert to vector3 or 3 floats

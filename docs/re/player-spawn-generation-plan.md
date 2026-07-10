@@ -19,8 +19,9 @@ Goal (chosen 2026-06-10, finished the same day over two sessions): generate the 
 
 ## Architecture (what ships)
 
-The login replay (`RetailLoginReplay.TryRebuildPlayerSpawnFromDb`) rebuilds the player's own spawn in the
-world burst in three steps, each with a no-op fallback:
+The burst-less world entry (`GameServerListener.BuildBurstlessPlayerSpawn`, `.WorldEntry`) builds the
+player's own spawn from DB in three steps (no captured-burst replay fallback remains — a missing scaffold
+just logs a warning and skips the spawn):
 
 1. **Transform** — `SpawnPacketBuilder.BuildSpawnBody` constructs the header + position (DB) + rotation
    (kept from the capture: rebuilding rotation from unreliable DB data once hung the client).
@@ -33,7 +34,9 @@ world burst in three steps, each with a no-op fallback:
    - `CharacterAttribute` — the uniform entry table (`Sequence`-ordered; wire order ≠ index order, see demol80)
    - `CharacterSkill` — the feat/ability ID list (`SkillId` ascending + a `Rank` byte)
    - `CharacterScaffoldPair` — the two ending `[id][s32]` pair lists (`ListIndex` 0/1)
-   - `CharacterSpawnFrame` — the raw pre-IIR frame blob + the `EntryTableX` scalar
+   - the pre-IIR frame + `EntryTableX` scalar are CONSTRUCTED from `Character.Class`
+     (`PlayerSpawnScaffoldRows.FreshPreFrame`; `EntryTableX` is const `0xB7`), NOT stored as rows — they
+     carry no per-character data (there is no `CharacterSpawnFrame` table)
 
 Characters without scaffold rows are lazily seeded ONCE at world entry (`EnsureSpawnScaffoldRows` →
 `IDatabaseRepository.SaveCharacterScaffold`) with the **fresh-character defaults** in
@@ -43,7 +46,7 @@ weighted attributes, 7 morph entries, the closer, 20 feat ids, fresh pre-frame).
 
 Buff/timer records (see grammar) are transient session state and are deliberately NOT stored: a buffed
 captured spawn extracts to the same rows as its unbuffed form (locked by
-`BuffedSpawn_RoundTripsToItsUnbuffedForm`).
+`BuffedSpawn_RoundTripsToItsUnbuffedConstructedForm`).
 
 ## Proven building blocks
 
@@ -59,7 +62,8 @@ captured spawn extracts to the same rows as its unbuffed form (locked by
   pair is 6/8 (left navs), the ranged pair 20/21 (right navs) - fixing a spawn-builder bug where MainWeapon
   read MainHandRight while persistence wrote MainHandLeft.
 - The player spawn is the FINICKIEST packet — historically even a rotation change hung the client on the
-  loading screen. Every generation step keeps a verbatim fallback, and changes are gated on the smoke test.
+  loading screen. The verbatim captured-burst fallback has since been removed (burst-less construction is the
+sole path); changes are gated on the smoke test.
 
 ## Wire grammar (validated: regenerates all 37 captured player spawns byte-exact)
 
@@ -78,8 +82,9 @@ Workbench: `Captures/scripts/parse_spawn_scaffold.py` (`template` / `players` / 
     **NOTE: the u32 @133 is NOT a length** (an early misread): Hoxxling's stays 1067 while his post-IIR
     varies by ±280 bytes, assassinl23's is 2018 (the 0x7E2 constant), and several chars have no length-consistent
     u32 at all. It is the u16 value island @135. The legacy splice path
-    (`SetSpawnName`/`SetCharacterMessage`) still adjusts it on resize — the client demonstrably tolerates
-    that — but the generation path treats the whole frame as stored data (`CharacterSpawnFrame.PreFrame`).
+    (the obsolete `SpawnPacketBuilder.SetCharacterMessage`, using `NameOuterLengthOffset` = 133) still
+    adjusts it on resize — the client demonstrably tolerates that — but the generation path builds the
+    whole frame from `Character.Class` (`PlayerSpawnScaffoldRows.FreshPreFrame` → `PlayerSpawnScaffold.PreFrame`).
   - **339 bytes (geared necrol80/demol80)**: adds XP-ish u32s @77-91, a few bytes @102-111, and a 26-slot table
     @188-291 of `[00][type 01|06][u16 value]` entries (slot types constant across chars, values per-char).
 - `[u32 innerLen]` + the **ProtoCoreCharacterIIR**.
@@ -89,7 +94,7 @@ Workbench: `Captures/scripts/parse_spawn_scaffold.py` (`template` / `players` / 
     that follow: `[t0][0x7E2][0][0x1207CF][a][b][0][seq from 4][0xC350][handle][5x u32 0]` (only on chars
     with active buffs; otherwise a bare 0x3F1).
   - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — the entry-table count and the per-char scalar X
-    (Strie 0xB7, necrol80 0x2B6, editor preview 0x3F1) = `CharacterSpawnFrame.EntryTableX`.
+    (Strie 0xB7, necrol80 0x2B6, editor preview 0x3F1) = `PlayerSpawnScaffold.EntryTableX`.
   - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 0][u16 tag][u32 value]` = `CharacterAttribute`.
     Three payload flavors share the shape: weighted attributes (`tag` = value, `value` = 0x3F800000 weight),
     **morph entries** (`tag` = type<<8|sliderId, `value` = float bits — see the morph finding below) and the

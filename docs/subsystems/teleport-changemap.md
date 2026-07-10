@@ -48,11 +48,12 @@ token** — and it is **not a per-map constant**: it differs between captures of
 capture's map-2010 token `0x00503570` vs our DB burst's `0x0050360F`), because the retail server mints a token
 per playfield instance. So the dest-announce only matches the destination world-entry if **both come from the
 same burst**. The live change-map path now sources it via
-`WorldBroadcaster.ResolveMapPlayfieldToken(destMapId)`, which extracts the token from the destination map's
-stored burst FullChar snapshot (the same `WorldDespawn.TryExtractPlayfieldToken` the world-entry's
-`CapturePlayfieldToken` uses) and caches it on the zone — so the announce and the reconnect's world-entry stamp
-the **same** token (relevant to the #211 loading-screen hang). `TeleportCodec.BuildDestination` keeps the
-capture default only for the golden test / a burst-less map.
+`WorldBroadcaster.ResolveMapPlayfieldToken(destMapId)`, which reads the destination map's stored
+`Map.PlayfieldToken` column (falling back to `WorldState.DefaultPlayfieldToken` for a map with no captured
+token) — so the announce and the reconnect's world-entry stamp the **same** token (relevant to the #211
+loading-screen hang). The live world-entry recovers the same token from the burst snapshot via
+`WorldDespawn.TryExtractPlayfieldToken`. `TeleportCodec.BuildDestination` keeps the capture default only for
+the golden test / a burst-less map.
 
 `destDescriptor` (`0x14` for map 2010, `0xBE` for map 2000) is the position blob's trailing word — a per-zone
 descriptor that does **not** correlate with the map's NPC / world-object / burst-record counts, so its meaning

@@ -1,7 +1,8 @@
 namespace Faolan.Core.Enums
 {
-	// What happens when a player USES (right-clicks) an item from a bag. The item-use dispatch (ItemUseService)
-	// switches on this, so item identity lives in one classifier (ItemUseClassifier) rather than as name/id checks
+	// What happens when a player USES (right-clicks) an item from a bag. The item-use dispatch
+	// (GameServerListener.UseInventoryItem) switches on this, so item identity lives in one classifier
+	// (ItemUseClassifier) rather than as name/id checks
 	// scattered through the handler. Add a member as each on-use effect is wired.
 	public enum ItemUseType
 	{

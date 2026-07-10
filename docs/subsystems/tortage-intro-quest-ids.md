@@ -1,8 +1,11 @@
 # Tortage intro quest ids (per-class check)
 
-Decoded from the capture set (`Captures/*.tshark.json`) by reading `questId` at offset **+17** from each
-`QuestIIR` (0x97E02314) / `QuestFullUpdate` (0x63268258) sub-opcode (u32 BE). Builders:
-`WorldQuest.BuildQuestIir` / `BuildQuestFullUpdate` (both put `questId` at content offset 17).
+Decoded from the capture set (`Captures/*.tshark.json`) by reading a u32 BE at offset **+17** from each
+`QuestIIR` (0x97E02314) / `QuestFullUpdate` (0x63268258) sub-opcode. Builders: `WorldQuest.BuildQuestIir` /
+`BuildQuestFullUpdate`. Note the two shapes differ: `BuildQuestFullUpdate` puts `questId` at +17
+(`WorldQuest.QuestFullUpdateContentOffset = 17`), so the +17 read yields the real quest id there;
+`BuildQuestIir` puts `questId` at **+21** and holds `state` at +17, so the uniform +17 read on a `QuestIIR`
+catches the `state` value (2/4), not the id (this is what surfaces the "2, 4" noted below).
 
 ## Conclusion: the beach Casilda chain is SHARED, not per-class
 

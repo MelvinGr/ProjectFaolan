@@ -4,9 +4,10 @@
 > playfield-instance token from whatever capture session the row/template was built in (a beach Crocodile row carries
 > `0x01EA985C`), NOT this session's live token (`0x004FE428`). The client looks a spawn's playfield up in its
 > loaded-playfield map and silently drops a miss before it ever polls (`0x2020`) the handle. The login burst rendered
-> only because it was replayed from the same session whose token IS the live one. Fix: `SendWorldSpawn` +
-> `MakeCorpseLootable` now re-stamp the token to the live `Zone.PlayfieldToken` via `SpawnPlayfieldRewriter`
-> (commit `0827af5`). **Verified in-client:** a `.spawnnpc Crocodile` drew the first mid-session `0x2020` poll +
+> only because it was replayed from the same session whose token IS the live one. Fix: `SendWorldSpawn`
+> now re-stamps the token to the live `Zone.PlayfieldToken` via `SpawnPlayfieldRewriter` (loot bags are built from
+> scratch with the live `Zone.PlayfieldToken` stamped in directly by `WorldObjectBuilder.BuildBody`, no rewriter
+> pass; commit `0827af5`). **Verified in-client:** a `.spawnnpc Crocodile` drew the first mid-session `0x2020` poll +
 > `0x2008` SpawnCheck in the project's history and rendered. This fixes `.spawnnpc`, mount, interest-streaming,
 > NPC respawn, and loot bags.
 >
@@ -39,7 +40,7 @@ spawns them correctly (they appear in the world model, the packet goes out) — 
 
 **This is NOT a packet bug.** Proven by a loopback capture (`dumpcap -i lo -f "tcp port 7014"`, no root) of our
 own `.spawnnpc`: the outgoing `FA015807` is byte-structurally identical to (a) retail's mid-session spawn and
-(b) our own rendering login burst — same sender `0x13CE71B1:0x58`, receiver `GamePlayerType:charId`, body
+(b) our own rendering login burst — same sender `0x13CE71B1:0x58`, receiver `GameInterfaceType:charId`, body
 `[u32 recordLen][fa015807][0000c350][u32 handle][00000000][2c 0a 0f 0d <vec3> 12 <quat> ...]`. Our full
 world-entry handshake is also structurally identical to retail's (`0x2003`→`0x200b`/`0x200c`/`0x2001`→`0x201c`×5
 →burst, consistent on sub-id `0x58`). No registration/precursor packet is missing (the rendering retail mount
@@ -77,7 +78,7 @@ mid-session world-conversation sender as unknown / "0").
 
 ## Ruled out (all match the rendering burst / retail)
 
-- **Framing** — sender `0x13CE71B1:0x58`, receiver `GamePlayerType (0x6C67C147):charId`: byte-identical to the
+- **Framing** — sender `0x13CE71B1:0x58`, receiver `GameInterfaceType (0x6C67C147):charId`: byte-identical to the
   burst and to retail's per-session conversation. Our whole session is consistent on `0x58` (handshake + burst +
   mid-session); the burst's `0x58` renders. (Retail's per-session value is `0x57`/`0x08`/`0x0b` — but it's
   server-chosen and the client addresses us with an empty instance, so a consistent value should suffice.)
@@ -245,10 +246,13 @@ necessarily the snapshot's playfield token. (Tracing descriptor[8] to its exact 
 step; it's a deep thiscall ctor chain — `FUN_008e0df0` Playfield ctor.)
 
 **The server-side suspect (offline-checkable lead):** our mid-session spawns get their `18 <varint>` token from
-`Zone.PlayfieldToken` (`WorldBroadcaster.cs:862`), which is set by `CapturePlayfieldToken` extracting the token
-from the **0x737A6DF9 snapshot body** (`WorldDespawn.TryExtractPlayfieldToken`), with a minted `0x00A00000+`
-fallback (`WorldState._nextPlayfieldToken`). If the value the client registers as `pf->GetInstance()` (+0x94, from
-the world-load descriptor) is NOT the same as the snapshot-extracted token we stamp into spawns, every mid-session
+`Zone.PlayfieldToken`, which is set at world entry (`GameServerListener.WorldEntry.cs:831`) to the map's own
+`Map.PlayfieldToken` (#305), falling back to `WorldState.DefaultPlayfieldToken` (`0x004FE428`, the beach id) for a
+map with no captured token, with a minted `0x00A00000+` fallback (`WorldState._nextPlayfieldToken`) for
+server-generated zones. (Originally this came from extracting the token back out of the `0x737A6DF9` snapshot body
+via `WorldDespawn.TryExtractPlayfieldToken`; that extract path is now retired in favour of the per-map source.)
+If the value the client registers as `pf->GetInstance()` (+0x94, from
+the world-load descriptor) is NOT the same as the zone token we stamp into spawns, every mid-session
 spawn misses the playfield map → dropped. The burst renders because its spawns carry the captured token verbatim
 (which, in the captured session, matched the real playfield instance).
 

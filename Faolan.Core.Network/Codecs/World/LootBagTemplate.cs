@@ -8,8 +8,8 @@ namespace Faolan.Core.Network.Codecs.World
 	// kd-tree bounds (typed, BuildBounds) + a clean ProtoLootBagIIR scaffold (LootBagMessageCodec). No embedded asset
 	// and no baked capture state - the former LootBagKdTreeTail.bin carried the captured bag's stale OwnerId + a
 	// captured item; the live cash + items are injected by WithLootContents into a fully-constructed bag (owner/inventory-id
-	// baked); this constructs both halves so a spawned bag carries no session leftovers. WorldObjectBuilder.BuildFromScratch
-	// assembles header/transform + identity-from-columns + this tail; SpliceLootContents then splices the live items + cash.
+	// baked); this constructs both halves so a spawned bag carries no session leftovers. WorldObjectBuilder.BuildBody
+	// assembles header/transform + identity-from-columns + this tail; WithLootContents then splices the live items + cash.
 	public static class LootBagTemplate
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // LootBagFullUpdateIIR
@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.World
 		private const uint DefaultMaxSize = 10;
 
 		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +
-		// size are spliced per drop (SpliceLootContents). Loot ops key on the bag ENTITY handle, not this id.
+		// size are spliced per drop (WithLootContents). Loot ops key on the bag ENTITY handle, not this id.
 		private const uint LootContainerKind = 115; // TODO: Add to ContainerKind?
 
 		// The loot bag's kd-tree / spatial-bounds node, decoded from the captured loot-bag tail and CONSTANT across all
@@ -65,7 +65,7 @@ namespace Faolan.Core.Network.Codecs.World
 			};
 		}
 
-		// A clean, empty ProtoLootBagIIR scaffold (no owner, no items) - SpliceLootContents fills in the live cash +
+		// A clean, empty ProtoLootBagIIR scaffold (no owner, no items) - WithLootContents fills in the live cash +
 		// items per drop. Built via the proven typed codec, not a captured blob.
 		private static ProtoLootBagIIR BuildEmptyScaffold()
 		{

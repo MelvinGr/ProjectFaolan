@@ -1,8 +1,9 @@
 # Player stats — where they live in the packets
 
-Cross-referencing the character-sheet **screenshots** (`Captures/screenshots/assassinl23/`) with the capture
-packets. Reference character: **AssassinL23, Stygian Assassin, level 23** (screenshot 2026-06-07 17:17), decoded
-against `AssassinL23_rogue-assassin_login_randomActions-changemap.json`. Generated 2026-06-08.
+Cross-referencing the character-sheet **screenshots** (captured under `Captures/screenshots/demol80/`, since
+removed from the repo in the tshark-JSON migration) with the capture packets. Reference character:
+**AssassinL23, Stygian Assassin, level 23** (screenshot 2026-06-07 17:17), decoded against
+`AssassinL23_rogue-assassin_login_randomActions-changemap.tshark.json`. Generated 2026-06-08.
 
 ## Where the data is
 

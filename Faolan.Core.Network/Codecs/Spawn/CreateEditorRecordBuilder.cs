@@ -18,7 +18,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The entity-class tag every per-character editor record carries (EntityClass.Character = 0xC350).
 
 		// BehaviorControlCenterIIR (0x642CD3D6), LONG form (116 bytes): the same 28-byte head as the short form
-		// above, plus an 88-byte behavior-state tail that binds the behavior to an EQUIPPED ITEM (the three records
+		// below, plus an 88-byte behavior-state tail that binds the behavior to an EQUIPPED ITEM (the three records
 		// in WorldPrep each pair with one of the burst's DispatchAddItem equipment pieces - the item's handle, its
 		// 4-char entity tag and its transform all match):
 		//   <head: short-form bytes, slot 9, msgLen 10, protobuf 08 <behaviorId> 18 <phase> 28 <field5> 30 <field6>>

@@ -6,7 +6,7 @@ is to construct it from scratch like the login path instead of replaying `Retail
 verbatim. **Status: `InitialBurst` is fully constructed, and all structured `*IIR` types in
 `WorldPrepBurst`/`CreationScriptBurst` are decoded + built + wired** (see §4; #223 closed).
 
-> **`WorldPrepBurst` has since been REMOVED entirely** (`262cb0dc`). It replayed the guardian capture's
+> **`WorldPrepBurst` has since been REMOVED entirely** (`0683e84d`). It replayed the guardian capture's
 > starting-kit grants (0x2052 abilities, `ComboBookIIR` combos, `SetItemStat`, `CharacterAction`/`Stat`/`Energy`
 > records) during creation — all proven redundant in-client: a created necromancer is fully functional without
 > it, because every grant is re-emitted class-driven by the SHARED world-entry loadout (`EnsureCharacterLoadout`:
@@ -106,12 +106,12 @@ create-specific to decode, only builder wiring to do:
    / `SpawnEditorPreview.bin`) — the seam for the eventual live chosen-looks preview.
 2. ~~Construct the editor-scene `SimpleDynel` props~~ **DONE** — the 18 props are `WorldObjects` rows on map
    4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the
-   `IDatabaseRepository` and SOURCES each scene dynel from its row (`BuildSceneDynel`): matched by identity
-   (`display_name`), re-addressed via `WorldObjectBuilder.TryBuild(row, handle, playfieldInstance, ...)` to the
-   record's handle + the create session's playfield token (the new playfield-instance overload —
-   `TryRewritePlayfieldInstance` — rewrites the rows' stored token, which is from a different session), and
-   emitted ONLY when byte-identical to the verbatim record (the `RetailLoginReplay` zero-render-risk gate); no DB
-   / no row / any drift falls back to verbatim. `CreateEditorSceneDynelTests` proves **all 18 reconstruct
+   `IDatabaseRepository` and SOURCES each scene dynel from its row: `LoadEditorSceneDynels` loads the map-4000
+   `WorldObjects` keyed by `CapturedHandle`, then the burst loops the fixed `EditorSceneDynelHandles` and builds
+   each byte-exact via `WorldObjectBuilder.TryBuild(row, handle, playfieldInstance, out body)` (the
+   playfield-instance overload), re-addressing every prop to the captured handle + the editor playfield instance
+   (`CreateEditorCharBuilder.EditorPlayfieldInstance`); a no-DB run simply omits them (no verbatim fallback).
+   `CreateEditorSceneDynelTests` proves **all 18 reconstruct
    byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. (Until Gitea #222 the 18th —
    localized `3072626`, handle `0x0002A7FE` — had no DB row: it shares an exact position with `347659` and the
    importer's position-keyed `WorldObject` dedup dropped it. Fixed by keying world objects by (position,
@@ -146,11 +146,12 @@ create-specific to decode, only builder wiring to do:
      `decode_create_iir_records.py` + `Captures/ghidra/DumpRegenReader.java`, built by
      `CreateEditorRecordBuilder.BuildRegenIir`.
    - `StatIIR` (0xF98E10B3) / `EnergyIIR` (0x40749B8A) / `StatUpdateIIR` (0x96B8DC59) — had builders, and as of
-     0d51565 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /
+     c2611b23 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /
      `WorldPrepBurst` are now built via `CreateEditorRecordBuilder` too (the per-class StatIIR runs as loops). The
      unused `C350` var + per-file `IirId` helpers were dropped. (`PlayfieldFIIR`/`GameTimeIIR` already wired.)
      The verbatim carriers of this family that are **avatar-directed** (frame = the live `id`) were converted
-     the same way (#304): 18× StatIIR in `Post205FBurst`; in `WorldEntryBurst` 5× StatIIR (+2× StatIIR /
+     the same way (#304): 18× StatIIR in `Post205FBurst` (that burst has since been removed entirely as a dead,
+     never-firing path, `022c0ca1`); in `WorldEntryBurst` 5× StatIIR (+2× StatIIR /
      2× StatUpdateIIR / 1× EnergyIIR / 1× FeedbackIIR / 1× CharInPlayIIR) + the live-cutscene EnergyIIR in
      `CreateWorldCutsceneScripts`; plus the 3 `id`-frame `GameActionListIIR` (0xF508F4C1) via
      `GameActionListCodec` and `CharInPlayIIR` in `PostReadyBurst`. **Correction:** an earlier claim of "no

@@ -13,9 +13,9 @@ namespace Faolan.Core.Network.Server.GameServer
 	}
 
 	/// <summary>
-	///     Multi-provider dispatcher: Faolan runs two GameServer listeners (creator + world ports), and a client
-	///     may be connected to either, so unlike the single-provider agent dispatcher this aggregates sessions
-	///     across all registered listeners and routes a GM command to whichever one actually holds the character.
+	///     Multi-provider dispatcher: more than one GameServer listener can register, so unlike the
+	///     single-provider agent dispatcher this aggregates sessions across all registered listeners and
+	///     routes a GM command to whichever one actually holds the character.
 	/// </summary>
 	public sealed class GameServerDispatcher : IGameServerDispatcher
 	{

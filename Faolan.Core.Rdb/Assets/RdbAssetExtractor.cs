@@ -10,10 +10,10 @@ using System.Text.Json.Serialization;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Phase 0 of the RDB -> 3D-model pipeline (Gitea #275): resolve a model's asset graph from its MESHINDEXFILE
-	// manifest and extract what is decodable today - the FCTX textures (-> DDS) and, on request, the raw geometry blob
-	// (RDB type 1010001) so it is in hand for the Phase 1 geometry-decode spike. The geometry format itself is still
-	// undecoded; this stage gives us the texture set + reference tree + the bytes to reverse next.
+	// The RDB -> 3D-model pipeline (Gitea #275): resolve a model's asset graph from its MESHINDEXFILE manifest and build
+	// a glb from it - the geometry (RDB type 1010001, decoded by RenderMeshReader), the FCTX textures (-> PNG/DDS), and
+	// (for skinned bodies) the skeleton + skin weights. Also dumps the raw geometry blob / a DDS texture set on request
+	// for offline analysis.
 	public static class RdbAssetExtractor
 	{
 		// A humanoid rig used as a last-resort fallback when auto-selection finds no skeleton covering a mesh's palette.

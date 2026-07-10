@@ -123,11 +123,6 @@ namespace Faolan.Core.Database.Repositories
 
 	public class DatabaseRepository : IDatabaseRepository
 	{
-		// Character ids (which double as the on-wire client instance) are DB-generated (SQLite max+1,
-		// continuing from the existing 0x0200xxxx rows). The old manual in-range allocation is gone: the
-		// burst replay pads varints (EncodeVarintPadded), so any id below 2^28 substitutes length-preserving
-		// into the captured packets.
-
 		// Character ids ARE the on-wire client instance and the burst replay substitutes them into captured 4-byte
 		// protobuf-varint slots, so they must encode to <= 4 varint bytes (id <= 0x0FFFFFFF). Allocate from this base
 		// continuing the existing 0x013xxxxx rows; a 5-byte id (> 0x0FFFFFFF) crashes the client (see DatabaseContext).
@@ -799,10 +794,8 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync();
 		}
 
-		// The captured static world objects for a map (decor/containers/zones). The world-entry path builds each
-		// object's body from its row via WorldObjectBuilder, like the NPC spawns.
 		// A captured NPC spawn by name (case-insensitive), any map (used by .spawnnpc and to fetch a mount-entity
-		// template like "Fading Black Horse" to spawn at the player). Prefers a row that has spawn Data.
+		// template like "Fading Black Horse" to spawn at the player). Requires the type to have a lifted stat core.
 		public async Task<NpcSpawn> GetNpcSpawnByName(string name)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -1268,8 +1261,9 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Items.Where(i => i.Name != null && i.Name.ToLower().Contains(lowered)).OrderBy(i => i.Name).Take(limit).ToArrayAsync();
 		}
 
-		// Captured NPC spawn rows whose name contains the substring, case-insensitive, any map. Rows without
-		// spawn Data are included (still useful to know the NPC exists) - callers check Data for spawnability.
+		// Captured NPC spawn rows whose name contains the substring, case-insensitive, any map. Rows whose type
+		// has no lifted stat core are included (still useful to know the NPC exists) - callers check StatCore for
+		// spawnability.
 		public async Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

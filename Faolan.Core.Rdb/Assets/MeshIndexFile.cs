@@ -10,8 +10,8 @@ namespace Faolan.Core.Rdb.Assets
 	// Parses an Age of Conan RDB MESHINDEXFILE record (type 1010030). Each record is a small XML manifest that ties a
 	// model together: it points at the actual geometry blob (<RenderMesh file="ID"/> -> RDB type 1010001), an optional
 	// collision blob (<CollisionMesh2 file="ID"/>), and a <Materials> list whose <Texture Path="TYPE:ID"/> entries
-	// reference FCTX/PNG texture resources. The geometry blob itself is a separate, still-undecoded binary (Gitea #275
-	// Phase 1); this manifest is the plain-XML graph that lets us resolve a model's textures + the geometry id to dump.
+	// reference FCTX/PNG texture resources. The geometry blob itself is a separate binary (decoded by RenderMeshReader,
+	// Gitea #275); this manifest is the plain-XML graph that lets us resolve a model's textures + the geometry id to load.
 	//
 	// Record layout: 12-byte RDB-Id header (type,id,marker) then the raw XML (no <?xml?> decl in most records, and the
 	// file paths carry Windows backslashes inside attribute values, which is valid XML). We parse from the first '<'.

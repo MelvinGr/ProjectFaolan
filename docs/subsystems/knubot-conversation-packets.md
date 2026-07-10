@@ -14,15 +14,15 @@ an unexpected sub-opcode. Proven byte-identical to the old handle-substitution
 **Stored structured (2026-06-30).** Every packet of a node is now decoded into structured `ConversationPacket`
 columns (`ConversationScreenDecoder` → `SubOpcode/Env/Field/Flag/ScreensJson`, plus `CameraAgentInstance/
 CameraParams` for the camera) and BUILT from those columns at send time, not from the raw `Data` blob (kept
-only as a fallback). All 355/355 rows are structured — 307 Knubot screens + 48 `SetDialogueCamera` (see below);
+only as a fallback). All 511/511 rows are structured — 439 Knubot screens + 72 `SetDialogueCamera` (see below);
 zero raw replay. The remoteformat XML itself is parsed/rebuilt byte-exact by `RemoteFormatXml`, and the **live
 player name/guild are regenerated** into each screen (`RemoteFormatXml.WithLivePlayer`) so the NPC greets the
 real character — the captured player's name is gone. **Remaining:** the screen TEXT (`id`/`category`/`key`)
 is still the captured template; generating it from RDB text + the Lua/tag VM is blocked on the harvested,
 client-validated content `key` (non-computable, same as the item TEA keys).
 
-`AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 197/197 +
-48/48): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. CloseChatWindow
+`AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 163/163 +
+40/40 across the structured rows): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. CloseChatWindow
 is that shape with a single empty `id="0"` remoteformat (retail's "nothing (more) to say").
 
 **Carrier framing (confirmed against the captures):** every Knubot s2c packet is opcode `0x2000`, sender
@@ -61,7 +61,7 @@ records with the right `(id, category, key)` refs.
 
 ## The non-dialogue packets in a node (`SetDialogueCamera`)
 
-A captured conversation node also carries packets that are **not** Knubot dialogue text (~48 of 355 rows in
+A captured conversation node also carries packets that are **not** Knubot dialogue text (~72 of 511 rows in
 `faolan.db`). These are **`DispatchSetDialogueCamera`** — opcode **`0x2015`**, caller **GameCharAgent
 (`0xA9ECB95D`)** → receiver **GameCharInterface (`0x8B87F791`)** (a different endpoint pair than the Knubot
 dialogue's GameAgent→GameInterface `0x2000`). The body is the cinematic conversation camera's two focus
@@ -71,9 +71,11 @@ entities + params:
 [u32 0xC350][u32 npcHandle][u32 0xC350][u32 playerHandle][u32 0x05010119][trailer]
 ```
 
-They carry no `remoteformat` text, so the structured-screen storage (#188) leaves them as raw `Data` and the
-runtime replays them re-addressed to the live player + NPC handles (alongside the interleaved quest-grant
-packets, which the WorldQuest builders construct). `ConversationScreenDecoder.Decode` returns null for them.
+They carry no `remoteformat` text, but they ARE structured (#188): `ConversationScreenDecoder.Decode`
+stores the GameCharAgent sender instance + the param bytes in the `CameraAgentInstance`/`CameraParams`
+columns, and the runtime BUILDS the packet from those columns via
+`DialogueCameraBody.BuildDialogueCameraPacket` re-addressed to the live player + NPC handles (byte-exact in
+`ConversationConstructTests`). The interleaved quest-grant packets are built by the `WorldQuest` builders.
 
 ## Remaining for #188
 - Harvest the dialogue TREE (screens + option remoteformat refs + branching) from the RDB (the captures

@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// opcode catalog is a misnomer; #91 / #149). Server→client it pushes a named scripted step the client's
 	// intro flow runs (e.g. "PlayOrSkip", "IntroDone", "ChangeSex", "ApproachCasilda", or the big
 	// "NEW_character_creation Slave Galley" creation step). Decoded byte-exact from captures (Captures/
-	// decode_quest.py + ScryScriptIIR ReadSubClass), built here from scratch.
+	// scripts/decode_quest.py + ScryScriptIIR ReadSubClass), built here from scratch.
 	//
 	// Wire (subopcode onward; the 4-byte packet length is added by the send layer):
 	//   [subop 0xA36D3B74][ack 0x0000C350][u32 playerHandle][u8 flag=0][u32 BE pbLen][protobuf pbLen bytes]

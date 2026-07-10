@@ -6,7 +6,7 @@ Dissector + validation: `Captures/scripts/decode_guild.py`.
 
 ## Where guilds live on the wire
 
-All guild RPCs run on the **CsPlayerAgent** connection (port 7012). The 16-bit opcode after the
+All guild RPCs run on the **CsPlayerAgent** connection (port 7001, `faolan.json` `CSPlayerAgentPort`). The 16-bit opcode after the
 RpcHeader is a **method index** (0x2000 + position) into the recovered RPC tables
 (`docs/re/aoc-client-rpc-methods.json`):
 
@@ -71,7 +71,7 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
 
 ## Server implementation (Faolan)
 
-- DB: `Guild` table + `Character.GuildId`/`GuildRank` (migration `AddGuilds`). Members are characters
+- DB: `Guild` table + `Character.GuildId`/`GuildRank` (created in the `InitialCreate` migration). Members are characters
   with `GuildId` set; deleting a guild releases members (`SetNull`).
 - `Faolan/CSPlayerAgent/GuildService.cs` — the guild collaborator extracted from the listener: wire
   builders (member record + invite body byte-exact against the capture: `GuildPacketTests`) plus the
@@ -85,7 +85,9 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   response, which opens the guild window without a relog — built byte-exact against the create-guild capture
   (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`). See `docs/subsystems/create-guild-decode.md` (#306). The
   login `0x203F` push still runs, so relog remains a fallback.
-- GM bootstrap: `.guild create <name>` (the capture-true CreateGuild RPC needs a registrar NPC window).
+- Create path: the capture-true `CreateGuild` RPC (0x2021 → `HandleCreateGuild`), triggered in-client from a
+  registrar NPC window. The old `.guild create <name>` GM bootstrap was removed with the other GM test
+  commands (commit `54f55dee`); the surviving GM commands are `.ah`/`.teleport`/… (no `.guild`).
 
 ## Open items
 

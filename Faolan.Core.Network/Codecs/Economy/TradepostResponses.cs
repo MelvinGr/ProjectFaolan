@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		private const string SendMailResultXml = "<remoteformat id=\"0\" category=\"0\" key=\"C4O?^XE&#39;^VC4O?^XE&#39;^V\" knubot=\"0\"  ></remoteformat>";
 
 		// Server source endpoint for tradepost dispatches: GameCharAgent sub-id 0x59, constant across both
-		// captures (same bytes as NewCharacterReadyForPlayScreenSender).
+		// captures (same bytes as the new-character ready-for-play-screen sender).
 		private const uint GameCharAgentInstance = 0x59;
 
 		// DispatchOpenTradepost body = the auctioneer access point [posX][posY][posZ][maxRadius] (big-endian floats).

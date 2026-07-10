@@ -29,7 +29,7 @@ now serves only as the golden test oracle. **`BuildFromScratch` is now wired int
 `BuildBurstlessSnapshot`); the captured-burst tails are retired.** The production FullChar tails are fully
 generated. Branch `development`, all green (506 tests).
 
-**UPDATE 2026-06-19 — MULTI-QUEST journal generates byte-exact + WIRED LIVE (#255 closed, verified in-client; commit 431673c).**
+**UPDATE 2026-06-19 — MULTI-QUEST journal generates byte-exact + WIRED LIVE (#255 closed, verified in-client; commit e89e83fe).**
 The quest region now carries the player's full set of held quests (from `CharacterQuests`), not just the beach quest —
 so the login journal shows the real quests, not the captured beach char's phantom 2/30 (#254). Multi-quest wire order
 (decoded byte-exact from the Strie/Stihetfv 2-quest `[beach+13479]` login snapshot, 2247 B):

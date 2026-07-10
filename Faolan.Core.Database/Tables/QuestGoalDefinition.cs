@@ -36,7 +36,7 @@ namespace Faolan.Core.Database.Tables
 
 		// What server-side ACTION advances/completes this goal (Gitea #261). The wire output of a completion is
 		// identical for every type (QuestProgressionService); the type only selects which trigger matches:
-		//   Kill       - a kill of the NPC named TargetName (CombatService.AdvanceKillQuests).
+		//   Kill       - a kill of the NPC named TargetName (QuestProgressionService.AdvanceKillGoals).
 		//   LootFromNpc- looting the corpse bag of the NPC named TargetName (LootService); the actual key item is a
 		//                quest-specific RDB item we don't materialise, so the bag's SOURCE NPC name is the match key.
 		//   TalkToNpc  - opening the greeting of the NPC named TargetName (ConversationService).

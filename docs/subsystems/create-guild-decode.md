@@ -10,9 +10,10 @@ previously written blind — "No retail capture of the upload exists").
 u8  form = 0x06     government/guild-form the client chose  (the current code ignores this)
 u16 0
 ```
-Body from the capture: `00 06 "faolan" 06 00 00`. The current `HandleCreateGuild` reads only the name via
-`ReadString()` and drops the trailing `06 00 00`; the `0x06` is the guild form the player selected in the
-registrar window.
+Body from the capture: `00 06 "faolan" 06 00 00`. `HandleCreateGuild` reads the name via `ReadString()` and
+then the trailing `form` byte (`0x06`) — the guild form the player selected in the registrar window — leaving
+the final `00 00` unread. (It previously read only the name and dropped `06 00 00`; the form is now parsed —
+see the Status note below.)
 
 ## Response — `DispatchGuildCreated` (0x2044), S→C  (NOT `0x203F`!)
 

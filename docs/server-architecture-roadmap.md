@@ -32,7 +32,7 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   removes regardless.
 > - **Persistence** ✓ event-driven (disconnect + teleport + `.save` flushes live world state) + a 5-min autosave
 >   timer. No game loop needed for it.
-> - **Game loop** ✓ a **10 Hz base tick** (`GameTickLoop`) measuring real wall-clock dt. Continuous systems run every
+> - **Game loop** ✓ a **10 Hz base tick** (`WorldSimulation.RunTickLoop`, `BaseTickSeconds = 0.1`) measuring real wall-clock dt. Continuous systems run every
 >   tick with that dt (`WorldState.Tick`); rate-based systems run via a per-behaviour `TickAccumulator` at their own
 >   interval, dt-scaled (vitals regen at 1 Hz, pushes only on change). A long stall fires a behaviour once with the
 >   whole elapsed (no catch-up storm).
@@ -40,23 +40,26 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   conversation; quest-givers/vendors are friendly and never aggro) aggros the nearest player within `NpcAggroRange`
 >   (20u) and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled
 >   damage (`ResolveNpcAttackDamage`) + pushes `0x96B8DC59`. A damaged NPC with no player in range **leashes** — heals
->   back to full (no kiting from out of range / across pulls). Both HP and hostility now come from columns the
->   **importer lifts** from the spawn blob: **`NpcSpawn.Health`** (real per-NPC max HP, was a level-scaled guess) and
->   **`NpcSpawn.Community`** (faction): `Community > 0` = a faction mob (poachers 59, scavengers 60, picts 317,
+>   back to full (no kiting from out of range / across pulls). NPC *movement* has since shipped: the tick chases/leashes
+>   and patrols via the decoded MoveTask grammar (`BroadcastNpcMove`/`BroadcastNpcPatrol` + `MoveTaskBuilder`,
+>   `PatrolPath` table). Both HP and hostility now come from columns the
+>   **importer lifts**: **`NpcSpawn.Health`** (real per-NPC max HP, was a level-scaled guess) and the type-level
+>   **`NpcStatCore.Community`** (faction; moved off `NpcSpawn` to the Npc-type side table in #244): `Community > 0` = a faction mob (poachers 59, scavengers 60, picts 317,
 >   crocs 374…) = hostile; `Community 0` = the neutral/friendly community (quest-givers AND neutral critters like
->   Scorpion/Guard Dog). The attack ANIMATION packet is undecoded (damage effect only); NPC
->   *movement* still waits on the pinned MoveTask grammar.
+>   Scorpion/Guard Dog). The attack ANIMATION packet is undecoded (damage effect only).
 > - **Player death → respawn at the closest known resurrection point** ✓ when a player's vitals hit 0 (HP=0 push =
->   the client's death state) a respawn countdown starts (`TickPlayerDeaths`, 10s); corpses don't regen and NPCs stop
->   hitting them. On expiry they're revived to full (`EntityVitals.ReviveToFull`) and re-entered (`RespawnPlayer`,
->   reusing `SendWorldEntry`, no gated warp) at the **closest resurrection point they KNOW** (`RespawnResolver`).
->   `RespawnPoint`/`CharacterRespawnPoint` tables (migration `AddRespawnPoints`): each point is always-known (the
+>   the client's death state) the death/release screen is sent once (`TickPlayerDeaths`) and the player then waits;
+>   corpses don't regen and NPCs stop hitting them. Respawn is **click-driven** — the client's `RespawnMe`
+>   (c2s `0x2024`) release click runs `TryRespawnNow` → `RespawnPlayer`, which revives to full
+>   (`EntityVitals.ReviveToFull`) and relocates to the **closest resurrection point they KNOW** (`RespawnResolver`).
+>   (The old 10s auto-revive timer was removed in #214 — it yanked the player back before the release screen could be used.)
+>   `RespawnPoint`/`CharacterRespawnPoint` tables (folded into the re-baselined `InitialCreate` migration): each point is always-known (the
 >   seeded Tortage-Beach starter) or must be **discovered** by walking near it (`DiscoverNearbyRespawnPoints`, persisted
 >   + a system message); respawn falls back to the map spawn if none known. Combat loop closed both ways. A dedicated
 >   death/rebirth-UI packet (if any) is undecoded; the HP=0 push is the death signal.
 > - **NPC death → respawn** ✓ NPC vitals live on `WorldEntity` (seeded level-scaled at zone load, world-authoritative).
 >   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
->   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and
+>   despawned for nearby players (`BroadcastEntityDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and
 >   revives it at its spawn point, re-rendered via `BroadcastNpcRespawn` (the NPC's `NpcSpawnBuilder` body). 5 unit
 >   tests. Visual confirmation is 2-client/in-client gated; the lifecycle logic is harness-verified.
 > - **XP + level-up on kill** ✓ killing a model NPC awards level-scaled XP (`CombatResolver.ResolveKillXp`); experience
@@ -69,9 +72,10 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   `docs/re/quests-and-combat.md`) — it's a loot **window + click-to-take**, not auto-loot. The **window flow is wired**:
 >   opening a bag (`Interact` action `0x12` `UseObject`) → `NewCurrentLooter` (0xD06568C8) + `SimpleDynelVisualChange`
 >   "Open" (0xE7F4F8F8) shows the contents and the bag STAYS; close (top-level `0x2044`) → fade (`n3ToClientFade`
->   0x66180B20) + remove. Loot expiry fades too. All `WorldLoot` builders are byte-exact vs the capture. **Taking an
->   item (`0x2043` → grant `ContainerAddItem` + `LootRemoveItems` 0x70010162) is the remaining, heavy/in-client-gated
->   piece** — no live inventory-add path exists yet, so a click is logged but yields nothing.
+>   0x66180B20) + remove. Loot expiry fades too. All `WorldLoot` builders are byte-exact vs the capture. **Taking items now grants live**:
+>   `TryLootAll` (`0x2043`) and single-drag `TryLootItem` (`0x2046`) route through `LootService` →
+>   `GrantItemToBackpack` (persist + live `DispatchAddItem`) + `LootRemoveItems` (`0x70010162`); in-client
+>   confirmation of the delivery is still pending.
 > **NEXT:** the loot item-grant (live ContainerAddItem); then NPC AI movement (the pinned MoveTask patrol grammar) so
 > the tick drives motion and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
 
@@ -86,7 +90,7 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 - **World rendering** — per-map world-burst replay renders a world with NPCs + objects; the player's own spawn is
   fully **DB-generated** (identity, race/sex/level, vitals, equipment, scaffold frame).
 - **Construct-don't-replay machinery** — `NpcSpawnBuilder` / `WorldObjectBuilder` / `MoveTaskBuilder` build packets
-  byte-exact; a coverage gate (`Faolan.Importer --burst-coverage`, ~29%) tracks how much of each map is rebuildable
+  byte-exact; a coverage gate (`Faolan.Importer --report burst-coverage`, ~29%) tracks how much of each map is rebuildable
   from tables vs still replayed.
 - **Combat scaffolding** — `CombatState` (in-memory vitals per handle), `CombatResolver` (provisional damage), NPC
   max HP now seeded from the spawn's `CharacterStats.health`.

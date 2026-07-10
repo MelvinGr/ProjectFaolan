@@ -1,7 +1,9 @@
 # NPC three-tier architecture (template / spawn-point / live)
 
-Status: **in progress** (#244 — lifting the stat core off the captured `Data` blob so NPC spawns are
-constructed from typed storage, not spliced from a capture). See also
+Status: **done** (#244 — the stat core is lifted off the captured `Data` blob so NPC spawns are
+constructed from typed storage, not spliced from a capture. The `Data` column has now been **retired** and
+every shipped spawn builds from typed columns (988/988) via `NpcSpawnBuilder.TryBuildLive` — the sole
+spawn-body path). See also
 [world-packets construct-not-replay], `docs/subsystems/mid-session-spawn-blocker.md`, and the simulation-layer roadmap.
 
 ## The three tiers
@@ -36,7 +38,7 @@ full health, not frozen at whatever moment it happened to be captured in (this a
 where an NPC captured mid-death would spawn dead). For an idle reference capture the canonical values ARE
 the captured values, so the byte output is unchanged; only mid-action captures differ.
 
-`NpcSpawnBuilder.TryBuild` (a placed spawn) and `TryBuildFromType` (a pet/summon with no `NpcSpawn` row)
+`NpcSpawnBuilder.TryBuildLive` (a placed spawn) and `TryBuildFromType` (a pet/summon with no `NpcSpawn` row)
 both build this way. **The playfield token, however, must NOT be baked at build/load time** - the
 value written at construction is only a placeholder. The token the client accepts is the LIVE playfield
 token the entering player loaded, which does not exist until that player enters the world; a spawn
@@ -94,7 +96,7 @@ from typed columns.
       `row` (placement overrides), with runtime anim/state canonical. Verified byte-exact for the type +
       placement fields across all 980 populated spawns (`NpcStatCoreCodecTests`). `Data` still supplies the
       frame + name + equipment structure.
-- [x] `NpcSpawnBuilder.BuildFromScratch` assembles the WHOLE body with no template: header constants;
+- [x] `NpcSpawnBuilder.BuildBody` assembles the WHOLE body with no template: header constants;
       transform `2C 0A <vec3> 12 <quat> 18 <token varint>` (token written in-place as a placeholder - the
       live token is re-stamped per-send, see above);
       pre-IIR = `NpcSpawnPreIir.BuildMinimal`; CoreChar header `[41][X][msgLen]` with X = the lifted
@@ -105,7 +107,7 @@ from typed columns.
       from columns**, 9 canonically cleaner (drop a captured runtime target), 155 the humanoid runtime-post-IIR
       tail (keep `Data`).
 - [x] WIRE it into the live path: `TryBuildLive` builds the body via `BuildMessageFromColumns` +
-      `BuildFromScratch(zoneToken)` for every expressible case, falling back to the `Data` splice only for the
+      `BuildBody(zoneToken)` for every expressible case, falling back to the `Data` splice only for the
       residual runtime-post-IIR tail. NB `SendWorldSpawn` STILL re-stamps the playfield token per-send
       (`SpawnPlayfieldRewriter`) - the token baked at build is only a placeholder; the live token isn't known
       until the player enters (a 2026-07-08 regression baked the load-time token + dropped the re-stamp,
@@ -138,3 +140,9 @@ from typed columns.
       just `Id`/`Name`/`TemplateId` + its navigations. `NpcStatCore.Sex` is the `Sex` enum (wire code
       `None=0`/`Male=2`/`Female=3`); `NpcStatCore.Race` stays a raw `uint` (creature model-race 0..98 — a
       different domain from the 3-value player `Race` enum).
+- [x] **Retire the `Data` column.** Every shipped spawn (988/988) now builds from typed columns, so the
+      captured `NpcSpawn.Data` blob was dropped from the table (`Faolan.Core.Database/Tables/NpcSpawn.cs`); the
+      importer lifts these rows from the dump body at import time without persisting it. `TryBuildLive` is the
+      SOLE spawn-body path — there is no longer a `Data`-splice fallback in `NpcSpawnBuilder`. The residual
+      no-morph-humanoid recordCounts noted above were closed by the importer's minimal-form lift
+      (`NpcStatCore.MinimalPostIirRecordCount`).
