@@ -1,0 +1,72 @@
+# Project Faolan — docker compose.
+#
+# Default: ONE all-in-one server (login tier + the first realm's world) — the simplest deploy. `docker compose up`
+# builds the image (Dockerfile) and runs it, persisting the game data via a bind mount.
+#
+# For a PROCESS-PER-REALM deployment (#324, docs/subsystems/multi-realm-plan.md) see the commented `login` +
+# `realm-*` services at the bottom. Two caveats for that mode:
+#   - The Realm rows' IpAddress must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT
+#     127.0.0.1 — the login tier advertises Realm.IpAddress:Port and the client connects there from OUTSIDE Docker;
+#     each realm's ports must be published on the host too.
+#   - All processes share one faolan.db over the bind mount, and SQLite is single-writer (file locking is awkward
+#     for concurrent containers) — fine for light/dev use, but production multi-realm wants a server DB (Postgres;
+#     see the DB-provider note in the plan). Then the shared DB is a service, not a bind mount.
+
+name: projectfaolan
+
+services:
+  faolan:
+    build: .
+    image: projectfaolan
+    # All-in-one: login tier + the first realm's world (the Dockerfile ENTRYPOINT, no --role override).
+    ports:
+      - "7010:7010" # UniverseAgent — the fixed client entry port
+      - "7011:7011" # PlayerAgent
+      - "7014:7014" # GameServer (realm world)
+      - "7012:7012" # AgentServer (chat)
+      - "7001:7001" # CsPlayerAgent (guilds/teams)
+    # Persist character saves + EF migrations across restarts. Bind-mounts the committed faolan.db, so it is
+    # MUTATED in place; for a clean deploy copy faolan.db somewhere else and bind that path instead.
+    volumes:
+      - ./faolan.db:/app/faolan.db
+    restart: unless-stopped
+
+# ---------------------------------------------------------------------------------------------------------------
+# PROCESS-PER-REALM example (uncomment; remove/keep the all-in-one `faolan` service above as you like). One shared
+# login/router tier + one game host per realm, all against the shared faolan.db. Seed a Realm row per realm first
+# (id + IpAddress reachable by the client + its Port/AgentServerPort/CsPlayerAgentPort), then publish those ports.
+# ---------------------------------------------------------------------------------------------------------------
+#  login:
+#    build: .
+#    image: projectfaolan
+#    command: ["--role", "login"]        # UniverseAgent + PlayerAgent only; owns no world
+#    ports:
+#      - "7010:7010"
+#      - "7011:7011"
+#    volumes:
+#      - ./faolan.db:/app/faolan.db
+#    restart: unless-stopped
+#
+#  realm-2:
+#    build: .
+#    image: projectfaolan
+#    command: ["--role", "realm=2"]      # one realm's game host, bound to Realm row 2's ports
+#    ports:
+#      - "7014:7014"                      # world / chat / cs = Realm row 2's Port / AgentServerPort / CsPlayerAgentPort
+#      - "7012:7012"
+#      - "7001:7001"
+#    volumes:
+#      - ./faolan.db:/app/faolan.db
+#    restart: unless-stopped
+#
+#  realm-3:
+#    build: .
+#    image: projectfaolan
+#    command: ["--role", "realm=3"]      # a second realm (seed Realm row 3 with these ports first)
+#    ports:
+#      - "7024:7024"
+#      - "7022:7022"
+#      - "7021:7021"
+#    volumes:
+#      - ./faolan.db:/app/faolan.db
+#    restart: unless-stopped
