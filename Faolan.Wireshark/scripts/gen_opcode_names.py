@@ -21,7 +21,7 @@ import sys
 # endpoint's class id picks the table (c2s receivers are *Agent classes, s2c receivers
 # *Interface classes). PlayerAgent/PlayerInterface use 32-bit hash dispatch, not
 # 0x2000+index, but their enums hold actual observed wire values so they map the same
-# way. The AgentServer chat enums are excluded: chat packets carry no RpcHeader.
+# way. The ChatServer chat enums are excluded: chat packets carry no RpcHeader.
 ENUM_TO_CLASS = {
     "UniverseAgentOpcodes": "UniverseAgent",
     "UniverseInterfaceOpcodes": "UniverseInterface",
@@ -40,7 +40,7 @@ ENUM_TO_CLASS = {
 }
 
 # Standalone (non-class-keyed) tables: the IIR type-name catalog carried inside the
-# GameAgent/GameInterface 0x2000 PassBlob packets, and the AgentServer chat opcodes
+# GameAgent/GameInterface 0x2000 PassBlob packets, and the ChatServer chat opcodes
 # (chat packets have no RpcHeader, so they can't ride the class-keyed tables).
 STANDALONE_ENUMS = {
     "GameServer0X2000Opcodes": "faolan_iir_names",

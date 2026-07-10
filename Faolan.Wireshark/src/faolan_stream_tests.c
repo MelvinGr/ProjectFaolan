@@ -245,7 +245,7 @@ static int test_framer_oversize_resets(void)
 
 static int test_chat_framer(void)
 {
-    /* AgentServer framing: [u16 opcode][u16 bodyLen][body]; a hello, a body-less packet and a
+    /* ChatServer framing: [u16 opcode][u16 bodyLen][body]; a hello, a body-less packet and a
        chat message, fed in awkward chunks. */
     const uint8_t stream_bytes[] = {
         0x00, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03,

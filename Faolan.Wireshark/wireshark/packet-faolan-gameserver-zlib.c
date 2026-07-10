@@ -12,7 +12,7 @@
  *          hashes of the client's agent/interface class names (docs/aoc-opcode-ids.md).
  *
  * Applies to UniverseAgent, PlayerAgent, CSPlayerAgent and GameServer connections. The
- * AgentServer chat protocol ([u16 opcode][u16 bodyLen][body] framing) is auto-detected per
+ * ChatServer chat protocol ([u16 opcode][u16 bodyLen][body] framing) is auto-detected per
  * conversation (first-packet CRC fails Conan + the stream walks as chat) and dissected with
  * its own packet fields.
  *
@@ -68,7 +68,7 @@ static int hf_faolan_pkt_direction = -1;
 static int hf_faolan_pkt_hdr_extra = -1;
 static int hf_faolan_pkt_body = -1;
 
-/* AgentServer chat packet fields */
+/* ChatServer chat packet fields */
 static int hf_faolan_chat_opcode = -1;
 static int hf_faolan_chat_method = -1;
 static int hf_faolan_chat_direction = -1;
@@ -167,7 +167,7 @@ typedef struct faolan_direction_state
 typedef enum faolan_conv_validation {
     FAOLAN_CONV_UNVALIDATED = 0,
     FAOLAN_CONV_CONAN,
-    FAOLAN_CONV_CHAT, /* AgentServer chat: [u16 opcode][u16 bodyLen][body] framing */
+    FAOLAN_CONV_CHAT, /* ChatServer chat: [u16 opcode][u16 bodyLen][body] framing */
     FAOLAN_CONV_SKIP
 } faolan_conv_validation_t;
 
@@ -184,7 +184,7 @@ typedef struct faolan_conv_state
 
 typedef struct faolan_frame_result
 {
-    bool is_chat; /* packets use AgentServer chat framing, not Conan */
+    bool is_chat; /* packets use ChatServer chat framing, not Conan */
     const char *compression_state;
     const char *stream_note; /* e.g. retransmission/out-of-order diagnostics */
     uint32_t input_bytes;
@@ -675,7 +675,7 @@ static void push_bytes(faolan_direction_state_t *dir, const uint8_t *bytes, uint
     free(inflated);
 }
 
-/* Sanity walk: does this byte stream look like AgentServer chat framing? Every packet is
+/* Sanity walk: does this byte stream look like ChatServer chat framing? Every packet is
    [u16 opcode][u16 bodyLen][body] with small opcodes (0x0000..0x00FF observed). */
 static bool plausible_chat_stream(const uint8_t *data, uint32_t len)
 {
@@ -793,7 +793,7 @@ static void deliver_in_order(
     }
 }
 
-/* Dissects one AgentServer chat packet: [u16 opcode][u16 bodyLen][body]. Chat packets carry
+/* Dissects one ChatServer chat packet: [u16 opcode][u16 bodyLen][body]. Chat packets carry
    no RpcHeader, so direction comes from the conversation initiator (the client opens the
    connection and speaks first) and picks the per-direction opcode-name table. */
 static void dissect_chat_packet(
@@ -877,7 +877,7 @@ static void process_first_pass(tvbuff_t *tvb, packet_info *pinfo, const struct t
     }
 
     /* The first completed packet decides the conversation protocol: a valid Conan CRC means
-       Conan; otherwise an AgentServer chat connection ([u16 opcode][u16 bodyLen] framing -
+       Conan; otherwise an ChatServer chat connection ([u16 opcode][u16 bodyLen] framing -
        its arithmetic matches a Conan misframe for the first packet, so the CRC is the
        discriminator). On chat, re-frame the conversation from its first byte. */
     if (conv_state->validation == FAOLAN_CONV_UNVALIDATED && acc.packet_count > 0) {
@@ -898,7 +898,7 @@ static void process_first_pass(tvbuff_t *tvb, packet_info *pinfo, const struct t
             memset(&acc, 0, sizeof(acc));
             acc.conv = conv_state;
             acc.ok = true;
-            note = "AgentServer chat connection";
+            note = "ChatServer chat connection";
 
             faolan_direction_state_t *dirs[2] = {&conv_state->a_to_b, &conv_state->b_to_a};
             for (int d = 0; d < 2; d++) {
@@ -1084,8 +1084,8 @@ void proto_register_faolan_gs_zlib(void)
         {&hf_faolan_pkt_hdr_extra, {"Header Extra", "faolan.pkt.header_extra", FT_BYTES, BASE_NONE, NULL, 0x0, "Header bytes after the opcode", HFILL}},
         {&hf_faolan_pkt_body, {"Body", "faolan.pkt.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
 
-        {&hf_faolan_chat_opcode, {"Chat Opcode", "faolan.chat.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "AgentServer chat opcode", HFILL}},
-        {&hf_faolan_chat_method, {"Chat Method", "faolan.chat.method", FT_STRING, BASE_NONE, NULL, 0x0, "Chat opcode name (per direction), from the C# AgentServer opcode enums", HFILL}},
+        {&hf_faolan_chat_opcode, {"Chat Opcode", "faolan.chat.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "ChatServer chat opcode", HFILL}},
+        {&hf_faolan_chat_method, {"Chat Method", "faolan.chat.method", FT_STRING, BASE_NONE, NULL, 0x0, "Chat opcode name (per direction), from the C# ChatServer opcode enums", HFILL}},
         {&hf_faolan_chat_direction, {"Chat Direction", "faolan.chat.direction", FT_STRING, BASE_NONE, NULL, 0x0, "c2s/s2c from the conversation initiator (the client connects and speaks first)", HFILL}},
         {&hf_faolan_chat_len, {"Chat Body Length", "faolan.chat.len", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}},
         {&hf_faolan_chat_body, {"Chat Body", "faolan.chat.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},

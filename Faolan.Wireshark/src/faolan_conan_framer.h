@@ -58,8 +58,8 @@ bool faolan_conan_framer_push_scan(
     bool *hit_marker);
 
 /*
- * AgentServer (chat) framing: [u16 BE opcode][u16 BE bodyLen][body] (mirrors
- * AgentServerMessageFramer). Reuses the same state struct - len_buf doubles as the 4-byte
+ * ChatServer (chat) framing: [u16 BE opcode][u16 BE bodyLen][body] (mirrors
+ * ChatServerMessageFramer). Reuses the same state struct - len_buf doubles as the 4-byte
  * header buffer. Emitted packets keep the 4-byte header.
  */
 bool faolan_chat_framer_push(
