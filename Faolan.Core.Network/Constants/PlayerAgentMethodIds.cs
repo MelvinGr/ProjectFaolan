@@ -21,17 +21,15 @@ namespace Faolan.Core.Network.Constants
 		public static readonly IReadOnlyDictionary<ushort, uint> ById = new Dictionary<ushort, uint>
 		{
 			// c2s PlayerAgent (received by the server; here for the dissector + gen)
-			[(ushort)PlayerAgentOpcodes.RequestAuth] = 0x96CBE509,
-			[(ushort)PlayerAgentOpcodes.RequestCharRealmData] = 0xA3E1FE0D,
+			[(ushort)PlayerAgentOpcodes.Authenticate] = 0x96CBE509,
+			[(ushort)PlayerAgentOpcodes.FinishGetStartupData] = 0xA3E1FE0D,
 			[(ushort)PlayerAgentOpcodes.DeleteCharacter] = 0x86979E0C,
-			[(ushort)PlayerAgentOpcodes.Ox209E] = 0x9ADCE109,
-			[(ushort)PlayerAgentOpcodes.Ox20A6] = 0xE0C19C0D,
-			[(ushort)PlayerAgentOpcodes.EnterWorld] = 0xDD85FB0E,
-			[(ushort)PlayerAgentOpcodes.RequestSmallCharList] = 0xDAD1D206,
-			[(ushort)PlayerAgentOpcodes.Ox20D6] = 0xDD9EC209,
+			[(ushort)PlayerAgentOpcodes.LoadFacebookToken] = 0xE0C19C0D,
+			[(ushort)PlayerAgentOpcodes.LoginCharacter] = 0xDD85FB0E,
+			[(ushort)PlayerAgentOpcodes.GetStartupData] = 0xDAD1D206,
+			[(ushort)PlayerAgentOpcodes.VerifyLanguageSetting] = 0xDD9EC209,
 			[(ushort)PlayerAgentOpcodes.CreateCharacter] = 0x9CB1D10C,
-			[(ushort)PlayerAgentOpcodes.Ox20EC] = 0xA4F2E303,
-			[(ushort)PlayerAgentOpcodes.Ox20F5] = 0xBDB28B05,
+			[(ushort)PlayerAgentOpcodes.ReceivedCharacterSettings] = 0xA4F2E303,
 
 			// s2c PlayerInterface (sent by the server)
 			[(ushort)PlayerAgentResponseOpcodes.SendCharacterRealmData] = 0xCBC6FC04,

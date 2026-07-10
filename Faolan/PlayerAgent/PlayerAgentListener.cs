@@ -30,7 +30,7 @@ namespace Faolan.PlayerAgent
 
 			switch (opcode)
 			{
-				case PlayerAgentOpcodes.RequestAuth:
+				case PlayerAgentOpcodes.Authenticate:
 				{
 					var accountId = packet.Body.ReadUInt32();
 					var cookie = packet.Body.ReadUInt32();
@@ -50,7 +50,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.RequestSmallCharList:
+				case PlayerAgentOpcodes.GetStartupData:
 				{
 					var unk1 = packet.Body.ReadUInt16();
 
@@ -59,7 +59,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.RequestCharRealmData:
+				case PlayerAgentOpcodes.FinishGetStartupData:
 				{
 					var charCount = packet.Body.ReadUInt32() / 1009 - 1; // % 1009
 
@@ -82,7 +82,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.Ox20A6:
+				case PlayerAgentOpcodes.LoadFacebookToken:
 				{
 					await new PacketStream() // headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
 						.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox209C)
@@ -93,7 +93,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.EnterWorld:
+				case PlayerAgentOpcodes.LoginCharacter:
 				{
 					var characterId = packet.Body.ReadUInt32();
 					var unk0 = packet.Body.ReadUInt32();
@@ -114,7 +114,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.Ox20D6:
+				case PlayerAgentOpcodes.VerifyLanguageSetting:
 				{
 					var languageId = packet.Body.ReadUInt32();
 
@@ -123,7 +123,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.Ox20EC: // after 0x20B9
+				case PlayerAgentOpcodes.ReceivedCharacterSettings: // after 0x20B9
 				{
 					// Retail order (login dump): CsPlayerAgent, then AgentServer, then GameServer, then gametweaks.
 					await SendCsPlayerAgent(client);

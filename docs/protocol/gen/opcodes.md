@@ -4,7 +4,7 @@
 > `Faolan.Core.Network/Constants/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 823 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 821 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -863,17 +863,15 @@ RPC class **PlayerAgent** (id `0x82F20484`) · C2S (client→server call)
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x2083` | `RequestAuth` | id 0x96CBE509 |
-| `0x208E` | `RequestCharRealmData` | id 0xA3E1FE0D |
+| `0x2083` | `Authenticate` | id 0x96CBE509 |
+| `0x208E` | `FinishGetStartupData` | id 0xA3E1FE0D |
 | `0x209D` | `DeleteCharacter` | id 0x86979E0C |
-| `0x209E` | `Ox209E` | id 0x9ADCE109 |
-| `0x20A6` | `Ox20A6` | id 0xE0C19C0D |
-| `0x20B6` | `EnterWorld` | id 0xDD85FB0E |
-| `0x20C1` | `RequestSmallCharList` | id 0xDAD1D206 |
-| `0x20D6` | `Ox20D6` | id 0xDD9EC209 |
+| `0x20A6` | `LoadFacebookToken` | id 0xE0C19C0D |
+| `0x20B6` | `LoginCharacter` | id 0xDD85FB0E |
+| `0x20C1` | `GetStartupData` | id 0xDAD1D206 |
+| `0x20D6` | `VerifyLanguageSetting` | id 0xDD9EC209 |
 | `0x20DE` | `CreateCharacter` | id 0x9CB1D10C |
-| `0x20EC` | `Ox20EC` | id 0xA4F2E303 |
-| `0x20F5` | `Ox20F5` | id 0xBDB28B05 |
+| `0x20EC` | `ReceivedCharacterSettings` | id 0xA4F2E303 |
 
 ## PlayerAgentResponseOpcodes
 

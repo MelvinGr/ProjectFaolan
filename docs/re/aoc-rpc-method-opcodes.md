@@ -569,12 +569,28 @@ what each proxy method passes at its send call** (matches the constants dumped f
 Until the transform is cracked the login opcodes+ids stay behavior-derived (they work); the names above are the
 proven client method set but their name↔opcode link is not yet established (so no rename — #320).
 
-**PARKED 2026-07.** Headless static analysis is exhausted for this transform — the mapping is buried across deep
-generic RPC-serialization functions (`SendMethodInvocation` `FUN_0046c910` → `RpcHeader` build → `FUN_00cbf4e0`
-buffer writes) whose calling conventions/struct layouts Ghidra can't infer from a headless pass, so reading more
-decompiles does not converge. The efficient way to finish is **not** more static RE: hook `SendMethodInvocation`
-(`0x46C910`) with Frida-under-Wine ([[frida_under_wine_client_re]]) during a driven login and log each call's
-`(internal key → wire opcode, wire id)` — that harvests the whole table directly. Deferred because the
-operationally-used methods are already covered (`Opcodes.cs` / `PlayerAgentMethodIds`); the remainder are methods
-the server doesn't implement (Facebook/offline-levels/hardcore/rename/…), so this is documentation-completeness
-(close the V0, cover all 17 interfaces in `gen/opcodes.md`), not function.
+**SOLVED for the login flow 2026-07 (Frida-under-Wine).** Static RE stalled on the key→wire transform, so instead
+we hooked `SendMethodInvocation` (`FUN_0046c910` @ `0x0046C910`) with Frida during a real login and logged each
+call's internal key (→ name via the constructor table above), then correlated by SEND ORDER with the wire
+`(opcode, id)` from a simultaneous loopback capture. `SendMethodInvocation` is the GENERAL proxy send — for
+PlayerAgent it passes the 32-bit key, for the other interfaces the small method index — so the PlayerAgent calls
+fall out cleanly. The login exercised 7 c2s methods, giving a **proven `name → (opcode, wire-id)`** table:
+
+| client method | opcode | wire id | (our old name) |
+|---|---|---|---|
+| `Authenticate` | `0x2083` | `0x96CBE509` | RequestAuth |
+| `GetStartupData` | `0x20C1` | `0xDAD1D206` | RequestSmallCharList — **was wrong** |
+| `FinishGetStartupData` | `0x208E` | `0xA3E1FE0D` | RequestCharRealmData — **was wrong** |
+| `LoadFacebookToken` | `0x20A6` | `0xE0C19C0D` | Ox20A6 |
+| `VerifyLanguageSetting` | `0x20D6` | `0xDD9EC209` | Ox20D6 |
+| `LoginCharacter` | `0x20B6` | `0xDD85FB0E` | EnterWorld |
+| `ReceivedCharacterSettings` | `0x20EC` | `0xA4F2E303` | Ox20EC |
+
+All seven wire ids matched the capture-derived enum exactly (independent confirmation), and `Opcodes.cs` +
+`PlayerAgentMethodIds` are renamed to these proven client names. Method: `Captures/frida/` pattern + a hook on
+`0x0046C910`; the c2s names come from the `PlayerAgentProxy_t` constructor keys above.
+
+**Remaining:** the c2s methods NOT sent during a plain login (CreateCharacter/RenameCharacter/Delete/Facebook-
+save/hardcore/offline-level/…) — re-run the same Frida hook while performing those actions in-client — and the
+**s2c PlayerInterface** login response names (hook the client's pre-auth receive dispatch). Both are more of the
+same technique; the login path (what we implement) is now proven.

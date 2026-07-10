@@ -694,22 +694,22 @@ namespace Faolan.Core.Network.Constants
 	// right after the 16-bit opcode (`ConanPacket.HeaderData` - empty for every other interface). The client
 	// dispatches on that 32-bit id; the 16-bit opcode is a normal 0x2000+index value carried alongside. The id per
 	// opcode lives in `PlayerAgentMethodIds` (the single source: WriteHeader appends it, gen/opcodes.md reads it) -
-	// all capture-verified. Names stay behavior-derived: the login methods are PRE-auth, so they are absent from the
-	// recovered post-auth PlayerInterfaceDispatch table (the name<->opcode link is not proven).
-	// See docs/re/aoc-rpc-method-opcodes.md, #320.
+	// all capture-verified. The 7 login-flow names (Authenticate/GetStartupData/FinishGetStartupData/
+	// LoadFacebookToken/LoginCharacter/VerifyLanguageSetting/ReceivedCharacterSettings) are the client's REAL method
+	// names, Frida-proven 2026-07 (hooked SendMethodInvocation during a login, correlated key->name with the wire
+	// (opcode,id) by send order). Create/DeleteCharacter aren't sent by a plain login, so they stay proxy-name-derived
+	// until re-hooked (create/delete a character under the Frida hook). See docs/re/aoc-rpc-method-opcodes.md, #320.
 	public enum PlayerAgentOpcodes : ushort
 	{
-		RequestAuth = 0x2083,
-		RequestCharRealmData = 0x208E,
+		Authenticate = 0x2083,
+		FinishGetStartupData = 0x208E,
 		DeleteCharacter = 0x209D,
-		Ox209E = 0x209E,
-		Ox20A6 = 0x20A6,
-		EnterWorld = 0x20B6,
-		RequestSmallCharList = 0x20C1,
-		Ox20D6 = 0x20D6,
+		LoadFacebookToken = 0x20A6,
+		LoginCharacter = 0x20B6,
+		GetStartupData = 0x20C1,
+		VerifyLanguageSetting = 0x20D6,
 		CreateCharacter = 0x20DE,
-		Ox20EC = 0x20EC,
-		Ox20F5 = 0x20F5
+		ReceivedCharacterSettings = 0x20EC
 	}
 
 	public enum PlayerAgentResponseOpcodes : ushort
