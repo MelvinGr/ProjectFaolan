@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -6,8 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.AgentServer;
 using Faolan.Core;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Database.Tables;
+using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Extensions;
 using Faolan.Core.Helpers;
 using Faolan.Core.Network.Server.AgentServer;
@@ -70,44 +74,98 @@ namespace Faolan
 			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ??
 															   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
 
+			// Process ROLE (multi-realm / process-per-realm, #324):
+			//   --role login  -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
+			//   --realm <id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
+			//                    realm's ports; the login tier routes players to it (SendGameServer/AgentServer/CsPlayerAgent).
+			//   (no args)     -> all-in-one: login + a game host for the first realm (the historical single-process dev run).
+			var realmArg = builder.Configuration["realm"];
+			var roleArg = builder.Configuration["role"];
+			uint? selectedRealmId = string.IsNullOrWhiteSpace(realmArg) ? null : uint.Parse(realmArg, CultureInfo.InvariantCulture);
+			bool runLogin, runRealm;
+			if (selectedRealmId.HasValue || string.Equals(roleArg, "realm", StringComparison.OrdinalIgnoreCase))
+			{
+				runRealm = true;
+				runLogin = false;
+			}
+			else if (string.Equals(roleArg, "login", StringComparison.OrdinalIgnoreCase))
+			{
+				runLogin = true;
+				runRealm = false;
+			}
+			else
+			{
+				runLogin = runRealm = true; // default: all-in-one (dev)
+			}
+
+			// The realm this process hosts (realm role). Resolved from the DB up front - the Realm row is the single
+			// source of truth for the bind ports, so the world/chat/guild listeners bind exactly what the login tier
+			// advertises for this realm (SendGameServer/AgentServer/CsPlayerAgent). Needs a migrated + seeded DB.
+			Realm hostRealm = null;
+			if (runRealm)
+			{
+				using var probe = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={builder.Configuration.DatabasePath}").Options);
+				hostRealm = selectedRealmId.HasValue
+					? probe.Realms.FirstOrDefault(r => r.Id == selectedRealmId.Value)
+					: probe.Realms.OrderBy(r => r.Id).FirstOrDefault();
+				if (hostRealm == null)
+					throw new Exception(selectedRealmId.HasValue
+						? $"--realm {selectedRealmId}: no such realm in the DB (migrate + seed a Realm row first)."
+						: "realm host: no realm seeded in the DB.");
+
+				// Bind the realm-local chat/guild listeners (they read config) to THIS realm's ports.
+				builder.Configuration.AddInMemoryCollection(new Dictionary<string, string>
+				{
+					["AgentServerPort"] = hostRealm.AgentServerPort.ToString(CultureInfo.InvariantCulture),
+					["CsPlayerAgentPort"] = hostRealm.CsPlayerAgentPort.ToString(CultureInfo.InvariantCulture)
+				});
+			}
+
+			Console.WriteLine($"[role] login={runLogin} realm={runRealm}" +
+							  (hostRealm != null ? $" — hosting '{hostRealm.Name}' (id {hostRealm.Id}): world {hostRealm.Port} / chat {hostRealm.AgentServerPort} / cs {hostRealm.CsPlayerAgentPort}" : ""));
+
 			builder.Services.AddLogging();
 
 			builder.Services.ConfigureFaolanDatabase(builder.Configuration);
 			builder.Services.AddScopedHostedService<DatabaseMigrator>();
 
-			builder.Services.AddScopedHostedService<UniverseAgentListener>();
-			builder.Services.AddScopedHostedService<PlayerAgentListener>();
-			builder.Services.AddScopedHostedService<CsPlayerAgentListener>();
-
-			builder.Services.AddSingleton<IAgentServerDispatcher, AgentServerDispatcher>();
-			builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
-			builder.Services.AddScopedHostedService<AgentServerListener>();
-
-			// Live seam into the GameServer listener: aggregates world sessions and routes
-			// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.
-			builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
-
-			// In-process MCP server (Claude tooling) on a localhost Kestrel port; shares the live singletons above.
-			// When disabled the AgentServer also skips the Claude chat-channel subscription (nothing reads the log).
-			if (builder.Configuration.McpEnabled)
-				builder.Services.AddFaolanMcp();
-
-			builder.Services.AddScopedHostedService(provider =>
+			if (runLogin)
 			{
-				var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-				var configuration = provider.GetRequiredService<IConfiguration>();
-				var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
-				var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
-				var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
+				builder.Services.AddScopedHostedService<UniverseAgentListener>();
+				builder.Services.AddScopedHostedService<PlayerAgentListener>();
+			}
 
-				// One-time startup resolution of the listener's realm/port; blocking here is fine (host build).
-				var realm = dataRepository.GetRealms().GetAwaiter().GetResult().FirstOrDefault();
-				if (realm == null)
-					throw new Exception("realm == null");
+			if (runRealm)
+			{
+				builder.Services.AddScopedHostedService<CsPlayerAgentListener>();
 
-				return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, realm.Port, agentServerDispatcher,
-					gameServerDispatcher);
-			});
+				builder.Services.AddSingleton<IAgentServerDispatcher, AgentServerDispatcher>();
+				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
+				builder.Services.AddScopedHostedService<AgentServerListener>();
+
+				// Live seam into the GameServer listener: aggregates world sessions and routes
+				// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.
+				builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
+
+				// In-process MCP server (Claude tooling) on a localhost Kestrel port; shares the live singletons above.
+				// When disabled the AgentServer also skips the Claude chat-channel subscription (nothing reads the log).
+				if (builder.Configuration.McpEnabled)
+					builder.Services.AddFaolanMcp();
+
+				var hostRealmId = hostRealm.Id;
+				var hostRealmPort = hostRealm.Port;
+				builder.Services.AddScopedHostedService(provider =>
+				{
+					var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+					var configuration = provider.GetRequiredService<IConfiguration>();
+					var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
+					var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
+					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
+
+					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealmId}"), configuration, dataRepository, hostRealmPort, agentServerDispatcher,
+						gameServerDispatcher);
+				});
+			}
 
 			var host = builder.Build();
 			await host.RunAsync();
