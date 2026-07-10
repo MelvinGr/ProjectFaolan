@@ -38,10 +38,12 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 ## Status
 
 Grammar SHAPE decoded + capture-length-validated for all 11 (the "genuinely undecoded" V1 tag is now only about
-the absence of a codec, not the wire format). **Six now HAVE byte-exact codecs** with captured round-trips
-(`RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`, `SpellBookCodec`, `FeedbackIirCodec`, `CrimeCodec` —
-`V1IirCodecTests`): coverage dropped **11 V1 → 5 V1**. The remaining five are each their own decode, not the fixed-field pattern: `UpdateInventoryIIR` is a **protobuf**
-message (reuse `ProtoInventoryGame`); `KnubotStartTradeIIR` is the variable shop list of `std::string`-named items
-(both Knubot readers share the version-gated base prefix `FUN_009a7e00`); `AreaFormulaIIR` has two `0x3F1`
-sub-lists; `TemplateActionIIR` a 68-B struct (`FUN_005d5150`). Their SHAPE is documented above; each needs its
-element/field grammar filled in before a codec.
+the absence of a codec, not the wire format). **Seven now HAVE byte-exact codecs with captured round-trips**
+(`V1IirCodecTests`) — `RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`, `SpellBookCodec`, `FeedbackIirCodec`,
+`CrimeCodec`, and `UpdateInventoryCodec` (which frames `[handle][env][u32 pbLen][ProtoInventoryGame protobuf]`).
+Coverage dropped **11 V1 → 4 V1**.
+
+The remaining four each need more than a fixed-field parse: `KnubotStartTradeIIR` is the variable shop list of
+`std::string`-named items and `KnubotFinishTradeIIR` shares its version-gated base prefix (`FUN_009a7e00`);
+`AreaFormulaIIR` has two `0x3F1` sub-lists; `TemplateActionIIR` a 68-B struct (`FUN_005d5150`). Their SHAPE is
+documented above; each needs its element/field grammar filled in before a codec.

@@ -77,5 +77,16 @@ namespace Faolan.Tests
 			Assert.Equal(1u, c.Value);
 			Assert.Equal(body, c.ToArray());
 		}
+
+		[Fact]
+		public void UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf()
+		{
+			var body = Convert.FromHexString("00000019a74d28140000c35000017e3600000000080a06086510b6fc05");
+			var u = UpdateInventoryCodec.Parse(body);
+			Assert.Equal(0x00017e36u, u.Handle);
+			// the length-prefixed protobuf (a ProtoInventoryGame) is carried intact.
+			Assert.Equal(Convert.FromHexString("0a06086510b6fc05"), u.InventoryProtobuf);
+			Assert.Equal(body, u.ToArray());
+		}
 	}
 }

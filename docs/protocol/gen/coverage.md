@@ -8,8 +8,8 @@
 ## Headline
 
 - **823** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **75** IIR carrier types: **48 V3** (byte-exact builder), **22 V2** (built, no golden), **5 V1** (no builder found).
-- **46** codec classes, **36** with a byte-exact test.
+- **75** IIR carrier types: **48 V3** (byte-exact builder), **23 V2** (built, no golden), **4 V1** (no builder found).
+- **47** codec classes, **36** with a byte-exact test.
 - **36** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -105,8 +105,8 @@ the margins, but never invents a golden that isn't there.
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
 | V2 | `TradeskillReplyIIR` | `GameServerListener.Outbound` *(inline)* |
 | V2 | `TradeskillRequestIIR` | `GameServerListener.Inbound` *(inline)* |
+| V2 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |
 | V1 | `AreaFormulaIIR` | — |
 | V1 | `KnubotFinishTradeIIR` | — |
 | V1 | `KnubotStartTradeIIR` | — |
 | V1 | `TemplateActionIIR` | — |
-| V1 | `UpdateInventoryIIR` | — |

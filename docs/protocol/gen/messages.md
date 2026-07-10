@@ -88,11 +88,11 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
 | V2 | `TradeskillReplyIIR` | `0x9062D559` | `GameServerListener.Outbound` *(inline)* |  |
 | V2 | `TradeskillRequestIIR` | `0x06B9CD94` | `GameServerListener.Inbound` *(inline)* |  |
+| V2 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` |  |
 | V1 | `AreaFormulaIIR` | `0xCE30BE4E` | — |  |
 | V1 | `KnubotFinishTradeIIR` | `0x7446F3FA` | — |  |
 | V1 | `KnubotStartTradeIIR` | `0x4B2A47BF` | — |  |
 | V1 | `TemplateActionIIR` | `0x6C300937` | — |  |
-| V1 | `UpdateInventoryIIR` | `0xA74D2814` | — |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
 [`gaps.md`](../gaps.md)). A V3 row with an empty golden column is byte-exact via a codec whose test the
