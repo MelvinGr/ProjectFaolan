@@ -18,6 +18,13 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// local ToHex() helpers several test classes define (CharacterStatBlockTests, CombatTests, ...).
 		private static readonly string[] ByteExactMarkers = { "Golden.Bytes", "ToHex", "TestPaths.Asset", "SequenceEqual" };
 
+		// A scope (whole test file, or one method body) is byte-exact if it carries one of the explicit markers above,
+		// OR it uses the round-trip idiom: a captured hex oracle (Convert.FromHexString) serialized back with .ToArray()
+		// and asserted equal. That idiom (V1IirCodecTests: `Assert.Equal(body, codec.Parse(body).ToArray())`) is a real
+		// byte-exact golden the explicit markers missed - which is why ~10 genuinely-tested IIR types read as V2.
+		private static bool IsByteExact(string scope) =>
+			ByteExactMarkers.Any(scope.Contains) || (scope.Contains("FromHexString") && scope.Contains(".ToArray("));
+
 		// A [Fact]/[Theory] method: the attribute(s), then a public (async) returntype Name(.
 		private static readonly Regex TestMethod = new(
 			@"\[(?:Fact|Theory)\b[^\]]*\]\s*(?:\[[^\]]*\]\s*)*public\s+(?:async\s+)?[\w<>?\[\]]+\s+(\w+)\s*\(",
@@ -117,7 +124,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				string method = null;
 				foreach (var (text, _) in testFiles)
 				{
-					if (!re.IsMatch(text) || !ByteExactMarkers.Any(text.Contains))
+					if (!re.IsMatch(text) || !IsByteExact(text))
 						continue;
 					golden = true;
 					method ??= FindGoldenMethod(text, codec);
@@ -156,7 +163,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				var start = methods[i].Index;
 				var end = i + 1 < methods.Count ? methods[i + 1].Index : text.Length;
 				var body = text[start..end];
-				if (body.Contains(codec, StringComparison.Ordinal) && ByteExactMarkers.Any(body.Contains))
+				if (body.Contains(codec, StringComparison.Ordinal) && IsByteExact(body))
 					return $"{cls}.{methods[i].Groups[1].Value}";
 			}
 
