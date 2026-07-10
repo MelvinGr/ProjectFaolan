@@ -31,7 +31,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Account> GetAccount(string userName);
 		Task<Character> GetCharacter(uint id);
 		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
-		Task<Character> GetCharacterByName(string name);
+		Task<Character> GetCharacterByName(string name, uint realmId);
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
@@ -442,10 +442,12 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// Character names are unique (guild invites and GM commands address players by name).
-		public async Task<Character> GetCharacterByName(string name)
+		// #324: character names are unique per realm, so a by-name lookup is realm-scoped (the caller passes its own
+		// realm - all name-addressed interactions are same-realm: guild invite, mail, GM in the realm process).
+		public async Task<Character> GetCharacterByName(string name, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Characters.FirstOrDefaultAsync(c => c.Name == name);
+			return await ctx.Characters.FirstOrDefaultAsync(c => c.RealmId == realmId && c.Name == name);
 		}
 
 		// The character's combo book (CharacterCombo) - re-emitted on login by GrantCharacterCombos (a max-level

@@ -210,7 +210,7 @@ namespace Faolan.CSPlayerAgent
 		public async Task HandleGuildInviteByName(INetworkClient client, ConanPacket packet)
 		{
 			var targetName = packet.Body.ReadString();
-			var target = await _database.GetCharacterByName(targetName);
+			var target = await _database.GetCharacterByName(targetName, client.Session.Character.RealmId);
 			await InviteCharacterToGuild(client, target, targetName);
 		}
 

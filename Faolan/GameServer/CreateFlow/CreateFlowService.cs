@@ -389,7 +389,7 @@ namespace Faolan.GameServer.CreateFlow
 			// Check the name is free BEFORE saving (Characters.Name is UNIQUE) so a taken name is rejected cleanly as
 			// NicknameTaken rather than blowing up the SaveCharacter unit of work. A row owned by THIS character doesn't
 			// count (idempotent re-name to the same value is handled above).
-			var existing = await _database.GetCharacterByName(name);
+			var existing = await _database.GetCharacterByName(name, character.RealmId);
 			if (existing != null && existing.Id != character.Id)
 			{
 				_logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);

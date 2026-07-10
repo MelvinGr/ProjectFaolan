@@ -78,7 +78,7 @@ namespace Faolan.GameServer
 
 			// Resolve the target account: by username first, else by a character name -> its owning account.
 			var account = await Database.GetAccount(name);
-			if (account == null && await Database.GetCharacterByName(name) is { } ch)
+			if (account == null && await Database.GetCharacterByName(name, client.Session.Character.RealmId) is { } ch)
 				account = await Database.GetAccount(ch.AccountId);
 
 			if (account == null)

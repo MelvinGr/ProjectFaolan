@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	[Index(nameof(Name), IsUnique = true)]
+	// Character names are unique PER REALM, not globally (#324): realm Crom and realm Fury may each have a "Bob".
+	[Index(nameof(RealmId), nameof(Name), IsUnique = true)]
 	public class Character : Base3DEntity
 	{
 		// The guild-creator's rank on the wire. 4 = leader, proven by the create-guild capture (the member record

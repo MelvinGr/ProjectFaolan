@@ -135,7 +135,7 @@ namespace Faolan.GameServer
 
 			// The listed item stayed in the SELLER's bank (with a "listed" overlay) until now - the sale removes it
 			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
-			var seller = await Database.GetCharacterByName(listing.SellerName);
+			var seller = await Database.GetCharacterByName(listing.SellerName, character.RealmId);
 			if (seller != null && seller.Id != character.Id)
 				await Database.SetCharacterInventorySlot(seller.Id, (int)FullPlayerCharacterBuilder.BankKind, (int)listing.BankSlot, null);
 
@@ -453,7 +453,7 @@ namespace Faolan.GameServer
 			packet.Body.ReadUInt32(); // 0x7E2 category constant (preserved)
 			var bankSlot = (int)packet.Body.ReadUInt32();
 
-			var recipient = await Database.GetCharacterByName(recipientName);
+			var recipient = await Database.GetCharacterByName(recipientName, character.RealmId);
 			if (recipient == null)
 			{
 				Logger.LogInformation("Tradepost mail: {Char} -> unknown recipient '{Recipient}'; rejected.", character.Name, recipientName);
@@ -562,7 +562,7 @@ namespace Faolan.GameServer
 			// AH system mail has an empty sender (the listed item already left the seller's bank on buy), so skip it.
 			if (!string.IsNullOrEmpty(mail.SenderName))
 			{
-				var sender = await Database.GetCharacterByName(mail.SenderName);
+				var sender = await Database.GetCharacterByName(mail.SenderName, mail.RealmId);
 				if (sender != null)
 					await Database.SetCharacterInventorySlot(sender.Id, (int)FullPlayerCharacterBuilder.BankKind, (int)mail.SenderBankSlot, null);
 			}
