@@ -20,6 +20,11 @@ Every gap below is a tracked Gitea issue (`melvin/projectfaolan`), so it lives o
 the trailing flag are understood (`flag == 0` ⇒ the rest of the direction is one zlib deflate stream). The four
 bytes between them are copied/skipped without interpretation. Our server never opens a compression stream, so
 nothing depends on them; a client-side reader (`Captures/ghidra/DumpFns.java` territory) would settle it.
+**Ghidra note (2026-07):** the `0x80000005` tag is NOT a literal constant in the client (a `FindConst` scan hit
+only signed-division magic numbers) — it is detected by the **high bit of the u32 length field** (`length &
+0x80000000` ⇒ control frame; low bits `= 5` ⇒ compression-stream-open). So the 4 bytes are the stream's
+parameter (a length/id for the inflate setup). Full decode needs the high-bit dispatch path in the receive loop
+or a capture carrying a live stream (the login captures on hand don't) — deferred as low-ROI since we skip it.
 
 ### RpcHeader trailing headerData
 **Tracked: Gitea #319.** `PacketStream.WriteHeader` accepts an optional `headerData` blob appended after the u16
