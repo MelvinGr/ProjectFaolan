@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
@@ -24,8 +25,7 @@ namespace Faolan.GameServer
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
-					s.WriteUInt32(GameServer0X2000Opcodes.CoreClaimIIR).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Account.ClientInstance).WriteArray(0x00, 0x09))
+				.WriteArrayUInt32Length(CoreClaimCodec.Build(client.Session.Account.ClientInstance))
 				.SendAsync(client);
 
 			// record 0: 0x00002000, 17-byte body

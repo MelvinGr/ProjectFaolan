@@ -16,6 +16,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Protobuf;
@@ -170,15 +171,10 @@ namespace Faolan.GameServer
 			var handle = client.Session.Account.ClientInstance;
 			var rows = await Database.GetRecipes();
 			var records = rows.Select(r => new TradeskillRecipeCodec.RecipeRecord(r.Id, r.Data)).ToList();
-			var replyBody = TradeskillRecipeCodec.BuildReplyBody(records);
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000Opcodes.TradeskillReplyIIR)
-					.WriteUInt32(0x0000C350) // the ProtoID type marker (0xC350) preceding the target handle
-					.WriteUInt32(handle)
-					.WriteArray(replyBody))
+				.WriteArrayUInt32Length(TradeskillRecipeCodec.BuildReplyIir(handle, records))
 				.SendAsync(client);
 
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
@@ -216,18 +212,7 @@ namespace Faolan.GameServer
 			var ps = new PacketStream();
 			ps
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
-				{
-					s.WriteUInt32(GameServer0X2000Opcodes.GameTimeIIR);
-					s.WriteUInt32(0x00000000); // TypeTag
-					s.WriteUInt32(0x00000000); // Handle (global)
-					s.WriteUInt32(0x01472BDD); // FieldA
-					// --- body (17 bytes) ---
-					s.WriteUInt32(0x00000000);
-					s.WriteByte(0x01);
-					s.WriteUInt64(0x0001920C6A024E93);
-					s.WriteUInt32(0x3F800000); // float 1.0 (time rate)
-				});
+				.WriteArrayUInt32Length(GameTimeCodec.Build());
 			return ps.WriteLengthHash().ToArray();
 		}
 
@@ -263,13 +248,10 @@ namespace Faolan.GameServer
 			var ps = new PacketStream();
 			ps
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
-				{
-					s.WriteUInt32(GameServer0X2000Opcodes.PlayfieldFIIR);
-					s.WriteArray(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId, charInstance, count, playfieldToken,
+				.WriteArrayUInt32Length(MapChangeCodec.BuildIir(
+					CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId, charInstance, count, playfieldToken,
 						15.0f,
-						BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB));
-				});
+						BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB)));
 			return ps.WriteLengthHash().ToArray();
 		}
 
@@ -338,7 +320,7 @@ namespace Faolan.GameServer
 			using var body = new FaolanStream();
 			body.WriteArrayUInt32Length(s =>
 			{
-				s.WriteUInt32(GameServer0X2000Opcodes.FullPlayerCharacterIIR);
+				s.WriteUInt32(FullCharSnapshotBuilder.Opcode);
 				s.WriteUInt32(SnapshotTypeTag);
 				s.WriteUInt32(instance);
 				s.WriteArray(prefix);

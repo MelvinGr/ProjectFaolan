@@ -8,8 +8,8 @@
 ## Headline
 
 - **823** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **75** IIR carrier types: **48 V3** (byte-exact builder), **27 V2** (built, no golden), **0 V1** (no builder found).
-- **51** codec classes, **36** with a byte-exact test.
+- **75** IIR carrier types: **50 V3** (byte-exact builder), **25 V2** (built, no golden), **0 V1** (no builder found).
+- **56** codec classes, **38** with a byte-exact test.
 - **36** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -47,6 +47,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `DoorFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `EnergyIIR` | `CombatPacketCodec` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
+| V3 | `FullPlayerCharacterIIR` | `FullCharSnapshotBuilder` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
 | V3 | `GuildUpdateIIR` | `GuildTagBody` |
 | V3 | `HateListUpdateIIR` | `HateListCodec` |
@@ -82,18 +83,18 @@ the margins, but never invents a golden that isn't there.
 | V3 | `StopIIR` | `StopCodec` |
 | V3 | `ThreatLevelIIR` | `ThreatLevelCodec` |
 | V3 | `TombStoneFullUpdateIIR` | `DynelFullUpdateCodec` |
+| V3 | `TradeskillReplyIIR` | `TradeskillRecipeCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
 | V2 | `AreaFormulaIIR` | `AreaFormulaCodec` |
 | V2 | `BankIIR` | `BankService` *(inline)* |
 | V2 | `ChainKillIIR` | `ChainKillCodec` |
 | V2 | `CharInPlayIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `CharacterActionIIR` | `GameServerListener.Inbound` *(inline)* |
-| V2 | `CoreClaimIIR` | `GameServerListener.PostReadyBurst` *(inline)* |
+| V2 | `CoreClaimIIR` | `CoreClaimCodec` |
 | V2 | `CrimeIIR` | `CrimeCodec` |
 | V2 | `DeleteItemIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `FeedbackIIR` | `FeedbackIirCodec` |
-| V2 | `FullPlayerCharacterIIR` | `GameServerListener.Outbound` *(inline)* |
-| V2 | `GameTimeIIR` | `GameServerListener.GmCommands` *(inline)* |
+| V2 | `GameTimeIIR` | `GameTimeCodec` |
 | V2 | `KnubotAnswerIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |
 | V2 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
@@ -101,12 +102,11 @@ the margins, but never invents a golden that isn't there.
 | V2 | `LookAtIIR` | `ShopOpenBuilder` |
 | V2 | `MoveInventoryItemIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `N3ToClientQuitIIR` | `WorldDespawn` |
-| V2 | `PlayfieldFIIR` | `GameServerListener.Outbound` *(inline)* |
+| V2 | `PlayfieldFIIR` | `MapChangeCodec` |
 | V2 | `RegenIIR` | `RegenCodec` |
 | V2 | `SetMorphValueIIR` | `CreateFlowService` *(inline)* |
 | V2 | `SetNameIIR` | `CreateFlowService` *(inline)* |
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
 | V2 | `TemplateActionIIR` | `TemplateActionCodec` |
-| V2 | `TradeskillReplyIIR` | `GameServerListener.Outbound` *(inline)* |
 | V2 | `TradeskillRequestIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |

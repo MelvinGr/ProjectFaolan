@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
@@ -24,12 +25,25 @@ namespace Faolan.Core.Network.Codecs.Economy
 	//   [u8]                                            # trailing flag (@0x5c)
 	public static class TradeskillRecipeCodec
 	{
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.TradeskillReplyIIR;
+
 		public const byte ListType = 3; // full recipe-book list (vs 1 = single RecipeLearnt)
 
 		public const byte RoleIngredient = 0;
 		public const byte RoleResult = 1;
 		public const uint ListFrame = 0x3F1;
 		public const uint Version = 1;
+
+		// The full TradeskillReplyIIR carrier: [subop][0xC350][handle][reply body] (the create/craft window's recipe list).
+		public static byte[] BuildReplyIir(uint handle, IReadOnlyCollection<RecipeRecord> recipes)
+		{
+			return new FaolanStream()
+				.WriteUInt32(Opcode)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteArray(BuildReplyBody(recipes))
+				.ToArray();
+		}
 
 		// Build the reply IIR body [env][version][type=3][count][records] from stored recipe rows.
 		public static byte[] BuildReplyBody(IReadOnlyCollection<RecipeRecord> recipes)

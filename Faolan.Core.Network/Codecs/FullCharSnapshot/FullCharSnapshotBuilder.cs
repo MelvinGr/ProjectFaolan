@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
@@ -19,6 +20,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	//     handle + slot, never on these instance ids).
 	public static class FullCharSnapshotBuilder
 	{
+		// The FullChar snapshot IIR (0x737A6DF9); the listener assembles [subop][typeTag][instance][prefix][root][tails].
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
+
 		public const uint BagKind = (uint)ContainerKind.Bag;
 		public const uint BankKind = (uint)ContainerKind.Bank;
 		public const uint EquippedKind = (uint)ContainerKind.Equipped;

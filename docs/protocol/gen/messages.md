@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**75** IIR carrier types · **48 V3** (48 with an auto-cited golden). The
+**75** IIR carrier types · **50 V3** (50 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -30,6 +30,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `DoorFullUpdateIIR` | `0x33A56FB0` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `EnergyIIR` | `0x40749B8A` | `CombatPacketCodec` | [V3: CombatPacketCodecTests.DamageResultBody_MatchesExpectedLayout] |
 | V3 | `FormatFeedbackIIR` | `0x8D5A8B6B` | `FormatFeedbackCodec` | [V3: AttributeChangedFeedbackTests.Build_FromFields_MatchesCapturedLevelUpMessage] |
+| V3 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `FullCharSnapshotBuilder` | [V3: FullCharIirRoundTripTests.BuildRoot_FromCapturedFields_ReEncodesByteIdentically] |
 | V3 | `GameActionListIIR` | `0xF508F4C1` | `GameActionListCodec` | [V3: GameActionListCodecTests.Parse_ThenBuild_RoundTripsByteExact] |
 | V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildTagBody` | [V3: GuildPacketTests.GuildTagBody_Matches_ExpectedLayout] |
 | V3 | `HateListUpdateIIR` | `0x8A01E5A1` | `HateListCodec` | [V3: CombatRecordCodecTests.HateList_BuildsByteExact] |
@@ -65,18 +66,18 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
 | V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
+| V3 | `TradeskillReplyIIR` | `0x9062D559` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormulaCodec` |  |
 | V2 | `BankIIR` | `0x0BA1C1CB` | `BankService` *(inline)* |  |
 | V2 | `ChainKillIIR` | `0x0EED7068` | `ChainKillCodec` |  |
 | V2 | `CharInPlayIIR` | `0x864CFEF8` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `CharacterActionIIR` | `0x6B6FD368` | `GameServerListener.Inbound` *(inline)* |  |
-| V2 | `CoreClaimIIR` | `0x06EC1255` | `GameServerListener.PostReadyBurst` *(inline)* |  |
+| V2 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimCodec` |  |
 | V2 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` |  |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIirCodec` |  |
-| V2 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `GameServerListener.Outbound` *(inline)* |  |
-| V2 | `GameTimeIIR` | `0x4F57DC08` | `GameServerListener.GmCommands` *(inline)* |  |
+| V2 | `GameTimeIIR` | `0x4F57DC08` | `GameTimeCodec` |  |
 | V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTradeCodec` |  |
 | V2 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTradeCodec` |  |
@@ -84,13 +85,12 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `N3ToClientQuitIIR` | `0x04B82B2D` | `WorldDespawn` |  |
-| V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `GameServerListener.Outbound` *(inline)* |  |
+| V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
 | V2 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` |  |
 | V2 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateFlowService` *(inline)* |  |
 | V2 | `SetNameIIR` | `0xADCE0CDA` | `CreateFlowService` *(inline)* |  |
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
 | V2 | `TemplateActionIIR` | `0x6C300937` | `TemplateActionCodec` |  |
-| V2 | `TradeskillReplyIIR` | `0x9062D559` | `GameServerListener.Outbound` *(inline)* |  |
 | V2 | `TradeskillRequestIIR` | `0x06B9CD94` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` |  |
 
