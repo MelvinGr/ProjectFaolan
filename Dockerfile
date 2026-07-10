@@ -7,17 +7,23 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore against just the project files first so the (slow) restore layer is cached until a .csproj changes.
-# The server's dependency graph is Faolan -> { Faolan.Core, Faolan.Mcp -> Faolan.Core }. Directory.Build.props
-# supplies the shared TargetFramework (net10.0); logo.ico is the projects' ApplicationIcon.
+# The server's runtime dependency graph (post the Faolan.Core split, #290):
+#   Faolan -> { Faolan.Core, Faolan.Core.Network -> Faolan.Core.Database -> Faolan.Core, Faolan.Mcp }
+# (Faolan.Core.Rdb is NOT in the server graph - it's importer/web-only.) Directory.Build.props supplies the
+# shared TargetFramework (net10.0); logo.ico is the projects' ApplicationIcon.
 COPY Directory.Build.props logo.ico ./
 COPY Faolan/Faolan.csproj Faolan/
 COPY Faolan.Core/Faolan.Core.csproj Faolan.Core/
+COPY Faolan.Core.Database/Faolan.Core.Database.csproj Faolan.Core.Database/
+COPY Faolan.Core.Network/Faolan.Core.Network.csproj Faolan.Core.Network/
 COPY Faolan.Mcp/Faolan.Mcp.csproj Faolan.Mcp/
 RUN dotnet restore Faolan/Faolan.csproj
 
-# Then the sources for the three projects in the graph and publish (Release -> IsDebug=false -> prod paths).
+# Then the sources for the projects in the graph and publish (Release -> IsDebug=false -> prod paths).
 COPY Faolan/ Faolan/
 COPY Faolan.Core/ Faolan.Core/
+COPY Faolan.Core.Database/ Faolan.Core.Database/
+COPY Faolan.Core.Network/ Faolan.Core.Network/
 COPY Faolan.Mcp/ Faolan.Mcp/
 RUN dotnet publish Faolan/Faolan.csproj -c Release -o /app/publish --no-restore
 
@@ -33,8 +39,13 @@ COPY --from=build /app/publish ./
 # command-line config provider) and update the realm row, or the handoff will advertise an unreachable address.
 COPY faolan.json faolan.db ./
 
-# UniverseAgent 7010 (the only fixed client entry port) - PlayerAgent 7011 - CSPlayerAgent 7001 -
-# AgentServer/chat 7012 - GameServer realm 7014. (MCP 7099 binds localhost only; not exposed.)
+# Ports for the all-in-one default run: the login tier is UniverseAgent 7010 (the only fixed client entry port) +
+# PlayerAgent 7011 (from faolan.json); the realm-local services - GameServer 7014, AgentServer/chat 7012,
+# CSPlayerAgent 7001 - are the first Realm row's ports (#324, so change the Realm row to change them, not config).
+# (MCP 7099 binds localhost only; not exposed.)
 EXPOSE 7001 7010 7011 7012 7014
 
+# Default = all-in-one (login + the first realm's world). For a process-per-realm deployment (#324), override the
+# command per container: `--role login` (router tier) or `--role realm=<id>` (one realm's game host, on that Realm
+# row's ports) - e.g. `command: ["dotnet","Faolan.dll","--role","realm=3"]` and EXPOSE that realm's ports.
 ENTRYPOINT ["dotnet", "Faolan.dll"]
