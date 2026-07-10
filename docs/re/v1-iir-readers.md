@@ -38,8 +38,10 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 ## Status
 
 Grammar SHAPE decoded + capture-length-validated for all 11 (the "genuinely undecoded" V1 tag is now only about
-the absence of a codec, not the wire format). The three fixed-u32 ones now HAVE codecs with byte-exact captured
-round-trips (`RegenCodec` / `LockedToChangedCodec` / `ChainKillCodec`, `V1IirCodecTests`) — coverage dropped from
-11 V1 to 8 V1. The remaining 8 have their grammar here; the list/struct ones (KnubotStartTrade shop list,
-AreaFormula nested lists, TemplateAction struct) need the per-field naming, and `UpdateInventoryIIR`'s stub-reader
-vs 12-B captures needs the slot re-verified before a codec.
+the absence of a codec, not the wire format). **Six now HAVE byte-exact codecs** with captured round-trips
+(`RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`, `SpellBookCodec`, `FeedbackIirCodec`, `CrimeCodec` —
+`V1IirCodecTests`): coverage dropped **11 V1 → 5 V1**. The remaining five need more than a fixed-field parse:
+`KnubotFinishTradeIIR` and `KnubotStartTradeIIR` share a base-class prefix (`FUN_009a7e00`) to decode first,
+`KnubotStartTradeIIR` is the variable shop list, `AreaFormulaIIR` has two `0x3F1` sub-lists, `TemplateActionIIR`
+a 68-B struct (`FUN_005d5150`), and `UpdateInventoryIIR`'s stub reader vs its 12-B captures needs the vtable slot
+re-verified.

@@ -71,7 +71,9 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `CharInPlayIIR` | `0x864CFEF8` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `CharacterActionIIR` | `0x6B6FD368` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `CoreClaimIIR` | `0x06EC1255` | `GameServerListener.PostReadyBurst` *(inline)* |  |
+| V2 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` |  |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `GameServerListener.Inbound` *(inline)* |  |
+| V2 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIirCodec` |  |
 | V2 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `GameServerListener.Outbound` *(inline)* |  |
 | V2 | `GameTimeIIR` | `0x4F57DC08` | `GameServerListener.GmCommands` *(inline)* |  |
 | V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `GameServerListener.Inbound` *(inline)* |  |
@@ -83,14 +85,12 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` |  |
 | V2 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateFlowService` *(inline)* |  |
 | V2 | `SetNameIIR` | `0xADCE0CDA` | `CreateFlowService` *(inline)* |  |
+| V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
 | V2 | `TradeskillReplyIIR` | `0x9062D559` | `GameServerListener.Outbound` *(inline)* |  |
 | V2 | `TradeskillRequestIIR` | `0x06B9CD94` | `GameServerListener.Inbound` *(inline)* |  |
 | V1 | `AreaFormulaIIR` | `0xCE30BE4E` | — |  |
-| V1 | `CrimeIIR` | `0xC7954504` | — |  |
-| V1 | `FeedbackIIR` | `0xBA1FD222` | — |  |
 | V1 | `KnubotFinishTradeIIR` | `0x7446F3FA` | — |  |
 | V1 | `KnubotStartTradeIIR` | `0x4B2A47BF` | — |  |
-| V1 | `SpellBookIIR` | `0x6BA10936` | — |  |
 | V1 | `TemplateActionIIR` | `0x6C300937` | — |  |
 | V1 | `UpdateInventoryIIR` | `0xA74D2814` | — |  |
 

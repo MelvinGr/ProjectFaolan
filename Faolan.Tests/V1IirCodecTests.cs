@@ -43,5 +43,39 @@ namespace Faolan.Tests
 			Assert.Equal(2u, c.Count);
 			Assert.Equal(body, c.ToArray());
 		}
+
+		[Fact]
+		public void SpellBook_RoundTripsCapturedBody()
+		{
+			var body = Convert.FromHexString("000000116ba109360000c35001316e7100000003f1");
+			var sb = SpellBookCodec.Parse(body);
+			Assert.Equal(0x01316e71u, sb.Handle);
+			Assert.Equal(0x3F1u, sb.ListMarker);
+			Assert.Equal(body, sb.ToArray());
+		}
+
+		[Fact]
+		public void Feedback_RoundTripsCapturedBody()
+		{
+			var body = Convert.FromHexString("0000001aba1fd2220000c35001316e71010000000000000064096a3a8401");
+			var f = FeedbackIirCodec.Parse(body);
+			Assert.Equal(0x01316e71u, f.Handle);
+			Assert.Equal((byte)0x01, f.Env);
+			Assert.Equal(100u, f.Value);
+			Assert.Equal(0x096a3a84u, f.Source);
+			Assert.Equal((byte)0x01, f.Flag);
+			Assert.Equal(body, f.ToArray());
+		}
+
+		[Fact]
+		public void Crime_RoundTripsCapturedBody()
+		{
+			var body = Convert.FromHexString("00000012c79545040000c35008006f31000100000001");
+			var c = CrimeCodec.Parse(body);
+			Assert.Equal(0x08006f31u, c.Handle);
+			Assert.Equal((byte)0x01, c.Flag);
+			Assert.Equal(1u, c.Value);
+			Assert.Equal(body, c.ToArray());
+		}
 	}
 }
