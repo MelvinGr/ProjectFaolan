@@ -37,19 +37,28 @@ Single-instance hardcoding (the gaps):
 - **Shared static content** (realm-agnostic reference): maps, NPC/item/spell templates, RDB assets. One copy,
   read by every realm.
 
-## Deployment model — the one real decision
+## Deployment model — CHOSEN: (B) process-per-realm
 
-**A) In-process multi-host (RECOMMENDED first).** One Faolan process; `Program.cs` loops realms and spins a
-`GameServerListener` + `WorldSimulation` per realm on its own port; shared `faolan.db`; chat/guild services gain a
-realm dimension. Simplest ops (one process, one DB); realms share process resources and a crash affects all.
+Each realm is its **own Faolan game process** bound to its `Realm.IpAddress:Port` (any host), with a **shared
+login/routing tier** directing players and a **shared `faolan.db`** (per-realm DBs are a later option, P5). True
+isolation + horizontal scale (a realm can live on its own machine; a crash takes only that realm down).
 
-**B) Process-per-realm (scale-out).** Each realm is its own Faolan game process bound to its `Realm.IpAddress:Port`
-(possibly on different machines); a standalone login/routing tier directs players; shared DB or per-realm DBs. True
-isolation + horizontal scale; more moving parts.
+Considered and rejected for now: (A) in-process multi-host (one process loops realms) — simpler ops but shares
+process/resources and couples realm lifecycles. `Realm.IpAddress` already exists precisely to enable B.
 
-`Realm.IpAddress` already enables B. **Recommendation:** build A cleanly — every world path *parameterized by realm
-id* rather than assuming a singleton — so B later is a **deployment change, not a rewrite** (split the process on
-realm-id boundaries the code already respects).
+### Process topology under B
+
+- **Login/router process (shared, one):** `UniverseAgent` (7010, the only fixed port) + `PlayerAgent` — auth, the
+  realm list, the character list, and the **EnterWorld routing** that hands the client to the selected character's
+  realm. Owns NO world. Reads `faolan.db` for accounts/characters/realms.
+- **Realm game process (one per realm):** `GameServerListener` + `WorldSimulation` **+ the realm-local chat/guild
+  services** (`AgentServerListener` chat, `CsPlayerAgentListener` guilds/teams) — because chat and guilds are
+  realm-local, they move OUT of the shared tier and INTO each realm process. Bound to that realm's `IpAddress:Port`
+  (+ the per-realm chat/cs ports); reads its own realm id from config/CLI (`--realm <id>`). Shares `faolan.db`,
+  scoping every dynamic query by realm.
+
+So `Program.cs` gains a **role**: `--role login` (or default) runs the router tier; `--realm <id>` runs a realm game
+host. One login process + N realm processes, all against the shared DB.
 
 ## Phased plan (each phase test-gated; no wire regressions)
 
@@ -57,26 +66,30 @@ realm-id boundaries the code already respects).
   already serves them. **Verify in-client** that the client accepts a >1 realm list + per-realm char counts (we've
   only ever sent 1 — retail-leading: confirm the multi-realm list bytes against a capture/Ghidra before relying on it).
 
-- **Phase 1 — Realm-routed handoff + realm-scoped char list.** Replace the static `Program.GameServerPort` in the
-  enter-world handoff with the *selected character's* `Realm.IpAddress:Port` (look the character's realm up at
-  EnterWorld). Scope `SendSmallCharList` to the realm the client selected. *Smallest visible slice:* two realm rows
-  pointing at the same world proves routing before the worlds are actually split.
+- **Phase 1 — Realm-routed handoff + realm-scoped char list** *(client-free to build; the smallest visible slice)*.
+  Replace the static `Program.GameServerPort` (Inbound.cs:1264) + the `Configuration.ServerIpAddress` handoff sends
+  with the *selected character's* `Realm.IpAddress:Port` — look the character's realm up at `EnterWorld` and thread
+  it into the GameServer/CsPlayerAgent/AgentServer handoff addresses. Scope `SendSmallCharList` (and the char-realm
+  counts) to the client's selected realm. Two realm rows pointing at the SAME process proves routing before the
+  process is actually split.
 
-- **Phase 2 — Per-realm world instances.** `Program.cs` loops `GetRealms()` → one `GameServerListener` +
-  `WorldSimulation` per realm on its port. Introduce a `realmId → listener/simulation` registry; key the
-  `IGameServerDispatcher` + MCP live tools by realm. Each world loads the shared static content but keeps its own
-  live sessions/zones.
+- **Phase 2 — Process role split** *(the heart of B)*. `Program.cs` gains a role: `--role login` (default) starts
+  ONLY `UniverseAgent` + `PlayerAgent` (+ the DB); `--realm <id>` starts a realm game host — `GameServerListener` +
+  `WorldSimulation` + the realm-local `AgentServerListener` + `CsPlayerAgentListener` — bound to that realm's ports,
+  with the realm id threaded through the whole world (simulation, dispatcher, MCP). The login tier no longer owns a
+  world; the realm host no longer owns login. Run one login process + one realm process locally to validate.
 
-- **Phase 3 — Realm-scope the dynamic data.** Add `RealmId` to `Guild`, `TradepostListing`, `Mail` (+ any other
-  world-global dynamic table); scope every query by realm; EF migration backfilling existing rows to realm 1.
-  Realm-scope the chat channels (`AgentServer`) and guild/team ops (`CsPlayerAgent`) — a realm dimension on the
-  session so channels/guilds don't cross realms.
+- **Phase 3 — Realm-scope the shared dynamic data.** Add `RealmId` to `Guild`, `TradepostListing`, `Mail` (+ any
+  world-global dynamic table); scope every query by realm; EF migration backfilling existing rows to realm 1. Now
+  that chat/guild services live IN the realm process (P2), they are realm-scoped by construction — but the DB rows
+  they read/write must carry `RealmId` so two realm processes on the shared DB don't cross-read.
 
-- **Phase 4 — Isolation hardening.** Audit for cross-realm leakage (interest, broadcast, dispatch, name lookups);
-  per-realm persistence loops; ensure a name/handle is only ever resolved within its realm.
+- **Phase 4 — Isolation hardening + N processes.** Run N realm processes against the shared DB; audit for
+  cross-realm leakage (dispatch, name/handle lookups, DB queries missing the realm filter); confirm a player on
+  realm A never sees realm B. Config/orchestration for launching the fleet (one login + N realm hosts).
 
-- **Phase 5 (optional) — Process-per-realm.** Extract the login/routing tier into its own host; each game process
-  reads its realm id (config/arg) and binds `Realm.IpAddress:Port`; shared DB or per-realm DBs.
+- **Phase 5 (optional) — Per-realm DBs.** If shared-DB contention or stronger isolation warrants it, give each realm
+  process its own DB (static content cloned/shared read-only, dynamic per-realm) instead of `RealmId` columns.
 
 ## Retail constraints (retail is leading)
 
