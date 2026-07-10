@@ -104,3 +104,18 @@ cannot be read statically** from the descriptor table.
 addresses == runtime — see the live-debug memory) reading `DAT_025073c0` + walking `DAT_025077c8` for the type
 whose keyList contains indices `0x27`+`0x58` → that slot's index gives the recast typeId and its full keyList
 order. Alternatively keep tracing the per-class registration statically, or capture a real retail recast cast.
+
+### Static registration path EXHAUSTED (2026-07-10, second RE session)
+
+Chased the per-class registration to confirm whether the typeId+keyList can be read statically. It cannot:
+- **Descriptor registrar = `FUN_008bde20`** — writes `descriptor+8 = typeId` and stashes the descriptor ptr in
+  `DAT_0297d418` (a "currently-registering" global); a follow-up appends the keyList at `descriptor+0xc`. It has
+  60+ callers (one per GameAction type).
+- **SetSpellRecastTime class:** handler `FUN_008b0f50` sits in the vtable at slot `0x01fd7aac`; vtable base
+  `0x01fd7a88` is installed by ctor **`FUN_008b0e10`** (thin — forwards to the shared base ctor `FUN_0089b390`
+  with the type-specific args).
+- **Dead end:** `FUN_008b0e10` has **zero** references — not a call, not a data pointer anywhere in the image
+  (searched memory for its little-endian address: 0 hits). The GameAction objects are created via an
+  inlined/data-driven factory Ghidra can't resolve, so the recast typeId + keyList are **not statically
+  recoverable**. The runtime tables (`DAT_025077c8` / `DAT_025073c0`) are the only source ⇒ a **live client
+  memory dump is the sole remaining path**. Scripts: `Captures/ghidra/DumpRecastReg.java`, `DumpRecastDescriptor.java`.
