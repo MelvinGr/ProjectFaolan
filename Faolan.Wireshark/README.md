@@ -115,11 +115,11 @@ Or every MoveTask the server streamed: `-Y 'faolan.pkt.iir == 0x96c46740'`.
 
 ## JSON export (analyzer-style dumps)
 
-`Captures/tshark_dump.sh` converts a capture into an analyzer-style dump - one record per
+`Captures/scripts/tshark_dump.sh` converts a capture into an analyzer-style dump - one record per
 Faolan/chat packet with frame/time/endpoints/direction/opcode/classes/body:
 
 ```zsh
-Captures/tshark_dump.sh <capture.pcapng> [output.json]   # default output: <capture>.tshark.json
+Captures/scripts/tshark_dump.sh <capture.pcapng> [output.json]   # default output: <capture>.tshark.json
 ```
 
 Under the hood: `tshark -T json` emits the full dissection tree (one object per frame; each

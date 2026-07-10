@@ -49,7 +49,7 @@ pair yields garbage that looks like entity handles (`0x0009FF9x`) — that was t
 ## 3. Decoded grammars
 
 ### Fully decoded (constructive builders + golden tests landed)
-`Faolan/GameServer/CreateFlow/CreateEditorRecordBuilder.cs`, locked by `Faolan.Tests/CreateEditorRecordTests.cs`.
+`Faolan.Core.Network/Codecs/Spawn/CreateEditorRecordBuilder.cs`, locked by `Faolan.Tests/CreateEditorRecordTests.cs`.
 
 - **StatIIR** (`0xF98E10B3`), 17 bytes — a single stat set on an entity:
   `[u32 type][u32 handle][u8 flag][u32 statId][u32 value]`.

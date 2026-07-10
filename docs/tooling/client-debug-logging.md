@@ -59,8 +59,9 @@ timings) are emitted by the stock client regardless of the gate. That's the same
 ## Takeaways
 
 - Don't re-add a "enable client debug logging" gate patch — it's a confirmed no-op on this client build.
-- For in-client ground truth, use `Faolan.ClientHook`'s remaining mechanisms: the **dispatcher hooks**
-  (per-interface server→client packet feed) and **field hooks** (e.g. `QuestFullUpdateIIR::Activate`), which
-  log to `faolan_hook.log` via inline detours — those produce real signal. See `Faolan.ClientHook/README.md`.
+- For in-client ground truth the `Faolan.ClientHook` project's other mechanisms were used — the **dispatcher
+  hooks** (per-interface server→client packet feed) and **field hooks** (e.g. `QuestFullUpdateIIR::Activate`),
+  logging to `faolan_hook.log` via inline detours — but that project is no longer in the repo; Frida-under-Wine
+  ([[frida_under_wine_client_re]]) is now the live-RE tool.
 - The patch *mechanism* (find the client pid, write+verify `/proc/<pid>/mem`) is sound and still lives in
   `LoginKeyPatcher` for the DH-key patch; it was only the debug-log *target* that was useless.

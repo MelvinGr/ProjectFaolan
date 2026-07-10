@@ -4,7 +4,7 @@ How to drive the retail AoC client against a local Faolan server without manual 
 automated, capture-backed integration testing. Proven end-to-end 2026-06-10 (login → EnterWorld, unattended).
 
 Pieces: **`Faolan.ClientLauncher`** (launches + drives the client), the **server** (`Faolan` project), **loopback
-packet capture** (`tshark`/`dumpcap` on `lo`), and the existing **analyzer/diff** tooling (`Captures/*.py`,
+packet capture** (`tshark`/`dumpcap` on `lo`), and the capture tooling (`Captures/scripts/*.py` + the Wireshark plugin
 `Faolan.PacketAnalyzer`). Related: [01-crypto.md](../protocol/01-crypto.md),
 README "Client launch flags".
 
@@ -105,7 +105,7 @@ By default any password is accepted. To enforce the real password, the client mu
 
 - **`--patch-login`** overwrites the client's embedded Funcom DH pubkey with
   CELLAO_PUB in `/proc/<pid>/mem` (copy-on-write — the game file is untouched). Needs ptrace permission.
-- Server side: `Faolan.Core/Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
+- Server side: `Faolan.Core.Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
 
 ---
@@ -124,7 +124,7 @@ Listens: UniverseAgent 7010, PlayerAgent 7011, AgentServer 7012, CSPlayerAgent 7
 ```
 tshark -i lo -f "tcp portrange 7001-7015" -w /tmp/session.pcap &
 ```
-The result is a normal pcap the analyzer/diff tools read (`Faolan.PacketAnalyzer`, `Captures/*.py`) — diff it
+The result is a normal pcap the capture tools read (`Captures/scripts/*.py`, the Wireshark plugin) — diff it
 against a retail capture for regressions, or `--dump` it.
 
 ### Launch + drive the client
@@ -145,7 +145,7 @@ Faolan.ClientLauncher --universeaddr --console -u faolan -p aa -c tester
 Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server; `--universeaddr` reverts
 `LocalConfig.xml` automatically on the launcher's exit.
 
-### Harness (`tools/client-smoke-test.sh`)
+### Harness (a local `client-smoke-test.sh` — not committed to the repo)
 A ready-made version of the above: starts the server, captures loopback, launches the client unattended, asserts
 the battery of markers (login → EnterWorld → GameServer traffic, gametweaks, no Dispatcher failures, pcap on
 7010+7014), **grabs a frame of the game window once in-world** (the game is an X11/XWayland window, so
@@ -160,7 +160,7 @@ needs interactive editor input, which the launcher flags can't provide — it'd 
 (only `xdotool`/XWayland is present; no Wayland injector, `/dev/uinput` is root-only).
 
 ### Proven run (2026-06-10)
-`tools/client-smoke-test.sh` → **14/14 PASS**: Proton launched the client → server logged `login accepted` →
+The smoke-test script → **14/14 PASS**: Proton launched the client → server logged `login accepted` →
 `RequestAuth` → `EnterWorld (0x20B6)` → CSPlayerAgent auth → in-world GameServer traffic; client applied the
 gametweaks with no Dispatcher failures; the loopback pcap held 360 packets across 7010+7014; the launcher reverted
 `UniverseAddr` and cleaned up its sidecar — all with **no manual interaction**. This unblocks the **TODO #7**
@@ -171,6 +171,6 @@ create-world loopback-capture diff (its pinned next step needed exactly this rep
 ## File map
 - `Faolan.ClientLauncher/Program.cs`, `LoginKeyPatcher.cs` — the launcher.
 - `Faolan.Core/Crypt/ConanLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
-- `Faolan.Core/Network/LoginEncryption.cs` — server-side DH+TEA login decrypt.
+- `Faolan.Core.Network/LoginEncryption.cs` — server-side DH+TEA login decrypt.
 - `Faolan.ClientLauncher/LoginKeyPatcher.cs` — the in-memory DH-key patcher, invoked by `--patch-login`.
 - `launchClient.sh` — the Proton launch env the launcher mirrors.

@@ -171,7 +171,7 @@ namespace Faolan.Core.Network.Constants
 	}
 
 	// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.
-	// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
 	public enum CSPlayerInterfaceDispatchOpcodes : ushort
 	{
@@ -740,7 +740,7 @@ namespace Faolan.Core.Network.Constants
 	}
 
 	// GameInterface server->client dispatch table (16 methods; +3 inserted no-arg).
-	// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
 	public enum GameInterfaceDispatchOpcodes : ushort
 	{
@@ -763,7 +763,7 @@ namespace Faolan.Core.Network.Constants
 	}
 
 	// GameCharInterfaceProject server->client dispatch table (16 methods; +1 inserted).
-	// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
 	public enum GameCharInterfaceProjectDispatchOpcodes : ushort
 	{
@@ -815,7 +815,7 @@ namespace Faolan.Core.Network.Constants
 	}
 
 	// TradepostInterface server->client dispatch table (8 methods; mail + tradepost search).
-	// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
 	public enum TradepostInterfaceDispatchOpcodes : ushort
 	{
@@ -830,7 +830,7 @@ namespace Faolan.Core.Network.Constants
 	}
 
 	// GameCharInterface server->client dispatch table (181 methods; +24 inserted no-arg). The main world s2c surface: inventory (DispatchAddItem 0x2020), shop, loot, quests, trade, spells/feats, formations.
-	// Generated from Captures/ghidra/s2c_tables.json (opcode = 0x2000 + dispatch switch index);
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (opcode = 0x2000 + dispatch switch index);
 	// <no-arg> insertion slots have a known opcode but no recoverable name -> Reserved0xXXXX.
 	public enum GameCharInterfaceDispatchOpcodes : ushort
 	{

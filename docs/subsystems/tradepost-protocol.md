@@ -155,7 +155,7 @@ attachCount x { [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trai
 Golden tests `MailMessageCodecTests` (Build == captured 629 B and 754 B; `includeAttachments=false` reproduces the
 base from the attachment mail).
 
-**Status (2026-06-14): BUY → mail delivery + the mailbox ops are WIRED** (`Faolan/GameServer/Economy/Tradepost/TradepostService.cs`,
+**Status (2026-06-14): BUY → mail delivery + the mailbox ops are WIRED** (`Faolan/GameServer/GameServerListener.Tradepost.cs`,
 `TradepostResponses.SendMailMessage/SendMailResult/SendRetrieveMailResult`). `TradepostBuyItem(0x200E)` debits the
 buyer (`DispatchUpdateCash`), creates a **system mail** (recipient = buyer, sender empty) with the listed item
 escrowed as a `MailAttachment`, deletes the listing, and pushes the base `DispatchMailMessage`. The mailbox ops then

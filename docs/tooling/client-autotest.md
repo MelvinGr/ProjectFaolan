@@ -46,5 +46,5 @@ call ... failed`) to confirm a world packet (e.g. the snapshot-quest injection, 
 *accepted* — note the headless visual render itself has been env-blocked (RDB thrash), but world-entry packet
 processing happens before that.
 
-Related: `docs/tooling/client-launcher.md`, [[lua_vm]] (the RDB Lua/script layer), `Faolan/GameServer/World/ScryScript.cs`,
+Related: `docs/tooling/client-launcher.md`, [[lua_vm]] (the RDB Lua/script layer), `Faolan.Core.Network/Codecs/Dialogue/ScryScript.cs`,
 [[protocol_quest_state]].

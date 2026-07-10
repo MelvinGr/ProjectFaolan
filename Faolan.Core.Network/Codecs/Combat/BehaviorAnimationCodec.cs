@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// the character stays stuck in the trance pose. Action params are capture-derived (necro).
 		private const uint SpellweaveExitAction = 41302;
 
-		// The caster's TRANCE-POSE animation on spellweave ACTIVATE (Captures/decode_spellweave.py frame 1645):
+		// The caster's TRANCE-POSE animation on spellweave ACTIVATE (Captures/scripts/decode_spellweave.py frame 1645):
 		// behaviorId 1, args {f1=TranceAction, f3=4, f5=8, f6=0, f11=1199}, trailer [0x27][1][0][0][0]. Without it the
 		// trance buffs render but the character stays idle. Action params are capture-derived (necro).
 		private const uint SpellweaveTranceAction = 42041;

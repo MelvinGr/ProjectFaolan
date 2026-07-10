@@ -3,7 +3,7 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Combat
 {
 	// Byte-exact builders for the spellweaving activate-response + fire wire (docs/subsystems/combos.md, decoded in
-	// Captures/decode_spellweave.py from NecroL80_..._consuming-potions-food-spellweaving; caster 0x0802E5D4).
+	// Captures/scripts/decode_spellweave.py from NecroL80_..._consuming-potions-food-spellweaving; caster 0x0802E5D4).
 	// Each method returns the record bytes AFTER the 0x2000 carrier's u32 length prefix - the caller wraps them in
 	// the world-framed IIR carrier (WriteArrayUInt32Length), exactly like PetIirCodec.
 	//

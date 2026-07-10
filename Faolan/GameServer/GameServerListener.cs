@@ -103,8 +103,8 @@ namespace Faolan.GameServer
 		// one. (There is no hand-built login/teleport path anymore.)
 		//private const uint DefaultWorldMapId = Map.TortageBeachId;
 
-		// Starter beach gear (StartingGear.MaleLegsItem / WristItem / FemaleOutfits / StartingWeapon) lives in
-		// Faolan.Core.Network.Constants/StartingGear.cs.
+		// Starter beach gear (StartingData.StartingMaleLegsItem / StartingWristItem / …) lives in
+		// Faolan.Core.Network/Constants/StartingData.cs.
 
 		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
 		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =

@@ -10,7 +10,7 @@ Grammar (big-endian), validated to the packet end on the demol80 randomActions c
   [u16 xmlLen][remoteformat XML]
   [u8 0x00][u32 0x40000001]   trailer (constant; carried verbatim until a 2nd sample names the halves)
 
-Mirrors the C# ChatTextCodec (Faolan.Core/Network/Packets/ChatTextCodec.cs), golden-tested in ChatTextCodecTests.
+Mirrors the C# ChatTextCodec (Faolan.Core.Network/Codecs/Text/ChatTextCodec.cs), golden-tested in ChatTextCodecTests.
 
 Usage: python3 Captures/scripts/decode_chattext.py [capture.tshark.json]
 """

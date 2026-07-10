@@ -14,7 +14,7 @@ Goal (chosen 2026-06-10, finished the same day over two sessions): generate the 
 > (`Faolan.Tests/Golden/SpawnStrieTemplate.bin`).
 > Verified: the wire grammar parses + regenerates **all captured player-own spawns byte-exact (37/37, incl. captures added after the codec was written)**
 > (`Captures/scripts/parse_spawn_scaffold.py`); the rows→bytes oracle is locked by
-> `PlayerSpawnScaffoldCodecTests`/`PlayerSpawnScaffoldRowsTests`; `tools/client-smoke-test.sh` 16/16 with the
+> `PlayerSpawnScaffoldCodecTests`/`PlayerSpawnScaffoldRowsTests`; a local smoke-test script, 16/16 with the
 > generated scaffold confirmed on the wire (session-pcap parse); 142 unit tests.
 
 ## Architecture (what ships)

@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct of the server-originated BehaviorControlCenterIIR (0x642CD3D6) animations vs the captured
-	// bytes in NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving (Captures/decode_spellweave.py).
+	// bytes in NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving (Captures/scripts/decode_spellweave.py).
 	// caster = 0x0802E5D4; the golden hex is the frame body with the 0x2000 carrier's u32 length prefix stripped.
 	public class BehaviorAnimationCodecTests
 	{

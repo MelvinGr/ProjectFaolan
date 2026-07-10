@@ -7,7 +7,7 @@ server must ECHO back a matching StartGroup. This script extracts the ScryScript
 BOTH directions from a tshark.json and prints the interleave, so a test run can be diffed against retail.
 
 Usage:
-  Captures/tshark_dump.sh /tmp/faolan_test.pcapng           # our loopback capture -> /tmp/faolan_test.tshark.json
+  Captures/scripts/tshark_dump.sh /tmp/faolan_test.pcapng           # our loopback capture -> /tmp/faolan_test.tshark.json
   python3 Captures/scripts/compare_create_cutscene.py /tmp/faolan_test.tshark.json   # ours
   python3 Captures/scripts/compare_create_cutscene.py                                # retail (default)
 """

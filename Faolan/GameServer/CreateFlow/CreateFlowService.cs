@@ -615,7 +615,7 @@ namespace Faolan.GameServer.CreateFlow
 			client.Session.AwaitingEnterWorld = true;
 		}
 		// Verbatim replay of the retail create-editor INITIAL download from
-		// Captures/account-stricken998-character-create-no-worldenter.json (GameServer port 7030),
+		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (GameServer port 7030),
 		// rows 30-65. This stage front-loads MapChange + SpawnObject/Spawn + AccessWindow + SetDayTime
 		// + the first 9x 0xF98E10B3 before the client sends its first 0x205F.
 
@@ -890,7 +890,7 @@ namespace Faolan.GameServer.CreateFlow
 		}
 
 		// Retail create-editor CHARACTER-CREATION SCRIPT burst from
-		// Captures/account-stricken998-character-create-no-worldenter.json (GameServer port 7030), rows 274-302/324-331.
+		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (GameServer port 7030), rows 274-302/324-331.
 		//
 		// This is the burst that starts the character-creation cutscene. The key packets are the two ScryScriptIIR
 		// remoteformats: token "playorskip(72)|...|NEW_character_creation Slave Galley (server-side)" then "PlayOrSkip".
@@ -989,7 +989,7 @@ namespace Faolan.GameServer.CreateFlow
 		}
 
 		// Verbatim replay of the fixed tail of the retail create-editor post-ready follow-up from
-		// Captures/account-stricken998-character-create-no-worldenter.json (rows 198-199, 203-204).
+		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (rows 198-199, 203-204).
 		// The leading 0x0009FF92-0x0009FF96 ack packets are generated dynamically from the request ids the
 		// client actually sends so the live flow can advance even when it stalls before all 5 retail requests.
 		internal static async Task SendRetailCreateEditorPostReadyBurst(INetworkClient client, IReadOnlyList<uint> requestIds)
@@ -1036,7 +1036,7 @@ namespace Faolan.GameServer.CreateFlow
 
 		// Step 3 of the create->world handshake: the world-prep / scene burst the creator sends after
 		// CharCreationFinished, before the client will send 0x206E (enter world). Verbatim from
-		// Captures/Dikketest_rogue-barbarian_create_random-actions.json (creator gs013:7016, 		// idx 364-438, excluding the 0x2082/0x2009 keepalive replies which are answered naturally), with the
+		// Captures/Dikketest_rogue-barbarian_create_random-actions.tshark.json (creator gs013:7016, 		// idx 364-438, excluding the 0x2082/0x2009 keepalive replies which are answered naturally), with the
 		// client instance retargeted from dikketest's 0x01316D2B to the local temp instance 0x021662C8
 		// (receiver varint AB DA C5 09 -> C8 C5 D9 10, body instance 01 31 6D 2B -> 02 16 62 C8). Each packet
 		// is resent through PacketStream so its CRC/length are recomputed for the retargeted bytes.

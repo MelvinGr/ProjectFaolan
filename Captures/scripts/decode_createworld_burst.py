@@ -2,7 +2,7 @@
 """Inventory / construction-coverage pass over the create-world INTRO CUTSCENE burst (#234).
 
 The post-creation world entry (shipwreck -> beach -> Kalanthes -> ApproachCasilda) is still served
-verbatim from Faolan/GameServer/CreateFlow/RetailCreateWorldEntryBurst.cs. This script reads the source
+verbatim from Faolan.Tests/Support/RetailCreateWorldEntryBurst.cs. This script reads the source
 capture, tallies the s2c stream, and classifies every 0x2000 IIR sub-opcode by how close it is to being
 CONSTRUCTED (vs replayed) — the decode-first inventory the ticket calls for. No client needed.
 

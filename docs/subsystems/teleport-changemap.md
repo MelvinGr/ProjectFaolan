@@ -2,7 +2,7 @@
 
 The two IIR bodies the retail server sends on the live connection before the `0x2002` enter-world handoff when
 a player changes map, decoded from the changemap captures (frames 4200/4212 for map 2010, 4417/4420 for map
-2000) and **named** against the IIR readers recovered in #233. Builder: `Faolan/GameServer/World/TeleportCodec.cs`,
+2000) and **named** against the IIR readers recovered in #233. Builder: `Faolan.Core.Network/Codecs/World/TeleportCodec.cs`,
 byte-exact golden tests in `TeleportHandoffTests`.
 
 Both carry the same **PlayfieldProxy** stream (the `FUN_00a6a600` sub-reader): `[u8 version='b'(0x62)]
@@ -64,6 +64,6 @@ Both bodies are built by the named `TeleportCodec` (was inline spliced templates
 **reader-structural** — the `begin` / PlayfieldProxy / `dest` readers are decompiled (`Captures/ghidra/
 DumpTeleportReaders.java` → `FUN_005bfce0` / `FUN_00a6a600` / `FUN_005d1ae0`, plus `FUN_00cbf5d0` for the
 position blob) and every dest byte is accounted for. Sibling lift under #219 — the **guild renown block** — is
-likewise a typed builder (`Faolan/CSPlayerAgent/GuildRenownBlock.cs`, `GuildRenownBlockTests`; full reader walk
+likewise a typed builder (`Faolan.Core.Network/Codecs/Guild/GuildRenownBlock.cs`, `GuildRenownBlockTests`; full reader walk
 documented in `docs/subsystems/guilds.md`). Remaining: in-client verification of the GM teleport path, and the semantic
 meaning of `destDescriptor`.

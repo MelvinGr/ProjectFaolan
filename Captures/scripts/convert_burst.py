@@ -2,7 +2,7 @@
 """Codemod: convert a Retail*Burst.cs verbatim-blob method to Iir()/IirId() helper calls (byte-identical)."""
 import re, sys
 CS = sys.argv[1]
-enum_txt = open("Faolan.Core/Network/Packets/Opcodes.cs").read()
+enum_txt = open("Faolan.Core.Network/Constants/Opcodes.cs").read()
 m = re.search(r"enum GameServer0X2000RespondsOpcodes\s*:\s*uint\s*\{(.*?)\n\t\t\}", enum_txt, re.S)
 val2name = {}
 for name, val in re.findall(r"(\w+)\s*=\s*0x([0-9A-Fa-f]+)", m.group(1)):

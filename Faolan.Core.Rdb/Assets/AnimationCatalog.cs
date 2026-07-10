@@ -18,7 +18,7 @@ namespace Faolan.Core.Rdb.Assets
 	//     then per-bone tracks [u32 nameLen][rig_bone_*][T-channel][R-channel]; each channel =
 	//     [u32 count][count f32 time][count x (vec3 translation | quat4 rotation)]. Plain float32, 25fps.
 	//
-	// Full decode + validation write-up in Captures/decode_lmxb.py (the reference dissector this mirrors).
+	// Full decode + validation write-up in Captures/scripts/decode_lmxb.py (the reference dissector this mirrors).
 	public static class AnimationCatalog
 	{
 		private const uint AnimSysType = 1010511; // LMXB clip metadata

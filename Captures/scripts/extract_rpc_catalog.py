@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 1 of docs/re/opcode-re-plan.md: extract the client's RPC method catalog from AgeOfConan.exe strings.
+"""Stage 1 of docs/re/aoc-opcode-ids.md: extract the client's RPC method catalog from AgeOfConan.exe strings.
 
 Two evidence sources in the binary:
   - proxy  (client->server): "<Class>Proxy_t::Method(<typed sig>) streamed payload of size "

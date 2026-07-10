@@ -5,7 +5,7 @@ Wire grammar (decoded 2026-06-12, validated on all 11 captured vendor windows):
   [shop ID32 (type 0xC75B)][vendor NPC ID32 (type 0xC350)][u32 contentLength][ProtoInventoryGame]
 
 The content is a plain ProtoInventoryGame (the SAME message the FullChar 0x737A6DF9 snapshot uses for the
-player's bag, docs/aoc-client-protos.proto):
+player's bag, Faolan.Core/Protobuf/aoc-client-protos.proto):
   f1 inventory_id        = ProtoID32{type=111, instance=0}   (111 = the shop container, bag is 104)
   f2 max_size            = shop capacity (observed 10/20/40/80/160)
   f3 disabled_slots_count= 0

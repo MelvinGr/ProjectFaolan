@@ -5,7 +5,7 @@ grouped into the 6 chunks, substituting the captured char instance with `id`.
 Reads the canonical Captures/*.tshark.json dump (already de-framed: endpoint class ids + opcode + body are
 fields), reconstructing each ProtoEndpoint header blob from its class id + instance.
 
-NOTE: the committed Faolan/GameServer/CreateFlow/RetailCreateWorldEntryBurst.cs has since been hand-refactored
+NOTE: the committed Faolan.Tests/Support/RetailCreateWorldEntryBurst.cs has since been hand-refactored
 (ConanEndpoints.EndpointBytes + named opcodes), so this generator's raw-byte output is SUPERSEDED — re-running
 it would revert those edits. It writes to an explicit output path (default /tmp) so it never clobbers the
 refactored file; pass the .cs path as argv[1] only if you really intend to regenerate the verbatim form."""

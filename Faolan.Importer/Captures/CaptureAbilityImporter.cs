@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Importer.Captures
 {
 	// Harvests the player's starting abilities from the retail 0x2052 ability-grant packets (the real wire format,
-	// NOT the C++ 0x4d scheme; see Faolan/GameServer/Packets/Send0x2052_GrantAbilities.cs). The grant body carries
+	// NOT the C++ 0x4d scheme; see Faolan.Core.Network/Codecs/Combat/AbilityGrantBody.cs). The grant body carries
 	// the ability's Slot (template word) + Data0..4 identity quad; names are client-side (resolved by id).
 	//
 	// CLASS-AWARE: each create-flow capture is attributed to its character's class via the ChangeClass editor command

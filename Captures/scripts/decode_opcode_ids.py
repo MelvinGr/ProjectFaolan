@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage 3 of docs/re/opcode-re-plan.md: decode the wire ids using the recovered BKDR-31 name hash.
+"""Stage 3 of docs/re/aoc-opcode-ids.md: decode the wire ids using the recovered BKDR-31 name hash.
 
 Stage 2 cracked the client's id hash: h = h*31 + c over the ASCII class name (Java String.hashCode / BKDR-31).
   - ProtoEndpoint.type ids   = hash(interface/agent class name), e.g. hash("GameCharInterface")=0x8B87F791
@@ -49,7 +49,7 @@ def resolve(idv, want_iir):
     return best, sorted(cands, key=lambda n: -rank(n, want_iir))
 
 # --- parse captures ---
-# The .tshark.json dump (Captures/tshark_dump.sh) already de-frames every packet: the RPC endpoint class ids,
+# The .tshark.json dump (Captures/scripts/tshark_dump.sh) already de-frames every packet: the RPC endpoint class ids,
 # the 16-bit opcode and the body come straight from the record. All Conan-protocol services collapse to
 # Protocol="Conan" (only chat keeps "AgentServer"), so the per-service breakdown is bucketed by the
 # server-side endpoint CLASS id (the stable interface discriminator — ports are dynamically advertised).

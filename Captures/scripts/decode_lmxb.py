@@ -33,7 +33,7 @@ validated end-to-end against the client RDB.
       to |q|=1.0. Static bones are 1-key channels. Decodable straight to glTF animation channels (T = translation
       sampler, R = rotation sampler; skeleton bone names match rig_bone_* directly).
 
-Usage: python3 Captures/decode_lmxb.py            # self-validates on 14532 + dumps a 1010003 sample
+Usage: python3 Captures/scripts/decode_lmxb.py            # self-validates on 14532 + dumps a 1010003 sample
 Reads the client RDB directly (RdbReader path from the agent memory client_rdb_install_path).
 """
 import os, struct, zlib, re, sys
