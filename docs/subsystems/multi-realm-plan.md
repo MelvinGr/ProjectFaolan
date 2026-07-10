@@ -54,10 +54,10 @@ process/resources and couples realm lifecycles. `Realm.IpAddress` already exists
 - **Realm game process (one per realm):** `GameServerListener` + `WorldSimulation` **+ the realm-local chat/guild
   services** (`AgentServerListener` chat, `CsPlayerAgentListener` guilds/teams) — because chat and guilds are
   realm-local, they move OUT of the shared tier and INTO each realm process. Bound to that realm's `IpAddress:Port`
-  (+ the per-realm chat/cs ports); reads its own realm id from config/CLI (`--realm <id>`). Shares `faolan.db`,
+  (+ the per-realm chat/cs ports); reads its own realm id from config/CLI (`--role realm=<id>`). Shares `faolan.db`,
   scoping every dynamic query by realm.
 
-So `Program.cs` gains a **role**: `--role login` (or default) runs the router tier; `--realm <id>` runs a realm game
+So `Program.cs` gains a **role**: `--role login` (or default) runs the router tier; `--role realm=<id>` runs a realm game
 host. One login process + N realm processes, all against the shared DB.
 
 ## Phased plan (each phase test-gated; no wire regressions)
@@ -74,7 +74,7 @@ host. One login process + N realm processes, all against the shared DB.
   process is actually split.
 
 - **Phase 2 — Process role split** *(the heart of B)*. `Program.cs` gains a role: `--role login` (default) starts
-  ONLY `UniverseAgent` + `PlayerAgent` (+ the DB); `--realm <id>` starts a realm game host — `GameServerListener` +
+  ONLY `UniverseAgent` + `PlayerAgent` (+ the DB); `--role realm=<id>` starts a realm game host — `GameServerListener` +
   `WorldSimulation` + the realm-local `AgentServerListener` + `CsPlayerAgentListener` — bound to that realm's ports,
   with the realm id threaded through the whole world (simulation, dispatcher, MCP). The login tier no longer owns a
   world; the realm host no longer owns login. Run one login process + one realm process locally to validate.

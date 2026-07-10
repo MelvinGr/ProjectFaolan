@@ -33,7 +33,7 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 
 ### Realms & deployment
 - 🟡 Multiple realms (game servers) — **process-per-realm**: `dotnet run --project Faolan` is all-in-one (dev),
-  `--role login` runs the shared login/router tier, and `--realm <id>` runs one realm's isolated world (its own
+  `--role login` runs the shared login/router tier, and `--role realm=<id>` runs one realm's isolated world (its own
   GameServer + chat + guilds, bound to that `Realm` row's `IpAddress`/ports). Guilds, auction house, mail, and
   character names are all `RealmId`-scoped; the client is routed to its selected character's realm. Server-side
   complete and fleet-verified (1 login + N realm processes on a shared DB); awaits an in-client 2-realm shakedown (#324)
@@ -142,8 +142,8 @@ per realm (each bound to its `Realm` row's `IpAddress`/ports), all against the s
 
 ```sh
 dotnet run --project Faolan -- --role login   # the shared login/router tier (UniverseAgent + PlayerAgent)
-dotnet run --project Faolan -- --realm 2       # one realm's game host (GameServer + realm-local chat + guilds)
-dotnet run --project Faolan -- --realm 3       # another realm, on that Realm row's ports
+dotnet run --project Faolan -- --role realm=2       # one realm's game host (GameServer + realm-local chat + guilds)
+dotnet run --project Faolan -- --role realm=3       # another realm, on that Realm row's ports
 ```
 
 ## Test

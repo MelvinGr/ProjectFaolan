@@ -74,28 +74,35 @@ namespace Faolan
 			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ??
 															   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
 
-			// Process ROLE (multi-realm / process-per-realm, #324):
-			//   --role login  -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
-			//   --realm <id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
-			//                    realm's ports; the login tier routes players to it (SendGameServer/AgentServer/CsPlayerAgent).
-			//   (no args)     -> all-in-one: login + a game host for the first realm (the historical single-process dev run).
-			var realmArg = builder.Configuration["realm"];
+			// Process ROLE (multi-realm / process-per-realm, #324) via a single --role option:
+			//   --role login       -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
+			//   --role realm=<id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
+			//                         realm's ports; the login tier routes players to it (SendGameServer/AgentServer/CsPlayerAgent).
+			//   --role realm       -> the same, for the first realm (id omitted).
+			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical single-process dev run).
 			var roleArg = builder.Configuration["role"];
-			uint? selectedRealmId = string.IsNullOrWhiteSpace(realmArg) ? null : uint.Parse(realmArg, CultureInfo.InvariantCulture);
+			uint? selectedRealmId = null;
 			bool runLogin, runRealm;
-			if (selectedRealmId.HasValue || string.Equals(roleArg, "realm", StringComparison.OrdinalIgnoreCase))
+			if (string.IsNullOrWhiteSpace(roleArg))
 			{
-				runRealm = true;
-				runLogin = false;
+				runLogin = runRealm = true; // default: all-in-one (dev)
 			}
-			else if (string.Equals(roleArg, "login", StringComparison.OrdinalIgnoreCase))
+			else if (roleArg.Equals("login", StringComparison.OrdinalIgnoreCase))
 			{
 				runLogin = true;
 				runRealm = false;
 			}
+			else if (roleArg.Equals("realm", StringComparison.OrdinalIgnoreCase) || roleArg.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
+			{
+				runRealm = true;
+				runLogin = false;
+				var eq = roleArg.IndexOf('=');
+				if (eq >= 0)
+					selectedRealmId = uint.Parse(roleArg[(eq + 1)..], CultureInfo.InvariantCulture);
+			}
 			else
 			{
-				runLogin = runRealm = true; // default: all-in-one (dev)
+				throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{roleArg}'.");
 			}
 
 			// The realm this process hosts (realm role). Resolved from the DB up front - the Realm row is the single
@@ -110,8 +117,8 @@ namespace Faolan
 					: probe.Realms.OrderBy(r => r.Id).FirstOrDefault();
 				if (hostRealm == null)
 					throw new Exception(selectedRealmId.HasValue
-						? $"--realm {selectedRealmId}: no such realm in the DB (migrate + seed a Realm row first)."
-						: "realm host: no realm seeded in the DB.");
+						? $"--role realm={selectedRealmId}: no such realm in the DB (migrate + seed a Realm row first)."
+						: "--role realm: no realm seeded in the DB.");
 
 				// Bind the realm-local chat/guild listeners (they read config) to THIS realm's ports.
 				builder.Configuration.AddInMemoryCollection(new Dictionary<string, string>
