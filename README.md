@@ -125,9 +125,9 @@ root — so run it **from the repo root** (running from `bin/Debug` fails with "
 dotnet run --project Faolan
 ```
 
-It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the per-session PlayerAgent,
-CsPlayerAgent, AgentServer and GameServer), migrates the database schema, and hosts an in-process MCP endpoint
-on `http://127.0.0.1:7099/mcp`.
+It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the PlayerAgent,
+CsPlayerAgent, AgentServer and GameServer listeners the client is handed off to in turn), migrates the
+database schema, and hosts an in-process MCP endpoint on `http://127.0.0.1:7099/mcp`.
 
 ## Test
 
