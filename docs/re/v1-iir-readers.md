@@ -18,7 +18,7 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 | **KnubotStartTradeIIR** | `0x4B2A47BF` | `FUN_009a63a0` | `[u64][u32 count][ count × { std::string name, u32, u32, u32, u32 } ][std::string …]` — the **shop item list** | 1676–1772 B (variable) ✓ |
 | **AreaFormulaIIR** | `0xCE30BE4E` | `FUN_0079e330` | `[0x3F1-list][u32][0x3F1-list][u32]` (two `0x3F1`-framed lists, à la GameActionList) | 28/36/44/52 B (variable) ✓ |
 | **TemplateActionIIR** | `0x6C300937` | `FUN_007a0b00` | `[68-B struct (FUN_005d5150)][u32 × 6]` | 10/10 = 92 B ✓ |
-| **UpdateInventoryIIR** | `0xA74D2814` | `FUN_005b9230` | reader resolved to a `return 0` **stub** — but captures are 12 B (likely `[u32][u32][u32]` like Regen); slot needs re-verification | 30× = 12 B (stub mismatch) |
+| **UpdateInventoryIIR** | `0xA74D2814` | `FUN_005b9230` (stub) | the body is **protobuf** (`08 0a …` field tags; repeated item entries with 16-B GUIDs — the inventory item schema). The slot-8 reader is a `return 0` stub because the client parses it as protobuf, not fixed fields — reuse `ProtoInventoryGame`, don't hand-roll | 25–1137 B protobuf ✓ |
 
 ## Notes
 
@@ -40,8 +40,8 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 Grammar SHAPE decoded + capture-length-validated for all 11 (the "genuinely undecoded" V1 tag is now only about
 the absence of a codec, not the wire format). **Six now HAVE byte-exact codecs** with captured round-trips
 (`RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`, `SpellBookCodec`, `FeedbackIirCodec`, `CrimeCodec` —
-`V1IirCodecTests`): coverage dropped **11 V1 → 5 V1**. The remaining five need more than a fixed-field parse:
-`KnubotFinishTradeIIR` and `KnubotStartTradeIIR` share a base-class prefix (`FUN_009a7e00`) to decode first,
-`KnubotStartTradeIIR` is the variable shop list, `AreaFormulaIIR` has two `0x3F1` sub-lists, `TemplateActionIIR`
-a 68-B struct (`FUN_005d5150`), and `UpdateInventoryIIR`'s stub reader vs its 12-B captures needs the vtable slot
-re-verified.
+`V1IirCodecTests`): coverage dropped **11 V1 → 5 V1**. The remaining five are each their own decode, not the fixed-field pattern: `UpdateInventoryIIR` is a **protobuf**
+message (reuse `ProtoInventoryGame`); `KnubotStartTradeIIR` is the variable shop list of `std::string`-named items
+(both Knubot readers share the version-gated base prefix `FUN_009a7e00`); `AreaFormulaIIR` has two `0x3F1`
+sub-lists; `TemplateActionIIR` a 68-B struct (`FUN_005d5150`). Their SHAPE is documented above; each needs its
+element/field grammar filled in before a codec.
