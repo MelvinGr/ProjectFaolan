@@ -8,8 +8,8 @@
 ## Headline
 
 - **823** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **75** IIR carrier types: **69 V3** (byte-exact builder), **6 V2** (built, no golden), **0 V1** (no builder found).
-- **59** codec classes, **53** with a byte-exact test.
+- **75** IIR carrier types: **72 V3** (byte-exact builder), **3 V2** (built, no golden), **0 V1** (no builder found).
+- **59** codec classes, **57** with a byte-exact test.
 - **38** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -47,6 +47,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `CombatReactiveIIR` | `SpellweaveCodec` |
 | V3 | `CombatShieldIIR` | `CombatShieldBuilder`, `CombatShieldCodec` |
 | V3 | `ComboBookIIR` | `ComboBookIirCodec` |
+| V3 | `CoreClaimIIR` | `CoreClaimCodec` |
 | V3 | `CrimeIIR` | `CrimeCodec` |
 | V3 | `DamageResultIIR` | `CombatEffectBuilder`, `CombatPacketCodec` |
 | V3 | `DestructibleFullUpdateIIR` | `DynelFullUpdateCodec` |
@@ -68,12 +69,14 @@ the margins, but never invents a golden that isn't there.
 | V3 | `KnubotOpenChatWindowIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
 | V3 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
 | V3 | `LockedToChangedIIR` | `LockedToChangedCodec` |
+| V3 | `LookAtIIR` | `ShopOpenBuilder` |
 | V3 | `LootBagFullUpdateIIR` | `LootBagMessageCodec`, `LootBagTemplate` |
 | V3 | `LootRemoveItemsIIR` | `WorldLoot` |
 | V3 | `MagicBuffIIR` | `NpcSpellCastBuilder`, `WorldDeath` |
 | V3 | `MoveTaskIIR` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` |
 | V3 | `N3TeleportIIR` | `TeleportCodec` |
 | V3 | `N3ToClientFadeIIR` | `WorldLoot` |
+| V3 | `N3ToClientQuitIIR` | `WorldDespawn` |
 | V3 | `NewAllowedLooterIIR` | `WorldLoot` |
 | V3 | `NewCurrentLooterIIR` | `WorldLoot` |
 | V3 | `NewLevelIIR` | `NewLevelIirCodec` |
@@ -104,9 +107,6 @@ the margins, but never invents a golden that isn't there.
 | V3 | `TradeskillRequestIIR` | `TradeskillRecipeCodec` |
 | V3 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
-| V2 | `CoreClaimIIR` | `CoreClaimCodec` |
 | V2 | `DeleteItemIIR` | `InventoryMoveCodec` |
-| V2 | `LookAtIIR` | `ShopOpenBuilder` |
 | V2 | `MoveInventoryItemIIR` | `InventoryMoveCodec` |
-| V2 | `N3ToClientQuitIIR` | `WorldDespawn` |
 | V2 | `PlayfieldFIIR` | `MapChangeCodec` |

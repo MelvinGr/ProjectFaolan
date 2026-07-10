@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
 
@@ -15,14 +16,8 @@ namespace Faolan.Tests
 			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
 
 			Assert.Equal(17, body.Length);
-			var expected = new byte[]
-			{
-				0x04, 0xB8, 0x2B, 0x2D, // subop
-				0x00, 0x00, 0xC3, 0x50, // typeTag/ack
-				0x00, 0x01, 0x7E, 0x29, // handle
-				0x01, // marker
-				0x01, 0xEA, 0x98, 0x5C // playfield token
-			};
+			// [subop 04B82B2D][typeTag 0000C350][handle 00017E29][marker 01][playfield token 01EA985C].
+			var expected = Convert.FromHexString("04b82b2d0000c35000017e290101ea985c");
 			Assert.Equal(expected, body);
 		}
 

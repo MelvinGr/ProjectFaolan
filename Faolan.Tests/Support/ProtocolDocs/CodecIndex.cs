@@ -18,12 +18,16 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// local ToHex() helpers several test classes define (CharacterStatBlockTests, CombatTests, ...).
 		private static readonly string[] ByteExactMarkers = { "Golden.Bytes", "ToHex", "TestPaths.Asset", "SequenceEqual" };
 
-		// A scope (whole test file, or one method body) is byte-exact if it carries one of the explicit markers above,
-		// OR it uses the round-trip idiom: a captured hex oracle (Convert.FromHexString) serialized back with .ToArray()
-		// and asserted equal. That idiom (V1IirCodecTests: `Assert.Equal(body, codec.Parse(body).ToArray())`) is a real
-		// byte-exact golden the explicit markers missed - which is why ~10 genuinely-tested IIR types read as V2.
-		private static bool IsByteExact(string scope) =>
-			ByteExactMarkers.Any(scope.Contains) || (scope.Contains("FromHexString") && scope.Contains(".ToArray("));
+		// A scope (whole test file, or one method body) is byte-exact for `codec` if it carries one of the explicit
+		// markers above, OR it loads a captured hex oracle (Convert.FromHexString) and compares it against a serialize
+		// output - either the round-trip `.ToArray()` (V1IirCodecTests: `Assert.Equal(body, codec.Parse(body).ToArray())`)
+		// or a direct call to THIS codec's Build* (ShopOpenBuilderTests/WorldDespawnTests: `Assert.Equal(captured,
+		// codec.BuildX(...))`). Requiring the codec's own Build keeps parse-only codecs (InventoryMoveCodec, which has
+		// no serialize path) from being falsely credited by an input-hex parser test. These idioms are real byte-exact
+		// goldens the explicit markers missed - why a batch of genuinely-tested IIR types read as V2.
+		private static bool IsByteExact(string scope, string codec) =>
+			ByteExactMarkers.Any(scope.Contains)
+			|| (scope.Contains("FromHexString") && (scope.Contains(".ToArray(") || scope.Contains($"{codec}.Build")));
 
 		// A [Fact]/[Theory] method: the attribute(s), then a public (async) returntype Name(.
 		private static readonly Regex TestMethod = new(
@@ -120,19 +124,22 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			foreach (var codec in idx.CodecToIir.Keys)
 			{
 				var re = new Regex(@"\b" + Regex.Escape(codec) + @"\b");
-				var golden = false;
 				string method = null;
 				foreach (var (text, _) in testFiles)
 				{
-					if (!re.IsMatch(text) || !IsByteExact(text))
+					// File-level IsByteExact is only a cheap pre-filter; the authoritative signal is a SINGLE method
+					// that both references the codec and is byte-exact (FindGoldenMethod). Requiring the method-level
+					// match stops a file from crediting a codec when its FromHexString and its .ToArray()/marker live in
+					// DIFFERENT, unrelated methods (e.g. InboundParserTests builds test input with .ToArray() in one
+					// method and loads a capture with FromHexString in another - neither a byte-exact InventoryMove golden).
+					if (!re.IsMatch(text) || !IsByteExact(text, codec))
 						continue;
-					golden = true;
-					method ??= FindGoldenMethod(text, codec);
+					method = FindGoldenMethod(text, codec);
 					if (method != null)
 						break;
 				}
 
-				idx.CodecGolden[codec] = golden;
+				idx.CodecGolden[codec] = method != null;
 				if (method != null)
 					idx.CodecGoldenMethod[codec] = method;
 			}
@@ -163,7 +170,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				var start = methods[i].Index;
 				var end = i + 1 < methods.Count ? methods[i + 1].Index : text.Length;
 				var body = text[start..end];
-				if (body.Contains(codec, StringComparison.Ordinal) && IsByteExact(body))
+				if (body.Contains(codec, StringComparison.Ordinal) && IsByteExact(body, codec))
 					return $"{cls}.{methods[i].Groups[1].Value}";
 			}
 

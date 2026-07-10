@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**75** IIR carrier types · **69 V3** (69 with an auto-cited golden). The
+**75** IIR carrier types · **72 V3** (72 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -28,8 +28,9 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
 | V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `CombatReactiveIIR` | `0x54C02089` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
-| V3 | `CombatShieldIIR` | `0xCFFD0519` | `CombatShieldBuilder`, `CombatShieldCodec` | [V3: CombatRecordCodecTests.CombatShield_BuildsByteExact] |
+| V3 | `CombatShieldIIR` | `0xCFFD0519` | `CombatShieldBuilder`, `CombatShieldCodec` | [V3: CombatShieldBuilderTests.Build_IsByteIdenticalToCapturedInstance] |
 | V3 | `ComboBookIIR` | `0xA8BBEB7F` | `ComboBookIirCodec` | [V3: ComboBookIirCodecTests.Build_MatchesCapturedLevelUpCombo] |
+| V3 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimCodec` | [V3: CoreClaimCodecTests.Build_MatchesCapturedClaim] |
 | V3 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` | [V3: V1IirCodecTests.Crime_RoundTripsCapturedBody] |
 | V3 | `DamageResultIIR` | `0xFEC4158A` | `CombatEffectBuilder`, `CombatPacketCodec` | [V3: CombatEffectBuilderTests.DamageResult_IsByteIdentical] |
 | V3 | `DestructibleFullUpdateIIR` | `0x6BD56736` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
@@ -51,12 +52,14 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTradeCodec` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
 | V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
+| V3 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` | [V3: ShopOpenBuilderTests.BuildTradeSelectEcho_IsByteIdenticalToFrame1189] |
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootBagTemplate` | [V3: LootBagTemplateTests.BuildBounds_ReproducesTheCapturedKdTreeGeometry_ByteForByte] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_FromCapturedFields_IsByteIdentical] |
+| V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_EmptyPayload_IsTheBuffRemovalEndTwin] |
 | V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskBuilderTests.BuildPatrol_FromCapturedWaypoints_IsByteIdentical] |
 | V3 | `N3TeleportIIR` | `0x5A32F0D7` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
 | V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `N3ToClientQuitIIR` | `0x04B82B2D` | `WorldDespawn` | [V3: WorldDespawnTests.BuildBody_MatchesRetailLayout] |
 | V3 | `NewAllowedLooterIIR` | `0x1E2E0139` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `NewLevelIIR` | `0x6D314743` | `NewLevelIirCodec` | [V3: NewLevelIirCodecTests.Build_Convenience_CarriesLevelWithZeroDeltas] |
@@ -87,11 +90,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V2 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimCodec` |  |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryMoveCodec` |  |
-| V2 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
-| V2 | `N3ToClientQuitIIR` | `0x04B82B2D` | `WorldDespawn` |  |
 | V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
