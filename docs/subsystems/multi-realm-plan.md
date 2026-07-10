@@ -84,6 +84,20 @@ host. One login process + N realm processes, all against the shared DB.
   that chat/guild services live IN the realm process (P2), they are realm-scoped by construction — but the DB rows
   they read/write must carry `RealmId` so two realm processes on the shared DB don't cross-read.
 
+  The bits that bite if missed (an **explicit** `RealmId` column, NOT derive-from-members — an empty/just-created
+  guild has no members to infer a realm from, and a guild's realm is pinned at creation, not by transient membership):
+  - **`Guild`**: add `RealmId` (FK), set at creation from the founder's realm. Change the unique index
+    `[Index(Name, IsUnique)]` → **composite `(RealmId, Name)`** (Crom and Fury must each be able to have a "Knights").
+    `CreateGuild(name, leaderCharacterId)` → take/derive `realmId`, and scope its name-uniqueness check + `GetGuildByName`
+    by realm (both are GLOBAL today: `DatabaseRepository.CreateGuild`/`GetGuildByName`).
+  - **`TradepostListing`** (auction house): `RealmId` = the seller's realm; the AH is realm-local (a realm process
+    shows only its own market). Scope every search/list/buy query by realm.
+  - **`Mail`**: `RealmId` = the recipient's realm (no cross-realm mail in retail); scope inbox/send by realm.
+  - **Character-owned data** (inventory, quests, shortcuts, …) is already transitively realm-scoped via
+    `Character.RealmId` — no column needed there.
+  - Migration backfills all existing rows to realm 1 (the current single realm), then a query audit ensures no
+    guild/AH/mail read path is missing the realm filter (the cross-realm-leak risk).
+
 - **Phase 4 — Isolation hardening + N processes.** Run N realm processes against the shared DB; audit for
   cross-realm leakage (dispatch, name/handle lookups, DB queries missing the realm filter); confirm a player on
   realm A never sees realm B. Config/orchestration for launching the fleet (one login + N realm hosts).
