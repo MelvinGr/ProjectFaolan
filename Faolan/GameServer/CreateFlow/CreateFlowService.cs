@@ -571,20 +571,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			var instance = client.Session.Account.ClientInstance;
 
-			await new PacketStream()
-				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
-				{
-					s.WriteUInt32(GameServer0X2000Opcodes.SetNameIIR);
-					s.WriteUInt32(EntityClass.Character);
-					s.WriteUInt32(instance);
-					s.WriteUInt32(0u);
-					s.WriteByte(0x03);
-					s.WriteByte(0x01);
-					s.WriteUInt32(0u);
-					s.WriteStringByteLength(name);
-				})
-				.SendAsync(client);
+			await SendIir(client, MorphAckSender, Receiver(client), GameServer0X2000Opcodes.SetNameIIR, CreateEditorRecordBuilder.BuildSetNameIir(instance, name));
 
 			await SendA36DCallback(client, "NicknameOk", name);
 			await SendCreateEditor2000(client, 0xF508F4C1u,

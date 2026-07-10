@@ -6,7 +6,9 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
@@ -200,10 +202,7 @@ namespace Faolan.GameServer
 					// The player picked a dialogue option. The chosen option INDEX is the last u32 of the body; it
 					// selects the branch, so route to the child screen at the extended answer-path (AdvanceConversation).
 					// No active conversation -> no-op.
-					var answerIndex = rawPayload.Length >= 4
-						? BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(rawPayload.Length - 4, 4))
-						: 0u;
-					await _conversation.AdvanceConversation(client, answerIndex);
+					await _conversation.AdvanceConversation(client, KnubotCodec.ParseAnswerIndex(rawPayload));
 
 					break;
 				}
@@ -659,10 +658,7 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.DeleteItemIIR:
 				{
-					var unk0 = packet.Body.ReadUInt32(); // c350
-					var clientInst = packet.Body.ReadUInt32();
-					var reserved = packet.Body.ReadUInt32();
-					var move = packet.Body.ReadProtobufByteLength<ProtoMoveInventoryItemIIR>();
+					var (_, move) = InventoryMoveCodec.Parse(packet.Body);
 
 					Logger.LogInformation($"DropItem: {move}");
 
@@ -687,10 +683,7 @@ namespace Faolan.GameServer
 					// the 0x737A6DF9 field-6 chain) "behaves like a container-owner handle" - it is the container's
 					// ProtoID32.instance, not a per-item id. No server->client packet follows these moves.
 
-					var protocolConstant = packet.Body.ReadUInt32();
-					var characterHandle = packet.Body.ReadUInt32();
-					var reserved = packet.Body.ReadUInt32();
-					var move = packet.Body.ReadProtobufByteLength<ProtoMoveInventoryItemIIR>();
+					var (_, move) = InventoryMoveCodec.Parse(packet.Body);
 
 					Logger.LogInformation($"MoveItemInInventory: {move}");
 

@@ -8,8 +8,8 @@
 ## Headline
 
 - **823** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **75** IIR carrier types: **50 V3** (byte-exact builder), **25 V2** (built, no golden), **0 V1** (no builder found).
-- **56** codec classes, **38** with a byte-exact test.
+- **75** IIR carrier types: **57 V3** (byte-exact builder), **18 V2** (built, no golden), **0 V1** (no builder found).
+- **59** codec classes, **40** with a byte-exact test.
 - **36** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -35,8 +35,11 @@ the margins, but never invents a golden that isn't there.
 
 | Level | IIR type | Built by |
 |-------|----------|----------|
+| V3 | `BankIIR` | `BankIirCodec` |
 | V3 | `BehaviorControlCenterIIR` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` |
 | V3 | `CharDCMoveIIR` | `CharDCMoveCodec` |
+| V3 | `CharInPlayIIR` | `CreateEditorRecordBuilder` |
+| V3 | `CharacterActionIIR` | `CreateEditorRecordBuilder` |
 | V3 | `ChatTextIIR` | `ChatTextCodec` |
 | V3 | `ClimbingDynelFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `CombatReactiveIIR` | `SpellweaveCodec` |
@@ -52,6 +55,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `GuildUpdateIIR` | `GuildTagBody` |
 | V3 | `HateListUpdateIIR` | `HateListCodec` |
 | V3 | `IntendedTeleportIIR` | `TeleportCodec` |
+| V3 | `KnubotAnswerIIR` | `KnubotCodec` |
 | V3 | `KnubotAnswerListIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
 | V3 | `KnubotAppendTextIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
 | V3 | `KnubotCloseChatWindowIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
@@ -72,6 +76,8 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestJournalIIR` | `WorldQuest` |
 | V3 | `QuestLogListIIR` | `WorldQuest` |
 | V3 | `ScryScriptIIR` | `ScryScript` |
+| V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
+| V3 | `SetNameIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
 | V3 | `SimpleCharFullUpdateIIR` | `PlayerSpawnScaffoldCodec` |
 | V3 | `SimpleCharKilledByUpdateIIR` | `WorldDeath` |
@@ -84,29 +90,23 @@ the margins, but never invents a golden that isn't there.
 | V3 | `ThreatLevelIIR` | `ThreatLevelCodec` |
 | V3 | `TombStoneFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `TradeskillReplyIIR` | `TradeskillRecipeCodec` |
+| V3 | `TradeskillRequestIIR` | `TradeskillRecipeCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
 | V2 | `AreaFormulaIIR` | `AreaFormulaCodec` |
-| V2 | `BankIIR` | `BankService` *(inline)* |
 | V2 | `ChainKillIIR` | `ChainKillCodec` |
-| V2 | `CharInPlayIIR` | `GameServerListener.Inbound` *(inline)* |
-| V2 | `CharacterActionIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `CoreClaimIIR` | `CoreClaimCodec` |
 | V2 | `CrimeIIR` | `CrimeCodec` |
-| V2 | `DeleteItemIIR` | `GameServerListener.Inbound` *(inline)* |
+| V2 | `DeleteItemIIR` | `InventoryMoveCodec` |
 | V2 | `FeedbackIIR` | `FeedbackIirCodec` |
 | V2 | `GameTimeIIR` | `GameTimeCodec` |
-| V2 | `KnubotAnswerIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |
 | V2 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
 | V2 | `LockedToChangedIIR` | `LockedToChangedCodec` |
 | V2 | `LookAtIIR` | `ShopOpenBuilder` |
-| V2 | `MoveInventoryItemIIR` | `GameServerListener.Inbound` *(inline)* |
+| V2 | `MoveInventoryItemIIR` | `InventoryMoveCodec` |
 | V2 | `N3ToClientQuitIIR` | `WorldDespawn` |
 | V2 | `PlayfieldFIIR` | `MapChangeCodec` |
 | V2 | `RegenIIR` | `RegenCodec` |
-| V2 | `SetMorphValueIIR` | `CreateFlowService` *(inline)* |
-| V2 | `SetNameIIR` | `CreateFlowService` *(inline)* |
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
 | V2 | `TemplateActionIIR` | `TemplateActionCodec` |
-| V2 | `TradeskillRequestIIR` | `GameServerListener.Inbound` *(inline)* |
 | V2 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |

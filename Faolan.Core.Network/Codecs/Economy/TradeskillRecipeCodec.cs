@@ -25,6 +25,15 @@ namespace Faolan.Core.Network.Codecs.Economy
 	//   [u8]                                            # trailing flag (@0x5c)
 	public static class TradeskillRecipeCodec
 	{
+		// This codec covers BOTH halves of the recipe-book exchange: the c2s TradeskillRequestIIR (0x06B9CD94, the
+		// client opening the book - a trigger with no body of interest) and the s2c TradeskillReplyIIR (0x9062D559,
+		// the catalog this codec builds). Opcode below is the reply (what BuildReplyIir emits).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.TradeskillReplyIIR,
+			GameServer0X2000Opcodes.TradeskillRequestIIR
+		];
+
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.TradeskillReplyIIR;
 
 		public const byte ListType = 3; // full recipe-book list (vs 1 = single RecipeLearnt)

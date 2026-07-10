@@ -1,9 +1,8 @@
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
@@ -62,11 +61,11 @@ namespace Faolan.GameServer.Economy
 			{
 				var ps = new PacketStream();
 				ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceDispatchOpcodes.DispatchSetItemStat);
-				WriteBankSlotRegistration(ps, charInstance, entry.Pos, recordId++);
+				BankIirCodec.WriteBankSlotRegistration(ps, charInstance, entry.Pos, recordId++);
 				await ps.SendAsync(client);
 			}
 
-			var record = BuildBankIirRecord(charInstance, bank);
+			var record = BankIirCodec.BuildBankIirRecord(charInstance, bank);
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(record)
@@ -117,24 +116,5 @@ namespace Faolan.GameServer.Economy
 			}
 		}
 
-		// The BankIIR record (everything after the 0x2000 packet's u32 length prefix). Golden-tested byte-exact
-		// against the captured bank (BankStorageTests).
-		public static byte[] BuildBankIirRecord(uint charInstance, ProtoInventoryGame containerBlob)
-		{
-			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000Opcodes.BankIIR)
-				.WriteUInt32(0x0000C350u)
-				.WriteUInt32(charInstance)
-				.WriteByte(0x01)
-				.WriteArrayUInt32Length(containerBlob.ToProtobuf())
-				.ToArray();
-		}
-
-		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]
-		// [u16 0x0f][u16 recordId]. Sent once per occupied bank slot before the BankIIR content.
-		public static void WriteBankSlotRegistration(FaolanStream s, uint charInstance, uint slot, ushort recordId)
-		{
-			s.WriteUInt32(FullCharSnapshotBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(0x17u).WriteUInt16(0x000F).WriteUInt16(recordId);
-		}
 	}
 }

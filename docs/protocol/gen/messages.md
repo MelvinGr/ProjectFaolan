@@ -12,14 +12,17 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**75** IIR carrier types · **50 V3** (50 with an auto-cited golden). The
+**75** IIR carrier types · **57 V3** (57 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
 | Level | IIR type | Opcode | Codec | Golden (proof of layout) |
 |-------|----------|--------|-------|--------------------------|
+| V3 | `BankIIR` | `0x0BA1C1CB` | `BankIirCodec` | [V3: BankStorageTests.BuildBankIirRecord_Matches_CapturedBank] |
 | V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` | [V3: BehaviorPhaseFieldTests.InsertBehaviorPhaseField_AppendsWhenNoField2] |
 | V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: DeadReckoningCodecTests.CharDCMove_RoundTripsByteExact] |
+| V3 | `CharInPlayIIR` | `0x864CFEF8` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
+| V3 | `CharacterActionIIR` | `0x6B6FD368` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
 | V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `CombatReactiveIIR` | `0x54C02089` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
@@ -35,6 +38,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildTagBody` | [V3: GuildPacketTests.GuildTagBody_Matches_ExpectedLayout] |
 | V3 | `HateListUpdateIIR` | `0x8A01E5A1` | `HateListCodec` | [V3: CombatRecordCodecTests.HateList_BuildsByteExact] |
 | V3 | `IntendedTeleportIIR` | `0x10D27BC0` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
+| V3 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotAnswerListIIR` | `0xF164A4A5` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotAppendTextIIR` | `0x4A3D899A` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
@@ -55,6 +59,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestJournalIIR` | `0x79F8C7A1` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestLogListIIR` | `0x504B7924` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScript` | [V3: ScryScriptCreateBurstTests.PlayOrSkipStep_BuildsTheCapturedRecord] |
+| V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
+| V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `PlayerSpawnScaffoldCodec` | [V3: PlayerSpawnScaffoldCodecTests.Generate_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `WorldDeath` | [V3: WorldDeathTests.BuildDeathEffect_ReproducesCapturedRecord_ByteExact] |
@@ -67,31 +73,25 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
 | V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `TradeskillReplyIIR` | `0x9062D559` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
+| V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormulaCodec` |  |
-| V2 | `BankIIR` | `0x0BA1C1CB` | `BankService` *(inline)* |  |
 | V2 | `ChainKillIIR` | `0x0EED7068` | `ChainKillCodec` |  |
-| V2 | `CharInPlayIIR` | `0x864CFEF8` | `GameServerListener.Inbound` *(inline)* |  |
-| V2 | `CharacterActionIIR` | `0x6B6FD368` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimCodec` |  |
 | V2 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` |  |
-| V2 | `DeleteItemIIR` | `0x72491DE9` | `GameServerListener.Inbound` *(inline)* |  |
+| V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryMoveCodec` |  |
 | V2 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIirCodec` |  |
 | V2 | `GameTimeIIR` | `0x4F57DC08` | `GameTimeCodec` |  |
-| V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTradeCodec` |  |
 | V2 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTradeCodec` |  |
 | V2 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` |  |
 | V2 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` |  |
-| V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `GameServerListener.Inbound` *(inline)* |  |
+| V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
 | V2 | `N3ToClientQuitIIR` | `0x04B82B2D` | `WorldDespawn` |  |
 | V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
 | V2 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` |  |
-| V2 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateFlowService` *(inline)* |  |
-| V2 | `SetNameIIR` | `0xADCE0CDA` | `CreateFlowService` *(inline)* |  |
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
 | V2 | `TemplateActionIIR` | `0x6C300937` | `TemplateActionCodec` |  |
-| V2 | `TradeskillRequestIIR` | `0x06B9CD94` | `GameServerListener.Inbound` *(inline)* |  |
 | V2 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see

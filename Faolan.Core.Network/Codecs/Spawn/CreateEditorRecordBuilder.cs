@@ -15,6 +15,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// RetailCreateEditor*Burst Iir() helper already does.
 	public static class CreateEditorRecordBuilder
 	{
+		// The create-editor IIR types this builder is the CANONICAL emitter of (the ones without a dedicated codec).
+		// The other Build* methods below (GameTime, PlayfieldFiir, Regen, Feedback, ComboBook, ...) build bodies for
+		// types owned by their own codecs (GameTimeCodec, MapChangeCodec, ...), which declare those - so they are not
+		// listed here (declaring twice would double-attribute in the coverage matrix). #317 convention.
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.CharacterActionIIR,
+			GameServer0X2000Opcodes.CharInPlayIIR,
+			GameServer0X2000Opcodes.SetMorphValueIIR,
+			GameServer0X2000Opcodes.SetNameIIR
+		];
+
 		// The entity-class tag every per-character editor record carries (EntityClass.Character = 0xC350).
 
 		// BehaviorControlCenterIIR (0x642CD3D6), LONG form (116 bytes): the same 28-byte head as the short form
@@ -218,6 +230,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteByte(p)
 				.WriteUInt32(q)
 				.ToArray();
+		}
+
+		// SetNameIIR (0xADCE0CDA): the create-editor "name accepted" record echoing the chosen character name back so
+		// the client advances to enter-world (dikketest idx 359, SendNicknameAccepted). RECORD:
+		//   [u32 type][u32 handle][u32 0][u8 0x03][u8 0x01][u32 0][u16 len][UTF-8 name]
+		public static byte[] BuildSetNameIir(uint handle, string name, uint type = EntityClass.Character)
+		{
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(0x03).WriteByte(0x01).WriteUInt32(0u).WriteStringByteLength(name).ToArray();
 		}
 
 		// StatIIR (0xF98E10B3): a single stat set on an entity. 17 bytes:

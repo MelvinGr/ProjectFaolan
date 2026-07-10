@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -16,6 +18,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
+			GameServer0X2000Opcodes.KnubotAnswerIIR,
 			GameServer0X2000Opcodes.KnubotAnswerListIIR,
 			GameServer0X2000Opcodes.KnubotAppendTextIIR,
 			GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
@@ -59,6 +62,16 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			foreach (var str in strings)
 				c.WriteUInt16(str.Length).WriteArray(str);
 			return CharDCMoveCodec.WithLength(c.ToArray());
+		}
+
+		// KnubotAnswerIIR_c (0x1E9E85E4) - the c2s answer pick. The chosen option INDEX is the last u32 of the body;
+		// it selects the branch (the server routes it via ConversationService.AdvanceConversation). Returns 0 for a
+		// body too short to carry an index (treated as "no selection").
+		public static uint ParseAnswerIndex(byte[] body)
+		{
+			return body is { Length: >= 4 }
+				? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(body.Length - 4, 4))
+				: 0u;
 		}
 
 		public static AppendText ParseAppendText(byte[] body)
