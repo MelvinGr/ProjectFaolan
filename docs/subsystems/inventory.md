@@ -28,7 +28,7 @@ all **big-endian**:
   field 6 × N = the containers (Equipped 101 / Bag 104 / Resource 112 / Quest 113), then fields 7, 8.
 - Tails = the 9282-byte record/XML region starting `00 00 00 18` (subclass version 24). Carried from the
   capture with live level/vitals/XP patched (`BigboyTailsFile`); a from-scratch template build exists
-  (`BeachTailsBuilder`, golden tests `BeachSnapshotConstructionTests`) for the construct direction.
+  (`FullCharSnapshotSubClass`, golden tests `BeachSnapshotConstructionTests`) for the construct direction.
 
 Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContainers`:
 `CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItemBuilder.BuildListEntry`, identity =

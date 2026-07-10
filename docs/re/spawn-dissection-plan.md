@@ -314,7 +314,7 @@ spatial), emit the empty 0x3F1 scaffold word, and the block regenerates from col
 cross-session stale refs. (Caveat: cross-session humanoid render still has a separate unknown — minimal
 post-IIR breaks humanoids, `memory npc_spawn_minimal_postiir_breaks_humanoids` — so prove the regenerated
 pre-IIR in-client.) Next: correlate the 53-u32 order with a captured NPC body (`Captures/scripts/dissect_npc_spawn.py`)
-to label the spatial fields, then a `NpcPreIirCodec` (Parse/Build) golden-tested like `PlayerSpawnScaffoldCodec`.
+to label the spatial fields, then a `NpcSpawnPreIirCodec` (Parse/Build) golden-tested like `PlayerSpawnScaffoldCodec`.
 
 PREMISE CORRECTION 2026-06-14 (#185): the long-standing claim that cross-session NPC rows fail to render
 because their **pre-IIR / post-IIR carry the wrong session's instance refs is WRONG.** Scanning 8 beach NPC
@@ -374,7 +374,7 @@ CONSTRUCTION PROGRESS (2026-06-10):
   Rebuilding Casilda/Crocodile from their own transform + decoded IIR is byte-identical.
 - ✓ DB-row → wire-body bridge (commit d10faa6): `NpcSpawnBuilder.TryBuild(NpcSpawn row, handle)` drives the
   transform from the row's columns and the IIR + raw pre/post-IIR scaffold from the row's `Data`; byte-identical
-  to the capture when the columns match, re-addressing changes only the handle (`NpcSpawnBuilderTests`).
+  to the capture when the columns match, re-addressing changes only the handle (`NpcSpawnConstructionTests`).
 
 - ✓ Wired into world entry (commit da1489d): `ReplayMapWorldBurst` matches each burst NPC spawn to its
   `NpcSpawns` row by spawn POSITION (the stable dedup key — handles are session-volatile, only 16/41 matched by

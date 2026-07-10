@@ -220,7 +220,7 @@ memory `snapshot_tails_construction_scope`):
   leading `[u32 X]` (Strie's `00 00 00 02`) is still the **quest count** per the evidence above — pinned to the
   template value for now; generate it with the quest system. (NB: `BeachSnapshotPrefix` currently labels it
   "base version 2"; treat as X=quest-count pending the quest wiring.)
-- **The tails are built from scratch for beach** (`BeachTailsBuilder` + server-owned `BeachTailsTemplate.bin`):
+- **The tails are built from scratch for beach** (`FullCharSnapshotSubClass` + server-owned `BeachTailsTemplate.bin`):
   level/vitals generated, instance re-addressed, the rest a content template. The `UnknownBefore` progression
   block was DECODED — a sequence of `[u32 field-block][length-prefixed <remoteformat> XML]` records; for beach
   it's byte-identical across characters EXCEPT the instance (proven), so the only per-character tails data is

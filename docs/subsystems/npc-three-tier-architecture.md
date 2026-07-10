@@ -92,7 +92,7 @@ from typed columns.
       but deviate per creature, so stored (derivable later if a curve is decoded).
 - [x] `NpcSpawnBuilder.ApplyStatCore` composes the CharacterIIR stat core from `row.Npc.StatCore` (type) +
       `row` (placement overrides), with runtime anim/state canonical. Verified byte-exact for the type +
-      placement fields across all 980 populated spawns (`NpcSpawnStatCoreTests`). `Data` still supplies the
+      placement fields across all 980 populated spawns (`NpcStatCoreCodecTests`). `Data` still supplies the
       frame + name + equipment structure.
 - [x] `NpcSpawnBuilder.BuildFromScratch` assembles the WHOLE body with no template: header constants;
       transform `2C 0A <vec3> 12 <quat> 18 <token varint>` (token written in-place as a placeholder - the

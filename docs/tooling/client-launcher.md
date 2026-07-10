@@ -5,7 +5,7 @@ automated, capture-backed integration testing. Proven end-to-end 2026-06-10 (log
 
 Pieces: **`Faolan.ClientLauncher`** (launches + drives the client), the **server** (`Faolan` project), **loopback
 packet capture** (`tshark`/`dumpcap` on `lo`), and the capture tooling (`Captures/scripts/*.py` + the Wireshark plugin
-`Faolan.PacketAnalyzer`). Related: [01-crypto.md](../protocol/01-crypto.md),
+`Faolan.Wireshark`). Related: [01-crypto.md](../protocol/01-crypto.md),
 README "Client launch flags".
 
 ---
@@ -113,16 +113,18 @@ By default any password is accepted. To enforce the real password, the client mu
 ## 5. Automated testing workflow
 
 ### Run the server
-Config (`faolan.json`) is loaded as `../../../faolan.json` relative to CWD, so run from the build output dir:
+`Program.cs` loads `faolan.json` + `faolan.db` from the CWD, and both live at the repo root, so run from the
+repo root (running from `bin/Debug` fails with "faolan.json not found"):
 ```
-( cd Faolan/bin/Debug && dotnet Faolan.dll )
+dotnet run --project Faolan
 ```
-Listens: UniverseAgent 7010, PlayerAgent 7011, AgentServer 7012, CSPlayerAgent 7001, GameServer 7014, World 7015.
+Listens: UniverseAgent 7010, PlayerAgent 7011, AgentServer 7012, CSPlayerAgent 7001, GameServer 7014 (from the
+realm row; the world connection shares this same port — the handoff advertises it, it is not port+1), MCP 7099.
 
 ### Capture the loopback session (no root needed)
 `dumpcap` carries `cap_net_raw,cap_net_admin` (file caps), so loopback capture works without sudo:
 ```
-tshark -i lo -f "tcp portrange 7001-7015" -w /tmp/session.pcap &
+tshark -i lo -f "tcp portrange 7001-7014" -w /tmp/session.pcap &
 ```
 The result is a normal pcap the capture tools read (`Captures/scripts/*.py`, the Wireshark plugin) — diff it
 against a retail capture for regressions, or `--dump` it.

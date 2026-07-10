@@ -13,7 +13,7 @@ memory `snapshot_tails_construction_scope`.
 ## Status & handover (2026-06-17, updated)
 
 **The WHOLE tails now build from scratch — no captured-tails template.** `FullCharSnapshotSubClass.BuildFromScratch`
-assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachSubClassFromScratchTests`):
+assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`):
 - **quest portion** `@0..1292` — DB-generated (`BuildQuestPortion`), wired into the production login
   snapshot (in-client verified 2026-06-16).
 - **access-window table** `@1292..7917` — carved out into the typed game-static catalog `AccessWindowCatalog`
@@ -75,7 +75,7 @@ DONE (2026-06-17): the **access-window table** (`[1292,7917)`, 86 `PFAccessWindo
 was carved into the typed game-static catalog `AccessWindowCatalog` (#258; `AccessWindowTable.bin` retired), and
 the **stat skeleton** + its patches are assembled by `FullCharSnapshotSubClass.BuildFromScratch` (serialized via
 `SubClassStatBlock.Serialize`). Together with the generated quest portion, `BuildFromScratch` reproduces
-`BeachTailsTemplate.bin` byte-for-byte (`BeachSubClassFromScratchTests`).
+`BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`).
 
 DONE (#210, since landed): both remaining integration steps below are complete —
 1. ✅ `BuildFromScratch` is wired into the burst-less world entry (#210); it is the ONLY world-entry path
