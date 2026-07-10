@@ -118,6 +118,15 @@ host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), b
   binding its own realm's ports from its `Realm` row (login 7010/7011; realm 2 → 7014/7012/7001; realm 3 →
   7024/7022/7021), no collisions. So the process-per-realm topology composes.
 
+  **Realm up/down status (P4, DONE):** `RealmStatusService` (`Faolan/Helpers/`, IHostedService, realm role only)
+  flips this realm's `Realm.OnlineStatus` → `Online` on startup and → `Offline` on graceful shutdown, via
+  `IDatabaseRepository.SetRealmOnlineStatus(realmId, status)` (updates by id, so hosts on a shared DB never touch
+  each other's rows). Registered last in the `runRealm` block, so it comes up after the listeners bind and — hosted
+  services stopping in reverse — flips Offline first as shutdown begins. The login tier's `SendRealmList` already
+  reads `OnlineStatus`, so this is what makes the realm list reflect reality. **Caveat:** a hard crash / SIGKILL
+  skips `StopAsync`, leaving the row stale-`Online`; a heartbeat/last-seen TTL is the robust follow-up if that
+  becomes a problem in practice. (Committed `faolan.db` carries the stopped-state default, `Offline`.)
+
   **Remaining (P4, needs a client):** the end-to-end in-client check — a character on realm 2 vs realm 3 routes to
   the right process and sees only its realm's world/chat/guild/AH — plus the P0 gate (does the client accept a >1
   realm list). Both need the retail client, so they're deferred to an in-client session.
