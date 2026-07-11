@@ -1,38 +1,46 @@
 # Project Faolan
 
-Project Faolan is a server-protocol emulator for the MMORPG *Age of Conan*, written in C# (.NET 10). It
+Project Faolan is a server-protocol emulator for the MMORPG _Age of Conan_, written in C# (.NET 10). It
 reimplements the game's network protocol — login, character creation, world entry, inventory, combat, chat,
 NPCs and the auction house — by mirroring real packet captures byte-for-byte, so a game client can connect
 to it and play.
 
 It is a **protocol-research and preservation project**, not a finished game server. Packet captures are the
 source of truth: where the emulator and a retail capture disagree, the emulator is wrong. Many subsystems are
-decoded and working; others are partially implemented or gated on further reverse-engineering (tracked as
-Gitea issues on `melvin/projectfaolan`, grouped by `area:*` labels).
+decoded and working; others are partially implemented or gated on further reverse-engineering.
 
 > **Disclaimer.** This is an independent, non-commercial research project for interoperability and game
-> preservation. *Age of Conan* is a trademark of Funcom; this project is not affiliated with or endorsed by
+> preservation. _Age of Conan_ is a trademark of Funcom; this project is not affiliated with or endorsed by
 > Funcom. No game client, assets, or copyrighted content are distributed here.
 
 ## Feature status
 
-Where things stand, by subsystem. This is a research/preservation project, so "works" means *reproduced
-byte-for-byte against a retail capture and (usually) confirmed in-client* — not production-hardened. Open work
+Where things stand, by subsystem. This is a research/preservation project, so "works" means _reproduced
+byte-for-byte against a retail capture and (usually) confirmed in-client_ — not production-hardened. Open work
 is tracked as Gitea issues; the `#NNN` refs point there.
 
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
+<!-- stats:start -->
+
+**Imported content** (the DB is the server's source of truth): 242 maps · 526 NPC types / 978 placements · 2,463 items · 20,822 spells · 27 abilities · 211 conversation nodes · 20 shops · 26 quests · 1,056 world objects · 136 patrol routes
+
+<!-- stats:end -->
+
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
-imported (capture-relative: retail has no public dialogue/vendor list, so this measures completeness *of what
-we've seen*, and names the gaps). Regenerate with
+imported (capture-relative: retail has no public dialogue/vendor list, so this measures completeness _of what
+we've seen_, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
+
 <!-- coverage:start -->
+
 - **NPC conversations** — 32/35 greeted dialogue NPCs imported (91.4%)
 - **Vendor shops** — 20/20 captured vendors imported (100.0%)
 - **RDB template catalog** (type 1000020, TEA-encrypted) — 2,455/77,631 decrypted, **3.2% of the total encrypted**. Keys held per category: 2,428 items, 27 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
+
 - ✅ Login / auth — Diffie–Hellman + TEA-CBC handshake (any password is accepted until the client is key-patched)
 - ✅ Character roster, selection, and existing-character world entry
 - ✅ Character creation — the create-editor flow (appearance/morphs, race/sex gating, the Casilda tableau)
@@ -42,6 +50,7 @@ we've seen*, and names the gaps). Regenerate with
   actors are still verbatim capture bytes (blocked on clean per-type captures, #234 / #185)
 
 ### Realms & deployment
+
 - 🟡 Multiple realms (game servers) — **process-per-realm**: `dotnet run --project Faolan` is all-in-one (dev),
   `--role login` runs the shared login/router tier, and `--role realm=<id>` runs one realm's isolated world (its own
   GameServer + chat + guilds, bound to that `Realm` row's `IpAddress`/ports). Guilds, auction house, mail, and
@@ -49,6 +58,7 @@ we've seen*, and names the gaps). Regenerate with
   complete and fleet-verified (1 login + N realm processes on a shared DB); awaits an in-client 2-realm shakedown (#324)
 
 ### World & simulation
+
 - ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
 - ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes; faction disposition (friendly/neutral
   NPCs never aggro and render green names, hostiles red)
@@ -60,6 +70,7 @@ we've seen*, and names the gaps). Regenerate with
 - 🟡 Playfield instancing — world keyed by `(mapId, instanceId)`; no per-map Solo instance yet (#268)
 
 ### Combat
+
 - ✅ Melee attack FSM, weapon draw, damage, vitals; spell-cast FSM; threat / hate list
 - ✅ Death window + resurrect/respawn
 - ✅ Buff application, damage-over-time, buff-expiry lifecycle (timers), and right-click cancel (server-driven
@@ -72,6 +83,7 @@ we've seen*, and names the gaps). Regenerate with
 - ⬜ Directional combat + defensive shield arcs ("real combat", #20) · Fatalities (#140)
 
 ### Character progression
+
 - ✅ Learned-spell grant on login; level-up spell / ability / combo grants; starting abilities & combos
 - 🟡 Combos persist across relog — fixed, awaits in-client confirm (#299)
 - 🟡 XP curve — provisional ramp; real thresholds only partially harvested (#297)
@@ -83,6 +95,7 @@ we've seen*, and names the gaps). Regenerate with
   ranger tracking (#145)
 
 ### Items & economy
+
 - ✅ Inventory (DB containers, equip, move, starting gear)
 - ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
 - 🟡 Shop-OPEN trigger — decoded flow implemented, awaits in-client confirm (#134)
@@ -93,6 +106,7 @@ we've seen*, and names the gaps). Regenerate with
 - ⬜ Gems / item socketing — gem slots that grant attribute bonuses (#311)
 
 ### Social & guilds
+
 - ✅ Chat — local say, channels, system, whisper (plus a live "Claude" MCP channel)
 - ✅ Guild create, invite/accept, tag, renown
 - 🟡 Guild-create no-relog window (`DispatchGuildCreated 0x2044`) — decoded + built byte-exact, awaits in-client
@@ -100,25 +114,29 @@ we've seen*, and names the gaps). Regenerate with
 - ⬜ Friends list + presence (#99, #100) · player↔player trade, quest sharing, team quests (#101)
 
 ### Quests & dialogue
+
 - ✅ Quest state model (kill / loot / talk goals), journal, the Casilda Tortage intro chain (kill→loot→free→follow)
 - ✅ NPC conversations — Knubot stage machine, routed by NPC name
 - 🟡 Escort-arrival completion (#262) · turn-in / reward dialog content (#260) · Lua quest-VM live wiring
 - ⬜ Tortage day/night destiny phasing (#149)
 
 ### Mounts & pets
+
 - ✅ Necromancer pets/minions — `.pet`, type-based spawn + follow
 - 🟡 Mounts — a mount is a player-cast summon spell; needs the cast FSM wired to the summon (#26)
 - ⬜ Mounted combat (#142)
 
 ### Group PvE content (not started)
+
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
   scripting; #309)
-- ⬜ Factions & reputation — the Khitai / *Rise of the Godslayer* system: faction ranks, faction vendors, and
+- ⬜ Factions & reputation — the Khitai / _Rise of the Godslayer_ system: faction ranks, faction vendors, and
   faction companions (#310). The client's **Factions window already populates** for imported characters: the
   per-faction standings ride the player-spawn scaffold's first ending pair list (faction id → signed standing).
-  What's missing is the semantic layer — a faction catalog and standing *changes* from quests/kills (#315)
+  What's missing is the semantic layer — a faction catalog and standing _changes_ from quests/kills (#315)
 
 ### Guild base & large-scale (not started)
+
 - ⬜ Guild base — player-built **guild cities** and **battlekeeps** in the Border Kingdoms: the central keep, walls
   and gates, rank-gated structures, and hired NPC guards (#147)
 - ⬜ Sieges — massed guild-vs-guild siege warfare (siege weapons, destructible walls) fought over those keeps (#147)
@@ -126,10 +144,11 @@ we've seen*, and names the gaps). Regenerate with
   building (#146)
 
 ### Tooling
-- ✅ Importer (captures + client RDB → `faolan.db`) 
-- ✅ Wireshark dissector 
+
+- 🟡 Importer (captures + client RDB → `faolan.db`)
+- ✅ Wireshark dissector
 - ✅ Client Launcher ·
-- ✅ In-process MCP server 
+- ✅ In-process MCP server
 - ✅ Content-CDN mirror
 
 ## Build
@@ -196,7 +215,7 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 ## Project layout
 
 | Project                  | Purpose                                                                                                                                                                                |
-|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Faolan/`                | The server host — runs every protocol listener as a hosted service.                                                                                                                    |
 | `Faolan.Core/`           | Shared base types, protobuf, crypto, and enums, with the layered `Faolan.Core.Database`, `Faolan.Core.Network`, and `Faolan.Core.Rdb` projects on top.                                 |
 | `Faolan.Importer/`       | CLI that (re)builds `faolan.db` from packet captures + the client RDB.                                                                                                                 |
@@ -228,8 +247,8 @@ emulator mirrors that traffic byte-for-byte, so almost every subsystem is decode
 then rebuilt from structured data: `decode_*.py` dissector → byte-exact golden test → constructed builder. Where
 a capture and the emulator disagree, the emulator is wrong.
 
-This is also the **main bottleneck**. A large share of the 🟡/⬜ items above are blocked *not on code but on
-lacking a capture* of the specific interaction — the wire format cannot be reproduced without seeing it once.
+This is also the **main bottleneck**. A large share of the 🟡/⬜ items above are blocked _not on code but on
+lacking a capture_ of the specific interaction — the wire format cannot be reproduced without seeing it once.
 That is especially true of **server-authored** records (the server writes them, so they can't be recovered by
 reverse-engineering the client alone).
 
@@ -239,6 +258,7 @@ captures against the local server (no root needed) and retail-session captures a
 `CLAUDE.md`.
 
 **Captures that would directly unblock currently-blocked features:**
+
 - A **spell cast of a known-cooldown spell** → the `SetSpellRecastTime` GameAction (#271)
 - **Guild-bank** deposit/withdraw, and **guild** member kick/promote/demote (#132, #104)
 - A **progressed quest journal** (non-empty objective/progress lists) → the opaque `WTHD` block (#304)
@@ -251,3 +271,4 @@ captures against the local server (no root needed) and retail-session captures a
   (#309, #310, #311)
 
 Contributing such captures is the single highest-leverage way to move the blocked items.
+

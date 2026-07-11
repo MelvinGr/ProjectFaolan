@@ -302,25 +302,35 @@ namespace Faolan.Importer.Cli
 			if (shopGaps.Count > 0)
 				Console.WriteLine($"\nshop gaps ({shopGaps.Count}) - a vendor window is in a dump, no Shop row:\n  {string.Join(", ", shopGaps)}");
 
+			// Imported-content stats: the scale of the DB (the server's source of truth). One `·`-separated line.
+			var stats = $"**Imported content** (the DB is the server's source of truth): "
+				+ $"{await db.Maps.CountAsync():N0} maps · {await db.Npcs.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · "
+				+ $"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · "
+				+ $"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · "
+				+ $"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";
+			Console.WriteLine("\n" + stats);
+
 			if (string.Equals(arg, "readme", StringComparison.OrdinalIgnoreCase))
 			{
-				UpdateReadmeSection(block.ToString().TrimEnd());
-				Console.WriteLine("\nREADME.md coverage section regenerated.");
+				UpdateReadmeSection("coverage", block.ToString().TrimEnd());
+				UpdateReadmeSection("stats", stats);
+				Console.WriteLine("\nREADME.md coverage + stats sections regenerated.");
 			}
 		}
 
-		// Rewrites the content between the coverage markers in README.md (leaving the rest untouched).
-		private static void UpdateReadmeSection(string block)
+		// Rewrites the content between the named markers (<!-- MARKER:start -->/<!-- MARKER:end -->) in README.md,
+		// leaving the rest untouched.
+		private static void UpdateReadmeSection(string marker, string block)
 		{
 			var path = Path.Combine(RepoRoot, "README.md");
 			var text = File.ReadAllText(path);
-			const string start = "<!-- coverage:start -->";
-			const string end = "<!-- coverage:end -->";
+			var start = $"<!-- {marker}:start -->";
+			var end = $"<!-- {marker}:end -->";
 			var s = text.IndexOf(start, StringComparison.Ordinal);
 			var e = text.IndexOf(end, StringComparison.Ordinal);
 			if (s < 0 || e < 0 || e < s)
 			{
-				Console.WriteLine("README.md has no <!-- coverage:start -->/<!-- coverage:end --> markers; skipping.");
+				Console.WriteLine($"README.md has no {start}/{end} markers; skipping.");
 				return;
 			}
 
