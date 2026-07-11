@@ -454,45 +454,67 @@ namespace Faolan.Importer.Modules
 		public string Description => "NPC hostility disposition (cCategory from RequestAggroStatus).";
 		public string Name => "npc-disposition";
 
+		private const long NullCommunity = -1; // sentinel for NPCs with no NpcStats.community
+
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// name -> vote count per cCategory across ALL captures. Disposition is a faction property, stable per
-			// NPC type, so a majority vote per name is the right aggregation (a few captures see an NPC as neutral
-			// while most see friendly, etc.).
-			var votes = new Dictionary<string, Dictionary<uint, int>>(StringComparer.OrdinalIgnoreCase);
+			// Harvest (npc name -> cCategory votes) across all captures.
+			var nameVotes = new Dictionary<string, Dictionary<uint, int>>(StringComparer.OrdinalIgnoreCase);
 			foreach (var cap in ctx.Captures)
 			foreach (var (name, category) in NpcDispositionExtractor.Extract(cap.Packets))
 			{
-				if (!votes.TryGetValue(name, out var byCat))
-					votes[name] = byCat = new Dictionary<uint, int>();
+				if (!nameVotes.TryGetValue(name, out var byCat))
+					nameVotes[name] = byCat = new Dictionary<uint, int>();
 				byCat[category] = byCat.GetValueOrDefault(category) + 1;
 			}
 
-			var byName = votes.ToDictionary(
-				kv => kv.Key,
-				kv => kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key).First().Key,
-				StringComparer.OrdinalIgnoreCase);
-
+			// Aggregate per FACTION (NpcStats.community), NOT per NPC. Hostility toward the player is a faction
+			// standing, and per-NPC cCategory is noisy: some passive court NPCs (Chancellor Publius, Ambassador Nidas,
+			// ...) consistently poll cCategory 1 yet never attack and read green in-client, while the faction-level
+			// majority is rock-solid (community 1 = civilians: 2649 friendly votes vs 12 hostile). Only a genuinely
+			// hostile MOB faction (poachers/picts/pirates/...) comes out hostile. NULL-community NPCs (unique story
+			// NPCs like Casilda/Kalanthes) share one bucket -> friendly/neutral. #256/aggro.
+			var cores = await ctx.Db.NpcStatCores.ToListAsync();
 			var nameById = await ctx.Db.Npcs.ToDictionaryAsync(n => n.Id, n => n.Name);
+			var commByName = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+			foreach (var core in cores)
+				if (nameById.TryGetValue(core.NpcId, out var nm) && nm != null)
+					commByName[nm] = core.Community.HasValue ? core.Community.Value : NullCommunity;
+
+			var commVotes = new Dictionary<long, Dictionary<uint, int>>();
+			foreach (var (name, votes) in nameVotes)
+			{
+				var comm = commByName.TryGetValue(name, out var c) ? c : NullCommunity;
+				if (!commVotes.TryGetValue(comm, out var byCat))
+					commVotes[comm] = byCat = new Dictionary<uint, int>();
+				foreach (var (cat, n) in votes)
+					byCat[cat] = byCat.GetValueOrDefault(cat) + n;
+			}
+
+			var commDisposition = commVotes.ToDictionary(
+				kv => kv.Key,
+				kv => kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key).First().Key);
+
 			var updated = 0;
 			var hostile = 0;
-			foreach (var core in await ctx.Db.NpcStatCores.ToListAsync())
+			foreach (var core in cores)
 			{
-				if (!nameById.TryGetValue(core.NpcId, out var name) || name == null || !byName.TryGetValue(name, out var category))
-					continue;
+				var comm = core.Community.HasValue ? core.Community.Value : NullCommunity;
+				if (!commDisposition.TryGetValue(comm, out var disposition))
+					continue; // this faction was never polled -> leave NULL (treated as non-hostile in the sim)
 
-				if (core.Disposition != category)
+				if (core.Disposition != disposition)
 				{
-					core.Disposition = category;
+					core.Disposition = disposition;
 					updated++;
 				}
 
-				if (category == 1)
+				if (disposition == 1)
 					hostile++;
 			}
 
 			await ctx.Db.SaveChangesAsync();
-			return new ImportResult($"{byName.Count} NPC names dispositioned; {updated} stat cores set ({hostile} hostile).");
+			return new ImportResult($"{commDisposition.Count} factions dispositioned; {updated} stat cores set ({hostile} hostile).");
 		}
 	}
 
