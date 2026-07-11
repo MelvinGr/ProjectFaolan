@@ -13,6 +13,7 @@ namespace Faolan.Core.Database.Tables
 	{
 		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its row and world burst are always
 		// seeded, so it is the safe default wherever a character needs a map (creation, import, world entry).
+		[Obsolete("Move to Constants")]
 		public const uint TortageBeachId = 0x00000FAA;
 
 		// The default resurrection anchor advertised on the login 0x2024 (= DispatchValidResurrectionSpots) when a map
