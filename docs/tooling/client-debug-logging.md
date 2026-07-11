@@ -7,8 +7,8 @@ as no-ops. This doc records the evidence so the dead end isn't re-explored.
 
 ## What we tried
 
-The hook DLL's mechanism #1 (and a short-lived `Faolan.ClientLauncher --debug-log` flag that did the same via
-`/proc/<pid>/mem`, the way `LoginKeyPatcher` patches the DH key) set two globals to open the client's internal
+The hook DLL's mechanism #1 (and a short-lived `Faolan.ClientLauncher --debug-log` flag that did the same via a
+live `/proc/<pid>/mem` write) set two globals to open the client's internal
 `LogBase` trace:
 
 - `DAT_021a2c29 = 1` (master log-enable, 1 byte)
@@ -64,4 +64,4 @@ timings) are emitted by the stock client regardless of the gate. That's the same
   logging to `faolan_hook.log` via inline detours — but that project is no longer in the repo; Frida-under-Wine
   ([[frida_under_wine_client_re]]) is now the live-RE tool.
 - The patch *mechanism* (find the client pid, write+verify `/proc/<pid>/mem`) is sound and still lives in
-  `LoginKeyPatcher` for the DH-key patch; it was only the debug-log *target* that was useless.
+  `ClientExePatcher` for the DH-key patch; it was only the debug-log *target* that was useless.

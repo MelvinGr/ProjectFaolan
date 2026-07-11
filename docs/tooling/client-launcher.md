@@ -53,7 +53,7 @@ character/playfield), `-clienthash`, `-key`, `-loginkey`, `-logindata`, `-statin
 ## 2. The launcher (`Faolan.ClientLauncher`)
 
 A drop-in stand-in for ConanPatcher: computes the two gate flags and launches the client. `Program.cs` +
-`LoginKeyPatcher.cs`.
+`ClientExePatcher.cs`.
 
 ```
 Faolan.ClientLauncher [options]
@@ -70,8 +70,8 @@ Faolan.ClientLauncher [options]
   --restore           heal a UniverseAddr left redirected by a hard-killed run (via the sidecar), then exit
   --console           foreground; tail AgeOfConan.log into THIS terminal (same content as the client console,
                       no separate wineconsole window); also drops -noconsole
-  --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch (password validation;
-                      needs ptrace permission — sudo, or works as the launching ancestor)
+  --patch-login       patch the client's DH key (Funcom -> CELLAO) on disk before launch (password validation;
+                      cross-platform, exe backed up to .bak; undo with --restore)
   --proton <path>     Proton 'proton' script (or PROTON env; default = Steam Proton-Experimental)
   --wine <cmd>        use a plain wine runner instead of Proton
   -n, --dry-run       print computed clienthash/key/args without launching
@@ -104,7 +104,9 @@ AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [01-crypto.
 By default any password is accepted. To enforce the real password, the client must use **our** DH public key:
 
 - **`--patch-login`** overwrites the client's embedded Funcom DH pubkey with
-  CELLAO_PUB in `/proc/<pid>/mem` (copy-on-write — the game file is untouched). Needs ptrace permission.
+  CELLAO_PUB in the `AgeOfConan.exe` file — a plain byte swap, cross-platform (no ptrace/process memory). The exe is
+  backed up to `.bak` first, so `--restore` puts it back. `--launcher-notes <url>` similarly redirects the client's
+  dead hardcoded launcher-notes URL (keep the two `%s`).
 - Server side: `Faolan.Core.Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
 
@@ -171,8 +173,8 @@ create-world loopback-capture diff (its pinned next step needed exactly this rep
 ---
 
 ## File map
-- `Faolan.ClientLauncher/Program.cs`, `LoginKeyPatcher.cs` — the launcher.
+- `Faolan.ClientLauncher/Program.cs`, `ClientExePatcher.cs` — the launcher.
 - `Faolan.Core/Crypt/ConanLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
 - `Faolan.Core.Network/LoginEncryption.cs` — server-side DH+TEA login decrypt.
-- `Faolan.ClientLauncher/LoginKeyPatcher.cs` — the in-memory DH-key patcher, invoked by `--patch-login`.
+- `Faolan.ClientLauncher/ClientExePatcher.cs` — the on-disk DH-key + launcher-notes patcher, invoked by `--patch-login` / `--launcher-notes`.
 - `launchClient.sh` — the Proton launch env the launcher mirrors.

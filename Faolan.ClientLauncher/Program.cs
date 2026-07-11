@@ -6,7 +6,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 
 namespace Faolan.ClientLauncher
@@ -25,6 +24,15 @@ namespace Faolan.ClientLauncher
 		private const string DefaultProton = "/mnt/btrfs/@games/debian-installation/steamapps/common/Proton - Experimental/proton";
 
 		private const string SteamAppId = "217750";
+
+		// Copy path -> path.bak only if the backup doesn't already exist, so the FIRST run captures the pristine
+		// original and later runs (which see an already-modified file) never overwrite it.
+		private static void BackupOnce(string path)
+		{
+			var bak = path + ".bak";
+			if (File.Exists(path) && !File.Exists(bak))
+				File.Copy(path, bak);
+		}
 
 		// Print any AgeOfConan.log content past `pos`; returns the new position. Resets to 0 if the file shrank
 		// (a new session truncated/recreated it). Shared-read so the client can keep writing/rotating it.
@@ -142,7 +150,7 @@ namespace Faolan.ClientLauncher
 			var streamOutput = false;
 			var patchLogin = false;
 			var restore = false;
-			string? mirrorUrl = null;
+			string? cdnUrl = null;
 			string? launcherNotes = null;
 
 			for (var i = 0; i < args.Length; i++)
@@ -173,6 +181,8 @@ namespace Faolan.ClientLauncher
 						break;
 					}
 
+					// --wine / --proton pick the LINUX runner for the Windows client (Proton by default, or a plain wine
+					// command). Both are ignored on Windows, where the exe runs directly (see the runner selection below).
 					case "--wine":
 					{
 						wine = args[++i];
@@ -215,15 +225,15 @@ namespace Faolan.ClientLauncher
 
 					// Redirect LocalConfig.xml's three CDN keys to the mirror base URL (each -> <base>/<tag>/upm) so
 					// loading-screen content pulls hit the store-and-forward mirror. Required value, no default.
-					case "--mirror":
+					case "--cdn":
 					{
 						if (i + 1 >= args.Length || args[i + 1].StartsWith('-'))
 						{
-							Console.Error.WriteLine("--mirror requires a base URL (e.g. --mirror http://127.0.0.1:7081).");
+							Console.Error.WriteLine("--cdn requires a base URL (e.g. --cdn http://host:port).");
 							return 2;
 						}
 
-						mirrorUrl = args[++i];
+						cdnUrl = args[++i];
 						break;
 					}
 
@@ -238,7 +248,7 @@ namespace Faolan.ClientLauncher
 						}
 
 						launcherNotes = args[++i];
-						if (!LoginKeyPatcher.ValidateNotesUrl(launcherNotes, out var notesErr))
+						if (!ClientExePatcher.ValidateNotesUrl(launcherNotes, out var notesErr))
 						{
 							Console.Error.WriteLine($"--launcher-notes URL invalid: {notesErr}.");
 							return 2;
@@ -328,20 +338,20 @@ namespace Faolan.ClientLauncher
 				SetConsoleSubsystem(exe, false);
 
 			// Patch the client's embedded Funcom DH pubkey -> CELLAO on disk so the server can validate the password
-			// (LoginKeyPatcher). Cross-platform (a byte swap, no ptrace/process memory - the old in-memory patch was
+			// (ClientExePatcher). Cross-platform (a byte swap, no ptrace/process memory - the old in-memory patch was
 			// Linux-only). Done here, before the md5, so -clienthash matches the launched file; persists like the
 			// LocalConfig redirects (undo with --restore). Idempotent - a no-op if already patched.
 			if (patchLogin && !dryRun)
 			{
-				switch (LoginKeyPatcher.Patch(exe))
+				switch (ClientExePatcher.PatchLoginKey(exe, ClientExePatcher.CellAo))
 				{
-					case LoginKeyPatcher.Result.Patched:
-						Console.WriteLine("login-key : patched DH pubkey -> CELLAO (password validation enabled)");
+					case ClientExePatcher.Result.Patched:
+						Console.WriteLine("login-key : patched DH pubkey (password validation enabled)");
 						break;
-					case LoginKeyPatcher.Result.AlreadyDone:
-						Console.WriteLine("login-key : DH pubkey already CELLAO (already patched)");
+					case ClientExePatcher.Result.AlreadyDone:
+						Console.WriteLine("login-key : DH pubkey already patched");
 						break;
-					case LoginKeyPatcher.Result.NotFound:
+					case ClientExePatcher.Result.NotFound:
 						Console.Error.WriteLine("login-key : DH pubkey not found in the exe; launching without password validation.");
 						break;
 				}
@@ -351,15 +361,15 @@ namespace Faolan.ClientLauncher
 			// swap, covered by the exe .bak. Done before the md5 so -clienthash matches the launched file.
 			if (launcherNotes != null && !dryRun)
 			{
-				switch (LoginKeyPatcher.PatchLauncherNotes(exe, launcherNotes))
+				switch (ClientExePatcher.PatchLauncherNotes(exe, launcherNotes))
 				{
-					case LoginKeyPatcher.Result.Patched:
-							Console.WriteLine($"notes-url : redirected launcher-notes URL -> {launcherNotes}");
+					case ClientExePatcher.Result.Patched:
+						Console.WriteLine($"notes-url : redirected launcher-notes URL -> {launcherNotes}");
 						break;
-					case LoginKeyPatcher.Result.AlreadyDone:
+					case ClientExePatcher.Result.AlreadyDone:
 						Console.WriteLine("notes-url : launcher-notes URL already redirected");
 						break;
-					case LoginKeyPatcher.Result.NotFound:
+					case ClientExePatcher.Result.NotFound:
 						Console.Error.WriteLine("notes-url : launcher-notes URL not found in the exe (or replacement too long); skipped.");
 						break;
 				}
@@ -401,7 +411,7 @@ namespace Faolan.ClientLauncher
 
 			// Point the three LocalConfig.xml CDN keys at the local ContentMirror. Same deal: persists, no revert,
 			// no backup file; `--restore` undoes it.
-			if (mirrorUrl is { } murl && SetMirrorConfig(gameDir, murl))
+			if (cdnUrl is { } murl && SetCdnConfig(gameDir, murl))
 				Console.WriteLine($"redirected CDN keys -> {murl}");
 
 			var psi = new ProcessStartInfo
@@ -486,27 +496,6 @@ namespace Faolan.ClientLauncher
 			return Convert.ToHexString(MD5.HashData(stream)).ToLowerInvariant();
 		}
 
-		// Copy path -> path.bak only if the backup doesn't already exist, so the FIRST run captures the pristine
-		// original and later runs (which see an already-modified file) never overwrite it.
-		private static void BackupOnce(string path)
-		{
-			var bak = path + ".bak";
-			if (File.Exists(path) && !File.Exists(bak))
-				File.Copy(path, bak);
-		}
-
-		// Copy path.bak back over path (if the backup exists). Leaves the .bak in place so it stays the pristine
-		// reference for a re-patch. Returns true if a backup was restored.
-		private static bool RestoreFromBackup(string path)
-		{
-			var bak = path + ".bak";
-			if (!File.Exists(bak))
-				return false;
-
-			File.Copy(bak, path, overwrite: true);
-			return true;
-		}
-
 		private static string NormalizePath(string path)
 		{
 			return path.Replace('\\', '/').ToLowerInvariant();
@@ -522,22 +511,20 @@ namespace Faolan.ClientLauncher
 			                    -u, --username <s>  auto-login account name
 			                    -p, --password <s>  auto-login password
 			                    -c, --charname <s>  auto-enter this character
-			                    --universeaddr <a>  point LocalConfig.xml <UniverseAddr> (the login server) at `a`, e.g.
-			                                        127.0.0.1:7010 (replaces /etc/hosts)
-			                    --mirror <url>      point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/
-			                                        ControlHttpPatchAddr) at <url> - each becomes <url>/<tag>/upm, e.g.
-			                                        http://127.0.0.1:7081 (the local Faolan.Web.Content)
-			                    --launcher-notes <url>  redirect the client's hardcoded launcher-notes URL (retail's dead
-			                                        msgs.ageofconan.com) to <url> - on-disk exe patch, keep the two %s
-			                                        (UniverseName, Language)
+			                    --universeaddr <a>  point LocalConfig.xml <UniverseAddr> (the login server) at (host:port)
+			                    --cdn <url>      point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/
+			                                        ControlHttpPatchAddr) at <url> - each becomes <url>/<tag>/upm
+			                    --launcher-notes <url>  redirect the client's hardcoded launcher-notes URL to <url> - keep the two %s (UniverseName, Language)
 			                    --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml from their .bak
 			                                        (undoes the login/notes exe patch + the CDN/UniverseAddr redirects) and exit
 			                    --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 			                                        as the client console, no separate wineconsole window); also drops -noconsole
-			                    --patch-login       patch the client's DH key (Funcom -> CELLAO) ON DISK before launch so the
-			                                        server can validate the real password (cross-platform; backed up to .bak)
-			                    --proton <path>     Proton 'proton' script (or set PROTON; defaults to the Steam Proton-Experimental)
-			                    --wine <cmd>        use this runner instead of Proton (e.g. 'wine')
+			                    --patch-login       patch the client's DH key ON DISK before launch so the
+			                                        server can validate the real password
+			                    --proton <path>     (Linux only) Proton 'proton' script (or set PROTON; defaults to the Steam
+			                                        Proton-Experimental). Ignored on Windows, which runs the exe directly.
+			                    --wine <cmd>        (Linux only) use this runner instead of Proton (e.g. 'wine'). Ignored on
+			                                        Windows, which runs the exe directly.
 			                    -n, --dry-run       print the computed clienthash/key/args without launching
 			                    -h, --help          this help
 
@@ -548,6 +535,18 @@ namespace Faolan.ClientLauncher
 			                  plain wine runner instead. Computes -clienthash (md5 of the exe) and -key (TEA-encrypted timestamp;
 			                  see Faolan.Core.Crypt.ConanLaunchToken).
 			                  """);
+		}
+
+		// Copy path.bak back over path (if the backup exists). Leaves the .bak in place so it stays the pristine
+		// reference for a re-patch. Returns true if a backup was restored.
+		private static bool RestoreFromBackup(string path)
+		{
+			var bak = path + ".bak";
+			if (!File.Exists(bak))
+				return false;
+
+			File.Copy(bak, path, true);
+			return true;
 		}
 
 		// Set a single LocalConfig.xml <tag> to `value`, returning the previous value (so the caller can revert),
@@ -638,7 +637,7 @@ namespace Faolan.ClientLauncher
 
 		// Point the three CDN keys at the mirror base URL (LocalConfig.xml is backed up to .bak first, so --restore
 		// puts the retail URLs back). Returns true if any key was changed.
-		private static bool SetMirrorConfig(string gameDir, string baseUrl)
+		private static bool SetCdnConfig(string gameDir, string baseUrl)
 		{
 			var b = baseUrl.TrimEnd('/');
 			var changed = false;

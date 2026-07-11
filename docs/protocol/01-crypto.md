@@ -40,7 +40,7 @@ The whole exchange is validated end-to-end against a reference Python implementa
   exact `AnswerChallenge` body. The **server never calls it** — it exists for tests and launcher work.
 - Static-initializer order matters: `N`, `g`, `ServerPrivate` must initialize before anything calls `ModPow`, or
   it sees `N = 0` and throws. The public key is therefore computed per access, not via a field initializer.
-- Patch tooling: the launcher's `--patch-login` (`Faolan.ClientLauncher/LoginKeyPatcher.cs`).
+- Patch tooling: the launcher's `--patch-login` (`Faolan.ClientLauncher/ClientExePatcher.cs`).
 
 ## See also
 
