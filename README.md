@@ -109,8 +109,8 @@ we've seen_, and names the gaps). Regenerate with
 
 - ✅ Chat — local say, channels, system, whisper (plus a live "Claude" MCP channel)
 - ✅ Guild create, invite/accept, tag, renown
-- 🟡 Guild-create no-relog window (`DispatchGuildCreated 0x2044`) — decoded + built byte-exact, awaits in-client
-  confirm (#306) · member kick/promote/demote fan-out — bodies uncaptured (#104)
+- ✅ Guild-create no-relog window (`DispatchGuildCreated 0x2044`) — the guild window + tag appear without a relog (#306)
+- 🟡 Member kick/promote/demote fan-out — bodies uncaptured (#104)
 - ⬜ Friends list + presence (#99, #100) · player↔player trade, quest sharing, team quests (#101)
 
 ### Quests & dialogue
