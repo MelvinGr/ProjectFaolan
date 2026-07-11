@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -426,6 +427,72 @@ namespace Faolan.Importer.Modules
 				? $"removed {removed}; "
 				: "";
 			return new ImportResult($"{prefix}{spawns.Count} spawns, {npcSpells.Count} npc-spell pairs ({spellsAdded} new), {patrols.Count} patrol routes.");
+		}
+	}
+
+	// NPC hostility DISPOSITION (cCategory) per NPC, harvested from the captured RequestAggroStatus responses -
+	// the SOLE correct hostility source. An NPC's Community is faction MEMBERSHIP, not hostility (community 1 is the
+	// civilian/default faction shared by Citizens/vendors/guards), so the old `Community > 0` aggro test wrongly made
+	// every townsperson hostile. Writes NpcStatCore.Disposition (0 friendly / 1 hostile / 2 neutral); the sim gates
+	// aggro (only 1 aggros) and the overhead name colour on it (#256/aggro). Depends on `npcs` (the stat cores to
+	// attach to must exist).
+	public sealed class NpcDispositionModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+
+		// No hard DependsOn: it attaches to whatever NpcStatCores exist, and registration order already sequences it
+		// after `npcs` in a full default run. (A hard dep would force `npcs` -> `characters` -> ... into a targeted
+		// `--only npc-disposition` run; it just no-ops on an empty DB, which is fine.)
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
+
+		public string Description => "NPC hostility disposition (cCategory from RequestAggroStatus).";
+		public string Name => "npc-disposition";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			// name -> vote count per cCategory across ALL captures. Disposition is a faction property, stable per
+			// NPC type, so a majority vote per name is the right aggregation (a few captures see an NPC as neutral
+			// while most see friendly, etc.).
+			var votes = new Dictionary<string, Dictionary<uint, int>>(StringComparer.OrdinalIgnoreCase);
+			foreach (var cap in ctx.Captures)
+			foreach (var (name, category) in NpcDispositionExtractor.Extract(cap.Packets))
+			{
+				if (!votes.TryGetValue(name, out var byCat))
+					votes[name] = byCat = new Dictionary<uint, int>();
+				byCat[category] = byCat.GetValueOrDefault(category) + 1;
+			}
+
+			var byName = votes.ToDictionary(
+				kv => kv.Key,
+				kv => kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key).First().Key,
+				StringComparer.OrdinalIgnoreCase);
+
+			var nameById = await ctx.Db.Npcs.ToDictionaryAsync(n => n.Id, n => n.Name);
+			var updated = 0;
+			var hostile = 0;
+			foreach (var core in await ctx.Db.NpcStatCores.ToListAsync())
+			{
+				if (!nameById.TryGetValue(core.NpcId, out var name) || name == null || !byName.TryGetValue(name, out var category))
+					continue;
+
+				if (core.Disposition != category)
+				{
+					core.Disposition = category;
+					updated++;
+				}
+
+				if (category == 1)
+					hostile++;
+			}
+
+			await ctx.Db.SaveChangesAsync();
+			return new ImportResult($"{byName.Count} NPC names dispositioned; {updated} stat cores set ({hostile} hostile).");
 		}
 	}
 

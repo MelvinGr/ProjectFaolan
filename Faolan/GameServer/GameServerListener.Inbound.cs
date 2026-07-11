@@ -17,6 +17,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Session;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -1436,11 +1437,15 @@ namespace Faolan.GameServer
 			// exactly 0/1/2. We always sent 0, so every NPC rendered green - including hostile mobs. Send 1 for a
 			// hostile NPC so its name renders red like retail. (The NpcStats.community we put in the spawn is correct
 			// but the client ignores it for the name colour - this RPC is the sole driver.)
-			uint category = 0;
+			// cCategory is the target's captured retail disposition (0 friendly / 1 hostile / 2 neutral), the SAME
+			// source that gates aggro (#256/aggro). Sending target.Disposition directly (not Hostile ? 1 : 0) means a
+			// neutral NPC renders yellow, not just red/green - and a friendly civilian in a non-zero faction community
+			// no longer wrongly renders red.
+			uint category = WorldEntity.DispositionFriendly;
 			// Resolve the target in the player's OWN instance (copy) of the map (#268), not the default shared zone.
 			var player = _simulation.PlayerWorldEntity(client);
-			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target) && target.Hostile)
-				category = 1;
+			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target))
+				category = target.Disposition;
 
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance), GameInterfaceOpcodes.DispatchPassBlob)

@@ -55,9 +55,20 @@ namespace Faolan.GameServer.World
 		// since the entity is recreated at world entry.
 		public bool GodMode { get; set; }
 
-		// Whether this NPC attacks players on sight. Mobs are hostile; talk-to NPCs (quest-givers/vendors, i.e. those
-		// with a conversation) are not. Set at zone load. Players are never hostile here.
+		// Whether this NPC attacks players on sight. Driven by Disposition (only cCategory 1 = hostile aggros);
+		// friendly/neutral NPCs (Citizens, vendors, guards, wildlife) never aggro. Set at zone load. Players are
+		// never hostile here.
 		public bool Hostile { get; set; }
+
+		// The retail overhead-name disposition toward the player: 0 = friendly (green), 1 = hostile (red),
+		// 2 = neutral (yellow). Sourced from NpcStatCore.Disposition (captured cCategory, #256/aggro) at zone load.
+		// Drives BOTH the RequestAggroStatus name-colour reply AND Hostile (Hostile == Disposition == 1). NULL in the
+		// DB -> DispositionFriendly here (matching the client's green default for an NPC it was never told about).
+		public uint Disposition { get; set; } = DispositionFriendly;
+
+		public const uint DispositionFriendly = 0;
+		public const uint DispositionHostile = 1;
+		public const uint DispositionNeutral = 2;
 
 		// True while this NPC is engaged in combat (a target in aggro range, not leashing home). Drives the combat-mode
 		// stat broadcast that makes the client DRAW the NPC's weapon - without it the NPC swings empty-handed (#218).

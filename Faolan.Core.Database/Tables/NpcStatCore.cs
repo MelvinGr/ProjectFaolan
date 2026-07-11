@@ -85,11 +85,19 @@ namespace Faolan.Core.Database.Tables
 		public uint? MaxStamina { get; set; }
 
 		// --- NpcStats (npc_stats) ---
-		// This NPC's own faction MEMBERSHIP, NOT a player's reputation with it. Community: 0 = neutral/friendly,
-		// > 0 = a hostile faction (drives the red/green overhead name + aggro). FactionId (below) = the faction this
-		// NPC belongs to. The PLAYER's per-faction standings (the client Factions window) are NOT stored yet - see
-		// Gitea #315 (would need a CharacterFaction table + faction catalog).
+		// This NPC's own faction MEMBERSHIP, NOT a player's reputation with it, and NOT hostility. (An earlier note
+		// here claimed "Community > 0 = hostile faction" - that is WRONG: community 1 is the civilian/default faction
+		// shared by Citizens, vendors, Gate Guards, Shopkeepers, etc. Hostility is a faction STANDING, captured
+		// separately as Disposition below.) FactionId (below) = the faction this NPC belongs to. The PLAYER's
+		// per-faction standings (the client Factions window) are NOT stored yet - see Gitea #315.
 		public uint? Community { get; set; }
+
+		// The retail overhead-name DISPOSITION (cCategory) this NPC's faction has toward the player: 0 = friendly
+		// (green), 1 = hostile (red), 2 = neutral (yellow). Harvested per NPC from the captured RequestAggroStatus
+		// responses (NpcDispositionModule) - the SOLE correct hostility source. Drives BOTH the overhead name colour
+		// and whether the sim aggros the player (only 1 = hostile aggros); NULL = unknown -> treated as non-hostile,
+		// matching the client's green default. This replaces the wrong `Community > 0` aggro test (#256/aggro).
+		public uint? Disposition { get; set; }
 		public uint? TemplateId { get; set; }
 		public uint? NpcType { get; set; }
 		public uint? NpcFlags { get; set; }

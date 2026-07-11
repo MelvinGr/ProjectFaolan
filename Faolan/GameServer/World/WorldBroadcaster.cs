@@ -763,10 +763,13 @@ namespace Faolan.GameServer.World
 					entity.ArmPatrolCycle();
 				}
 
-				// Hostile = a faction creature (Npc.Community > 0, lifted from NpcStats.community by the importer).
-				// community 0 is the neutral/friendly community (quest-givers like Casilda/Kalanthes AND neutral critters
-				// like Scorpion/Guard Dog); faction mobs (poachers 59, scavengers 60, picts 317, crocs 374, ...) are > 0.
-				entity.Hostile = community > 0;
+				// Disposition drives BOTH the overhead name colour and whether this NPC aggros. It is the captured
+				// retail cCategory (NpcStatCore.Disposition, #256/aggro) - the SOLE correct hostility source. Community
+				// is faction MEMBERSHIP, NOT hostility: community 1 is the civilian/default faction shared by Citizens,
+				// vendors and guards, so the old `community > 0` test wrongly aggroed every townsperson. NULL disposition
+				// -> friendly (the client's green default for an un-told-about NPC). Only cCategory 1 (hostile) aggros.
+				entity.Disposition = npc.Npc.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
+				entity.Hostile = entity.Disposition == WorldEntity.DispositionHostile;
 
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
@@ -959,7 +962,8 @@ namespace Faolan.GameServer.World
 
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.Npc?.Name ?? npcName, vitals);
 			entity.Level = npc.Level;
-			entity.Hostile = killable && npc.Npc?.StatCore?.Community > 0;
+			entity.Disposition = npc.Npc?.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
+			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)
 
