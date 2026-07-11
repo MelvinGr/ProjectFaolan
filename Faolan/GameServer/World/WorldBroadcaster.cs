@@ -987,7 +987,11 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null)
+				// #307: register the spawn in the viewer's Known set. The follow/patrol MoveTask (BroadcastNpcMove) is
+				// Known-gated (#245/#322/#323), and the client only RENDERS a spawned model once a MoveTask arrives at its
+				// position - so a directly-spawned pet/NPC that isn't in Known sends its FA015807 but never its MoveTask,
+				// and stays invisible. (This is why necro pets stopped rendering after the Known-gate was tightened.)
+				if (viewer.Client != null && viewer.Known.Add(entity.Handle))
 					await SendWorldSpawn(viewer.Client, entity);
 			}
 
@@ -1028,7 +1032,11 @@ namespace Faolan.GameServer.World
 			_sim.World.ZoneForEntity(player).Add(entity);
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null)
+				// #307: register the spawn in the viewer's Known set. The follow/patrol MoveTask (BroadcastNpcMove) is
+				// Known-gated (#245/#322/#323), and the client only RENDERS a spawned model once a MoveTask arrives at its
+				// position - so a directly-spawned pet/NPC that isn't in Known sends its FA015807 but never its MoveTask,
+				// and stays invisible. (This is why necro pets stopped rendering after the Known-gate was tightened.)
+				if (viewer.Client != null && viewer.Known.Add(entity.Handle))
 					await SendWorldSpawn(viewer.Client, entity);
 			}
 
