@@ -8,15 +8,20 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Importer.Cli;
+using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
 	// Ambient NPC chatter (per-NPC bark lines). The barks are chat-server CharacterChat (0x0022) local-says whose body
-	// is [u32 senderHandle][u16 len][<remoteformat token="sayinchat(N)|conversationM(K)|<Group>" ...>]. The shared
-	// tshark reader keeps only the Conan stream, so this module reads the *.tshark.json directly: it correlates the
-	// bark's sender handle -> the NPC name (from the Conan FA015807 spawns) -> the Npc TYPE, and stores each distinct
-	// remoteformat verbatim under NpcChatter. The dialogue is SPECIFIC per NPC, so it is keyed per type.
+	// is [u32 senderHandle][u16 len][<remoteformat token="sayinchat(N)|conversationM(K)|<Group>" ...>]. The dialogue is
+	// SPECIFIC to the NPC that says it, so it is keyed by the NPC's TEMPLATE (NpcStats.f4 / Npc.TemplateId), NOT by
+	// name - several distinct templates share a display name (7 "Nobleman"/"Noblewoman" rows), and only the exact
+	// template captured barking gets the lines; the others stay silent until captured.
+	//
+	// The shared tshark reader keeps only the Conan stream, so spawns come from ctx.Captures (via NpcSpawnExtractor,
+	// which decodes the TemplateId out of the FA015807 CharacterIIR) while the AgentServer 0x0022 barks are read from
+	// the matching *.tshark.json directly. Correlation: bark sender handle -> the spawn's TemplateId (same capture).
 	public sealed class NpcChatterModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
@@ -28,16 +33,26 @@ namespace Faolan.Importer.Modules
 			WriteMode.Overwrite
 		};
 
-		public string Description => "Ambient NPC chatter bark lines (chat-server sayinchat remoteformats).";
+		public string Description => "Ambient NPC chatter bark lines (chat-server sayinchat remoteformats), keyed by template.";
 		public string Name => "npc-chatter";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// name -> the distinct verbatim <remoteformat> bark lines seen for it.
-			var byName = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+			// TemplateId -> the distinct verbatim <remoteformat> bark lines captured for that exact NPC template.
+			var byTemplate = new Dictionary<uint, HashSet<string>>();
 
-			foreach (var file in Directory.EnumerateFiles(ctx.CapturesDir, "*.tshark.json"))
+			foreach (var cap in ctx.Captures)
 			{
+				// handle -> TemplateId from the Conan FA015807 spawns (last spawn for a reused handle wins).
+				var handleToTemplate = new Dictionary<uint, uint>();
+				foreach (var spawn in NpcSpawnExtractor.Extract(cap.Packets))
+					if (spawn.TemplateId != 0)
+						handleToTemplate[spawn.Handle] = spawn.TemplateId;
+
+				var file = Path.Combine(ctx.CapturesDir, cap.Name + ".tshark.json");
+				if (!File.Exists(file))
+					continue;
+
 				JsonDocument doc;
 				try
 				{
@@ -53,49 +68,32 @@ namespace Faolan.Importer.Modules
 					if (!doc.RootElement.TryGetProperty("Packets", out var packets) || packets.ValueKind != JsonValueKind.Array)
 						continue;
 
-					// Pass 1: handle -> NPC name from the Conan FA015807 spawns.
-					var names = new Dictionary<uint, string>();
 					foreach (var p in packets.EnumerateArray())
 					{
-						if (!IsDownload(p) || Body(p) is not { } body || body.Length < 16)
-							continue;
-						if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != 0xFA015807u)
-							continue;
-						var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-						if (ReadSpawnName(body) is { } name)
-							names[handle] = name;
-					}
-
-					// Pass 2: the chat-server sayinchat barks -> attribute to the sender's NPC name.
-					foreach (var p in packets.EnumerateArray())
-					{
-						if (Proto(p) != "AgentServer" || Opcode(p) != "0x0022" || Body(p) is not { } body || body.Length < 6)
+						if (Str(p, "Protocol") != "AgentServer" || Str(p, "Opcode") != "0x0022" || Body(p) is not { } body || body.Length < 6)
 							continue;
 						var sender = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
 						var len = BinaryPrimitives.ReadUInt16BigEndian(body.AsSpan(4, 2));
 						if (6 + len > body.Length)
 							continue;
 						var text = Encoding.Latin1.GetString(body.AsSpan(6, len));
-						if (!text.Contains("sayinchat(", StringComparison.Ordinal) || !names.TryGetValue(sender, out var name))
+						if (!text.Contains("sayinchat(", StringComparison.Ordinal) || !handleToTemplate.TryGetValue(sender, out var template))
 							continue;
-						if (!byName.TryGetValue(name, out var set))
-							byName[name] = set = new HashSet<string>();
+						if (!byTemplate.TryGetValue(template, out var set))
+							byTemplate[template] = set = new HashSet<string>();
 						set.Add(text);
 					}
 				}
 			}
 
-			// Attach to each NPC type by name. Overwrite the type's chatter set wholesale (idempotent rebuild).
-			var npcsByName = (await ctx.Db.Npcs.ToListAsync())
-				.Where(n => n.Name != null)
-				.GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-				.ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+			// Attach to the exact Npc type by TemplateId (unique - one Npc row per template).
+			var npcByTemplate = await ctx.Db.Npcs.ToDictionaryAsync(n => n.TemplateId, n => n);
 
 			var lines = 0;
 			var npcs = 0;
-			foreach (var (name, texts) in byName)
+			foreach (var (template, texts) in byTemplate)
 			{
-				if (!npcsByName.TryGetValue(name, out var npc))
+				if (!npcByTemplate.TryGetValue(template, out var npc))
 					continue;
 
 				var existing = await ctx.Db.NpcChatter.Where(c => c.NpcId == npc.Id).ToListAsync();
@@ -108,12 +106,10 @@ namespace Faolan.Importer.Modules
 			}
 
 			await ctx.Db.SaveChangesAsync();
-			return new ImportResult($"{npcs} NPC types with chatter, {lines} bark lines.");
+			return new ImportResult($"{npcs} NPC templates with chatter, {lines} bark lines.");
 		}
 
-		private static bool IsDownload(JsonElement p) => p.TryGetProperty("IsDownload", out var d) && d.ValueKind == JsonValueKind.True;
-		private static string Proto(JsonElement p) => p.TryGetProperty("Protocol", out var v) ? v.GetString() : null;
-		private static string Opcode(JsonElement p) => p.TryGetProperty("Opcode", out var v) ? v.GetString() : null;
+		private static string Str(JsonElement p, string name) => p.TryGetProperty(name, out var v) ? v.GetString() : null;
 
 		private static byte[] Body(JsonElement p)
 		{
@@ -130,31 +126,6 @@ namespace Faolan.Importer.Modules
 			{
 				return null;
 			}
-		}
-
-		// The NPC name embedded in an FA015807 spawn body: the first `0x0A [u8 len 1..63] [ascii]` from offset 16.
-		private static string ReadSpawnName(byte[] body)
-		{
-			for (var i = 16; i + 2 < body.Length; i++)
-			{
-				if (body[i] != 0x0A)
-					continue;
-				int len = body[i + 1];
-				if (len is < 1 or > 63 || i + 2 + len > body.Length)
-					continue;
-				var ok = true;
-				for (var j = 0; j < len; j++)
-					if (body[i + 2 + j] is < 0x20 or > 0x7E)
-					{
-						ok = false;
-						break;
-					}
-
-				if (ok)
-					return Encoding.ASCII.GetString(body, i + 2, len);
-			}
-
-			return null;
 		}
 	}
 }
