@@ -148,6 +148,39 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
+		// Every distinct NPC (by resolved spawn name) the player sent a GREETING TalkToNpc to (field3 == 0) in these
+		// packets - the DENOMINATOR for conversation coverage. An NPC greeted here but absent from ConversationNodes is
+		// a gap: a dump of the interaction exists, but no dialogue was decoded/imported for it (it fell to the "no
+		// dialogue imported" bubble). Greetings whose handle isn't in the capture's spawn-name map resolve to null and
+		// are dropped (not attributable to a named NPC).
+		public static IReadOnlyCollection<string> GreetedNpcNames(IReadOnlyList<CapturedPacket> packets)
+		{
+			var namesByHandle = BuildSpawnNameMap(packets);
+			var names = new HashSet<string>();
+			foreach (var p in packets)
+			{
+				if (p is not { IsDownload: false, Opcode: Opcode2000, SubOpcode: InteractSubOpcode })
+					continue;
+
+				var body = GetBody(p.Bytes);
+				if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
+					continue;
+
+				var argLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(22, 4));
+				if (26 + argLen > body.Length)
+					continue;
+
+				var (_, _, field3, parsedNpc) = ParseArgs(body.AsSpan(26, argLen));
+				if (field3 != 0)
+					continue;
+
+				if (namesByHandle.GetValueOrDefault(parsedNpc) is { Length: > 0 } name)
+					names.Add(name);
+			}
+
+			return names;
+		}
+
 		// Merges screens from many captures/instances, deduped by (NpcName, TypeId, AnswerPath) - the stable branch
 		// key. This is what UNIONS the option tree: each conversation re-walk (a different Mode) explored a different
 		// option at a screen, so it contributes a different answer-path screen; merging them assembles the full tree.

@@ -40,6 +40,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "coverage":
+				{
+					await Coverage(dbPath, LoadCaptures(capturesDir), arg);
+					return 0;
+				}
+
 				case "anim":
 				{
 					Anim(LoadCaptures(capturesDir), arg ?? "Casilda");
@@ -150,7 +156,7 @@ namespace Faolan.Importer.Cli
 
 				default:
 				{
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, worldobj, spell-fields, rdb-assets.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
 				}
 			}
@@ -206,6 +212,75 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Per-NPC dialogue screens + mid-conversation quest grants per (capture, NPC) (#37).
+		// Content coverage: of the NPCs/vendors we've actually INTERACTED with across the capture corpus, how many did
+		// we import. Capture-relative by necessity (there is no authoritative game-wide vendor/dialogue list - retail
+		// dialogue is TEA-encrypted in the RDB), so it measures import completeness OF WHAT WE'VE SEEN and names the
+		// gaps to go capture/decode. `--report-arg readme` rewrites the marked section of README.md; else it prints.
+		private static async Task Coverage(string dbPath, IReadOnlyList<NamedCapture> captures, string arg)
+		{
+			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
+			var greeted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			foreach (var c in captures)
+				foreach (var n in ConversationExtractor.GreetedNpcNames(c.Packets))
+					greeted.Add(n);
+
+			// Shops: vendors whose 0x2033 window appears in a dump (denominator) vs imported Shop rows (numerator).
+			var vendorsSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			foreach (var c in captures)
+				foreach (var e in CaptureShopImporter.Extract(c.Packets))
+					vendorsSeen.Add(e.VendorName);
+
+			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync())
+				.ToHashSet(StringComparer.OrdinalIgnoreCase);
+			var shopImported = (await db.Shops.Select(s => s.VendorName).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+			// A greeted VENDOR opens its shop, not a conversation - exclude vendors (imported shops) from the dialogue
+			// denominator so they don't read as conversation gaps. A real conversation gap = greeted, but neither a
+			// dialogue node NOR a shop was imported for it (it falls to the "no dialogue or shop imported" bubble).
+			var greetedTalkers = greeted.Where(n => !shopImported.Contains(n)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+			var convGaps = greetedTalkers.Where(n => !convImported.Contains(n)).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+			var shopGaps = vendorsSeen.Where(v => !shopImported.Contains(v)).OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToList();
+			var convHave = greetedTalkers.Count - convGaps.Count;
+			var shopHave = vendorsSeen.Count - shopGaps.Count;
+
+			static string Pct(int have, int total) => total == 0 ? "n/a" : $"{100.0 * have / total:0}%";
+			var block = new StringBuilder();
+			block.AppendLine($"- **NPC conversations** — {convHave}/{greetedTalkers.Count} greeted dialogue NPCs imported ({Pct(convHave, greetedTalkers.Count)})");
+			block.AppendLine($"- **Vendor shops** — {shopHave}/{vendorsSeen.Count} captured vendors imported ({Pct(shopHave, vendorsSeen.Count)})");
+
+			Console.WriteLine("Content coverage (capture-relative: of the NPCs/vendors seen in dumps, how many are imported)\n");
+			Console.Write(block.ToString());
+			if (convGaps.Count > 0)
+				Console.WriteLine($"\nconversation gaps ({convGaps.Count}) - greeted in a dump, no dialogue imported:\n  {string.Join(", ", convGaps)}");
+			if (shopGaps.Count > 0)
+				Console.WriteLine($"\nshop gaps ({shopGaps.Count}) - a vendor window is in a dump, no Shop row:\n  {string.Join(", ", shopGaps)}");
+
+			if (string.Equals(arg, "readme", StringComparison.OrdinalIgnoreCase))
+			{
+				UpdateReadmeSection(block.ToString().TrimEnd());
+				Console.WriteLine("\nREADME.md coverage section regenerated.");
+			}
+		}
+
+		// Rewrites the content between the coverage markers in README.md (leaving the rest untouched).
+		private static void UpdateReadmeSection(string block)
+		{
+			var path = Path.Combine(RepoRoot, "README.md");
+			var text = File.ReadAllText(path);
+			const string start = "<!-- coverage:start -->";
+			const string end = "<!-- coverage:end -->";
+			var s = text.IndexOf(start, StringComparison.Ordinal);
+			var e = text.IndexOf(end, StringComparison.Ordinal);
+			if (s < 0 || e < 0 || e < s)
+			{
+				Console.WriteLine("README.md has no <!-- coverage:start -->/<!-- coverage:end --> markers; skipping.");
+				return;
+			}
+
+			File.WriteAllText(path, text[..(s + start.Length)] + "\n" + block + "\n" + text[e..]);
+		}
+
 		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)
 		{
 			foreach (var c in captures)

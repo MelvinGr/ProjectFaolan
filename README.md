@@ -22,6 +22,15 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
+**Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
+imported (capture-relative: retail has no public dialogue/vendor list, so this measures completeness *of what
+we've seen*, and names the gaps). Regenerate with
+`dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
+<!-- coverage:start -->
+- **NPC conversations** — 32/35 greeted dialogue NPCs imported (91%)
+- **Vendor shops** — 20/20 captured vendors imported (100%)
+<!-- coverage:end -->
+
 ### Connection & session
 - ✅ Login / auth — Diffie–Hellman + TEA-CBC handshake (any password is accepted until the client is key-patched)
 - ✅ Character roster, selection, and existing-character world entry

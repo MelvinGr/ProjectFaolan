@@ -37,7 +37,7 @@ namespace Faolan.Importer.Cli
 						: ""));
 				}
 
-				Console.WriteLine("\nReports (read-only): --report conversation-states | anim | burst-coverage | worldobj  [--report-arg <name>]");
+				Console.WriteLine("\nReports (read-only): --report coverage | conversation-states | anim | burst-coverage | worldobj  [--report-arg <name>]");
 				return 0;
 			}
 
