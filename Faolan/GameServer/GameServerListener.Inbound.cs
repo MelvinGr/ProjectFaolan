@@ -185,15 +185,28 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.CharInPlayIIR: //peer0_160
 				{
-					// CharInPlayIIR is ONLY sent by the create-editor (unnamed) client: retail login and the create
-					// WORLD entry both use 0x205f, and a dead player's respawn pick is a separate RespawnMe (0x2024
-					// GameCharAgent) - all verified in captures. So a named character never reaches this; nothing to do.
-					// Retail answers the editor's CharInPlayIIR DIRECTLY with the post-ready burst - the 0x2024
-					// ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the creation script that launches the
-					// editor (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95). No
-					// instance-echo counting or deferral - CharInPlayIIR IS the trigger.
-					Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
-					await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
+					// CharInPlayIIR ("ReadyForPlayScreen") has TWO senders, told apart by the connection role:
+					//  - the create-editor (unnamed) connection sends it to launch the editor. Retail answers DIRECTLY
+					//    with the post-ready burst - the 0x2024 ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the
+					//    creation script that launches the editor (Blablatest necro create: client CharInPlayIIR at f90
+					//    -> server burst at f95).
+					//  - a NAMED character on a changemap/teleport reconnect sends it too: that reconnect carries NO
+					//    0x205F, so the client uses CharInPlayIIR as its ready signal instead of the 0x2020 poll the
+					//    normal login flushes on. Treating it as an editor launch put the create-editor UI in-world
+					//    after a teleport (and on any login that came in via this reconnect shape). So flush the armed
+					//    post-0x205F follow-up here - the same ReadyForPlayScreen (+ abilities/combos) burst the 0x2020
+					//    path sends - which drops the loading screen into the world. (This restores the named-character
+					//    branch dropped in d43dd426 as "dead"; it isn't - the teleport reconnect exercises it.)
+					if (client.Session.IsCreateEditorConnection)
+					{
+						Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
+						await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
+					}
+					else
+					{
+						Logger.LogInformation("Named-character CharInPlayIIR (changemap/teleport reconnect, no 0x205F): flushing the world post-0x205F follow-up.");
+						await FlushPendingPost205FFollowUp(client);
+					}
 
 					break;
 				}
