@@ -23,7 +23,7 @@ namespace Faolan.Core.Database.Tables
 		public uint NpcId { get; set; }
 
 		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; }
+		public virtual Npc Npc { get; set; } = null!;
 
 		// The CoreCharacter-IIR header word X in [u8 0x41][u32 X][u32 msgLen] that precedes the embedded message
 		// (#244). A type-stable field-presence/shape mask (RE: 0/510 types carry a mixed value): the low 16 bits

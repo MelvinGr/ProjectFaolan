@@ -8,9 +8,9 @@ namespace Faolan.Core.Database.Tables
 	// the create-flow captures (0x205E req -> 0x205D resp), served by GameServer StockConversationService.
 	public class StockPhrase
 	{
-		public byte[] RemoteFormat { get; set; }
+		public byte[] RemoteFormat { get; set; } = null!;
 
 		[Key, MaxLength(32)]
-		public string Key { get; set; } // the client's "{stock_N}" token
+		public string Key { get; set; } = null!; // the client's "{stock_N}" token
 	}
 }

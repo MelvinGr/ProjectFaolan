@@ -18,7 +18,7 @@ namespace Faolan.Core.Database.Tables
 		public uint RealmId { get; set; }
 
 		[ForeignKey(nameof(RealmId))]
-		public virtual Realm Realm { get; set; }
+		public virtual Realm Realm { get; set; } = null!;
 
 		// The unique wire mail id (the client's GetMailByID / GetMailItem target).
 		public ulong MailId { get; set; }
@@ -31,13 +31,13 @@ namespace Faolan.Core.Database.Tables
 		// The mail body, a remoteformat XML string (length-prefixed u16 on the wire). For an AH delivery it is the
 		// TradePostGUI_MailItemBought token with the buyer + item parameters.
 		[MaxLength(4096)]
-		public string BodyXml { get; set; }
+		public string BodyXml { get; set; } = null!;
 
 		[MaxLength(64)]
-		public string RecipientName { get; set; }
+		public string RecipientName { get; set; } = null!;
 
 		[MaxLength(64)]
-		public string SenderName { get; set; }
+		public string SenderName { get; set; } = null!;
 
 		// --- footer scalars (preserved verbatim; semantics partly loose, like ShopItem.Stat356) ----------------
 		// A constant word (0x0B in the capture) before the money/timestamps.

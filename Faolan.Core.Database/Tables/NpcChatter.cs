@@ -16,9 +16,9 @@ namespace Faolan.Core.Database.Tables
 		public uint NpcId { get; set; }
 
 		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; }
+		public virtual Npc Npc { get; set; } = null!;
 
 		// The verbatim <remoteformat> XML sent as the CharacterChat (0x0022) message.
-		public string RemoteFormat { get; set; }
+		public string RemoteFormat { get; set; } = null!;
 	}
 }

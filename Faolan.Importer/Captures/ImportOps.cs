@@ -242,6 +242,11 @@ namespace Faolan.Importer.Captures
 					.Include(n => n.Equipment)
 					.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
 
+				// NpcId is required now (no phantom rows), so a spawn whose type doesn't resolve is dropped - the same
+				// rule ImportNpcSpells applies to typeless casters, and consistent with the phantom-scrub invariant.
+				if (e.TemplateId == 0 || !typeByTemplate.TryGetValue(e.TemplateId, out var npc))
+					continue;
+
 				var row = existing ?? new NpcSpawn
 				{
 					MapId = e.MapId,
@@ -250,9 +255,7 @@ namespace Faolan.Importer.Captures
 					PositionZ = e.Z
 				};
 				Populate(row, e);
-				row.NpcId = e.TemplateId != 0 && typeByTemplate.TryGetValue(e.TemplateId, out var npc)
-					? npc.Id
-					: null;
+				row.NpcId = npc.Id;
 				if (existing == null)
 					db.NpcSpawns.Add(row);
 			}

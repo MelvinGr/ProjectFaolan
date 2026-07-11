@@ -13,11 +13,11 @@ namespace Faolan.Core.Database.Tables
 	{
 		public uint ItemId { get; set; }
 		[ForeignKey(nameof(ItemId))]
-		public virtual Item Item { get; set; }
+		public virtual Item Item { get; set; } = null!;
 
 		public uint RecipeId { get; set; }
 		[ForeignKey(nameof(RecipeId))]
-		public virtual Recipe Recipe { get; set; }
+		public virtual Recipe Recipe { get; set; } = null!;
 
 		public int Position { get; set; } // order within its list
 

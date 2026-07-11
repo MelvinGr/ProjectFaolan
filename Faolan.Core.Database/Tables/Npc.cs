@@ -36,10 +36,10 @@ namespace Faolan.Core.Database.Tables
 		// (keyed by NpcId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.
 		// This is what lets a SUMMON-ONLY creature (pet/mount, #307) build its spawn body from the type ALONE, with a
 		// caller-supplied transform and NO world placement (NpcSpawnBuilder.TryBuildFromType).
-		public virtual NpcStatCore StatCore { get; set; }
+		public virtual NpcStatCore? StatCore { get; set; }
 
 		// The creature's display name (the stable join key conversations/shops/spells use).
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 	}
 }

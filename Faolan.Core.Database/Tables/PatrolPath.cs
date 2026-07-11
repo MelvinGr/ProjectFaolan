@@ -15,7 +15,7 @@ namespace Faolan.Core.Database.Tables
 		public uint NpcSpawnId { get; set; }
 
 		[ForeignKey(nameof(NpcSpawnId))]
-		public virtual NpcSpawn NpcSpawn { get; set; }
+		public virtual NpcSpawn NpcSpawn { get; set; } = null!;
 
 		// The columnarized MoveTask task tree: every AST node of this patrol (the root has ParentId == null).
 		// Cascade-deletes with the path.

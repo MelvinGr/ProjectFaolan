@@ -12,7 +12,7 @@ namespace Faolan.Core.Database.Tables
 		public uint NpcId { get; set; }
 
 		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; }
+		public virtual Npc Npc { get; set; } = null!;
 
 		public uint Level { get; set; }
 
@@ -24,6 +24,6 @@ namespace Faolan.Core.Database.Tables
 		public uint Template { get; set; }
 
 		[ForeignKey(nameof(Template))]
-		public virtual Item Item { get; set; }
+		public virtual Item Item { get; set; } = null!;
 	}
 }

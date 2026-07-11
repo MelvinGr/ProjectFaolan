@@ -17,7 +17,7 @@ namespace Faolan.Core.Database.Tables
 		public int DotDelta { get; set; }
 
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 
 		public uint DotType { get; set; }
 

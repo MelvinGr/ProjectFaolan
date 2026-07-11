@@ -17,13 +17,13 @@ namespace Faolan.Core.Database.Tables
 		public uint GrantQuestId { get; set; }
 
 		public uint TypeId { get; set; }
-		public virtual ICollection<ConversationPacket> Packets { get; set; }
+		public virtual ICollection<ConversationPacket> Packets { get; set; } = [];
 
 		// The answer-index path to this screen within the NPC's dialogue: "" = the greeting, "0" = after picking
 		// option 0, "0>1" = then option 1, ... The runtime tracks the live player's path and serves the matching
 		// screen. This is the STABLE branch key (the old Mode/Field3 were session-volatile counters).
 		[MaxLength(128)]
-		public string AnswerPath { get; set; }
+		public string AnswerPath { get; set; } = null!;
 
 		// A Lua CONDITION source (run against the live player via LuaScriptVm.RunCondition) that gates this screen
 		// variant - how the SAME (NpcName, TypeId, AnswerPath) serves different dialogue by quest/tag state (e.g.
@@ -42,7 +42,7 @@ namespace Faolan.Core.Database.Tables
 		// with both sides matching the same ReadSpawnName output. Switch to template_id only if same-named conversational
 		// NPCs ever appear - until then name is correct and the simpler key.)
 		[MaxLength(128)]
-		public string NpcName { get; set; }
+		public string? NpcName { get; set; }
 
 		public uint CapturedInstance { get; set; }
 		public uint CapturedNpcHandle { get; set; }

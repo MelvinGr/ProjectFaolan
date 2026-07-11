@@ -23,7 +23,7 @@ namespace Faolan.Core.Database.Tables
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
+		public virtual Map Map { get; set; } = null!;
 
 		public uint ObjectId { get; set; }
 		public uint? TemplateItemId { get; set; } // proto field 8 (present on ~25%)
@@ -36,13 +36,13 @@ namespace Faolan.Core.Database.Tables
 		// this tail (#187). This is the object's geometry TRUTH (not re-derivable), the counterpart of the NPC stat
 		// columns; the captured raw `Data` packet has been RETIRED. The transform (pos/rot) is rebuilt from
 		// Base3DEntity's columns and the live playfield token comes from the burst.
-		public byte[] KdTreeTail { get; set; }
+		public byte[]? KdTreeTail { get; set; }
 
 		[MaxLength(128)]
-		public string DisplayName { get; set; } // proto field 3
+		public string? DisplayName { get; set; } // proto field 3
 
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string? Name { get; set; }
 
 		public uint CapturedHandle { get; set; }
 		public uint CarsGroup { get; set; } // proto field 5

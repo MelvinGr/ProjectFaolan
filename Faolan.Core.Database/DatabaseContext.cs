@@ -303,7 +303,7 @@ namespace Faolan.Core.Database
 			// instance/spell if the type is ever removed (the type is reference data, not a cascade parent).
 			modelBuilder.Entity<Npc>().HasIndex(n => n.TemplateId).IsUnique();
 
-			modelBuilder.Entity<Npc>().HasMany(n => n.Spawns).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.SetNull);
+			modelBuilder.Entity<Npc>().HasMany(n => n.Spawns).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.Restrict);
 
 			modelBuilder.Entity<Npc>().HasMany(n => n.Spells).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.SetNull);
 

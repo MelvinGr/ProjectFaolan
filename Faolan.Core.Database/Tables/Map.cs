@@ -38,11 +38,11 @@ namespace Faolan.Core.Database.Tables
 		};
 
 		// The map's loot pool (#273): the items its captured bags carried, that kills on this map roll random drops from.
-		public virtual ICollection<MapLootEntry> LootEntries { get; set; }
-		public virtual ICollection<NpcSpawn> NpcSpawns { get; set; }
-		public virtual ICollection<RespawnPoint> RespawnPoints { get; set; }
+		public virtual ICollection<MapLootEntry> LootEntries { get; set; } = [];
+		public virtual ICollection<NpcSpawn> NpcSpawns { get; set; } = [];
+		public virtual ICollection<RespawnPoint> RespawnPoints { get; set; } = [];
 
-		public virtual ICollection<WorldObject> Objects { get; set; }
+		public virtual ICollection<WorldObject> Objects { get; set; } = [];
 
 		// word3 = the player instance when instanced (beach), else 0 (shared/mainland). NB this is the WIRE-layer
 		// counterpart of InstanceMode (#268): same concept (is this playfield instanced?) but a different layer -
@@ -60,7 +60,7 @@ namespace Faolan.Core.Database.Tables
 		public MapInstanceMode InstanceMode { get; set; } = MapInstanceMode.Shared;
 
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 
 		// The per-map PlayfieldFIIR (0x5D85BFC7 MapChange) rule fields (#308). This packet is the playfield the client
 		// enters, and the client keys per-area rules on it (mount permission FIXED via PlayfieldFlags). The values are

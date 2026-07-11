@@ -22,7 +22,7 @@ namespace Faolan.Core.Database.Tables
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
+		public virtual Map Map { get; set; } = null!;
 
 		// The next stage in a multi-stage quest CHAIN (Gitea #261): completing this quest's goal SUPERSEDES it with
 		// NextQuestId (QuestProgressionService sends QuestGoal + QuestIIR 2->4 + QuestFullUpdate(next) and sets the next
@@ -41,7 +41,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
 
 		[MaxLength(128)]
-		public string IndexGoalSteps { get; set; }
+		public string? IndexGoalSteps { get; set; }
 
 		// Quest index region: the W6QT goal-id table's marker + three lead words + trailer word, and the goal-step ids
 		// (CSV, the client's 1..n goal index). Beach 10238: marker 0x7E2, fields 1/7/0, trailer 0x156E7, 8 steps.

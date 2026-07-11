@@ -26,13 +26,13 @@ namespace Faolan.Core.Database.Tables
 		// The input action sequence that performs the combo, comma-separated (e.g. "CombatUpperRight,CombatUpperLeft"),
 		// from the child <action name="..."/> elements in order.
 		[MaxLength(128)]
-		public string Actions { get; set; }
+		public string Actions { get; set; } = null!;
 
 		[MaxLength(128)]
-		public string Animation { get; set; } // XML `animation`
+		public string Animation { get; set; } = null!; // XML `animation`
 		// The combo id (Id, from BaseEntity) is the RDB 1010206 entry id = the ComboBookIIR/CharacterCombo combo id.
 
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 	}
 }

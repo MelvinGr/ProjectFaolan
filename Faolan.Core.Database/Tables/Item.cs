@@ -29,7 +29,7 @@ namespace Faolan.Core.Database.Tables
 		public ItemType Type { get; set; }
 
 		[MaxLength(256)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 
 		// The item's stable identity - the per-template 128-bit TEA key (4 words) that unlocks the item's encrypted
 		// RDB template. On the wire it is exactly ProtoAcgItem.key1, repeated in the inventory-snapshot tail and the

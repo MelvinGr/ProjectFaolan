@@ -16,12 +16,12 @@ namespace Faolan.Core.Database.Tables
 		public uint ItemTemplateId { get; set; }
 
 		[ForeignKey(nameof(ItemTemplateId))]
-		public virtual Item Item { get; set; }
+		public virtual Item Item { get; set; } = null!;
 
 		public uint ShopId { get; set; }
 
 		[ForeignKey(nameof(ShopId))]
-		public virtual Shop Shop { get; set; }
+		public virtual Shop Shop { get; set; } = null!;
 
 		public uint Count { get; set; }
 		public uint Pos { get; set; }

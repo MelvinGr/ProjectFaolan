@@ -21,7 +21,7 @@ namespace Faolan.Core.Database.Tables
 		public uint SpellId { get; set; }
 
 		[ForeignKey(nameof(SpellId))]
-		public virtual Spell Spell { get; set; }
+		public virtual Spell Spell { get; set; } = null!;
 
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }

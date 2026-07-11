@@ -20,15 +20,15 @@ namespace Faolan.Core.Database.Tables
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
+		public virtual Map Map { get; set; } = null!;
 
 		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
-		// on Npc now, reached via the Npc navigation. Nullable only for phantom rows with no resolvable type (none
-		// remain after the phantom-player scrub); a real spawn always has one.
-		public uint? NpcId { get; set; }
+		// on Npc now, reached via the Npc navigation. Required - a real spawn always resolves to a type (the phantom
+		// rows that once lacked one were scrubbed).
+		public uint NpcId { get; set; }
 
 		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; }
+		public virtual Npc Npc { get; set; } = null!;
 
 		// The worn equipment (CharacterIIR f23) lifted from the captured spawn (#185) - empty for unarmed NPCs.
 		// When present, NpcSpawnBuilder rebuilds the spawn's inventory_entry list from these rows instead of the
@@ -37,7 +37,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The captured patrol route this spawn walks (#316), or null for a stationary NPC. One-to-one; cascade-deletes
 		// with the spawn.
-		public virtual PatrolPath PatrolPath { get; set; }
+		public virtual PatrolPath? PatrolPath { get; set; }
 
 		// Race/Sex moved to the Npc TYPE table (#287): they are type-level identity (every placement of a type shares
 		// them), so they live on `Npc` now and are reached via the `Npc` navigation.

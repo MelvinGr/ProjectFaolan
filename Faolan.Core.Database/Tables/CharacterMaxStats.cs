@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 	public class CharacterMaxStats
 	{
 		public uint CharacterId { get; set; }
-		public virtual Character Character { get; set; }
+		public virtual Character Character { get; set; } = null!;
 
 		// Player-facing values (what the character sheet shows), e.g. Health 1270. The on-wire ×100 vitals scale
 		// is applied at send time, not stored.

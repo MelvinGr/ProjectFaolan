@@ -11,7 +11,7 @@ namespace Faolan.Core.Database.Tables
 		public uint PatrolNodeId { get; set; }
 
 		[ForeignKey(nameof(PatrolNodeId))]
-		public virtual PatrolNode PatrolNode { get; set; }
+		public virtual PatrolNode PatrolNode { get; set; } = null!;
 
 		public int Ordinal { get; set; }
 

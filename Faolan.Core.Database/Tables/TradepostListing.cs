@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Tables
 		public uint RealmId { get; set; }
 
 		[ForeignKey(nameof(RealmId))]
-		public virtual Realm Realm { get; set; }
+		public virtual Realm Realm { get; set; } = null!;
 
 		// The catalog item (template id) the listing is filed/searched under (the row's itemId field). FK to Items:
 		// the filed item MUST exist - this guards against the 30000-placeholder import bug (#212) where every listing
@@ -31,13 +31,13 @@ namespace Faolan.Core.Database.Tables
 		// virtual so the lazy-loading-proxy DbContext used in tests (EquipmentPersistenceTests etc.) can build its
 		// model - UseLazyLoadingProxies requires every navigation to be virtual (the live app doesn't enable proxies).
 		[ForeignKey(nameof(ItemId))]
-		public virtual Item Item { get; set; }
+		public virtual Item Item { get; set; } = null!;
 
 		// The unique listing id; the buy targets this, and it doubles as the entry's ProtoInventoryGameEntry.ItemId.
 		public ulong SaleId { get; set; }
 
 		[MaxLength(64)]
-		public string SellerName { get; set; }
+		public string SellerName { get; set; } = null!;
 
 		// The seller's origin BANK slot the item was listed from. The seller addresses their own listing by this
 		// slot (TradepostChangeItemPrice / TradepostCancelSellItem carry nBankItemSlot, not the saleId), and a cancel
@@ -50,7 +50,7 @@ namespace Faolan.Core.Database.Tables
 		// this nav. Named TemplateItem to avoid colliding with the Item nav (the ItemId search-catalog item). ItemHash
 		// stays a column: on the wire the AH row carries the CAPTURED hash (0 for AH search results), NOT Items.Hash.
 		[ForeignKey(nameof(Template))]
-		public virtual Item TemplateItem { get; set; }
+		public virtual Item TemplateItem { get; set; } = null!;
 
 		// Entry stat 0 (a flag word, 0x421 in the capture) and stat 265 (a timestamp/expiry-like value).
 		public uint EntryFlags { get; set; }

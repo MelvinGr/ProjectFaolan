@@ -17,7 +17,7 @@ namespace Faolan.Core.Database.Tables
 		public uint ObjectiveRefId { get; set; }
 
 		[ForeignKey(nameof(QuestDefinitionId))]
-		public virtual QuestDefinition Quest { get; set; }
+		public virtual QuestDefinition Quest { get; set; } = null!;
 
 		public uint QuestDefinitionId { get; set; }
 
@@ -45,7 +45,7 @@ namespace Faolan.Core.Database.Tables
 		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
 
 		[MaxLength(128)]
-		public string ObjectiveKey { get; set; }
+		public string? ObjectiveKey { get; set; }
 
 		// The NPC this goal is ABOUT, interpreted per GoalType: the NPC to kill (Kill), whose corpse bag to loot
 		// (LootFromNpc), or to talk to (TalkToNpc / Escort). SERVER-SIDE ONLY - NOT on the wire: the goal record carries
@@ -54,13 +54,13 @@ namespace Faolan.Core.Database.Tables
 		// 13479 = kill "Scavenger Tuut", 13563 = loot "Scavenger Tuut"'s bag, 13480 = talk "Casilda").
 		// Null/empty = target not yet sourced.
 		[MaxLength(128)]
-		public string TargetName { get; set; }
+		public string? TargetName { get; set; }
 
 		[MaxLength(64)]
-		public string TrailingFlags { get; set; }
+		public string? TrailingFlags { get; set; }
 
 		[MaxLength(128)]
-		public string TrailingKey { get; set; }
+		public string? TrailingKey { get; set; }
 
 		// Two of the "reserved" header words: 0 for most goals; the beach goal 2 carries a number + a 4-char tag
 		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.

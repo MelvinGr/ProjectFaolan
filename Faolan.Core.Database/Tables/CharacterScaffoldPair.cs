@@ -17,7 +17,7 @@ namespace Faolan.Core.Database.Tables
 		public uint CharacterId { get; set; }
 
 		[ForeignKey(nameof(CharacterId))]
-		public virtual Character Character { get; set; }
+		public virtual Character Character { get; set; } = null!;
 
 		// For ListIndex 0: the FACTION id (10 Children of Yag-kosha, 20 Yellow Priests of Yun, 30 Shadows of Jade,
 		// 40 Brittle Blade, 50 Last Legion, 60 Scarlet Circle, 90 Wolves of the Steppes, ...).

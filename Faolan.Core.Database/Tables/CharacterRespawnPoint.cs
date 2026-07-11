@@ -8,11 +8,11 @@ namespace Faolan.Core.Database.Tables
 		public uint CharacterId { get; set; }
 
 		[ForeignKey(nameof(CharacterId))]
-		public virtual Character Character { get; set; }
+		public virtual Character Character { get; set; } = null!;
 
 		public uint RespawnPointId { get; set; }
 
 		[ForeignKey(nameof(RespawnPointId))]
-		public virtual RespawnPoint RespawnPoint { get; set; }
+		public virtual RespawnPoint RespawnPoint { get; set; } = null!;
 	}
 }

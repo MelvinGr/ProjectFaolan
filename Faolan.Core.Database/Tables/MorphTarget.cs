@@ -21,6 +21,6 @@ namespace Faolan.Core.Database.Tables
 
 		// The registry name: a slider name ("arm", "02_BrowLow") or a resource ref ("*texscript_1108153").
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 	}
 }

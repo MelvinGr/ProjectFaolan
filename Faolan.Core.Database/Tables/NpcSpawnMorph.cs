@@ -14,7 +14,7 @@ namespace Faolan.Core.Database.Tables
 		public uint NpcSpawnId { get; set; }
 
 		[ForeignKey(nameof(NpcSpawnId))]
-		public virtual NpcSpawn NpcSpawn { get; set; }
+		public virtual NpcSpawn NpcSpawn { get; set; } = null!;
 
 		public float Value { get; set; }
 		public int Ordinal { get; set; }

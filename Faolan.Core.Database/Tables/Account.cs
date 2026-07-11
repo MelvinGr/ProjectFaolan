@@ -14,7 +14,7 @@ namespace Faolan.Core.Database.Tables
 		[NotMapped]
 		public ulong LongId => 0x0000271200000000u + Id; // As used by the client
 
-		public virtual ICollection<Character> Characters { get; set; }
+		public virtual ICollection<Character> Characters { get; set; } = [];
 
 		[ConstrainToEnumValues]
 		public AccountState State { get; set; }
@@ -36,16 +36,16 @@ namespace Faolan.Core.Database.Tables
 		public int CreateState { get; set; }
 
 		[MaxLength(32)]
-		public string AuthChallenge { get; set; }
+		public string? AuthChallenge { get; set; }
 
 		[MaxLength(64)] // INET6_ADDRSTRLEN 46
-		public string LastIpAddress { get; set; }
+		public string? LastIpAddress { get; set; }
 
 		[MaxLength(128)]
-		public string Password { get; set; }
+		public string Password { get; set; } = null!;
 
 		[MaxLength(128)]
-		public string UserName { get; set; }
+		public string UserName { get; set; } = null!;
 
 		public uint AuthStatus { get; set; }
 

@@ -11,6 +11,6 @@ namespace Faolan.Core.Database.Tables
 		// The Lua source text, e.g. "if player:HasTag(3104) then return false else return true end" or
 		// "player:AddTag(2742)".
 		[MaxLength(65536)]
-		public string Source { get; set; }
+		public string Source { get; set; } = null!;
 	}
 }

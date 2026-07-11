@@ -12,13 +12,13 @@ namespace Faolan.Core.Database.Tables
 		public uint CharacterId { get; set; }
 
 		[ForeignKey(nameof(CharacterId))]
-		public virtual Character Character { get; set; }
+		public virtual Character Character { get; set; } = null!;
 
 		// Arrival order in the editor stream (the weighted entries' wire order).
 		public int Sequence { get; set; }
 
 		// The resource ref as sent by the editor, e.g. "*texscript_1108153".
 		[MaxLength(128)]
-		public string Ref { get; set; }
+		public string Ref { get; set; } = null!;
 	}
 }

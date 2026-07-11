@@ -11,12 +11,12 @@ namespace Faolan.Core.Database.Tables
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
+		public virtual Map Map { get; set; } = null!;
 
 		// True for the always-available starter point (e.g. Tortage Beach) - known without discovery.
 		public bool AlwaysKnown { get; set; }
 
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 	}
 }

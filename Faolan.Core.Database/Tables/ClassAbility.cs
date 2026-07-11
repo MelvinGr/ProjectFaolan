@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Tables
 		public uint AbilityId { get; set; }
 
 		[ForeignKey(nameof(AbilityId))]
-		public virtual Ability Ability { get; set; }
+		public virtual Ability Ability { get; set; } = null!;
 
 		// The character level this ability unlocks at FOR THIS CLASS (min level of that class's captured holders).
 		public byte Level { get; set; }

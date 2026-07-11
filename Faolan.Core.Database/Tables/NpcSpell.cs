@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Tables
 		public uint NpcId { get; set; }
 
 		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; }
+		public virtual Npc Npc { get; set; } = null!;
 
 		// The full wire spell id the NPC casts: (rdbBase << 8) | rank. The client resolves the visual/effect from it.
 		public uint SpellId { get; set; }

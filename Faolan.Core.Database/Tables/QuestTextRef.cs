@@ -11,7 +11,7 @@ namespace Faolan.Core.Database.Tables
 		public uint QuestId { get; set; }
 
 		[ForeignKey(nameof(QuestId))]
-		public virtual QuestDefinition Quest { get; set; }
+		public virtual QuestDefinition Quest { get; set; } = null!;
 
 		public uint RefId { get; set; }
 
@@ -22,12 +22,12 @@ namespace Faolan.Core.Database.Tables
 
 		// <localized flags="...">; null/empty for remoteformat slots.
 		[MaxLength(64)]
-		public string Flags { get; set; }
+		public string? Flags { get; set; }
 
 		// The deterministic content hash from the capture (pre-escaped, e.g. contains &#36;). Render-critical:
 		// the client validates it, a wrong key yields blank text.
 		[MaxLength(256)]
-		public string KeyText { get; set; }
+		public string KeyText { get; set; } = null!;
 
 		public uint Category { get; set; }
 	}

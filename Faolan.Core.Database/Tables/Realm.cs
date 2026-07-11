@@ -9,7 +9,7 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(Name), IsUnique = true)]
 	public class Realm : BaseEntity
 	{
-		public virtual ICollection<Character> Characters { get; set; }
+		public virtual ICollection<Character> Characters { get; set; } = [];
 
 		[ConstrainToEnumValues]
 		public RealmCountry Country { get; set; }
@@ -24,10 +24,10 @@ namespace Faolan.Core.Database.Tables
 		public RealmType Type { get; set; }
 
 		[MaxLength(64)]
-		public string IpAddress { get; set; }
+		public string IpAddress { get; set; } = null!;
 
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 
 		// The realm's GameServer (world) port - advertised to the client in the EnterWorld handoff (SendGameServer).
 		public ushort Port { get; set; }

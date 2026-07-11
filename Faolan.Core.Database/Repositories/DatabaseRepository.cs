@@ -15,7 +15,7 @@ namespace Faolan.Core.Database.Repositories
 		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<bool> CheckLogin(string username, string password);
 		Task<Character> CreateCharacter(uint accountId, uint realmId);
-		Task<Guild> CreateGuild(string name, uint leaderCharacterId);
+		Task<Guild?> CreateGuild(string name, uint leaderCharacterId);
 		Task<Mail> CreateMail(Mail mail);
 		Task CreateTradepostListing(TradepostListing listing);
 		Task<bool> DeleteCharacter(uint characterId);
@@ -26,19 +26,19 @@ namespace Faolan.Core.Database.Repositories
 		Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds);
 		Task Execute(Func<IDatabaseContext, Task> work);
 		Task<Ability[]> GetAbilities();
-		Task<Ability> GetAbility(uint id);
-		Task<Account> GetAccount(uint id);
-		Task<Account> GetAccount(string userName);
-		Task<Character> GetCharacter(uint id);
+		Task<Ability?> GetAbility(uint id);
+		Task<Account?> GetAccount(uint id);
+		Task<Account?> GetAccount(string userName);
+		Task<Character?> GetCharacter(uint id);
 		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
-		Task<Character> GetCharacterByName(string name, uint realmId);
+		Task<Character?> GetCharacterByName(string name, uint realmId);
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
-		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
-		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
+		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
+		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
-		Task<Character> GetCharacterScaffold(uint characterId);
+		Task<Character?> GetCharacterScaffold(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
@@ -48,49 +48,49 @@ namespace Faolan.Core.Database.Repositories
 		Task<Combo[]> GetClassCombos(uint level, Class @class);
 		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
-		Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath);
+		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath);
 		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath);
-		Task<RespawnPoint> GetDefaultSpawn(uint mapId);
+		Task<RespawnPoint?> GetDefaultSpawn(uint mapId);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
-		Task<Guild> GetGuild(uint id);
-		Task<Guild> GetGuildByName(string name, uint realmId);
+		Task<Guild?> GetGuild(uint id);
+		Task<Guild?> GetGuildByName(string name, uint realmId);
 		Task<List<Guild>> GetGuilds(uint realmId);
-		Task<Item> GetItem(uint id);
+		Task<Item?> GetItem(uint id);
 		Task<uint?> GetItemSearchCategory(uint template);
-		Task<LuaScript> GetLuaScript(uint scriptId);
-		Task<Mail> GetMailByWireId(ulong mailId);
+		Task<LuaScript?> GetLuaScript(uint scriptId);
+		Task<Mail?> GetMailByWireId(ulong mailId);
 		Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId);
-		Task<Map> GetMap(uint id);
+		Task<Map?> GetMap(uint id);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
-		Task<Npc> GetNpcByName(string name);
-		Task<NpcSpawn> GetNpcSpawnByName(string name);
+		Task<Npc?> GetNpcByName(string name);
+		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
-		Task<QuestDefinition> GetQuestDefinition(uint questId);
+		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
 		Task<Dictionary<string, uint>> GetQuestGiverMap();
 		Task<Item[]> GetRandomBuildableItems(int count);
 		Task<Item[]> GetRandomLootExcludedItems();
-		Task<Realm> GetRealm(uint id);
+		Task<Realm?> GetRealm(uint id);
 		Task<Realm[]> GetRealms();
 		Task SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status);
 		Task<ChatMessage[]> GetRecentChatMessages(int limit = 100, uint? channelId = null);
 		Task<Recipe[]> GetRecipes();
-		Task<RespawnPoint> GetRespawnPoint(uint id);
+		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
-		Task<Shop> GetShopByVendorName(string vendorName);
-		Task<Spell> GetSpell(uint id);
+		Task<Shop?> GetShopByVendorName(string vendorName);
+		Task<Spell?> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
 		Task<Dictionary<string, byte[]>> GetStockPhrases();
-		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
-		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
+		Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId);
+		Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
 		Task<List<TradepostListing>> GetTradepostListings(uint itemId, uint realmId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
-		Task<WorldObject> GetWorldObject(uint mapId, uint captureId);
+		Task<WorldObject?> GetWorldObject(uint mapId, uint captureId);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task RemoveCharacterShortcut(uint characterId, uint slot);
@@ -113,7 +113,7 @@ namespace Faolan.Core.Database.Repositories
 		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
-		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null);
+		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
 		Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId);
 		Task<int> SetCreationSpawn(Character character);
 		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
@@ -240,7 +240,7 @@ namespace Faolan.Core.Database.Repositories
 					Class = Class.Barbarian,
 					Race = Race.Cimmerian,
 					CreationDate = DateTime.UtcNow,
-					MapId = Map.TortageBeachId,
+					MapId = Map.NewPlayerSpawnSpawnPoint.MapId,
 					Position = Map.NewPlayerSpawnSpawnPoint.Position
 				};
 
@@ -258,7 +258,7 @@ namespace Faolan.Core.Database.Repositories
 
 		// Creates a guild with the given character as its leader. Returns null when the name is taken or the
 		// character is already in a guild.
-		public async Task<Guild> CreateGuild(string name, uint leaderCharacterId)
+		public async Task<Guild?> CreateGuild(string name, uint leaderCharacterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var leader = await ctx.Characters.FirstOrDefaultAsync(c => c.Id == leaderCharacterId);
@@ -410,25 +410,25 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Abilities.OrderBy(a => a.Id).ToArrayAsync();
 		}
 
-		public async Task<Ability> GetAbility(uint id)
+		public async Task<Ability?> GetAbility(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
 		}
 
-		public async Task<Account> GetAccount(uint id)
+		public async Task<Account?> GetAccount(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Accounts.FirstOrDefaultAsync(a => a.Id == id);
 		}
 
-		public async Task<Account> GetAccount(string userName)
+		public async Task<Account?> GetAccount(string userName)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Accounts.FirstOrDefaultAsync(a => a.UserName == userName);
 		}
 
-		public async Task<Character> GetCharacter(uint id)
+		public async Task<Character?> GetCharacter(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			// Include Body so the create-editor can resume an existing character's morphs without creating a
@@ -448,7 +448,7 @@ namespace Faolan.Core.Database.Repositories
 		// Character names are unique (guild invites and GM commands address players by name).
 		// #324: character names are unique per realm, so a by-name lookup is realm-scoped (the caller passes its own
 		// realm - all name-addressed interactions are same-realm: guild invite, mail, GM in the realm process).
-		public async Task<Character> GetCharacterByName(string name, uint realmId)
+		public async Task<Character?> GetCharacterByName(string name, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Characters.FirstOrDefaultAsync(c => c.RealmId == realmId && c.Name == name);
@@ -462,7 +462,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterCombos.Where(c => c.CharacterId == characterId).OrderBy(c => c.ComboId).ToArrayAsync();
 		}
 
-		public async Task<CharacterEquipment> GetCharacterEquipment(uint characterId)
+		public async Task<CharacterEquipment?> GetCharacterEquipment(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			// Eager-load every equip-slot item nav + the bag slot so the inventory builder can read them detached.
@@ -488,7 +488,7 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync(e => e.CharacterId == characterId);
 		}
 
-		public async Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance)
+		public async Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 
@@ -526,7 +526,7 @@ namespace Faolan.Core.Database.Repositories
 		// Loads the character with its spawn-scaffold rows (entry table / feat-ID list / ending pair lists /
 		// pre-IIR frame) plus Body and BodyResources, so first-entry seeding can generate the morph and
 		// weighted-appearance entries from the editor choices. Detached like every read here.
-		public async Task<Character> GetCharacterScaffold(uint characterId)
+		public async Task<Character?> GetCharacterScaffold(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
@@ -638,7 +638,7 @@ namespace Faolan.Core.Database.Repositories
 		// is the real branch selector; the old Mode/Field3 were session-volatile counters). Null = no captured screen
 		// for that path (an un-walked branch) -> the runtime closes the window gracefully. See memory
 		// protocol_conversation_routing.
-		public async Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath)
+		public async Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath)
 		{
 			if (string.IsNullOrEmpty(npcName))
 				return null;
@@ -662,7 +662,7 @@ namespace Faolan.Core.Database.Repositories
 			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToList();
 		}
 
-		public async Task<RespawnPoint> GetDefaultSpawn(uint mapId)
+		public async Task<RespawnPoint?> GetDefaultSpawn(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var points = ctx.RespawnPoints.Where(r => r.MapId == mapId);
@@ -676,19 +676,19 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterRespawnPoints.Where(c => c.CharacterId == characterId).Select(c => c.RespawnPointId).ToArrayAsync();
 		}
 
-		public async Task<Shop> GetFirstShop()
+		public async Task<Shop?> GetFirstShop()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Shops.Include(s => s.Items).OrderBy(s => s.Id).FirstOrDefaultAsync();
 		}
 
-		public async Task<Guild> GetGuild(uint id)
+		public async Task<Guild?> GetGuild(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await LoadGuild(ctx, id);
 		}
 
-		public async Task<Guild> GetGuildByName(string name, uint realmId)
+		public async Task<Guild?> GetGuildByName(string name, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var id = await ctx.Guilds.Where(g => g.RealmId == realmId && g.Name == name).Select(g => g.Id).FirstOrDefaultAsync();
@@ -706,7 +706,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Guilds.Include(g => g.Members).Where(g => g.RealmId == realmId).ToListAsync();
 		}
 
-		public async Task<Item> GetItem(uint id)
+		public async Task<Item?> GetItem(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
@@ -734,14 +734,14 @@ namespace Faolan.Core.Database.Repositories
 			return categories.GroupBy(c => c).OrderByDescending(g => g.Count()).First().Key;
 		}
 
-		public async Task<LuaScript> GetLuaScript(uint scriptId)
+		public async Task<LuaScript?> GetLuaScript(uint scriptId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.LuaScripts.FirstOrDefaultAsync(s => s.Id == scriptId);
 		}
 
 		// One mail by its wire MailId (the GetMailByID / GetMailItem target), attachments eager-loaded.
-		public async Task<Mail> GetMailByWireId(ulong mailId)
+		public async Task<Mail?> GetMailByWireId(ulong mailId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).FirstOrDefaultAsync(m => m.MailId == mailId);
@@ -755,7 +755,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).OrderByDescending(m => m.Id).ToListAsync();
 		}
 
-		public async Task<Map> GetMap(uint id)
+		public async Task<Map?> GetMap(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Maps.FirstOrDefaultAsync(m => m.Id == id);
@@ -797,7 +797,7 @@ namespace Faolan.Core.Database.Repositories
 		// GetNpcSpawnByName, which returns a world PLACEMENT. Includes the type's caster Spells + everything
 		// TryBuildFromType needs to assemble the body from columns: the stat core, worn equipment, appearance morphs.
 		// Null if no such type or it has no lifted stat core (can't be spawned standalone).
-		public async Task<Npc> GetNpcByName(string name)
+		public async Task<Npc?> GetNpcByName(string name)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
@@ -813,7 +813,7 @@ namespace Faolan.Core.Database.Repositories
 
 		// A captured NPC spawn by name (case-insensitive), any map (used by .spawnnpc and to fetch a mount-entity
 		// template like "Fading Black Horse" to spawn at the player). Requires the type to have a lifted stat core.
-		public async Task<NpcSpawn> GetNpcSpawnByName(string name)
+		public async Task<NpcSpawn?> GetNpcSpawnByName(string name)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
@@ -845,7 +845,7 @@ namespace Faolan.Core.Database.Repositories
 				.Include(n => n.Npc)
 				.ThenInclude(t => t.StatCore) // #244: the type stat core, so the spawn body builds from columns
 				.Include(n => n.PatrolPath) // #316: the spawn's patrol route (its columnarized MoveTask node tree)
-				.ThenInclude(p => p.Nodes)
+				.ThenInclude(p => p!.Nodes)
 				.ThenInclude(pn => pn.Waypoints)
 				.Where(n => n.MapId == mapId)
 				.ToArrayAsync();
@@ -863,7 +863,7 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// The shared journal-content definition for a quest (text refs + objective marker), or null if not seeded.
-		public async Task<QuestDefinition> GetQuestDefinition(uint questId)
+		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
@@ -889,7 +889,7 @@ namespace Faolan.Core.Database.Repositories
 				.Distinct()
 				.ToListAsync();
 
-			return killTargets.Where(x => !givers.Contains(x.TargetName)).GroupBy(x => x.TargetName).ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
+			return killTargets.Where(x => !givers.Contains(x.TargetName)).GroupBy(x => x.TargetName!).ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 		}
 
 		// Quest-giver NPC name -> the quest id it grants (from ConversationNodes.GrantQuestId). Drives the per-NPC
@@ -907,7 +907,7 @@ namespace Faolan.Core.Database.Repositories
 				})
 				.Distinct()
 				.ToListAsync();
-			return grants.GroupBy(g => g.NpcName).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId));
+			return grants.GroupBy(g => g.NpcName!).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId));
 		}
 
 		// A random sample of snapshot-buildable gear/normal items (Hash != 0, so SnapshotItemBuilder can
@@ -933,7 +933,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Items.Where(i => i.ExcludeFromRandomLoot && i.Type == ItemType.Normal).OrderBy(i => i.Name).ToArrayAsync();
 		}
 
-		public async Task<Realm> GetRealm(uint id)
+		public async Task<Realm?> GetRealm(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Realms.FirstOrDefaultAsync(r => r.Id == id);
@@ -974,7 +974,7 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// A single resurrection point by id (resolves a character's bind point to its map+position on recall).
-		public async Task<RespawnPoint> GetRespawnPoint(uint id)
+		public async Task<RespawnPoint?> GetRespawnPoint(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.RespawnPoints.FirstOrDefaultAsync(p => p.Id == id);
@@ -986,13 +986,13 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.RespawnPoints.Where(r => r.MapId == mapId).ToArrayAsync();
 		}
 
-		public async Task<Shop> GetShopByVendorName(string vendorName)
+		public async Task<Shop?> GetShopByVendorName(string vendorName)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.VendorName == vendorName);
 		}
 
-		public async Task<Spell> GetSpell(uint id)
+		public async Task<Spell?> GetSpell(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Spells.FirstOrDefaultAsync(s => s.Id == id);
@@ -1070,7 +1070,7 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// One listing by its unique sale id - the buy targets this (TradepostBuyItem [saleId]).
-		public async Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId)
+		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == saleId);
@@ -1078,7 +1078,7 @@ namespace Faolan.Core.Database.Repositories
 
 		// The seller's active listing for a given origin bank slot - how the seller's own change-price / cancel ops
 		// address their listing (they carry nBankItemSlot, not the saleId). Keyed by (seller, slot).
-		public async Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId)
+		public async Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.RealmId == realmId && l.SellerName == sellerName && l.BankSlot == bankSlot);
@@ -1100,7 +1100,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.DisplayName != null).ToArrayAsync();
 		}
 
-		public async Task<WorldObject> GetWorldObject(uint mapId, uint capturedHandle)
+		public async Task<WorldObject?> GetWorldObject(uint mapId, uint capturedHandle)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.WorldObjects.FirstOrDefaultAsync(o => o.MapId == mapId && o.DisplayName != null && o.CapturedHandle == capturedHandle);
@@ -1420,7 +1420,7 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// Upserts a character's quest state/progress.
-		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null)
+		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
@@ -1651,12 +1651,12 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// Guild with the full member roster (the 0x203F full update needs every member's name/level/class).
-		private static Task<Guild> LoadGuild(DatabaseContext ctx, uint id)
+		private static Task<Guild?> LoadGuild(DatabaseContext ctx, uint id)
 		{
 			return ctx.Guilds.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == id);
 		}
 
-		private static Task<CharacterEquipment> LoadTrackedEquipment(DatabaseContext ctx, uint characterId)
+		private static Task<CharacterEquipment?> LoadTrackedEquipment(DatabaseContext ctx, uint characterId)
 		{
 			return ctx
 				.CharacterEquipment.Include(e => e.Neck)
@@ -1680,7 +1680,7 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync(e => e.CharacterId == characterId);
 		}
 
-		private static async Task<Item> ResolveItem(DatabaseContext ctx, uint? id)
+		private static async Task<Item?> ResolveItem(DatabaseContext ctx, uint? id)
 		{
 			return id == null
 				? null

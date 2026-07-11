@@ -17,13 +17,13 @@ namespace Faolan.Core.Database.Tables
 		public uint PatrolPathId { get; set; }
 
 		[ForeignKey(nameof(PatrolPathId))]
-		public virtual PatrolPath PatrolPath { get; set; }
+		public virtual PatrolPath PatrolPath { get; set; } = null!;
 
 		// Self-reference: null for the root task, else the parent ListMoveTask. Ordinal is the child order.
 		public uint? ParentId { get; set; }
 
 		[ForeignKey(nameof(ParentId))]
-		public virtual PatrolNode Parent { get; set; }
+		public virtual PatrolNode? Parent { get; set; }
 
 		public virtual ICollection<PatrolNode> Children { get; set; } = new List<PatrolNode>();
 
@@ -65,7 +65,7 @@ namespace Faolan.Core.Database.Tables
 		// The node's fixed numeric-array payload that doesn't columnize, as raw big-endian bytes: Path's 3 middle
 		// trailer words (pad + 2 dir), Ballistic's 7 words, Formation's 6, Rotate/SetPos's 7 (Vec7), Approach's 10-byte
 		// tail. Null when the mode has none.
-		public byte[] WordsData { get; set; }
+		public byte[]? WordsData { get; set; }
 
 		// mode 1 PathMoveTask else-branch waypoints (empty for other modes / the packed branch).
 		public virtual ICollection<PatrolNodeWaypoint> Waypoints { get; set; } = new List<PatrolNodeWaypoint>();

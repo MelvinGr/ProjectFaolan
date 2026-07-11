@@ -11,7 +11,7 @@ namespace Faolan.Core.Database.Tables
 	public class Ability : BaseEntity
 	{
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 
 		// The leading identity word of the 0x2052 grant (written before the key). Distinct from Key; meaning not fully decoded.
 		public uint Data0 { get; set; }

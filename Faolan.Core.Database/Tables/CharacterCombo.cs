@@ -15,7 +15,7 @@ namespace Faolan.Core.Database.Tables
 		public uint CharacterId { get; set; }
 
 		[ForeignKey(nameof(CharacterId))]
-		public virtual Character Character { get; set; }
+		public virtual Character Character { get; set; } = null!;
 
 		// The combo id (e.g. 0x00416544); the client resolves the combo from this via ComboBookIIR.
 		public uint ComboId { get; set; }

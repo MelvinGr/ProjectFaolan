@@ -16,7 +16,7 @@ namespace Faolan.Core.Database.Tables
 		public uint ItemId { get; set; }
 
 		[ForeignKey(nameof(ItemId))]
-		public virtual Item Item { get; set; }
+		public virtual Item Item { get; set; } = null!;
 
 		// The modifier's WIRE stat id (the same id space the stat block uses): 804=Str / 806=Con / 808=Int / 810=Wis
 		// / 814=Dex for the primary-attribute modifier. Stored raw so a future secondary/vital stat slots in unchanged.

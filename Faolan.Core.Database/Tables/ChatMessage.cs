@@ -31,9 +31,9 @@ namespace Faolan.Core.Database.Tables
 		public DateTimeOffset SentAt { get; set; }
 
 		[MaxLength(64)]
-		public string SenderName { get; set; }
+		public string SenderName { get; set; } = null!;
 
 		[MaxLength(512)]
-		public string Text { get; set; }
+		public string Text { get; set; } = null!;
 	}
 }

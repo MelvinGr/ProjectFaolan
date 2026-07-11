@@ -19,6 +19,6 @@ namespace Faolan.Core.Database.Tables
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
+		public virtual Map Map { get; set; } = null!;
 	}
 }

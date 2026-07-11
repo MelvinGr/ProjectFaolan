@@ -21,7 +21,7 @@ namespace Faolan.Core.Database.Tables
 		public uint AccountId { get; set; }
 
 		[ForeignKey(nameof(AccountId))]
-		public virtual Account Account { get; set; }
+		public virtual Account Account { get; set; } = null!;
 
 		// Bind / recall point: the resurrection point the Totem of Origin (and, later, death-recall) returns the
 		// character to. A reference to a RespawnPoint the player has DISCOVERED (CharacterRespawnPoint) - set by a
@@ -31,58 +31,58 @@ namespace Faolan.Core.Database.Tables
 		public uint? BindRespawnPointId { get; set; }
 
 		[ForeignKey(nameof(BindRespawnPointId))]
-		public virtual RespawnPoint BindRespawnPoint { get; set; }
+		public virtual RespawnPoint? BindRespawnPoint { get; set; }
 
 		// Guild membership; null = guildless. Rank 0 = fresh member (retail's invite-accept record), higher =
 		// promoted; the guild creator gets GuildLeaderRank. See Captures/scripts/decode_guild.py for the wire records.
 		public uint? GuildId { get; set; }
 
 		[ForeignKey(nameof(GuildId))]
-		public virtual Guild Guild { get; set; }
+		public virtual Guild? Guild { get; set; }
 
 		// Required: a character always lives on a map; Tortage Beach is the universal fallback world.
 		public uint MapId { get; set; } = Map.TortageBeachId;
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
+		public virtual Map Map { get; set; } = null!;
 
 		// Required: set on creation (CreateCharacter) and by the capture importer.
 		public uint RealmId { get; set; }
 
 		[ForeignKey(nameof(RealmId))]
-		public virtual Realm Realm { get; set; }
+		public virtual Realm Realm { get; set; } = null!;
 
-		public virtual CharacterBody Body { get; set; }
-		public virtual CharacterEquipment Equipment { get; set; }
+		public virtual CharacterBody? Body { get; set; }
+		public virtual CharacterEquipment? Equipment { get; set; }
 
 		// One-to-one max-stat block (Health/Mana/Stamina, player-facing values). Created with class/level
 		// defaults on character creation; the ×100 vitals wire scale is applied when sending (CharacterStatBlock).
-		public virtual CharacterMaxStats MaxStats { get; set; }
+		public virtual CharacterMaxStats? MaxStats { get; set; }
 
 		// The spawn's IIR scaffold, structured so it can be generated instead of template-copied: the uniform
 		// entry table (Attributes), the feat/ability ID list (Skills), the two ending pair lists (ScaffoldPairs)
 		// (the pre-IIR frame + EntryTableX are reconstructed from Class at spawn time, not stored - they carry no
 		// character data). See docs/re/player-spawn-generation-plan.md + docs/re/fa015807-spawn-reader.md.
-		public virtual ICollection<CharacterAttribute> Attributes { get; set; }
+		public virtual ICollection<CharacterAttribute> Attributes { get; set; } = [];
 
 		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,
 		// scars), in editor send order. Resolved via MorphTarget into the spawn scaffold's weighted entries.
-		public virtual ICollection<CharacterBodyResource> BodyResources { get; set; }
+		public virtual ICollection<CharacterBodyResource> BodyResources { get; set; } = [];
 
 		// Non-worn carried items (bag/backpack/quest/resources); worn items are in Equipment. Drives the FullChar
 		// inventory snapshot. See [[CharacterInventory]] / docs/re/player-spawn-generation-plan.md.
-		public virtual ICollection<CharacterInventory> Inventory { get; set; }
+		public virtual ICollection<CharacterInventory> Inventory { get; set; } = [];
 
 		// Per-character progression/state collections (inverse sides of the matching child tables, all cascade-delete
 		// with the character). Quests/Tags are the quest-state machine, RespawnPoints the resurrection points the
 		// character has discovered, Shortcuts the hotbar, Spells the learned spell set re-granted on login.
-		public virtual ICollection<CharacterQuest> Quests { get; set; }
-		public virtual ICollection<CharacterRespawnPoint> RespawnPoints { get; set; }
-		public virtual ICollection<CharacterScaffoldPair> ScaffoldPairs { get; set; }
-		public virtual ICollection<CharacterShortcut> Shortcuts { get; set; }
-		public virtual ICollection<CharacterSkill> Skills { get; set; }
-		public virtual ICollection<CharacterSpell> Spells { get; set; }
-		public virtual ICollection<CharacterTag> Tags { get; set; }
+		public virtual ICollection<CharacterQuest> Quests { get; set; } = [];
+		public virtual ICollection<CharacterRespawnPoint> RespawnPoints { get; set; } = [];
+		public virtual ICollection<CharacterScaffoldPair> ScaffoldPairs { get; set; } = [];
+		public virtual ICollection<CharacterShortcut> Shortcuts { get; set; } = [];
+		public virtual ICollection<CharacterSkill> Skills { get; set; } = [];
+		public virtual ICollection<CharacterSpell> Spells { get; set; } = [];
+		public virtual ICollection<CharacterTag> Tags { get; set; } = [];
 
 		// True once a bind point has been set (an unbound character recalls to / reports its current map).
 		[NotMapped]
@@ -111,16 +111,16 @@ namespace Faolan.Core.Database.Tables
 		public Sex Sex { get; set; } = Sex.Male;
 
 		[MaxLength(32)]
-		public string AuthChallenge { get; set; }
+		public string? AuthChallenge { get; set; }
 
 		[MaxLength(4)]
-		public string Language { get; set; }
+		public string? Language { get; set; }
 
 		[MaxLength(64)] // INET6_ADDRSTRLEN 46
-		public string LastIpAddress { get; set; }
+		public string? LastIpAddress { get; set; }
 
 		[MaxLength(128)]
-		public string Name { get; set; }
+		public string? Name { get; set; }
 
 		public uint Experience { get; set; }
 

@@ -17,19 +17,19 @@ namespace Faolan.Core.Database.Tables
 		public uint ConversationNodeId { get; set; }
 
 		[ForeignKey(nameof(ConversationNodeId))]
-		public virtual ConversationNode Node { get; set; }
+		public virtual ConversationNode Node { get; set; } = null!;
 
 		public byte? Env { get; set; } // KnubotBaseIIR env byte
 		public byte? Flag { get; set; } // OpenChatWindow/AppendText trailing flag (null otherwise)
-		public byte[] CameraParams { get; set; }
+		public byte[]? CameraParams { get; set; }
 
 		[Obsolete("FROM SCRATCH")]
-		public byte[] Data { get; set; }
+		public byte[]? Data { get; set; }
 
 		public int Sequence { get; set; }
 
 		[MaxLength(8192), Obsolete("Deserialize xml and store as columns, then build from scratch")]
-		public string ScreensJson { get; set; } // JSON array of the remoteformat XML screen(s); null for Open
+		public string? ScreensJson { get; set; } // JSON array of the remoteformat XML screen(s); null for Open
 
 		// SetDialogueCamera (0x2015): the GameCharAgent sender instance (varies per conversation) + the 10 camera
 		// param bytes after the two endpoint handles. Body = [0xC350][npc][0xC350][player][CameraParams].

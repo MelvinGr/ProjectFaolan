@@ -22,9 +22,9 @@ namespace Faolan.Core.Database.Tables
 		public uint RealmId { get; set; }
 
 		[ForeignKey(nameof(RealmId))]
-		public virtual Realm Realm { get; set; }
+		public virtual Realm Realm { get; set; } = null!;
 
-		public virtual ICollection<Character> Members { get; set; }
+		public virtual ICollection<Character> Members { get; set; } = [];
 
 		// The guild government form. NOTE: this is NOT the 0x203F's first byte (that is the CoreGuild_c streaming
 		// version, fixed at 3 - see GuildService). The actual government-form byte sits after guildId and is fixed
@@ -42,7 +42,7 @@ namespace Faolan.Core.Database.Tables
 		public string MessageOfTheDay { get; set; } = "";
 
 		[MaxLength(64)]
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 
 		public uint Renown { get; set; }
 

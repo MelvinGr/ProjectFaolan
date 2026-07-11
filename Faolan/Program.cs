@@ -182,8 +182,6 @@ namespace Faolan
 				if (builder.Configuration.McpEnabled)
 					builder.Services.AddFaolanMcp();
 
-				var hostRealmId = hostRealm.Id;
-				var hostRealmPort = hostRealm.Port;
 				builder.Services.AddScopedHostedService(provider =>
 				{
 					var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
@@ -192,14 +190,14 @@ namespace Faolan
 					var agentServerDispatcher = provider.GetRequiredService<IChatServerDispatcher>();
 					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
-					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealmId}"), configuration, dataRepository, hostRealmPort, agentServerDispatcher,
-						gameServerDispatcher);
+					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm.Id}"),
+						configuration, dataRepository, hostRealm, agentServerDispatcher, gameServerDispatcher);
 				});
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
 				// stop in reverse order, flips the realm Offline first as shutdown begins (#324).
 				builder.Services.AddScopedHostedService(provider =>
-					new RealmStatusService(provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<ILogger<RealmStatusService>>(), hostRealmId));
+					new RealmStatusService(provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<ILogger<RealmStatusService>>(), hostRealm.Id));
 			}
 
 			var host = builder.Build();

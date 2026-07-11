@@ -13,7 +13,7 @@ namespace Faolan.Core.Database.Tables
 		public uint CharacterId { get; set; }
 
 		[ForeignKey(nameof(CharacterId))]
-		public virtual Character Character { get; set; }
+		public virtual Character Character { get; set; } = null!;
 
 		// The RDB quest id (e.g. 13479); the client renders the quest's text from this.
 		public uint QuestId { get; set; }
@@ -25,7 +25,7 @@ namespace Faolan.Core.Database.Tables
 		// quest objective definitions live in the pinned RDB Lua quest VM; until then the target is set when the quest
 		// is added (e.g. via .quest), and the tracker advances GoalProgress on a matching kill.
 		[MaxLength(128)]
-		public string GoalTargetName { get; set; }
+		public string? GoalTargetName { get; set; }
 
 		// Provisional single-objective progress (current/required). Multi-goal quests get richer modelling later.
 		public uint GoalProgress { get; set; }

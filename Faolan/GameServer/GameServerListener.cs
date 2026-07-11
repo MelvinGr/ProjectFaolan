@@ -44,25 +44,7 @@ namespace Faolan.GameServer
 		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
 		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
 		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
-		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprint
-
-		// A captured ChatTextIIR system line (demol80 randomActions #7564): a localized `CriteriaYou` remoteformat.
-		// Replayed verbatim (localized token ids + keys unchanged) with only the live session instance substituted, 		// so it is guaranteed byte-valid. Arbitrary LITERAL text would need a literal-text remoteformat template (or
-		// RDB string ids) - the same follow-up the FormatFeedback FIFO banner has.
-		private const string CriteriaSystemLineXml = "<remoteformat id=\"562\" category=\"100\" key=\"6segSK/UI?Kc`Tzg.tio\" knubot=\"0\"  >" +
-													 "<parameter value=\"7;&lt;localized token=&quot;CriteriaYou&quot; category=&quot;130&quot; flags=&quot;&quot; " +
-													 "key=&quot;^4L2&amp;#36;dU5AGjcTX_xJ[*Q&quot; &gt;\" /><parameter value=\"7;&lt;localized id=&quot;700&quot; " +
-													 "category=&quot;55200&quot; flags=&quot;&quot; key=&quot;MpRf.Cx.%^MGdFXT&amp;quot;9X(&quot; &gt;\" /></remoteformat>";
-		// Tradepost (auction house) + mail state-mutating ops, folded off the former TradepostService onto the
-		// listener. HandleTradepostPacket (GameServerListener.Tradepost.cs) dispatches to these. They use Database /
-		// Logger and the listener's own SendUpdateCash / SendAddItem (its IEconomyOutbound impl) directly.
-
-		// Mail wire/DB constants (MailConstants.EndpointClass / FooterUnread / AttachmentTrailerWord / ExpirySeconds) live in
-		// the shared Faolan.Core MailConstants so the server and the MCP economy tools agree on one source.
-
-		// The bank "listed" overlay rides on the SAME item-stat ids as a listing entry (TradepostListingCodec.Stat*:
-		// 0=flags, 258=price, 265=timestamp), pushed as 0x201c stat updates on container 105. Only the flag VALUES
-		// below are bank-overlay-specific.
+		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprintource.
 
 		private const uint BankFlagListed = 0x401; // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
@@ -227,9 +209,8 @@ namespace Faolan.GameServer
 		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts;
 
-		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IChatServerDispatcher agentServerDispatcher,
-			IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
-			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes)))
+		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher)
+			: base(realm.Port, logger, configuration, database, new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes)))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;

@@ -22,7 +22,7 @@ namespace Faolan.Core.Database.Tables
 		public uint ComboId { get; set; }
 
 		[ForeignKey(nameof(ComboId))]
-		public virtual Combo Combo { get; set; }
+		public virtual Combo Combo { get; set; } = null!;
 
 		// The character level this combo unlocks at FOR THIS CLASS.
 		public byte Level { get; set; }

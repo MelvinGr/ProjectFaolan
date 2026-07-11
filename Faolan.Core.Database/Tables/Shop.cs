@@ -16,10 +16,10 @@ namespace Faolan.Core.Database.Tables
 		// The shop ID32 type word on the wire (0x0000C75B).
 		public const uint WireType = 0x0000C75B;
 
-		public virtual ICollection<ShopItem> Items { get; set; }
+		public virtual ICollection<ShopItem> Items { get; set; } = [];
 
 		[MaxLength(64)]
-		public string VendorName { get; set; }
+		public string VendorName { get; set; } = null!;
 
 		// Window capacity (ProtoInventoryGame.max_size; observed 10/20/40/80/160).
 		public uint MaxSize { get; set; }
