@@ -833,6 +833,28 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 		}
 
+		// A player used a STATIC world object (Interact UseObject) that isn't a loot bag - a DOOR/GATE (e.g. the
+		// "King Conan's Throne Room" gate). Reply with the SimpleDynelVisualChange so the client plays the open
+		// animation + drops the collision: numeric state 5 then the "object_open" state string, matching the
+		// conans-castle capture (rec 1697 -> 1698). The object is looked up by its CapturedHandle - the handle it was
+		// streamed with (WorldObjectBuilder.TryBuild uses row.CapturedHandle) - on the player's map. Returns false if
+		// no such object exists, so the caller can fall through to the loot-bag path.
+		public async Task<bool> OpenWorldObject(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return false;
+
+			var obj = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o => o.CapturedHandle == handle);
+			if (obj == null)
+				return false;
+
+			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x05));
+			await SendWorldIir(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
+			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? obj.DisplayName ?? "object", handle);
+			return true;
+		}
+
 		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
 		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
 		// correct, state-driven marker instead of a hardcoded value.

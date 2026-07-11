@@ -466,8 +466,12 @@ namespace Faolan.GameServer
 
 							case ActionType.UseObject:
 							{
-								// Using a world object - the loot path: `target` is the object handle (its typetag, 								// 0xC87A for loot bags, rides in `from`). Opens the bag if it's a loot bag in the zone.
-								await _broadcaster.OpenLootBag(client, target);
+								// Using a world object - `target` is the object handle (its typetag, 0xC87A for loot bags,
+								// rides in `from`). A STATIC world object (a door/gate) plays its open state; a loot bag
+								// (zone entity) opens its window. Try the door path first (DB world object by CapturedHandle);
+								// fall through to the loot-bag path when it isn't one.
+								if (!await _broadcaster.OpenWorldObject(client, target))
+									await _broadcaster.OpenLootBag(client, target);
 
 								break;
 							}
