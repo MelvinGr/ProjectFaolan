@@ -42,7 +42,7 @@ namespace Faolan.Core.Network
 		// auth): the create connection names the character mid-connection (CommitCharacterName), after which
 		// this flips to false while IsCreateEditorConnection stays true. Handshake steps that must behave
 		// differently before vs after the name is committed (the instance-echo route, the 0x205F create branch,
-		// the create-vs-login ReadyForPlayScreen/AccessWindow bodies) key on THIS, not the role flag.
+		// the create-vs-login SendReadyForPlayScreen body) key on THIS, not the role flag.
 		bool IsUnnamedCreatePhase { get; }
 
 		// Spellweaving trance state (docs/subsystems/combos.md): true between the activate and deactivate PerformSpecialAction
