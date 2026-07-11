@@ -222,8 +222,49 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.RequestRenownHistory:
 				{
-					// Logger.LogInformation("Opcodes.Ox2040");
+					// The renown-over-time graph in the guild window (retail answers with 0x2039). We track no history,
+					// so we return a zeroed block (flat graph).
+					await SendGuildRenownHistory(client, packet);
 
+					break;
+				}
+
+				case CSPlayerAgentOpcodes.SearchForGuilds:
+				{
+					// The guild-finder browse window (0x2043 -> 0x205C). Return the realm's guilds.
+					await SendGuildSearchResult(client, packet);
+
+					break;
+				}
+
+				case CSPlayerAgentOpcodes.CharacterSearch:
+				{
+					// Character/"who" search (0x200A -> 0x2010). Empty result (no search index yet).
+					await SendCharacterSearchResult(client, packet);
+
+					break;
+				}
+
+				case CSPlayerAgentOpcodes.SearchForTeam:
+				{
+					// LFG team search (0x200B -> 0x200F). Empty result.
+					await SendTeamSearchResult(client, packet);
+
+					break;
+				}
+
+				case CSPlayerAgentOpcodes.PvPMatchMakingRequestInfo:
+				{
+					// PvP matchmaking info (0x2054 -> 0x2092). Empty / not-queued result.
+					await SendPvpMatchMakingInfo(client, packet);
+
+					break;
+				}
+
+				case CSPlayerAgentOpcodes.PvPMatchMakingIsInMatchMaking:
+				{
+					// "Am I queued for PvP matchmaking?" (0x2055). Retail sends no response; consume it so it isn't
+					// logged as unhandled.
 					break;
 				}
 

@@ -108,6 +108,12 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
 - **CS-agent reply endpoints:** every `CsPlayerAgent` s2c is addressed FROM the guild-server object endpoint
   (`GuildService.ReplySender` stamps the fixed instance `0x04` onto the class the client targeted), matching retail —
   the client targets the class with instance 0, and captures always show a nonzero server instance on replies.
+- **Search / matchmaking requests** (`Faolan/CSPlayerAgent/Packets.cs`): the client's remaining CS-agent requests are
+  now all answered so no window is left hanging. `SearchForGuilds` (0x2043 → `0x205C`) is CONSTRUCTED from the realm's
+  guilds via `GuildSearchResult` (byte-exact codec, `GuildSearchResultTests`) — the guild-finder browse list.
+  `RequestRenownHistory` (0x2040 → `0x2039`) returns a zeroed 112-byte history (we track no time series). The
+  character/team/PvP-matchmaking searches (`0x200A`→`0x2010`, `0x200B`→`0x200F`, `0x2054`→`0x2092`) return well-formed
+  empty `0x3F1` lists (retail's own no-result bodies), and `0x2055` gets no reply (retail sends none).
 - Create path: the capture-true `CreateGuild` RPC (0x2021 → `HandleCreateGuild`), triggered in-client from a
   registrar NPC window. The old `.guild create <name>` GM bootstrap was removed with the other GM test
   commands (commit `54f55dee`); the surviving GM commands are `.ah`/`.teleport`/… (no `.guild`).

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
@@ -26,6 +27,9 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// what makes the client abort the dispatch and drop the CsPlayerAgent connection.
 	public sealed class GuildRankings
 	{
+		// The CSPlayerInterface opcode this body is the payload of (0x2038).
+		public const CSPlayerInterfaceOpcodes Opcode = CSPlayerInterfaceOpcodes.DispatchGuildRankingsUpdate;
+
 		public const uint GuildClass = 0x0000DEB7; // the guild ID32 type word (Guild.WireType)
 		public const uint ListMultiplier = 0x3F1; // count-framed-list word == (count + 1) * 0x3F1
 		public const int CategoryCount = 4; // Total(0), Valor(1), Glory(2), Artistry(3)
