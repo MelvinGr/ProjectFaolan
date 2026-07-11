@@ -64,7 +64,7 @@ def reshape(frames):
             packets.append({
                 "Frame": frame_no,
                 "TimeUtc": time,
-                "Protocol": "AgentServer" if chat else "Conan",
+                "Protocol": "ChatServer" if chat else "Conan",
                 "IsDownload": 7000 <= src_port <= 7999,
                 "Source": {"IpAddress": src_ip, "Port": src_port},
                 "Destination": {"IpAddress": dst_ip, "Port": dst_port},

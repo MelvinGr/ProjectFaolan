@@ -20,7 +20,7 @@ namespace Faolan.Importer.Modules
 	// template captured barking gets the lines; the others stay silent until captured.
 	//
 	// The shared tshark reader keeps only the Conan stream, so spawns come from ctx.Captures (via NpcSpawnExtractor,
-	// which decodes the TemplateId out of the FA015807 CharacterIIR) while the AgentServer 0x0022 barks are read from
+	// which decodes the TemplateId out of the FA015807 CharacterIIR) while the ChatServer 0x0022 barks are read from
 	// the matching *.tshark.json directly. Correlation: bark sender handle -> the spawn's TemplateId (same capture).
 	public sealed class NpcChatterModule : IImportModule
 	{
@@ -70,7 +70,7 @@ namespace Faolan.Importer.Modules
 
 					foreach (var p in packets.EnumerateArray())
 					{
-						if (Str(p, "Protocol") != "AgentServer" || Str(p, "Opcode") != "0x0022" || Body(p) is not { } body || body.Length < 6)
+						if (Str(p, "Protocol") != "ChatServer" || Str(p, "Opcode") != "0x0022" || Body(p) is not { } body || body.Length < 6)
 							continue;
 						var sender = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
 						var len = BinaryPrimitives.ReadUInt16BigEndian(body.AsSpan(4, 2));

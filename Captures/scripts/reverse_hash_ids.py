@@ -49,8 +49,8 @@ def best_name(idv):
 # scan capture bodies — the .tshark.json dump already de-frames each packet (opcode + body are fields), and
 # all Conan services collapse to Protocol="Conan", so the context label is the server-side endpoint class id.
 def service_label(p):
-    if p.get("Protocol") == "AgentServer":
-        return "AgentServer"
+    if p.get("Protocol") == "ChatServer":
+        return "ChatServer"
     cls = p.get("SenderClass") if p.get("IsDownload") else p.get("ReceiverClass")
     return cls or p.get("Protocol") or "?"
 

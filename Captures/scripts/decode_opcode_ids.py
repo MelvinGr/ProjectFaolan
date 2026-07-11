@@ -51,14 +51,14 @@ def resolve(idv, want_iir):
 # --- parse captures ---
 # The .tshark.json dump (Captures/scripts/tshark_dump.sh) already de-frames every packet: the RPC endpoint class ids,
 # the 16-bit opcode and the body come straight from the record. All Conan-protocol services collapse to
-# Protocol="Conan" (only chat keeps "AgentServer"), so the per-service breakdown is bucketed by the
+# Protocol="Conan" (only chat keeps "ChatServer"), so the per-service breakdown is bucketed by the
 # server-side endpoint CLASS id (the stable interface discriminator — ports are dynamically advertised).
 def hexint(s):
     return int(s, 16) if s else None
 
 def service_label(p):
-    if p.get("Protocol") == "AgentServer":
-        return "AgentServer"
+    if p.get("Protocol") == "ChatServer":
+        return "ChatServer"
     cls = p.get("SenderClass") if p.get("IsDownload") else p.get("ReceiverClass")
     return cls or p.get("Protocol") or "?"
 
