@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Faolan.Core.Crypt;
@@ -334,12 +333,6 @@ namespace Faolan.ClientLauncher
 				BackupOnce(Path.Combine(Path.GetDirectoryName(exe)!, "LocalConfig.xml"));
 			}
 
-			// Keep the exe as a GUI subsystem app: a CUI flip makes Wine spawn a separate wineconsole window, which
-			// we don't want - we stream the client's stdio into this terminal instead (see --console below). This
-			// also undoes any earlier CUI patch. Done before the md5 so -clienthash matches the launched file.
-			if (!dryRun)
-				SetConsoleSubsystem(exe, false);
-
 			// Patch the client's embedded Funcom DH pubkey -> CELLAO on disk so the server can validate the password
 			// (ClientExePatcher). Cross-platform (a byte swap, no ptrace/process memory - the old in-memory patch was
 			// Linux-only). Done here, before the md5, so -clienthash matches the launched file; persists like the
@@ -367,7 +360,7 @@ namespace Faolan.ClientLauncher
 				switch (ClientExePatcher.PatchLauncherNotes(exe, launcherNotes))
 				{
 					case ClientExePatcher.Result.Patched:
-						Console.WriteLine($"notes-url : redirected launcher-notes URL -> {launcherNotes}");
+						Console.WriteLine($"notes-url : {launcherNotes}");
 						break;
 					case ClientExePatcher.Result.AlreadyDone:
 						Console.WriteLine("notes-url : launcher-notes URL already redirected");
@@ -618,41 +611,6 @@ namespace Faolan.ClientLauncher
 			{
 				Console.Error.WriteLine($"{tag} update failed: {e.Message}");
 				return null;
-			}
-		}
-
-		// Flip the PE subsystem byte: GUI(2) <-> CUI/console(3). The offset is computed from the PE header (no magic
-		// constant); only writes when it differs and the current value is a sane 2/3 (so we never corrupt the exe).
-		private static void SetConsoleSubsystem(string exe, bool console)
-		{
-			try
-			{
-				using var fs = new FileStream(exe, FileMode.Open, FileAccess.ReadWrite);
-				using var br = new BinaryReader(fs, Encoding.ASCII, true);
-
-				fs.Position = 0x3c;
-				var peOffset = br.ReadInt32();
-				fs.Position = peOffset;
-				if (br.ReadUInt32() != 0x0000_4550) // "PE\0\0"
-					return;
-
-				var subsystemOffset = peOffset + 4 + 20 + 68; // PE sig + COFF header + Subsystem offset in optional header
-				fs.Position = subsystemOffset;
-				var current = br.ReadByte();
-				var want = (byte)(console
-					? 3
-					: 2);
-
-				if (current is not (2 or 3) || current == want)
-					return;
-
-				fs.Position = subsystemOffset;
-				fs.WriteByte(want);
-				Console.WriteLine($"patched PE subsystem -> {(console ? "CUI (console)" : "GUI")}");
-			}
-			catch (Exception e)
-			{
-				Console.Error.WriteLine($"subsystem patch skipped: {e.Message}");
 			}
 		}
 

@@ -28,21 +28,24 @@ case "$command" in
 
     --client)
         shift
+        # exe/proton auto-detected from Steam (app 217750).
         dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
-            --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe' \
             --console \
             --universeaddr 127.0.0.1:7010 \
-            --mirror 7081 \
+            --cdn http://127.0.0.1:7081 \
+            --launcher-notes 'http://127.0.0.1:7081/_stats?UniverseName=%s&Language=%s' \
             "$@"
         ;;
 
     --client2)
         shift
+        # A second install auto-detect can't find, so point --exe at it explicitly.
         dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
             --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan 2/AgeOfConan.exe' \
             --console \
             --universeaddr 127.0.0.1:7010 \
-            --mirror 7081 \
+            --cdn http://127.0.0.1:7081 \
+            --launcher-notes 'http://127.0.0.1:7081/_stats?UniverseName=%s&Language=%s' \
             "$@"
         ;;
 

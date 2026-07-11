@@ -62,29 +62,32 @@ Faolan.ClientLauncher [options]
   -u, --username <s>  auto-login account
   -p, --password <s>  auto-login password
   -c, --charname <s>  auto-enter this character
-  --universeaddr [a]  point LocalConfig.xml <UniverseAddr> at `a` for the session (bare = 127.0.0.1:7010),
-                      reverted on exit (and on Ctrl+C / process exit). Replaces an /etc/hosts override. The
-                      original is recorded in a sidecar first, so a hard-killed run self-heals on the next launch.
-  --detach            with --universeaddr: revert + return once the client has read the config (fire-and-forget),
-                      instead of holding the foreground until the client exits
-  --restore           heal a UniverseAddr left redirected by a hard-killed run (via the sidecar), then exit
-  --console           foreground; tail AgeOfConan.log into THIS terminal (same content as the client console,
-                      no separate wineconsole window); also drops -noconsole
-  --patch-login       patch the client's DH key (Funcom -> CELLAO) on disk before launch (password validation;
-                      cross-platform, exe backed up to .bak; undo with --restore)
-  --proton <path>     Proton 'proton' script (or PROTON env; default = Steam Proton-Experimental)
-  --wine <cmd>        use a plain wine runner instead of Proton
+  --universeaddr <a>  point LocalConfig.xml <UniverseAddr> (login server) at `a`, e.g. 127.0.0.1:7010 (host:port).
+                      Required value. Replaces an /etc/hosts override; persists (undo with --restore)
+  --cdn <url>         point the three LocalConfig.xml CDN keys at <url> (each -> <url>/<tag>/upm), e.g.
+                      http://127.0.0.1:7081 (the local Faolan.Web.Content). Required value; persists
+  --launcher-notes <url>  redirect the client's dead hardcoded launcher-notes URL to <url> (keep the two %s).
+                      Required value; on-disk exe patch, covered by the .bak
+  --patch-login       patch the DH key (Funcom -> CELLAO) on disk before launch so the server can validate the
+                      real password. Cross-platform; the exe is backed up to .bak
+  --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml from their .bak, then exit
+  --console           foreground; tail AgeOfConan.log into THIS terminal (no separate wineconsole window); also
+                      drops -noconsole
+  --proton <path>     (Linux only) Proton 'proton' script or PROTON env (default: auto-detected - the build Steam
+                      runs AoC with). Ignored on Windows, which runs the exe directly
+  --wine <cmd>        (Linux only) use a plain wine runner instead of Proton. Ignored on Windows
   -n, --dry-run       print computed clienthash/key/args without launching
 ```
 
 Behaviors:
 
 - **Kills any running client first** (clean repeated launches).
-- **Launches via Proton** off Windows — `proton run <exe> <args>` with the Steam compat env from `launchClient.sh`
-  (`STEAM_COMPAT_DATA_PATH`, `STEAM_COMPAT_CLIENT_INSTALL_PATH`, `SteamAppId/SteamGameId=217750`, `WINEDEBUG=-all`).
-  `--wine` for a plain wine runner; direct on Windows.
-- **Keeps the exe GUI-subsystem** (a CUI flip would spawn a separate wineconsole window) and computes `-clienthash`
-  from the actual launched file.
+- **Launches via Proton** off Windows — `proton run <exe> <args>` with the Steam compat env
+  (`STEAM_COMPAT_DATA_PATH` from the auto-detected compat-data, `STEAM_COMPAT_CLIENT_INSTALL_PATH`,
+  `SteamAppId/SteamGameId=217750`, `PROTON_USE_WINED3D`/`PROTON_NO_ESYNC`/`PROTON_NO_FSYNC`).
+  `--wine` for a plain wine runner; direct on Windows. The exe, compat-data, and Proton build are all auto-detected
+  from Steam (see `SteamPaths.cs`).
+- **Computes `-clienthash`** from the actual launched file (after any on-disk patch, so the hash matches).
 
 ---
 
@@ -93,8 +96,8 @@ Behaviors:
 The client reads its login server from **`LocalConfig.xml`** → `<UniverseAddr>dm09-nj4.ageofconan.com:7010</UniverseAddr>`
 (confirmed via RE — AgeOfConan.exe references both `LocalConfig.xml` and `UniverseAddr`; it is **not** in the exe).
 So instead of an `/etc/hosts` line (`127.0.0.1 dm09-nj4.ageofconan.com`), `--universeaddr` rewrites that field to
-`127.0.0.1:7010` for the session and reverts it afterward (byte-identical round-trip verified). `--detach` reverts
-after the client has read it rather than holding for the whole session.
+`127.0.0.1:7010`. It PERSISTS (LocalConfig.xml is backed up to `.bak` first; `--restore` puts it back), so nothing
+races the client's read of the config.
 
 ---
 
@@ -133,9 +136,9 @@ against a retail capture for regressions, or `--dump` it.
 
 ### Launch + drive the client
 ```
-Faolan.ClientLauncher --universeaddr --detach -u faolan -p aa -c tester [--patch-login]
+Faolan.ClientLauncher --universeaddr 127.0.0.1:7010 --cdn http://127.0.0.1:7081 -u faolan -p aa -c tester [--patch-login]
 # or foreground with live log:
-Faolan.ClientLauncher --universeaddr --console -u faolan -p aa -c tester
+Faolan.ClientLauncher --universeaddr 127.0.0.1:7010 --console -u faolan -p aa -c tester
 ```
 
 ### Watch for success markers
@@ -166,8 +169,8 @@ needs interactive editor input, which the launcher flags can't provide — it'd 
 ### Proven run (2026-06-10)
 The smoke-test script → **14/14 PASS**: Proton launched the client → server logged `login accepted` →
 `RequestAuth` → `EnterWorld (0x20B6)` → CSPlayerAgent auth → in-world GameServer traffic; client applied the
-gametweaks with no Dispatcher failures; the loopback pcap held 360 packets across 7010+7014; the launcher reverted
-`UniverseAddr` and cleaned up its sidecar — all with **no manual interaction**. This unblocks the **TODO #7**
+gametweaks with no Dispatcher failures; the loopback pcap held 360 packets across 7010+7014; the launcher applied
+the `UniverseAddr` redirect — all with **no manual interaction**. This unblocks the **TODO #7**
 create-world loopback-capture diff (its pinned next step needed exactly this repeatable live run).
 
 ---
@@ -177,4 +180,4 @@ create-world loopback-capture diff (its pinned next step needed exactly this rep
 - `Faolan.Core/Crypt/ConanLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
 - `Faolan.Core.Network/LoginEncryption.cs` — server-side DH+TEA login decrypt.
 - `Faolan.ClientLauncher/ClientExePatcher.cs` — the on-disk DH-key + launcher-notes patcher, invoked by `--patch-login` / `--launcher-notes`.
-- `launchClient.sh` — the Proton launch env the launcher mirrors.
+- `Faolan.ClientLauncher/SteamPaths.cs` — Steam auto-detection of the exe / compat-data / Proton build; `run.sh --client` is the convenience wrapper.
