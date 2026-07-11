@@ -748,7 +748,15 @@ namespace Faolan.GameServer.World
 				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
 				// players holding one of them (e.g. Scavenger Tuut while you carry Casilda's kill quest).
 				if (npcName != null && _questGatedNpcs.TryGetValue(npcName, out var gateQuests))
+				{
 					entity.GateQuestIds = gateQuests;
+					// Quest-gated NPCs are one-time KILL TARGETS (the gate map is exactly the kill-goal targets that
+					// aren't quest givers). A story kill target must NOT respawn ~15s later - killing Scavenger Tuut
+					// for Casilda's quest completes the goal and he should stay dead (retail solo-instances him). So a
+					// gated NPC despawns after death instead of reviving; its loot bag (the quest key) is a separate
+					// entity and still drops.
+					entity.NoRespawn = true;
+				}
 
 				// #266 patrol: attach this NPC's captured route (linked by exact spawn position). REPLAY the captured
 				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
