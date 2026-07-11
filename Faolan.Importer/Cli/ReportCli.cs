@@ -42,7 +42,7 @@ namespace Faolan.Importer.Cli
 
 				case "coverage":
 				{
-					await Coverage(dbPath, LoadCaptures(capturesDir), arg);
+					await Coverage(dbPath, LoadCaptures(capturesDir), arg, GetOption(args, "--rdb"));
 					return 0;
 				}
 
@@ -216,7 +216,7 @@ namespace Faolan.Importer.Cli
 		// we import. Capture-relative by necessity (there is no authoritative game-wide vendor/dialogue list - retail
 		// dialogue is TEA-encrypted in the RDB), so it measures import completeness OF WHAT WE'VE SEEN and names the
 		// gaps to go capture/decode. `--report-arg readme` rewrites the marked section of README.md; else it prints.
-		private static async Task Coverage(string dbPath, IReadOnlyList<NamedCapture> captures, string arg)
+		private static async Task Coverage(string dbPath, IReadOnlyList<NamedCapture> captures, string arg, string rdbDir)
 		{
 			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
 			var greeted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -244,10 +244,56 @@ namespace Faolan.Importer.Cli
 			var convHave = greetedTalkers.Count - convGaps.Count;
 			var shopHave = vendorsSeen.Count - shopGaps.Count;
 
-			static string Pct(int have, int total) => total == 0 ? "n/a" : $"{100.0 * have / total:0}%";
+			static string Pct(int have, int total) => total == 0 ? "n/a" : $"{100.0 * have / total:0.0}%";
 			var block = new StringBuilder();
 			block.AppendLine($"- **NPC conversations** — {convHave}/{greetedTalkers.Count} greeted dialogue NPCs imported ({Pct(convHave, greetedTalkers.Count)})");
 			block.AppendLine($"- **Vendor shops** — {shopHave}/{vendorsSeen.Count} captured vendors imported ({Pct(shopHave, vendorsSeen.Count)})");
+
+			// RDB item/feat/ability template decryption (optional - needs the client RDB). The whole catalog (type
+			// 1000020) is TEA-encrypted; we can only decrypt an entry whose key we've harvested from a capture (item
+			// quads via ItemHashHarvester, ability keys via the 0x2052 grants). There is NO plaintext category tag in
+			// the encrypted RDBH header, so a per-category %-of-total is impossible (we can't tell an undecrypted
+			// entry's category) - we report the overall decrypted share + the absolute per-category decrypted counts.
+			var rdb = string.IsNullOrEmpty(rdbDir) ? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB" : rdbDir;
+			if (Directory.Exists(rdb))
+			{
+				var itemIds = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
+				var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+				using var reader = new RdbReader(rdb);
+				var catalog = reader.EntriesOfType(1000020).ToList();
+				int encrypted = 0, plaintext = 0, decrypted = 0, itemsDec = 0, abilitiesDec = 0;
+				foreach (var e in catalog)
+				{
+					byte[] blob;
+					try
+					{
+						blob = reader.ReadDecompressed(e);
+					}
+					catch
+					{
+						continue;
+					}
+
+					if (RdbReader.IsRdbh(blob))
+					{
+						encrypted++;
+						if (itemIds.Contains(e.Id))
+						{
+							decrypted++;
+							itemsDec++;
+						}
+						else if (abilityIds.Contains(e.Id))
+						{
+							decrypted++;
+							abilitiesDec++;
+						}
+					}
+					else
+						plaintext++;
+				}
+
+				block.AppendLine($"- **RDB template catalog** (type 1000020, TEA-encrypted) — {decrypted:N0}/{encrypted:N0} decrypted, **{Pct(decrypted, encrypted)} of the total encrypted**. Keys held per category: {itemsDec:N0} items, {abilitiesDec:N0} abilities, 0 feats (feat keys absent from captures). (+{plaintext:N0} plaintext catalog entries, no key needed.)");
+			}
 
 			Console.WriteLine("Content coverage (capture-relative: of the NPCs/vendors seen in dumps, how many are imported)\n");
 			Console.Write(block.ToString());

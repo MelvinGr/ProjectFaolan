@@ -27,8 +27,9 @@ imported (capture-relative: retail has no public dialogue/vendor list, so this m
 we've seen*, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
 <!-- coverage:start -->
-- **NPC conversations** — 32/35 greeted dialogue NPCs imported (91%)
-- **Vendor shops** — 20/20 captured vendors imported (100%)
+- **NPC conversations** — 32/35 greeted dialogue NPCs imported (91.4%)
+- **Vendor shops** — 20/20 captured vendors imported (100.0%)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 2,455/77,631 decrypted, **3.2% of the total encrypted**. Keys held per category: 2,428 items, 27 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
