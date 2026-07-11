@@ -63,6 +63,16 @@ namespace Faolan.Importer.Extractors
 
 				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
 				var (objectId, name) = ReadMessage(body);
+				var displayName = WorldObjectBuilder.ReadIdentity(body);
+
+				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-bag DROPS and static lootable
+				// CHESTS. A drop ("Bag of loot", or a bag named after its single item content) spawns dynamically on a
+				// kill and fades after ~120s (WorldBroadcaster.LootBagExpirySeconds) - it must NOT be imported as a
+				// permanent WorldObject (else it stands around forever, e.g. the "Bag of loot" heaps stuck on the
+				// Tortage beach). Static containers share the subopcode but are named as a chest or carry a [script-tag]
+				// identity; keep those, drop the drops.
+				if (subop == (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR && IsTransientLootBag(name, displayName))
+					continue;
 
 				entries.Add(new WorldObjectEntry(currentMap, subop, handle, ReadLE(body, SpawnPacketBuilder.PosXOffset), ReadLE(body, SpawnPacketBuilder.PosYOffset),
 					ReadLE(body, SpawnPacketBuilder.PosZOffset), p.Bytes)
@@ -73,11 +83,21 @@ namespace Faolan.Importer.Extractors
 					RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
 					ObjectId = objectId,
 					Name = name,
-					DisplayName = WorldObjectBuilder.ReadIdentity(body)
+					DisplayName = displayName
 				});
 			}
 
 			return entries;
+		}
+
+		// A LootBagFullUpdateIIR object is a TRANSIENT loot-bag drop (skip it) rather than a static lootable container
+		// (keep it) when its identity is neither a chest nor a scripted object: a drop is named "Bag of loot" or after
+		// its single item content, while every static container in the corpus is named as a chest or carries a
+		// bracketed [script-tag] identity.
+		private static bool IsTransientLootBag(string name, string displayName)
+		{
+			var identity = (name ?? "") + " " + (displayName ?? "");
+			return !identity.Contains("chest", StringComparison.OrdinalIgnoreCase) && !identity.Contains('[');
 		}
 
 		// Dedup by (map, spawn point, identity); keep the first seen. Identity (the display_name) is part of the key
