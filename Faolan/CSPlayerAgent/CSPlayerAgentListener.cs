@@ -204,18 +204,18 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.MassivePvpInfoRequest:
 				{
-					// The client polls GroupFinder activity summaries with 0x2077; retail answers each with a 0x20A5
-					// (verified in the login dump: four 0x2077 -> four 0x20A5). Same response body as 0x202F.
-					await SendQuickGuildSummary(client, packet);
+					// The client polls the Massive-PvP guild leaderboard with 0x2077; retail answers each with a 0x20A5
+					// DispatchMassivePvpInfoRequestReturn (verified in the login dump: 0x2077 -> 0x20A5).
+					await SendMassivePvpInfo(client, packet);
 
 					break;
 				}
 
 				case CSPlayerAgentOpcodes.GuildRequestMemberList:
 				{
-					// Retail answers the member-list request with a fresh 0x203F full update plus the 0x20A5 summary.
+					// Retail answers the member-list request with a fresh 0x203F full update plus the 0x20A5 leaderboard.
 					await _guild.SendGuildStateOnLogin(client, packet);
-					await SendQuickGuildSummary(client, packet);
+					await SendMassivePvpInfo(client, packet);
 
 					break;
 				}
