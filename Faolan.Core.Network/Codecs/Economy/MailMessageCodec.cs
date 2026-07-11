@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text;
 using Faolan.Core.Database.Tables;
@@ -73,11 +74,13 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 
 		// The attachment item as the wire ProtoInventoryGameEntry (item_id = the instance id, stat_list = {26: qty},
-		// item_data = the instance's ProtoAcgItem). The Data1..4 quad describes the concrete item, so it comes off
-		// the attachment row, not the Items template table (same convention as TradepostListingCodec.BuildEntry).
+		// item_data = the instance's ProtoAcgItem). The item's TEA key is per-TEMPLATE and lives in Items, reached
+		// through the Item nav (FK on Template) - Include it before building (Parse attaches a transient Item so a
+		// decoded attachment round-trips without a DB). The Template/Level/ItemHash tail still comes off the row.
 		public static ProtoInventoryGameEntry BuildEntry(MailAttachment a)
 		{
-			var key = a.Key;
+			var key = (a.Item ?? throw new InvalidOperationException(
+				$"MailAttachment (template {a.Template}): the Item navigation is not loaded - Include it before building the entry.")).Key;
 			var entry = new ProtoInventoryGameEntry
 			{
 				ItemId = a.ItemInstanceId,
@@ -140,7 +143,11 @@ namespace Faolan.Core.Network.Codecs.Economy
 				{
 					ItemInstanceId = instanceId,
 					Quantity = qty,
-					Key = key,
+					// The key is per-template and lives in Items; on a DB-backed attachment BuildEntry reads it through
+					// the Item nav. Decoding here has no DB, so attach a TRANSIENT Item carrying just the key so the
+					// decoded attachment round-trips (Build -> bytes). This Item is never tracked/saved - callers that
+					// persist a mail set only the Template FK column (the row resolves its real Items row on reload).
+					Item = new Item { Key = key },
 					Template = item.Template1,
 					ItemLevel = item.Level,
 					ItemHash = item.Hash,

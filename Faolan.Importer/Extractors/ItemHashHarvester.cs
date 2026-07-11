@@ -252,8 +252,11 @@ namespace Faolan.Importer.Extractors
 			var mail = MailMessageCodec.Parse(packet.Body.ToArray());
 			foreach (var a in mail.Attachments)
 			{
-				if (a.Template != 0 && (a.Key.Key1 | a.Key.Key2 | a.Key.Key3 | a.Key.Key4) != 0)
-					into.TryAdd(a.Template, new CapturedItem(a.Key.Key1, a.Key.Key2, a.Key.Key3, a.Key.Key4, a.ItemHash));
+				// Parse attaches a transient Item carrying the decoded per-template key (MailAttachment no longer
+				// stores it inline - it lives in Items via the Template FK).
+				var key = a.Item?.Key;
+				if (a.Template != 0 && key != null && (key.Key1 | key.Key2 | key.Key3 | key.Key4) != 0)
+					into.TryAdd(a.Template, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, a.ItemHash));
 			}
 		}
 

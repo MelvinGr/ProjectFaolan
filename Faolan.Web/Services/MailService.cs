@@ -96,8 +96,7 @@ namespace Faolan.Web.Services
 					Quantity = count == 0
 						? 1u
 						: count,
-					Key = (ProtoDecryptionKey)item.Key.Clone(),
-					Template = item.Id,
+					Template = item.Id, // the key lives in Items (FK on Template); no inline copy
 					ItemLevel = item.Level,
 					ItemHash = item.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,

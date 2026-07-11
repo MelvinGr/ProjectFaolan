@@ -326,6 +326,7 @@ namespace Faolan.Tests
 						SaleId = 1,
 						RealmId = 1,
 						ItemId = 0x7530,
+						Template = 0x7530, // FK-restricted to Items.Id (the instance template's key lives there)
 						Price = 5000,
 						SellerName = "b"
 					});
@@ -334,6 +335,7 @@ namespace Faolan.Tests
 						SaleId = 2,
 						RealmId = 1,
 						ItemId = 0x7530,
+						Template = 0x7530,
 						Price = 25,
 						SellerName = "a"
 					});
@@ -342,6 +344,7 @@ namespace Faolan.Tests
 						SaleId = 3,
 						RealmId = 1,
 						ItemId = 0x9999,
+						Template = 0x9999,
 						Price = 1,
 						SellerName = "c"
 					}); // other item
@@ -665,11 +668,17 @@ namespace Faolan.Tests
 				{
 					await ctx.Database.EnsureCreatedAsync();
 					ctx.Realms.Add(new Realm { Id = 1, Name = "R", IpAddress = "127.0.0.1", Port = 1 }); // #324: RealmId FK
-					// The listing's ItemId is FK-restricted to Items.Id (#212), so the referenced catalog item must exist.
+					// The listing's ItemId (search key) AND Template (instance, where the key lives) are both FK-restricted
+					// to Items.Id, so seed both referenced catalog items.
 					ctx.Items.Add(new Item
 					{
 						Id = 0x7530,
 						Name = "TestWare"
+					});
+					ctx.Items.Add(new Item
+					{
+						Id = 0x3E0A97,
+						Name = "TestInstanceTemplate"
 					});
 					ctx.TradepostListings.Add(new TradepostListing
 					{

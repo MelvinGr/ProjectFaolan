@@ -55,11 +55,13 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 
 		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItemBuilder emits, with the
-		// AH-specific stat set). The Data1..4 quad describes the concrete listed INSTANCE, so it comes off the
-		// listing row, not the Items template table.
+		// AH-specific stat set). The listed instance's TEA key is per-TEMPLATE and lives in Items, reached through the
+		// TemplateItem nav (FK on Template) - Include it before building. The Template/Level/ItemHash tail still comes
+		// off the listing row (ItemHash is the captured wire value, 0 for AH, not Items.Hash).
 		public static ProtoInventoryGameEntry BuildEntry(TradepostListing listing)
 		{
-			var key = listing.Key;
+			var key = (listing.TemplateItem ?? throw new InvalidOperationException(
+				$"TradepostListing {listing.SaleId} (template {listing.Template}): the TemplateItem navigation is not loaded - Include it before building the row.")).Key;
 
 			var entry = new ProtoInventoryGameEntry
 			{

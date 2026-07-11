@@ -91,7 +91,7 @@ namespace Faolan.Importer.Captures
 					Level = (byte)Math.Min(src.ItemLevel, byte.MaxValue),
 					Type = ItemType.Normal,
 					Hash = src.ItemHash, // 0 for AH listings - rendered by-template via the live add, not the snapshot
-					Key = (ProtoDecryptionKey)src.Key.Clone()
+					Key = (ProtoDecryptionKey)src.TemplateItem.Key.Clone() // carried on the transient nav from ToListing
 				});
 				harvested++;
 			}
@@ -116,6 +116,7 @@ namespace Faolan.Importer.Captures
 
 			foreach (var e in merged)
 			{
+				e.TemplateItem = null; // key already harvested into Items above; persist only the Template FK column
 				var existing = await db.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == e.SaleId);
 				if (existing == null)
 				{
@@ -133,10 +134,6 @@ namespace Faolan.Importer.Captures
 					existing.ItemHandle = e.ItemHandle;
 					existing.EntryFlags = e.EntryFlags;
 					existing.Timestamp = e.Timestamp;
-					existing.Key.Key1 = e.Key.Key1;
-					existing.Key.Key2 = e.Key.Key2;
-					existing.Key.Key3 = e.Key.Key3;
-					existing.Key.Key4 = e.Key.Key4;
 					existing.Template = e.Template;
 					existing.ItemLevel = e.ItemLevel;
 					existing.ItemHash = e.ItemHash;
@@ -186,7 +183,10 @@ namespace Faolan.Importer.Captures
 				ItemHandle = row.ItemHandle,
 				EntryFlags = flags,
 				Timestamp = timestamp,
-				Key = key,
+				// The listed instance's TEA key lives once in Items (harvested by template). Carry it on a TRANSIENT
+				// TemplateItem so HarvestItems can seed Items from it; ImportAsync nulls this nav before saving the
+				// listing (only the Template FK column persists - the row resolves its real Items row on reload).
+				TemplateItem = new Item { Key = key },
 				Template = item.Template1,
 				ItemLevel = item.Level,
 				ItemHash = item.Hash

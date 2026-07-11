@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Faolan.Core.Protobuf;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -46,8 +45,12 @@ namespace Faolan.Core.Database.Tables
 		public uint BankSlot { get; set; }
 
 		// --- the listed item INSTANCE identity (the entry's ProtoAcgItem) ------------------------------------
-		// The listed item's 128-bit TEA DecryptionKey (owned -> flat columns Key1..Key4). virtual: see Item.Key.
-		public virtual ProtoDecryptionKey Key { get; set; } = new();
+		// The listed item's TEA key is per-TEMPLATE and lives once in Items; the listing references it by Template
+		// (a SECOND hard FK to Items, distinct from the ItemId search key above) and the codec reads Key1..4 through
+		// this nav. Named TemplateItem to avoid colliding with the Item nav (the ItemId search-catalog item). ItemHash
+		// stays a column: on the wire the AH row carries the CAPTURED hash (0 for AH search results), NOT Items.Hash.
+		[ForeignKey(nameof(Template))]
+		public virtual Item TemplateItem { get; set; }
 
 		// Entry stat 0 (a flag word, 0x421 in the capture) and stat 265 (a timestamp/expiry-like value).
 		public uint EntryFlags { get; set; }

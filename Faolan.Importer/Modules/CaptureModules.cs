@@ -627,7 +627,12 @@ namespace Faolan.Importer.Modules
 	{
 		public bool InDefaultSet => false;
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [];
+
+		// Depends on `items`: every RecipeItem.ItemId is a hard FK to Items. The recipe importer harvests each
+		// referenced item's identity (key + hash) into Items from the recipe element, but the items module must run
+		// first so a real named item wins over the bare harvested placeholder (and the FK resolves for a `--only
+		// recipes` run, which pulls items in via this dependency).
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -642,8 +647,8 @@ namespace Faolan.Importer.Modules
 		{
 			var recipes = ctx.Captures.SelectMany(c => CaptureRecipeImporter.Extract(c.Packets)).ToList();
 			var deduped = recipes.GroupBy(r => r.Id).Select(g => g.First()).ToList();
-			var (seen, added, updated) = await CaptureRecipeImporter.ImportAsync(ctx.Db, deduped);
-			return new ImportResult($"{seen} recipe(s), {added} new, {updated} updated.");
+			var (seen, added, updated, harvested) = await CaptureRecipeImporter.ImportAsync(ctx.Db, deduped);
+			return new ImportResult($"{seen} recipe(s), {added} new, {updated} updated, {harvested} item template(s) harvested.");
 		}
 	}
 

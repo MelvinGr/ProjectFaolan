@@ -741,7 +741,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Mail> GetMailByWireId(ulong mailId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Mails.Include(m => m.Attachments).FirstOrDefaultAsync(m => m.MailId == mailId);
+			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).FirstOrDefaultAsync(m => m.MailId == mailId);
 		}
 
 		// All mail addressed to a character (newest first), attachments eager-loaded so the codec can build the
@@ -749,7 +749,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Mails.Include(m => m.Attachments).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).OrderByDescending(m => m.Id).ToListAsync();
+			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).OrderByDescending(m => m.Id).ToListAsync();
 		}
 
 		public async Task<Map> GetMap(uint id)
@@ -1087,7 +1087,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<List<TradepostListing>> GetTradepostListings(uint itemId, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var rows = await ctx.TradepostListings.Where(l => l.RealmId == realmId && l.ItemId == itemId).ToListAsync();
+			var rows = await ctx.TradepostListings.Include(l => l.TemplateItem).Where(l => l.RealmId == realmId && l.ItemId == itemId).ToListAsync();
 			return rows.OrderBy(l => l.Price).ToList();
 		}
 

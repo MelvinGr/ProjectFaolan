@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations.Schema;
-using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -20,7 +19,11 @@ namespace Faolan.Core.Database.Tables
 		public virtual Mail Mail { get; set; }
 
 		// --- the item INSTANCE identity (the entry's ProtoAcgItem)
-		public virtual ProtoDecryptionKey Key { get; set; } = new();
+		// The item's TEA key is per-TEMPLATE and lives once in Items; this attachment references it by Template (hard
+		// FK to Items) and the codec reads Key1..4 through the Item nav. ItemHash stays a column: on the wire the
+		// mail/AH entry carries the CAPTURED hash (0 for AH-delivered items), which is NOT the template's Items.Hash.
+		[ForeignKey(nameof(Template))]
+		public virtual Item Item { get; set; }
 
 		public uint ItemHash { get; set; }
 		public uint ItemLevel { get; set; }

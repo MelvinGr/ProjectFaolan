@@ -203,8 +203,11 @@ lack the retail item-type search id), so a normal item-type search won't necessa
 `Items.Id` (`OnDelete Restrict`) so a listing can't be filed under a non-existent item. This fixed an import bug
 where 242 of 243 captured listings carried a placeholder `ItemId=30000` (sharing one `ItemHandle`), which the
 client collapsed into a single "Torn Rags" row in every category — those broken listings were deleted and the FK
-added (`DatabaseContext` `TradepostListing` → `Items` FK, `DeleteBehavior.Restrict`). NOTE the instance identity (`Template`/`Data1..4`) still lives on the row and is distinct
-from the `ItemId` search key. (Open: the in-client "Torn Rags in every category" browse persisted after the DB fix —
+added (`DatabaseContext` `TradepostListing` → `Items` FK, `DeleteBehavior.Restrict`). The listed **instance's**
+`Template` is a SECOND FK to `Items` (`Restrict`, distinct from the `ItemId` search key, which usually differs):
+the instance's per-template TEA key lives once in `Items` and the codec reads it through the `TemplateItem` nav —
+the old inline `Data1..4`/`Key1..4` columns were dropped (`ItemHash` stays a row column: the AH wire hash is 0,
+not `Items.Hash`). `MailAttachment` got the same treatment (`Template` FK → `Items`, inline key dropped). (Open: the in-client "Torn Rags in every category" browse persisted after the DB fix —
 likely a client AH cache or a non-listings category-browse path, not the listing data.)
 
 **`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), WIRED

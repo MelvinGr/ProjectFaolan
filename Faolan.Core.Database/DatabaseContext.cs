@@ -172,9 +172,6 @@ namespace Faolan.Core.Database
 
 			modelBuilder.Entity<Item>().OwnsOne(i => i.Key, OwnKey);
 			modelBuilder.Entity<Ability>().OwnsOne(a => a.Key, OwnKey);
-			modelBuilder.Entity<MailAttachment>().OwnsOne(m => m.Key, OwnKey);
-			modelBuilder.Entity<RecipeItem>().OwnsOne(r => r.Key, OwnKey);
-			modelBuilder.Entity<TradepostListing>().OwnsOne(t => t.Key, OwnKey);
 
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
@@ -216,6 +213,19 @@ namespace Faolan.Core.Database
 			// the import loudly instead of rendering the NPC with missing gear.
 			modelBuilder.Entity<NpcSpawnEquipment>().HasOne(e => e.Item).WithMany().HasForeignKey(e => e.Template).OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<NpcEquipment>().HasOne(e => e.Item).WithMany().HasForeignKey(e => e.Template).OnDelete(DeleteBehavior.Restrict);
+
+			// A recipe ingredient/result references its Items row (the item's TEA key + hash live once in Items,
+			// harvested from the recipe element by the recipes importer). Restrict, same rationale as the shop ware:
+			// an un-harvested referenced item fails the import loudly instead of a recipe with a dangling ingredient.
+			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Item).WithMany().HasForeignKey(ri => ri.ItemId).OnDelete(DeleteBehavior.Restrict);
+
+			// A mail attachment / AH listing carries a concrete item INSTANCE, but the instance's TEA key is
+			// per-TEMPLATE and lives once in Items; both reference it by Template (Restrict). For TradepostListing this
+			// is a SECOND FK to Items distinct from the ItemId search-key FK above (ItemId is the search category, the
+			// listed instance's Template usually differs). The codec reads Key1..4 through these navs; ItemHash stays a
+			// row column (the captured wire hash, 0 for AH, differs from Items.Hash).
+			modelBuilder.Entity<MailAttachment>().HasOne(a => a.Item).WithMany().HasForeignKey(a => a.Template).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<TradepostListing>().HasOne(t => t.TemplateItem).WithMany().HasForeignKey(t => t.Template).OnDelete(DeleteBehavior.Restrict);
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).HasForeignKey<CharacterMaxStats>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);

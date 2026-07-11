@@ -71,8 +71,7 @@ namespace Faolan.GameServer
 				Quantity = listing.Quantity == 0
 					? 1
 					: listing.Quantity,
-				Key = (ProtoDecryptionKey)listing.Key.Clone(),
-				Template = listing.Template,
+				Template = listing.Template, // the key lives in Items (FK on Template); no inline copy
 				ItemLevel = listing.ItemLevel,
 				ItemHash = listing.ItemHash,
 				TrailerWord = MailConstants.AttachmentTrailerWord,
@@ -414,8 +413,7 @@ namespace Faolan.GameServer
 				ItemHandle = 0,
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
 				Timestamp = 0,
-				Key = (ProtoDecryptionKey)row.Item.Key.Clone(),
-				Template = row.Item.Id,
+				Template = row.Item.Id, // the key lives in Items (FK on Template); no inline copy
 				ItemLevel = row.Item.Level,
 				ItemHash = row.Item.Hash
 			};
@@ -490,8 +488,7 @@ namespace Faolan.GameServer
 					Quantity = row.Count == 0
 						? 1u
 						: row.Count,
-					Key = (ProtoDecryptionKey)row.Item.Key.Clone(),
-					Template = row.Item.Id,
+					Template = row.Item.Id, // the key lives in Items (FK on Template); no inline copy
 					ItemLevel = row.Item.Level,
 					ItemHash = row.Item.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,
@@ -582,12 +579,15 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
 		}
 
-		// Builds the live DispatchAddItem entry for a mail attachment from its stored instance identity (no Items
-		// lookup), mirroring SnapshotItemBuilder's bag entry: ProtoAcgItem{key=Data quad, template1/2=template, 		// level, hash} + the bag stat triple (0=flags, 23=recordId, 26=count). The client resolves the visual from
-		// the template via its RDB, so this renders even for items we don't have as Items rows.
+		// Builds the live DispatchAddItem entry for a mail attachment, mirroring SnapshotItemBuilder's bag entry:
+		// ProtoAcgItem{key=the template's TEA quad, template1/2=template, level, hash} + the bag stat triple (0=flags,
+		// 23=recordId, 26=count). The per-template key lives in Items, reached through the attachment's Item nav (FK on
+		// Template) - the caller loads the mail with Attachments.ThenInclude(a => a.Item). The client resolves the
+		// visual from the template via its RDB.
 		private static ProtoInventoryGameEntry BuildMailItemEntry(MailAttachment a, uint charId, int slot)
 		{
-			var key = a.Key;
+			var key = (a.Item ?? throw new InvalidOperationException(
+				$"MailAttachment (template {a.Template}): the Item navigation is not loaded - Include it before granting.")).Key;
 			var qty = a.Quantity == 0
 				? 1u
 				: a.Quantity;
