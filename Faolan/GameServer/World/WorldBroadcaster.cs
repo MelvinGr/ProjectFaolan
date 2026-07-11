@@ -702,13 +702,18 @@ namespace Faolan.GameServer.World
 			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
 
-			// NpcSpawns accretes one row per capture observation, so the same physical NPC appears many times - the
-			// same name at near-identical positions across sessions (e.g. Kalanthes captured 5×, all at his hideout).
-			// Burst-as-truth lives in the IMPORTER now (#266, BuildBurstTruthSpawns): NpcSpawns holds only each map's
-			// authoritative login-burst faction set + the named/unique NPCs, so the cross-session duplicate density (a
-			// Crocodile logged at 50 spots -> 50 phantom copies) never reaches the DB. This load path just reads the
-			// already-clean rows; the (name, coarse cell) dedup below is a cheap residual safety net.
-			var seenCells = new HashSet<(string, int, int, int)>();
+			// NpcSpawns is the SOURCE OF TRUTH: the importer's burst-truth extraction (#266, BuildBurstTruthSpawns)
+			// already produced one clean row per intended placement (keyed by MapId + exact XYZ), so this load path
+			// renders EVERY row verbatim - NO runtime dedup. The old name/cell collapse silently dropped legitimately
+			// distinct NPCs: neutral animals of the same name (5 Hens, 4 Scorpions), and faction guards standing 1-4
+			// units apart (the Tarantia Noble District line and the Castle of King Conan door pairs). Any genuine
+			// over-density is a data bug fixed in the importer, never hidden here.
+			//
+			// CapturedHandle is session-volatile and NOT guaranteed unique across the merged DB (a handful collide from
+			// different captures); since the zone is handle-keyed, a colliding row would silently overwrite another, so
+			// a collision gets a fresh handle below - the last real dedup this loop still needs, for wire correctness.
+			var usedHandles = new HashSet<uint>();
+			var nextFreeHandle = npcs.Length == 0 ? 1u : npcs.Max(n => n.CapturedHandle) + 1u;
 			foreach (var npc in npcs)
 			{
 				// The type identity (name/community) lives on the Npc type now (#244); a spawn with no type is a phantom
@@ -717,21 +722,6 @@ namespace Faolan.GameServer.World
 					continue;
 
 				var npcName = npc.Npc.Name;
-				var community = npc.Npc.StatCore?.Community ?? 0;
-
-				// Faction mobs (Community > 0) are legitimately MANY of the same name spread across the map - dedup by
-				// (name, coarse cell): same-spot cross-session re-captures collapse, distinct mobs in different cells
-				// survive. Friendly/neutral named NPCs (Community 0: quest-givers like Casilda/Kalanthes + a few neutral
-				// critters) are UNIQUE - but their cross-session captures land at genuinely DIFFERENT spots (Casilda was
-				// captured at ~361 AND ~448, 87 units apart), so cell dedup keeps phantom duplicates that bloat the
-				// spawn set and confuse the client. Collapse those by NAME alone -> one instance (the burst-handle row
-				// wins, ordered first, so the kept entity coincides with the burst-rendered one).
-				const float cell = 8f;
-				var dedupKey = community == 0
-					? (npcName ?? "", 0, 0, 0)
-					: (npcName ?? "", (int)(npc.PositionX / cell), (int)(npc.PositionY / cell), (int)(npc.PositionZ / cell));
-				if (!seenCells.Add(dedupKey))
-					continue;
 
 				// Seed killable vitals from the NPC's REAL max health (lifted from the spawn into NpcSpawn.Health by the
 				// importer), falling back to a level-scaled value when the spawn carried none.
@@ -739,9 +729,15 @@ namespace Faolan.GameServer.World
 					? npc.Health
 					: CombatResolver.NpcMaxHealthForLevel(npc.Level);
 				var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
-				// World entry is burst-less, so every NPC streams in on the player's first move (interest) under its own
-				// captured handle - there is no separate burst handle to reconcile with.
+				// World entry is burst-less: every NPC streams in on the player's first move (interest) under its own
+				// captured handle. Reassign only on a cross-capture handle collision so both rows still render.
 				var handle = npc.CapturedHandle;
+				if (!usedHandles.Add(handle))
+				{
+					while (!usedHandles.Add(nextFreeHandle))
+						nextFreeHandle++;
+					handle = nextFreeHandle;
+				}
 				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
 				entity.Level = npc.Level;
@@ -801,8 +797,7 @@ namespace Faolan.GameServer.World
 				zone.Add(entity);
 			}
 
-			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} rows, {Collapsed} cross-session re-captures collapsed).", zone.Count, mapId, instanceId,
-				npcs.Length, npcs.Length - seenCells.Count);
+			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
 		}
 
 		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW

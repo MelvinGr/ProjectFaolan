@@ -398,9 +398,12 @@ namespace Faolan.Importer.Modules
 		// characters (e.g. Ranochar) as a side effect. RunAsync itself FKs to Map/Npc/Items, never to Characters.
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
+		// Overwrite ONLY (wipe + rebuild), like conversations. NpcSpawns is a fully-derived burst-truth set with no
+		// hand-edits, so UPSERT is wrong: it keeps stale rows whose position changed between imports (a walked NPC like
+		// Prospero accreted a 2nd row at his new spot; the Noble District guards accreted to 41 vs the true burst 29).
+		// A default `--only npcs` (mode Upsert) falls back to Overwrite so a re-import always replaces the set cleanly.
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
-			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
 
