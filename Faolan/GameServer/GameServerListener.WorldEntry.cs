@@ -248,13 +248,16 @@ namespace Faolan.GameServer
 			if (!client.Session.HasPendingPost205FFollowUp)
 				return;
 
-			if (client.Session.Character?.Name == null)
+			if (client.Session.IsUnnamedCreatePhase)
 			{
 				Logger.LogInformation("New-character post-0x205F follow-up remains pending on 0x2020; waiting for the retail create handoff instead of flushing early.");
 				return;
 			}
 
-			// TODO: Remove client.Session.Character?.Name != null checks below
+			// Past the early return the character is always named (the create-editor connection never reaches
+			// here), so the IsUnnamedCreatePhase branches below are the create-vs-named split of the shared flush -
+			// kept because a named character on this connection is either a Login or a TeleportReentry, both of
+			// which want the full existing-character burst.
 
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
 			await SendPost205FOxf98E10B3Prompt(client);
@@ -265,7 +268,7 @@ namespace Faolan.GameServer
 				Logger.LogInformation($"Sending deferred SpawnCheck with observed 0x2020 requestId={requestId:X}.");
 				await SendPost205FSpawnCheck(client);
 			}
-			else if (client.Session.Character?.Name != null)
+			else if (!client.Session.IsUnnamedCreatePhase)
 				await SendPost205FSpawnCheck(client);
 			else
 			{
@@ -279,7 +282,7 @@ namespace Faolan.GameServer
 			// but never this, so the client finished the handshake (0x2020 -> 0x2008 -> 0x2076) and then sat on the
 			// loading screen forever. Confirmed by diffing a 4010 login against the Strie dump: 0x2024 ours=0 /
 			// dump=1. The new-character create flow sends its own 0x2024 elsewhere, so gate this to named characters.
-			if (client.Session.Character?.Name != null)
+			if (!client.Session.IsUnnamedCreatePhase)
 			{
 				Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
 				await SendReadyForPlayScreen(client);
@@ -340,7 +343,7 @@ namespace Faolan.GameServer
 				}
 			}
 
-			if (client.Session.Character?.Name == null)
+			if (client.Session.IsUnnamedCreatePhase)
 			{
 				Logger.LogInformation("Sending deferred new-character AccessWindow/SetDayTime after the post-0x205F follow-up.");
 
@@ -687,24 +690,22 @@ namespace Faolan.GameServer
 
 		private async Task SendReadyForPlayScreen(INetworkClient client)
 		{
-			var character = client.Session.Character;
-
-			var sender = character?.Name == null
+			var sender = client.Session.IsUnnamedCreatePhase
 				? Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59)
 				: Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
 
-			var receiver = character?.Name == null
+			var receiver = client.Session.IsUnnamedCreatePhase
 				? [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10]
 				: client.Endpoint(Endpoints.GameCharInterfaceType);
 
 			using var newPs = new PacketStream();
 			newPs.WriteHeader(sender, receiver, GameCharInterfaceOpcodes.DispatchValidResurrectionSpots);
 
-			if (character?.Name == null)
+			if (client.Session.IsUnnamedCreatePhase)
 			{
 				// New-character create flow: the create-capture's ValidResurrectionSpots body - a sibling of the login
 				// WriteValidResurrectionSpotsBody with the create variant's own constants (see ResurrectionSpotsBody).
-				ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(newPs, character!.Position);
+				ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(newPs, client.Session.Character.Position);
 			}
 			else
 			{
@@ -714,8 +715,8 @@ namespace Faolan.GameServer
 				// same closest-known/AlwaysKnown resolution SendDeathScreen does), so the anchor is per-character/per-map and
 				// advertises our REAL RespawnPoint.Id (the id RespawnMe echoes back) instead of the Strie capture's hardcoded
 				// beach point. Falls back to the universal Tortage Beach default when the map defines no point.
-				var spot = await ResolveLoginResurrectionSpot(character);
-				ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(newPs, character.Position, [spot]);
+				var spot = await ResolveLoginResurrectionSpot(client.Session.Character);
+				ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(newPs, client.Session.Character.Position, [spot]);
 			}
 
 			await newPs.SendAsync(client);

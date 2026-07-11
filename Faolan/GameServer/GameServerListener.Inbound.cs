@@ -45,7 +45,7 @@ namespace Faolan.GameServer
 			// During the create-editor handshake the client echoes its own instance id as the 0x2000 subopcode.
 			// Retail used a fixed id (0x021662C8, or Strie's 0x02165EFF); we hand out the character's real id, so
 			// the subopcode is dynamic - match it against the session instance and route it to the echo handler.
-			if (client.Session.Character?.Name == null && client.Session.Account != null && (uint)pbOpcode == client.Session.Account.ClientInstance)
+			if (client.Session.IsUnnamedCreatePhase && client.Session.Account?.ClientInstance == (uint)pbOpcode)
 			{
 				await HandleCreateEditorInstanceEcho(client, packet);
 				return;
@@ -70,7 +70,7 @@ namespace Faolan.GameServer
 				case GameServer0X2000Opcodes.StatIIR:
 				{
 					// Create-editor (unnamed) avatar stat stream: retail sends no response, we just observe it.
-					if (client.Session.Character?.Name == null)
+					if (client.Session.IsUnnamedCreatePhase)
 						Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}.", client.Session.HasPendingPost205FFollowUp);
 
 					break;
@@ -850,11 +850,8 @@ namespace Faolan.GameServer
 		// character's real id, so the matching is done dynamically by the caller.)
 		private async Task HandleCreateEditorInstanceEcho(INetworkClient client, ConanPacket packet)
 		{
-			if (client.Session.Character?.Name != null)
-				return;
-
 			uint? requestId = null;
-			if (packet.Body.Length - packet.Body.Position >= sizeof(uint) * 2)
+			if (packet.Body.Length - packet.Body.Position >= sizeof(uint) * 2) // TODO: Fix this flow?
 			{
 				var ack0 = packet.Body.ReadUInt32();
 				requestId = packet.Body.ReadUInt32();
@@ -940,8 +937,15 @@ namespace Faolan.GameServer
 					// full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
 					// auth + the intro/cutscene), so skip the helper auth for it.
 					var isCreateWorldEntry = !isNewCharacter && CreateFlowService.TryConsumePendingCreateWorldEntry(clientInstance);
-					client.Session.IsCreateWorldSession = isCreateWorldEntry;
-					client.Session.IsCreateEditorConnection = isNewCharacter;
+					// The connection's world-entry role, decided ONCE here and the single source of truth for routing
+					// every later handshake signal (docs/subsystems/world-entry-flow.md). CreateWorld/CreateEditor are
+					// known now; the Login-vs-TeleportReentry split is finalised in the existing-login branch below (it
+					// consumes PendingTeleportReentry there, next to the follow-up arming that depends on it).
+					client.Session.EntryMode = isCreateWorldEntry
+						? WorldEntryMode.CreateWorld
+						: isNewCharacter
+							? WorldEntryMode.CreateEditor
+							: WorldEntryMode.Login;
 
 					// Retail sends this auth trio (DimensionId 0x200b / ServerId 0x200c / AckAuthenticate 0x2001)
 					// byte-identically in BOTH the create-editor and the existing-login flow (verified against
@@ -1009,6 +1013,7 @@ namespace Faolan.GameServer
 						// dismisses; otherwise the burst lands but the client loads forever (#28 / totem recall).
 						if (PendingTeleportReentry.TryRemove(clientInstance, out _))
 						{
+							client.Session.EntryMode = WorldEntryMode.TeleportReentry;
 							client.Session.HasPendingPost205FFollowUp = true;
 							Logger.LogInformation(
 								"Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).",
@@ -1107,7 +1112,7 @@ namespace Faolan.GameServer
 					var unk0 = packet.Body.ReadUInt32(); // 0xc350
 					var characterId = packet.Body.ReadUInt32();
 
-					if (client.Session.Character?.Name == null)
+					if (client.Session.IsUnnamedCreatePhase)
 					{
 						// Create-editor phase: retail sends no download in response to 0x205F - it just acks the
 						// client's polls and waits for CharInPlayIIR (which triggers the editor-launch burst).

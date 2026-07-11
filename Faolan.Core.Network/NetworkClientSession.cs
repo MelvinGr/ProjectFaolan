@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network
 {
@@ -21,14 +22,28 @@ namespace Faolan.Core.Network
 
 		bool HasPendingPost205FFollowUp { get; set; }
 
-		// True on the character-creator (editor) GameServer connection: set in the Hello handler when a
-		// not-yet-named character connects.
-		bool IsCreateEditorConnection { get; set; }
+		// The role this GameServer connection plays in the world-entry handshake, decided ONCE at
+		// GameAgent.Authenticate2 and the single source of truth for routing every later handshake signal.
+		// See docs/subsystems/world-entry-flow.md. IsCreateEditorConnection / IsCreateWorldSession are derived
+		// views of it (kept for the call sites that only care about one role).
+		WorldEntryMode EntryMode { get; set; }
+
+		// True on the character-creator (editor) GameServer connection. A derived view of EntryMode (role at
+		// auth); NOT the same as IsUnnamedCreatePhase (name-now) - see that member and WorldEntryMode.
+		bool IsCreateEditorConnection { get; }
 
 		// True on the post-creation WORLD GameServer connection (the second connection, opened after the
 		// 0x2002 enter-world handoff). Gates the intro/cutscene bursts so they only fire on the first world
-		// entry, not on normal existing-character logins.
-		bool IsCreateWorldSession { get; set; }
+		// entry, not on normal existing-character logins. A derived view of EntryMode.
+		bool IsCreateWorldSession { get; }
+
+		// True ONLY while the character-creator connection is still pre-name (Character.Name == null). This is
+		// the TRANSIENT "the editor UI is active" question, distinct from IsCreateEditorConnection (the role at
+		// auth): the create connection names the character mid-connection (CommitCharacterName), after which
+		// this flips to false while IsCreateEditorConnection stays true. Handshake steps that must behave
+		// differently before vs after the name is committed (the instance-echo route, the 0x205F create branch,
+		// the create-vs-login ReadyForPlayScreen/AccessWindow bodies) key on THIS, not the role flag.
+		bool IsUnnamedCreatePhase { get; }
 
 		// Spellweaving trance state (docs/subsystems/combos.md): true between the activate and deactivate PerformSpecialAction
 		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
@@ -129,8 +144,10 @@ namespace Faolan.Core.Network
 		public bool AwaitingEnterWorld { get; set; }
 		public bool EnergyLoopActive { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
-		public bool IsCreateEditorConnection { get; set; }
-		public bool IsCreateWorldSession { get; set; }
+		public WorldEntryMode EntryMode { get; set; } = WorldEntryMode.Login;
+		public bool IsCreateEditorConnection => EntryMode == WorldEntryMode.CreateEditor;
+		public bool IsCreateWorldSession => EntryMode == WorldEntryMode.CreateWorld;
+		public bool IsUnnamedCreatePhase => Character?.Name == null;
 		public bool IsSpellweaving { get; set; }
 		public bool IsSprinting { get; set; }
 		public bool IsTeleportingOut { get; set; }
