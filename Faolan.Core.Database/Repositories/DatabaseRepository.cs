@@ -116,6 +116,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<int> SetCreationSpawn(Character character);
 		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
 		Task SetMailMoney(ulong mailId, ulong money);
+		Task<bool> SetVanityFilter(uint characterId, uint slot, bool hidden);
 		Task SetMailRead(ulong mailId, bool read);
 		Task SetTradepostListingPrice(ulong saleId, ulong price);
 		Task<bool> UpdateLastInfo(Account account, string ipAddress);
@@ -1473,6 +1474,21 @@ namespace Faolan.Core.Database.Repositories
 				return false;
 
 			item.ExcludeFromRandomLoot = excluded;
+			await ctx.SaveChangesAsync();
+			return true;
+		}
+
+		// Persists one ToggleVanityArmorFilter (0x200B) choice onto the character's equipment vanity flags so the
+		// appearance survives relog. The wire 'slot' -> flag mapping lives on the entity (CharacterEquipment.
+		// SetVanityFilter). Returns false if nothing changed: the character has no equipment row, or the slot is an
+		// appearance slot beyond our five (+ master) that we don't model.
+		public async Task<bool> SetVanityFilter(uint characterId, uint slot, bool hidden)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var equipment = await ctx.CharacterEquipment.FirstOrDefaultAsync(e => e.CharacterId == characterId);
+			if (equipment == null || !equipment.SetVanityFilter(slot, hidden))
+				return false;
+
 			await ctx.SaveChangesAsync();
 			return true;
 		}

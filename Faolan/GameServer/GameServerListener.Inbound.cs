@@ -1429,36 +1429,76 @@ namespace Faolan.GameServer
 		// (~17 over a login); we answered none, so the live client retried the same poll 450+ times and sat on the
 		// loading screen forever - which is why it never opened the ChatServer/CommunityServer (chat) connection.
 		// Decoded from the kalantes_chat retail capture (port 7015):
-		//   req  C->S: recv=GameCharAgentProject, send=GameCharInterfaceProject/<player>, op 0x2000, 		//              body [u32 0xC350][u32 charInstance][u32 0xC350][u32 targetInstance]   (two ProtoID32s)
-		//   resp S->C: send=GameCharAgentProject/<zone handle 0x58>, recv=GameCharInterfaceProject/<player>, op 0x2000, 		//              body [u32 0xC350][u32 targetInstance][u32 cCategory]
+		//   req  C->S: recv=GameCharAgentProject, send=GameCharInterfaceProject/<player>, op 0x2000,
+		//               body [u32 0xC350][u32 charInstance][u32 0xC350][u32 targetInstance]   (two ProtoID32s)
+		//   resp S->C: send=GameCharAgentProject/<zone handle 0x58>, recv=GameCharInterfaceProject/<player>, op 0x2000,
+		//               body [u32 0xC350][u32 targetInstance][u32 cCategory]
 		// The 3rd field is the target's overhead NAME-COLOUR category (0 friendly / 1 hostile / 2 neutral), the SOLE
 		// driver of the red/green/yellow name (proven by live gdb, #256) - not a live-aggro flag. We answer every
 		// poll (still unblocks the load) and now set 1 for hostile NPCs so their names render red like retail.
-		private async Task HandleGameCharAgentProject(INetworkClient client, ConanPacket packet) // TODO: convert to proper switch on opcode
+		private async Task HandleGameCharAgentProject(INetworkClient client, ConanPacket packet)
 		{
-			var opcode = packet.Opcode;
-			if (opcode != 0x2000)
+			switch ((GameCharAgentProjectOpcodes)packet.Opcode)
 			{
-				// SetSprintInputState (0x200C, the sprint key): a fire-and-forget input-state update retail does NOT
-				// reply to (#72). Body = [u16 state] (1 = on, 0 = off). Sprint drains the yellow ENERGY bar CLIENT-side
-				// (retail's server barely streams the bar during sprint - verified: 1 packet across a sprint-heavy
-				// capture). We don't reply or drive the bar; we only MIRROR the drain into the tracked session.Energy so
-				// spellweaving starts from the real current value and Exhausted can fire at 0 (docs/subsystems/combos.md).
-				if (opcode == 0x200C)
+				case GameCharAgentProjectOpcodes.RequestAggroStatus: // 0x2000 - GATES the loading screen (must reply)
 				{
+					await HandleRequestAggroStatus(client, packet);
+					break;
+				}
+
+				case GameCharAgentProjectOpcodes.ToggleVanityArmorFilter: // 0x200B - persist the appearance filter
+				{
+					await HandleToggleVanityArmorFilter(client, packet);
+					break;
+				}
+
+				case GameCharAgentProjectOpcodes.SetSprintInputState: // 0x200C, the sprint key
+				{
+					// A fire-and-forget input-state update retail does NOT reply to (#72). Body = [u16 state] (1 = on,
+					// 0 = off). Sprint drains the yellow ENERGY bar CLIENT-side (retail's server barely streams the bar
+					// during sprint - verified: 1 packet across a sprint-heavy capture). We don't reply or drive the bar;
+					// we only MIRROR the drain into the tracked session.Energy so spellweaving starts from the real
+					// current value and Exhausted can fire at 0 (docs/subsystems/combos.md).
 					var state = packet.Body != null && packet.Body.Length - packet.Body.Position >= sizeof(ushort)
 						? packet.Body.ReadUInt16()
 						: (ushort)0;
 					TrackSprintEnergy(client, state == 1);
-					return;
+					break;
 				}
 
-				// Other GameCharAgentProject methods are not loading gates and retail's replies aren't decoded yet -
-				// log and no-op rather than misparse them as a 0x2000 ping.
-				Logger.LogDebug("GameCharAgentProject opcode 0x{Opcode:X4} (unhandled, no reply).", opcode);
-				return;
+				default:
+				{
+					// Other GameCharAgentProject methods are not loading gates and retail's replies aren't decoded yet -
+					// log and no-op rather than misparse them.
+					Logger.LogDebug("GameCharAgentProject opcode 0x{Opcode:X4} (unhandled, no reply).", packet.Opcode);
+					break;
+				}
 			}
+		}
 
+		// ToggleVanityArmorFilter(int slot, uint32 removeditemOccupySlots, bool toggleState): the appearance panel's
+		// per-slot (and master) "hide this vanity piece" toggle. Fire-and-forget like sprint - retail sends no reply and
+		// the client renders the show/hide itself. Body = [u32 slot][u32 removedItemOccupySlots][u8 toggleState]. We
+		// PERSIST it (CharacterEquipment vanity flags) so it survives relog: a withheld vanity item then drops out of
+		// the character snapshot equipment (PlayerSpawnEquipment), which is how the client restores the toggle on login.
+		private async Task HandleToggleVanityArmorFilter(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null || packet.Body == null || packet.Body.Length - packet.Body.Position < 9)
+				return;
+
+			var slot = packet.Body.ReadUInt32();
+			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
+			var toggleState = packet.Body.ReadByte();
+			var hidden = toggleState != 0; // [V0] polarity guess: filter set -> vanity withheld; flip if in-client is inverted
+
+			var applied = await Database.SetVanityFilter(character.Id, slot, hidden);
+			Logger.LogDebug("ToggleVanityArmorFilter(slot={Slot}, hidden={Hidden}) {Applied}.", slot, hidden,
+				applied ? "persisted" : "(unmodelled appearance slot, ignored)");
+		}
+
+		private async Task HandleRequestAggroStatus(INetworkClient client, ConanPacket packet)
+		{
 			// RequestAggroStatus(const ID32& charId, const ID32& targetId): each ID32 is [u32 type][u32 instance].
 			packet.Body.ReadUInt32(); // charId.type   (0x0000C350)
 			packet.Body.ReadUInt32(); // charId.instance (the polling player)
@@ -1477,7 +1517,7 @@ namespace Faolan.GameServer
 			// source that gates aggro (#256/aggro). Sending target.Disposition directly (not Hostile ? 1 : 0) means a
 			// neutral NPC renders yellow, not just red/green - and a friendly civilian in a non-zero faction community
 			// no longer wrongly renders red.
-			uint category = WorldEntity.DispositionFriendly;
+			var category = WorldEntity.DispositionFriendly;
 			// Resolve the target in the player's OWN instance (copy) of the map (#268), not the default shared zone.
 			var player = _simulation.PlayerWorldEntity(client);
 			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target))

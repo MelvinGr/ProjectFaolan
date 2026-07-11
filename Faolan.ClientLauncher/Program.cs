@@ -339,7 +339,7 @@ namespace Faolan.ClientLauncher
 			// LocalConfig redirects (undo with --restore). Idempotent - a no-op if already patched.
 			if (patchLogin && !dryRun)
 			{
-				switch (ClientExePatcher.PatchLoginKey(exe, ClientExePatcher.CellAo))
+				switch (ClientExePatcher.PatchPublicKey(exe, ClientExePatcher.NewPublicKey))
 				{
 					case ClientExePatcher.Result.Patched:
 						Console.WriteLine("login-key : patched DH pubkey (password validation enabled)");

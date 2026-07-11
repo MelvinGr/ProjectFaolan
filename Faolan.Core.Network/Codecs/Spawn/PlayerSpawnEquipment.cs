@@ -49,6 +49,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (item == null || item.Hash == 0) // only fully-buildable items (real identity + hash)
 					continue;
 
+				// A vanity slot filtered OFF (ToggleVanityArmorFilter) is withheld so the real worn item shows through -
+				// this is what makes the toggle survive relog (the client re-reads the state from the snapshot equipment).
+				if (equipment.IsVanityHidden(slot))
+					continue;
+
 				entries.Add(BuildEntry(slot, item));
 			}
 

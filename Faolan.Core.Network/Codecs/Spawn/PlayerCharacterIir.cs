@@ -91,8 +91,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay captured.
 			if (message.Stats != null && (uint)character.Race != 0)
 			{
-				// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the Sex enum now IS
-				// the wire sex-code (MALE=2 / FEMALE=3, uniform with NPC sex), so it's emitted directly - no offset.
 				message.Stats.Sex = (uint)character.Sex;
 				message.Stats.Race = (uint)character.Race;
 				message.Stats.Level = character.Level;

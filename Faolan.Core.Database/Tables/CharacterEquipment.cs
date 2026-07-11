@@ -310,5 +310,57 @@ namespace Faolan.Core.Database.Tables
 				}
 			}
 		}
+
+		// --- vanity ("costume") armour FILTER toggles (client method ToggleVanityArmorFilter, GameCharAgentProject
+		// 0x200B). A vanity slot is just its equipment slot + a show/hide toggle: when a slot is filtered the
+		// character's vanity item for that slot is withheld from the spawn snapshot so the real worn item shows
+		// through. VanityAllHidden is the "main" master toggle (filter every vanity piece at once). Persisted so the
+		// choice survives relog - the client renders the show/hide itself and reads the state back from the equipment
+		// carried in the character snapshot (PlayerCharacterIir), not a dedicated wire field.
+		public bool VanityAllHidden { get; set; }
+		public bool VanityHeadHidden { get; set; }
+		public bool VanityBeltHidden { get; set; }
+		public bool VanityCapeHidden { get; set; }
+		public bool VanityBootsHidden { get; set; }
+		public bool VanityWristHidden { get; set; }
+
+		// The ToggleVanityArmorFilter 'slot' arg that means the MAIN (hide-all) toggle rather than a single slot.
+		// [V0: best guess - the most frequent lone value across captures (2/29/30/31 seen); the per-slot toggles use
+		// the BASE equip slot id (slot=2 -> Head is capture-confirmed). Verify the master id + the 30/31 slots + the
+		// toggleState polarity in-client, then correct these constants - see Gitea #336.]
+		public const uint VanityFilterMainSlot = 29; // TODO: Check me
+
+		// Apply one ToggleVanityArmorFilter(slot, toggleState) to the stored per-slot filter. Maps the wire 'slot' to
+		// the matching vanity toggle (main or one of the five modelled vanity slots, keyed by BASE equip slot id).
+		// Returns false for a slot we don't model (an appearance slot beyond our five) so the caller can log it.
+		public bool SetVanityFilter(uint slot, bool hidden)
+		{
+			switch (slot)
+			{
+				case VanityFilterMainSlot: VanityAllHidden = hidden; return true;
+				case (uint)CharacterEquipmentSlot.Head: VanityHeadHidden = hidden; return true;
+				case (uint)CharacterEquipmentSlot.Belt: VanityBeltHidden = hidden; return true;
+				case (uint)CharacterEquipmentSlot.Cape: VanityCapeHidden = hidden; return true;
+				case (uint)CharacterEquipmentSlot.Boots: VanityBootsHidden = hidden; return true;
+				case (uint)CharacterEquipmentSlot.Wrist: VanityWristHidden = hidden; return true;
+				default: return false;
+			}
+		}
+
+		// Whether the given VANITY slot's item should be WITHHELD from the appearance (its own toggle, or the master,
+		// is set). Non-vanity slots are never hidden by this filter.
+		public bool IsVanityHidden(CharacterEquipmentSlot slot)
+		{
+			// The master (VanityAllHidden) only withholds VANITY slots - never the real worn gear, which always ships.
+			return slot switch
+			{
+				CharacterEquipmentSlot.VanityHead => VanityAllHidden || VanityHeadHidden,
+				CharacterEquipmentSlot.VanityBelt => VanityAllHidden || VanityBeltHidden,
+				CharacterEquipmentSlot.VanityCape => VanityAllHidden || VanityCapeHidden,
+				CharacterEquipmentSlot.VanityBoots => VanityAllHidden || VanityBootsHidden,
+				CharacterEquipmentSlot.VanityWrist => VanityAllHidden || VanityWristHidden,
+				_ => false
+			};
+		}
 	}
 }
