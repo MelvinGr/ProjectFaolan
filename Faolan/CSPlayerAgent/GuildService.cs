@@ -52,15 +52,6 @@ namespace Faolan.CSPlayerAgent
 			return new ProtoEndpoint { Type = clientTarget.Type, Instance = GuildServerInstance };
 		}
 
-		// The 225-byte create-time renown/trailer block that closes DispatchGuildCreated (after the member record +
-		// header). Captured from DemoL80's create-guild flow - which is itself a FRESH guild being created, so these
-		// are the create-time defaults (the feat numbers 0xFC4/0x410/0x816/0xBEA are the default create values, not
-		// earned renown); only the 40-byte trailer holds capture-specific creation timestamps/ids (cosmetic). Emitted
-		// verbatim as a valid create-time block until it is decoded field-by-field (docs/subsystems/create-guild-decode.md, #306).
-		[Obsolete("DECODE")]
-		private static readonly byte[] GuildCreatedTail = Convert.FromHexString(
-			"00000003f100000000000000000000000000000000000000000000000000000fc4000004100000081600000bea000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000373131310007a12800000000064ab1780000000009d5d338000000000000000001a93458");
-
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
 		// headers - those packets are not replies, so there is no incoming packet to echo.
@@ -448,9 +439,11 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO
 		// RELOG (vs the 0x203F GuildUpdate, which only takes effect on the next login). Body decoded byte-exact
-		// (docs/subsystems/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte tail].
-		// The header is the 0x203F head EXCEPT the post-cash byte carries the request's guild FORM (0x203F hardcodes
-		// 0x03). The creator is online (they just made it); `playfield` is their current map/playfield token.
+		// (docs/subsystems/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte
+		// renown block]. The header is the 0x203F head EXCEPT the post-cash byte carries the request's guild FORM
+		// (0x203F hardcodes 0x03). The 225-byte tail is the SAME CoreGuild_c::Read renown block as the 0x203F, written
+		// in its create-time form (GuildRenownBlock.ForGuildCreate) - no longer a verbatim blob. The creator is online
+		// (they just made it); `playfield` is their current map/playfield token.
 		internal static void WriteGuildCreatedBody(FaolanStream s, Guild guild, Character creator, byte form, uint playfield)
 		{
 			WriteGuildMemberRecord(s, creator, true, playfield, 0);
@@ -465,7 +458,7 @@ namespace Faolan.CSPlayerAgent
 				.WriteString(guild.Name)
 				.WriteString(guild.Description ?? "")
 				.WriteString(guild.MessageOfTheDay ?? "")
-				.WriteArray(GuildCreatedTail);
+				.WriteArray(GuildRenownBlock.ForGuildCreate().Encode());
 		}
 
 		// 0x202A guild invite: [guild ID32][guildName s16][invitee ID32][inviterName s16]. Shows the client's

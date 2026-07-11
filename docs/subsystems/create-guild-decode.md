@@ -54,6 +54,10 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
 - **The golden corrected a blind guess:** the guild LEADER's wire rank is **4** (this capture's member record),
   not the 6 the server hardcoded. `Character.GuildLeaderRank` fixed — no rank-comparison logic depended on it.
 - Also parses the request's `form` byte (previously dropped).
-- **Remaining follow-ups:** decode the 225-byte tail field-by-field (so a guild's real renown/creation values are
-  constructed rather than templated), and fan out the `0x003c` guild + officer chat-CHANNEL subs (step 3 below)
-  so the guild chat tabs appear. Neither blocks the window opening. Needs an in-client no-relog confirmation.
+- **Tail decoded + constructed:** the 225-byte tail is the SAME `CoreGuild_c::Read` renown block as the 0x203F
+  (FUN_00565900, case 1→3), written in its create-time form: `Flag=0` (the full update uses 1) and an EMPTY StatIds
+  list (so 225 = 277 − 52), zeroed renown, the feat defaults `List2 = 0x410/0x816/0xBEA`, and create-time constants
+  in `Counters64C[0..2]`/`Counters64D`. `WriteGuildCreatedBody` now emits `GuildRenownBlock.ForGuildCreate().Encode()`
+  (byte-exact — `GuildRenownBlockTests.ForGuildCreate_EncodesToTheCapturedCreateTail`), replacing the verbatim blob.
+- **Remaining follow-up:** fan out the `0x003c` guild + officer chat-CHANNEL subs (step 3 below) so the guild chat
+  tabs appear. Does not block the window opening.

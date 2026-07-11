@@ -172,6 +172,25 @@ namespace Faolan.Core.Network.Codecs.Guild
 			return b;
 		}
 
+		// The create-time block that closes DispatchGuildCreated (0x2044) - the SAME CoreGuild_c::Read case-1->3
+		// layout as the 0x203F renown block (FUN_00565900), but as a fresh guild writes it at creation: Flag=0 (the
+		// full update uses 1), an EMPTY StatIds list (the 13 slot ids are populated later), and zeroed renown. The
+		// only non-zero fields are the create-time feat defaults (List2 = 0x410/0x816/0xBEA) and Counters64C[0..2] /
+		// Counters64D, whose exact semantics the stripped binary doesn't name - kept as the captured create-time
+		// constants (this capture is itself a fresh guild). Encodes to the 225-byte tail (GuildRenownBlockTests).
+		public static GuildRenownBlock ForGuildCreate()
+		{
+			return new GuildRenownBlock
+			{
+				Flag = 0x00,
+				StatIds = [],
+				BoolA = 0,
+				List2 = [0x410, 0x816, 0xBEA],
+				Counters64C = [0x373131310007A128, 0x064AB178, 0x09D5D338],
+				Counters64D = 0x01A93458
+			};
+		}
+
 		private static uint[] ReadList(ReadOnlySpan<byte> b, ref int o)
 		{
 			var word = ReadU32(b, ref o);

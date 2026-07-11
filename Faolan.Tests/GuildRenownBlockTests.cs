@@ -75,5 +75,19 @@ namespace Faolan.Tests
 		{
 			Assert.Equal(GuildRenownBlock.ForFreshGuild().Encode(), GuildRenownBlock.ForRenown(0).Encode());
 		}
+
+		// The create-time block (0x2044 tail) is the same codec, Flag=0 + empty StatIds -> 225 bytes. This reproduces
+		// the create-guild capture's tail byte-for-byte, so GuildService.WriteGuildCreatedBody constructs it via the
+		// typed codec instead of the old verbatim hex blob (#306).
+		[Fact]
+		public void ForGuildCreate_EncodesToTheCapturedCreateTail()
+		{
+			var block = GuildRenownBlock.ForGuildCreate();
+
+			Assert.Equal(Golden.Bytes("GuildCreateRenownBlock"), block.Encode());
+			Assert.Equal(225, block.Encode().Length);
+			Assert.Equal((byte)0x00, block.Flag);
+			Assert.Empty(block.StatIds);
+		}
 	}
 }
