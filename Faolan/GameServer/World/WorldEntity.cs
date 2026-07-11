@@ -178,6 +178,10 @@ namespace Faolan.GameServer.World
 		// Empty for non-caster NPCs and players; IsCaster gates the sim's cast branch.
 		public List<NpcSpellCast> Spells { get; } = [];
 
+		// Ambient bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
+		// zone load. Null/empty = this NPC has no captured chatter group and stays silent.
+		public string[] ChatterLines { get; set; }
+
 		// Item template ids carried by a loot bag, rolled when it drops; granted to the looter's backpack via
 		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
 		public List<uint> LootItems { get; } = [];

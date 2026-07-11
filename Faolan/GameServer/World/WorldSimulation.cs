@@ -620,6 +620,22 @@ namespace Faolan.GameServer.World
 									await _output.BroadcastNpcHeartbeat(effect.Entity);
 								break;
 							}
+
+							case WorldTickEffectType.NpcChatter:
+							{
+								// Ambient bystander bark: the NPC local-says a random RenownBystanderLovers line (chat
+								// server CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the
+								// NPC handle so the client shows the bubble over it.
+								var npc = effect.Entity;
+								if (npc.ChatterLines is not { Length: > 0 } lines)
+									break;
+								var recipients = new HashSet<uint>();
+								foreach (var near in World.ZoneForEntity(npc).PlayersInRange(npc.Position, SayRangeUnits, npc.Handle))
+									recipients.Add(near.Handle);
+								if (recipients.Count > 0)
+									await _agents.CharacterSay(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
+								break;
+							}
 						}
 					}
 

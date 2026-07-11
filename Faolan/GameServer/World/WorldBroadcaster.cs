@@ -794,6 +794,10 @@ namespace Faolan.GameServer.World
 						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
 				}
 
+				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
+				if (npc.Npc.Chatter is { Count: > 0 } chatter)
+					entity.ChatterLines = chatter.Select(c => c.RemoteFormat).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+
 				zone.Add(entity);
 			}
 

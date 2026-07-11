@@ -17,7 +17,7 @@ namespace Faolan.Importer.Cli
 			// --- capture modules ---
 			new ListingsModule(), new StockPhrasesModule(), new ItemsModule(), new MapsModule(), new SpellsModule(), new StatDamageModule(), new AbilitiesModule(), new StartingSpellsModule(),
 			new CharactersModule(), new ConversationsModule(), new CharacterStateModule(), new LearnedSpellsModule(), new CharacterAbilitiesModule(), new CharacterQuestsModule(),
-			new CharacterBankModule(), new ShopsModule(), new NpcsModule(), new NpcDispositionModule(), new WorldObjectsModule(), new MapLootModule(), new QuestsModule(), new MountsModule(), // opt-in
+			new CharacterBankModule(), new ShopsModule(), new NpcsModule(), new NpcDispositionModule(), new NpcChatterModule(), new WorldObjectsModule(), new MapLootModule(), new QuestsModule(), new MountsModule(), // opt-in
 			new PetsModule(), // opt-in (#307)
 			new RecipesModule(), // opt-in (crafting recipe book)
 			// --- tsv modules ---

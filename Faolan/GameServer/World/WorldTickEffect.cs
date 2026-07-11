@@ -16,7 +16,8 @@ namespace Faolan.GameServer.World
 		NpcCast, // a CASTER NPC (Entity) casts a spell at a player (Target); the listener sends ApplySpell + applies damage (#232)
 		NpcPatrol, // a patrolling NPC (Entity) should (re-)issue its patrol route so it keeps walking its loop (#266)
 		NpcFollow, // a companion NPC (Entity) stepped toward the PLAYER it follows (Target); broadcast its MoveTask, ungated (not combat) (#262)
-		NpcHeartbeat // the continuous idle-behavior pulse: (re-)assert the NPC's (Entity) short-form BehaviorControlCenterIIR so it keeps playing its idle animation instead of freezing (#225)
+		NpcHeartbeat, // the continuous idle-behavior pulse: (re-)assert the NPC's (Entity) short-form BehaviorControlCenterIIR so it keeps playing its idle animation instead of freezing (#225)
+		NpcChatter // an ambient bystander bark: the NPC (Entity) local-says a random RenownBystanderLovers line to nearby players (chat server), purely cosmetic
 	}
 
 	// `Target` is the attacked/chased/aggroed player for NpcAttack/NpcMove/NpcEnterCombat; null otherwise.

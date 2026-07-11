@@ -56,6 +56,7 @@ namespace Faolan.Core.Database
 		DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; }
 		DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; }
 		DbSet<NpcSpell> NpcSpells { get; }
+		DbSet<NpcChatter> NpcChatter { get; }
 		DbSet<NpcStatCore> NpcStatCores { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<PatrolWaypoint> PatrolWaypoints { get; }
@@ -122,6 +123,7 @@ namespace Faolan.Core.Database
 		public DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; set; }
 		public DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; set; }
 		public DbSet<NpcSpell> NpcSpells { get; set; }
+		public DbSet<NpcChatter> NpcChatter { get; set; }
 		public DbSet<NpcStatCore> NpcStatCores { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }

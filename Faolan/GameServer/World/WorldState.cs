@@ -92,6 +92,12 @@ namespace Faolan.GameServer.World
 		private const double HeartbeatIntervalSeconds = 1.0;
 		private readonly TickAccumulator _heartbeat = new(HeartbeatIntervalSeconds);
 
+		// Ambient bystander chatter: on each check a friendly/neutral NPC has a small chance to bark, so barks stay
+		// sparse + staggered across NPCs rather than all firing at once. Cosmetic; tune in the in-client pass.
+		private const double ChatterCheckSeconds = 4.0;
+		private const double ChatterChancePerCheck = 0.05;
+		private readonly TickAccumulator _chatter = new(ChatterCheckSeconds);
+
 		// Mints the next playfield-instance token. Thread-safe (zones can be created from any connection).
 		public uint NextPlayfieldToken()
 		{
@@ -156,6 +162,7 @@ namespace Faolan.GameServer.World
 			// #225: fire the idle heartbeat for every live NPC on its own cadence (once per HeartbeatIntervalSeconds),
 			// not every base tick. Computed once per Tick, then applied inside the entity loop below.
 			var heartbeatDue = _heartbeat.Advance(deltaSeconds, out _);
+			var chatterDue = _chatter.Advance(deltaSeconds, out _);
 
 			foreach (var zone in _zones.Values) // Parralell?
 			{
@@ -196,6 +203,12 @@ namespace Faolan.GameServer.World
 					// it also moves this tick (retail streams the heartbeat continuously alongside any MoveTask).
 					if (heartbeatDue)
 						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcHeartbeat));
+
+					// Ambient chatter: NPCs that have captured bark lines (NpcChatter) occasionally speak, staggered by
+					// the per-NPC random roll so they don't all bark at once. The processor picks a random line + sends
+					// it to nearby players (cosmetic). NPCs without a captured group stay silent.
+					if (chatterDue && entity.ChatterLines is { Length: > 0 } && Random.Shared.NextDouble() < ChatterChancePerCheck)
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcChatter));
 
 					// #262 companion-follow: a "released" NPC (e.g. Casilda after her rescue) follows its leading player -
 					// step toward them and broadcast a MoveTask each step (UNGATED; not combat), the server-driven

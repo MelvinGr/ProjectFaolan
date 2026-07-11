@@ -32,6 +32,9 @@ namespace Faolan.Core.Database.Tables
 		// The spells this NPC type casts (#232) - now FK'd to the type instead of joined by name string.
 		public virtual ICollection<NpcSpell> Spells { get; set; } = new List<NpcSpell>();
 
+		// Ambient chatter bark lines this NPC type periodically says (per-NPC; see NpcChatter).
+		public virtual ICollection<NpcChatter> Chatter { get; set; } = new List<NpcChatter>();
+
 		// The type-level CharacterIIR stat core (#244), lifted off the captured body into a 1:1 NpcStatCore side table
 		// (keyed by NpcId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.
 		// This is what lets a SUMMON-ONLY creature (pet/mount, #307) build its spawn body from the type ALONE, with a
