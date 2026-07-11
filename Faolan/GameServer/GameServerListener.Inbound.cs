@@ -523,6 +523,17 @@ namespace Faolan.GameServer
 										: "<unmapped handle>";
 									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.",
 										npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
+
+									// Surface the gap instead of silently closing (Melvin: have them say so). A greeting click
+									// that reaches here has NEITHER an imported shop (the vendor branch above didn't match)
+									// NOR an imported conversation node - and we can't tell a vendor-without-shop from a plain
+									// talk NPC (no merchant flag on the NPC), so one honest bubble covers both. Sender = the NPC
+									// handle so the client floats it over the NPC; recipient = the clicking player (SayRecipients
+									// excludes the actor, which would drop the clicker here). No-fallbacks rule: say what's missing.
+									if (npcHandle != 0)
+										await _agentServerDispatcher.CharacterSay(npcHandle,
+											$"({routedName}: no dialogue or shop imported yet)", [client.Session.Character.Id]);
+
 									await ConversationService.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
 								}
 
