@@ -14,24 +14,6 @@ namespace Faolan.Core.Network.Codecs.World
 	// the interest/send orchestration; these are the byte construction it forwards.
 	public static class WorldBroadcastBodies
 	{
-		// Re-addresses a captured MoveTask patrol body to a live handle + from-position (byte-exact round-trip).
-		// Still needed: MoveTaskBuilder.BuildPatrol reproduces only the CANONICAL waypoint form (proven on one golden),
-		// but the committed captured patrols carry richer per-patrol fields BuildPatrol/PatrolPath don't yet model - a
-		// non-zero move-block header (e.g. 41200000/41007BF0) and a real trailer (40DDA1FD + two floats + 40C00000 pair)
-		// - so from-scratch rebuild is 0/62 byte-exact on them. Retiring this needs those fields decoded and added to
-		// PatrolPath + BuildPatrol (Gitea #316); until then re-addressing the captured body is the faithful path.
-		[Obsolete(
-			"Blocked on from-scratch patrol construction (#316): BuildPatrol only covers the canonical waypoint form; committed patrols carry undecoded header/trailer fields (0/62 byte-exact from scratch).")]
-		public static byte[] ReaddressPatrol(byte[] capturedBody, uint handle, Vector3 from)
-		{
-			var task = MoveTaskComposite.Parse(capturedBody);
-			task.Handle = handle;
-			task.FromX = BitConverter.SingleToUInt32Bits(from.X);
-			task.FromY = BitConverter.SingleToUInt32Bits(from.Y);
-			task.FromZ = BitConverter.SingleToUInt32Bits(from.Z);
-			return task.Encode();
-		}
-
 		// A QuestTextRef -> on-wire text record (remoteformat/localized). Missing slots fall back to an empty
 		// remoteformat so the framing stays valid (the client just renders nothing for that slot).
 		public static byte[] Record(QuestDefinition def, QuestTextSlot slot)

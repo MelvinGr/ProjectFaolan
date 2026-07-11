@@ -863,7 +863,9 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<PatrolPath[]> GetPatrolPaths(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.PatrolPaths.Include(p => p.Waypoints).Where(p => p.MapId == mapId).ToArrayAsync();
+			// Load every node of each patrol's tree (+ its waypoints); EF relationship fixup wires the Parent/Children
+			// navs from ParentId so MoveTaskBuilder can walk the tree from the root (ParentId == null).
+			return await ctx.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints).Where(p => p.MapId == mapId).ToArrayAsync();
 		}
 
 		// The shared journal-content definition for a quest (text refs + objective marker), or null if not seeded.

@@ -139,7 +139,6 @@ namespace Faolan.GameServer.World
 		// Live vitals (NPCs are seeded at load; null for entities the combat/world layer doesn't track here yet).
 		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
 		public EntityVitals Vitals { get; set; }
-		public float PatrolSpeed { get; set; }
 
 		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
 		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).

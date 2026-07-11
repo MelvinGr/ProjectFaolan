@@ -172,7 +172,7 @@ namespace Faolan.Importer.Captures
 
 					spawns.Add(e);
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
-						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints, 0, r.Body));
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Root));
 				}
 			}
 		}
@@ -296,13 +296,13 @@ namespace Faolan.Importer.Captures
 			return inserted;
 		}
 
-		// NPC patrol routes, deduped by (map, position). Replaces waypoints wholesale on re-import.
+		// NPC patrol routes, deduped by (map, position). Replaces the columnarized task tree (#316) wholesale on re-import.
 		public static async Task ImportPatrolPaths(DatabaseContext db, List<PatrolPathEntry> paths)
 		{
 			foreach (var e in paths)
 			{
 				var existing = await db
-					.PatrolPaths.Include(p => p.Waypoints)
+					.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints)
 					.FirstOrDefaultAsync(p => p.MapId == e.MapId && p.PositionX == e.Position.X && p.PositionY == e.Position.Y && p.PositionZ == e.Position.Z);
 
 				if (existing == null)
@@ -316,25 +316,71 @@ namespace Faolan.Importer.Captures
 				}
 				else
 				{
-					db.PatrolWaypoints.RemoveRange(existing.Waypoints);
-					existing.Waypoints.Clear();
+					db.PatrolNodes.RemoveRange(existing.Nodes); // cascades the waypoints
+					existing.Nodes.Clear();
 				}
 
-				existing.Speed = e.Speed;
-				existing.Body = e.Body;
-				for (var i = 0; i < e.Waypoints.Count; i++)
-				{
-					existing.Waypoints.Add(new PatrolWaypoint
-					{
-						Ordinal = i,
-						PositionX = e.Waypoints[i].X,
-						PositionY = e.Waypoints[i].Y,
-						PositionZ = e.Waypoints[i].Z
-					});
-				}
+				// Attach a fresh copy of the task tree, flattened so EF assigns every node its PatrolPathId (the
+				// Parent/Children navs carry ParentId). Clone because a Root can be shared across entries.
+				AddNodeTree(existing, CloneNode(e.Root));
 			}
 
 			await db.SaveChangesAsync();
+		}
+
+		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
+		// sets ParentId).
+		private static void AddNodeTree(PatrolPath path, PatrolNode node)
+		{
+			path.Nodes.Add(node);
+			foreach (var child in node.Children)
+				AddNodeTree(path, child);
+		}
+
+		private static PatrolNode CloneNode(PatrolNode n)
+		{
+			var clone = new PatrolNode
+			{
+				Ordinal = n.Ordinal,
+				Mode = n.Mode,
+				HeaderFlags = n.HeaderFlags,
+				Duration = n.Duration,
+				Remaining = n.Remaining,
+				ListMin = n.ListMin,
+				PathFlags = n.PathFlags,
+				PathFloat10 = n.PathFloat10,
+				PathFloat20 = n.PathFloat20,
+				PathPacked1 = n.PathPacked1,
+				PathPacked2 = n.PathPacked2,
+				TrailerByte = n.TrailerByte,
+				Speed = n.Speed,
+				AnchorX = n.AnchorX,
+				AnchorY = n.AnchorY,
+				AnchorZ = n.AnchorZ,
+				Flag = n.Flag,
+				RotateTail = n.RotateTail,
+				ApproachType = n.ApproachType,
+				ApproachTarget = n.ApproachTarget,
+				WordsData = n.WordsData?.ToArray()
+			};
+
+			foreach (var w in n.Waypoints)
+				clone.Waypoints.Add(new PatrolNodeWaypoint
+				{
+					Ordinal = w.Ordinal,
+					PositionX = w.PositionX,
+					PositionY = w.PositionY,
+					PositionZ = w.PositionZ
+				});
+
+			foreach (var child in n.Children)
+			{
+				var childClone = CloneNode(child);
+				childClone.Parent = clone;
+				clone.Children.Add(childClone);
+			}
+
+			return clone;
 		}
 
 		// Quest journal-content definitions, refreshed per harvested quest; un-harvested quests untouched.

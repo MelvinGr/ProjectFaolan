@@ -758,13 +758,16 @@ namespace Faolan.GameServer.World
 				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
 				// speed/flags, so the client walks the route at the right pace (a rebuilt mode-1 path lost the speed and
 				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
-				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol) && patrol.Body is { Length: > 0 } && patrol.Waypoints.Count > 0)
+				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol) && patrol.Nodes.Count > 0)
 				{
-					entity.PatrolWaypoints = patrol.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.PositionX, w.PositionY, w.PositionZ)).ToList();
-					entity.PatrolSpeed = patrol.Speed;
-					entity.PatrolBody = WorldBroadcastBodies.ReaddressPatrol(patrol.Body, handle, entity.Position);
-					entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
-					entity.ArmPatrolCycle();
+					var waypoints = MoveTaskBuilder.PatrolWaypoints(patrol);
+					if (waypoints.Count > 0)
+					{
+						entity.PatrolWaypoints = waypoints;
+						entity.PatrolBody = MoveTaskBuilder.BuildPatrol(handle, entity.Position, patrol);
+						entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
+						entity.ArmPatrolCycle();
+					}
 				}
 
 				// Disposition drives BOTH the overhead name colour and whether this NPC aggros. It is the captured

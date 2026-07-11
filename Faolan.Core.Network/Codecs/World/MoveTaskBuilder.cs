@@ -65,15 +65,46 @@ namespace Faolan.Core.Network.Codecs.World
 				.ToArray();
 		}
 
-		// Builds the patrol MoveTask for `handle` from a DB-sourced PatrolPath row (#53): the row's Position is the
-		// current/anchor point, its ordered Waypoints the path, and Speed the walk speed. Byte-identical to the
-		// captured patrol the row was extracted from (PatrolPath rows only store the canonical single-segment form -
-		// PatrolPathExtractor). Same output as the explicit BuildPatrol overload, sourced from data instead of args.
-		public static byte[] BuildPatrol(uint handle, PatrolPath path)
+		// Builds the patrol MoveTask for a live spawn from its columnarized PatrolNode tree (#316): the stored task
+		// tree (any of the captured forms - single- or multi-segment) re-addressed to the live `handle` and the
+		// spawn's current position `from`, re-emitted byte-exact via MoveTaskComposite. Replaces the captured-Body
+		// re-address (the retired WorldBroadcastBodies.ReaddressPatrol).
+		public static byte[] BuildPatrol(uint handle, Vector3 from, PatrolPath path)
 		{
 			ArgumentNullException.ThrowIfNull(path);
-			var waypoints = path.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.PositionX, w.PositionY, w.PositionZ)).ToList();
-			return BuildPatrol(handle, path.Position, waypoints, path.Speed);
+			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null)
+				?? throw new InvalidOperationException($"patrol {path.Id} has no root node");
+
+			return new MoveTaskComposite
+			{
+				Handle = handle,
+				FromX = BitConverter.SingleToUInt32Bits(from.X),
+				FromY = BitConverter.SingleToUInt32Bits(from.Y),
+				FromZ = BitConverter.SingleToUInt32Bits(from.Z),
+				Task = PatrolNodeMapper.ToTask(root)
+			}.Encode();
+		}
+
+		// The patrol's ordered waypoints (every PathMoveTask's waypoint list, walked in tree order) - the world
+		// simulation's route + cycle-length source, from the columnarized tree.
+		public static IReadOnlyList<Vector3> PatrolWaypoints(PatrolPath path)
+		{
+			ArgumentNullException.ThrowIfNull(path);
+			var waypoints = new List<Vector3>();
+			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null);
+			if (root != null)
+				CollectWaypoints(root, waypoints);
+			return waypoints;
+		}
+
+		private static void CollectWaypoints(PatrolNode node, List<Vector3> waypoints)
+		{
+			if (node.Mode == 1)
+				foreach (var w in node.Waypoints.OrderBy(w => w.Ordinal))
+					waypoints.Add(new Vector3(w.PositionX, w.PositionY, w.PositionZ));
+
+			foreach (var child in node.Children.OrderBy(c => c.Ordinal))
+				CollectWaypoints(child, waypoints);
 		}
 
 		public static byte[] BuildStationary(uint handle, Vector3 position)

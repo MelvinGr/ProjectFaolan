@@ -42,6 +42,7 @@ namespace Faolan.Core.Network.Codecs.World
 		public ushort PathPacked1 { get; set; } // PathFlags & 1 branch
 		public ushort PathPacked2 { get; set; }
 		public ushort RotateTail { get; set; }
+
 		private bool HasHeaderFloats => (HeaderFlags & 1) == 0;
 
 		public static MoveTaskNode Read(FaolanStream r)

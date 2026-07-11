@@ -421,7 +421,8 @@ namespace Faolan.Importer.Modules
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnMorphs");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnEquipment");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawns");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolWaypoints");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolNodeWaypoints");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolNodes");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolPaths");
 			}
 

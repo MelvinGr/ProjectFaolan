@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Attributes;
@@ -13,6 +14,7 @@ namespace Faolan.Core.Database
 	public interface IDatabaseContext
 	{
 		DatabaseFacade Database { get; } // from DbContext
+
 		DbSet<Ability> Abilities { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AppearanceChoice> AppearanceChoices { get; }
@@ -59,7 +61,8 @@ namespace Faolan.Core.Database
 		DbSet<NpcChatter> NpcChatter { get; }
 		DbSet<NpcStatCore> NpcStatCores { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
-		DbSet<PatrolWaypoint> PatrolWaypoints { get; }
+		DbSet<PatrolNode> PatrolNodes { get; }
+		DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
@@ -73,6 +76,7 @@ namespace Faolan.Core.Database
 		DbSet<StockPhrase> StockPhrases { get; }
 		DbSet<TradepostListing> TradepostListings { get; }
 		DbSet<WorldObject> WorldObjects { get; }
+
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
 	}
 
@@ -83,14 +87,12 @@ namespace Faolan.Core.Database
 		public DbSet<AppearanceChoice> AppearanceChoices { get; set; }
 		public DbSet<Character> Characters { get; set; }
 		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
-
 		public DbSet<CharacterAttribute> CharacterAttributes { get; set; }
 		public DbSet<CharacterBody> CharacterBodies { get; set; }
 		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
 		public DbSet<CharacterCombo> CharacterCombos { get; set; }
 		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
 		public DbSet<CharacterInventory> CharacterInventory { get; set; }
-
 		public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
 		public DbSet<CharacterQuest> CharacterQuests { get; set; }
 		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
@@ -126,7 +128,8 @@ namespace Faolan.Core.Database
 		public DbSet<NpcChatter> NpcChatter { get; set; }
 		public DbSet<NpcStatCore> NpcStatCores { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
-		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
+		public DbSet<PatrolNode> PatrolNodes { get; set; }
+		public DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
@@ -314,7 +317,12 @@ namespace Faolan.Core.Database
 					p.PositionZ
 				})
 				.IsUnique();
-			modelBuilder.Entity<PatrolPath>().HasMany(p => p.Waypoints).WithOne(w => w.PatrolPath).HasForeignKey(w => w.PatrolPathId).OnDelete(DeleteBehavior.Cascade);
+			// The columnarized task tree (#316): all of a patrol's nodes hang off the path (cascade-delete); the tree
+			// shape is the self-reference ParentId (NoAction - every node is already deleted via its PatrolPathId, so
+			// the self-ref must not add a second cascade path). Each node's waypoints cascade with it.
+			modelBuilder.Entity<PatrolPath>().HasMany(p => p.Nodes).WithOne(n => n.PatrolPath).HasForeignKey(n => n.PatrolPathId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).HasForeignKey(n => n.ParentId).OnDelete(DeleteBehavior.NoAction);
+			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
 
 			// A captured world object is deduped by its (map, spawn point, identity): two distinct props can occupy the
 			// EXACT same coordinates (#222), so the display_name identity is part of the key - position alone would

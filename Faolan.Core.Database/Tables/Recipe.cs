@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -23,7 +24,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The record bytes AFTER the leading list-key (which is Id): everything FUN_0077be70 reads plus the trailing
 		// 1-byte flag. The wire list element is [u32 Id][Data]; the builder reproduces exactly that.
-		[Column(TypeName = "BLOB")]
+		[Column(TypeName = "BLOB"), Obsolete("Decode/Columnize")]
 		public byte[] Data { get; set; } = [];
 	}
 }
