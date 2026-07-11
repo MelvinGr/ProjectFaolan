@@ -111,7 +111,9 @@ namespace Faolan.Importer.Extractors
 			return seen.Values.ToList();
 		}
 
-		private static byte[] GetBody(byte[] full)
+		// Internal (shared with WorldTeleportExtractor, #zone-lines): strip the 12-byte lead + variable header, yielding
+		// the IIR body whose [0:4]=len, [4:8]=subop, [12:16]=handle.
+		internal static byte[] GetBody(byte[] full)
 		{
 			if (full.Length < 12)
 				return [];
@@ -123,14 +125,14 @@ namespace Faolan.Importer.Extractors
 				: [];
 		}
 
-		private static float ReadLE(byte[] body, int offset)
+		internal static float ReadLE(byte[] body, int offset)
 		{
 			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
 		}
 
 		// The object message is [u32 BE length][message] right after the 0x2C transform group (no pre-IIR block).
 		// Reads field 1 (id, varint) and field 2 (name, string). Returns (0, "") if the layout is unexpected.
-		private static (uint Id, string Name) ReadMessage(byte[] body)
+		internal static (uint Id, string Name) ReadMessage(byte[] body)
 		{
 			var start = TransformEnd(body);
 			if (start < 0 || start + 4 > body.Length)

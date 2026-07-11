@@ -90,6 +90,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
 		Task<List<TradepostListing>> GetTradepostListings(uint itemId, uint realmId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
+		Task<WorldObject> GetWorldObject(uint mapId, uint captureId);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task RemoveCharacterShortcut(uint characterId, uint slot);
@@ -1096,6 +1097,12 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.DisplayName != null).ToArrayAsync();
+		}
+
+		public async Task<WorldObject> GetWorldObject(uint mapId, uint capturedHandle)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.WorldObjects.FirstOrDefaultAsync(o => o.MapId == mapId && o.DisplayName != null && o.CapturedHandle == capturedHandle);
 		}
 
 		public async Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work)

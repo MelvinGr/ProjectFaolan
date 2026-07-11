@@ -852,6 +852,38 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
+		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place
+		// them on it. DestMapId == 0 means the object IS a teleporter but its destination hasn't been captured yet -
+		// the caller surfaces a message instead of silently dropping the player somewhere (no fallbacks).
+		public readonly record struct ZoneLineDestination(uint DestMapId, Vector3? ArrivalPosition, string DestinationName);
+
+		// The column-driven interaction of a USED world object: its InteractAction (what the object does) plus, for a
+		// teleporter, the resolved Teleport destination. Action is None when the handle isn't a DB world object at all
+		// (e.g. a loot bag, a zone entity) - the caller falls through to the open-animation / loot path. Lets the
+		// UseObject handler switch on the action rather than special-casing one kind.
+		public readonly record struct UsedObjectInteraction(InteractAction Action, ZoneLineDestination Teleport);
+
+		// Resolve a used world object's interaction, DATA-DRIVEN from its InteractAction + Destination* columns
+		// (populated by the world-teleports importer from captured UseObject->N3Teleport sequences). A teleporter
+		// WITHOUT a captured destination yields Teleport.DestMapId == 0 so the caller can surface a message. (Whether
+		// it's a same-playfield Teleport or a cross-playfield ProxyTeleport, the handoff path is the same - DoTeleport
+		// change-maps only when the destination map differs.)
+		public async Task<UsedObjectInteraction> ResolveUseObject(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			var obj = player == null
+				? null
+				: await _database.GetWorldObject(player.MapId, handle);
+			if (obj == null)
+				return new UsedObjectInteraction(InteractAction.None, default);
+
+			var name = obj.Name ?? obj.DisplayName ?? "?";
+			var teleport = obj.DestinationMapId is uint destMap
+				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
+				: new ZoneLineDestination(0, null, name);
+			return new UsedObjectInteraction(obj.InteractAction, teleport);
+		}
+
 		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
 		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
 		// correct, state-driven marker instead of a hardcoded value.
@@ -888,7 +920,7 @@ namespace Faolan.GameServer.World
 			var token = (await _database.GetMap(mapId))?.PlayfieldToken ?? 0;
 			return token != 0
 				? token
-				: WorldState.DefaultPlayfieldToken;
+				: WorldState.DefaultPlayfieldToken; // TODO: remove this fallback when possible (Or just throw?)
 		}
 
 		// On world entry: re-send the player's persisted active quests so their journal is restored.
@@ -928,7 +960,7 @@ namespace Faolan.GameServer.World
 		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
 		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
 		// off the beach or before she's freed.
-		public async Task SendBeachGateOnEntry(INetworkClient client)
+		public async Task SendBeachGateOnEntry(INetworkClient client) // TODO: This should be in some sort of quest handler service
 		{
 			var character = client.Session?.Character;
 			if (character == null || character.MapId != Map.TortageBeachId)

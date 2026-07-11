@@ -297,7 +297,7 @@ namespace Faolan.GameServer
 								// animation end. Confirmed NOT server-side - retail sends nothing extra during the dismount window (only
 								// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
 								// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
-								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
+								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default; // TODO: No fallback
 								var playerEntity = PlayerWorldEntity(client);
 								var dismounting = playerEntity?.IsMounted ?? false;
 								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
@@ -480,11 +480,39 @@ namespace Faolan.GameServer
 							case ActionType.UseObject:
 							{
 								// Using a world object - `target` is the object handle (its typetag, 0xC87A for loot bags,
-								// rides in `from`). A STATIC world object (a door/gate) plays its open state; a loot bag
-								// (zone entity) opens its window. Try the door path first (DB world object by CapturedHandle);
-								// fall through to the loot-bag path when it isn't one.
-								if (!await _broadcaster.OpenWorldObject(client, target))
-									await _broadcaster.OpenLootBag(client, target);
+								// rides in `from`). Dispatch on what the object DOES (its InteractAction, data-driven from
+								// the DB): a zone-line teleports to another playfield; everything else (a SimpleDynel door
+								// that opens, a loot bag) is handled by the open/loot path.
+								var interaction = await _broadcaster.ResolveUseObject(client, target);
+								switch (interaction.Action)
+								{
+									case InteractAction.Teleport:
+									case InteractAction.ProxyTeleport:
+									{
+										// Hand the player off to the destination playfield - or, if this teleporter's
+										// destination hasn't been captured yet, surface a message (like the missing-vendor
+										// case) rather than a silent no-op.
+										var dest = interaction.Teleport;
+										if (dest.DestMapId == 0)
+											await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+												$"<span style=\"color: red;\">Zone-line '{dest.DestinationName}' has no known destination yet.</span>");
+										else
+											await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition);
+
+										break;
+									}
+
+									case InteractAction.None:
+									default:
+									{
+										// Not a column-driven teleporter: the animated-door open path (DB world object by
+										// CapturedHandle), else the loot-bag window.
+										if (!await _broadcaster.OpenWorldObject(client, target))
+											await _broadcaster.OpenLootBag(client, target);
+
+										break;
+									}
+								}
 
 								break;
 							}

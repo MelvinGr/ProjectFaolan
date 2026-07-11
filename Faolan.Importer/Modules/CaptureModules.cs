@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Extractors;
@@ -547,6 +549,106 @@ namespace Faolan.Importer.Modules
 			var objects = WorldObjectExtractor.Merge(ctx.Captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets)));
 			await ImportOps.ImportWorldObjects(ctx.Db, objects);
 			return new ImportResult($"{objects.Count} world objects.");
+		}
+	}
+
+	// Zone-line teleport destinations: enriches the DoorFullUpdateIIR world objects that are teleporters with their
+	// destination (map + arrival), harvested from captured UseObject->N3Teleport sequences (WorldTeleportExtractor).
+	// Only doors actually walked through in a capture get a destination; the rest keep InteractAction=None and the
+	// server surfaces a message on use. Depends on world-objects (the rows it enriches must exist).
+	public sealed class WorldTeleportsModule : IImportModule
+	{
+		private const uint ZoneLineSubOpcode = (uint)GameServer0X2000Opcodes.DoorFullUpdateIIR; // 0x33A56FB0
+		private const float PositionTolerance = 1.0f; // burst pos vs stored row pos (both from the same import)
+
+		public ImportSource Source => ImportSource.Captures;
+
+		// No hard DependsOn (mirrors NpcDispositionModule): it enriches whatever zone-line WorldObjects already exist,
+		// and registration order already sequences it right after `world-objects` in a full default run. A hard dep
+		// would drag the heavy world-objects re-import into a targeted `--only world-teleports` run - which fails on a
+		// populated DB (its Insert path collides on the (map,pos,name) unique key). On an empty DB this just no-ops.
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
+
+		public string Description => "Zone-line teleport destinations (captured UseObject->N3Teleport).";
+		public string Name => "world-teleports";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var links = WorldTeleportExtractor.Merge(ctx.Captures.SelectMany(c => WorldTeleportExtractor.Extract(c.Packets)));
+
+			// Overwrite: clear any previously-written destinations so a re-import reflects only the current harvest.
+			var cleared = 0;
+			if (ctx.ModeFor(Name) == WriteMode.Overwrite)
+			{
+				foreach (var o in await ctx.Db.WorldObjects.Where(o => o.InteractAction != InteractAction.None).ToListAsync())
+				{
+					o.InteractAction = InteractAction.None;
+					o.DestinationMapId = null;
+					o.DestinationX = o.DestinationY = o.DestinationZ = null;
+					cleared++;
+				}
+			}
+
+			var zoneLines = await ctx.Db.WorldObjects.Where(o => o.SubOpcode == ZoneLineSubOpcode).ToListAsync();
+
+			var matched = 0;
+			var misses = 0;
+			foreach (var link in links)
+			{
+				var row = NearestZoneLine(zoneLines, link);
+				if (row == null)
+				{
+					misses++;
+					continue;
+				}
+
+				// Same-playfield reposition vs cross-playfield handoff - the client's Teleport vs ProxyTeleport GameAction.
+				row.InteractAction = link.DestMapId == row.MapId ? InteractAction.Teleport : InteractAction.ProxyTeleport;
+				row.DestinationMapId = link.DestMapId;
+				row.DestinationX = link.DestX;
+				row.DestinationY = link.DestY;
+				row.DestinationZ = link.DestZ;
+				matched++;
+			}
+
+			await ctx.Db.SaveChangesAsync();
+
+			var prefix = cleared > 0
+				? $"cleared {cleared}; "
+				: "";
+			return new ImportResult($"{prefix}{links.Count} teleport links harvested, {matched} matched to world objects, {misses} unmatched.");
+		}
+
+		// The stored zone-line row for a harvested link: same map + name, nearest to the captured source position
+		// (a name can repeat across maps; within a map the position disambiguates). Null when none is within tolerance.
+		private static Faolan.Core.Database.Tables.WorldObject NearestZoneLine(
+			IReadOnlyList<Faolan.Core.Database.Tables.WorldObject> zoneLines, TeleportLink link)
+		{
+			Faolan.Core.Database.Tables.WorldObject best = null;
+			var bestSq = PositionTolerance * PositionTolerance;
+			foreach (var o in zoneLines)
+			{
+				if (o.MapId != link.SourceMapId || !string.Equals(o.Name, link.SourceName, StringComparison.Ordinal))
+					continue;
+
+				var dx = o.PositionX - link.SrcX;
+				var dy = o.PositionY - link.SrcY;
+				var dz = o.PositionZ - link.SrcZ;
+				var sq = dx * dx + dy * dy + dz * dz;
+				if (sq <= bestSq)
+				{
+					bestSq = sq;
+					best = o;
+				}
+			}
+
+			return best;
 		}
 	}
 
