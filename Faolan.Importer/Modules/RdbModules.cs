@@ -125,7 +125,7 @@ namespace Faolan.Importer.Modules
 	public sealed class RdbAbilitiesModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Rdb;
-		public IReadOnlyList<string> DependsOn => ["abilities"];
+		public IReadOnlyList<string> DependsOn => [nameof(AbilitiesModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

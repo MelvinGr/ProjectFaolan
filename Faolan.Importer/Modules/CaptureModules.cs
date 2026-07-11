@@ -124,7 +124,7 @@ namespace Faolan.Importer.Modules
 	public sealed class StatDamageModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["spells"];
+		public IReadOnlyList<string> DependsOn => [nameof(SpellsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -219,7 +219,7 @@ namespace Faolan.Importer.Modules
 	public sealed class StarterSpellLevelsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["class-spells"];
+		public IReadOnlyList<string> DependsOn => [nameof(StartingSpellsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -264,7 +264,7 @@ namespace Faolan.Importer.Modules
 	public sealed class CharacterStateModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["characters"];
+		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -286,7 +286,7 @@ namespace Faolan.Importer.Modules
 	public sealed class LearnedSpellsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["characters", "spells"];
+		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(SpellsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -311,7 +311,7 @@ namespace Faolan.Importer.Modules
 	public sealed class CharacterAbilitiesModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["characters", "abilities"];
+		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(AbilitiesModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -342,7 +342,7 @@ namespace Faolan.Importer.Modules
 	public sealed class CharacterQuestsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["characters", "quests"];
+		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(QuestsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -366,7 +366,7 @@ namespace Faolan.Importer.Modules
 	public sealed class CharacterBankModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["characters", "items"];
+		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -392,7 +392,11 @@ namespace Faolan.Importer.Modules
 	public sealed class NpcsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["characters"];
+		// Depends on `items` (NpcSpawnEquipment.Template is an FK to Items - the worn item's quad + hash live there,
+		// harvested by ItemHashHarvester's spawn source over the same FA015807 packets). NOT on `characters`: the old
+		// "characters" dep was spurious - it only dragged the characters module in and added stray captured player
+		// characters (e.g. Ranochar) as a side effect. RunAsync itself FKs to Map/Npc/Items, never to Characters.
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -546,7 +550,7 @@ namespace Faolan.Importer.Modules
 	public sealed class MapLootModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["items"];
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -593,7 +597,8 @@ namespace Faolan.Importer.Modules
 	{
 		public bool InDefaultSet => false;
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [];
+		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -644,7 +649,8 @@ namespace Faolan.Importer.Modules
 	{
 		public bool InDefaultSet => false;
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [];
+		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

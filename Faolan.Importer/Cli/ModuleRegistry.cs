@@ -31,9 +31,13 @@ namespace Faolan.Importer.Cli
 		// The default set when no --only is given: every module that opts in (RDB + mounts are opt-in).
 		public static IReadOnlyList<IImportModule> DefaultSet => All.Where(m => m.InDefaultSet).ToList();
 
+		// Resolves a module by its CLI Name ("items", from --only/--skip) OR by its class name (nameof(ItemsModule),
+		// the compile-checked key DependsOn uses so a renamed/removed module breaks the build, not a run).
 		public static IImportModule? Find(string name)
 		{
-			return All.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+			return All.FirstOrDefault(m =>
+				string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase) ||
+				string.Equals(m.GetType().Name, name, StringComparison.OrdinalIgnoreCase));
 		}
 
 		// Expands a requested set with its transitive dependencies, then returns it in dependency order

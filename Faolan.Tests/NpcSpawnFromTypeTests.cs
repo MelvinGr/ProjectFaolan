@@ -32,6 +32,7 @@ namespace Faolan.Tests
 			var types = ctx
 				.Npcs.Include(n => n.StatCore)
 				.Include(n => n.Equipment)
+				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
 				.Include(n => n.Morphs)
 				.Where(n => n.StatCore != null && n.StatCore.IirHeader != null && (n.Equipment.Any() || n.Morphs.Any()))
 				.AsNoTracking()

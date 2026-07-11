@@ -204,6 +204,16 @@ namespace Faolan.Core.Database
 			// bug (listings with a bogus ItemId=30000 that the client collapsed into one "Torn Rags" row).
 			modelBuilder.Entity<TradepostListing>().HasOne(t => t.Item).WithMany().HasForeignKey(t => t.ItemId).OnDelete(DeleteBehavior.Restrict);
 
+			// A shop ware references its Items row (the harvested ProtoAcgItem identity); Restrict so an item can't be
+			// deleted out from under an open shop, and so an un-harvested ware fails the import loudly (empty shop bug).
+			modelBuilder.Entity<ShopItem>().HasOne(si => si.Item).WithMany().HasForeignKey(si => si.ItemTemplateId).OnDelete(DeleteBehavior.Restrict);
+
+			// NPC worn equipment references its Items row by template (the quad + hash live once in Items, harvested
+			// from the same spawn packet). Restrict, same rationale as the shop ware: an un-harvested worn item fails
+			// the import loudly instead of rendering the NPC with missing gear.
+			modelBuilder.Entity<NpcSpawnEquipment>().HasOne(e => e.Item).WithMany().HasForeignKey(e => e.Template).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<NpcEquipment>().HasOne(e => e.Item).WithMany().HasForeignKey(e => e.Template).OnDelete(DeleteBehavior.Restrict);
+
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).HasForeignKey<CharacterMaxStats>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.Inventory).WithOne(i => i.Character).HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);

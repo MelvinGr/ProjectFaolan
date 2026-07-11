@@ -794,6 +794,7 @@ namespace Faolan.Core.Database.Repositories
 				.Npcs.Include(t => t.Spells)
 				.Include(t => t.StatCore)
 				.Include(t => t.Equipment)
+				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
 				.Include(t => t.Morphs)
 				.Where(t => t.Name != null && t.Name.ToLower() == lowered && t.StatCore != null)
 				.FirstOrDefaultAsync();
@@ -812,6 +813,7 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(t => t.StatCore) // the type stat core, so the spawn builds from columns (TryBuildLive)
 				.Include(n => n.Morphs)
 				.Include(n => n.Equipment)
+				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
 				.Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered && n.Npc.StatCore != null) // #244: name lives on the type
 				.FirstOrDefaultAsync();
 		}
@@ -824,6 +826,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx
 				.NpcSpawns.Include(n => n.Morphs)
 				.Include(n => n.Equipment)
+				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
 				.Include(n => n.Npc)
 				.ThenInclude(t => t.Spells) // #244: the NPC type + its FK'd spells (replaces the name-string spell join)
 				.Include(n => n.Npc)

@@ -240,7 +240,9 @@ namespace Faolan.Importer.Cli
 
 				var slots = read
 					.Message.InventoryEntries.Select(entry => NpcSpawnEquipmentBuilder.TryLift<NpcSpawnEquipment>(entry, out var row)
-						? $"slot{row.Pos}=tpl{row.Template}[k={row.Key1},{row.Key2},{row.Key3},{row.Key4} lvl={row.Level} hash={row.Hash}]"
+						// The row stores only slot/template/level now (the quad + hash are the Items row Template FKs to);
+						// read the identity for the report off the captured entry itself.
+						? $"slot{row.Pos}=tpl{row.Template}[k={entry.Item.Key1.Key1},{entry.Item.Key1.Key2},{entry.Item.Key1.Key3},{entry.Item.Key1.Key4} lvl={row.Level} hash={entry.Item.Hash}]"
 						: "slot?=unliftable")
 					.ToList();
 				Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} pos=({e.X:0.#},{e.Z:0.#})");

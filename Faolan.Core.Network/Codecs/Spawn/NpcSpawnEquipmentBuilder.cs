@@ -23,26 +23,28 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(INpcEquipment row)
 		{
-			var key = new ProtoDecryptionKey
-			{
-				Key1 = row.Key1,
-				Key2 = row.Key2,
-				Key3 = row.Key3,
-				Key4 = row.Key4
-			};
+			// The item identity (quad + hash) lives in Items and is reached through the FK navigation; require it
+			// loaded rather than silently emitting an empty item (no-fallbacks: say what's missing).
+			var item = row.Item ?? throw new InvalidOperationException(
+				$"NPC worn-equipment slot {row.Pos} (template {row.Template}): the Item navigation is not loaded - Include it before building the spawn.");
 
+			return BuildEntry(row.Pos, row.Template, row.Level, item.Key, item.Hash);
+		}
+
+		private static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(uint pos, uint template, uint level, ProtoDecryptionKey key, uint hash)
+		{
 			return new ProtoCoreCharacterIIR.InventoryEntry
 			{
-				Pos = row.Pos,
+				Pos = pos,
 				Item = new ProtoAcgItem
 				{
 					Key1 = key,
 					Key2 = key,
 					Key3 = key,
-					Template1 = row.Template,
-					Template2 = row.Template,
-					Level = row.Level,
-					Hash = row.Hash
+					Template1 = template,
+					Template2 = template,
+					Level = level,
+					Hash = hash
 				}
 			};
 		}
@@ -50,7 +52,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Lifts a captured InventoryEntry into a row (per-placement NpcSpawnEquipment or per-type NpcEquipment via the
 		// type param), but ONLY if it matches the reproducible shape (the three keys identical, the two templates
 		// identical, no template3). Returns false for any entry outside that shape, so the importer can decline the whole
-		// NPC rather than store something the builder would not reproduce byte-for-byte.
+		// NPC rather than store something the builder would not reproduce byte-for-byte. The row stores just the slot +
+		// template + level; the quad + hash it validates against belong to the Items row the FK on Template points at
+		// (harvested from this same spawn packet, so they match by construction - verified template-canonical).
 		public static bool TryLift<T>(ProtoCoreCharacterIIR.InventoryEntry entry, out T row) where T : INpcEquipment, new()
 		{
 			row = default;
@@ -63,25 +67,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (item.Template1 != item.Template2 || item.ShouldSerializeTemplate3())
 				return false;
 
+			// Byte-exact gate: the entry must be fully described by (pos, template, level) + the canonical identity
+			// (quad + hash). Rebuild from exactly those and require an exact match, so we never store an entry carrying
+			// fields the FK model can't reproduce (extra ProtoAcgItem fields, an absent level/hash, etc.).
+			if (!BuildEntry(entry.Pos, item.Template1, item.Level, k, item.Hash).ToProtobuf().SequenceEqual(entry.ToProtobuf()))
+				return false;
+
 			row = new T
 			{
 				Pos = entry.Pos,
-				Key1 = k.Key1,
-				Key2 = k.Key2,
-				Key3 = k.Key3,
-				Key4 = k.Key4,
 				Template = item.Template1,
-				Level = item.Level,
-				Hash = item.Hash
+				Level = item.Level
 			};
-
-			// Byte-exact gate: only accept entries the rebuilt row reproduces exactly (guards any item carrying
-			// fields the row doesn't model - extra ProtoAcgItem fields, an absent level/hash, etc.).
-			if (!BuildEntry(row).ToProtobuf().SequenceEqual(entry.ToProtobuf()))
-			{
-				row = default;
-				return false;
-			}
 
 			return true;
 		}

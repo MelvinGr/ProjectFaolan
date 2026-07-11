@@ -466,13 +466,8 @@ namespace Faolan.Importer.Captures
 				row.Equipment.Add(new NpcSpawnEquipment
 				{
 					Pos = eq.Pos,
-					Key1 = eq.Key1,
-					Key2 = eq.Key2,
-					Key3 = eq.Key3,
-					Key4 = eq.Key4,
-					Template = eq.Template,
-					Level = eq.Level,
-					Hash = eq.Hash
+					Template = eq.Template, // FK to Items; the quad + hash live there (harvested by the items module)
+					Level = eq.Level
 				});
 			}
 

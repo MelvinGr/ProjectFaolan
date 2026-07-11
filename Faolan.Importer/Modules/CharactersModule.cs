@@ -13,7 +13,7 @@ namespace Faolan.Importer.Modules
 	public sealed class CharactersModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => ["items"];
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
