@@ -15,6 +15,7 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.World;
@@ -243,6 +244,45 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.CreatureName, character.Name, character.MapId);
 		}
 
+		// The client's world-entry spawn-poll, arriving on wire 0x2020 (GameCharAgent method slot 0x20, RPC-catalog
+		// label UpdateQuestMarkerNPC - the login/world flow reuses the opcode). Fires once per spawned entity the
+		// client confirms it built (requestId = that entity's handle). Three jobs, all part of finishing world entry:
+		//  (1) record the confirmed handle so interest only ever despawns handles the client actually built (#245 -
+		//      a despawn for an unbuilt handle crashes a still-loading client: pcDynel == null);
+		//  (2) answer with the 0x2008 SpawnCheck that completes/renders that entity (verified: the dikketest world
+		//      conn polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). Both existing-login and post-creation
+		//      world entry need it - the create flow's old hand-built batch answered the wrong hardcoded capture
+		//      handles, so its entities were never confirmed and the intro cinematic failed;
+		//  (3) drive the ready-trigger: on a normal login retail arms the follow-up off the client's 0x205F and
+		//      expects 0x2024 ReadyForPlayScreen right after this spawn handshake, so the flush lives HERE
+		//      (capture-proven - moving it strands login on the loading screen). FlushPendingPost205FFollowUp no-ops
+		//      unless armed, so a create-editor / post-ready poll just falls through.
+		// Bodies shorter than the 16-byte poll are not spawn-polls (some other same-opcode traffic); just log them.
+		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, ConanPacket packet)
+		{
+			if (packet.Body == null || packet.Body.Length < sizeof(uint) * 4)
+			{
+				LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray());
+				return;
+			}
+
+			var ack0 = packet.Body.ReadUInt32();
+			var requestId = packet.Body.ReadUInt32();
+			var ack1 = packet.Body.ReadUInt32();
+			var characterId = packet.Body.ReadUInt32();
+
+			_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
+
+			if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
+				await SendSpawnCheckResponse(client, requestId);
+
+			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
+			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId,
+				ack1, characterId, client.Session.HasPendingPost205FFollowUp);
+			await FlushPendingPost205FFollowUp(client);
+			packet.Body.Position = 0;
+		}
+
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
 			if (!client.Session.HasPendingPost205FFollowUp)
@@ -254,107 +294,77 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Past the early return the character is always named (the create-editor connection never reaches
-			// here), so the IsUnnamedCreatePhase branches below are the create-vs-named split of the shared flush -
-			// kept because a named character on this connection is either a Login or a TeleportReentry, both of
-			// which want the full existing-character burst.
-
+			// Past the early return the character is always named: the create-editor connection returned above (it
+			// flushes via the retail create handoff, not here), so every connection that reaches this point is a
+			// Login or a TeleportReentry - both of which want the full existing-character burst below. This is the
+			// cleanup the old "Remove ...Name != null checks below" TODO asked for, now that the early return is in
+			// place: the create-vs-named conditionals that used to guard this body were all unreachable dead code.
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
 			await SendPost205FOxf98E10B3Prompt(client);
 			Logger.LogInformation("Sent deferred 0xF98E10B3 prompt.");
 
-			if (client.Session.LastGameServer2020RequestId is uint requestId)
+			await SendPost205FSpawnCheck(client);
+
+			// Retail sends 0x2024 ReadyForPlayScreen right after the spawn handshake (0x2076) - the "leave the
+			// loading screen and enter the world" signal. We were sending the manifest but never this, so the client
+			// finished the handshake (0x2020 -> 0x2008 -> 0x2076) and then sat on the loading screen forever.
+			// Confirmed by diffing a 4010 login against the Strie dump: 0x2024 ours=0 / dump=1.
+			Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
+			await SendReadyForPlayScreen(client);
+			// Retail grants the starting abilities (0x2052) + combo book right after 0x2024, not during world entry
+			// (faolan necro login capture: abilities at frame 192, just after ReadyForPlayScreen). Both are granted
+			// here, post-snapshot: neither rides the FullChar snapshot known-list (spells do), so a pre-snapshot grant
+			// is discarded by the client's identity reconstruction.
+			await GrantCharacterAbilities(client);
+			await GrantCharacterCombos(client);
+			// Re-seat the persisted mount if the player was riding one and this map allows mounts. Runs on login
+			// AND on every teleport/changemap re-entry (this flush is re-armed on both), so riding into a no-mount
+			// area dismounts and riding back re-mounts, and a relog restores the mount.
+			await RestoreMount(client);
+			// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
+			// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
+			// the pre-snapshot GrantCharacterSpells re-send is absorbed silently. (The old PendingSpellLearns
+			// post-ready re-announce - needed only while the snapshot carried an empty known-list - re-toasted "You
+			// have learned a new spell" on every login; the known-list makes it redundant.)
+			// Shield of the Risen (#221): re-applies the persistent protection self-buff every character carries.
+			// This flush is also re-armed on teleport/changemap re-entry, so the buff is re-asserted on each
+			// playfield change too (Melvin: "on every map change / login"). RESOLVED 2026-07-11: the old id
+			// 0x000B9000 was the wrong spell (rendered as the "Exhausted" debuff, no DB row -> never cleared).
+			// The capture-proven ids are bases 4061768 (1h) + 3666828 (10h) - both in Spells with real durations,
+			// so #274 arms a matching expiry and they clear on schedule. Rendered top-of-screen by the client.
+			await SendShieldOfTheRisen(client);
+
+			// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
+			await SendPostReadyBurst(client);
+
+			// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
+			// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
+			// CLIENT-SIDE from the char data we already deliver. Verified in-client
+			// with the force-feed DISABLED on BOTH paths: an existing lvl80 login read stat 0x43 = Necromancer, // and a freshly-created char read stat 0x43 = HeraldOfXotli - both displayed correctly. The earlier
+			// interim predated the client-derivation working; no server-side class stat is needed.
+
+			// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an hash
+			// (AH-bought items - harvested template, no hash) via the live add path, so they survive relog.
+			await RedeliverNonSnapshotBagItems(client);
+
+			// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
+			// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot, // see BuildBurstlessSnapshotRoot.)
+
+			// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
+			// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
+			// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration.
+			if (client.Session.Character.Money > 0)
+				await SendUpdateCash(client, client.Session.Character.Money, UpdateCashReason.Spend);
+
+			// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
+			// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry
+			// yet, so re-assert it here - the client applies it the same way. (After the snapshot, like the
+			// wallet sync - keep the burst -> snapshot gap clean.)
+			if (client.Session.Character.GuildId is uint guildId)
 			{
-				Logger.LogInformation($"Sending deferred SpawnCheck with observed 0x2020 requestId={requestId:X}.");
-				await SendPost205FSpawnCheck(client);
-			}
-			else if (!client.Session.IsUnnamedCreatePhase)
-				await SendPost205FSpawnCheck(client);
-			else
-			{
-				Logger.LogInformation("No observed 0x2020 request id is available while flushing; SpawnCheck will be skipped for new-character flow.");
-				Logger.LogWarning("Pending post-0x205F follow-up flushed without any observed 0x2020 request id; skipping SpawnCheck instead of sending a guessed correlation id.");
-				return;
-			}
-
-			// Existing-character login: retail sends 0x2024 ReadyForPlayScreen right after the spawn handshake
-			// (0x2076) - the "leave the loading screen and enter the world" signal. We were sending the manifest
-			// but never this, so the client finished the handshake (0x2020 -> 0x2008 -> 0x2076) and then sat on the
-			// loading screen forever. Confirmed by diffing a 4010 login against the Strie dump: 0x2024 ours=0 /
-			// dump=1. The new-character create flow sends its own 0x2024 elsewhere, so gate this to named characters.
-			if (!client.Session.IsUnnamedCreatePhase)
-			{
-				Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
-				await SendReadyForPlayScreen(client);
-				// Retail grants the starting abilities (0x2052) + combo book right after 0x2024, not during world entry
-				// (faolan necro login capture: abilities at frame 192, just after ReadyForPlayScreen). Both are granted
-				// here, post-snapshot: neither rides the FullChar snapshot known-list (spells do), so a pre-snapshot grant
-				// is discarded by the client's identity reconstruction.
-				await GrantCharacterAbilities(client);
-				await GrantCharacterCombos(client);
-				// Re-seat the persisted mount if the player was riding one and this map allows mounts. Runs on login
-				// AND on every teleport/changemap re-entry (this flush is re-armed on both), so riding into a no-mount
-				// area dismounts and riding back re-mounts, and a relog restores the mount.
-				await RestoreMount(client);
-				// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
-				// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
-				// the pre-snapshot GrantCharacterSpells re-send is absorbed silently. (The old PendingSpellLearns
-				// post-ready re-announce - needed only while the snapshot carried an empty known-list - re-toasted "You
-				// have learned a new spell" on every login; the known-list makes it redundant.)
-				// Shield of the Risen (#221): re-applies the persistent protection self-buff every character carries.
-				// This flush is also re-armed on teleport/changemap re-entry, so the buff is re-asserted on each
-				// playfield change too (Melvin: "on every map change / login"). RESOLVED 2026-07-11: the old id
-				// 0x000B9000 was the wrong spell (rendered as the "Exhausted" debuff, no DB row -> never cleared).
-				// The capture-proven ids are bases 4061768 (1h) + 3666828 (10h) - both in Spells with real durations,
-				// so #274 arms a matching expiry and they clear on schedule. Rendered top-of-screen by the client.
-				await SendShieldOfTheRisen(client);
-
-				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
-				await SendPostReadyBurst(client);
-
-				// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
-				// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
-				// CLIENT-SIDE from the char data we already deliver. Verified in-client
-				// with the force-feed DISABLED on BOTH paths: an existing lvl80 login read stat 0x43 = Necromancer, // and a freshly-created char read stat 0x43 = HeraldOfXotli - both displayed correctly. The earlier
-				// interim predated the client-derivation working; no server-side class stat is needed.
-
-				// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an hash
-				// (AH-bought items - harvested template, no hash) via the live add path, so they survive relog.
-				await RedeliverNonSnapshotBagItems(client);
-
-				// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
-				// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot, // see BuildBurstlessSnapshotRoot.)
-
-				// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
-				// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
-				// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration.
-				if (client.Session.Character.Money > 0)
-					await SendUpdateCash(client, client.Session.Character.Money, UpdateCashReason.Spend);
-
-				// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
-				// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry
-				// yet, so re-assert it here - the client applies it the same way. (After the snapshot, like the
-				// wallet sync - keep the burst -> snapshot gap clean.)
-				if (client.Session.Character.GuildId is uint guildId)
-				{
-					var guild = await Database.GetGuild(guildId);
-					if (guild != null)
-						await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
-				}
-			}
-
-			if (client.Session.IsUnnamedCreatePhase)
-			{
-				Logger.LogInformation("Sending deferred new-character AccessWindow/SetDayTime after the post-0x205F follow-up.");
-
-				// The new-character world-access catalog (0x737A6DF9 IIR) - an 8 KB static template lifted to an embedded
-				// resource (NewCharacterAccessWindow); only the client instance is stamped per character.
-				await new PacketStream()
-					.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x0E), [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArray(NewCharacterAccessWindow.Build(client.Session.Account.ClientInstance))
-					.SendAsync(client);
-
-				await SetTimeOfDay(client);
+				var guild = await Database.GetGuild(guildId);
+				if (guild != null)
+					await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
 			}
 
 			client.Session.HasPendingPost205FFollowUp = false;

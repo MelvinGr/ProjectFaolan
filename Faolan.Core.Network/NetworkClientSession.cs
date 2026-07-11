@@ -7,7 +7,7 @@ namespace Faolan.Core.Network
 	public interface INetworkClientSession
 	{
 		uint ConversationTypeId { get; set; }
-		uint? LastGameServer2020RequestId { get; set; }
+
 		Account Account { get; set; }
 
 		// The base id of the Shield of the Risen protection buff currently shown to this client (#221), or null if
@@ -137,7 +137,6 @@ namespace Faolan.Core.Network
 	{
 		public uint ConversationTypeId { get; set; }
 
-		public uint? LastGameServer2020RequestId { get; set; }
 		public uint? ActiveShieldSpellBase { get; set; }
 		public Account Account { get; set; }
 

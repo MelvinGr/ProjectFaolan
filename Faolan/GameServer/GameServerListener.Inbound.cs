@@ -966,7 +966,6 @@ namespace Faolan.GameServer
 						await new PacketStream().WriteHeader(authSender, authReceiver, GameInterfaceOpcodes.DispatchAckAuthenticate).WriteUInt32(1).SendAsync(client);
 					}
 
-					client.Session.LastGameServer2020RequestId = null;
 					client.Session.HasPendingPost205FFollowUp = false;
 					client.Session.CreateEditorObservedRequestIds.Clear();
 					client.Session.MorphAckCounter = 0;
@@ -1130,38 +1129,10 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.UpdateQuestMarkerNPC:
 				{
-					if (packet.Body?.Length >= sizeof(uint) * 4)
-					{
-						var ack0 = packet.Body.ReadUInt32();
-						var requestId = packet.Body.ReadUInt32();
-						var ack1 = packet.Body.ReadUInt32();
-						var characterId = packet.Body.ReadUInt32();
-						client.Session.LastGameServer2020RequestId = requestId;
-
-						// #245: the poll's requestId is a handle the client is CONFIRMING it built - record it so interest
-						// only ever despawns confirmed handles (a despawn for an unbuilt handle crashes a still-loading
-						// client: pcDynel == null). The self-handle poll is harmless (the player never despawns itself).
-						_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
-
-						// 0x2020 is the client polling a spawned entity (requestId = the entity handle). Retail
-						// answers each with a 0x2008 SpawnCheck echoing that handle (verified: dikketest world conn
-						// polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). This is what completes/renders
-						// each entity. Both existing-character login (burst-less world entry) AND post-creation world
-						// entry need it: the create-world flow's old hand-built batch answered the wrong, hardcoded
-						// capture handles (0x818xx) on Strie's instance, so its entities (incl. Kalanthes) were never
-						// confirmed and the intro cinematic ("invalid camera path Kalanthes") failed.
-						if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
-							await SendSpawnCheckResponse(client, requestId);
-
-						Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
-						Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId,
-							ack1, characterId, client.Session.HasPendingPost205FFollowUp);
-						await FlushPendingPost205FFollowUp(client);
-						packet.Body.Position = 0;
-					}
-					else
-						LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray());
-
+					// wire 0x2020 on the GameCharAgent class = method-index slot 0x20, whose RPC catalog LABEL is
+					// UpdateQuestMarkerNPC - but the world-entry handshake REUSES it as the client's spawn-poll +
+					// ready-trigger. Owned by HandleWorldEntrySpawnPoll (WorldEntry partial), not decoded inline here.
+					await HandleWorldEntrySpawnPoll(client, packet);
 					break;
 				}
 
