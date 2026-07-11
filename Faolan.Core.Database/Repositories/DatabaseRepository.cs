@@ -54,6 +54,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task<Guild> GetGuild(uint id);
 		Task<Guild> GetGuildByName(string name, uint realmId);
+		Task<List<Guild>> GetGuilds(uint realmId);
 		Task<Item> GetItem(uint id);
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<LuaScript> GetLuaScript(uint scriptId);
@@ -693,6 +694,14 @@ namespace Faolan.Core.Database.Repositories
 			return id == 0
 				? null
 				: await LoadGuild(ctx, id);
+		}
+
+		// All guilds in a realm, with members loaded (for the rankings roster count). Realm-scoped so two realm
+		// processes on the shared DB never cross-read (#324).
+		public async Task<List<Guild>> GetGuilds(uint realmId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Guilds.Include(g => g.Members).Where(g => g.RealmId == realmId).ToListAsync();
 		}
 
 		public async Task<Item> GetItem(uint id)

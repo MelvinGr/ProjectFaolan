@@ -32,20 +32,41 @@ namespace Faolan.CSPlayerAgent
 		private const byte CoreGuildStreamVersion = 0x03; // first body byte - CoreGuild_c streaming version (must be 3)
 		private const byte GuildGovernmentForm = 0x01; // byte after guildId - the form selecting the case 1->3 layout
 
+		// Retail addresses every CsPlayerAgent server->client packet FROM the guild-server object endpoint
+		// {class = the class the client targeted, instance = a fixed server-object handle}. The client targets the
+		// class with NO instance (its Authenticate/requests carry instance 0), and the captures show a nonzero server
+		// instance on every reply (0x04 on the Hoxxling login, 0x52 on the DemoL80 create - so it is an arbitrary server
+		// handle, not session data). We stamp a constant so our s2c headers match retail's shape instead of echoing the
+		// client's instance-0 endpoint back as the sender.
+		private const uint GuildServerInstance = 0x04;
+
+		// The AoC count-framed-list multiplier: every such list on the wire starts with a u32 word == (count+1)*0x3F1
+		// (the client's list readers assert word % 0x3F1 == 0 and take count = word/0x3F1 - 1). Shared by the renown
+		// block's stat-lists (GuildRenownBlock), the 0x203F member list, and the 0x2038 rankings lists.
+		internal const uint GuildListMultiplier = 0x3F1;
+
+		// The reply SENDER endpoint for a CsPlayerAgent s2c packet: the class the client addressed, stamped with the
+		// guild-server instance (see GuildServerInstance).
+		public static ProtoEndpoint ReplySender(ProtoEndpoint clientTarget)
+		{
+			return new ProtoEndpoint { Type = clientTarget.Type, Instance = GuildServerInstance };
+		}
+
 		// The 225-byte create-time renown/trailer block that closes DispatchGuildCreated (after the member record +
 		// header). Captured from DemoL80's create-guild flow - which is itself a FRESH guild being created, so these
 		// are the create-time defaults (the feat numbers 0xFC4/0x410/0x816/0xBEA are the default create values, not
 		// earned renown); only the 40-byte trailer holds capture-specific creation timestamps/ids (cosmetic). Emitted
 		// verbatim as a valid create-time block until it is decoded field-by-field (docs/subsystems/create-guild-decode.md, #306).
+		[Obsolete("DECODE")]
 		private static readonly byte[] GuildCreatedTail = Convert.FromHexString(
 			"00000003f100000000000000000000000000000000000000000000000000000fc4000004100000081600000bea000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000373131310007a12800000000064ab1780000000009d5d338000000000000000001a93458");
 
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
 		// headers - those packets are not replies, so there is no incoming packet to echo.
-		private readonly ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)> _replyEndpoints = new();
+		private readonly ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)> _replyEndpoints = [];
 
-		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = new();
+		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = [];
 		private readonly Func<uint, INetworkClient> _clientForCharacter;
 		private readonly IDatabaseRepository _database;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
@@ -97,7 +118,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			_logger.LogInformation("{Character} joined guild \"{Guild}\" (invited by {Inviter}).", character.Name, guild.Name, invite.InviterName);
-			await SendGuildFullUpdate(client, packet.Receiver, packet.Sender, guild, character);
+			await SendGuildFullUpdate(client, ReplySender(packet.Receiver), packet.Sender, guild, character);
 			await BroadcastGuildMemberJoined(guild, character); // includes the joiner, matching retail order
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
@@ -119,7 +140,7 @@ namespace Faolan.CSPlayerAgent
 				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
 				// taken verbatim from the capture (Dahviie, same-guild reply).
 				await new PacketStream()
-					.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateMember)
+					.WriteHeader(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateMember)
 					.WriteUInt32(targetId)
 					.WriteUInt32(Guild.WireType)
 					.WriteUInt32(targetGuildId)
@@ -139,7 +160,7 @@ namespace Faolan.CSPlayerAgent
 			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
 			// is a server-wide constant rather than guild data.
 			await new PacketStream()
-				.WriteHeader(packet.Receiver, packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateOther)
+				.WriteHeader(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateOther)
 				.WriteUInt32(targetId)
 				.WriteUInt32(Guild.WireType)
 				.WriteUInt32(targetGuildId)
@@ -192,7 +213,7 @@ namespace Faolan.CSPlayerAgent
 			// Retail's immediate create response is 0x2044 DispatchGuildCreated (opens the window with NO relog), not
 			// the 0x203F full-update. If the client doesn't accept it the guild still shows on the next login (the
 			// re-auth 0x203F push), so this only ADDS the no-relog path.
-			await SendGuildCreated(client, packet.Receiver, packet.Sender, guild, character, form);
+			await SendGuildCreated(client, ReplySender(packet.Receiver), packet.Sender, guild, character, form);
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
 
@@ -232,8 +253,8 @@ namespace Faolan.CSPlayerAgent
 			await _gameServerDispatcher.SendGuildTag(character.Id, "");
 		}
 
-		// 0x202E GuildMessageOfTheDay(i_cGuildMessageOfTheDay): persists the MOTD and re-pushes the full update
-		// to every online member so their guild window refreshes.
+		// 0x202E GuildMessageOfTheDay(i_cGuildMessageOfTheDay): persists the MOTD and pushes the targeted MOTD-change
+		// packet (0x2057) to every online member so their guild window's MOTD refreshes + the toast pops.
 		public async Task HandleGuildMessageOfTheDay(INetworkClient client, ConanPacket packet)
 		{
 			var character = client.Session.Character;
@@ -255,7 +276,7 @@ namespace Faolan.CSPlayerAgent
 				if (memberClient?.Session?.Character == null || !_replyEndpoints.TryGetValue(memberClient, out var endpoints))
 					continue;
 
-				await SendGuildFullUpdate(memberClient, endpoints.Sender, endpoints.Receiver, guild, memberClient.Session.Character);
+				await SendGuildMessageOfTheDayChanged(memberClient, endpoints.Sender, endpoints.Receiver, motd);
 			}
 		}
 
@@ -266,10 +287,11 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// Remember a connected client's reply endpoints (captured from its Authenticate packet) so guild pushes can
-		// be addressed to it later. Called by the listener on auth.
-		public void RememberReplyEndpoints(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver)
+		// be addressed to it later. Called by the listener on auth. The sender is stamped with the guild-server
+		// instance here (the client's target carries instance 0), so pushed events inherit the correct s2c address.
+		public void RememberReplyEndpoints(INetworkClient client, ProtoEndpoint clientTarget, ProtoEndpoint receiver)
 		{
-			_replyEndpoints[client] = (sender, receiver);
+			_replyEndpoints[client] = (ReplySender(clientTarget), receiver);
 		}
 
 		// Pushes guild state to a freshly authenticated guilded character: retail sends the 0x203F full update
@@ -284,7 +306,7 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			await SendGuildFullUpdate(client, packet.Receiver, packet.Sender, guild, character);
+			await SendGuildFullUpdate(client, ReplySender(packet.Receiver), packet.Sender, guild, character);
 		}
 
 		// Fans a member-joined record out to every online member of the guild (their reply endpoints were
@@ -350,9 +372,12 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x203F full guild update - the packet that makes the client consider itself a guild member (guild
 		// window, guild chat tab, MOTD popup). Retail pushes it right after the Authenticate ack on login and
-		// again on join/member-list requests. The whole body is CoreGuild_c::Read's i_pcGuild argument:
-		//   [version u8=3][guildId u32][govForm u8=1][cash u64][b u8][u32 0][b u8][name s16][description s16][motd s16]
-		//   [renown block][self member record][selfContribution u32][other member records ... to packet end]
+		// again on join/member-list requests. DispatchGuildUpdate reads THREE arguments in order (FUN_013428d0),
+		// each with its own "stream bad after '<arg>'" abort:
+		//   i_pcGuild    = [version u8=3][guildId u32][govForm u8=1][cash u64][b u8=03][u32 0][b u8=00]
+		//                  [name s16][description s16][motd s16][277-byte renown block]
+		//   i_pcMember   = [self member record]                       (the authenticated member)
+		//   i_cMemberList= [u32 (otherCount+1)*0x3F1][other member records]   (0x3F1-count-framed list)
 		// The renown block is built per-guild from Guild.Renown (GuildRenownBlock.ForRenown), now that the 277-byte
 		// block is a typed codec (#219) - our created guilds no longer carry the captured guild's feat/city numbers.
 		private async Task SendGuildFullUpdate(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character self)
@@ -372,13 +397,31 @@ namespace Faolan.CSPlayerAgent
 				.WriteString(guild.MessageOfTheDay ?? "")
 				.WriteArray(GuildRenownBlock.ForRenown(guild.Renown).Encode());
 
-			WriteGuildMemberRecord(ps, self);
-			ps.WriteUInt32(0); // self contribution counter (grows with renown gain in the capture)
+			WriteGuildMemberRecord(ps, self); // i_pcMember: the authenticated member
 
-			foreach (var member in guild.Members.Where(m => m.Id != self.Id && m.Name != null))
+			// i_cMemberList: the OTHER members as a 0x3F1-framed list ([u32 (count+1)*0x3F1][records]). CoreGuild's list
+			// reader (FUN_0134ed30) asserts the count-word is a multiple of 0x3F1; the old WriteUInt32(0) here (misread
+			// as a "self contribution" counter) fails that check, so the client aborts DispatchGuildUpdate ("stream bad
+			// after i_cMemberList") and the character shows as guildless. Retail's word for a 173-member roster was
+			// 0x2ADCE = (173+1)*0x3F1.
+			var others = guild.Members.Where(m => m.Id != self.Id && m.Name != null).ToList();
+			ps.WriteUInt32((uint)((others.Count + 1) * GuildListMultiplier));
+			foreach (var member in others)
 				WriteGuildMemberRecord(ps, member);
 
 			await ps.SendAsync(client);
+		}
+
+		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates
+		// the stored MOTD + pops the "message of the day" toast, without re-sending the whole roster (unlike 0x203F).
+		// No capture for it; the body is the single string arg from the client method sig, s16-framed like the other
+		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
+		private async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
+		{
+			await new PacketStream()
+				.WriteHeader(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged)
+				.WriteString(motd)
+				.SendAsync(client);
 		}
 
 		// 0x202F member joined: [member ID32][member record]. Retail fans this out to every online guild member

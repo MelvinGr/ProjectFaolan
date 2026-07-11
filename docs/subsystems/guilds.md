@@ -85,6 +85,29 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   response, which opens the guild window without a relog — built byte-exact against the create-guild capture
   (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`). See `docs/subsystems/create-guild-decode.md` (#306). The
   login `0x203F` push still runs, so relog remains a fallback.
+- **0x3F1 count-framed lists (the "not in guild" fix):** every list on the guild wire begins with a u32 word ==
+  `(elementCount + 1) * 0x3F1` — the client's list readers assert `word % 0x3F1 == 0` and take `count = word/0x3F1 - 1`,
+  aborting the whole dispatch ("stream bad after '<arg>'") and dropping the CsPlayerAgent connection on any non-0x3F1
+  word. `DispatchGuildUpdate` (0x203F) reads THREE arguments (`FUN_013428d0`): `i_pcGuild` (version…renown block),
+  `i_pcMember` (the self record), then `i_cMemberList` = `[u32 (otherCount+1)*0x3F1][other member records]`. The old
+  builder wrote a bare `0` where that count-word belongs (misread as a "self contribution" counter); `0` isn't a 0x3F1
+  multiple, so the client aborted `GuildUpdate`, never registered the guild, and re-polled every 30s — THIS was the
+  "not in guild after relog" bug. Verified in-client: with the count-word correct the CsPlayerAgent connection stays
+  persistent (1 connect, matching retail) instead of the 30s reconnect loop. Shared multiplier: `GuildListMultiplier`
+  / `GuildRankings.ListMultiplier` (= the renown block's `0x3F1` list framing).
+- **Rankings (0x2038):** the global guild-renown leaderboard (the "Guild Renown Rankings" window, tabs
+  Total/Valor/Glory/Artistry) is now CONSTRUCTED from the realm's guilds via `GuildRankings`
+  (`Faolan.Core.Network/Codecs/Guild/GuildRankings.cs`, byte-exact against the capture — `GuildRankingsTests`,
+  decoder `Captures/scripts/decode_guild_rankings.py`), no longer a verbatim retail blob. Its body is three nested
+  0x3F1-framed lists: `[guildList][sectionsList (always 4 tabs)][u32 nextUpdateUnix]`, each section
+  `[u32 tabIndex][entryList]`. The four renown categories live on the `Guild` table
+  (`RenownValor`/`RenownGlory`/`RenownArtistry`, plus `Level`; the Total column is their sum, `RenownTotal`); a guild
+  appears on a tab only once it has renown there, so a fresh server shows an empty board rather than fake guilds. The
+  wire `prevRank` word is the guild's PREVIOUS-snapshot position (drives the "Change" column); with no history we emit
+  the current position (no movement).
+- **CS-agent reply endpoints:** every `CsPlayerAgent` s2c is addressed FROM the guild-server object endpoint
+  (`GuildService.ReplySender` stamps the fixed instance `0x04` onto the class the client targeted), matching retail —
+  the client targets the class with instance 0, and captures always show a nonzero server instance on replies.
 - Create path: the capture-true `CreateGuild` RPC (0x2021 → `HandleCreateGuild`), triggered in-client from a
   registrar NPC window. The old `.guild create <name>` GM bootstrap was removed with the other GM test
   commands (commit `54f55dee`); the surviving GM commands are `.ah`/`.teleport`/… (no `.guild`).
@@ -96,7 +119,8 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
 - Member-left / kick / promote / demote fan-out packets: no capture exercises them.
 - The 0x202D invite-reply-to-inviter and failure replies (bad name, on cooldown): opcodes not decoded.
 - 0x203A "counters update" (52 b, frequent): small u32 counters, semantics unknown.
-- Renown block internal framing; renown history (0x2039) / rankings (0x2038) are replayed blobs.
+- Renown block internal framing; renown history (0x2039) is a replayed blob; the mass-PvP / guild-search list
+  (0x2010 `DispatchMassivePvpInfoRequestReturn`) is still a verbatim blob. Rankings (0x2038) are now constructed.
 - Other players' guild tags ride in their spawn data (cross-player visibility is future work anyway).
 
 ## Ghidra: guild s2c reader topology (2026-06-16, #219)
