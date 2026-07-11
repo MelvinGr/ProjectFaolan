@@ -80,7 +80,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var imported = await CaptureMapImporter.ImportAsync(ctx.Db, ctx.RawPackets);
+			var (imported, reflagged) = await CaptureMapImporter.ImportAsync(ctx.Db, ctx.RawPackets);
 
 			var renamed = 0;
 			foreach (var map in await ctx.Db.Maps.ToListAsync())
@@ -96,7 +96,7 @@ namespace Faolan.Importer.Modules
 			if (renamed > 0)
 				await ctx.Db.SaveChangesAsync();
 
-			return new ImportResult($"{imported} maps imported, {renamed} names sanitized (#31).");
+			return new ImportResult($"{imported} maps imported, {reflagged} PlayfieldFlags updated, {renamed} names sanitized (#31).");
 		}
 	}
 
