@@ -418,10 +418,6 @@ namespace Faolan.GameServer
 
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
 		// remoteformat template lands.
-		private static Task SendSampleWorldChat(INetworkClient client)
-		{
-			return SendWorldChat(client, CriteriaSystemLineXml);
-		}
 
 		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
 		{

@@ -89,6 +89,10 @@ namespace Faolan.GameServer
 		// blob used; the client does not validate it - #304).
 		private const uint DefaultSelfBuffEffectNonce = 0x14C5C912;
 
+		// Shield of the Risen (#221) base spell ids - the two persistent protection buffs applied on every world entry.
+		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
+		private const uint ShieldOfTheRisenBase2 = 3666828; // 10h (wire (base<<8) = 0x37F38C00)
+
 		// The snapshot record's TypeTag - the 0x0000C350 constant every 0x737A6DF9 carrier carries (= the IIR
 		// conversation tag, shared with the 0x201C handshake bodies).
 		private const uint SnapshotTypeTag = 0x0000C350;

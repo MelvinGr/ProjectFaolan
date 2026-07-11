@@ -40,7 +40,9 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 
 ### World & simulation
 - ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
-- ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes
+- ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes; faction disposition (friendly/neutral
+  NPCs never aggro and render green names, hostiles red)
+- ✅ Interactive world objects — doors/gates open on use
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
   client-side movement jitter (#272)
 - 🟡 Per-map playfield token — sourced per-map from `Map.PlayfieldToken` (seeded with a captured token per map);
@@ -50,7 +52,9 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 ### Combat
 - ✅ Melee attack FSM, weapon draw, damage, vitals; spell-cast FSM; threat / hate list
 - ✅ Death window + resurrect/respawn
-- ✅ Buff application, damage-over-time, and buff-expiry lifecycle (timers)
+- ✅ Buff application, damage-over-time, buff-expiry lifecycle (timers), and right-click cancel (server-driven
+  icon removal)
+- ✅ Shield of the Risen — the top-of-screen protection buff, re-applied on login and every map change
 - 🟡 Debuff icon-clear at 0 + non-health effect application — built, awaits in-client confirm (#274)
 - 🟡 Spell cooldowns — client-side semantics fully RE'd; the server-authored builder is capture-blocked (#271)
 - 🟡 Spellweaving (necromancer) — byte-exact builders; energy-bar drop still open (#141)

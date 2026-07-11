@@ -9,6 +9,11 @@ namespace Faolan.Core.Network
 		uint? LastGameServer2020RequestId { get; set; }
 		Account Account { get; set; }
 
+		// The base id of the Shield of the Risen protection buff currently shown to this client (#221), or null if
+		// none. Tracked so a playfield change removes the prior shield's icon (retail keeps exactly one active at a
+		// time) before applying the new one. Session-only (client buff state resets on relog).
+		uint? ActiveShieldSpellBase { get; set; }
+
 		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
 		// 0x206E enter-world signal, which we answer with the 0x2002 world-address handoff.
 		bool AwaitingEnterWorld { get; set; }
@@ -118,6 +123,7 @@ namespace Faolan.Core.Network
 		public uint ConversationTypeId { get; set; }
 
 		public uint? LastGameServer2020RequestId { get; set; }
+		public uint? ActiveShieldSpellBase { get; set; }
 		public Account Account { get; set; }
 
 		public bool AwaitingEnterWorld { get; set; }

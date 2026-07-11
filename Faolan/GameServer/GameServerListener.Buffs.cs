@@ -82,6 +82,46 @@ namespace Faolan.GameServer
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffData(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
 		}
 
+		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh
+		// login AND on each changemap/teleport re-entry (this runs from FlushPendingPost205FFollowUp, which the teleport
+		// path re-arms). Bases 4061768 (1h) + 3666828 (10h); the client renders these TOP-OF-SCREEN (protection banner)
+		// unlike the regular corner buffs, and auto-generates the "You are protected by Shield of the Risen" chat line
+		// from the ApplySpell itself (no separate server packet - confirmed absent from the capture). Byte-exact against
+		// NecroL80_..._conans-castle-exit rec#165 (wire 0x3dfa4800, dur 0x57e40) + rec#736 (0x37f38c00, 0x36ee80); the
+		// durations resolve from the Spells rows so SendMagicBuffIir arms the matching expiry (#274) and they DO clear.
+		// These use the LONG (54-byte) buff-data form - the client's MagicBuffIIR_c::ReadSubClass rejects the 50-byte
+		// short form for them (runs off the end), same as the spellweave/mount buffs.
+		//
+		// Retail shows exactly ONE shield at a time, picked by playfield type: the 1h base 4061768 on an INSTANCED
+		// playfield (the conans-castle login), the 10h base 3666828 in the SHARED open world - the castle-exit
+		// transition removes the 1h and applies the 10h (NecroL80_..._castle-exit rec#165 -> rec#735 remove -> rec#736
+		// apply). Applying BOTH at once (the first cut) made the client render a second, description-less duplicate.
+		// Our maps are all InstanceMode.Shared for now, so this resolves to the 10h everywhere; it future-proofs the
+		// moment the beach/Tortage maps are modelled Solo. On a playfield change we remove the prior shield's icon
+		// (retail's rank-1 end twin) before applying the new one so only one is ever shown.
+		private async Task SendShieldOfTheRisen(INetworkClient client)
+		{
+			var self = client.Session.Account.ClientInstance;
+			var map = await Database.GetMap(client.Session.Character.MapId);
+			var desired = map?.InstanceMode is null or MapInstanceMode.Shared
+				? ShieldOfTheRisenBase2  // 10h shared/open-world
+				: ShieldOfTheRisenBase1; // 1h instanced
+
+			if (client.Session.ActiveShieldSpellBase is uint prior && prior != desired)
+				await SendBuffRemoval(client, self, self, prior << 8);
+
+			await SendShieldBuff(client, self, desired);
+			client.Session.ActiveShieldSpellBase = desired;
+		}
+
+		private async Task SendShieldBuff(INetworkClient client, uint self, uint spellBase)
+		{
+			var spell = await Database.GetSpell(spellBase);
+			var durationCs = (spell?.DurationMs ?? 0) / 10;
+			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
+			await SendMagicBuffIir(client, self, self, spellBase << 8, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+		}
+
 		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
 		// 54-byte MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) instead of the shared 50-byte self-buff form -
 		// the client rejects the short shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's

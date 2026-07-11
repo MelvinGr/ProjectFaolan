@@ -1204,18 +1204,39 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameCharAgentOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId][u32 charId]
+				case GameCharAgentOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId(base)][u32 charId]
 				{
 					var buffId = packet.Body.ReadUInt32();
 					var charId = packet.Body.ReadUInt32();
-
-					// The client removes its own icon (retail replies only a FormatFeedback text, no removal
-					// IIR); removing the entry from the server-side registry is what makes the cancel real.
+					var self = client.Session.Account.ClientInstance;
 					var entity = _simulation.PlayerWorldEntity(client);
-					if (entity != null && entity.ActiveBuffs.TryRemove(buffId, out _))
-						Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, charId);
+
+					// The client sends the buff's BASE id (rank byte stripped, e.g. 0x0037F38C); our registry keys are
+					// the APPLIED wire id ((base<<8)|rank). Match by base so the removal twin carries the exact id.
+					var appliedId = buffId << 8;
+					if (entity != null)
+						foreach (var key in entity.ActiveBuffs.Keys)
+							if (key >> 8 == buffId)
+							{
+								appliedId = key;
+								break;
+							}
+
+					// The client does NOT self-remove the icon on right-click (verified in-client: the icon stayed up
+					// with only the registry drop) - the server has to drive it. Send retail's rank-1 end twin, which
+					// clears the icon live (byte-exact vs the captured buff-end twin, NecroL80_..._castle-exit rec#735).
+					// No capture oracle for the cancel reply exists, so this is the in-client-proven behaviour.
+					await SendBuffRemoval(client, self, self, appliedId);
+
+					if (entity != null && entity.ActiveBuffs.TryRemove(appliedId, out _))
+						Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", appliedId, charId);
 					else
-						Logger.LogDebug("CancelBuff: buff 0x{Buff:X8} was not tracked for {CharId:X8} (cast before the registry, or an aura).", buffId, charId);
+						Logger.LogDebug("CancelBuff: buff 0x{Buff:X8} was not tracked for {CharId:X8} (cast before the registry, or an aura).", appliedId, charId);
+
+					// If the cancelled buff was the tracked Shield of the Risen, forget it so the next playfield entry
+					// re-applies cleanly rather than trying to remove an id the client no longer shows.
+					if (client.Session.ActiveShieldSpellBase == buffId)
+						client.Session.ActiveShieldSpellBase = null;
 
 					break;
 				}

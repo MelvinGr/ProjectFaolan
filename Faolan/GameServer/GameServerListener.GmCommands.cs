@@ -529,7 +529,7 @@ namespace Faolan.GameServer
 		// FIFO banner). The test bootstrap for the ChatTextIIR path.
 		private async Task SysChatCommand(INetworkClient client)
 		{
-			await SendSampleWorldChat(client);
+			// await SendWorldChat(client, CriteriaSystemLineXml);
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent a world/system chat line (ChatTextIIR 0xE0B51102).");
 		}
 
