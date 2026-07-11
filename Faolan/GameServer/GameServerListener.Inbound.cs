@@ -326,6 +326,10 @@ namespace Faolan.GameServer
 									await SendStatUpdate(client, dismountStats, self);
 									if (playerEntity != null)
 										playerEntity.IsMounted = false;
+
+									// Voluntary dismount -> forget the mount so it isn't restored on the next world entry.
+									client.Session.Character.MountId = null;
+									await Database.SaveCharacterMount(client.Session.Character.Id, null);
 									break;
 								}
 
@@ -351,6 +355,11 @@ namespace Faolan.GameServer
 									await SendStatUpdate(client, mountStats, self);
 									if (playerEntity != null)
 										playerEntity.IsMounted = true;
+
+									// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
+									// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.
+									client.Session.Character.MountId = mount.Id;
+									await Database.SaveCharacterMount(client.Session.Character.Id, mount.Id);
 								}, Logger);
 
 								break;

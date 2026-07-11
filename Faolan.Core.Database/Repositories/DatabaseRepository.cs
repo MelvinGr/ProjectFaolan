@@ -99,6 +99,7 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacter(Character character);
 		Task SaveCharacterBind(uint characterId, uint respawnPointId);
 		Task SaveCharacterDeadState(uint characterId, bool isDead);
+		Task SaveCharacterMount(uint characterId, uint? mountId);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
@@ -1192,6 +1193,12 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsDead, isDead));
+		}
+
+		public async Task SaveCharacterMount(uint characterId, uint? mountId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.MountId, mountId));
 		}
 
 		public async Task SaveCharacterEquipment(CharacterEquipment equipment)

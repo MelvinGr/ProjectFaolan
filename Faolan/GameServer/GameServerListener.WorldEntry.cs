@@ -208,6 +208,41 @@ namespace Faolan.GameServer
 			}
 		}
 
+		private const uint MountAllowedFlag = 0x1; // Map.PlayfieldFlags bit 0: the playfield permits mounts
+
+		// Re-seat the character's persisted mount (Character.MountId) after world entry, when the map allows mounts.
+		// Sends the ride buff + Mount/MountSpeed StatUpd and marks the live entity mounted - the same seat the
+		// SummonMount channel ends with, minus the cast animation. No-op on foot, on a no-mount map (the client
+		// auto-dismounted on entry), or if the stored id no longer resolves.
+		private async Task RestoreMount(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character?.MountId is not uint mountId)
+				return;
+
+			var map = await Database.GetMap(character.MapId);
+			if (((map?.PlayfieldFlags ?? 0) & MountAllowedFlag) == 0)
+				return;
+
+			var mount = MountCatalog.ForId(mountId);
+			if (mount == null)
+				return;
+
+			var self = client.Session.Account.ClientInstance;
+			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
+			await SendStatUpdate(client, new CharacterStatBlock
+			{
+				[CharacterStatId.Mount] = mount.RideStat,
+				[CharacterStatId.MountSpeed] = 100
+			}, self);
+
+			var entity = PlayerWorldEntity(client);
+			if (entity != null)
+				entity.IsMounted = true;
+
+			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.CreatureName, character.Name, character.MapId);
+		}
+
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
 			if (!client.Session.HasPendingPost205FFollowUp)
@@ -254,6 +289,10 @@ namespace Faolan.GameServer
 				// is discarded by the client's identity reconstruction.
 				await GrantCharacterAbilities(client);
 				await GrantCharacterCombos(client);
+				// Re-seat the persisted mount if the player was riding one and this map allows mounts. Runs on login
+				// AND on every teleport/changemap re-entry (this flush is re-armed on both), so riding into a no-mount
+				// area dismounts and riding back re-mounts, and a relog restores the mount.
+				await RestoreMount(client);
 				// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
 				// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
 				// the pre-snapshot GrantCharacterSpells re-send is absorbed silently. (The old PendingSpellLearns

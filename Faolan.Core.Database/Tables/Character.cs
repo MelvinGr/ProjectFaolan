@@ -130,6 +130,13 @@ namespace Faolan.Core.Database.Tables
 		public ulong Money { get; set; }
 		public ushort Level { get; set; }
 
+		// The mount the character is currently riding (a MountCatalog mount id; null = on foot). Persisted so the mount
+		// survives a relog and a trip through a no-mount area: it is set when the player summons a mount and cleared
+		// on a voluntary dismount, but NOT on the auto-dismount the client does when entering a no-mount playfield -
+		// so re-entering a mount-allowed area (or logging back in there) re-seats the same mount. Re-applied on world
+		// entry only when the destination map allows mounts (Map.PlayfieldFlags mount bit).
+		public uint? MountId { get; set; }
+
 		public override string ToString()
 		{
 			return $"{base.ToString()}: {Name}";
