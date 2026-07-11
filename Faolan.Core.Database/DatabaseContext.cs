@@ -305,18 +305,9 @@ namespace Faolan.Core.Database
 			// so a spawn body is constructed from typed storage, not spliced. Cascades with the type.
 			modelBuilder.Entity<Npc>().HasOne(n => n.StatCore).WithOne(s => s.Npc).HasForeignKey<NpcStatCore>(s => s.NpcId).OnDelete(DeleteBehavior.Cascade);
 
-			// One patrol route per (map, spawn point) - keyed like the NpcSpawn it belongs to, so the live MoveTask
-			// builder joins them by position (#53). Its waypoints cascade-delete with the route.
-			modelBuilder
-				.Entity<PatrolPath>()
-				.HasIndex(p => new
-				{
-					p.MapId,
-					p.PositionX,
-					p.PositionY,
-					p.PositionZ
-				})
-				.IsUnique();
+			// One patrol route per NpcSpawn (#316): the FK joins a route to the NPC that walks it, so the runtime
+			// looks it up via the spawn's nav instead of matching floats. Cascade-deletes with the spawn.
+			modelBuilder.Entity<PatrolPath>().HasOne(p => p.NpcSpawn).WithOne(n => n.PatrolPath).HasForeignKey<PatrolPath>(p => p.NpcSpawnId).OnDelete(DeleteBehavior.Cascade);
 			// The columnarized task tree (#316): all of a patrol's nodes hang off the path (cascade-delete); the tree
 			// shape is the self-reference ParentId (NoAction - every node is already deleted via its PatrolPathId, so
 			// the self-ref must not add a second cascade path). Each node's waypoints cascade with it.

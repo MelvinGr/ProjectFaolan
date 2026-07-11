@@ -390,14 +390,20 @@ namespace Faolan.CSPlayerAgent
 
 			WriteGuildMemberRecord(ps, self); // i_pcMember: the authenticated member
 
-			// i_cMemberList: the OTHER members as a 0x3F1-framed list ([u32 (count+1)*0x3F1][records]). CoreGuild's list
+			// i_cMemberList: the FULL roster as a 0x3F1-framed list ([u32 (count+1)*0x3F1][records]). CoreGuild's list
 			// reader (FUN_0134ed30) asserts the count-word is a multiple of 0x3F1; the old WriteUInt32(0) here (misread
 			// as a "self contribution" counter) fails that check, so the client aborts DispatchGuildUpdate ("stream bad
 			// after i_cMemberList") and the character shows as guildless. Retail's word for a 173-member roster was
 			// 0x2ADCE = (173+1)*0x3F1.
-			var others = guild.Members.Where(m => m.Id != self.Id && m.Name != null).ToList();
-			ps.WriteUInt32((uint)((others.Count + 1) * GuildListMultiplier));
-			foreach (var member in others)
+			//
+			// The list must include EVERY member, the viewing player included - it fills the client's member std::map
+			// (CoreGuild+0x1e4 node ptr / +0x1e8 _Mysize count). i_pcMember above is a separate self-pointer, NOT a map
+			// entry, so excluding self here left the map empty. The guild-management panel then averages renown over the
+			// members (FUN_0176d4a0: sum(member renown) / map._Mysize), and a 0 count is an Integer-Divide-By-Zero crash
+			// (__aulldiv) the instant the panel opens. Sending the full roster keeps the count >= 1.
+			var roster = guild.Members.Where(m => m.Name != null).ToList();
+			ps.WriteUInt32((roster.Count + 1) * GuildListMultiplier);
+			foreach (var member in roster)
 				WriteGuildMemberRecord(ps, member);
 
 			await ps.SendAsync(client);

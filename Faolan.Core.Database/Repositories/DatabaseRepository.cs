@@ -68,7 +68,6 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
-		Task<PatrolPath[]> GetPatrolPaths(uint mapId);
 		Task<QuestDefinition> GetQuestDefinition(uint questId);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
 		Task<Dictionary<string, uint>> GetQuestGiverMap();
@@ -842,6 +841,9 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(t => t.Chatter) // ambient bark lines for this NPC type
 				.Include(n => n.Npc)
 				.ThenInclude(t => t.StatCore) // #244: the type stat core, so the spawn body builds from columns
+				.Include(n => n.PatrolPath) // #316: the spawn's patrol route (its columnarized MoveTask node tree)
+				.ThenInclude(p => p.Nodes)
+				.ThenInclude(pn => pn.Waypoints)
 				.Where(n => n.MapId == mapId)
 				.ToArrayAsync();
 		}
@@ -855,17 +857,6 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
 			return await ctx.NpcSpells.Where(s => s.Npc != null && s.Npc.Name != null && s.Npc.Name.ToLower() == lowered).ToListAsync();
-		}
-
-		// A map's captured patrol routes (#266 patrol), each with its ordered waypoints. Keyed at the paired NPC's
-		// spawn position (the importer correlates route->spawn by handle and stores the route at the spawn point), so
-		// the world model links a route to its NPC by exact position.
-		public async Task<PatrolPath[]> GetPatrolPaths(uint mapId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			// Load every node of each patrol's tree (+ its waypoints); EF relationship fixup wires the Parent/Children
-			// navs from ParentId so MoveTaskBuilder can walk the tree from the root (ParentId == null).
-			return await ctx.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints).Where(p => p.MapId == mapId).ToArrayAsync();
 		}
 
 		// The shared journal-content definition for a quest (text refs + objective marker), or null if not seeded.

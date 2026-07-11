@@ -28,7 +28,6 @@ namespace Faolan.Core.Database.Tables
 		public uint Flag { get; set; } // element field [3] (small enum-ish; 0x14/0x28/...)
 		public uint Hash { get; set; } // element field [4]
 
-		// TODO: Decode
 		public uint Trailing { get; set; } // ingredient trailing word [17] (0 for results)
 	}
 

@@ -3,20 +3,19 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
 {
-	// A captured NPC patrol route - the MoveTaskIIR (0x96C46740) task tree. Keyed by (MapId, Position): Position is
-	// the patrol's current/anchor point, which equals the paired NpcSpawn's spawn position (the spawn and its
-	// MoveTask share a transform - see npc_spawn_movetask_position), so the live MoveTask the server builds for a
-	// spawn sources its route from here by position (construct-don't-replay, #53). The task is stored COLUMNARIZED
-	// as a PatrolNode tree (#316) - the full recursive MoveTask AST (single- and multi-segment, all 7 captured
-	// forms) - which MoveTaskBuilder.BuildPatrol re-emits byte-exact (re-addressed to the live handle + spawn
-	// position), replacing the old verbatim Body blob + PatrolWaypoint list. Imported from captures by
-	// Faolan.Importer (PatrolPathExtractor). Position columns are inherited from Base3DEntity (rotation is unused).
-	public class PatrolPath : Base3DEntity
+	// A captured NPC patrol route - the MoveTaskIIR (0x96C46740) task tree, columnarized as a PatrolNode tree (#316,
+	// the full recursive AST). Belongs to ONE NpcSpawn (the NPC that walks it) via NpcSpawnId - the importer
+	// correlates route -> spawn by their shared transform (the spawn position == the MoveTask anchor, see
+	// npc_spawn_movetask_position) at import time, then stores the FK, so the runtime joins a spawn to its route
+	// directly (no float-position match). MoveTaskBuilder.BuildPatrol re-emits the tree byte-exact, re-addressed to
+	// the live handle + spawn position. Map + anchor position live on the NpcSpawn. Imported from captures by
+	// Faolan.Importer (PatrolPathExtractor); cascade-deletes with its spawn.
+	public class PatrolPath : BaseEntity
 	{
-		public uint MapId { get; set; }
+		public uint NpcSpawnId { get; set; }
 
-		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; }
+		[ForeignKey(nameof(NpcSpawnId))]
+		public virtual NpcSpawn NpcSpawn { get; set; }
 
 		// The columnarized MoveTask task tree: every AST node of this patrol (the root has ParentId == null).
 		// Cascade-deletes with the path.

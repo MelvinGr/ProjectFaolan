@@ -694,11 +694,6 @@ namespace Faolan.GameServer.World
 			var npcs = await _database.GetNpcSpawns(mapId);
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
-			// #266 patrol: captured routes keyed at their paired spawn's position (the importer correlated route->spawn
-			// by handle), so link each route to its NPC by exact position below. The NPC then walks it client-side via a
-			// patrol MoveTask issued at spawn (retail style).
-			var patrolByPosition = (await _database.GetPatrolPaths(mapId)).GroupBy(p => PositionKey(p.PositionX, p.PositionY, p.PositionZ)).ToDictionary(g => g.Key, g => g.First());
-
 			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
 
@@ -758,7 +753,7 @@ namespace Faolan.GameServer.World
 				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
 				// speed/flags, so the client walks the route at the right pace (a rebuilt mode-1 path lost the speed and
 				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
-				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol) && patrol.Nodes.Count > 0)
+				if (npc.PatrolPath is { Nodes.Count: > 0 } patrol)
 				{
 					var waypoints = MoveTaskBuilder.PatrolWaypoints(patrol);
 					if (waypoints.Count > 0)

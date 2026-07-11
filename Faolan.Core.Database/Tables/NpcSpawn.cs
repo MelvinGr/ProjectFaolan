@@ -35,6 +35,10 @@ namespace Faolan.Core.Database.Tables
 		// captured Data blob's (the NPC counterpart of the player's DB-sourced equipment, PlayerSpawnEquipment).
 		public virtual ICollection<NpcSpawnEquipment> Equipment { get; set; } = new List<NpcSpawnEquipment>();
 
+		// The captured patrol route this spawn walks (#316), or null for a stationary NPC. One-to-one; cascade-deletes
+		// with the spawn.
+		public virtual PatrolPath PatrolPath { get; set; }
+
 		// Race/Sex moved to the Npc TYPE table (#287): they are type-level identity (every placement of a type shares
 		// them), so they live on `Npc` now and are reached via the `Npc` navigation.
 

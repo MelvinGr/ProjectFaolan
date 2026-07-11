@@ -420,10 +420,11 @@ namespace Faolan.Importer.Modules
 				removed = await ctx.Db.NpcSpawns.CountAsync();
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnMorphs");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnEquipment");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawns");
+				// Patrols FK the spawn (#316) - delete them (children first) before the spawns they reference.
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolNodeWaypoints");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolNodes");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolPaths");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawns");
 			}
 
 			await ImportOps.ImportNpcSpawns(ctx.Db, spawns);

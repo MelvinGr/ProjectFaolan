@@ -296,22 +296,25 @@ namespace Faolan.Importer.Captures
 			return inserted;
 		}
 
-		// NPC patrol routes, deduped by (map, position). Replaces the columnarized task tree (#316) wholesale on re-import.
+		// NPC patrol routes, one per NpcSpawn (#316). The route is correlated to its NPC by the shared spawn position
+		// (the spawns were imported + saved just before), then FK'd; the columnarized task tree is replaced wholesale
+		// on re-import.
 		public static async Task ImportPatrolPaths(DatabaseContext db, List<PatrolPathEntry> paths)
 		{
 			foreach (var e in paths)
 			{
+				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(
+					n => n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z);
+				if (spawn == null)
+					continue; // a route with no matching spawn (should not happen for burst-truth patrols) - skip
+
 				var existing = await db
 					.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints)
-					.FirstOrDefaultAsync(p => p.MapId == e.MapId && p.PositionX == e.Position.X && p.PositionY == e.Position.Y && p.PositionZ == e.Position.Z);
+					.FirstOrDefaultAsync(p => p.NpcSpawnId == spawn.Id);
 
 				if (existing == null)
 				{
-					existing = new PatrolPath
-					{
-						MapId = e.MapId,
-						Position = e.Position
-					};
+					existing = new PatrolPath { NpcSpawnId = spawn.Id };
 					db.PatrolPaths.Add(existing);
 				}
 				else

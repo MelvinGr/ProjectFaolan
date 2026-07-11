@@ -13,11 +13,8 @@ namespace Faolan.Core.Database.Tables
 	// `NpcSpawn` (table `NpcSpawns`).
 	public class Npc : BaseEntity
 	{
-		// Community/Level/Race/Sex are type-level identity that now live on the 1:1 StatCore side table
-		// (StatCore.Community / .Level / .Race / .Sex) - the old duplicate Npc columns were retired.
-
 		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId). Unique - one Npc row per template.
-		public uint TemplateId { get; set; }
+		public uint TemplateId { get; set; } // TODO: Make PK?
 
 		// The type-level worn equipment + appearance/morph table (#307), for a summon-only creature that has no NpcSpawn
 		// placement to carry them - the per-TYPE counterpart of NpcSpawnEquipment/NpcSpawnMorph. Empty for a plain map
