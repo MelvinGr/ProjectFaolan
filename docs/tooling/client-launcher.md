@@ -57,7 +57,7 @@ A drop-in stand-in for ConanPatcher: computes the two gate flags and launches th
 
 ```
 Faolan.ClientLauncher [options]
-  --exe <path>        AgeOfConan.exe (or AOC_EXE env; default = the Steam path)
+  --exe <path>        AgeOfConan.exe (default: auto-detected from the Steam install, app 217750)
   --dx10              launch AgeOfConanDX10.exe instead
   -u, --username <s>  auto-login account
   -p, --password <s>  auto-login password

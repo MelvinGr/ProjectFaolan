@@ -17,12 +17,6 @@ namespace Faolan.ClientLauncher
 	// Optionally adds the auto-login flags (-username/-password/-charname) so you skip the login + character screens.
 	internal static class Program
 	{
-		private const string DefaultCompatData = "/mnt/btrfs/@games/debian-installation/steamapps/compatdata/217750";
-
-		// Dev defaults (from launchClient.sh); override with the flags / env vars below.
-		private const string DefaultExe = "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe";
-		private const string DefaultProton = "/mnt/btrfs/@games/debian-installation/steamapps/common/Proton - Experimental/proton";
-
 		private const string SteamAppId = "217750";
 
 		// Copy path -> path.bak only if the backup doesn't already exist, so the FIRST run captures the pristine
@@ -137,13 +131,13 @@ namespace Faolan.ClientLauncher
 
 		private static int Main(string[] args)
 		{
-			var exe = DefaultExe;
+			string? exe = null; // --exe overrides; else Steam auto-detect (SteamPaths) after the arg loop
 			string? username = null;
 			string? password = null;
 			string? charname = null;
 			string? wine = null;
 			string? universeAddr = null;
-			var proton = DefaultProton;
+			string? proton = null; // --proton/PROTON overrides; else Steam auto-detect (SteamPaths) at launch
 			var dx10 = false;
 			var dryRun = false;
 			var noConsole = true;
@@ -290,6 +284,15 @@ namespace Faolan.ClientLauncher
 				}
 			}
 
+			// Resolve the client exe: --exe wins, else auto-detect the Steam install (app 217750, Linux + Windows).
+			// No hardcoded fallback - error out if neither yields a path.
+			exe ??= SteamPaths.FindExe();
+			if (exe == null)
+			{
+				Console.Error.WriteLine("Could not find AgeOfConan.exe via Steam (app 217750 not installed, or a non-standard Steam path). Pass --exe <path>.");
+				return 1;
+			}
+
 			if (dx10)
 			{
 				var dx10Exe = Path.Combine(Path.GetDirectoryName(exe) ?? ".", "AgeOfConanDX10.exe");
@@ -299,7 +302,7 @@ namespace Faolan.ClientLauncher
 
 			if (!File.Exists(exe))
 			{
-				Console.Error.WriteLine($"Client not found: {exe}\nPass --exe <path> or set the AOC_EXE env var.");
+				Console.Error.WriteLine($"Client not found: {exe}\nPass a valid --exe <path>.");
 				return 1;
 			}
 
@@ -431,16 +434,24 @@ namespace Faolan.ClientLauncher
 			}
 			else
 			{
+				proton ??= Environment.GetEnvironmentVariable("PROTON") ?? SteamPaths.FindProton();
+				if (proton == null)
+				{
+					Console.Error.WriteLine("Could not find Proton via Steam. Pass --proton <path> (or --wine <cmd>).");
+					return 1;
+				}
+
 				psi.FileName = proton;
 				psi.ArgumentList.Add("run");
 				psi.ArgumentList.Add(exe);
 
 				var home = Environment.GetEnvironmentVariable("HOME") ?? "";
-				SetIfUnset(psi, "STEAM_COMPAT_DATA_PATH", DefaultCompatData);
+				if (SteamPaths.FindCompatData() is { } compat)
+					SetIfUnset(psi, "STEAM_COMPAT_DATA_PATH", compat);
+
 				SetIfUnset(psi, "STEAM_COMPAT_CLIENT_INSTALL_PATH", Path.Combine(home, ".steam", "steam"));
 				SetIfUnset(psi, "SteamAppId", SteamAppId);
 				SetIfUnset(psi, "SteamGameId", SteamAppId);
-				SetIfUnset(psi, "WINEDEBUG", "-all");
 
 				SetIfUnset(psi, "PROTON_USE_WINED3D", "1");
 				SetIfUnset(psi, "PROTON_NO_ESYNC", "1");
@@ -506,25 +517,25 @@ namespace Faolan.ClientLauncher
 			Console.WriteLine("""
 			                  Faolan.ClientLauncher - launch AgeOfConan.exe directly (bypassing ConanPatcher).
 
-			                    --exe <path>        path to AgeOfConan.exe (or set AOC_EXE; defaults to the Steam path)
+			                    --exe <path>        path to AgeOfConan.exe (default: auto-detected from your Steam install, app 217750)
 			                    --dx10              launch AgeOfConanDX10.exe instead
 			                    -u, --username <s>  auto-login account name
 			                    -p, --password <s>  auto-login password
 			                    -c, --charname <s>  auto-enter this character
 			                    --universeaddr <a>  point LocalConfig.xml <UniverseAddr> (the login server) at (host:port)
-			                    --cdn <url>      point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/
+			                    --cdn <url>			point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/
 			                                        ControlHttpPatchAddr) at <url> - each becomes <url>/<tag>/upm
-			                    --launcher-notes <url>  redirect the client's hardcoded launcher-notes URL to <url> - keep the two %s (UniverseName, Language)
+			                    --launcher-notes <url>  redirect the client's hardcoded launcher-notes URL to <url> - 
+			                                        keep the two %s (UniverseName, Language)
 			                    --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml from their .bak
 			                                        (undoes the login/notes exe patch + the CDN/UniverseAddr redirects) and exit
 			                    --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 			                                        as the client console, no separate wineconsole window); also drops -noconsole
 			                    --patch-login       patch the client's DH key ON DISK before launch so the
 			                                        server can validate the real password
-			                    --proton <path>     (Linux only) Proton 'proton' script (or set PROTON; defaults to the Steam
-			                                        Proton-Experimental). Ignored on Windows, which runs the exe directly.
-			                    --wine <cmd>        (Linux only) use this runner instead of Proton (e.g. 'wine'). Ignored on
-			                                        Windows, which runs the exe directly.
+			                    --proton <path>     (Linux only) Proton 'proton' script or set PROTON (default: auto-detected -
+			                                        the build Steam runs AoC with). Ignored on Windows, which runs the exe directly.
+			                    --wine <cmd>        (Linux only) use this runner instead of Proton (e.g. 'wine').
 			                    -n, --dry-run       print the computed clienthash/key/args without launching
 			                    -h, --help          this help
 
@@ -547,6 +558,23 @@ namespace Faolan.ClientLauncher
 
 			File.Copy(bak, path, true);
 			return true;
+		}
+
+		// Point the three CDN keys at the mirror base URL (LocalConfig.xml is backed up to .bak first, so --restore
+		// puts the retail URLs back). Returns true if any key was changed.
+		private static bool SetCdnConfig(string gameDir, string baseUrl)
+		{
+			var b = baseUrl.TrimEnd('/');
+			var changed = false;
+			// The three LocalConfig.xml CDN keys and the mirror path tag that routes each (the request path carries
+			// the tag, so a key -> <base>/<tag>/upm). UniverseAddr (the login server) is separate - see --universeaddr.
+			foreach (var (key, tag) in new[] { ("HttpPatchAddr", "update"), ("ClientHttpPatchAddr", "gameupdate"), ("ControlHttpPatchAddr", "control") })
+			{
+				if (SetConfigTag(gameDir, key, $"{b}/{tag}/upm") != null)
+					changed = true;
+			}
+
+			return changed;
 		}
 
 		// Set a single LocalConfig.xml <tag> to `value`, returning the previous value (so the caller can revert),
@@ -633,23 +661,6 @@ namespace Faolan.ClientLauncher
 		{
 			if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
 				psi.Environment[name] = value;
-		}
-
-		// Point the three CDN keys at the mirror base URL (LocalConfig.xml is backed up to .bak first, so --restore
-		// puts the retail URLs back). Returns true if any key was changed.
-		private static bool SetCdnConfig(string gameDir, string baseUrl)
-		{
-			var b = baseUrl.TrimEnd('/');
-			var changed = false;
-			// The three LocalConfig.xml CDN keys and the mirror path tag that routes each (the request path carries
-			// the tag, so a key -> <base>/<tag>/upm). UniverseAddr (the login server) is separate - see --universeaddr.
-			foreach (var (key, tag) in new[] { ("HttpPatchAddr", "update"), ("ClientHttpPatchAddr", "gameupdate"), ("ControlHttpPatchAddr", "control") })
-			{
-				if (SetConfigTag(gameDir, key, $"{b}/{tag}/upm") != null)
-					changed = true;
-			}
-
-			return changed;
 		}
 
 		// Set LocalConfig.xml's <UniverseAddr> (the client's login server) to `addr`, returning the previous value,
