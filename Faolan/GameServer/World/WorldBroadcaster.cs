@@ -969,6 +969,7 @@ namespace Faolan.GameServer.World
 			}
 
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.Npc?.Name ?? npcName, vitals);
+			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
 			entity.Level = npc.Level;
 			entity.Disposition = npc.Npc?.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
@@ -1022,6 +1023,10 @@ namespace Faolan.GameServer.World
 				: 1;
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals);
+			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
+												   // (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
+												   // than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
+												   // client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
 			entity.Level = level;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true;

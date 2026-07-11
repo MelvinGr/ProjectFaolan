@@ -183,7 +183,7 @@ namespace Faolan.GameServer
 		private async Task SendListAllMaps(uint characterId)
 		{
 			var maps = await Database.GetMaps();
-			await _agentServerDispatcher.SendSystemMessage(characterId, maps.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
+			await _agentServerDispatcher.SendSystemMessage(characterId, maps.OrderBy(m => m.Name).Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
 		}
 
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
