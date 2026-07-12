@@ -680,7 +680,7 @@ namespace Faolan.Importer.Modules
 	public sealed class QuestsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [];
+		public IReadOnlyList<string> DependsOn => [nameof(MapsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

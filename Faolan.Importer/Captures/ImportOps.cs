@@ -404,10 +404,24 @@ namespace Faolan.Importer.Captures
 		// Quest journal-content definitions, refreshed per harvested quest; un-harvested quests untouched.
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
 		{
+			// The world is pruned to Tortage, so some harvested quests point their map marker at a playfield that isn't
+			// in the (pruned) Maps catalog (e.g. quest 19522 -> map 30200). QuestDefinition.MapId is a required FK to
+			// Maps, so importing those would fail the FK. Skip them with a clear line rather than silently — they'll
+			// re-import once/if their map is added back.
+			var knownMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			var skipped = 0;
+
 			var added = 0;
 			var updated = 0;
 			foreach (var def in definitions)
 			{
+				if (!knownMaps.Contains(def.MapId))
+				{
+					Console.WriteLine($"Quest {def.QuestId}: skipped - map {def.MapId} not in the (pruned) Maps catalog.");
+					skipped++;
+					continue;
+				}
+
 				var existing = await db.QuestDefinitions.Include(q => q.TextRefs).FirstOrDefaultAsync(q => q.QuestId == def.QuestId);
 				if (existing == null)
 				{
@@ -427,7 +441,7 @@ namespace Faolan.Importer.Captures
 			}
 
 			await db.SaveChangesAsync();
-			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated.");
+			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated, {skipped} skipped (map not in catalog).");
 
 			await SeedBeachQuestGoals(db);
 			await SeedCasildaChain(db);

@@ -891,7 +891,7 @@ namespace Faolan.Core.Database.Repositories
 
 			var killTargets = await ctx
 				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.TargetName != null && g.TargetName != "")
-				.Join(ctx.QuestDefinitions, g => g.QuestDefinitionId, d => d.Id, (g, d) => new
+				.Join(ctx.QuestDefinitions, g => g.QuestDefinitionId, d => d.QuestId, (g, d) => new
 				{
 					g.TargetName,
 					d.QuestId

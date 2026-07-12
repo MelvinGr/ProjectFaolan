@@ -10,7 +10,9 @@ namespace Faolan.Core.Database.Tables
 	// its RDB; KeyText is the deterministic per-(id,category) content hash.
 	// CharacterQuest persists a character's STATE (active/progress); this is the shared, character-independent
 	// definition looked up by the RDB quest id.
-	public class QuestDefinition : BaseEntity
+	// QuestId (the RDB quest id) IS the primary key - a natural-key catalog like NpcTemplate/Item/Spell/Map (#350),
+	// set from the RDB by the importer and never DB-generated. No synthetic Id (BaseEntity dropped).
+	public class QuestDefinition
 	{
 		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
 		public uint AreaId { get; set; }
@@ -30,7 +32,8 @@ namespace Faolan.Core.Database.Tables
 		// 13479 (kill Tuut) -> 13563 (loot key) -> 13480 (free/talk Casilda) -> 12407 (escort) -> 0.
 		public uint NextQuestId { get; set; }
 
-		// The RDB quest id (e.g. 13479) - the stable lookup key; the synthetic Id is the row PK.
+		// The RDB quest id (e.g. 13479) - the primary key (natural key; see the class note).
+		[Key]
 		public uint QuestId { get; set; }
 
 		// The per-GOAL objective detail (the @609 region of the FullChar snapshot tails) - one row per goal of the

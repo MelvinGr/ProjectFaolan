@@ -311,6 +311,11 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<NpcTemplate>().HasKey(n => n.TemplateId);
 			modelBuilder.Entity<NpcTemplate>().Property(n => n.TemplateId).ValueGeneratedNever();
 
+			// QuestDefinition is a natural-key catalog too (#350): QuestId (the RDB quest id) IS the PK, never
+			// DB-generated. Its Goals/TextRefs FK to QuestId (populated via the nav on import).
+			modelBuilder.Entity<QuestDefinition>().HasKey(q => q.QuestId);
+			modelBuilder.Entity<QuestDefinition>().Property(q => q.QuestId).ValueGeneratedNever();
+
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spawns).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
 
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spells).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.SetNull);
