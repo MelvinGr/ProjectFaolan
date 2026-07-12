@@ -23,6 +23,13 @@ namespace Faolan.Importer.Captures
 		public static List<ShopEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var names = ConversationExtractor.BuildSpawnNameMap(packets);
+			// handle -> vendor TEMPLATE id (#244): the shop is keyed by the vendor's NPC TYPE, not its (non-unique)
+			// internal name, so distinct same-named vendors don't merge and a shop never leaks onto a same-named
+			// non-vendor (e.g. the conversation NPC Atraxus vs the "Halen van Dummy" vendors).
+			var templates = Extractors.NpcSpawnExtractor.Extract(packets)
+				.Where(e => e.Handle != 0 && e.TemplateId != 0)
+				.GroupBy(e => e.Handle)
+				.ToDictionary(g => g.Key, g => g.First().TemplateId);
 			var shops = new List<ShopEntry>();
 			foreach (var p in packets)
 			{
@@ -49,10 +56,11 @@ namespace Faolan.Importer.Captures
 				}
 
 				var vendor = names.GetValueOrDefault(content.NpcHandle);
-				if (string.IsNullOrEmpty(vendor))
-					continue; // no stable key without the vendor spawn in the same capture
+				var template = templates.GetValueOrDefault(content.NpcHandle);
+				if (template == 0)
+					continue; // no stable key without the vendor spawn (its template) in the same capture
 
-				shops.Add(new ShopEntry(vendor, content.MaxSize, content.Entries));
+				shops.Add(new ShopEntry(template, vendor ?? "", content.MaxSize, content.Entries));
 			}
 
 			return shops;
@@ -65,11 +73,12 @@ namespace Faolan.Importer.Captures
 			var merged = Merge(shops);
 			foreach (var e in merged)
 			{
-				var shop = await db.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.VendorName == e.VendorName);
+				var shop = await db.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.NpcTemplateId == e.TemplateId);
 				if (shop == null)
 				{
 					shop = new Shop
 					{
+						NpcTemplateId = e.TemplateId,
 						VendorName = e.VendorName
 					};
 					db.Shops.Add(shop);
@@ -77,6 +86,7 @@ namespace Faolan.Importer.Captures
 				}
 				else
 				{
+					shop.VendorName = e.VendorName; // refresh the display name
 					if (shop.Items != null)
 						db.ShopItems.RemoveRange(shop.Items);
 					updated++;
@@ -105,9 +115,9 @@ namespace Faolan.Importer.Captures
 		// shift the volatile ids).
 		public static List<ShopEntry> Merge(IEnumerable<ShopEntry> entries)
 		{
-			return entries.GroupBy(e => e.VendorName, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList();
+			return entries.GroupBy(e => e.TemplateId).Select(g => g.Last()).ToList();
 		}
 
-		public sealed record ShopEntry(string VendorName, uint MaxSize, IReadOnlyList<ShopContentCodec.ShopEntry> Items);
+		public sealed record ShopEntry(uint TemplateId, string VendorName, uint MaxSize, IReadOnlyList<ShopContentCodec.ShopEntry> Items);
 	}
 }

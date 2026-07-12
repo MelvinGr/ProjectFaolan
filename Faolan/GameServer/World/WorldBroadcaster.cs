@@ -711,7 +711,7 @@ namespace Faolan.GameServer.World
 						nextFreeHandle++;
 					handle = nextFreeHandle;
 				}
-				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals);
+				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals, npc.NpcTemplateId);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
 				entity.Level = npc.Level;
 				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
@@ -1059,7 +1059,7 @@ namespace Faolan.GameServer.World
 				vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			}
 
-			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.NpcTemplate.Name ?? npcName, vitals);
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.NpcTemplate.Name ?? npcName, vitals, npc.NpcTemplateId);
 			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
 			entity.Level = npc.Level;
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
@@ -1113,7 +1113,7 @@ namespace Faolan.GameServer.World
 				? CombatResolver.NpcMaxHealthForLevel(level)
 				: 1;
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
-			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals);
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
 												   // (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
 												   // than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
@@ -1291,10 +1291,14 @@ namespace Faolan.GameServer.World
 				{
 					case InterestEventType.Spawn when ev.Subject.SpawnBody != null:
 					{
-						// Register a streamed-in NPC's handle -> name so clicking it routes to the right conversation
-						// (the same map the world-burst spawns use; players are not conversation targets).
+					// Register a streamed-in NPC's handle -> name + template so clicking it routes to the right
+						// conversation/shop by the stable template key (the same map the world-burst spawns use; players
+						// are not conversation targets).
 						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot && ev.Subject.Name != null)
+						{
 							recipient.Session.SpawnedNpcNamesByHandle[ev.Subject.Handle] = ev.Subject.Name;
+							recipient.Session.SpawnedNpcTemplatesByHandle[ev.Subject.Handle] = ev.Subject.NpcTemplateId;
+						}
 						await SendWorldSpawn(recipient, ev.Subject);
 						// #241: when a quest-giver NPC enters view, set its marker from THIS viewer's quest state
 						// (! available / ? ready-to-turn-in / none active). Recomputed per entry, so it transitions as

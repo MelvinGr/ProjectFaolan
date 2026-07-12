@@ -80,7 +80,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Recipe[]> GetRecipes();
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
-		Task<Shop?> GetShopByVendorName(string vendorName);
+		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
 		Task<Spell?> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
@@ -994,10 +994,13 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.RespawnPoints.Where(r => r.MapId == mapId).ToArrayAsync();
 		}
 
-		public async Task<Shop?> GetShopByVendorName(string vendorName)
+		public async Task<Shop?> GetShopByTemplate(uint npcTemplateId)
 		{
+			if (npcTemplateId == 0)
+				return null;
+
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.VendorName == vendorName);
+			return await ctx.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.NpcTemplateId == npcTemplateId);
 		}
 
 		public async Task<Spell?> GetSpell(uint id)

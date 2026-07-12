@@ -75,6 +75,11 @@ namespace Faolan.Core.Network
 		// that conversation routing keys on. Populated when the burst is replayed.
 		Dictionary<uint, string> SpawnedNpcNamesByHandle { get; }
 
+		// Live NPC entity handle -> NpcTemplateId, captured alongside SpawnedNpcNamesByHandle. The template is the stable
+		// per-type key for shop/conversation lookup (names collide: 25 templates share "Halen van Dummy"), so a clicked
+		// handle resolves to the right shop/dialogue by template, not the shared name.
+		Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; }
+
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
 		int CreateWorldChunkIndex { get; set; }
@@ -165,6 +170,7 @@ namespace Faolan.Core.Network
 		public Character Character { get; set; }
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new();
+		public Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; } = new();
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }

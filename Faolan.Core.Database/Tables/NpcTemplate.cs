@@ -41,6 +41,8 @@ namespace Faolan.Core.Database.Tables
 		// caller-supplied transform and NO world placement (NpcSpawnBuilder.TryBuildFromType).
 		public virtual NpcStatCore? StatCore { get; set; }
 
+		public virtual Shop? Shop { get; set; }
+
 		// The creature's display name (the stable join key conversations/shops/spells use).
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;

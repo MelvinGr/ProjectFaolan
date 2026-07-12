@@ -315,6 +315,11 @@ namespace Faolan.Core.Database
 
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spells).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.SetNull);
 
+			// A vendor shop points at its NPC TYPE (#244) - keyed by template (unique), not the non-unique internal
+			// name, so it's one-to-one (NpcTemplate.Shop). Restrict like the other NpcTemplate references: the type is
+			// reference data, not a cascade parent.
+			modelBuilder.Entity<Shop>().HasOne(s => s.NpcTemplate).WithOne(t => t.Shop).HasForeignKey<Shop>(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
+
 			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its NpcTemplate type.
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).HasForeignKey(e => e.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Morphs).WithOne(m => m.NpcTemplate).HasForeignKey(m => m.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);

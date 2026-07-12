@@ -197,6 +197,11 @@ namespace Faolan.GameServer.World
 		public string LootSourceName { get; set; }
 		public string Name { get; }
 
+		// The NPC's TYPE id (NpcTemplateId), or 0 for players/loot. The stable per-type key used to look up shops and
+		// conversations without the shared-placeholder-name collision (many NPCs share an internal name, e.g. 25 share
+		// "Halen van Dummy"). 0 for players (they aren't shop/conversation NPCs).
+		public uint NpcTemplateId { get; init; }
+
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the .spawnbag player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever
 		// earned it rather than everyone in range. 0 = unowned (anyone). Loot-permission ENFORCEMENT (gating the take
@@ -423,7 +428,7 @@ namespace Faolan.GameServer.World
 
 		// Convenience factory for an NPC (no owning client) placed at a fixed transform. The transform is also recorded
 		// as the spawn point the NPC returns to on respawn. Optional vitals make it killable + respawnable by the tick.
-		public static WorldEntity ForNpc(uint handle, uint mapId, Vector3 position, Quaternion rotation, string name, EntityVitals vitals = null)
+		public static WorldEntity ForNpc(uint handle, uint mapId, Vector3 position, Quaternion rotation, string name, EntityVitals vitals = null, uint templateId = 0)
 		{
 			return new WorldEntity(handle, mapId, false, name, null)
 			{
@@ -431,7 +436,8 @@ namespace Faolan.GameServer.World
 				Rotation = rotation,
 				SpawnPosition = position,
 				SpawnRotation = rotation,
-				Vitals = vitals
+				Vitals = vitals,
+				NpcTemplateId = templateId
 			};
 		}
 	}

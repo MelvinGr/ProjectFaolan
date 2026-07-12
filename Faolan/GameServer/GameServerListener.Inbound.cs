@@ -605,13 +605,14 @@ namespace Faolan.GameServer
 								// echo + DispatchShopData riding this conversation (sell_items_to_trader frames
 								// 1188-1193) - no knubot screens in between. Checked on the greeting click only
 								// (Field3 == 0, like the captured open).
-								// Only a NAMED shop VENDOR takes this path: SpawnedNpcNamesByHandle holds EVERY spawned NPC, so
-								// gate on an actual shop row existing for the name. A non-vendor (Casilda, a quest NPC, ...)
-								// falls through to normal conversation below - do NOT break here, or the greeting is swallowed
-								// and dialogue never opens. (A vendor whose shop simply isn't imported yet is indistinguishable
-								// from a non-vendor here - both yield a null shop - so it too falls through to conversation.)
-								if (npcHandle != 0 && args.Field3 == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var vendorNpcName) &&
-								    await Database.GetShopByVendorName(vendorNpcName) is { } vendorShop)
+								// Only a shop VENDOR takes this path: gate on an actual shop row existing for the clicked NPC's
+								// TEMPLATE (#244). Keying by template, not name, is what stops the "Halen van Dummy" collision -
+								// the vendor templates (19265, ...) get their shop, while the same-named conversation NPC Atraxus
+								// (template 12236) does NOT, so his click falls through to dialogue below. A non-vendor (Casilda,
+								// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
+								// the greeting is swallowed and dialogue never opens.
+								if (npcHandle != 0 && args.Field3 == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
+								    await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
 								{
 									await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
 									break;
