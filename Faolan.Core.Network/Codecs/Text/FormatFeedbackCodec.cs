@@ -37,6 +37,18 @@ namespace Faolan.Core.Network.Codecs.Text
 			return new Message(instance, typeFlags, footer, xml).ToArray();
 		}
 
+		// The GenericDisplayAreaName FIFO-banner XML (the top-of-screen zone/area-name reveal) for a given client
+		// localized-text id. Byte-exact against the captured banners (all carry this same token/category/key; only the
+		// text id varies per area - the ids are per-SUB-REGION, sourced from the client's region volumes, #348). Send
+		// the result via Build(instance, FifoBannerTypeFlags, 1, xml).
+		public static byte[] BuildAreaNameXml(uint textId)
+		{
+			return System.Text.Encoding.ASCII.GetBytes(
+				"<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
+				"key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
+				$"token=&#39;DisplayedText(3)|GenericDisplayAreaName|{textId}&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>");
+		}
+
 		public static Message Parse(byte[] body)
 		{
 			return Message.Read(new FaolanStream(body));

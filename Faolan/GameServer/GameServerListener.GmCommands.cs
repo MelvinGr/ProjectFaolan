@@ -299,6 +299,7 @@ namespace Faolan.GameServer
 				["additem"] = AddItemCommand,
 				["removeitem"] = RemoveItemCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
+				["areaname"] = AreaNameCommand,
 				["lua"] = LuaCommand,
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
@@ -522,6 +523,22 @@ namespace Faolan.GameServer
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
+		}
+
+		// .areaname <textId> - push the GenericDisplayAreaName FIFO banner (top-of-screen zone-name reveal) for a
+		// client localized-text id. The test bootstrap for #348 (area-name banner on entering areas): the auto-on-entry
+		// trigger needs the per-region text-id map from the client's region volumes, so this lets us verify the wire
+		// form + discover which id renders which area name in-client (ids seen in captures: 3373519-23, 3474586, ...).
+		private async Task AreaNameCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length != 1 || !uint.TryParse(parts[0], out var textId))
+			{
+				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Usage: .areaname &lt;localizedTextId&gt;  (e.g. 3474586)");
+				return;
+			}
+
+			await SendAreaNameBanner(client, textId);
 		}
 
 		// .syschat - push a world/system chat line into the chat window via ChatTextIIR (#103). Sends the captured

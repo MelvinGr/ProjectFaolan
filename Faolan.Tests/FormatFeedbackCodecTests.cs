@@ -49,6 +49,20 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BuildAreaNameXml_MatchesCapturedBanner()
+		{
+			// The area-name banner is fully reconstructable from just its localized-text id (#348): rebuild the whole
+			// captured AreaNameBody from BuildAreaNameXml(3474586) + the captured instance/typeFlags/footer.
+			var captured = Convert.FromHexString(AreaNameBody);
+			var p = FormatFeedbackCodec.Parse(captured);
+
+			var xml = FormatFeedbackCodec.BuildAreaNameXml(3474586);
+			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, xml);
+
+			Assert.Equal(AreaNameBody, Convert.ToHexStringLower(rebuilt));
+		}
+
+		[Fact]
 		public void Parse_DecodesTheFifoBanner()
 		{
 			var p = FormatFeedbackCodec.Parse(Convert.FromHexString(AreaNameBody));

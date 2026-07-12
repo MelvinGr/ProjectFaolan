@@ -405,6 +405,14 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 		}
 
+		// Pushes the GenericDisplayAreaName FIFO banner (the top-of-screen zone/area-name reveal) for a client
+		// localized-text id. The auto-on-entry / region-crossing trigger is #348 (needs the per-region text-id map from
+		// the client's region volumes); this sender is the mechanism, exercised via the .areaname GM command.
+		private static Task SendAreaNameBanner(INetworkClient client, uint textId)
+		{
+			return SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildAreaNameXml(textId)));
+		}
+
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
 		private static async Task SendRemoveItem(INetworkClient client, uint containerType, uint itemPos, uint amountToRemove = 0)
 		{
