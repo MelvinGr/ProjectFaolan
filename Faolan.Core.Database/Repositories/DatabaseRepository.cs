@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public interface IDatabaseRepository // TODO: Split into multiple
+	public interface IDatabaseRepository // #353: split into cohesive per-domain repositories
 	{
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
 		Task AddCharacterTag(uint characterId, uint tagId);

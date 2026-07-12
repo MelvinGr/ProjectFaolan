@@ -24,7 +24,7 @@ namespace Faolan.Core.Network.Constants
 		private static readonly Dictionary<Class, SpellweaveProfile> Profiles = new Dictionary<Class, SpellweaveProfile>
 		{
 			[Class.Necromancer] = Necromancer
-			// TODO: Demonologist / PriestOfMitra / TempestOfSet - need per-class spellweaving captures.
+			// Demonologist / PriestOfMitra / TempestOfSet - need per-class spellweaving captures (#141).
 		};
 
 		// Necromancer (NecroL80 capture): trance buffs 0x37F29800/0x37E5A800/0x3969D000; weave elements Arcane Renewal

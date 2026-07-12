@@ -40,6 +40,6 @@ namespace Faolan.Core.Database.Tables
 		// camera (0x2015 DispatchSetDialogueCamera) - REQUIRED (the importer rejects a packet it can't decode).
 		// Knubot uses Env/Field/Flag + the Screens rows; the camera uses CameraParams. Both use SenderInstance and
 		// the live npc/player handles at send time.
-		public uint? SubOpcode { get; set; } // TODO: Use enum
+		public uint? SubOpcode { get; set; } // #353: use an enum (layering-blocked - opcode enum lives in Core.Network)
 	}
 }

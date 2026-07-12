@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// lifecycle (every captured 13479 full-update uses 3, on grant and on every re-display: frames 687/8876/9947/
 		// 10129), so it is a quest property, not a dynamic state. Passing the QuestIIR value (2) here makes the client
 		// silently DROP the full-update (journal stays empty) - the bug behind the dialogue-grant not rendering.
-		// TODO: harvest this per quest into QuestDefinition; 3 is the captured value for Casilda's 13479 (and the only
+		// Harvest this per quest into QuestDefinition (#352); 3 is the captured value for Casilda's 13479 (and the only
 		// value observed for active quests so far - a different quest 0x..27 used 1).
 		public const uint FullUpdateStateActive = 3;
 

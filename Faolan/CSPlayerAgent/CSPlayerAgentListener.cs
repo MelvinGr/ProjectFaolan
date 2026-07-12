@@ -48,7 +48,7 @@ namespace Faolan.CSPlayerAgent
 					var characterId = packet.Body.ReadUInt32();
 					if (packet.Body.Position == packet.Body.Length)
 					{
-						Logger.LogDebug("Received incomplete Authenticate packet, ignoring"); // TODO: figure out why this happens and if it can be fixed
+						Logger.LogDebug("Received incomplete Authenticate packet, ignoring"); // #354: why do these arrive?
 						break;
 					}
 

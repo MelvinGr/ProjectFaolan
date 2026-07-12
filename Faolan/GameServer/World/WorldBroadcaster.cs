@@ -963,7 +963,7 @@ namespace Faolan.GameServer.World
 		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
 		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
 		// off the beach or before she's freed.
-		public async Task SendBeachGateOnEntry(INetworkClient client) // TODO: This should be in some sort of quest handler service
+		public async Task SendBeachGateOnEntry(INetworkClient client) // #353: extract to a quest-handler service
 		{
 			var character = client.Session?.Character;
 			if (character == null || character.MapId != Map.TortageBeachId)

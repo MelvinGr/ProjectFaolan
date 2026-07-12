@@ -82,7 +82,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case (GameServer0X2000Opcodes)GameCharAgentOpcodes.QueuePetCommand: // TODO: dont think this should be here? client check if HandleGameCharAgentPacket receives 0x205B
+				case (GameServer0X2000Opcodes)GameCharAgentOpcodes.QueuePetCommand: // #354: verify routing (vs HandleGameCharAgentPacket for 0x205B)
 				{
 					await HandlePetCommand(client, packet);
 					break;
@@ -900,7 +900,7 @@ namespace Faolan.GameServer
 		private async Task HandleCreateEditorInstanceEcho(INetworkClient client, ConanPacket packet)
 		{
 			uint? requestId = null;
-			if (packet.Body.Length - packet.Body.Position >= sizeof(uint) * 2) // TODO: Fix this flow?
+			if (packet.Body.Length - packet.Body.Position >= sizeof(uint) * 2) // #354: confirm this framing vs the create captures
 			{
 				var ack0 = packet.Body.ReadUInt32();
 				requestId = packet.Body.ReadUInt32();

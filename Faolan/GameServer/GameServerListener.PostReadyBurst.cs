@@ -16,7 +16,8 @@ namespace Faolan.GameServer
 		// capture as explicit PacketStream sends: the live player instance is written inline (the receiver is built via
 		// Endpoints.EndpointBytes(type, instance), WriteUInt32(instance) where the body carries it), so no ids are
 		// hard-coded. The remaining body
-		// bytes are opaque captured payloads (quest/UI blobs). TODO: per-map/DB-driven construction, like the world content.
+		// bytes are opaque captured payloads (quest/UI blobs). Per-map/DB-driven construction (like the rest of world
+		// content) is #352 - blocked on decoding these blobs.
 		// #304: the legacy verbatim beach NPC records (spawns/MoveTasks/despawns/BehaviorCC on captured handles) were
 		// deleted - WorldBroadcaster interest streaming owns the beach population, confirmed in-client.
 		private async Task SendPostReadyBurst(INetworkClient client)

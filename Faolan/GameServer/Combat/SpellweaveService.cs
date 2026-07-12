@@ -190,8 +190,8 @@ namespace Faolan.GameServer.Combat
 
 			await Feedback(client, $"Spellweave fired with {session.WeaveComponents.Count} components.");
 
-			// TODO: resolve the blended effect from the accumulated components (componentIndex -> effect) + roll
-			// backlash - awaits the per-class weave-element contribution table (captures, #141). The trance root is
+			// Remaining (#141): resolve the blended effect from the accumulated components (componentIndex -> effect) +
+			// roll backlash - awaits the per-class weave-element contribution table (captures). The trance root is
 			// already released: IsSpellweaving was cleared above, so the move handler stops pinning the caster.
 			session.WeaveComponents.Clear();
 			session.SpellweaveBuffStack = 0;
