@@ -436,8 +436,7 @@ namespace Faolan.GameServer
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots);
+			ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchValidResurrectionSpots);
 			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
 			return ps.SendAsync(client);
 		}

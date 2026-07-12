@@ -295,7 +295,7 @@ namespace Faolan.GameServer
 				{
 					// Sent (empty body) AFTER the client received DispatchOpenTradepost (auctioneer / .ah) - the
 					// observed "window opened" signal; nothing to send back, just log.
-					Logger.LogInformation("Tradepost: {Char} opened the auction house.", TradepostCharName(client));
+					Logger.LogInformation("Tradepost: {Char} opened the auction house.", client.Session?.Character.Name);
 					break;
 				}
 
@@ -303,7 +303,7 @@ namespace Faolan.GameServer
 				{
 					var query = TradepostResponses.ParseSearch(packet.Body);
 					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character?.RealmId ?? 0); // #324: realm-local market
-					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", TradepostCharName(client), query.Lang, query.ItemId,
+					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", client.Session?.Character.Name, query.Lang, query.ItemId,
 						query.Page, listings.Count);
 
 					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no rows).
@@ -351,7 +351,7 @@ namespace Faolan.GameServer
 
 				case TradepostAgentOpcodes.Close:
 				{
-					Logger.LogInformation("Tradepost: {Char} closed the auction house.", TradepostCharName(client));
+					Logger.LogInformation("Tradepost: {Char} closed the auction house.", client.Session?.Character.Name);
 					break;
 				}
 
@@ -369,7 +369,7 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					Logger.LogInformation("Tradepost: {Char} unknown method 0x{Method:X4} (bodylen={Len}).", TradepostCharName(client), packet.Opcode, packet.Body?.Length ?? 0);
+					Logger.LogInformation("Tradepost: {Char} unknown method 0x{Method:X4} (bodylen={Len}).", client.Session?.Character.Name, packet.Opcode, packet.Body?.Length ?? 0);
 					break;
 				}
 			}
@@ -462,6 +462,8 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			var now = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
 			var mail = new Mail
 			{
 				MailId = await AllocateMailId(),
@@ -473,8 +475,8 @@ namespace Faolan.GameServer
 				BodyXml = bodyText,
 				FooterWord = MailConstants.FooterUnread,
 				Money = money,
-				Timestamp1 = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-				Timestamp2 = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds() + MailConstants.ExpirySeconds
+				Timestamp1 = now,
+				Timestamp2 = now + MailConstants.ExpirySeconds
 			};
 
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
@@ -582,53 +584,22 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
 		}
 
-		// Builds the live DispatchAddItem entry for a mail attachment, mirroring SnapshotItemBuilder's bag entry:
-		// ProtoAcgItem{key=the template's TEA quad, template1/2=template, level, hash} + the bag stat triple (0=flags,
-		// 23=recordId, 26=count). The per-template key lives in Items, reached through the attachment's Item nav (FK on
-		// Template) - the caller loads the mail with Attachments.ThenInclude(a => a.Item). The client resolves the
-		// visual from the template via its RDB.
+		// Builds the live DispatchAddItem entry for a mail attachment via the shared SnapshotItemBuilder (the single
+		// item-entry wire builder). The mail-specific glue is only the mapping: the itemId/recordId are derived from the
+		// target BAG slot, the stat triple is the fixed (0=flags, 23=recordId, 26=count), and the template identity +
+		// per-instance hash/level come off the attachment (its Item nav = the FK on Template, so Item.Id == Template;
+		// the caller loads it via Attachments.ThenInclude(a => a.Item) for the TEA key).
 		private static ProtoInventoryGameEntry BuildMailItemEntry(MailAttachment a, uint charId, int slot)
 		{
-			var key = (a.Item ?? throw new InvalidOperationException(
-				$"MailAttachment (template {a.Template}): the Item navigation is not loaded - Include it before granting.")).Key;
+			var itemId = FullPlayerCharacterBuilder.ItemId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot);
+			var recordId = (uint)FullPlayerCharacterBuilder.RecordId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot);
 			var qty = a.Quantity == 0
 				? 1u
 				: a.Quantity;
-			var entry = new ProtoInventoryGameEntry
-			{
-				ItemId = FullPlayerCharacterBuilder.ItemId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot),
-				ItemData = new ProtoAcgItem
-				{
-					Key1 = key,
-					Key2 = key,
-					Key3 = key,
-					Template1 = a.Template,
-					Template2 = a.Template,
-					Level = a.ItemLevel,
-					Hash = a.ItemHash
-				}
-			};
-			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
-			{
-				Stat = 0,
-				Value = 1
-			});
-			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
-			{
-				Stat = 23,
-				Value = (uint)FullPlayerCharacterBuilder.RecordId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot)
-			});
-			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
-			{
-				Stat = 26,
-				Value = qty
-			});
-			return entry;
-		}
 
-		private static string TradepostCharName(INetworkClient client)
-		{
-			return client.Session?.Character?.Name ?? "?";
+			return SnapshotItemBuilder.BuildInventoryEntry(itemId, a.Item, a.ItemHash,
+				[new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, recordId), new SnapshotItemBuilder.ItemStat(26, qty)],
+				a.ItemLevel);
 		}
 	}
 }
