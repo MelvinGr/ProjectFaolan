@@ -196,6 +196,13 @@ namespace Faolan.Tests
 			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], Rec(QuestTextSlot.AreaTitle));
 			Assert.Equal(CaptureBody("504b7924"), Convert.ToHexString(logList).ToLowerInvariant());
 
+			// Inverse: TryParseQuestLogList recovers the handle, tracked id, and the exact quest-id list (the
+			// CaptureQuestImporter path that harvests each character's held-quest set from the J-panel log).
+			Assert.True(WorldQuest.TryParseQuestLogList(logList, out var logHandle, out var trackedId, out var logIds));
+			Assert.Equal(0x0131720Bu, logHandle);
+			Assert.Equal(0x34A7u, trackedId);
+			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], logIds);
+
 			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
 			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (xxx-login's 13479
 			// tails block) EXCEPT the 3 explained spots: quest PROGRESS @577 (just-accepted 0x64 vs in-progress 0x50)

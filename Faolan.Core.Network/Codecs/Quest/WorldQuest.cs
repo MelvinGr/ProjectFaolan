@@ -311,6 +311,40 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return true;
 		}
 
+		// The inverse of BuildQuestLogList: recovers (playerHandle, trackedQuestId, questIds) from a QuestLogList body.
+		// The list populates the J-panel - the character's full quest log as the retail server sent it on login - so it
+		// is the bulk per-character quest set (many ids in ONE packet), unlike the one-quest QuestIIR/QuestGoal packets.
+		public static bool TryParseQuestLogList(ReadOnlySpan<byte> body, out uint playerHandle, out uint trackedQuestId, out List<uint> questIds)
+		{
+			playerHandle = 0;
+			trackedQuestId = 0;
+			questIds = null;
+			if (body.Length < 29)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestLogListIIR)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
+				return false;
+			if (body[12] != 0x01)
+				return false;
+
+			playerHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+			trackedQuestId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(21, 4));
+			var count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4));
+			if (count > 4096 || 29 + count * 8 > body.Length)
+				return false; // implausible count / truncated - not a well-formed log list
+
+			questIds = new List<uint>((int)count);
+			var off = 29;
+			for (uint i = 0; i < count; i++)
+			{
+				questIds.Add(BinaryPrimitives.ReadUInt32BigEndian(body.Slice(off + 4, 4)));
+				off += 8;
+			}
+
+			return true;
+		}
+
 		private static byte[] TextRecord(string xml)
 		{
 			var ascii = Encoding.ASCII.GetBytes(xml);
