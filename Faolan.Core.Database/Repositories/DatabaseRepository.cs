@@ -971,7 +971,10 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Recipe[]> GetRecipes()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Recipes.OrderBy(r => r.Id).ToArrayAsync();
+			return await ctx.Recipes
+				.Include(r => r.Items).ThenInclude(i => i.Item) // element key + hash live on the Items row (owned Key loads inline)
+				.OrderBy(r => r.Id)
+				.ToArrayAsync();
 		}
 
 		// A single resurrection point by id (resolves a character's bind point to its map+position on recall).

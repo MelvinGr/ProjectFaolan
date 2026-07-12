@@ -3,12 +3,12 @@ using Faolan.Core.Database.Attributes;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One ingredient (input) or result (output) item of a crafting Recipe - a queryable projection of the recipe
-	// record's KEY1 (ingredients) / listC (results) element lists (decoded in TradeskillRecipeCodec.ParseRecordItems,
-	// see docs/subsystems/tradeskill-recipes.md). The recipe still ships byte-exact from Recipe.Data; these rows exist so
-	// recipes are queryable ("which recipes produce / consume item X"). Each references the item template by id (hard
-	// FK to Items) - the item's TEA key (the same key RequestRecipeInfo 0x2090 uses) and hash live there, harvested
-	// into Items from the recipe element by the recipes importer, so they're not duplicated here.
+	// One ingredient (input) or result (output) item of a crafting Recipe - the recipe record's KEY1 (ingredients) /
+	// listC (results) element lists (TradeskillRecipeCodec elements, see docs/subsystems/tradeskill-recipes.md). These
+	// rows ARE the wire elements (the recipe rebuilds byte-exact from them via TradeskillRecipeCodec.ToRecord) and are
+	// also queryable ("which recipes produce / consume item X"). Each references the item template by id (hard FK to
+	// Items) - the item's TEA key (the same key RequestRecipeInfo 0x2090 uses) and hash live there, harvested into
+	// Items from the recipe element by the recipes importer, so they're not duplicated here.
 	public class RecipeItem : BaseEntity
 	{
 		public uint ItemId { get; set; }

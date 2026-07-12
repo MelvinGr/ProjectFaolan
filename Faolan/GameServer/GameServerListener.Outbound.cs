@@ -170,7 +170,7 @@ namespace Faolan.GameServer
 		{
 			var handle = client.Session.Account.ClientInstance;
 			var rows = await Database.GetRecipes();
-			var records = rows.Select(r => new TradeskillRecipeCodec.RecipeRecord(r.Id, r.Data)).ToList();
+			var records = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)

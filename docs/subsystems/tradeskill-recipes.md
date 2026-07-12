@@ -45,28 +45,37 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
 
 ## Implementation
 
-- **`TradeskillRecipeCodec`** (`Faolan.Core.Network`): `ParseReplyBody` (→ `RecipeRecord[]`), `RecordLength`
-  (the 0x3F1-aware record walker), `BuildReplyBody` (env/version/type/count + records). Byte-exact golden vs
-  the capture.
-- **`Recipe` table** (`Id` = recipeId, `Data` = verbatim record body after the id). The inner
-  ingredient/result fields stay verbatim in `Data` (decoded-framing interim, like the item templates);
-  splitting them into child tables is the follow-up.
+- **`TradeskillRecipeCodec`** (`Faolan.Core.Network`): `ParseReplyBody` (→ typed `RecipeRecord[]`),
+  `BuildReplyBody` (env/version/type/count + records), and `ToRecord` (a stored `Recipe` row → wire record).
+  Fully decoded — no verbatim blob. `ParseReplyBody` → `BuildReplyBody` round-trips the capture byte-for-byte,
+  and so does the DB path (`Recipe` row → `ToRecord` → `BuildReplyBody`); both are golden-gated in
+  `TradeskillRecipeCodecTests`. Parse validates every folded constant (header word 0 == list-key, mid header,
+  element id-dup / key-dup / `[13..16]` const) so a capture that breaks the layout throws rather than mis-building.
+- **`Recipe` table** — **fully columnized** (#193): `Id` (= recipeId = header word 0), `Header1`, `RdbType`
+  (`0xf4241`/`0xf4242`), `MidFlag` (0/1), `Tail`, `TrailingFlag` (0/1), and the opaque ref-id list as `RefId0`
+  (always present) + `RefId1` (nullable; every captured record has 1 or 2). No `Data` blob.
 - **Importer** `--only recipes` (`RecipesModule` / `CaptureRecipeImporter`) — scans captures for the reply
-  sub-opcode, parses records, upserts `Recipe` rows. Seeded 603 from the NecroL80 capture.
-- **Handler** `Handle0X2000` → `SendCraftingRecipeBook`: on `TradeskillRequestIIR`, builds the reply from
-  `Database.GetRecipes()` (ordered by id = capture order) and sends it on the world framing.
+  sub-opcode, parses records into `Recipe` rows (columns) + `RecipeItem` children, upserts them. Seeded 603
+  from the NecroL80 capture.
+- **Handler** `Handle0X2000` → `SendCraftingRecipeBook`: on `TradeskillRequestIIR`, loads `Database.GetRecipes()`
+  (ordered by id = capture order, `Items` + their `Items` rows included), maps each via `ToRecord`, and sends the
+  reply on the world framing.
+
+## Element layout
+
+`RecipeItem` (Role ingredient/result, Position, ItemId, Flag, Trailing) is the wire element; the referenced
+`Items` row supplies the rest. The fixed 18-u32 (ingredient) / 17-u32 (result) element:
+`[0]=[1]=itemId, [2]=0, [3]=Flag, [4]=Hash, [5..8]=[9..12]=key, [13..16]=const, [17]=Trailing (ingredient only)`.
+`ItemId` is a hard FK to `Items` (`Restrict`): the item's per-template TEA key (the key `RequestRecipeInfo`
+0x2090 uses) + hash live **once** in `Items` (harvested there from the recipe element by the importer;
+verified: no itemId ever carries two different non-zero hashes or keys across the 603 records), so they're
+**not** duplicated on `RecipeItem`. `ToRecord` reads them back through the `RecipeItem` → `Items` nav.
 
 ## Open / follow-ups
 
 - The catalog is served **whole** to every character (the one capture is an L80 necro's full book). Real
   per-character known-recipe filtering (which recipes a char has learned) needs per-char recipe data — none
   is captured yet. An empty catalog yields a valid empty list (book opens, no recipes).
-- ~~Normalise the ingredient/result sub-lists into child tables so recipes are queryable.~~ **DONE:**
-  `RecipeItem` (Role ingredient/result, Position, ItemId, Flag, Trailing) via
-  `TradeskillRecipeCodec.ParseRecordItems`; the importer seeds it (2476 rows: 1873 ingredients + 603 results).
-  `ItemId` is a hard FK to `Items` (`Restrict`): the referenced item's per-template TEA key and hash live once in
-  `Items` (the key `RequestRecipeInfo` 0x2090 uses), harvested there from the recipe element by the importer, so
-  they're **not** duplicated on `RecipeItem`. `Recipe.Data` stays the byte-exact wire source; the child rows are
-  the queryable projection. The element layout is fixed 18 u32 (ingredient) / 17 u32 (result):
-  `[0]=[1]=itemId, [2]=0, [3]=Flag, [4]=Hash, [5..8]=[9..12]=key, [13..16]=const, [17]=Trailing`.
+- `Header1` / `RdbType` / `MidFlag` / `Tail` / `TrailingFlag` / the ref-id list are stored faithfully but their
+  gameplay meaning is not yet decoded (they reproduce the wire exactly regardless).
 - `type=1` single-`RecipeLearnt` form + the `LearnRecipe` GameAction (`FUN_0112d750`) are not built yet.
