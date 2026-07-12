@@ -126,15 +126,23 @@ namespace Faolan.GameServer
 							// authoritative entity and broadcast from it; fall back to the Character only if the player
 							// isn't in the world model yet.
 							var moveEntity = PlayerWorldEntity(client);
+
+							// Trance root (#141): the spellweave trance immobilises the caster, so while IsSpellweaving the
+							// server PINS the position (rejects translation) but still accepts rotation - the move handler is
+							// the enforcement point. Others then see the caster rooted; the relay below carries the pinned pos.
+							var acceptedPosition = client.Session.IsSpellweaving
+								? moveEntity?.Position ?? sessionCharacter.Position
+								: movePosition;
+
 							if (moveEntity != null)
 							{
-								moveEntity.Position = movePosition;
+								moveEntity.Position = acceptedPosition;
 								moveEntity.Rotation = moveRotation.ToQuaternion();
 							}
 							else
 							{
 								// The DB Character stores a quaternion; the move wire carries a Vector3 (Euler) rotation.
-								sessionCharacter.Position = movePosition;
+								sessionCharacter.Position = acceptedPosition;
 								sessionCharacter.Rotation = moveRotation.ToQuaternion();
 							}
 

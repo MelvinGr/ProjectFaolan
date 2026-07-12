@@ -22,7 +22,8 @@ namespace Faolan.GameServer.Combat
 	// via two narrow seams the listener passes in - `_applySpell` (the listener's ApplySpell self-buff helper) and
 	// `_sendIir` (wrap a record in the world-framed IIR carrier). The per-add element re-send (with the used element
 	// zeroed) + the meter drain-stream + the componentIndex -> stat/effect contribution table are not built yet (see
-	// docs/subsystems/combos-spellweaving-handoff.md); the trance immobilisation is likewise a TODO.
+	// docs/subsystems/combos-spellweaving-handoff.md). The trance immobilisation IS wired (the CharDCMove handler
+	// pins the caster's position while IsSpellweaving).
 	public sealed class SpellweaveService
 	{
 		private const int DotDrainPerTick = 31_705;
@@ -189,8 +190,9 @@ namespace Faolan.GameServer.Combat
 
 			await Feedback(client, $"Spellweave fired with {session.WeaveComponents.Count} components.");
 
-			// TODO: resolve the blended effect from the accumulated components (componentIndex -> effect), roll
-			// backlash, and release the trance immobilisation.
+			// TODO: resolve the blended effect from the accumulated components (componentIndex -> effect) + roll
+			// backlash - awaits the per-class weave-element contribution table (captures, #141). The trance root is
+			// already released: IsSpellweaving was cleared above, so the move handler stops pinning the caster.
 			session.WeaveComponents.Clear();
 			session.SpellweaveBuffStack = 0;
 		}
@@ -298,7 +300,8 @@ namespace Faolan.GameServer.Combat
 			_ = RunTranceMeter(client, caster); // fire-and-forget; it logs its own exceptions and stops itself
 
 			await Feedback(client, "Spellweave started.");
-			// TODO: immobilise the caster for the trance (the move handler should reject motion while IsSpellweaving).
+			// The trance root is enforced in the CharDCMove handler: while IsSpellweaving it pins the caster's
+			// position (rejects translation). Cleared when IsSpellweaving clears (deactivate / fire). #141 (needs in-client test).
 		}
 	}
 }
