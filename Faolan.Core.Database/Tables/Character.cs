@@ -15,7 +15,6 @@ namespace Faolan.Core.Database.Tables
 		// The guild-creator's rank on the wire. 4 = leader, proven by the create-guild capture (the member record
 		// in DispatchGuildCreated / GuildFullUpdate); the earlier 6 was a blind guess. No rank-comparison logic
 		// depends on the exact value, so this only affects the wire member record (now retail-accurate). See #306.
-		[Obsolete("Move to enum with guild rank values")]
 		public const byte GuildLeaderRank = 4;
 
 		public uint AccountId { get; set; }

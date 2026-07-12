@@ -113,7 +113,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return result;
 		}
 
-		[Obsolete("Splice/patch path - build the spawn packet from scratch instead (construct, don't patch)")]
+		// Splice-side length fixup: the CharacterIIR is re-encoded in place (SetCharacterMessage), so the enclosing
+		// length prefixes are delta-adjusted rather than rebuilt. Part of the splice path the from-scratch generator
+		// (PlayerSpawnScaffoldRows) is superseding - kept while CreateEditorCharBuilder still rides SetCharacterMessage.
 		private static void AddBigEndian(byte[] buffer, int offset, int delta)
 		{
 			var value = (uint)(BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4)) + delta);

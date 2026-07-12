@@ -1,4 +1,3 @@
-using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 
@@ -12,7 +11,6 @@ namespace Faolan.GameServer.Inventory
 	// on-use spell - heal/mana/xp for potions), which isn't decoded yet (same family as the stat-attribute decode,
 	// docs/rdb/item-template-stats.md). Bulk consumables (potions/food) should be classified by that effect once decoded
 	// - keyed off a derived column or the SearchCategory - rather than by enumerating hundreds of template ids here.
-	[Obsolete("Should be replaced by a data-driven classification based on the item's ON-USE effect (once decoded).")]
 	public static class ItemUseClassifier
 	{
 		// Totem of Origins template (faolan.db). Recall item; future totem tiers add their ids to this case.
