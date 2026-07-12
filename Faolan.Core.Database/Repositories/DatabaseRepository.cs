@@ -645,7 +645,9 @@ namespace Faolan.Core.Database.Repositories
 				return null;
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ConversationNodes.Include(n => n.Packets).FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath);
+			return await ctx.ConversationNodes
+				.Include(n => n.Packets).ThenInclude(p => p.Screens).ThenInclude(s => s.Parameters)
+				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath);
 		}
 
 		// All quest/tag-conditioned variants of a screen (same NpcName/TypeId/AnswerPath, differing ConditionScript).
@@ -657,7 +659,9 @@ namespace Faolan.Core.Database.Repositories
 				return [];
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var nodes = await ctx.ConversationNodes.Include(n => n.Packets).Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath).ToListAsync();
+			var nodes = await ctx.ConversationNodes
+				.Include(n => n.Packets).ThenInclude(p => p.Screens).ThenInclude(s => s.Parameters)
+				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath).ToListAsync();
 
 			// Conditioned variants first, the unconditional fallback last.
 			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToList();

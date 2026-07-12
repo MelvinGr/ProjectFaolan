@@ -11,15 +11,20 @@ builders. So `ServeScreen` no longer replays any packet — substitution-replay 
 an unexpected sub-opcode. Proven byte-identical to the old handle-substitution
 (`ConversationConstructTests`/`KnubotCodecTests`).
 
-**Stored structured (2026-06-30).** Every packet of a node is now decoded into structured `ConversationPacket`
-columns (`ConversationScreenDecoder` → `SubOpcode/Env/Field/Flag/ScreensJson`, plus `CameraAgentInstance/
-CameraParams` for the camera) and BUILT from those columns at send time, not from the raw `Data` blob (kept
-only as a fallback). All 511/511 rows are structured — 439 Knubot screens + 72 `SetDialogueCamera` (see below);
-zero raw replay. The remoteformat XML itself is parsed/rebuilt byte-exact by `RemoteFormatXml`, and the **live
-player name/guild are regenerated** into each screen (`RemoteFormatXml.WithLivePlayer`) so the NPC greets the
-real character — the captured player's name is gone. **Remaining:** the screen TEXT (`id`/`category`/`key`)
-is still the captured template; generating it from RDB text + the Lua/tag VM is blocked on the harvested,
-client-validated content `key` (non-computable, same as the item TEA keys).
+**Stored structured (2026-06-30; screens fully columnized 2026-07-12).** Every packet of a node is decoded into
+structured `ConversationPacket` columns (`ConversationScreenDecoder` → `SubOpcode/Env/Field/Flag`, plus
+`CameraAgentInstance/CameraParams` for the camera) and BUILT from those columns at send time, not from the raw
+`Data` blob (kept only as a fallback for non-Knubot packets). The remoteformat screen(s) are now stored as
+**typed `ConversationScreen` rows** (`id`/`category`/`key`/`knubot`/`antitag` + ordered `ConversationScreenParameter`
+child rows of `name`/`InnerRaw`) — the old JSON-array-of-XML `ScreensJson` blob is **gone**. The importer
+columnizes each screen via `ConversationScreenColumns.ToRow`, which throws unless the typed round-trip
+reproduces the captured XML byte-for-byte (652/652 screens, 6090 parameters); the runtime rebuilds the wire XML
+from the rows via `ConversationScreenColumns.ToScreen` → `RemoteFormatXml.Build`, with **no fallback** — the
+columns are authoritative. The **live player name/guild are regenerated** into each screen's `name`/`guildname`
+parameters (`RemoteFormatXml.WithLivePlayer`) so the NPC greets the real character — the captured player's name
+is gone. **Remaining:** the screen TEXT (`key`) is still the captured template; generating it from RDB text +
+the Lua/tag VM is blocked on the harvested, client-validated content `key` (non-computable, same as the item
+TEA keys).
 
 `AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 163/163 +
 40/40 across the structured rows): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. CloseChatWindow

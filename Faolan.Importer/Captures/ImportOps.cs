@@ -573,9 +573,11 @@ namespace Faolan.Importer.Captures
 				pkt.Env = cols.Env;
 				pkt.Field = cols.Field;
 				pkt.Flag = cols.Flag;
-				pkt.ScreensJson = cols.ScreensJson;
 				pkt.CameraAgentInstance = cols.CameraAgentInstance;
 				pkt.CameraParams = cols.CameraParams;
+				if (cols.Screens != null)
+					for (var i = 0; i < cols.Screens.Count; i++)
+						pkt.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i)); // throws if a screen isn't byte-exact round-trippable
 			}
 
 			return pkt;

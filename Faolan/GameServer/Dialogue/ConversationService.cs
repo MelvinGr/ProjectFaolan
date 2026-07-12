@@ -3,7 +3,6 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Repositories;
@@ -431,15 +430,14 @@ namespace Faolan.GameServer.Dialogue
 			return SendConstructedKnubot(client, agentInstance, id, record);
 		}
 
-		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen text comes from ScreensJson, the
-		// live player name/guild are regenerated in. Byte-identical to the Data-path construct for the same inputs
-		// (gated by ConversationStructuredScreenTests), so swapping the source doesn't change the wire output.
+		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen is rebuilt from its typed
+		// ConversationScreen rows (RemoteFormatXml.Build) with the live player name/guild regenerated in. The rows are
+		// gated byte-exact at import (ConversationScreenColumns.ToRow), so this build is authoritative - no Data-path
+		// fallback. Byte-identical to the raw-capture construct for the same inputs (ConversationConstructTests).
 		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle, string playerName, string guildName)
 		{
 			var env = p.Env ?? 0;
-			var screens = string.IsNullOrEmpty(p.ScreensJson)
-				? []
-				: JsonSerializer.Deserialize<string[]>(p.ScreensJson) ?? [];
+			var screens = ConversationScreenColumns.ToScreens(p.Screens); // ordered RemoteFormatXml.Screen list
 
 			if (p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR)
 				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
@@ -452,7 +450,38 @@ namespace Faolan.GameServer.Dialogue
 
 			byte[] Screen(int i)
 			{
-				return WithLivePlayer(Encoding.Latin1.GetBytes(screens[i]), playerName, guildName);
+				// With no live player (empty name) keep the captured screen content as-is, matching the raw-Data
+				// construct; otherwise regenerate the live player name/guild into the name/guildname parameters.
+				var screen = string.IsNullOrEmpty(playerName)
+					? screens[i]
+					: RemoteFormatXml.WithLivePlayer(screens[i], playerName, guildName ?? "");
+				return Encoding.Latin1.GetBytes(RemoteFormatXml.Build(screen));
+			}
+		}
+
+		// Regenerate the live player's name/guild into a RAW captured screen's remoteformat XML (the Data-path
+		// construct for non-columnized packets - TryConstructKnubotRecord). SAFETY: only rebuilds when the parser
+		// reproduces the captured XML byte-for-byte first; otherwise the original bytes are returned untouched, so an
+		// unrecognised screen variant can never be corrupted. (The columnized screen path builds from typed rows
+		// directly and needs no such guard.)
+		private static byte[] WithLivePlayer(byte[] screenXml, string playerName, string guildName)
+		{
+			if (screenXml == null || screenXml.Length == 0 || string.IsNullOrEmpty(playerName))
+				return screenXml;
+
+			try
+			{
+				var xml = Encoding.Latin1.GetString(screenXml);
+				var screen = RemoteFormatXml.Parse(xml);
+				if (RemoteFormatXml.Build(screen) != xml)
+					return screenXml; // not byte-exact roundtrippable -> leave it alone
+
+				var rebuilt = RemoteFormatXml.Build(RemoteFormatXml.WithLivePlayer(screen, playerName, guildName ?? ""));
+				return Encoding.Latin1.GetBytes(rebuilt);
+			}
+			catch
+			{
+				return screenXml;
 			}
 		}
 
@@ -623,29 +652,5 @@ namespace Faolan.GameServer.Dialogue
 			}
 		}
 
-		// Regenerate the live player's name/guild into a captured screen's remoteformat XML via the structured
-		// builder (so the captured player's name no longer shows to everyone). SAFETY: only rebuilds when the parser
-		// reproduces the captured XML byte-for-byte first; otherwise the original bytes are returned untouched, so an
-		// unrecognised screen variant can never be corrupted.
-		private static byte[] WithLivePlayer(byte[] screenXml, string playerName, string guildName)
-		{
-			if (screenXml == null || screenXml.Length == 0 || string.IsNullOrEmpty(playerName))
-				return screenXml;
-
-			try
-			{
-				var xml = Encoding.Latin1.GetString(screenXml);
-				var screen = RemoteFormatXml.Parse(xml);
-				if (RemoteFormatXml.Build(screen) != xml)
-					return screenXml; // not byte-exact roundtrippable -> leave it alone
-
-				var rebuilt = RemoteFormatXml.Build(RemoteFormatXml.WithLivePlayer(screen, playerName, guildName ?? ""));
-				return Encoding.Latin1.GetBytes(rebuilt);
-			}
-			catch
-			{
-				return screenXml;
-			}
-		}
 	}
 }

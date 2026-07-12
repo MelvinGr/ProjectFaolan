@@ -2,14 +2,14 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.Json;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
 	// Decodes a captured conversation packet's raw Conan Data into the structured Knubot-screen columns (#188), so
-	// the importer can populate ConversationPacket.{SubOpcode,Env,Field,Flag,ScreensJson} and the runtime builds the
-	// screen from fields. Pure byte-slicing (no codec dependency); returns null for non-Knubot packets, which keep
+	// the importer can populate ConversationPacket.{SubOpcode,Env,Field,Flag} + the Screens rows (each decoded here as
+	// raw remoteformat XML, columnized by ConversationScreenColumns.ToRow) and the runtime builds the screen from
+	// fields. Pure byte-slicing (no codec dependency); returns null for non-Knubot packets, which keep
 	// replaying from Data. Mirrors KnubotCodec's framing: carrier = Data[12 + headerLen ..] = [u32 len][u32 sub]
 	// [u32 0xC350][u32 instance][u8 env][u16 ver][u32 0xC350][u32 npc][ body ].
 	//
@@ -161,11 +161,8 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return inst;
 		}
 
-		public sealed record Columns(uint SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string> Screens, uint? CameraAgentInstance = null, byte[] CameraParams = null)
-		{
-			public string ScreensJson => Screens == null
-				? null
-				: JsonSerializer.Serialize(Screens);
-		}
+		// The decoded columns of one conversation packet. Screens is the raw remoteformat screen XML list (the
+		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToRow).
+		public sealed record Columns(uint SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string> Screens, uint? CameraAgentInstance = null, byte[] CameraParams = null);
 	}
 }

@@ -42,6 +42,8 @@ namespace Faolan.Core.Database
 		DbSet<Combo> Combos { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
+		DbSet<ConversationScreen> ConversationScreens { get; }
+		DbSet<ConversationScreenParameter> ConversationScreenParameters { get; }
 		DbSet<Guild> Guilds { get; }
 		DbSet<Item> Items { get; }
 		DbSet<ItemStat> ItemStats { get; }
@@ -109,6 +111,8 @@ namespace Faolan.Core.Database
 		public DbSet<Combo> Combos { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
+		public DbSet<ConversationScreen> ConversationScreens { get; set; }
+		public DbSet<ConversationScreenParameter> ConversationScreenParameters { get; set; }
 		public DbSet<Guild> Guilds { get; set; }
 		public DbSet<Item> Items { get; set; }
 		public DbSet<ItemStat> ItemStats { get; set; }
@@ -274,6 +278,8 @@ namespace Faolan.Core.Database
 				})
 				.IsUnique();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<ConversationPacket>().HasMany(p => p.Screens).WithOne(s => s.Packet).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<ConversationScreen>().HasMany(s => s.Parameters).WithOne(sp => sp.Screen).OnDelete(DeleteBehavior.Cascade);
 
 			// A class<->spell access row is unique per (Class, SpellId) - now the compound primary key.
 			// SpellId references the Spell catalog (the importer catalogs every harvested spell id). Restrict so a

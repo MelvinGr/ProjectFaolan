@@ -58,9 +58,10 @@ namespace Faolan.Tests
 					SubOpcode = cols.SubOpcode,
 					Env = cols.Env,
 					Field = cols.Field,
-					Flag = cols.Flag,
-					ScreensJson = cols.ScreensJson
+					Flag = cols.Flag
 				};
+				for (var i = 0; i < cols.Screens.Count; i++)
+					p.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i));
 
 				var fromColumns = ConversationService.BuildKnubotFromColumns(p, LiveInstance, ClickedNpc, "", "");
 				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out var fromData));
