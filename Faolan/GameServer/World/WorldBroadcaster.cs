@@ -802,12 +802,12 @@ namespace Faolan.GameServer.World
 		// per the decoded flow (protocol_loot_interaction): assign the player as the current looter and send the
 		// SimpleDynelVisualChange "Open" so the client shows the bag's contents. The bag STAYS in the world - it is
 		// consumed on close (0x2044), not on open. Taking an item (0x2043 -> grant + LootRemoveItems) is the remaining,
-		// in-client-gated piece. No-op for non-loot / unknown objects.
-		public async Task OpenLootBag(INetworkClient client, uint objectHandle)
+		// in-client-gated piece. Returns false for non-loot / unknown objects so the caller can surface the gap.
+		public async Task<bool> OpenLootBag(INetworkClient client, uint objectHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(objectHandle, out var bag) || !bag.IsLootable)
-				return;
+				return false;
 
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
@@ -828,6 +828,7 @@ namespace Faolan.GameServer.World
 				.SendAsync(client);
 
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
+			return true;
 		}
 
 		// A player used a STATIC world object (Interact UseObject) that isn't a loot bag - a DOOR/GATE (e.g. the
@@ -850,6 +851,77 @@ namespace Faolan.GameServer.World
 			await SendWorldIir(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
 			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? obj.DisplayName ?? "object", handle);
 			return true;
+		}
+
+		// The object class the sit remoteformat names (capture: startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel).
+		private const string BenchObjectClass = "TavernBenchSimpleDynel";
+
+		// Seat the player on a BENCH (the sit interaction - Captures/scripts/decode_sit.py). Interacting with a bench
+		// plays the actor's "chair_sit_calm" animation (a server-originated BehaviorControlCenterIIR) and marks the
+		// session seated; standing back up is triggered by the next move (StandUpIfSeated). Recognized by the object
+		// NAME ("Bench"), the same stable key as shop vendors / the auctioneer. Returns false when the used object is
+		// NOT a bench, so the caller falls through to the normal open-object / loot path. Renders for the actor and
+		// every nearby player who already sees them.
+		public async Task<bool> TrySitOnObject(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return false;
+
+			var obj = await _database.GetWorldObject(player.MapId, handle);
+			if (obj == null || !string.Equals(obj.Name, "Bench", StringComparison.OrdinalIgnoreCase))
+				return false;
+
+			// The client double-sends the interact (like the #217 greeting). Re-sending the whole sit sequence on the
+			// duplicate lands a SECOND chair_sit_calm right after the first, which re-triggers the sit-down and reverts
+			// the pose. Absorb the duplicate: already seated on this bench -> ack it (return true) without re-sitting.
+			if (client.Session.SeatedOnHandle == handle)
+				return true;
+
+			// Retail brackets the sit ANIMATION with the object-action STATE (behaviorId 0x12) that commits the client
+			// to "using" the bench - without it the sit-down plays then reverts to idle (F2793 hold-echo BEFORE the
+			// animation, F2795 the animation, F2801 hold-assert AFTER). The animation alone is a one-shot transition.
+			var sit = BehaviorAnimationCodec.PlayerSitOnObject(player.Handle, handle, BehaviorAnimationCodec.SitRemoteformat(BenchObjectClass));
+			var holdEcho = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqBegin, handle);
+			var holdAssert = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqObjectHold, handle);
+
+			foreach (var body in new[] { holdEcho, sit, holdAssert })
+			{
+				await SendWorldIir(client, body);
+				await BroadcastBehaviorToViewers(client, body);
+			}
+
+			client.Session.SeatedOnHandle = handle;
+			client.Session.SeatedPosition = player.Position;
+			_logger.LogInformation("Sit: {Player} sat on '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name, handle);
+			return true;
+		}
+
+		// How far a seated player must move from their seat before they stand up. While seated the client keeps
+		// streaming position syncs at (roughly) the seat position - plus a one-time seat-snap of up to ~1 unit - and
+		// those must NOT be read as "left the bench" (that stood the player straight back up). Only a real walk exceeds
+		// this. Capture: the seated position syncs drift < 1 unit; the player is well past this by the time standup fires.
+		private const float SeatLeaveDistance = 2.0f;
+
+		// Stand the player back up when they've MOVED away from their seat (called from the move handler: standup is
+		// triggered by movement, per the capture - not a second click). No-op when not seated or still within
+		// SeatLeaveDistance of the seat. Broadcasts the "standup" animation to the actor + nearby viewers and clears
+		// the seated state.
+		public async Task StandUpIfMoved(INetworkClient client, Vector3 newPosition)
+		{
+			var handle = client.Session.SeatedOnHandle;
+			if (handle == 0 || Vector3.Distance(newPosition, client.Session.SeatedPosition) < SeatLeaveDistance)
+				return;
+
+			client.Session.SeatedOnHandle = 0;
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var body = BehaviorAnimationCodec.PlayerStandUp(player.Handle, handle, BehaviorAnimationCodec.StandRemoteformat());
+			await SendWorldIir(client, body);
+			await BroadcastBehaviorToViewers(client, body);
+			_logger.LogInformation("Sit: {Player} stood up from 0x{Handle:X8}.", player.Name, handle);
 		}
 
 		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place
@@ -963,6 +1035,7 @@ namespace Faolan.GameServer.World
 		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
 		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
 		// off the beach or before she's freed.
+		// TODO: move to something like a questHandlerService
 		public async Task SendBeachGateOnEntry(INetworkClient client) // #353: extract to a quest-handler service
 		{
 			var character = client.Session?.Character;

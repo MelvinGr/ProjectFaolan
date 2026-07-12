@@ -137,6 +137,9 @@ namespace Faolan.Core.Network
 		// the .kill GM command to target whatever the player is looking at (the player's own ClientInstance when they
 		// select themselves).
 		uint SelectedTargetHandle { get; set; }
+
+		uint SeatedOnHandle { get; set; }
+		System.Numerics.Vector3 SeatedPosition { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
@@ -179,5 +182,14 @@ namespace Faolan.Core.Network
 		public uint MorphAckCounter { get; set; }
 		public uint MorphActivitySequence { get; set; }
 		public uint SelectedTargetHandle { get; set; }
+
+		// The world-object (bench) handle the player is currently seated on (0 = standing). Set when the player
+		// interacts with a bench (the sit animation); cleared when they move off it (standup). See WorldBroadcaster
+		// TrySitOnObject / StandUpIfMoved.
+		public uint SeatedOnHandle { get; set; }
+
+		// The player's position at the moment they sat: standup only fires once they've moved away from it (the client
+		// keeps streaming position syncs while seated - and a small seat-snap - which must NOT be read as leaving).
+		public System.Numerics.Vector3 SeatedPosition { get; set; }
 	}
 }

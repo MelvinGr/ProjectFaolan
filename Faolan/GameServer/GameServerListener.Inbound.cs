@@ -121,6 +121,11 @@ namespace Faolan.GameServer
 							// isn't in the world model yet.
 							var moveEntity = PlayerWorldEntity(client);
 
+							// A seated player who MOVES AWAY from the bench stands up first (the sit capture triggers standup
+							// on movement, not a second click). Gated on distance from the seat, NOT the packet type: the
+							// client streams position syncs (and a small seat-snap) while seated that must not stand it up.
+							await _broadcaster.StandUpIfMoved(client, movePosition);
+
 							// Trance root (#141): the spellweave trance immobilises the caster, so while IsSpellweaving the
 							// server PINS the position (rejects translation) but still accepts rotation - the move handler is
 							// the enforcement point. Others then see the caster rooted; the relay below carries the pinned pos.
@@ -152,25 +157,32 @@ namespace Faolan.GameServer
 							// block, so B drifted/teleported even while standing still (#48). Clear the env byte.
 							var relayMovingType = (ushort)((ushort)movingType & 0x00FF);
 
-							// send to all (nearby) clients? (single client for now -> the session conversation;
-							// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
-							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
-							// nearby players is the next step.
-							await new PacketStream()
-								.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-								.WriteArrayUInt32Length(s => s
-									.WriteUInt32(pbOpcode)
-									.WriteUInt32(dataobjdec)
-									.WriteUInt32(dataclientinst)
-									.WriteUInt16(relayMovingType)
-									.WriteVector3(livePosition)
-									.WriteVector3(liveRotation)
-									.WriteArray(datadat))
-								.SendAsync(client);
+							// While SEATED (StandUpIfMoved above cleared the seat if the player actually walked off), the
+							// client still streams idle position-syncs on the bench. Echoing those back re-asserts a move
+							// on the seated player and CANCELS the sit pose (the character stands up as the animation ends).
+							// So suppress the move echo + relay while seated in place - there is nothing to render anyway.
+							if (client.Session.SeatedOnHandle == 0)
+							{
+								// send to all (nearby) clients? (single client for now -> the session conversation;
+								// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
+								// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
+								// nearby players is the next step.
+								await new PacketStream()
+									.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
+									.WriteArrayUInt32Length(s => s
+										.WriteUInt32(pbOpcode)
+										.WriteUInt32(dataobjdec)
+										.WriteUInt32(dataclientinst)
+										.WriteUInt16(relayMovingType)
+										.WriteVector3(livePosition)
+										.WriteVector3(liveRotation)
+										.WriteArray(datadat))
+									.SendAsync(client);
 
-							// Interest-managed broadcast: spawn this player to newly-near players and forward the move
-							// to players who already see them (docs/server-architecture-roadmap.md). No-op solo.
-							await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, relayMovingType, livePosition, liveRotation, datadat);
+								// Interest-managed broadcast: spawn this player to newly-near players and forward the move
+								// to players who already see them (docs/server-architecture-roadmap.md). No-op solo.
+								await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, relayMovingType, livePosition, liveRotation, datadat);
+							}
 
 							break;
 						}
@@ -557,10 +569,22 @@ namespace Faolan.GameServer
 									case InteractAction.None:
 									default:
 									{
-										// Not a column-driven teleporter: the animated-door open path (DB world object by
-										// CapturedHandle), else the loot-bag window.
-										if (!await _broadcaster.OpenWorldObject(client, target))
-											await _broadcaster.OpenLootBag(client, target);
+										// Not a column-driven teleporter: a BENCH seats the player (the sit animation), else the
+										// animated-door open path (DB world object by CapturedHandle), else the loot-bag window.
+										if (await _broadcaster.TrySitOnObject(client, target))
+											break;
+										if (await _broadcaster.OpenWorldObject(client, target))
+											break;
+										if (await _broadcaster.OpenLootBag(client, target))
+											break;
+
+										// Unknown object: no bench/door/loot behavior. Surface the gap the same way as an
+										// un-imported vendor/dialogue NPC (Melvin: notify the player, never a silent no-op).
+										// Float the bubble over the clicked object so the client shows it in place.
+										var usedMapId = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
+										var usedObj = await Database.GetWorldObject(usedMapId, target);
+										await _agentServerDispatcher.CharacterSay(target,
+											$"({usedObj?.Name ?? "object"}: not imported yet)", [client.Session.Character.Id]);
 
 										break;
 									}
