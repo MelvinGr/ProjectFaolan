@@ -41,6 +41,10 @@ namespace Faolan.GameServer
 		private const int EnergyRegenPerTick = 600;
 		private const int EnergyTickMs = 1000;
 
+		// The AoC auction-house NPC is named "Trader" (capture FA015807 "Trader"); the stable key is the NPC name, as
+		// with shop vendors. Talking to it opens the Tradepost (GameServerListener.Inbound TalkToNpc auctioneer branch).
+		private const string AuctioneerNpcName = "Trader";
+
 		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
 		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
 		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).

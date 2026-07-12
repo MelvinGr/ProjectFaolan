@@ -593,6 +593,20 @@ namespace Faolan.GameServer
 									break;
 								}
 
+								// Auction-house open (the real trigger for the Tradepost - the `.ah` GM command is only a PoC
+								// bootstrap). Retail opens the AH window when the player interacts with the "Trader" auctioneer
+								// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"). The NPC NAME
+								// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
+								// click it, so their own position trivially satisfies the 15-unit client proximity check.
+								if (npcHandle != 0 && args.Field3 == 0 &&
+								    client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
+								    talkedNpcName == AuctioneerNpcName &&
+								    PlayerWorldEntity(client) is { } auctioneerPlayer)
+								{
+									await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
+									break;
+								}
+
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 								// the client asked for, re-addressed to the clicked NPC.
 								if (await _conversation.TryReplayConversation(client, (uint)args.TypeId, (uint)args.Field3, npcHandle))

@@ -391,21 +391,29 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// The window's first/default tab is the BANK (personal storage), a separate channel: container kind 105
-			// delivered via a BankIIR (decoded, protocol_bank_storage). Populate it from the character's Container=105 rows.
+			var bankCount = await SendAuctionHouseOpen(client, entity.Position);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bankCount} item(s).");
+		}
+
+		// Bootstrap the AH window at accessPosition (must be within the 15-unit client proximity check). Shared by the
+		// `.ah` GM command and the real trigger - talking to the "Trader" auctioneer NPC (GameServerListener.Inbound
+		// TalkToNpc). The window's first/default tab is the BANK (personal storage), a separate channel: container kind
+		// 105 delivered via a BankIIR (decoded, protocol_bank_storage), populated from the character's Container=105 rows.
+		// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content (the 0x201c
+		// slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already populated -
+		// account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR][DispOpenTradepost].
+		// Sending the open FIRST landed the BankIIR before the window existed and the first open rendered empty. So:
+		// bank first, open last. Returns the bank item count for the caller's feedback.
+		private async Task<int> SendAuctionHouseOpen(INetworkClient client, System.Numerics.Vector3 accessPosition)
+		{
+			var characterId = client.Session.Character.Id;
 			var rows = await Database.GetCharacterInventory(characterId);
 			var bankRows = rows.Where(r => r.Container == (int)FullPlayerCharacterBuilder.BankKind).ToList();
 			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, 50, 30, characterId, bankRows);
 
-			// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content
-			// (the 0x201c slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already
-			// populated - account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR]
-			// [DispOpenTradepost]. We previously sent the open FIRST, so the BankIIR landed before the window existed
-			// and the first open rendered empty (you had to close + reopen). Now: bank first, open last.
 			await _bank.SendBank(client, bank);
-			await TradepostResponses.SendOpenTradepost(client, entity.Position);
-
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bank.Items.Count} item(s).");
+			await TradepostResponses.SendOpenTradepost(client, accessPosition);
+			return bank.Items.Count;
 		}
 
 		// .position  - print the caller's current map + live position (the in-world entity transform when
