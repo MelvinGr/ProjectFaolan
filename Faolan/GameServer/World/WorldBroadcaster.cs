@@ -87,38 +87,16 @@ namespace Faolan.GameServer.World
 		// range (0x02000000+) - small, valid, collision-free. (Matches the RetailLoginReplay built-NPC test handle.)
 		private int _nextLootHandle = 0x00090000;
 
-		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger)
+		// _questHandler is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
+		// call into it (Casilda's captive pose on stream-in) without a construction cycle.
+		private readonly QuestHandlerService _questHandler;
+
+		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, QuestHandlerService questHandler)
 		{
 			_sim = sim;
 			_database = database;
 			_logger = logger;
-		}
-
-		// #267: drop the beach "invisible wall". The wall is the Casilda chain decor's COLLISION (the
-		// `004709_Global__decor_chain_hangingwoman` SimpleDynel sent at world entry; its mesh doesn't render for us, so
-		// it reads as an invisible barrier). Retail flips it off with a SimpleDynel visual-change (state 5) to that dynel
-		// the instant Casilda is freed on the beach (Hoxxling gameplay idx 2053). Looked up by the chain world-object's
-		// identity so the handle matches what the client was sent at entry (its CapturedHandle). No-op off-beach / if the
-		// map has no such chain.
-		public async Task DropBeachWall(INetworkClient client)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return;
-
-			var chain = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o =>
-				o.SubOpcode == SimpleDynelMessageCodec.Opcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
-			if (chain == null)
-				return;
-
-			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(chain.CapturedHandle, 0x05));
-			_logger.LogInformation("#267: dropped beach chain-wall collision (handle 0x{Handle:X8}) for {Player}.", chain.CapturedHandle, player.Name);
-
-			// She's freed now: clear the captive (chained) struggle pose so she stands/walks normally as she follows
-			// (the live counterpart to the captive pose the interest stream sends while she's a prisoner).
-			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == "Casilda");
-			if (casilda != null)
-				await SendCasildaPose(client, casilda.Handle, false);
+			_questHandler = questHandler;
 		}
 
 		// #267: re-send the NAMED NPC's quest marker in-place (handles are session-volatile, so resolve by name in the
@@ -1032,20 +1010,6 @@ namespace Faolan.GameServer.World
 				await SendQuestJournal(client, definitions.Select(d => d.Def).ToList());
 		}
 
-		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
-		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
-		// off the beach or before she's freed.
-		// TODO: move to something like a questHandlerService
-		public async Task SendBeachGateOnEntry(INetworkClient client) // #353: extract to a quest-handler service
-		{
-			var character = client.Session?.Character;
-			if (character?.MapId != Map.TortageBeachId)
-				return;
-
-			if (await IsCasildaFreed(character.Id))
-				await DropBeachWall(client);
-		}
-
 		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
 		// world tick (WorldState) then steps it toward the player and broadcasts a MoveTask each step. Returns the NPC,
 		// or null if the handle isn't a non-player entity in the caller's zone. Used by the .npcfollow GM command and by
@@ -1333,8 +1297,8 @@ namespace Faolan.GameServer.World
 							await SendPatrol(recipient, ev.Subject);
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
-						if (!ev.Subject.IsPlayer && ev.Subject.Name == "Casilda" && recipient.Session?.Character != null && !await IsCasildaFreed(recipient.Session.Character.Id))
-							await SendCasildaPose(recipient, ev.Subject.Handle, true);
+						if (!ev.Subject.IsPlayer && ev.Subject.Name == "Casilda" && recipient.Session?.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
+							await _questHandler.SendCasildaPose(recipient, ev.Subject.Handle, true);
 						break;
 					}
 
@@ -1351,24 +1315,6 @@ namespace Faolan.GameServer.World
 					}
 				}
 			}
-		}
-
-		// Whether the character has freed Casilda - data-driven (no hard-coded quest ids): any COMPLETED quest whose
-		// first goal is a TalkToNpc goal targeting Casilda (the freeing stage of the intro chain, #261).
-		private async Task<bool> IsCasildaFreed(uint characterId)
-		{
-			foreach (var quest in await _database.GetCharacterQuests(characterId))
-			{
-				if (quest.State != QuestState.Completed)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-				if (goal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
-					return true;
-			}
-
-			return false;
 		}
 
 		// #261: reload the player entity's ActiveQuestIds from the DB (the set interest gating tests gated NPCs against).
@@ -1429,27 +1375,6 @@ namespace Faolan.GameServer.World
 				items = await _database.GetRandomBuildableItems(count); // map has no captured loot pool - fall back
 
 			return items.Select(i => i.Id).ToList();
-		}
-
-		// #267/#266: Casilda's captive (chained) vs freed pose, as a BehaviorControlCenterIIR. Both decoded byte-exact
-		// from the Hoxxling beach gameplay capture's BCC (0x642CD3D6) records targeting her handle 0x00017ED0:
-		//  - CAPTIVE = the prisoner struggle the destiny scene loops (slot 5, behaviorId 159428, field5 24, no tail;
-		//    retail alternates 159428/159427 each phase but a single registration loops it).
-		//  - FREED = her slot-9 locomotion behavior 42010 (field5 24) WITH the 20-byte bound tail (boundA 0x12), the
-		//    record retail sends at the rescue (capture idx 2106) so she stops struggling and walks when following.
-		private Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
-		{
-			// BuildBehaviorControlCenterIir returns the record BODY ([type][handle][form][slot][protobuf]) WITHOUT the
-			// 0x642CD3D6 sub-opcode (the create-burst Iir helper prepends it), so prepend it here - SendWorldIir only adds
-			// the carrier + length, not the sub-op, and the client drops a BCC record that doesn't start with it.
-			var record = captive
-				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
-				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
-			var body = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
-			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
-				? "CAPTIVE"
-				: "freed", casildaHandle, client.Session?.Character?.Name);
-			return SendWorldIir(client, body);
 		}
 
 		// #241: drive a quest-giver NPC's marker from the viewer's quest state when it enters view. Recomputed each

@@ -30,11 +30,13 @@ namespace Faolan.GameServer.Quest
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly IQuestOutbound _outbound;
+		private readonly QuestHandlerService _questHandler;
 
-		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IChatServerDispatcher agents, ILogger logger)
+		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, QuestHandlerService questHandler, IChatServerDispatcher agents, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
+			_questHandler = questHandler;
 			_agents = agents;
 			_logger = logger;
 		}
@@ -110,7 +112,7 @@ namespace Faolan.GameServer.Quest
 					// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
 					// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
 					// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
-					await _outbound.DropBeachWall(client);
+					await _questHandler.DropBeachWall(client);
 				}
 			}
 

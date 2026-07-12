@@ -430,7 +430,7 @@ namespace Faolan.GameServer
 			// #267: if this character has ALREADY freed Casilda (relog after the beach talk stage), drop the chain-wall
 			// collision up-front so they aren't re-blocked by the world-entry burst's chain dynel.
 			if (client.Session.Character?.MapId == Map.TortageBeachId)
-				await _broadcaster.SendBeachGateOnEntry(client);
+				await _questHandler.SendBeachGateOnEntry(client);
 
 			Logger.LogInformation("Sent the post-0x2024 login records.");
 

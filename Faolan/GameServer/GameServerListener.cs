@@ -181,6 +181,9 @@ namespace Faolan.GameServer
 		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
 		private readonly QuestProgressionService _questProgression;
 
+		// Scripted Tortage-intro narrative (Kalanthes create-cutscene walk + Casilda beach rescue), #353.
+		private readonly QuestHandlerService _questHandler;
+
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
 		private readonly ShopService _shop;
@@ -217,8 +220,11 @@ namespace Faolan.GameServer
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
-			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
+			// Constructed before the broadcaster (needs only the sim + DB) so the broadcaster's interest stream can call
+			// into it (Casilda's captive pose) without a construction cycle.
+			_questHandler = new QuestHandlerService(database, _simulation, logger);
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler);
+			_questProgression = new QuestProgressionService(database, _broadcaster, _questHandler, agentServerDispatcher, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
 				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
 			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),

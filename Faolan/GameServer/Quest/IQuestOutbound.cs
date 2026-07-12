@@ -12,10 +12,6 @@ namespace Faolan.GameServer.Quest
 	// recording fake.
 	public interface IQuestOutbound
 	{
-		// #267: drop the beach "invisible wall" (the Casilda chain decor's collision) for the player by sending the
-		// SimpleDynel visual-change retail sends the instant Casilda is freed on the beach (talk-goal completion).
-		Task DropBeachWall(INetworkClient client);
-
 		// #267: re-send the named NPC's quest marker to the player in-place (handles are session-volatile, so by NAME).
 		// Used after a chain stage supersedes to a TALK goal while that NPC is away (e.g. looting Tuut's key activates
 		// the talk-Casilda stage), so her '?' appears immediately instead of only on the next 0x2020 poll / re-stream.

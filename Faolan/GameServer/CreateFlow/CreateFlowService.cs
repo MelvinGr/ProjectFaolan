@@ -16,6 +16,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
+using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -26,7 +27,8 @@ namespace Faolan.GameServer.CreateFlow
 	// _createFlow and forwards the inbound create-flow callbacks to it; the flow's outbound packet builders
 	// (the create-world handshake, the destiny-cutscene Scry scripts, and the Retail*Burst editor bursts) all
 	// live in this file. Verbatim/byte-exact burst builders stay `static` so the golden tests reach them
-	// unchanged (CreateFlowService.SendRetailCreateEditorInitialBurst / .BuildKalanthesIntroMove / ...).
+	// unchanged (CreateFlowService.SendRetailCreateEditorInitialBurst / ...). The Kalanthes cutscene MoveTask
+	// builders moved to QuestHandlerService (#353); the cutscene flow calls them statically.
 	//
 	// Cross-cutting deps follow the house pattern (CLAUDE.md "composed collaborators"): the world model comes in by
 	// ctor, and the one listener-owned outbound op the cutscene needs (SendBurstlessWorldEntry, also used by the
@@ -43,8 +45,6 @@ namespace Faolan.GameServer.CreateFlow
 		internal const string CreateWorldScriptToken =
 			"<remoteformat token=\"playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley (server-side)\" category=\"50023\" key=\"&quot;B]SZ.AGRGrAyOGe*BG-\" knubot=\"0\"  ></remoteformat>";
 
-		private const float KalanthesWalkPathLength = 8.567047119140625f; // from -> target distance (interp timing)
-
 		internal static readonly byte[] MorphAckSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x0C);
 		private static readonly byte[] EditorAvatarSnapshot = Program.LoadEmbeddedResource("Faolan.CreateEditorAvatarSnapshot.bin");
 
@@ -59,8 +59,6 @@ namespace Faolan.GameServer.CreateFlow
 		// mutated from different connection threads (add on one connection, consume on the reconnect). Value unused.
 		private static readonly ConcurrentDictionary<uint, byte> PendingCreateWorldEntry = new ConcurrentDictionary<uint, byte>();
 
-		private static readonly Quaternion KalanthesIntroFacing = new Quaternion(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
-
 		// The 18 galley scene-prop dynels the create-editor initial burst streams, in retail send order. Each is a
 		// WorldObjects row on the editor map (4000), matched by captured handle and built byte-exact via
 		// WorldObjectBuilder (see LoadEditorSceneDynels + CreateEditorSceneDynelTests). The client also renders the
@@ -71,13 +69,6 @@ namespace Faolan.GameServer.CreateFlow
 			0x0002A7FC, 0x0002A7FD, 0x0002A7FE
 		];
 
-		// #234/#193 Kalanthes walk-up, CONSTRUCTED from typed MoveTask data (no replayed hex blob). Decoded from the
-		// captured MoveTasks (96C46740) Blablabla_* f657 (intro) + f890 (walk): the intro is a mode-2 Rotate that SNAPS
-		// Kalanthes to the wash-ashore spot facing the player; the walk is a ListMoveTask[ PathMoveTask(2 waypoints) +
-		// WaitMoveTask ] that moves him UP to the player. Positions are absolute beach coords (byte-exact - the floats
-		// round-trip to the captured bits, KalanthesCutsceneMoveTests). Built with the LIVE Kalanthes handle directly.
-		private static readonly Vector3 KalanthesIntroPos = new Vector3(333.20001220703125f, 146.29666137695312f, 706.0260009765625f);
-		private static readonly Vector3 KalanthesWalkTarget = new Vector3(324.7233581542969f, 145.43357849121094f, 705.1339721679688f);
 
 		// The listener's burst-less world entry (GameServerListener.WorldEntry.cs) - the constructed live-char world the
 		// create-flow enters before the destiny cutscene overlay. Injected as a seam (shared with the login replay).
@@ -528,7 +519,7 @@ namespace Faolan.GameServer.CreateFlow
 					await SendScry(client, ScryScript.BuildStep(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					// Position Kalanthes next to the washed-ashore player (his cutscene start), so the walk-up reads
 					// (his DB spawn is back by the rocks). The walk path itself follows on the Move callback.
-					await SendKalanthesMoveTask(client, BuildKalanthesIntroMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
+					await QuestHandlerService.SendKalanthesMoveTask(client, QuestHandlerService.BuildKalanthesIntroMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					break;
 				}
 
@@ -553,7 +544,7 @@ namespace Faolan.GameServer.CreateFlow
 				case "Move":
 				{
 					// Kalanthes walks up to the player (f890 path), then kneels.
-					await SendKalanthesMoveTask(client, BuildKalanthesWalkMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
+					await QuestHandlerService.SendKalanthesMoveTask(client, QuestHandlerService.BuildKalanthesWalkMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					await SendScry(client, ScryScript.BuildStep(id, "Kneel"));
 					break;
 				}
@@ -815,51 +806,6 @@ namespace Faolan.GameServer.CreateFlow
 					.WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(prefix).WriteUInt32(id).WriteArray(suffix))
 					.SendAsync(client);
-			}
-		}
-
-		// The intro TRANSFORM: a stationary (from==to) mode-2 MoveTask placing Kalanthes at his cutscene start.
-		internal static byte[] BuildKalanthesIntroMove(uint handle)
-		{
-			return MoveTaskCodec.BuildBody(handle, KalanthesIntroPos, KalanthesIntroPos, KalanthesIntroFacing);
-		}
-
-		// The WALK: ListMoveTask[ PathMoveTask(from -> target) + WaitMoveTask ], the exact captured composite shape,
-		// built from the typed model so it round-trips byte-exact while the positions stay explicit data.
-		internal static byte[] BuildKalanthesWalkMove(uint handle)
-		{
-			var path = new MoveTaskNode
-			{
-				Mode = 1,
-				HeaderFlags = 1,
-				PathFlags = 0,
-				Waypoints = [B(KalanthesIntroPos.X), B(KalanthesIntroPos.Y), B(KalanthesIntroPos.Z), B(KalanthesWalkTarget.X), B(KalanthesWalkTarget.Y), B(KalanthesWalkTarget.Z)],
-				TrailerByte = 0,
-				TrailerWords = [B(KalanthesWalkPathLength), 0, 0, 0, B(KalanthesIntroPos.X), B(KalanthesIntroPos.Y), B(KalanthesIntroPos.Z)]
-			};
-			var wait = new MoveTaskNode
-			{
-				Mode = 0,
-				HeaderFlags = 1
-			};
-			return new MoveTaskComposite
-			{
-				Handle = handle,
-				FromX = B(KalanthesIntroPos.X),
-				FromY = B(KalanthesIntroPos.Y),
-				FromZ = B(KalanthesIntroPos.Z),
-				Task = new MoveTaskNode
-				{
-					Mode = 4,
-					HeaderFlags = 1,
-					ListMin = 0,
-					Children = [path, wait]
-				}
-			}.Encode();
-
-			static uint B(float f)
-			{
-				return BitConverter.SingleToUInt32Bits(f);
 			}
 		}
 
@@ -1162,16 +1108,6 @@ namespace Faolan.GameServer.CreateFlow
 		private static Task SendIir(INetworkClient client, byte[] sender, byte[] receiver, GameServer0X2000Opcodes iir, params byte[] body)
 		{
 			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
-		}
-
-		// Sends a constructed Kalanthes MoveTask on the world conversation (WorldFraming + IirCarrier - the same framing
-		// every rendered NPC move goes out on).
-		private static Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
-		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
-				.SendAsync(client);
 		}
 
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:

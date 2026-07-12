@@ -1,5 +1,5 @@
 using System;
-using Faolan.GameServer.CreateFlow;
+using Faolan.GameServer.Quest;
 using Xunit;
 
 namespace Faolan.Tests
@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		public void BuildKalanthesIntroMove_ReproducesTheCapturedTransform()
 		{
 			var expected = Convert.FromHexString("96c467400000c35000002c1c000043a6999a43124bf2443081aa0243a6999a43124bf2443081aa00000000bf3e417f000000003f2b49150000");
-			Assert.Equal(expected, CreateFlowService.BuildKalanthesIntroMove(CapturedHandle));
+			Assert.Equal(expected, QuestHandlerService.BuildKalanthesIntroMove(CapturedHandle));
 		}
 
 		[Fact]
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		{
 			var expected = Convert.FromHexString(
 				"96c467400000c35000002c1c000043a6999a43124bf2443081aa040100020101000000000243a6999a43124bf2443081aa43a25c9743116eff4430489300410912a000000000000000000000000043a6999a43124bf2443081aa0001");
-			Assert.Equal(expected, CreateFlowService.BuildKalanthesWalkMove(CapturedHandle));
+			Assert.Equal(expected, QuestHandlerService.BuildKalanthesWalkMove(CapturedHandle));
 		}
 	}
 }
