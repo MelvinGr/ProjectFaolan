@@ -59,6 +59,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return w.ToArray();
 		}
 
+		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
+		// so it can't drift from ToArray).
+		public int ByteLength
+		{
+			get
+			{
+				using var w = new FaolanStream();
+				Write(w);
+				return (int)w.Length;
+			}
+		}
+
 		// GENERATES the objective region from a quest's per-goal definitions (construct, don't replay - #186): each
 		// QuestGoalDefinition's numeric fields + its objective/trailing text refs build a record via BuildSingle, so
 		// the region comes from the DB instead of BeachTailsTemplate.bin. `instance` is the live player's client

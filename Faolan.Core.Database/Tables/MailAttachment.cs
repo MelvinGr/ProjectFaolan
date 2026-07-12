@@ -10,8 +10,10 @@ namespace Faolan.Core.Database.Tables
 	// (#1607, 754 B vs the 629 B no-attachment base); MailMessageCodec builds it byte-exact.
 	public class MailAttachment : BaseEntity
 	{
-		// The item instance id, repeated as the entry's ProtoInventoryGameEntry.ItemId.
-		public ulong ItemInstanceId { get; set; } // TODO: Rename to ItemId?
+		// The item INSTANCE id (repeated as the entry's ProtoInventoryGameEntry.ItemId). Kept as ItemInstanceId, not
+		// ItemId: it is the per-instance id, distinct from the Template FK / the Item nav on this same row, so the
+		// longer name is the clearer one.
+		public ulong ItemInstanceId { get; set; }
 
 		public uint MailId { get; set; } // FK -> Mail.Id (the row key, not the wire MailId)
 

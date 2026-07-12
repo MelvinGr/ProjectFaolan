@@ -188,7 +188,7 @@ namespace Faolan.Tests
 		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
 		private static int QuestRegionTrailerLength(FullCharSnapshotSubClass tails)
 		{
-			return (tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0); // TODO: Fix ToArray()
+			return (tails.QuestObjectives?.ByteLength ?? 0) + (tails.QuestIndex?.ByteLength ?? 0);
 		}
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>

@@ -120,6 +120,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 			}
 		}
 
+		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
+		// so it can't drift from ToArray).
+		public int ByteLength
+		{
+			get
+			{
+				using var w = new FaolanStream();
+				Write(w);
+				return (int)w.Length;
+			}
+		}
+
 		// Generates the index region for the held quests (already ordered - primary first). Each quest contributes a
 		// goal-id block from its seeded index fields; the block trailers chain to the next quest's AreaId, terminating
 		// on the primary's IndexTrailerWord. The marker/count/sentinel follow from the quest count. #186/#255/#304.

@@ -82,7 +82,9 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0
 		// on world dynels; the two nullable columns are emitted only when present, reproducing the captured field-set.
-		public static ProtoSimpleDynelIIR ToMessage(WorldObject row) // TODO: Maybe move to WorldObject?
+		// Stays here, not on WorldObject: the entity is a plain Core.Database row, and wire/protobuf construction is
+		// the codec's job - putting it on the row would couple the DB layer to the protobuf message type.
+		public static ProtoSimpleDynelIIR ToMessage(WorldObject row)
 		{
 			var message = new ProtoSimpleDynelIIR
 			{
