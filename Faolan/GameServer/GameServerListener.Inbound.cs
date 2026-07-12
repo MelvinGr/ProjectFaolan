@@ -815,8 +815,8 @@ namespace Faolan.GameServer
 					// Push the LIVE remove so the open bag updates without a relog (#230): the DropItem opcode has no
 					// implicit client-side removal, so without this the dropped item stays visible until next login.
 					// Same DispatchRemoveItem (0x201F) the .removeitem GM path / RemoveItemFromBackpack use.
-					if (move?.SourceContainerId is { Type: InventoryContainerBackpack })
-						await SendRemoveItem(client, InventoryContainerBackpack, (uint)move.SourceItemPos);
+					if (move?.SourceContainerId?.Type == (uint)ContainerKind.Bag)
+						await SendRemoveItem(client, (ContainerKind)move.SourceContainerId.Type, (uint)move.SourceItemPos);
 
 					break;
 				}
@@ -1421,11 +1421,27 @@ namespace Faolan.GameServer
 					// spellweave captures), 0xFF = open the Crafting -> Recipes book, 0x6C/0x6D/0x70/0xF0 = melee
 					// combo inputs (Hoxxling/AssassinL23 combo captures). Only 0xFC drives the trance - blindly routing
 					// every 0x205A to spellweave made opening the recipe book start a weave on a necro.
-					var counter = packet.Body.ReadUInt32();
+					var action = packet.Body.ReadUInt32();
 
-					Logger.LogInformation("0x205A (PerformSpecialAction) param={Counter:X4}", counter);
-					if (counter == SpellweaveToggleParam)
-						await _spellweave.ToggleAsync(client, counter);
+					Logger.LogInformation("0x205A (PerformSpecialAction) param={Action:X4}", action);
+
+					switch (action)
+					{
+						case SpellweaveToggleParam:
+						{
+							await _spellweave.ToggleAsync(client, action);
+							break;
+						}
+
+						// Path of Asura: a recall teleport, same as the Totem of Origin (#206). The client double-sends the
+						// action (capture F303+F307), so gate on IsTeleportingOut - the first recall arms the handoff, the
+						// duplicate is absorbed.
+						case PathOfAsuraSpecialAction when !client.Session.IsTeleportingOut:
+						{
+							await RecallToBindCommand(client, "The Path of Asura carries you home...");
+							break;
+						}
+					}
 
 					break;
 				}

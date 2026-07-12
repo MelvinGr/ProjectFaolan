@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
@@ -35,8 +36,8 @@ namespace Faolan.GameServer
 		// Inventory container ID32 types seen in the captured DispatchAddItem inventoryID (these equal the ContainerKind
 		// numbers: 0x68 = 104 Bag, 0x71 = 113 Quest). The Casilda-chain captures (casilda_quest_first_stage /
 		// compeltefirstquest) deliver the quest key via a live add to 0x71 - the quest-items tab (#261).
-		internal const uint InventoryContainerBackpack = 0x68;
-		internal const uint InventoryContainerQuest = 0x71;
+		internal const ContainerKind InventoryContainerBackpack = ContainerKind.Bag;
+		internal const ContainerKind InventoryContainerQuest = ContainerKind.Quest;
 
 		private const int EnergyRegenPerTick = 600;
 		private const int EnergyTickMs = 1000;
@@ -83,6 +84,12 @@ namespace Faolan.GameServer
 		// (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
 		// spellweaves.
 		private const uint SpellweaveToggleParam = 0xFC;
+
+		// The 0x205A (PerformSpecialAction) selector for the "Path of Asura" teleport spell (NecroL80 path-of-azura
+		// capture: PerformSpecialAction 0x4E1 -> retail DispatchRedirectToServer, a long-load teleport). Works like the
+		// Totem of Origin - a recall to the bind point (our single-server DoTeleport is the equivalent of retail's
+		// cross-server redirect).
+		private const uint PathOfAsuraSpecialAction = 0x4E1;
 
 		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
 		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
@@ -453,7 +460,7 @@ namespace Faolan.GameServer
 
 			var all = await Database.GetMaps();
 			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ??
-				   all.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+				   all.FirstOrDefault(m => m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform

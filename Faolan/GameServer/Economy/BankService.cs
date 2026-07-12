@@ -87,22 +87,20 @@ namespace Faolan.GameServer.Economy
 			if (character == null || move?.SourceContainerId == null || move.DestinationContainerId == null)
 				return;
 
-			var sKind = (int)move.SourceContainerId.Type;
-			var dKind = (int)move.DestinationContainerId.Type;
-			const int bank = (int)FullPlayerCharacterBuilder.BankKind;
-			const int bag = (int)FullPlayerCharacterBuilder.BagKind;
-			if (sKind != bank && dKind != bank)
+			var sKind = (ContainerKind)move.SourceContainerId.Type;
+			var dKind = (ContainerKind)move.DestinationContainerId.Type;
+			if (sKind != FullPlayerCharacterBuilder.BankKind && dKind != FullPlayerCharacterBuilder.BankKind)
 				return; // not a bank move - nothing to refresh
 
 			// Refresh the bank tab from the just-persisted rows (covers deposit, withdraw, and in-bank rearrange).
 			await ResendBank(client);
 
 			// Withdraw (bank -> bag): the item now lives in the bag; push the live add so it renders there too.
-			if (sKind == bank && dKind == bag)
+			if (sKind == FullPlayerCharacterBuilder.BankKind && dKind == FullPlayerCharacterBuilder.BagKind)
 			{
 				var dPos = move.DestinationItemPos;
 				var rows = await _database.GetCharacterInventory(character.Id);
-				var row = rows.FirstOrDefault(r => r.Container == (ContainerKind)bag && r.Slot == dPos);
+				var row = rows.FirstOrDefault(r => r.Container == FullPlayerCharacterBuilder.BagKind && r.Slot == dPos);
 				if (row?.ItemId == null)
 					return;
 
@@ -113,7 +111,7 @@ namespace Faolan.GameServer.Economy
 				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos, FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, (ulong)dPos),
 						FullPlayerCharacterBuilder.RecordId(character.Id, FullPlayerCharacterBuilder.BagKind, (ulong)dPos), row.Count, item, item.Hash)
 					.Item;
-				await _outbound.SendAddItem(client, 0x68u, (uint)dPos, entry);
+				await _outbound.SendAddItem(client, ContainerKind.Bag, (uint)dPos, entry);
 			}
 		}
 

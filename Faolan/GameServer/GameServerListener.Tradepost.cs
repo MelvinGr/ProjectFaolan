@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -545,7 +546,7 @@ namespace Faolan.GameServer
 			}
 
 			var entry = BuildMailItemEntry(attachment, character.Id, slot.Value);
-			await SendAddItem(client, 0x68u, (uint)slot.Value, entry);
+			await SendAddItem(client, ContainerKind.Bag, (uint)slot.Value, entry);
 
 			var qty = attachment.Quantity == 0
 				? 1u

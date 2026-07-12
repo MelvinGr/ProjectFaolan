@@ -1,4 +1,5 @@
 using System.IO;
+using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
 
@@ -17,7 +18,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return ms.ToArray();
 		}
 
-		public static void WriteAddItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, byte[] entry, uint feedback = 0)
+		public static void WriteAddItemBody(FaolanStream s, ContainerKind containerType, uint charId, uint itemPos, byte[] entry, uint feedback = 0)
 		{
 			s.WriteUInt32(containerType).WriteUInt32(charId).WriteUInt32(itemPos).WriteArrayUInt32Length(entry).WriteUInt32(feedback);
 		}

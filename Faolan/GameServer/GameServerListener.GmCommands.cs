@@ -429,7 +429,9 @@ namespace Faolan.GameServer
 
 		// .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The real
 		// trigger is using the totem ITEM (use_totem_of_origin capture); this GM command is the test bootstrap.
-		private async Task RecallToBindCommand(INetworkClient client)
+		// Recall the player to their bind point (the Totem of Origin, the Path of Asura teleport spell, and .recall all
+		// funnel here). `flavor` is the on-screen line shown before the handoff, so each caller keeps its own voice.
+		private async Task RecallToBindCommand(INetworkClient client, string flavor = "The Totem of Origin pulls you home...")
 		{
 			var character = client.Session.Character;
 			if (character.BindRespawnPointId is not uint pointId)
@@ -445,7 +447,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await _agentServerDispatcher.SendSystemMessage(character.Id, "The Totem of Origin pulls you home...");
+			await _agentServerDispatcher.SendSystemMessage(character.Id, flavor);
 			await DoTeleport(character.Id, point.MapId, point.Position);
 		}
 

@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Protobuf;
@@ -16,7 +17,7 @@ namespace Faolan.GameServer.Economy
 		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1);
 
 		// Push a live single-item add into a container (backpack 0x68, bank 0x69, ...). See GameServerListener.Outbound.cs SendAddItem.
-		Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0);
+		Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0);
 
 		// Push the wallet update (absolute balance in TIN) to the client. See GameServerListener.Outbound.cs SendUpdateCash.
 		Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason);

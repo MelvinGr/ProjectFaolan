@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.GameServer;
 using Xunit;
@@ -16,7 +17,7 @@ namespace Faolan.Tests
 		// gameplay captures): container 0x71 (equipped), charId 0x01316D8A, pos 0, amount 0.
 		private const string CapturedBody = "0000007101316d8a0000000000000000";
 		private const uint CharId = 0x01316d8a;
-		private const uint EquippedContainer = 0x71;
+		private const ContainerKind EquippedContainer = ContainerKind.Quest;
 
 		[Fact]
 		public void RemoveItemBody_EncodesFields()
@@ -27,7 +28,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(16, body.Length);
 			var r = new FaolanStream(body);
-			Assert.Equal(GameServerListener.InventoryContainerBackpack, r.ReadUInt32());
+			Assert.Equal((uint)GameServerListener.InventoryContainerBackpack, r.ReadUInt32());
 			Assert.Equal(CharId, r.ReadUInt32());
 			Assert.Equal(5u, r.ReadUInt32());
 			Assert.Equal(2u, r.ReadUInt32());

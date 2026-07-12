@@ -34,7 +34,7 @@ namespace Faolan.GameServer
 			return GrantItemToBackpack(client, itemTemplateId, count);
 		}
 
-		Task IEconomyOutbound.SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
+		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
 		{
 			return SendAddItem(client, containerType, itemPos, entry, feedback);
 		}
@@ -372,7 +372,7 @@ namespace Faolan.GameServer
 
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
 		// updates (0x2005) ride.
-		private static async Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
+		private static async Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
 		{
 			var charId = client.Session.Character.Id;
 
@@ -414,7 +414,7 @@ namespace Faolan.GameServer
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
-		private static async Task SendRemoveItem(INetworkClient client, uint containerType, uint itemPos, uint amountToRemove = 0)
+		private static async Task SendRemoveItem(INetworkClient client, ContainerKind containerType, uint itemPos, uint amountToRemove = 0)
 		{
 			var charId = client.Session.Character.Id;
 
