@@ -82,15 +82,6 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// 0x205B arrives as a GameAgent PassBlob INNER subopcode (client -> GameAgent/PassBlob -> Handle0X2000 ->
-				// this switch), not a GameCharAgent-endpoint packet, so HandleGameCharAgentPacket never sees it - this is
-				// the correct handler. The name only lives in GameCharAgentOpcodes; the value is dispatched here. (#354)
-				case (GameServer0X2000Opcodes)GameCharAgentOpcodes.QueuePetCommand:
-				{
-					await HandlePetCommand(client, packet);
-					break;
-				}
-
 				case GameServer0X2000Opcodes.CharDCMoveIIR:
 				{
 					var dataobjdec = packet.Body.ReadUInt32();
@@ -902,27 +893,19 @@ namespace Faolan.GameServer
 		// character's real id, so the matching is done dynamically by the caller.)
 		private async Task HandleCreateEditorInstanceEcho(INetworkClient client, ConanPacket packet)
 		{
-			uint? requestId = null;
-			if (packet.Body.Length - packet.Body.Position >= sizeof(uint) * 2) // #354: confirm this framing vs the create captures
-			{
-				var ack0 = packet.Body.ReadUInt32();
-				requestId = packet.Body.ReadUInt32();
-				Logger.LogInformation("Create-editor instance-echo decoded: ack0={Ack0:X}, requestId={RequestId:X}.", ack0, requestId.Value);
+			// The instance-echo carries [ack0][requestId]; read them directly (a short body throws, surfacing the
+			// unexpected shape, rather than being silently swallowed).
+			var ack0 = packet.Body.ReadUInt32();
+			var requestId = packet.Body.ReadUInt32();
+			Logger.LogInformation("Create-editor instance-echo decoded: ack0={Ack0:X}, requestId={RequestId:X}.", ack0, requestId);
 
-				if (!client.Session.CreateEditorObservedRequestIds.Contains(requestId.Value))
-					client.Session.CreateEditorObservedRequestIds.Add(requestId.Value);
-			}
+			if (!client.Session.CreateEditorObservedRequestIds.Contains(requestId))
+				client.Session.CreateEditorObservedRequestIds.Add(requestId);
 
 			// Retail just ACKs the client's create-editor instance-echoes (there is no special post-0x205F burst); the
-			// burst that actually launches the editor is sent on CharInPlayIIR. So an echo carrying a request id gets a
-			// plain ack, and one without is ignored.
-			if (requestId.HasValue)
-			{
-				Logger.LogInformation("Acknowledging create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
-				await CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId.Value);
-			}
-			else
-				Logger.LogInformation("Ignoring create-editor instance-echo with no request id.");
+			// burst that actually launches the editor is sent on CharInPlayIIR.
+			Logger.LogInformation("Acknowledging create-editor instance-echo with requestId={RequestId:X}.", requestId);
+			await CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId);
 		}
 
 		// GameAgent (connection-class) dispatch: auth / chat / ping / server-stats. Routed here by receiver class.
@@ -1486,6 +1469,12 @@ namespace Faolan.GameServer
 					}
 
 					break;
+				}
+
+				case GameCharAgentOpcodes.QueuePetCommand:
+				{
+					await HandlePetCommand(client, packet);
+					return;
 				}
 
 				default:

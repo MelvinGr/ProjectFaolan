@@ -46,12 +46,6 @@ namespace Faolan.CSPlayerAgent
 				case CSPlayerAgentOpcodes.Authenticate:
 				{
 					var characterId = packet.Body.ReadUInt32();
-					if (packet.Body.Position == packet.Body.Length)
-					{
-						Logger.LogDebug("Received incomplete Authenticate packet, ignoring"); // #354: why do these arrive?
-						break;
-					}
-
 					var accountId = packet.Body.ReadUInt32();
 					var authReply = packet.Body.ReadUInt32();
 
