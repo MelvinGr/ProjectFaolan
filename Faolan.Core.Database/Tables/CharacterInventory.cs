@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Attributes;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -24,7 +26,8 @@ namespace Faolan.Core.Database.Tables
 
 		// Which container this stack lives in (the captured inventory is a nested chain of containers, e.g. the normal
 		// backpack vs quest vs resources). Stored as the container's id so the snapshot's container chain can be rebuilt.
-		public int Container { get; set; }
+		[ConstrainToEnumValues]
+		public ContainerKind Container { get; set; }
 
 		// Position within the container.
 		public int Slot { get; set; }

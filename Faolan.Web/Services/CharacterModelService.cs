@@ -479,9 +479,9 @@ namespace Faolan.Web.Services
 				.AsEnumerable()
 				.Select(x => (ItemInfo.From(x.Item!, x.Count), x.Container switch
 				{
-					113 => "Quest",
-					112 => "Resources",
-					_   => "Normal"
+					ContainerKind.Quest    => "Quest",
+					ContainerKind.Resource => "Resources",
+					_                      => "Normal"
 				}))
 				.ToList();
 		}

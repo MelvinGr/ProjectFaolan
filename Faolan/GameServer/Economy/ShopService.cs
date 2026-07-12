@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
@@ -116,7 +117,7 @@ namespace Faolan.GameServer.Economy
 			if (character == null)
 				return;
 
-			var row = (await _database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == (int)container && i.Slot == (int)slot);
+			var row = (await _database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == (ContainerKind)container && i.Slot == (int)slot);
 			if (row?.Item == null)
 			{
 				_logger.LogWarning("SellItem to shop {Shop:X}: no item in container {Container} slot {Slot} for {Character}.", shopId, container, slot, character.Name);
@@ -132,7 +133,7 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			await _database.SetCharacterInventorySlot(character.Id, (int)container, (int)slot, null);
+			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)container, (int)slot, null);
 			character.Money += price;
 			await _database.SetCharacterMoney(character.Id, character.Money);
 			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
@@ -157,7 +158,7 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			await _database.SetCharacterInventorySlot(character.Id, sale.Container, sale.Slot, sale.ItemId, sale.Count);
+			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)sale.Container, sale.Slot, sale.ItemId, sale.Count);
 			character.Money = character.Money >= sale.PriceTin
 				? character.Money - sale.PriceTin
 				: 0;

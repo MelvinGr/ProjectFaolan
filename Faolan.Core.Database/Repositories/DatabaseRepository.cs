@@ -110,7 +110,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> SetAccountPassword(uint accountId, string password);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, byte rank);
-		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
+		Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1);
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
@@ -1372,7 +1372,7 @@ namespace Faolan.Core.Database.Repositories
 
 		// Upserts (itemId set) or clears (itemId null) ONE container cell - the persistence unit of the client's
 		// inventory moves (equip consumes the source cell, unequip parks into the target cell).
-		public async Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1)
+		public async Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var row = await ctx.CharacterInventory.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);

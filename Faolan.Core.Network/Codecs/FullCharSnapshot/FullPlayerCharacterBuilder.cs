@@ -23,9 +23,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The FullChar snapshot IIR (0x737A6DF9); the listener assembles [subop][typeTag][instance][prefix][root][tails].
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
 
-		public const uint BagKind = (uint)ContainerKind.Bag;
-		public const uint BankKind = (uint)ContainerKind.Bank;
-		public const uint EquippedKind = (uint)ContainerKind.Equipped;
+		public const ContainerKind BagKind = ContainerKind.Bag;
+		public const ContainerKind BankKind = ContainerKind.Bank;
+		public const ContainerKind EquippedKind = ContainerKind.Equipped;
+		public const ContainerKind QuestKind = ContainerKind.Quest;
+		public const ContainerKind ResourceKind = ContainerKind.Resource;
 
 		// The server's account-entitlement policy: every account gets the full expansion + subscription set. These
 		// are the root's f4/f5 (account bitfields the client reads to gate expansion content, NOT per-character
@@ -33,8 +35,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// byte-identically (other captured accounts e.g. Strie carry fewer - presence is per-account).
 		public const uint FullExpansionFlags = 0x000C0001;
 		public const uint FullSubscriptionFlags = 0x00018181;
-		public const uint QuestKind = 113; // (uint)ContainerKind.Quest;
-		public const uint ResourceKind = (uint)ContainerKind.Resource;
 
 		// The first bag cell of a fresh character's snapshot is pos 1 (Strie's captured starter bag).
 		private const uint BagFirstPos = 1;
@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// render by template / Hash 0, like the live add) so an AH-bought item deposited to the bank still shows on
 		// reopen - unlike the chat-critical world-entry snapshot, the BankIIR is its own channel, so a half-identified
 		// item here can't break world entry. Rows without a resolved Item (no DB identity at all) are still skipped.
-		public static ProtoInventoryGame BuildContainer(uint kind, uint capacity, uint disabledSlots, uint instance, IReadOnlyCollection<CharacterInventory> rows)
+		public static ProtoInventoryGame BuildContainer(ContainerKind kind, uint capacity, uint disabledSlots, uint instance, IReadOnlyCollection<CharacterInventory> rows)
 		{
 			var container = NewContainer(kind, capacity, disabledSlots, instance);
 			foreach (var row in (rows ?? []).Where(r => r.Item != null).OrderBy(r => r.Slot))
@@ -75,17 +75,17 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// CharacterInventory rows fill their container by kind (bag rows from unequip persistence; resource/
 			// quest rows once something writes them). Buildable items only - a row without real identity is
 			// silently absent, like the equipped path.
-			var byKind = containers.ToDictionary(c => c.InventoryId.Type);
+			var byKind = containers.ToDictionary(c => (ContainerKind)c.InventoryId.Type);
 			var bagSlotsTaken = new HashSet<ulong>();
 			foreach (var row in (inventoryRows ?? []).Where(r => r.Item is { Hash: not 0 }).OrderBy(r => r.Slot))
 			{
-				if (!byKind.TryGetValue((uint)row.Container, out var container))
+				if (!byKind.TryGetValue(row.Container, out var container))
 					continue;
 
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, (uint)row.Container, slot), RecordId(instance, (uint)row.Container, slot), row.Count, row.Item,
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item,
 					row.Item.Hash));
-				if (container.InventoryId.Type == BagKind)
+				if ((ContainerKind)container.InventoryId.Type == BagKind)
 					bagSlotsTaken.Add(slot);
 			}
 
@@ -140,23 +140,23 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// Unique within the character, stable across logins: epoch | kind | slot | instance-low. Internal so the
 		// live DispatchAddItem grant path (GrantItemToBackpack) computes the same itemId/recordId the next login's
 		// snapshot will, keeping the live add and the snapshot in agreement on the entry's identity.
-		public static ulong ItemId(uint instance, uint kind, ulong slot)
+		public static ulong ItemId(uint instance, ContainerKind kind, ulong slot)
 		{
-			return ItemIdEpoch | ((kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
+			return ItemIdEpoch | (((uint)kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
 		}
 
-		public static ulong RecordId(uint instance, uint kind, ulong slot)
+		public static ulong RecordId(uint instance, ContainerKind kind, ulong slot)
 		{
-			return ((kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
+			return (((uint)kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
 		}
 
-		private static ProtoInventoryGame NewContainer(uint kind, uint capacity, uint disabledSlots, uint instance)
+		private static ProtoInventoryGame NewContainer(ContainerKind kind, uint capacity, uint disabledSlots, uint instance)
 		{
 			return new ProtoInventoryGame
 			{
 				InventoryId = new ProtoID32
 				{
-					Type = kind,
+					Type = (uint)kind,
 					Instance = instance
 				},
 				MaxSize = capacity,

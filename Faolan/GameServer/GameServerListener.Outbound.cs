@@ -66,7 +66,7 @@ namespace Faolan.GameServer
 		{
 			var equipment = await Database.GetCharacterEquipment(characterId);
 			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == (int)FullPlayerCharacterBuilder.BagKind).Select(r => r.Slot).ToHashSet();
+			var taken = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BagKind).Select(r => r.Slot).ToHashSet();
 			if (equipment?.FirstPosBag is { Hash: not 0 })
 				taken.Add(1);
 			return Enumerable.Range(0, 24).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
@@ -77,7 +77,7 @@ namespace Faolan.GameServer
 		private async Task<int?> FindFreeContainerSlot(uint characterId, int container, int capacity)
 		{
 			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
+			var taken = rows.Where(r => r.Container == (ContainerKind)container).Select(r => r.Slot).ToHashSet();
 			if (container == (int)FullPlayerCharacterBuilder.BagKind)
 			{
 				var equipment = await Database.GetCharacterEquipment(characterId);
@@ -123,7 +123,7 @@ namespace Faolan.GameServer
 			if (slot == null)
 				return null;
 
-			await Database.SetCharacterInventorySlot(characterId, (int)kind, slot.Value, itemTemplateId, count);
+			await Database.SetCharacterInventorySlot(characterId, kind, slot.Value, itemTemplateId, count);
 
 			if (!pushLiveAdd)
 				return slot;
@@ -149,14 +149,14 @@ namespace Faolan.GameServer
 			var present = false;
 			foreach (var r in rows)
 			{
-				if (r.Container == (int)FullPlayerCharacterBuilder.BagKind && r.Slot == slot)
+				if (r.Container == FullPlayerCharacterBuilder.BagKind && r.Slot == slot)
 					present = true;
 			}
 
 			if (!present)
 				return false;
 
-			await Database.SetCharacterInventorySlot(characterId, (int)FullPlayerCharacterBuilder.BagKind, slot, null);
+			await Database.SetCharacterInventorySlot(characterId, FullPlayerCharacterBuilder.BagKind, slot, null);
 			await SendRemoveItem(client, InventoryContainerBackpack, (uint)slot, amountToRemove);
 			return true;
 		}

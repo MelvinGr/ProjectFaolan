@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
@@ -41,7 +42,7 @@ namespace Faolan.Importer.Captures
 				if (!await db.Characters.AnyAsync(c => c.Id == characterId))
 					continue;
 
-				var kind = (int)container.InventoryId.Type;
+				var kind = (ContainerKind)container.InventoryId.Type;
 
 				// Replace the character's bank container with the captured contents (the BankIIR is the whole bank).
 				var oldRows = await db.CharacterInventory.Where(r => r.CharacterId == characterId && r.Container == kind).ToListAsync();
@@ -57,7 +58,7 @@ namespace Faolan.Importer.Captures
 					db.CharacterInventory.Add(new CharacterInventory
 					{
 						CharacterId = characterId,
-						Container = kind,
+						Container = (ContainerKind)kind,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
 						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1

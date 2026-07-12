@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -44,7 +45,7 @@ namespace Faolan.GameServer.Economy
 		{
 			var characterId = client.Session.Character.Id;
 			var rows = await _database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == (int)FullPlayerCharacterBuilder.BankKind).ToList();
+			var bankRows = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BankKind).ToList();
 			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, BankMaxSize, BankDisabledSlots, characterId, bankRows);
 			await SendBank(client, bank);
 		}
@@ -101,7 +102,7 @@ namespace Faolan.GameServer.Economy
 			{
 				var dPos = move.DestinationItemPos;
 				var rows = await _database.GetCharacterInventory(character.Id);
-				var row = rows.FirstOrDefault(r => r.Container == bag && r.Slot == dPos);
+				var row = rows.FirstOrDefault(r => r.Container == (ContainerKind)bag && r.Slot == dPos);
 				if (row?.ItemId == null)
 					return;
 

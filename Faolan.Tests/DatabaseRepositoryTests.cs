@@ -34,8 +34,8 @@ namespace Faolan.Tests
 				const uint accountId = 1;
 				const uint realmId = 1;
 				const uint itemId = 354477; // an item with a real hash (renders in the container)
-				const int bank = (int)FullPlayerCharacterBuilder.BankKind; // 105
-				const int bag = (int)FullPlayerCharacterBuilder.BagKind; // 104
+				const ContainerKind bank = FullPlayerCharacterBuilder.BankKind; // 105
+				const ContainerKind bag = FullPlayerCharacterBuilder.BagKind; // 104
 
 				var (repo, factory) = NewRepo(dbPath);
 				await using (var ctx = await factory.CreateDbContextAsync())
@@ -418,8 +418,8 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync();
 				}
 
-				await repo.SetCharacterInventorySlot(5, 104, 2, 100);
-				await repo.SetCharacterInventorySlot(5, 104, 7, 200, 3); // a second cell coexists
+				await repo.SetCharacterInventorySlot(5,(ContainerKind)104, 2, 100);
+				await repo.SetCharacterInventorySlot(5,(ContainerKind)104, 7, 200, 3); // a second cell coexists
 
 				var rows = await repo.GetCharacterInventory(5);
 				Assert.Equal(2, rows.Length);
@@ -427,9 +427,9 @@ namespace Faolan.Tests
 				Assert.Equal("A", rows.Single(r => r.Slot == 2).Item!.Name); // Item nav loaded
 				Assert.Equal(3u, rows.Single(r => r.Slot == 7).Count);
 
-				await repo.SetCharacterInventorySlot(5, 104, 2, 200); // re-upsert updates in place
-				await repo.SetCharacterInventorySlot(5, 104, 7, null); // clear removes
-				await repo.SetCharacterInventorySlot(5, 104, 9, null); // clearing an empty cell is a no-op
+				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 2, 200); // re-upsert updates in place
+				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 7, null); // clear removes
+				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 9, null); // clearing an empty cell is a no-op
 
 				rows = await repo.GetCharacterInventory(5);
 				var only = Assert.Single(rows);

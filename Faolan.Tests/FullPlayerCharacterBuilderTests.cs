@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Tests.Support;
@@ -90,7 +91,7 @@ namespace Faolan.Tests
 			{
 				new CharacterInventory
 				{
-					Container = 104,
+					Container = (ContainerKind)104,
 					Slot = 3,
 					Item = Manacles,
 					ItemId = Manacles.Id,
@@ -98,14 +99,14 @@ namespace Faolan.Tests
 				},
 				new CharacterInventory
 				{
-					Container = 104,
+					Container = (ContainerKind)104,
 					Slot = 1,
 					Item = Signet,
 					ItemId = Signet.Id
 				}, // occupies the FirstPosBag cell
 				new CharacterInventory
 				{
-					Container = 104,
+					Container = (ContainerKind)104,
 					Slot = 5,
 					Item = new Item
 					{

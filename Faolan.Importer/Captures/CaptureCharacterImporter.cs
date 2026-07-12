@@ -496,7 +496,7 @@ namespace Faolan.Importer.Captures
 			var total = 0;
 			foreach (var container in root.Inventories)
 			{
-				if (container.InventoryId.Type == FullPlayerCharacterBuilder.EquippedKind)
+				if ((ContainerKind)container.InventoryId.Type == FullPlayerCharacterBuilder.EquippedKind)
 					continue;
 
 				foreach (var entry in container.Items)
@@ -509,7 +509,7 @@ namespace Faolan.Importer.Captures
 					db.CharacterInventory.Add(new CharacterInventory
 					{
 						CharacterId = characterId,
-						Container = (int)container.InventoryId.Type,
+						Container = (ContainerKind)container.InventoryId.Type,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
 						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1

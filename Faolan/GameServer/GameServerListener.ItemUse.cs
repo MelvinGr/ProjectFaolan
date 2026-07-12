@@ -19,7 +19,7 @@ namespace Faolan.GameServer
 			if (character == null)
 				return;
 
-			var item = (await Database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == container && i.Slot == slot)?.Item;
+			var item = (await Database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == (ContainerKind)container && i.Slot == slot)?.Item;
 			if (item == null)
 			{
 				Logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);

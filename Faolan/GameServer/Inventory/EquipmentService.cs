@@ -52,7 +52,7 @@ namespace Faolan.GameServer.Inventory
 				{
 					var equipment = await _database.GetCharacterEquipment(character.Id);
 					var rows = await _database.GetCharacterInventory(character.Id);
-					if (equipment?.FirstPosBag != null && rows.All(r => !(r.Container == bag && r.Slot == firstBagPos)))
+					if (equipment?.FirstPosBag != null && rows.All(r => !(r.Container == (ContainerKind)bag && r.Slot == firstBagPos)))
 					{
 						equipment.FirstPosBag = null;
 						await _database.SaveCharacterEquipment(equipment);
@@ -61,7 +61,7 @@ namespace Faolan.GameServer.Inventory
 					}
 				}
 
-				await _database.SetCharacterInventorySlot(character.Id, kind, pos, null);
+				await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)kind, pos, null);
 				_logger.LogInformation("Persisted DROP: {Kind}[{Pos}] for character {CharacterId}.", kind, pos, character.Id);
 			}
 			catch (Exception ex)
@@ -104,8 +104,8 @@ namespace Faolan.GameServer.Inventory
 				// Consume the bag row the item came from (no-op when the source was the seeded FirstPosBag or a
 				// captured-only entry).
 				var bagRows = await _database.GetCharacterInventory(character.Id);
-				if (bagRows.Any(r => r.Container == (int)FullPlayerCharacterBuilder.BagKind && r.Slot == fromBagSlot && r.ItemId == item.Id))
-					await _database.SetCharacterInventorySlot(character.Id, (int)FullPlayerCharacterBuilder.BagKind, fromBagSlot, null);
+				if (bagRows.Any(r => r.Container == FullPlayerCharacterBuilder.BagKind && r.Slot == fromBagSlot && r.ItemId == item.Id))
+					await _database.SetCharacterInventorySlot(character.Id, FullPlayerCharacterBuilder.BagKind, fromBagSlot, null);
 
 				_logger.LogInformation("Persisted EQUIP: {Name} ({Id}) bag[{BagSlot}] -> {Slot} for character {CharacterId}.", item.Name, item.Id, fromBagSlot, targetSlot, character.Id);
 			}
@@ -149,7 +149,7 @@ namespace Faolan.GameServer.Inventory
 				// Resolve the DB item id + count at a (kind, pos), counting the legacy FirstPosBag at bag slot 1.
 				(uint? Id, uint Count, bool IsFirstBag) Resolve(int kind, int pos)
 				{
-					var row = rows.FirstOrDefault(r => r.Container == kind && r.Slot == pos);
+					var row = rows.FirstOrDefault(r => r.Container == (ContainerKind)kind && r.Slot == pos);
 					if (row?.ItemId != null)
 						return (row.ItemId, row.Count, false);
 					if (kind == bag && pos == firstBagPos && equipment?.FirstPosBag != null)
@@ -177,8 +177,8 @@ namespace Faolan.GameServer.Inventory
 
 				// Apply: item -> destination; the destination's previous occupant (if any) -> source (swap). A null
 				// dstId means the destination was empty, which clears the source row.
-				await _database.SetCharacterInventorySlot(character.Id, dKind, dPos, srcId, srcCount);
-				await _database.SetCharacterInventorySlot(character.Id, sKind, sPos, dstId, dstCount);
+				await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)dKind, dPos, srcId, srcCount);
+				await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)sKind, sPos, dstId, dstCount);
 
 				_logger.LogInformation("Persisted MOVE: item {Src} {SKind}[{SPos}] -> {DKind}[{DPos}]{Swap} for character {CharacterId}.", srcId, sKind, sPos, dKind, dPos, dstId.HasValue
 					? $" (swap with {dstId})"
@@ -203,15 +203,15 @@ namespace Faolan.GameServer.Inventory
 			{
 				const int bag = (int)FullPlayerCharacterBuilder.BagKind;
 				var rows = await _database.GetCharacterInventory(character.Id);
-				var src = rows.FirstOrDefault(r => r.Container == bag && r.Slot == sourceSlot);
+				var src = rows.FirstOrDefault(r => r.Container == (ContainerKind)bag && r.Slot == sourceSlot);
 				if (src?.ItemId == null || src.Count <= splitSize)
 				{
 					_logger.LogInformation("Split not persisted: bag[{Slot}] is not a splittable stack (count <= split size).", sourceSlot);
 					return;
 				}
 
-				await _database.SetCharacterInventorySlot(character.Id, bag, sourceSlot, src.ItemId, src.Count - splitSize);
-				await _database.SetCharacterInventorySlot(character.Id, bag, targetSlot, src.ItemId, splitSize);
+				await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, sourceSlot, src.ItemId, src.Count - splitSize);
+				await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, targetSlot, src.ItemId, splitSize);
 				_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, src.Count - splitSize,
 					targetSlot, splitSize, character.Id);
 			}
@@ -245,7 +245,7 @@ namespace Faolan.GameServer.Inventory
 
 				equipment[fromSlot] = null;
 				await _database.SaveCharacterEquipment(equipment);
-				await _database.SetCharacterInventorySlot(character.Id, (int)FullPlayerCharacterBuilder.BagKind, targetBagSlot, current.Id);
+				await _database.SetCharacterInventorySlot(character.Id, FullPlayerCharacterBuilder.BagKind, targetBagSlot, current.Id);
 
 				_logger.LogInformation("Persisted UNEQUIP: {Name} ({Id}) from {Slot} -> bag[{BagSlot}] for character {CharacterId}.", current.Name, current.Id, fromSlot, targetBagSlot, character.Id);
 			}

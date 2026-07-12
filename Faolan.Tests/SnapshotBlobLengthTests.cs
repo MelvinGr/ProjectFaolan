@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
@@ -56,14 +57,14 @@ namespace Faolan.Tests
 			{
 				new CharacterInventory
 				{
-					Container = 104,
+					Container = (ContainerKind)104,
 					Slot = 2,
 					Count = 1,
 					Item = Mk(13817, 1796783475, 3438012111, 3985322333, 505316191, 1177700698)
 				},
 				new CharacterInventory
 				{
-					Container = 104,
+					Container = (ContainerKind)104,
 					Slot = 3,
 					Count = 1,
 					Item = Mk(13826, 1761429601, 4267309034, 1871298002, 3660826526, 1160857399)
