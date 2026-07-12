@@ -20,15 +20,18 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint ComboXmlType = 1010206;
 
-		public static async Task<(int Seen, int Imported)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger? logger = null)
+		public static async Task<(int Seen, int Imported)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null, ILogger? logger = null)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var existing = await db.Combos.ToDictionaryAsync(c => c.Id);
 
 			var seen = 0;
 			var imported = 0;
-			foreach (var e in rdb.EntriesOfType(ComboXmlType).Where(x => x.File != 0xff))
+			foreach (var e in rdb.EntriesOfType(ComboXmlType))
 			{
+				if (!rdb.CanRead(e)) // CDN-only with no reachable mirror / a negative-cached miss
+					continue;
+
 				byte[] body;
 				try
 				{
@@ -38,6 +41,9 @@ namespace Faolan.Importer.Rdb
 				{
 					continue;
 				}
+
+				if (body.Length == 0) // CDN miss (404 / proxy down)
+					continue;
 
 				// The entry is an XML doc after the RDB-Id header; carve out just the <combo>...</combo> root (the body
 				// can carry a header before it and padding after it, which would trip a strict parse).

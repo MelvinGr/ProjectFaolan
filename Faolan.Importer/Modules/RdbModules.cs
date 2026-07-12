@@ -116,7 +116,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var r = await RdbSpellImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var r = await RdbSpellImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			return new ImportResult($"{r.Seen} named records, {r.Inserted} new, {r.NamesSet} names, {r.CastTimesSet} cast times.");
 		}
 	}
@@ -138,7 +138,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var (decrypted, namesSet) = await RdbAbilityImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var (decrypted, namesSet) = await RdbAbilityImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			return new ImportResult($"{decrypted} templates decrypted, {namesSet} names set.");
 		}
 	}
@@ -160,7 +160,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var (seen, imported) = await RdbComboImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var (seen, imported) = await RdbComboImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			return new ImportResult($"{seen} combo XML entries, {imported} combos imported.");
 		}
 	}
@@ -181,8 +181,8 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var r = await RdbMapImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
-			return new ImportResult($"{r.Found} playfields ({r.Gated} v6-gated); {r.Created} created, {r.Renamed} renamed.");
+			var r = await RdbMapImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
+			return new ImportResult($"{r.Found} playfields ({r.Gated} unreachable); {r.Created} created, {r.Renamed} renamed.");
 		}
 	}
 
@@ -254,7 +254,7 @@ namespace Faolan.Importer.Modules
 			var dump = ctx.DryRun
 				? null
 				: ctx.DumpTemplatesDir;
-			var r = await RdbItemImporter.ImportAsync(ctx.Db, ctx.RdbDir!, dump);
+			var r = await RdbItemImporter.ImportAsync(ctx.Db, ctx.RdbDir!, dump, ctx.RdbProxyBase);
 			return new ImportResult($"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.CategoriesAdded} categories, {r.ValuesAdded} values, {r.StatsAdded} stat mods.");
 		}
 	}

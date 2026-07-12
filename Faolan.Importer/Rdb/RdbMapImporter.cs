@@ -11,10 +11,11 @@ namespace Faolan.Importer.Rdb
 {
 	// Imports map names + ids from the client RDB PLAYFIELDDESCRIPTIONDATA (type 1070003). Each record is an XML
 	// <playfielddescriptiondata> carrying <playfield Name=".." ID=".."/>; the RDB record id == the playfield id ==
-	// our Map.Id (verified: 4010 Tortage Island, 2040 Castle of King Conan, 3000 Khemi, ...). v5-reachable records
-	// (file < 0xFF) are read now; the v6 content-addressed ones (file == 0xFF) are skipped until the v6 index is
-	// cracked (docs/rdb/rdb-extraction-plan.md). Names fill/replace Map.Name; missing maps are created as reference rows
-	// (id + name only - no spawn transform / world burst, so they label the map without being enterable).
+	// our Map.Id (verified: 4010 Tortage Island, 2040 Castle of King Conan, 3000 Khemi, ...). Both v5-reachable
+	// records (file < 0xFF) and the on-demand content-addressed ones (file == 0xFF) are imported: the latter are
+	// pulled through the mirror proxy by RdbReader (cdnBaseUrl), so e.g. playfield 30200 - a real CDN-only playfield
+	// that quest 19522 markers onto - now resolves. Names fill/replace Map.Name; missing maps are created as reference
+	// rows (id + name only - no spawn transform / world burst, so they label the map without being enterable).
 	public static class RdbMapImporter
 	{
 		private const uint PlayfieldDescriptionType = 1070003;
@@ -27,9 +28,9 @@ namespace Faolan.Importer.Rdb
 		// never part of a real map name, so this can't truncate a legitimate one.
 		private static readonly string[] ToolingMarkers = [" Heigh_Tiles", "_statel", " Statels", "_height", "_painting", " and Hmap", " Hmap"];
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase = null)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var maps = await db.Maps.ToDictionaryAsync(m => m.Id);
 
 			int found = 0, gated = 0, created = 0, renamed = 0;
@@ -38,7 +39,9 @@ namespace Faolan.Importer.Rdb
 				if (e.Size == 0)
 					continue;
 
-				if (e.File == 0xff) // v6 content-addressed - not in the v5 NN.rdbdata files
+				// CDN (file==0xFF) records are pulled through the mirror; count the ones we can't reach (no proxy /
+				// negative-cached miss) as gated so the summary still reports coverage.
+				if (!rdb.CanRead(e))
 				{
 					gated++;
 					continue;
@@ -51,6 +54,12 @@ namespace Faolan.Importer.Rdb
 				}
 				catch
 				{
+					continue;
+				}
+
+				if (dec.Length == 0) // CDN miss (404 / proxy down) - ReadRaw returns empty
+				{
+					gated++;
 					continue;
 				}
 

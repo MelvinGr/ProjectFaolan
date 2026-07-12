@@ -120,6 +120,7 @@ namespace Faolan.Importer.Cli
 				RawPackets = rawPackets,
 				CreateCaptures = createCaptures,
 				RdbCdnBase = GetOption(args, "--cdn"),
+				RdbProxyBase = GetOption(args, "--rdb-proxy") ?? ImportContext.DefaultProxyBase,
 				RdbStoreDir = GetOption(args, "--store"),
 				DumpTemplatesDir = GetOption(args, "--dump-templates"),
 				Mode = mode,

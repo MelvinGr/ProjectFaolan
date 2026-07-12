@@ -70,16 +70,17 @@ namespace Faolan.Importer.Rdb
 			return null;
 		}
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string dumpDir = null)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string dumpDir = null, string? cdnBase = null)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 
-			// (type, id) -> entry for the template types, skipping empty/sentinel entries.
+			// (type, id) -> entry for the template types, skipping empty/sentinel entries. CDN-only (file==0xFF)
+			// templates are kept when a mirror is reachable - RdbReader.ReadDecrypted pulls their blob through it.
 			var byTypeId = new Dictionary<(uint, uint), RdbReader.Entry>();
 			foreach (var type in ItemTemplateTypes)
 			foreach (var e in rdb.EntriesOfType(type))
 			{
-				if (e.Size > 0 && e.File != 0xff)
+				if (e.Size > 0 && rdb.CanRead(e))
 					byTypeId[(type, e.Id)] = e;
 			}
 

@@ -19,17 +19,17 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint AbilityTemplateType = 1000020;
 
-		public static async Task<(int Decrypted, int NamesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger? logger = null)
+		public static async Task<(int Decrypted, int NamesSet)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null, ILogger? logger = null)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var abilities = await db.Abilities.ToListAsync();
 
 			var decrypted = 0;
 			var namesSet = 0;
 			foreach (var a in abilities)
 			{
-				if (!rdb.TryGet(AbilityTemplateType, a.Id, out var e) || e.File == 0xff || e.Size == 0)
-					continue;
+				if (!rdb.TryGet(AbilityTemplateType, a.Id, out var e) || e.Size == 0 || !rdb.CanRead(e))
+					continue; // no template, empty sentinel, or CDN-only with no reachable mirror
 
 				byte[] body;
 				try

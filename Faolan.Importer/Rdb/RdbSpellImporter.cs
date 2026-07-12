@@ -34,9 +34,9 @@ namespace Faolan.Importer.Rdb
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
 
-		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger? logger = null)
+		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null, ILogger? logger = null)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 
 			var byId = (await db.Spells.ToListAsync()).ToDictionary(s => s.Id);
 			var toAdd = new List<Spell>();
@@ -47,8 +47,8 @@ namespace Faolan.Importer.Rdb
 			var castTimesSet = 0;
 			foreach (var entry in rdb.EntriesOfType(SpellDataType))
 			{
-				if (entry.Size == 0 || entry.File == 0xff)
-					continue; // empty sentinel or CDN-only (not in the local rdbdata files)
+				if (entry.Size == 0 || !rdb.CanRead(entry))
+					continue; // empty sentinel, or CDN-only with no reachable mirror / a negative-cached miss
 
 				byte[] body;
 				try
@@ -61,7 +61,7 @@ namespace Faolan.Importer.Rdb
 				}
 
 				if (body.Length < 12)
-					continue;
+					continue; // too short, or a CDN miss (empty)
 
 				var name = RdbItemImporter.ExtractName(body);
 				if (string.IsNullOrEmpty(name))

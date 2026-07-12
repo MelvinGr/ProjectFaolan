@@ -167,11 +167,11 @@ namespace Faolan.Importer.Cli
 		private static void AbilityNames(string rdbDir, string dbPath)
 		{
 			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			foreach (var a in db.Abilities.OrderBy(x => x.Slot).ToList())
 			{
 				var key = new[] { a.Key.Key1, a.Key.Key2, a.Key.Key3, a.Key.Key4 };
-				if (!rdb.TryGet(1000020, a.Id, out var e) || e.File == 0xff || e.Size == 0)
+				if (!rdb.TryGet(1000020, a.Id, out var e) || e.Size == 0 || !rdb.CanRead(e))
 				{
 					Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} (no 1000020 entry)");
 					continue;
@@ -407,12 +407,12 @@ namespace Faolan.Importer.Cli
 			}
 
 			Console.WriteLine($"item {itemId} \"{item.Name}\" type={item.Type} cat={item.SearchCategory} key={item.Key.Key1:X8},{item.Key.Key2:X8},{item.Key.Key3:X8},{item.Key.Key4:X8}");
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
 			byte[] template = null;
 			foreach (var type in new uint[] { 1000020, 1000620 })
 			{
-				if (rdb.TryGet(type, itemId, out var e) && e.File != 0xff && e.Size > 0)
+				if (rdb.TryGet(type, itemId, out var e) && e.Size > 0 && rdb.CanRead(e))
 				{
 					try
 					{
@@ -788,13 +788,15 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			if (outDir != null)
 				Directory.CreateDirectory(outDir);
 
-			foreach (var e in rdb.EntriesOfType(type).Where(e => e.File != 0xff))
+			foreach (var e in rdb.EntriesOfType(type).Where(rdb.CanRead))
 			{
 				var body = rdb.ReadDecompressed(e);
+				if (body.Length == 0) // CDN miss
+					continue;
 				Console.WriteLine($"type={type} id={e.Id} decompressed={body.Length} B");
 				if (outDir != null)
 					File.WriteAllBytes(Path.Combine(outDir, $"{type}_{e.Id}.bin"), body);
@@ -1010,7 +1012,7 @@ namespace Faolan.Importer.Cli
 		// with ms-range values). Field 0x126=cast/0x11F=range/0x15C=damage are already known.
 		private static void SpellFields(string rdbDir, string arg)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			var counts = new Dictionary<uint, int>();
 			var samples = new Dictionary<uint, List<uint>>();
 			uint? wanted = uint.TryParse(arg, out var w)
@@ -1018,7 +1020,7 @@ namespace Faolan.Importer.Cli
 				: null;
 			foreach (var e in rdb.EntriesOfType(1040005))
 			{
-				if (e.Size == 0 || e.File == 0xff)
+				if (e.Size == 0 || !rdb.CanRead(e))
 					continue;
 
 				byte[] body;

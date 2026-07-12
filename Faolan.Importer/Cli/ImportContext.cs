@@ -37,6 +37,13 @@ namespace Faolan.Importer.Cli
 		public string? RdbDir { get; init; }
 		public string? RdbStoreDir { get; init; }
 
+		// The Faolan.Web.Content mirror-proxy base for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
+		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).
+		// Passed to every importer RdbReader so CDN-only records import instead of being skipped. Override with
+		// --rdb-proxy (e.g. to point at a remote mirror); defaults to the local mirror. See [[aoc_content_cdn_mirror]].
+		public const string DefaultProxyBase = "http://127.0.0.1:7081/gameupdate/upm/rdb";
+		public string RdbProxyBase { get; init; } = DefaultProxyBase;
+
 		public TextWriter Out { get; init; } = Console.Out;
 
 		// Global write strategy + optional per-module overrides (--mode npcs=overwrite,items=insert).
