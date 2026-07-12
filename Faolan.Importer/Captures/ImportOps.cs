@@ -422,7 +422,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				var existing = await db.QuestDefinitions.Include(q => q.TextRefs).FirstOrDefaultAsync(q => q.QuestId == def.QuestId);
+				var existing = await db.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == def.QuestId);
 				if (existing == null)
 				{
 					db.QuestDefinitions.Add(def);
@@ -437,6 +437,23 @@ namespace Faolan.Importer.Captures
 				existing.MarkerY = def.MarkerY;
 				db.QuestTextRefs.RemoveRange(existing.TextRefs);
 				existing.TextRefs = def.TextRefs;
+
+				// Merge the harvested PRIMARY goal by GoalId into the existing rows WITHOUT clobbering the server-side-only
+				// fields (TargetName/GoalType/QuestItemId) a prior Seed* set - only the wire fields refresh.
+				foreach (var hg in def.Goals)
+				{
+					var g = existing.Goals.FirstOrDefault(x => x.GoalId == hg.GoalId);
+					if (g == null)
+						existing.Goals.Add(g = new QuestGoalDefinition { GoalId = hg.GoalId, Sequence = hg.Sequence, RequiredCount = hg.RequiredCount });
+
+					g.MapId = hg.MapId;
+					g.MarkerX = hg.MarkerX;
+					g.MarkerY = hg.MarkerY;
+					g.ObjectiveRefId = hg.ObjectiveRefId;
+					g.ObjectiveCategory = hg.ObjectiveCategory;
+					g.ObjectiveKey = hg.ObjectiveKey;
+				}
+
 				updated++;
 			}
 
@@ -644,57 +661,56 @@ namespace Faolan.Importer.Captures
 			quest.IndexTrailerWord = 0x000156E7;
 			quest.IndexGoalSteps = "10238,12369,12373,10320,12371,10286,10287,10915";
 
-			if (quest.Goals.Count > 0)
-			{
-				await db.SaveChangesAsync();
-				return;
-			}
+			// Overlay the two goals' full @609 detail (find-or-create by GoalId): the extractor may have already emitted
+			// goal 1448 as the harvested PRIMARY goal (wire fields only) - this completes it and adds goal 3490 - so the
+			// beach byte-exact @609 region is authoritative here regardless of what the capture harvested.
+			var goal1 = quest.Goals.FirstOrDefault(g => g.GoalId == 1448) ?? Add(quest, 1448);
+			goal1.Sequence = 1;
+			goal1.RequiredCount = 1;
+			goal1.Separator = 9;
+			goal1.SubId = 180;
+			goal1.MapId = 4010;
+			goal1.MarkerX = 416;
+			goal1.MarkerY = 701;
+			goal1.Extra5 = 0;
+			goal1.Extra6 = 0;
+			goal1.ObjectiveRefId = 1448;
+			goal1.ObjectiveCategory = 50304;
+			goal1.ObjectiveKey = "pARATX1!DX]&#92;So+0*A9B";
+			goal1.TrailingRefId = 180;
+			goal1.TrailingCategory = 51200;
+			goal1.TrailingKey = "b2Y2],LfVfAVps*9JX*G";
+			goal1.TrailingLocalized = false;
+			goal1.TrailingFlags = "";
 
-			quest.Goals.Add(new QuestGoalDefinition
-			{
-				GoalId = 1448,
-				Sequence = 1,
-				RequiredCount = 1,
-				Separator = 9,
-				SubId = 180,
-				MapId = 4010,
-				MarkerX = 416,
-				MarkerY = 701,
-				Extra5 = 0,
-				Extra6 = 0,
-				ObjectiveRefId = 1448,
-				ObjectiveCategory = 50304,
-				ObjectiveKey = "pARATX1!DX]&#92;So+0*A9B",
-				TrailingRefId = 180,
-				TrailingCategory = 51200,
-				TrailingKey = "b2Y2],LfVfAVps*9JX*G",
-				TrailingLocalized = false,
-				TrailingFlags = ""
-			});
-			quest.Goals.Add(new QuestGoalDefinition
-			{
-				GoalId = 3490,
-				Sequence = 2,
-				RequiredCount = 1,
-				Separator = 12,
-				SubId = 0,
-				MapId = 4010,
-				MarkerX = 521,
-				MarkerY = 757,
-				Extra5 = 70099,
-				Extra6 = 0x36314C56,
-				ObjectiveRefId = 3490,
-				ObjectiveCategory = 50304,
-				ObjectiveKey = "cA!(EbPpfzUK&#92;WPN@!H!",
-				TrailingRefId = 9500,
-				TrailingCategory = 51000,
-				TrailingKey = "]+/sUK&#39;G3mO)clF`)9Jh",
-				TrailingLocalized = true,
-				TrailingFlags = "m"
-			});
+			var goal2 = quest.Goals.FirstOrDefault(g => g.GoalId == 3490) ?? Add(quest, 3490);
+			goal2.Sequence = 2;
+			goal2.RequiredCount = 1;
+			goal2.Separator = 12;
+			goal2.SubId = 0;
+			goal2.MapId = 4010;
+			goal2.MarkerX = 521;
+			goal2.MarkerY = 757;
+			goal2.Extra5 = 70099;
+			goal2.Extra6 = 0x36314C56;
+			goal2.ObjectiveRefId = 3490;
+			goal2.ObjectiveCategory = 50304;
+			goal2.ObjectiveKey = "cA!(EbPpfzUK&#92;WPN@!H!";
+			goal2.TrailingRefId = 9500;
+			goal2.TrailingCategory = 51000;
+			goal2.TrailingKey = "]+/sUK&#39;G3mO)clF`)9Jh";
+			goal2.TrailingLocalized = true;
+			goal2.TrailingFlags = "m";
 
 			await db.SaveChangesAsync();
 			Console.WriteLine("Seeded beach quest 10238 goal-detail (2 goals) for the @609 objective region.");
+
+			static QuestGoalDefinition Add(QuestDefinition q, uint goalId)
+			{
+				var g = new QuestGoalDefinition { GoalId = goalId };
+				q.Goals.Add(g);
+				return g;
+			}
 		}
 
 		// The Tortage intro quest CHAIN (#261): 13479 is a four-stage supersession chain. Idempotent.

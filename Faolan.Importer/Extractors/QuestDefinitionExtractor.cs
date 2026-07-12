@@ -146,6 +146,29 @@ namespace Faolan.Importer.Extractors
 			SetRef(def, QuestTextSlot.MapName, map);
 			SetRef(def, QuestTextSlot.Objective, objective);
 			SetRef(def, QuestTextSlot.ObjectiveLocalized, objectiveLocalized);
+
+			// Emit the quest's PRIMARY goal as a QuestGoalDefinition from the just-decoded objective + marker block -
+			// real per-quest map/marker/objective-ref, not a hardcoded seed. The importer's Seed* overlays later
+			// find-or-create by GoalId, so this completes with the server-side-only fields (TargetName/GoalType/
+			// QuestItemId) and any multi-goal @609 detail rather than being duplicated. This is the goal the wire
+			// carries; a quest's non-primary goals only appear in the @609 snapshot region (seeded where captured).
+			UpsertGoal(def, objective.Id, def.MapId, def.MarkerX, def.MarkerY, objective);
+		}
+
+		// Find-or-create the goal by GoalId within the quest and set the WIRE fields (map/marker/objective ref). Leaves
+		// the server-side-only fields untouched so a later Seed* overlay can complete them.
+		private static void UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective)
+		{
+			var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
+			if (goal == null)
+				def.Goals.Add(goal = new QuestGoalDefinition { GoalId = goalId, Sequence = 1, RequiredCount = 1 });
+
+			goal.MapId = mapId;
+			goal.MarkerX = markerX;
+			goal.MarkerY = markerY;
+			goal.ObjectiveRefId = objective.Id;
+			goal.ObjectiveCategory = objective.Category;
+			goal.ObjectiveKey = objective.Key;
 		}
 
 		private static void MergeJournal(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
