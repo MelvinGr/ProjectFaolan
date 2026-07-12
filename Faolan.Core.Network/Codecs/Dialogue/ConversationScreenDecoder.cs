@@ -92,7 +92,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				}
 			}
 
-			return new Columns(sub, env, field, flag, screens);
+			return new Columns(sub, env, field, flag, screens, RpcCallerInstance(data));
 
 			uint U32(int rel)
 			{
@@ -162,7 +162,9 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		}
 
 		// The decoded columns of one conversation packet. Screens is the raw remoteformat screen XML list (the
-		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToRow).
-		public sealed record Columns(uint SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string> Screens, uint? CameraAgentInstance = null, byte[] CameraParams = null);
+		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToRow). SenderInstance
+		// is the rpcHeader caller endpoint instance (retail varies it per conversation), stored so the send path
+		// re-frames from columns instead of the raw Data blob; CameraParams is the SetDialogueCamera payload.
+		public sealed record Columns(uint SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string> Screens, uint? SenderInstance = null, byte[] CameraParams = null);
 	}
 }

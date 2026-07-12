@@ -2,19 +2,18 @@
 
 Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `Captures/ghidra/DumpIirReaders.java`).
 These are the NPC-dialogue packets served by `ConversationService.ServeScreen`. The **whole Knubot s2c set is
-now CONSTRUCTED** via `KnubotCodec` (`Faolan.Core.Network/Codecs/Dialogue/KnubotCodec.cs`) — `KnubotAppendText` (the
-spoken line), `KnubotOpenChatWindow`, `KnubotAnswerList` (the option buttons) and `KnubotCloseChatWindow`:
-`TryConstructKnubotRecord` lifts the remoteformat XML / options out of the captured record and rebuilds them
-re-addressed to the live player + clicked NPC, framed on the conversation endpoint (`GameAgent:<captured
-instance>`) like `SendConversationClose`. The quest-grant packets in the flow are built by the `WorldQuest`
-builders. So `ServeScreen` no longer replays any packet — substitution-replay survives only as a fallback for
-an unexpected sub-opcode. Proven byte-identical to the old handle-substitution
-(`ConversationConstructTests`/`KnubotCodecTests`).
+CONSTRUCTED** via `KnubotCodec` (`Faolan.Core.Network/Codecs/Dialogue/KnubotCodec.cs`) — `KnubotAppendText` (the
+spoken line), `KnubotOpenChatWindow`, `KnubotAnswerList` (the option buttons) and `KnubotCloseChatWindow` —
+entirely from the packet's typed columns, re-addressed to the live player + clicked NPC and framed on the
+conversation endpoint (`GameAgent:<stored SenderInstance>`) like `SendConversationClose`. The quest-grant packets
+in the flow are built by the `WorldQuest` builders. `ServeScreen` **replays nothing** — there is no raw-`Data`
+fallback (see below). Proven byte-identical to the codec construct (`ConversationConstructTests`/`KnubotCodecTests`).
 
-**Stored structured (2026-06-30; screens fully columnized 2026-07-12).** Every packet of a node is decoded into
-structured `ConversationPacket` columns (`ConversationScreenDecoder` → `SubOpcode/Env/Field/Flag`, plus
-`CameraAgentInstance/CameraParams` for the camera) and BUILT from those columns at send time, not from the raw
-`Data` blob (kept only as a fallback for non-Knubot packets). The remoteformat screen(s) are now stored as
+**Stored structured (2026-06-30; screens columnized + `Data` retired 2026-07-12).** Every packet of a node is
+decoded into structured `ConversationPacket` columns (`ConversationScreenDecoder` → `SubOpcode/Env/Field/Flag`,
+plus `SenderInstance` and `CameraParams` for the camera) and BUILT wholly from those columns at send time — the
+raw `Data` blob is **gone** (the importer REJECTS, rather than stores, a packet it can't decode to a recognised
+sub-opcode, so there is nothing left to replay). The remoteformat screen(s) are stored as
 **typed `ConversationScreen` rows** (`id`/`category`/`key`/`knubot`/`antitag` + ordered `ConversationScreenParameter`
 child rows of `name`/`InnerRaw`) — the old JSON-array-of-XML `ScreensJson` blob is **gone**. The importer
 columnizes each screen via `ConversationScreenColumns.ToRow`, which throws unless the typed round-trip
@@ -35,8 +34,8 @@ is that shape with a single empty `id="0"` remoteformat (retail's "nothing (more
 `<playerHandle>`. Retail **varies the GameAgent sender instance per conversation** — `0x07, 0x08, 0x0a, 0x0b,
 0x0e, 0x10, 0x11, 0x54..0x5a` observed (`0x08`/`0x0e` most common) — and the client addresses its `KnubotAnswer`
 (c2s: `GameInterface:<player>` → `GameAgent:<thatInstance>`) back to whichever instance sent the screen. So the
-construct path **preserves the captured sender instance** (`ConversationService.ReadSenderInstance`) rather than
-fixing one, matching retail/replay byte-for-byte.
+construct path **preserves the captured sender instance** (the `ConversationPacket.SenderInstance` column, decoded
+by `ConversationScreenDecoder`) rather than fixing one, matching retail byte-for-byte.
 
 Read primitives (shared with the rest of the protocol): `FUN_0048f900` = read u32 (byte-swapped when the
 big-endian flag is set), `FUN_0048f840` / `FUN_006200a0` = read a length-prefixed string (the
@@ -77,7 +76,7 @@ entities + params:
 ```
 
 They carry no `remoteformat` text, but they ARE structured (#188): `ConversationScreenDecoder.Decode`
-stores the GameCharAgent sender instance + the param bytes in the `CameraAgentInstance`/`CameraParams`
+stores the GameCharAgent sender instance + the param bytes in the `SenderInstance`/`CameraParams`
 columns, and the runtime BUILDS the packet from those columns via
 `DialogueCameraBody.BuildDialogueCameraPacket` re-addressed to the live player + NPC handles (byte-exact in
 `ConversationConstructTests`). The interleaved quest-grant packets are built by the `WorldQuest` builders.

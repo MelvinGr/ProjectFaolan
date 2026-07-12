@@ -30,31 +30,31 @@ namespace Faolan.Tests
 			var cols = ConversationScreenDecoder.Decode(captured);
 			Assert.NotNull(cols);
 			Assert.Equal(ConversationScreenDecoder.SetDialogueCamera, cols.SubOpcode);
-			Assert.Equal(0x58u, cols.CameraAgentInstance);
+			Assert.Equal(0x58u, cols.SenderInstance);
 
 			// The captured body's two handles: [0xC350][npc][0xC350][player] at 12 + headerLen.
 			var body = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
 			var npc = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 4, 4));
 			var player = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 12, 4));
 
-			var rebuilt = DialogueCameraBody.BuildDialogueCameraPacket(cols.CameraAgentInstance!.Value, player, npc, cols.CameraParams);
+			var rebuilt = DialogueCameraBody.BuildDialogueCameraPacket(cols.SenderInstance!.Value, player, npc, cols.CameraParams);
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(rebuilt));
 		}
 
-		// The structured-column construct (#188) must be BYTE-IDENTICAL to the Data-path construct, so persisting the
-		// decoded screen and building from it doesn't change the wire output.
+		// The structured-column construct (#188) must be BYTE-IDENTICAL to the direct codec construct from the raw
+		// record, so building the packet from the typed columns (no Data blob) doesn't change the wire output.
 		[Fact]
-		public void BuildFromColumns_IsByteIdenticalToTheDataPath()
+		public void BuildFromColumns_MatchesTheCodecConstruct()
 		{
 			foreach (var recordHex in new[] { KnubotCodecTestData.AppendTextBody, KnubotCodecTestData.AnswerListBody, KnubotCodecTestData.CloseChatWindowBody })
 			{
-				var packet = WrapInPacket(Convert.FromHexString(recordHex));
+				var record = Convert.FromHexString(recordHex);
+				var packet = WrapInPacket(record);
 
 				var cols = ConversationScreenDecoder.Decode(packet);
 				Assert.NotNull(cols);
 				var p = new ConversationPacket
 				{
-					Data = packet,
 					SubOpcode = cols.SubOpcode,
 					Env = cols.Env,
 					Field = cols.Field,
@@ -64,9 +64,23 @@ namespace Faolan.Tests
 					p.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i));
 
 				var fromColumns = ConversationService.BuildKnubotFromColumns(p, LiveInstance, ClickedNpc, "", "");
-				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out var fromData));
-				Assert.Equal(Convert.ToHexStringLower(fromData), Convert.ToHexStringLower(fromColumns));
+				Assert.Equal(Convert.ToHexStringLower(ExpectedConstruct(record)), Convert.ToHexStringLower(fromColumns));
 			}
+		}
+
+		// The codec-construct oracle: rebuild the record straight from the parsed raw record (the path KnubotCodecTests
+		// gates against the captures), for comparison with the from-columns build.
+		private static byte[] ExpectedConstruct(byte[] record)
+		{
+			var sub = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4));
+			if (sub == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
+			{
+				var a = KnubotCodec.ParseAppendText(record);
+				return KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc, a.Xml, a.Field, a.Trailing, a.Env);
+			}
+
+			var s = KnubotCodec.ParseStringList(record);
+			return KnubotCodec.BuildStringList(sub, LiveInstance, ClickedNpc, s.Strings, s.Env);
 		}
 
 		[Fact]
@@ -123,69 +137,33 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
 		}
 
-		// Retail varies the GameAgent sender instance per conversation (0x07..0x5a in the captures); we preserve the
-		// captured packet's instance so the constructed framing matches retail byte-for-byte. ReadSenderInstance must
-		// recover exactly what the real endpoint encoder (Endpoints) wrote.
-		[Theory, InlineData(0x08u), InlineData(0x0Eu), InlineData(0x5Au), InlineData(0x01316E71u)]
-		// a multi-byte varint instance, for good measure
-		public void ReadSenderInstance_RecoversTheEncodedGameAgentInstance(uint instance)
+		// Retail varies the GameAgent sender instance per conversation (0x07..0x5a in the captures); the decoder now
+		// recovers it into ConversationScreen.SenderInstance so the send path re-frames from columns (no raw Data).
+		// Verify the decode recovers exactly what the real endpoint encoder (Endpoints) wrote, incl. a multi-byte varint.
+		[Theory, InlineData(0x08u), InlineData(0x5Au), InlineData(0x01316E71u)]
+		public void Decode_RecoversTheSenderInstance(uint instance)
 		{
+			// A real CloseChatWindow record wrapped in a packet whose rpcHeader carries the chosen GameAgent sender:
+			// [8 len+crc][u32 headerLen][0x0a][byteLen][sender endpoint][record].
+			var record = Convert.FromHexString(KnubotCodecTestData.CloseChatWindowBody);
 			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, instance);
+			var header = new byte[2 + sender.Length];
+			header[0] = 0x0a;
+			header[1] = (byte)sender.Length;
+			Buffer.BlockCopy(sender, 0, header, 2, sender.Length);
 
-			// assemble a header the way PacketStream.WriteHeader does: [8 len+crc][u32 headerLen][0x0a][byteLen][sender]...
-			var packet = new byte[14 + sender.Length + 1];
-			packet[12] = 0x0a;
-			packet[13] = (byte)sender.Length;
-			Buffer.BlockCopy(sender, 0, packet, 14, sender.Length);
-
-			Assert.Equal(instance, ConversationService.ReadSenderInstance(packet));
-		}
-
-		[Fact]
-		public void TryConstructKnubotRecord_LiftsAndRebuildsFromAFullPacket()
-		{
-			var record = Convert.FromHexString(KnubotCodecTestData.AppendTextBody);
-
-			// wrap the record in a full conversation packet: [8 len+crc][u32 headerLen][header][record]
-			var header = new byte[20];
 			var packet = new byte[12 + header.Length + record.Length];
 			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
 			Buffer.BlockCopy(header, 0, packet, 12, header.Length);
 			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
 
-			Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out var rebuilt));
-
-			var expected = KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc, KnubotCodec.ParseAppendText(record).Xml);
-			Assert.Equal(Convert.ToHexStringLower(expected), Convert.ToHexStringLower(rebuilt));
+			var cols = ConversationScreenDecoder.Decode(packet);
+			Assert.NotNull(cols);
+			Assert.Equal(instance, cols.SenderInstance);
 		}
 
-		[Fact]
-		public void TryConstructKnubotRecord_RebuildsAnswerListAndCloseChatWindow()
-		{
-			foreach (var recordHex in new[] { KnubotCodecTestData.AnswerListBody, KnubotCodecTestData.CloseChatWindowBody })
-			{
-				var record = Convert.FromHexString(recordHex);
-				var packet = WrapInPacket(record);
-				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out var rebuilt));
-				var sub = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4)); // preserve AnswerList vs CloseChatWindow
-				var p = KnubotCodec.ParseStringList(record);
-				var expected = KnubotCodec.BuildStringList(sub, LiveInstance, ClickedNpc, p.Strings, p.Env);
-				Assert.Equal(Convert.ToHexStringLower(expected), Convert.ToHexStringLower(rebuilt));
-			}
-		}
-
-		[Fact]
-		public void TryConstructKnubotRecord_ReturnsFalseForUnhandledSubOpcode()
-		{
-			// a non-constructed sub-opcode (here a quest QuestLogList 0x504B7924) must stay on the substitution path
-			var record = Convert.FromHexString("0000000c504b79240000c350110099bd00");
-			var packet = WrapInPacket(record);
-			Assert.False(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out _));
-		}
-
-		// Replaces every big-endian u32 occurrence of oldVal with newVal - the record-level equivalent of
-		// ConversationService.SubstituteUInt32 (which scans from offset 8 of a FULL packet; a bare record's handles
-		// sit past that, so scanning the whole record matches).
+		// Replaces every big-endian u32 occurrence of oldVal with newVal - the record-level handle substitution the
+		// Construct_* tests compare the codec build against (a bare record's handles sit past the length prefix).
 		private static byte[] SubstituteU32(byte[] data, uint oldVal, uint newVal)
 		{
 			var outp = (byte[])data.Clone();

@@ -47,6 +47,10 @@ namespace Faolan.GameServer.Dialogue
 			0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x3E
 		];
 
+		// The GameAgent sender instance to use when a packet has none stored (retail's most common value); the real
+		// per-conversation instance comes from ConversationPacket.SenderInstance.
+		private const uint DefaultSenderInstance = 0x08;
+
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly LuaScriptVm _luaVm;
@@ -247,8 +251,6 @@ namespace Faolan.GameServer.Dialogue
 		private async Task ServeScreen(INetworkClient client, ConversationNode node, uint clickedNpcHandle)
 		{
 			var liveInstance = client.Session.Account.ClientInstance;
-			var oldInstanceVarint = new FaolanStream().WriteVarint(node.CapturedInstance).ToArray();
-			var newInstanceVarint = new FaolanStream().WriteVarint(liveInstance).ToArray();
 
 			// The live player's name/guild are regenerated into each screen's remoteformat XML (replacing the captured
 			// player's), so a dialogue addresses the player who's actually talking. Guild is empty when guildless.
@@ -261,13 +263,13 @@ namespace Faolan.GameServer.Dialogue
 			// instantly closes, can't accept). When the screen has a real AnswerList, drop the spurious close; a pure
 			// terminal screen (CloseChatWindow only) is kept.
 			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).ToList();
-			var hasAnswerList = orderedPackets.Any(p => SubOpcodeOf(p) == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR);
+			var hasAnswerList = orderedPackets.Any(p => p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR);
 
 			// Remember the GameAgent instance this conversation's packets are sent from (retail varies it per
 			// conversation). SendConversationClose must reuse it - a close from a different instance (e.g. the old
 			// hardcoded 0x08) doesn't match the dialogue and the client re-fires the greeting (#217).
 			if (orderedPackets.Count > 0)
-				client.Session.ConversationAgentInstance = ReadSenderInstance(orderedPackets[0].Data);
+				client.Session.ConversationAgentInstance = orderedPackets[0].SenderInstance ?? DefaultSenderInstance;
 
 			// A grant node accepts a quest. Retail announces it INTERLEAVED inside the grant screen, in this order:
 			// AppendText -> QuestLogList (0x504B7924, the J-panel list) -> QuestFullUpdate (0x63268258, the detail) ->
@@ -280,7 +282,15 @@ namespace Faolan.GameServer.Dialogue
 
 			foreach (var p in orderedPackets)
 			{
-				var subOp = SubOpcodeOf(p);
+				// Every conversation packet is stored STRUCTURED (#188): the importer requires a recognised SubOpcode,
+				// so the columns are the SOLE construction path - no raw-Data fallback. A null SubOpcode would be an
+				// import bug; surface it rather than silently dropping the line.
+				if (p.SubOpcode is not { } subOp)
+				{
+					_logger.LogError("Conversation: packet {Id} (node {Node}) has no SubOpcode; the importer should have columnized it. Skipping.", p.Id, node.Id);
+					continue;
+				}
+
 				if (hasAnswerList && subOp == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR)
 					continue; // skip the spurious close so the option list stays interactive
 
@@ -291,33 +301,13 @@ namespace Faolan.GameServer.Dialogue
 					grantSent = true;
 				}
 
-				// Preferred path: the packet is stored STRUCTURED (#188) - build it from the columns. Falls back to
-				// decoding/patching the raw Data when the columns aren't populated (re-import gap) or unrecognised.
-				if (p.SubOpcode is { } structuredSub)
-				{
-					if (structuredSub == ConversationScreenDecoder.SetDialogueCamera)
-						await SendDialogueCamera(client, p.CameraAgentInstance ?? 0x08, liveInstance, clickedNpcHandle, p.CameraParams);
-					else
-						await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
-
-					continue;
-				}
-
-				// CONSTRUCT every Knubot record through the typed codec (#188): AppendText (line) + OpenChatWindow +
-				// AnswerList + CloseChatWindow all rebuild via KnubotCodec re-addressed to the live endpoints. Only
-				// NON-Knubot records (e.g. interleaved quest packets) fall through to the substitution-replay below.
-				if (TryConstructKnubotRecord(p.Data, liveInstance, clickedNpcHandle, playerName, guildName, out var constructed))
-				{
-					await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, constructed);
-					continue;
-				}
-
-				var packet = (byte[])p.Data.Clone();
-				SubstituteUInt32(packet, node.CapturedNpcHandle, clickedNpcHandle);
-				SubstituteUInt32(packet, node.CapturedInstance, liveInstance);
-				if (oldInstanceVarint.Length == newInstanceVarint.Length)
-					ReplaceAll(packet, oldInstanceVarint, newInstanceVarint);
-				await new PacketStream(packet).SendAsync(client);
+				// The sender instance (retail varies it per conversation) is a stored column; the record body is built
+				// from the typed screen columns re-addressed to the live player + clicked NPC.
+				var senderInstance = p.SenderInstance ?? DefaultSenderInstance;
+				if (subOp == ConversationScreenDecoder.SetDialogueCamera)
+					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, p.CameraParams);
+				else
+					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
 			}
 
 			if (grantDef != null && !grantSent) // no AnswerList on this screen - send after the (terminal) screen
@@ -338,7 +328,7 @@ namespace Faolan.GameServer.Dialogue
 			// on the client. Recording it as the active position left the session "inside" a finished conversation,
 			// so the greeting the client fires right after re-opened it (#217). End instead - this arms the post-close
 			// guard (EndConversation) so that follow-up greeting is absorbed.
-			var isTerminalClose = !hasAnswerList && orderedPackets.Any(p => ConversationSubOpcode(p.Data) == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR);
+			var isTerminalClose = !hasAnswerList && orderedPackets.Any(p => p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR);
 			if (isTerminalClose)
 			{
 				client.Session.ConversationNpcHandle = clickedNpcHandle; // ensure the guard arms for THIS npc
@@ -459,151 +449,6 @@ namespace Faolan.GameServer.Dialogue
 			}
 		}
 
-		// Regenerate the live player's name/guild into a RAW captured screen's remoteformat XML (the Data-path
-		// construct for non-columnized packets - TryConstructKnubotRecord). SAFETY: only rebuilds when the parser
-		// reproduces the captured XML byte-for-byte first; otherwise the original bytes are returned untouched, so an
-		// unrecognised screen variant can never be corrupted. (The columnized screen path builds from typed rows
-		// directly and needs no such guard.)
-		private static byte[] WithLivePlayer(byte[] screenXml, string playerName, string guildName)
-		{
-			if (screenXml == null || screenXml.Length == 0 || string.IsNullOrEmpty(playerName))
-				return screenXml;
-
-			try
-			{
-				var xml = Encoding.Latin1.GetString(screenXml);
-				var screen = RemoteFormatXml.Parse(xml);
-				if (RemoteFormatXml.Build(screen) != xml)
-					return screenXml; // not byte-exact roundtrippable -> leave it alone
-
-				var rebuilt = RemoteFormatXml.Build(RemoteFormatXml.WithLivePlayer(screen, playerName, guildName ?? ""));
-				return Encoding.Latin1.GetBytes(rebuilt);
-			}
-			catch
-			{
-				return screenXml;
-			}
-		}
-
-		// Reads the GameAgent sender instance out of a captured packet's RPC header. Header layout (PacketStream):
-		// [u32 len][u32 crc][u32 headerLen][0x0a][byteLen][sender endpoint][0x12]... where a ProtoEndpoint is
-		// [0x0D <type LE32> 0x10 <instance varint>]. Falls back to 0x08 (the common value / SendConversationClose's)
-		// if the header is shaped unexpectedly.
-		internal static uint ReadSenderInstance(byte[] packet)
-		{
-			const uint Fallback = 0x08;
-			if (packet == null || packet.Length < 14 || packet[12] != 0x0a)
-				return Fallback;
-
-			var senderLen = packet[13];
-			var i = 14;
-			var end = i + senderLen;
-			if (end > packet.Length || packet[i] != 0x0d)
-				return Fallback;
-
-			i += 1 + 4; // skip 0x0D + the fixed32 type
-			if (i >= end || packet[i] != 0x10)
-				return Fallback;
-
-			i++; // skip the 0x10 instance tag
-
-			uint value = 0;
-			var shift = 0;
-			while (i < end)
-			{
-				var bb = packet[i++];
-				value |= (uint)(bb & 0x7f) << shift;
-				if ((bb & 0x80) == 0)
-					return value;
-
-				shift += 7;
-			}
-
-			return Fallback;
-		}
-
-		// Lifts the IIR carrier payload (the [u32 len][record]) out of a captured full conversation packet and, if it
-		// is an AppendText or OpenChatWindow, rebuilds it through KnubotCodec re-addressed to the live player + clicked
-		// NPC. Returns false for every other sub-opcode (those stay on the substitution-replay path).
-		internal static bool TryConstructKnubotRecord(byte[] capturedPacket, uint liveInstance, uint clickedNpcHandle, string playerName, string guildName, out byte[] record)
-		{
-			record = null;
-			if (capturedPacket == null || capturedPacket.Length < 12)
-				return false;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(capturedPacket.AsSpan(8, 4));
-			var start = 12 + headerLen;
-			if (start + 8 > capturedPacket.Length)
-				return false;
-
-			var carrier = capturedPacket.AsSpan(start).ToArray(); // [u32 len][sub][...]
-			var sub = BinaryPrimitives.ReadUInt32BigEndian(carrier.AsSpan(4, 4));
-
-			if (sub == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
-			{
-				var p = KnubotCodec.ParseAppendText(carrier);
-				var xml = WithLivePlayer(p.Xml, playerName, guildName);
-				record = KnubotCodec.BuildAppendText(liveInstance, clickedNpcHandle, xml, p.Field, p.Trailing, p.Env);
-				return true;
-			}
-
-			if (sub == (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR)
-			{
-				var p = KnubotCodec.ParseOpenChatWindow(carrier);
-				record = KnubotCodec.BuildOpenChatWindow(liveInstance, clickedNpcHandle, p.Value, p.Env);
-				return true;
-			}
-
-			// AnswerList + CloseChatWindow share the string-list grammar; rebuild re-addressed to the live endpoints.
-			if (sub == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR || sub == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR)
-			{
-				var p = KnubotCodec.ParseStringList(carrier);
-				var strings = p.Strings.Select(x => WithLivePlayer(x, playerName, guildName)).ToList();
-				record = KnubotCodec.BuildStringList(sub, liveInstance, clickedNpcHandle, strings, p.Env);
-				return true;
-			}
-
-			return false;
-		}
-
-		// The conversation IIR sub-opcode of a stored packet: full Conan packet is [len4][crc4][headerLen4][header]
-		// [body], and the body is [u32 len][u32 subOpcode]... so the sub-op is the u32 at 12 + headerLen + 4.
-		private static uint ConversationSubOpcode(byte[] packet)
-		{
-			if (packet == null || packet.Length < 12)
-				return 0;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			var off = 12 + headerLen + 4;
-			return off + 4 <= packet.Length
-				? BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(off, 4))
-				: 0;
-		}
-
-		// Byte-array find/replace from offset 8 (skips the length+crc prefix). Copied from RetailLoginReplay's
-		// private helper - a small self-contained util; duplicating it keeps this service free of the listener.
-		private static void ReplaceAll(byte[] buffer, byte[] find, byte[] repl)
-		{
-			for (var i = 8; i + find.Length <= buffer.Length; i++)
-			{
-				var match = true;
-				for (var j = 0; j < find.Length; j++)
-				{
-					if (buffer[i + j] != find[j])
-					{
-						match = false;
-						break;
-					}
-				}
-
-				if (match)
-				{
-					repl.CopyTo(buffer, i);
-					i += find.Length - 1;
-				}
-			}
-		}
-
 		// Frames a constructed Knubot record exactly as retail does (verified against the captures): the conversation
 		// runs sender `GameAgent:<conversationAgentInstance>` -> receiver `GameInterface:<playerHandle>` on opcode
 		// 0x2000. Retail VARIES the GameAgent instance per conversation (0x07..0x5a observed; 0x08 the most common),
@@ -624,32 +469,6 @@ namespace Faolan.GameServer.Dialogue
 		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
 		{
 			return client.SendAsync(DialogueCameraBody.BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
-		}
-
-		// The packet's Knubot sub-opcode: the stored column when structured, else read from the raw Data.
-		private static uint SubOpcodeOf(ConversationPacket p)
-		{
-			return p.SubOpcode ?? ConversationSubOpcode(p.Data);
-		}
-
-		// Replaces every big-endian uint32 occurrence of oldVal with newVal after the 8-byte length+crc prefix.
-		// The handle/instance are 4 bytes both ways, so every nested length prefix stays valid.
-		private static void SubstituteUInt32(byte[] packet, uint oldVal, uint newVal)
-		{
-			if (oldVal == newVal)
-				return;
-
-			Span<byte> needle = stackalloc byte[4];
-			BinaryPrimitives.WriteUInt32BigEndian(needle, oldVal);
-
-			for (var i = 8; i + 4 <= packet.Length; i++)
-			{
-				if (packet[i] == needle[0] && packet[i + 1] == needle[1] && packet[i + 2] == needle[2] && packet[i + 3] == needle[3])
-				{
-					BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(i, 4), newVal);
-					i += 3;
-				}
-			}
 		}
 
 	}

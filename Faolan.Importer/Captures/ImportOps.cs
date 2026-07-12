@@ -557,28 +557,28 @@ namespace Faolan.Importer.Captures
 			s.FlagC = fx.FlagC;
 		}
 
-		// Upsert (never wipe): refresh from a clean slate so stale handle-keyed (un-named) nodes don't linger.
-		// One ConversationPacket: keep the raw Data (fallback + non-Knubot replay) and, for the four Knubot dialogue
-		// IIRs, also store the screen STRUCTURED (#188) so the runtime builds it from fields.
+		// Upsert (never wipe): refresh from a clean slate so stale handle-keyed (un-named) nodes don't linger. One
+		// ConversationPacket is stored FULLY STRUCTURED (#188): decoded into typed columns + ConversationScreen rows,
+		// no raw Data blob. A packet that doesn't decode to a recognised sub-opcode is a REJECT (throws) rather than a
+		// silent raw-replay - the runtime has no Data fallback, so an un-decodable packet must surface here.
 		private static ConversationPacket BuildPacket(byte[] data, int sequence)
 		{
+			if (ConversationScreenDecoder.Decode(data) is not { } cols)
+				throw new InvalidOperationException($"Conversation packet #{sequence} did not decode to a recognised sub-opcode (no Data fallback exists).");
+
 			var pkt = new ConversationPacket
 			{
 				Sequence = sequence,
-				Data = data
+				SubOpcode = cols.SubOpcode,
+				Env = cols.Env,
+				Field = cols.Field,
+				Flag = cols.Flag,
+				SenderInstance = cols.SenderInstance,
+				CameraParams = cols.CameraParams
 			};
-			if (ConversationScreenDecoder.Decode(data) is { } cols)
-			{
-				pkt.SubOpcode = cols.SubOpcode;
-				pkt.Env = cols.Env;
-				pkt.Field = cols.Field;
-				pkt.Flag = cols.Flag;
-				pkt.CameraAgentInstance = cols.CameraAgentInstance;
-				pkt.CameraParams = cols.CameraParams;
-				if (cols.Screens != null)
-					for (var i = 0; i < cols.Screens.Count; i++)
-						pkt.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i)); // throws if a screen isn't byte-exact round-trippable
-			}
+			if (cols.Screens != null)
+				for (var i = 0; i < cols.Screens.Count; i++)
+					pkt.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i)); // throws if a screen isn't byte-exact round-trippable
 
 			return pkt;
 		}
