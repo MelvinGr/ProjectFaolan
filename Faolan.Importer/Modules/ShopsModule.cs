@@ -15,7 +15,8 @@ namespace Faolan.Importer.Modules
 		// the items module (ItemHashHarvester's shop source reads the same 0x2033 packets). Shops must run AFTER that
 		// so the ShopItem -> Items FK resolves; otherwise a `--only shops` run leaves the wares orphaned and the shop
 		// window renders empty (the builder skips slots whose template has no Items row).
-		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
+		// NpcsModule too (#244): the shop FK-keys on NpcTemplateId, so the vendor's NPC TYPE must be imported first.
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule), nameof(NpcsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

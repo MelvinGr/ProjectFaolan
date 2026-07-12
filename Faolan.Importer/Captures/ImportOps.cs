@@ -190,6 +190,10 @@ namespace Faolan.Importer.Captures
 			db.ConversationPackets.RemoveRange(existing.SelectMany(n => n.Packets));
 			db.ConversationNodes.RemoveRange(existing);
 
+			// A conversation NPC's template must exist to be the FK target (#244); the world is pruned, so a template
+			// resolved from a capture may not be imported - null it out (name-only fallback) rather than fail the FK.
+			var knownTemplates = (await db.NpcTemplates.Select(t => t.TemplateId).ToListAsync()).ToHashSet();
+
 			foreach (var e in conversations)
 			{
 				db.ConversationNodes.Add(new ConversationNode
@@ -198,6 +202,7 @@ namespace Faolan.Importer.Captures
 					AnswerPath = e.AnswerPath,
 					CapturedNpcHandle = e.CapturedNpcHandle,
 					NpcName = e.NpcName,
+					NpcTemplateId = e.NpcTemplateId is { } t && knownTemplates.Contains(t) ? t : null,
 					CapturedInstance = e.CapturedInstance,
 					ConditionScript = e.ConditionScript,
 					GrantQuestId = e.GrantQuestId,

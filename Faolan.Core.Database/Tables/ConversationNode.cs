@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -33,16 +34,22 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(256)]
 		public string ConditionScript { get; set; } = "";
 
-		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. NPC dynel handles are
-		// session-volatile (the world burst we replay and the conversation came from different captures), so routing
-		// by handle fails; the name is the stable identity the runtime matches the clicked NPC against.
-		// (#39 reviewed 2026-06-19: NpcStats.template_id from the spawn is the more *canonical* id, but it's redundant
-		// here - name AND template_id are both derived from the same spawn parse on both the import and live sides, so
-		// neither is more durable; every conversational NPC has a unique name; and the lookup is name-keyed end-to-end
-		// with both sides matching the same ReadSpawnName output. Switch to template_id only if same-named conversational
-		// NPCs ever appear - until then name is correct and the simpler key.)
+		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. Display/routing hint;
+		// the runtime now gates on NpcTemplateId (below), not the name alone.
 		[MaxLength(128)]
 		public string? NpcName { get; set; }
+
+		// The NPC's TYPE id (NpcStats.template_id from the same spawn) - the STABLE per-type key the runtime gates the
+		// conversation on (#244). Needed now that same-named conversational NPCs exist: "Halen van Dummy" is the internal
+		// name of 25 templates (the quest-giver Atraxus 12236 + children/dummies), so a name match ALONE would open
+		// Atraxus's dialogue on any of them. Null when the conversation NPC's spawn (its template) wasn't in the capture -
+		// then the runtime falls back to name-only matching (create-flow scripted intros, etc.).
+		// Nullable BY DESIGN: the world is pruned, so a conversation NPC's TYPE may not be imported (e.g. the Conarch
+		// Village Guard's 42008 tree) - null there means "gate off, match by name only" rather than dropping the dialogue.
+		public uint? NpcTemplateId { get; set; }
+
+		[ForeignKey(nameof(NpcTemplateId))]
+		public virtual NpcTemplate? NpcTemplate { get; set; }
 
 		public uint CapturedInstance { get; set; }
 		public uint CapturedNpcHandle { get; set; }

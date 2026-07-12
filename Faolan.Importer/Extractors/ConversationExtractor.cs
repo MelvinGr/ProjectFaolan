@@ -28,6 +28,7 @@ namespace Faolan.Importer.Extractors
 		uint CapturedInstance,
 		List<byte[]> Packets,
 		string NpcName,
+		uint? NpcTemplateId = null,
 		string ConditionScript = "",
 		uint GrantQuestId = 0,
 		uint QuestContextId = 0);
@@ -61,6 +62,12 @@ namespace Faolan.Importer.Extractors
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var namesByHandle = BuildSpawnNameMap(packets);
+			// handle -> NPC TEMPLATE id (#244): the runtime gates the conversation on the clicked NPC's template so a
+			// same-named NPC (25 share "Halen van Dummy") can't open another's dialogue.
+			var templatesByHandle = NpcSpawnExtractor.Extract(packets)
+				.Where(e => e.Handle != 0 && e.TemplateId != 0)
+				.GroupBy(e => e.Handle)
+				.ToDictionary(g => g.Key, g => g.First().TemplateId);
 			var entries = new List<ConversationEntry>();
 
 			// Per-conversation-instance state, reset at each greeting (TalkToNpc f3=0).
@@ -144,7 +151,8 @@ namespace Faolan.Importer.Extractors
 			void Flush()
 			{
 				if (active && screen.Count > 0)
-					entries.Add(new ConversationEntry(typeId, path, npc, instance, [.. screen], namesByHandle.GetValueOrDefault(npc), GrantQuestId: grant, QuestContextId: instanceContext));
+					entries.Add(new ConversationEntry(typeId, path, npc, instance, [.. screen], namesByHandle.GetValueOrDefault(npc),
+						templatesByHandle.TryGetValue(npc, out var tpl) ? tpl : null, GrantQuestId: grant, QuestContextId: instanceContext));
 			}
 		}
 

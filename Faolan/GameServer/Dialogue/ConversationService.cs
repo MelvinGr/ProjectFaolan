@@ -75,7 +75,8 @@ namespace Faolan.GameServer.Dialogue
 			var childPath = path.Length == 0
 				? answerIndex.ToString()
 				: $"{path}>{answerIndex}";
-			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath);
+			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath,
+				client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(client.Session.ConversationNpcHandle));
 			if (screen == null)
 			{
 				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
@@ -91,7 +92,7 @@ namespace Faolan.GameServer.Dialogue
 		// instead of replaying a baked captured line. Returns false when the NPC has no matching screen for `typeId`.
 		public async Task<bool> ServeGreeting(INetworkClient client, string npcName, uint typeId, uint npcHandle)
 		{
-			var greeting = await PickConversationScreen(client, npcName, typeId, "");
+			var greeting = await PickConversationScreen(client, npcName, typeId, "", client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(npcHandle));
 			if (greeting == null)
 				return false;
 
@@ -135,7 +136,7 @@ namespace Faolan.GameServer.Dialogue
 			// Pick the greeting in the player's CURRENT (pre-completion) quest state so a talk-stage shows its OWN
 			// dialogue: e.g. Casilda's "I'll protect you now" one-off is gated on HasQuest(13480), so it must be picked
 			// while 13480 is still active (#264).
-			var greeting = await PickConversationScreen(client, npcName, typeId, "");
+			var greeting = await PickConversationScreen(client, npcName, typeId, "", client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(clickedNpcHandle));
 			if (greeting == null)
 				return false;
 
@@ -154,9 +155,9 @@ namespace Faolan.GameServer.Dialogue
 		// variants exist, evaluate each (conditioned-first) against the character's tags + completed quests via the
 		// LuaScriptVm, and serve the first that passes; the unconditional "" variant is the fallback. A condition
 		// script error is treated as "doesn't match" (permissive=false) so a bad gate can't hijack every player.
-		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath)
+		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath, uint clickedTemplateId)
 		{
-			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath);
+			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath, clickedTemplateId);
 			if (variants.Count == 0)
 				return null;
 			if (variants.Count == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))

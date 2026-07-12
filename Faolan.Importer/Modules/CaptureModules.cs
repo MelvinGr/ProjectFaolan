@@ -244,7 +244,8 @@ namespace Faolan.Importer.Modules
 	public sealed class ConversationsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [];
+		// NpcsModule (#244): conversation nodes FK-key on NpcTemplateId, so the NPC TYPEs must be imported first.
+		public IReadOnlyList<string> DependsOn => [nameof(NpcsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

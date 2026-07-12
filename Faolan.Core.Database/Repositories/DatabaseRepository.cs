@@ -48,8 +48,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<Combo[]> GetClassCombos(uint level, Class @class);
 		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
-		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath);
-		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath);
+		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
+		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
 		Task<RespawnPoint?> GetDefaultSpawn(uint mapId);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task<Guild?> GetGuild(uint id);
@@ -639,7 +639,7 @@ namespace Faolan.Core.Database.Repositories
 		// is the real branch selector; the old Mode/Field3 were session-volatile counters). Null = no captured screen
 		// for that path (an un-walked branch) -> the runtime closes the window gracefully. See memory
 		// protocol_conversation_routing.
-		public async Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath)
+		public async Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
 		{
 			if (string.IsNullOrEmpty(npcName))
 				return null;
@@ -647,13 +647,16 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.ConversationNodes
 				.Include(n => n.Packets).ThenInclude(p => p.Screens).ThenInclude(s => s.Parameters)
-				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath);
+				// #244: gate on the clicked NPC's template so a same-named NPC ("Halen van Dummy" x25) can't open
+				// another's dialogue; a null template (create-flow scripted screens) falls back to name-only matching.
+				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath
+					&& (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId));
 		}
 
 		// All quest/tag-conditioned variants of a screen (same NpcName/TypeId/AnswerPath, differing ConditionScript).
 		// The runtime evaluates each variant's condition against the live player and serves the matching one (the
 		// unconditional "" variant is the fallback). Ordered conditioned-first so the caller can take the first pass.
-		public async Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath)
+		public async Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
 		{
 			if (string.IsNullOrEmpty(npcName))
 				return [];
@@ -661,7 +664,9 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var nodes = await ctx.ConversationNodes
 				.Include(n => n.Packets).ThenInclude(p => p.Screens).ThenInclude(s => s.Parameters)
-				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath).ToListAsync();
+				// #244: gate on the clicked NPC's template (null template = create-flow screen -> name-only fallback).
+				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath
+					&& (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId)).ToListAsync();
 
 			// Conditioned variants first, the unconditional fallback last.
 			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToList();

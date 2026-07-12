@@ -320,6 +320,11 @@ namespace Faolan.Core.Database
 			// reference data, not a cascade parent.
 			modelBuilder.Entity<Shop>().HasOne(s => s.NpcTemplate).WithOne(t => t.Shop).HasForeignKey<Shop>(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
 
+			// A conversation node points at its NPC TYPE (#244) - many nodes per type, keyed by template so a same-named
+			// NPC (25 share "Halen van Dummy") can't open another's dialogue. Nullable (create-flow scripted screens have
+			// no captured spawn/template); Restrict, the type is reference data.
+			modelBuilder.Entity<ConversationNode>().HasOne(n => n.NpcTemplate).WithMany().HasForeignKey(n => n.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
+
 			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its NpcTemplate type.
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).HasForeignKey(e => e.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Morphs).WithOne(m => m.NpcTemplate).HasForeignKey(m => m.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
