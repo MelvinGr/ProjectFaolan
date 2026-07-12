@@ -10,7 +10,7 @@ namespace Faolan.Tests
 	// #244 gate: a captured stat-core sub-message (CharacterStats/NpcStats/CharacterBcc) must survive the
 	// NpcStatCoreCodec decompose->compose round-trip and re-serialise byte-for-byte - the guarantee that lets NPC cores
 	// be rebuilt from typed columns with zero wire drift. Driven from the golden captures (the DB no longer stores the
-	// captured body - both NpcSpawn.Data and Npc.Data are retired), covering the animal + humanoid core shapes.
+	// captured body - both NpcSpawn.Data and NpcTemplate.Data are retired), covering the animal + humanoid core shapes.
 	public class NpcStatCoreCodecTests
 	{
 		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther"), InlineData("SpawnNpcCasilda")]

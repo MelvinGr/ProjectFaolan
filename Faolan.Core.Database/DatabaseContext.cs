@@ -53,7 +53,7 @@ namespace Faolan.Core.Database
 		DbSet<Map> Maps { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
-		DbSet<Npc> Npcs { get; }
+		DbSet<NpcTemplate> NpcTemplates { get; }
 		DbSet<NpcEquipment> NpcEquipment { get; }
 		DbSet<NpcMorph> NpcMorphs { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
@@ -122,7 +122,7 @@ namespace Faolan.Core.Database
 		public DbSet<Map> Maps { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
-		public DbSet<Npc> Npcs { get; set; }
+		public DbSet<NpcTemplate> NpcTemplates { get; set; }
 		public DbSet<NpcEquipment> NpcEquipment { get; set; }
 		public DbSet<NpcMorph> NpcMorphs { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
@@ -305,21 +305,24 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Equipment).WithOne(e => e.NpcSpawn).HasForeignKey(e => e.NpcSpawnId).OnDelete(DeleteBehavior.Cascade);
 
 			// The NPC TYPE table (#244): one row per TemplateId, deduping the type identity duplicated across every
-			// placement. A spawn (instance) and a spell point at their type by the Npc PK (NpcId); SetNull keeps the
+			// placement. A spawn (instance) and a spell point at their type by the NpcTemplate PK (NpcTemplateId); SetNull keeps the
 			// instance/spell if the type is ever removed (the type is reference data, not a cascade parent).
-			modelBuilder.Entity<Npc>().HasIndex(n => n.TemplateId).IsUnique();
+			// TemplateId (the RDB NpcStats.f4 id) IS the primary key - a natural-key catalog like Item/Spell/Map, set
+			// from the RDB by the importer and never DB-generated (#350).
+			modelBuilder.Entity<NpcTemplate>().HasKey(n => n.TemplateId);
+			modelBuilder.Entity<NpcTemplate>().Property(n => n.TemplateId).ValueGeneratedNever();
 
-			modelBuilder.Entity<Npc>().HasMany(n => n.Spawns).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spawns).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
 
-			modelBuilder.Entity<Npc>().HasMany(n => n.Spells).WithOne(s => s.Npc).HasForeignKey(s => s.NpcId).OnDelete(DeleteBehavior.SetNull);
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spells).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.SetNull);
 
-			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its Npc type.
-			modelBuilder.Entity<Npc>().HasMany(n => n.Equipment).WithOne(e => e.Npc).HasForeignKey(e => e.NpcId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Npc>().HasMany(n => n.Morphs).WithOne(m => m.Npc).HasForeignKey(m => m.NpcId).OnDelete(DeleteBehavior.Cascade);
+			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its NpcTemplate type.
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).HasForeignKey(e => e.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Morphs).WithOne(m => m.NpcTemplate).HasForeignKey(m => m.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
 
-			// One-to-one Npc <-> NpcStatCore (#244), keyed by NpcId; the type-level stat core lifted off the Data blob
+			// One-to-one NpcTemplate <-> NpcStatCore (#244), keyed by NpcTemplateId; the type-level stat core lifted off the Data blob
 			// so a spawn body is constructed from typed storage, not spliced. Cascades with the type.
-			modelBuilder.Entity<Npc>().HasOne(n => n.StatCore).WithOne(s => s.Npc).HasForeignKey<NpcStatCore>(s => s.NpcId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcTemplate>().HasOne(n => n.StatCore).WithOne(s => s.NpcTemplate).HasForeignKey<NpcStatCore>(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
 
 			// One patrol route per NpcSpawn (#316): the FK joins a route to the NPC that walks it, so the runtime
 			// looks it up via the spawn's nav instead of matching floats. Cascade-deletes with the spawn.

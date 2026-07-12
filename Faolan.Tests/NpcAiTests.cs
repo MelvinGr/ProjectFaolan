@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // chased out past the leash
 			zone.Add(npc);
 			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0));
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			var far = Player(2, 15, 0);
 			var near = Player(3, 3, 0);
 			zone.Add(npc);
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			zone.Add(npc);
 			zone.Add(Player(2, 8, 0));
 
@@ -74,7 +74,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			npc.Vitals.ApplyHealthDelta(-50);
 			zone.Add(npc);
 			zone.Add(Player(2, 3, 0)); // still in combat range
@@ -88,7 +88,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			npc.Vitals.ApplyHealthDelta(-50); // hurt to 50/100
 			zone.Add(npc);
 			zone.Add(Player(2, 1000, 1000)); // fled far away
@@ -102,7 +102,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			npc.Vitals.ApplyHealthDelta(-100); // dead
 			npc.MarkDead();
 			zone.Add(npc);
@@ -117,7 +117,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			var player = Player(2, 3, 0);
 			zone.Add(npc);
 			zone.Add(player);
@@ -133,7 +133,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			zone.Add(Npc(1, 0, 0));
+			zone.Add(NpcTemplate(1, 0, 0));
 			var player = Player(2, 3, 0); // right next to a hostile NPC
 			player.Invisible = true; // .invisible
 			zone.Add(player);
@@ -146,7 +146,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0); // spawns (and homes) at the origin
+			var npc = NpcTemplate(1, 0, 0); // spawns (and homes) at the origin
 			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // already chased out past the leash
 			zone.Add(npc);
 			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0)); // a player right next to it, well within aggro range
@@ -166,7 +166,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			zone.Add(Npc(1, 0, 0, hostile: false)); // a quest-giver / vendor
+			zone.Add(NpcTemplate(1, 0, 0, hostile: false)); // a quest-giver / vendor
 			zone.Add(Player(2, 3, 0)); // right next to it
 
 			Assert.Empty(NonHeartbeat(world.Tick(WorldState.NpcAttackInterval)));
@@ -177,7 +177,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			zone.Add(Npc(1, 0, 0));
+			zone.Add(NpcTemplate(1, 0, 0));
 			zone.Add(Player(2, 1000, 1000)); // far away
 
 			Assert.Empty(NonHeartbeat(world.Tick(WorldState.NpcAttackInterval * 2)));
@@ -188,7 +188,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			var player = Player(2, 10, 0); // aggro range (20) but beyond melee (3)
 			zone.Add(npc);
 			zone.Add(player);
@@ -221,7 +221,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
+			var npc = NpcTemplate(1, 0, 0);
 			var player = Player(2, 2, 0); // within NpcMeleeRange (3)
 			zone.Add(npc);
 			zone.Add(player);
@@ -245,7 +245,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			zone.Add(Npc(1, 0, 0));
+			zone.Add(NpcTemplate(1, 0, 0));
 			// Right above the NPC (1u horizontal) but a storey up - through a floor (#284 vertical-delta gate).
 			var player = new WorldEntity(2, 4010, true, "P2", null)
 			{
@@ -268,7 +268,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0); // homes at the origin
+			var npc = NpcTemplate(1, 0, 0); // homes at the origin
 			npc.RespawnDelaySeconds = 1.0;
 			zone.Add(npc);
 
@@ -297,7 +297,7 @@ namespace Faolan.Tests
 			// tick and not before the interval elapses. Non-hostile so no aggro/move effects muddy the assertion.
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0, hostile: false);
+			var npc = NpcTemplate(1, 0, 0, hostile: false);
 			zone.Add(npc);
 
 			Assert.DoesNotContain(world.Tick(0.2), e => e.Type == WorldTickEffectType.NpcHeartbeat); // before the interval
@@ -311,7 +311,7 @@ namespace Faolan.Tests
 			// corpse the client is despawning would reference a handle in flux. The emit sits past the IsDead gate.
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0, hostile: false);
+			var npc = NpcTemplate(1, 0, 0, hostile: false);
 			npc.Vitals.ApplyHealthDelta(-100); // killing blow
 			npc.MarkDead();
 			zone.Add(npc);
@@ -326,7 +326,7 @@ namespace Faolan.Tests
 			return effects.Where(e => e.Type != WorldTickEffectType.NpcHeartbeat);
 		}
 
-		private static WorldEntity Npc(uint handle, float x, float z, uint level = 1, bool hostile = true)
+		private static WorldEntity NpcTemplate(uint handle, float x, float z, uint level = 1, bool hostile = true)
 		{
 			var e = WorldEntity.ForNpc(handle, 4010, new Vector3(x, 0, z), Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
 			e.Hostile = hostile;

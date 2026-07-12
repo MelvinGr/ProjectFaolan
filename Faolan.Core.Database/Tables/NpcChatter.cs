@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Faolan.Core.Database.Tables
 {
 	// An ambient "chatter" bark an NPC TYPE periodically says (CharacterChat 0x0022 local-say, a chat bubble over the
-	// NPC). Keyed by NpcId (the NPC type), like NpcSpell. The dialogue is SPECIFIC per NPC - each NPC references its
+	// NPC). Keyed by NpcTemplateId (the NPC type), like NpcSpell. The dialogue is SPECIFIC per NPC - each NPC references its
 	// own conversation group; they do NOT share one table - so lines are stored per NPC type.
 	//
 	// Harvested from captures by Faolan.Importer (NpcChatterModule): the bark is a
@@ -12,11 +12,11 @@ namespace Faolan.Core.Database.Tables
 	// key, so we store + replay it byte-for-byte rather than reconstructing it.
 	public class NpcChatter : BaseEntity
 	{
-		// The NPC TYPE that says this line (loader reads via Npc.Chatter). A bark whose speaker has no Npc type is dropped.
-		public uint NpcId { get; set; }
+		// The NPC TYPE that says this line (loader reads via NpcTemplate.Chatter). A bark whose speaker has no NpcTemplate type is dropped.
+		public uint NpcTemplateId { get; set; }
 
-		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; } = null!;
+		[ForeignKey(nameof(NpcTemplateId))]
+		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
 
 		// The verbatim <remoteformat> XML sent as the CharacterChat (0x0022) message.
 		public string RemoteFormat { get; set; } = null!;

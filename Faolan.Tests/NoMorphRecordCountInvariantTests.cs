@@ -27,13 +27,13 @@ namespace Faolan.Tests
 			var db = Path.Combine(FindRepoRoot(), "faolan.db");
 			var options = TestDb.ReadOnly(db);
 			using var ctx = new DatabaseContext(options);
-			var rows = ctx.NpcSpawns.Include(s => s.Npc).ThenInclude(n => n.StatCore).Include(s => s.Morphs).Where(s => s.Npc != null && s.Npc.StatCore != null && s.Life > 0).AsNoTracking().ToList();
+			var rows = ctx.NpcSpawns.Include(s => s.NpcTemplate).ThenInclude(n => n.StatCore).Include(s => s.Morphs).Where(s => s.NpcTemplate != null && s.NpcTemplate.StatCore != null && s.Life > 0).AsNoTracking().ToList();
 
-			var fallback = rows.Where(s => !(s.Npc.StatCore.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.Npc.StatCore.MinimalPostIirRecordCount is not null))).ToList();
+			var fallback = rows.Where(s => !(s.NpcTemplate.StatCore.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.NpcTemplate.StatCore.MinimalPostIirRecordCount is not null))).ToList();
 
 			_out.WriteLine($"shipped={rows.Count} not-buildable-from-columns={fallback.Count}");
 			foreach (var s in fallback.Take(20))
-				_out.WriteLine($"  {s.Npc?.Name} map={s.MapId}");
+				_out.WriteLine($"  {s.NpcTemplate?.Name} map={s.MapId}");
 			Assert.Empty(fallback);
 		}
 

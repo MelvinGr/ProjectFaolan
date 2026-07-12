@@ -611,7 +611,7 @@ namespace Faolan.GameServer
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
 										? rn
 										: "<unmapped handle>";
-									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.",
+									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{NpcTemplate:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.",
 										npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
 
 									// Surface the gap instead of silently closing (Melvin: have them say so). A greeting click

@@ -304,7 +304,7 @@ namespace Faolan.Importer.Cli
 
 			// Imported-content stats: the scale of the DB (the server's source of truth). One `·`-separated line.
 			var stats = $"**Imported content** (the DB is the server's source of truth): "
-				+ $"{await db.Maps.CountAsync():N0} maps · {await db.Npcs.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · "
+				+ $"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · "
 				+ $"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · "
 				+ $"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · "
 				+ $"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";

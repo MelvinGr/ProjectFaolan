@@ -5,16 +5,19 @@ namespace Faolan.Core.Database.Tables
 {
 	// An NPC *type* - the type-level identity shared by every placement of the same creature (#244). `NpcSpawn` is
 	// the per-placement INSTANCE (transform + per-spawn appearance/equipment rolls); the type half (TemplateId, name,
-	// community, and - in a later step - the type-level stat core) lives here once instead of being duplicated across
-	// every spawn (e.g. Pillager 8756 is placed 85x). Keyed by `TemplateId` (NpcStats.f4, the stable per-type id).
+	// community, and the type-level stat core) lives here once instead of being duplicated across every spawn (e.g.
+	// Pillager 8756 is placed 85x). The PRIMARY KEY is `TemplateId` (NpcStats.f4, the stable RDB per-type id) - a
+	// natural-key catalog like Item/Spell/Map (the RDB is the source of truth, so the stable RDB id is the key, not a
+	// volatile DB-generated surrogate). Children reference it by their `NpcTemplateId` FK.
 	//
-	// NB unrelated to the LEGACY `Npc`/`Npcs` table (the old C++-port static NPC defs) dropped 2026-06-11 by
-	// `DropLegacyNpcTables`; this is a fresh type table reusing the now-free name. The capture-derived spawn rows are
-	// `NpcSpawn` (table `NpcSpawns`).
-	public class Npc : BaseEntity
+	// NB the LEGACY `Npc`/`Npcs` table (the old C++-port static NPC defs) was dropped 2026-06-11 by
+	// `DropLegacyNpcTables`; this fresh type table originally reused that freed `Npc` name and was renamed to
+	// `NpcTemplate` (#350) to name it for what it is. The capture-derived spawn rows are `NpcSpawn` (table `NpcSpawns`).
+	public class NpcTemplate
 	{
-		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId). Unique - one Npc row per template.
-		public uint TemplateId { get; set; } // TODO: Make PK?
+		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId) - the PRIMARY KEY (set from the RDB by the
+		// importer, never DB-generated; see DatabaseContext). One NpcTemplate row per template.
+		public uint TemplateId { get; set; }
 
 		// The type-level worn equipment + appearance/morph table (#307), for a summon-only creature that has no NpcSpawn
 		// placement to carry them - the per-TYPE counterpart of NpcSpawnEquipment/NpcSpawnMorph. Empty for a plain map
@@ -33,7 +36,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<NpcChatter> Chatter { get; set; } = new List<NpcChatter>();
 
 		// The type-level CharacterIIR stat core (#244), lifted off the captured body into a 1:1 NpcStatCore side table
-		// (keyed by NpcId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.
+		// (keyed by NpcTemplateId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.
 		// This is what lets a SUMMON-ONLY creature (pet/mount, #307) build its spawn body from the type ALONE, with a
 		// caller-supplied transform and NO world placement (NpcSpawnBuilder.TryBuildFromType).
 		public virtual NpcStatCore? StatCore { get; set; }

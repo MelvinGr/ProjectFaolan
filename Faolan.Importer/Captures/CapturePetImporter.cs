@@ -17,7 +17,7 @@ namespace Faolan.Importer.Captures
 	// pet is done the RIGHT way (#244): its captured FA015807 stat core + equipment + morphs are lifted onto the creature TYPE,
 	// and the server spawns it FROM THE TYPE at the summoner's position (NpcSpawnBuilder.TryBuildFromType) - no world
 	// placement at all. Resolved at summon time by NAME (SummonPetForPlayer -> GetNpcByName), the name PetSummonCatalog
-	// maps each summon-spell id to. Isolated: only touches the Npc rows for the wanted pet creatures.
+	// maps each summon-spell id to. Isolated: only touches the NpcTemplate rows for the wanted pet creatures.
 	public static class CapturePetImporter
 	{
 		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
@@ -49,16 +49,16 @@ namespace Faolan.Importer.Captures
 			{
 				// The pet creature TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
 				// resolves by name. Upsert so re-runs keep the type id stable.
-				var type = await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ??
-				           await db.Npcs.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs).FirstOrDefaultAsync(n => n.Name == e.Name);
+				var type = await db.NpcTemplates.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ??
+				           await db.NpcTemplates.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs).FirstOrDefaultAsync(n => n.Name == e.Name);
 				if (type == null)
 				{
-					type = new Npc
+					type = new NpcTemplate
 					{
 						TemplateId = e.TemplateId,
 						Name = e.Name
 					};
-					db.Npcs.Add(type);
+					db.NpcTemplates.Add(type);
 				}
 
 				// #307/#244: lift the whole spawn onto the TYPE from its capture so a summoned pet builds wholly from

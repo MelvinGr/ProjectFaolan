@@ -99,18 +99,18 @@ namespace Faolan.Mcp.Tools
 				: Serialize(spawns.Select(n => new
 				{
 					n.Id,
-					n.Npc?.Name, // #244: name on the Npc type, community on its StatCore
+					n.NpcTemplate?.Name, // #244: name on the NpcTemplate type, community on its StatCore
 					n.MapId,
 					n.Level,
 					n.Health,
-					Community = n.Npc?.StatCore?.Community ?? 0,
+					Community = n.NpcTemplate?.StatCore?.Community ?? 0,
 					Position = new
 					{
 						X = n.PositionX,
 						Y = n.PositionY,
 						Z = n.PositionZ
 					},
-					Spawnable = n.Npc?.StatCore?.IirHeader != null // builds from columns via TryBuildLive
+					Spawnable = n.NpcTemplate?.StatCore?.IirHeader != null // builds from columns via TryBuildLive
 				}));
 		}
 

@@ -124,7 +124,7 @@ namespace Faolan.GameServer.Dialogue
 			// exited instead of instantly re-triggering.
 			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationEndedNpcHandle)
 			{
-				_logger.LogInformation("Conversation: suppressed the reflexive post-close greeting for NPC 0x{Npc:X} (#217; re-select to talk again).", clickedNpcHandle);
+				_logger.LogInformation("Conversation: suppressed the reflexive post-close greeting for NPC 0x{NpcTemplate:X} (#217; re-select to talk again).", clickedNpcHandle);
 				return true;
 			}
 
@@ -223,7 +223,7 @@ namespace Faolan.GameServer.Dialogue
 			var goalTargetName = firstGoal?.TargetName;
 
 			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
-			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired,
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {NpcTemplate}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired,
 				goalTargetName ?? "-");
 			return def;
 		}
@@ -333,7 +333,7 @@ namespace Faolan.GameServer.Dialogue
 			{
 				client.Session.ConversationNpcHandle = clickedNpcHandle; // ensure the guard arms for THIS npc
 				EndConversation(client);
-				_logger.LogInformation("Conversation ended (npc={Name}, typeId={TypeId}, path='{Path}') for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, clickedNpcHandle);
+				_logger.LogInformation("Conversation ended (npc={Name}, typeId={TypeId}, path='{Path}') for NPC 0x{NpcTemplate:X}.", node.NpcName, node.TypeId, node.AnswerPath, clickedNpcHandle);
 				return;
 			}
 
@@ -342,7 +342,7 @@ namespace Faolan.GameServer.Dialogue
 			client.Session.ConversationAnswerPath = node.AnswerPath;
 			client.Session.ConversationNpcHandle = clickedNpcHandle;
 
-			_logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath,
+			_logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{NpcTemplate:X}.", node.NpcName, node.TypeId, node.AnswerPath,
 				node.Packets.Count, clickedNpcHandle);
 		}
 
@@ -367,7 +367,7 @@ namespace Faolan.GameServer.Dialogue
 			await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
 			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateActive);
 			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateCompleted);
-			_logger.LogInformation("Quest {Quest} turned in to {Npc} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress, held.GoalRequired);
+			_logger.LogInformation("Quest {Quest} turned in to {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress, held.GoalRequired);
 		}
 
 		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the

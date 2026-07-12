@@ -90,7 +90,7 @@ pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift)
 - `SummonPetForPlayer` (shared by `.pet` + the CastSpell hook) resolves the creature TYPE; only falls back
   to the placement path for the `.pet` GM test.
 - `PetIirCodec` (0x1F4CB0F7) owner-assign/remove + inbound `QueuePetCommand` (0x205B) dismiss.
-- `CapturePetImporter` + `PetsModule` (`--only pets`): lifts each pet's captured `FA015807` onto its `Npc`
+- `CapturePetImporter` + `PetsModule` (`--only pets`): lifts each pet's captured `FA015807` onto its `NpcTemplate`
   type. Seeded from the necro capture: **Arcanist** (tpl 11733) + **Magus** (tpl 11732) — the two combat
   necro pets (lvl 80); **Pleasurable Company** (tpl 17756) — the social companion (lvl 5).
 

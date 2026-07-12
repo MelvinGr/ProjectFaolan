@@ -7,8 +7,8 @@ namespace Faolan.Core.Database.Tables
 	// point; the entity handle is session-scoped. Imported from captures by Faolan.Importer (NpcSpawnExtractor).
 	//
 	// The whole spawn body is now CONSTRUCTED from typed columns (#243/#244): the transform from the columns below,
-	// the pre-IIR/post-IIR scaffolds from scratch, the stat core from Npc.StatCore, equipment from NpcSpawnEquipment,
-	// morphs from NpcSpawnMorph, and a no-morph spawn's post-IIR recordCount from Npc.StatCore.MinimalPostIirRecordCount.
+	// the pre-IIR/post-IIR scaffolds from scratch, the stat core from NpcTemplate.StatCore, equipment from NpcSpawnEquipment,
+	// morphs from NpcSpawnMorph, and a no-morph spawn's post-IIR recordCount from NpcTemplate.StatCore.MinimalPostIirRecordCount.
 	// The captured FA015807 `Data` blob has been RETIRED - every shipped spawn builds from columns (988/988), so the
 	// column was dropped; the importer lifts these rows from the dump body at import time (never persisting it).
 	// The structured columns below are LIFTED from the ProtoCoreCharacterIIR: NPC identity/appearance
@@ -23,12 +23,12 @@ namespace Faolan.Core.Database.Tables
 		public virtual Map Map { get; set; } = null!;
 
 		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
-		// on Npc now, reached via the Npc navigation. Required - a real spawn always resolves to a type (the phantom
+		// on NpcTemplate now, reached via the NpcTemplate navigation. Required - a real spawn always resolves to a type (the phantom
 		// rows that once lacked one were scrubbed).
-		public uint NpcId { get; set; }
+		public uint NpcTemplateId { get; set; }
 
-		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; } = null!;
+		[ForeignKey(nameof(NpcTemplateId))]
+		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
 
 		// The worn equipment (CharacterIIR f23) lifted from the captured spawn (#185) - empty for unarmed NPCs.
 		// When present, NpcSpawnBuilder rebuilds the spawn's inventory_entry list from these rows instead of the
@@ -39,8 +39,8 @@ namespace Faolan.Core.Database.Tables
 		// with the spawn.
 		public virtual PatrolPath? PatrolPath { get; set; }
 
-		// Race/Sex moved to the Npc TYPE table (#287): they are type-level identity (every placement of a type shares
-		// them), so they live on `Npc` now and are reached via the `Npc` navigation.
+		// Race/Sex moved to the NpcTemplate TYPE table (#287): they are type-level identity (every placement of a type shares
+		// them), so they live on `NpcTemplate` now and are reached via the `NpcTemplate` navigation.
 
 		// The humanoid appearance / morph table lifted from the captured post-IIR (#185) - empty for animals, which
 		// carry no such table. When present, NpcSpawnBuilder generates the post-IIR from these rows instead of
@@ -51,7 +51,7 @@ namespace Faolan.Core.Database.Tables
 		public uint ApprenticeLevel { get; set; }
 		public uint CapturedHandle { get; set; }
 
-		// Per-PLACEMENT stat values (#244), lifted from this spawn's capture, overriding the type-level Npc.StatCore
+		// Per-PLACEMENT stat values (#244), lifted from this spawn's capture, overriding the type-level NpcTemplate.StatCore
 		// when the spawn body is built. A spawn point carries its own LEVEL (the same template can be placed at a range
 		// of levels - e.g. Starved Watchdog L65-79), and the pools track that level. These are the spawn/MAX values,
 		// NOT per-instance runtime state (not current HP); AoC has no scale-to-player scaling.

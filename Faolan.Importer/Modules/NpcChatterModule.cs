@@ -15,7 +15,7 @@ namespace Faolan.Importer.Modules
 {
 	// Ambient NPC chatter (per-NPC bark lines). The barks are chat-server CharacterChat (0x0022) local-says whose body
 	// is [u32 senderHandle][u16 len][<remoteformat token="sayinchat(N)|conversationM(K)|<Group>" ...>]. The dialogue is
-	// SPECIFIC to the NPC that says it, so it is keyed by the NPC's TEMPLATE (NpcStats.f4 / Npc.TemplateId), NOT by
+	// SPECIFIC to the NPC that says it, so it is keyed by the NPC's TEMPLATE (NpcStats.f4 / NpcTemplate.TemplateId), NOT by
 	// name - several distinct templates share a display name (7 "Nobleman"/"Noblewoman" rows), and only the exact
 	// template captured barking gets the lines; the others stay silent until captured.
 	//
@@ -86,8 +86,8 @@ namespace Faolan.Importer.Modules
 				}
 			}
 
-			// Attach to the exact Npc type by TemplateId (unique - one Npc row per template).
-			var npcByTemplate = await ctx.Db.Npcs.ToDictionaryAsync(n => n.TemplateId, n => n);
+			// Attach to the exact NpcTemplate type by TemplateId (unique - one NpcTemplate row per template).
+			var npcByTemplate = await ctx.Db.NpcTemplates.ToDictionaryAsync(n => n.TemplateId, n => n);
 
 			var lines = 0;
 			var npcs = 0;
@@ -96,10 +96,10 @@ namespace Faolan.Importer.Modules
 				if (!npcByTemplate.TryGetValue(template, out var npc))
 					continue;
 
-				var existing = await ctx.Db.NpcChatter.Where(c => c.NpcId == npc.Id).ToListAsync();
+				var existing = await ctx.Db.NpcChatter.Where(c => c.NpcTemplateId == npc.TemplateId).ToListAsync();
 				ctx.Db.NpcChatter.RemoveRange(existing);
 				foreach (var text in texts)
-					ctx.Db.NpcChatter.Add(new NpcChatter { NpcId = npc.Id, RemoteFormat = text });
+					ctx.Db.NpcChatter.Add(new NpcChatter { NpcTemplateId = npc.TemplateId, RemoteFormat = text });
 
 				npcs++;
 				lines += texts.Count;

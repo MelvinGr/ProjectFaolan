@@ -16,8 +16,8 @@ namespace Faolan.Tests
 		{
 			var zone = new Zone(2040);
 			zone.Add(Player(1, 0, 0));
-			zone.Add(Npc(4, 5, 0));
-			zone.Add(Npc(5, 100, 0));
+			zone.Add(NpcTemplate(4, 5, 0));
+			zone.Add(NpcTemplate(5, 100, 0));
 
 			var seen = zone.EntitiesInRange(new Vector3(0, 0, 0), 50f).Select(e => e.Handle).OrderBy(h => h).ToArray();
 
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			var self = Player(1, 0, 0);
 			var near = Player(2, 30, 0); // within 50
 			var far = Player(3, 200, 0); // outside 50
-			var npc = Npc(4, 5, 0); // close but not a player
+			var npc = NpcTemplate(4, 5, 0); // close but not a player
 			foreach (var e in new[] { self, near, far, npc })
 				zone.Add(e);
 
@@ -174,7 +174,7 @@ namespace Faolan.Tests
 			Assert.Equal(first, world.ZoneFor(2040).PlayfieldToken);
 		}
 
-		private static WorldEntity Npc(uint handle, float x, float z)
+		private static WorldEntity NpcTemplate(uint handle, float x, float z)
 		{
 			return new WorldEntity(handle, 0, false, $"N{handle}", null)
 			{

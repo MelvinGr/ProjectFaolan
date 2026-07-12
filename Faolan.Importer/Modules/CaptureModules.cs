@@ -397,7 +397,7 @@ namespace Faolan.Importer.Modules
 		// Depends on `items` (NpcSpawnEquipment.Template is an FK to Items - the worn item's quad + hash live there,
 		// harvested by ItemHashHarvester's spawn source over the same FA015807 packets). NOT on `characters`: the old
 		// "characters" dep was spurious - it only dragged the characters module in and added stray captured player
-		// characters (e.g. Ranochar) as a side effect. RunAsync itself FKs to Map/Npc/Items, never to Characters.
+		// characters (e.g. Ranochar) as a side effect. RunAsync itself FKs to Map/NpcTemplate/Items, never to Characters.
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		// Overwrite ONLY (wipe + rebuild), like conversations. NpcSpawns is a fully-derived burst-truth set with no
@@ -486,10 +486,10 @@ namespace Faolan.Importer.Modules
 			// hostile MOB faction (poachers/picts/pirates/...) comes out hostile. NULL-community NPCs (unique story
 			// NPCs like Casilda/Kalanthes) share one bucket -> friendly/neutral. #256/aggro.
 			var cores = await ctx.Db.NpcStatCores.ToListAsync();
-			var nameById = await ctx.Db.Npcs.ToDictionaryAsync(n => n.Id, n => n.Name);
+			var nameById = await ctx.Db.NpcTemplates.ToDictionaryAsync(n => n.TemplateId, n => n.Name);
 			var commByName = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 			foreach (var core in cores)
-				if (nameById.TryGetValue(core.NpcId, out var nm) && nm != null)
+				if (nameById.TryGetValue(core.NpcTemplateId, out var nm) && nm != null)
 					commByName[nm] = core.Community.HasValue ? core.Community.Value : NullCommunity;
 
 			var commVotes = new Dictionary<long, Dictionary<uint, int>>();
@@ -754,7 +754,7 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
-	// Summonable PET creatures (#307): lifts each pet's captured FA015807 stat core onto its creature TYPE (Npc.Data)
+	// Summonable PET creatures (#307): lifts each pet's captured FA015807 stat core onto its creature TYPE (NpcTemplate.Data)
 	// so a pet-summon spell spawns it FROM THE TYPE (no world placement). Opt-in like mounts; run against a pet-summon
 	// capture, e.g. `--only pets`.
 	public sealed class PetsModule : IImportModule

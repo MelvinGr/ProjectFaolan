@@ -37,8 +37,8 @@ namespace Faolan.Tests
 				Assert.True(seeded >= 1);
 
 				// Mounts are now TYPES (#307), not sentinel-map NpcSpawn placements: the creature builds wholly from
-				// columns via TryBuildFromType, so its type carries a lifted stat core (no Npc.Data blob).
-				var mountTypes = await db.Npcs.Include(t => t.StatCore).ToListAsync();
+				// columns via TryBuildFromType, so its type carries a lifted stat core (no NpcTemplate.Data blob).
+				var mountTypes = await db.NpcTemplates.Include(t => t.StatCore).ToListAsync();
 				Assert.Contains(mountTypes, t => string.Equals(t.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && t.StatCore?.IirHeader != null);
 			}
 			finally

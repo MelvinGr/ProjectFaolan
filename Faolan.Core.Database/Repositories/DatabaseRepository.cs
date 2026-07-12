@@ -64,7 +64,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
-		Task<Npc?> GetNpcByName(string name);
+		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
@@ -334,7 +334,7 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = (name ?? "").ToLowerInvariant();
-			var query = ctx.NpcSpawns.Where(n => n.MapId == mapId && n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered); // #244: name lives on the type
+			var query = ctx.NpcSpawns.Where(n => n.MapId == mapId && n.NpcTemplate != null && n.NpcTemplate.Name != null && n.NpcTemplate.Name.ToLower() == lowered); // #244: name lives on the type
 			if (x is { } px && y is { } py && z is { } pz)
 			{
 				query = query.Where(n =>
@@ -802,12 +802,12 @@ namespace Faolan.Core.Database.Repositories
 		// GetNpcSpawnByName, which returns a world PLACEMENT. Includes the type's caster Spells + everything
 		// TryBuildFromType needs to assemble the body from columns: the stat core, worn equipment, appearance morphs.
 		// Null if no such type or it has no lifted stat core (can't be spawned standalone).
-		public async Task<Npc?> GetNpcByName(string name)
+		public async Task<NpcTemplate?> GetNpcByName(string name)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
 			return await ctx
-				.Npcs.Include(t => t.Spells)
+				.NpcTemplates.Include(t => t.Spells)
 				.Include(t => t.StatCore)
 				.Include(t => t.Equipment)
 				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
@@ -823,14 +823,14 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
 			return await ctx
-				.NpcSpawns.Include(n => n.Npc)
+				.NpcSpawns.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Spells)
-				.Include(n => n.Npc)
+				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.StatCore) // the type stat core, so the spawn builds from columns (TryBuildLive)
 				.Include(n => n.Morphs)
 				.Include(n => n.Equipment)
 				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
-				.Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered && n.Npc.StatCore != null) // #244: name lives on the type
+				.Where(n => n.NpcTemplate != null && n.NpcTemplate.Name != null && n.NpcTemplate.Name.ToLower() == lowered && n.NpcTemplate.StatCore != null) // #244: name lives on the type
 				.FirstOrDefaultAsync();
 		}
 
@@ -843,11 +843,11 @@ namespace Faolan.Core.Database.Repositories
 				.NpcSpawns.Include(n => n.Morphs)
 				.Include(n => n.Equipment)
 				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
-				.Include(n => n.Npc)
+				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Spells) // #244: the NPC type + its FK'd spells (replaces the name-string spell join)
-				.Include(n => n.Npc)
+				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Chatter) // ambient bark lines for this NPC type
-				.Include(n => n.Npc)
+				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.StatCore) // #244: the type stat core, so the spawn body builds from columns
 				.Include(n => n.PatrolPath) // #316: the spawn's patrol route (its columnarized MoveTask node tree)
 				.ThenInclude(p => p!.Nodes)
@@ -864,7 +864,7 @@ namespace Faolan.Core.Database.Repositories
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
-			return await ctx.NpcSpells.Where(s => s.Npc != null && s.Npc.Name != null && s.Npc.Name.ToLower() == lowered).ToListAsync();
+			return await ctx.NpcSpells.Where(s => s.NpcTemplate != null && s.NpcTemplate.Name != null && s.NpcTemplate.Name.ToLower() == lowered).ToListAsync();
 		}
 
 		// The shared journal-content definition for a quest (text refs + objective marker), or null if not seeded.
@@ -1313,10 +1313,10 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = nameSubstring.ToLowerInvariant();
 			return await ctx
-				.NpcSpawns.Include(n => n.Npc)
+				.NpcSpawns.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.StatCore) // so the Spawnable flag can check buildability (StatCore.IirHeader)
-				.Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower().Contains(lowered)) // #244: name lives on the type
-				.OrderBy(n => n.Npc.Name)
+				.Where(n => n.NpcTemplate != null && n.NpcTemplate.Name != null && n.NpcTemplate.Name.ToLower().Contains(lowered)) // #244: name lives on the type
+				.OrderBy(n => n.NpcTemplate.Name)
 				.ThenBy(n => n.MapId)
 				.Take(limit)
 				.ToArrayAsync();

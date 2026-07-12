@@ -230,7 +230,7 @@ namespace Faolan.Importer.Captures
 			return kept.Count;
 		}
 
-		// Upsert by (map, spawn point); never wipe. Ensures Npc TYPE rows exist first (#244).
+		// Upsert by (map, spawn point); never wipe. Ensures NpcTemplate TYPE rows exist first (#244).
 		public static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
 		{
 			var typeByTemplate = await UpsertNpcTypes(db, spawns);
@@ -242,7 +242,7 @@ namespace Faolan.Importer.Captures
 					.Include(n => n.Equipment)
 					.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
 
-				// NpcId is required now (no phantom rows), so a spawn whose type doesn't resolve is dropped - the same
+				// NpcTemplateId is required now (no phantom rows), so a spawn whose type doesn't resolve is dropped - the same
 				// rule ImportNpcSpells applies to typeless casters, and consistent with the phantom-scrub invariant.
 				if (e.TemplateId == 0 || !typeByTemplate.TryGetValue(e.TemplateId, out var npc))
 					continue;
@@ -255,7 +255,7 @@ namespace Faolan.Importer.Captures
 					PositionZ = e.Z
 				};
 				Populate(row, e);
-				row.NpcId = npc.Id;
+				row.NpcTemplateId = npc.TemplateId;
 				if (existing == null)
 					db.NpcSpawns.Add(row);
 			}
@@ -263,14 +263,14 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 		}
 
-		// Caster NPCs' spells (#232), upserted by (Npc type, spell id). The caster NAME is resolved to its Npc TYPE id
-		// (types were upserted by ImportNpcSpawns just before) and only stored as the NpcId FK - a cast whose caster is
-		// a PLAYER (mis-harvested self-buff) or has no captured Npc type (off-beach named NPCs) is DROPPED, since the
-		// loader reads spells via the FK (Npc.Spells).
+		// Caster NPCs' spells (#232), upserted by (NpcTemplate type, spell id). The caster NAME is resolved to its NpcTemplate TYPE id
+		// (types were upserted by ImportNpcSpawns just before) and only stored as the NpcTemplateId FK - a cast whose caster is
+		// a PLAYER (mis-harvested self-buff) or has no captured NpcTemplate type (off-beach named NPCs) is DROPPED, since the
+		// loader reads spells via the FK (NpcTemplate.Spells).
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
 			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n.ToLowerInvariant()).ToHashSet();
-			var typeByName = (await db.Npcs.Where(n => n.Name != null).ToListAsync()).GroupBy(n => n.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First().Id);
+			var typeByName = (await db.NpcTemplates.Where(n => n.Name != null).ToListAsync()).GroupBy(n => n.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First().TemplateId);
 
 			var inserted = 0;
 			foreach (var e in spells)
@@ -279,12 +279,12 @@ namespace Faolan.Importer.Captures
 				if (playerNames.Contains(name) || !typeByName.TryGetValue(name, out var npcId))
 					continue;
 
-				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcId == npcId && s.SpellId == e.SpellId);
+				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcTemplateId == npcId && s.SpellId == e.SpellId);
 				if (existing == null)
 				{
 					var s = new NpcSpell
 					{
-						NpcId = npcId,
+						NpcTemplateId = npcId,
 						SpellId = e.SpellId
 					};
 					ApplyEffect(s, e.Payload);
@@ -470,7 +470,7 @@ namespace Faolan.Importer.Captures
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
-			// Race/Sex are type-level now (#287) - set on the Npc type in UpsertNpcTypes, not on the spawn row.
+			// Race/Sex are type-level now (#287) - set on the NpcTemplate type in UpsertNpcTypes, not on the spawn row.
 			row.Level = e.Level;
 			row.MonsterScale = e.MonsterScale;
 			row.MonsterData = e.MonsterData;
@@ -761,10 +761,10 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Seeded chain stage: quest {questId} = {goalType} '{target}' (goal {goalId}, required {required}, keyItem {questItemId}) -> {nextQuestId}.");
 		}
 
-		// Upserts the Npc TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.
-		private static async Task<Dictionary<uint, Npc>> UpsertNpcTypes(DatabaseContext db, List<NpcSpawnEntry> entries)
+		// Upserts the NpcTemplate TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.
+		private static async Task<Dictionary<uint, NpcTemplate>> UpsertNpcTypes(DatabaseContext db, List<NpcSpawnEntry> entries)
 		{
-			var byTemplate = await db.Npcs.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
+			var byTemplate = await db.NpcTemplates.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
 
 			// #243: the fresh minimal post-IIR recordCount per type (the type-stable 1 or 2, not an animal/humanoid split),
 			// read from a NO-MORPH CAPTURE (the dump-file body, e.Data) - NOT the stored NpcSpawn.Data column, which is
@@ -791,16 +791,16 @@ namespace Faolan.Importer.Captures
 				{
 					if (!string.IsNullOrEmpty(e.Name))
 						npc.Name = e.Name;
-					// Community/Race/Sex now live on StatCore (set below via Lift), not the retired Npc columns.
+					// Community/Race/Sex now live on StatCore (set below via Lift), not the retired NpcTemplate columns.
 				}
 				else
 				{
-					npc = new Npc
+					npc = new NpcTemplate
 					{
 						TemplateId = e.TemplateId,
 						Name = e.Name
 					};
-					db.Npcs.Add(npc);
+					db.NpcTemplates.Add(npc);
 					byTemplate[e.TemplateId] = npc;
 				}
 

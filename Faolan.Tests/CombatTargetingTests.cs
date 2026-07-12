@@ -14,10 +14,10 @@ namespace Faolan.Tests
 		public void CapsToMax()
 		{
 			var zone = new Zone(4010);
-			var primary = Npc(1, 0, 0);
+			var primary = NpcTemplate(1, 0, 0);
 			zone.Add(primary);
 			for (uint h = 2; h <= 9; h++)
-				zone.Add(Npc(h, 1, 0));
+				zone.Add(NpcTemplate(h, 1, 0));
 
 			Assert.Equal(3, CombatTargeting.CleaveTargets(zone, primary, 5f, 3).Count);
 		}
@@ -26,13 +26,13 @@ namespace Faolan.Tests
 		public void ExcludesPlayersNonHostileAndDeadNpcs()
 		{
 			var zone = new Zone(4010);
-			var primary = Npc(1, 0, 0);
+			var primary = NpcTemplate(1, 0, 0);
 			var player = new WorldEntity(2, 4010, true, "P", null)
 			{
 				Position = new Vector3(2, 0, 0)
 			};
-			var questGiver = Npc(3, 2, 0, false);
-			var corpse = Npc(4, 2, 0);
+			var questGiver = NpcTemplate(3, 2, 0, false);
+			var corpse = NpcTemplate(4, 2, 0);
 			corpse.Vitals.ApplyHealthDelta(-100); // dead
 			Assert.True(corpse.IsDead);
 			foreach (var e in new[] { primary, player, questGiver, corpse })
@@ -45,10 +45,10 @@ namespace Faolan.Tests
 		public void HitsHostileNpcsInRange_NearestFirst_ExcludesPrimary()
 		{
 			var zone = new Zone(4010);
-			var primary = Npc(1, 0, 0);
-			var near = Npc(2, 2, 0);
-			var farInRange = Npc(3, 4, 0);
-			var outOfRange = Npc(4, 50, 0);
+			var primary = NpcTemplate(1, 0, 0);
+			var near = NpcTemplate(2, 2, 0);
+			var farInRange = NpcTemplate(3, 4, 0);
+			var outOfRange = NpcTemplate(4, 50, 0);
 			foreach (var e in new[] { primary, near, farInRange, outOfRange })
 				zone.Add(e);
 
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			Assert.Equal(new uint[] { 2, 3 }, targets.Select(t => t.Handle).ToArray()); // nearest-first, no primary, no #4
 		}
 
-		private static WorldEntity Npc(uint handle, float x, float z, bool hostile = true)
+		private static WorldEntity NpcTemplate(uint handle, float x, float z, bool hostile = true)
 		{
 			var e = WorldEntity.ForNpc(handle, 4010, new Vector3(x, 0, z), Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
 			e.Hostile = hostile;

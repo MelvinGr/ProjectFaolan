@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// The type-level CharacterIIR stat CORE (#244), lifted off the captured `Data` blob into typed columns so an NPC
-	// spawn body can be CONSTRUCTED from the DB instead of spliced from a capture. A 1:1 side table keyed to its `Npc`
+	// spawn body can be CONSTRUCTED from the DB instead of spliced from a capture. A 1:1 side table keyed to its `NpcTemplate`
 	// type (like Character <-> CharacterMaxStats). Property names mirror the protobuf field names in
 	// ProtoCoreCharacterIIR's Stats (CharacterStats) / npc_stats (NpcStats) / Bcc (CharacterBcc) sub-messages exactly,
 	// so NpcStatCoreCodec maps them by name with no per-field code. Nullable throughout: null = the proto field was NOT
@@ -17,13 +17,13 @@ namespace Faolan.Core.Database.Tables
 	// health/mana, scale, voice, ...) are overridden per-instance from NpcSpawn; transient runtime state (animation
 	// phase, BccState, current HP) is emitted canonical at spawn from the live tier (WorldEntity), never stored here.
 	// See docs/subsystems/npc-three-tier-architecture.md.
-	[PrimaryKey(nameof(NpcId)), NoReorder]
+	[PrimaryKey(nameof(NpcTemplateId)), NoReorder]
 	public class NpcStatCore
 	{
-		public uint NpcId { get; set; }
+		public uint NpcTemplateId { get; set; }
 
-		[ForeignKey(nameof(NpcId))]
-		public virtual Npc Npc { get; set; } = null!;
+		[ForeignKey(nameof(NpcTemplateId))]
+		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
 
 		// The CoreCharacter-IIR header word X in [u8 0x41][u32 X][u32 msgLen] that precedes the embedded message
 		// (#244). A type-stable field-presence/shape mask (RE: 0/510 types carry a mixed value): the low 16 bits

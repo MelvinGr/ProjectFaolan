@@ -711,12 +711,12 @@ namespace Faolan.GameServer.World
 			var nextFreeHandle = npcs.Length == 0 ? 1u : npcs.Max(n => n.CapturedHandle) + 1u;
 			foreach (var npc in npcs)
 			{
-				// The type identity (name/community) lives on the Npc type now (#244); a spawn with no type is a phantom
+				// The type identity (name/community) lives on the NpcTemplate type now (#244); a spawn with no type is a phantom
 				// capture artifact (no real creature) - skip it.
-				if (npc.Npc == null)
+				if (npc.NpcTemplate == null)
 					continue;
 
-				var npcName = npc.Npc.Name;
+				var npcName = npc.NpcTemplate.Name;
 
 				// Seed killable vitals from the NPC's REAL max health (lifted from the spawn into NpcSpawn.Health by the
 				// importer), falling back to a level-scaled value when the spawn carried none.
@@ -770,7 +770,7 @@ namespace Faolan.GameServer.World
 				// is faction MEMBERSHIP, NOT hostility: community 1 is the civilian/default faction shared by Citizens,
 				// vendors and guards, so the old `community > 0` test wrongly aggroed every townsperson. NULL disposition
 				// -> friendly (the client's green default for an un-told-about NPC). Only cCategory 1 (hostile) aggros.
-				entity.Disposition = npc.Npc.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
+				entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 				entity.Hostile = entity.Disposition == WorldEntity.DispositionHostile;
 
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
@@ -780,16 +780,16 @@ namespace Faolan.GameServer.World
 				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody))
 					entity.SpawnBody = spawnBody;
 
-				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.Npc.Spells, loaded
+				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
 				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
-				if (npc.Npc.Spells is { Count: > 0 } typeSpells)
+				if (npc.NpcTemplate.Spells is { Count: > 0 } typeSpells)
 				{
 					foreach (var s in typeSpells)
 						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
 				}
 
 				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
-				if (npc.Npc.Chatter is { Count: > 0 } chatter)
+				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
 					entity.ChatterLines = chatter.Select(c => c.RemoteFormat).Where(x => !string.IsNullOrEmpty(x)).ToArray();
 
 				zone.Add(entity);
@@ -1006,7 +1006,7 @@ namespace Faolan.GameServer.World
 										   // baked ones are just placeholders (the player's zone token here).
 			if (npc == null || !NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken, out var body))
 			{
-				_logger.LogInformation("Spawn: no spawnable '{Npc}' template found.", npcName);
+				_logger.LogInformation("Spawn: no spawnable '{NpcTemplate}' template found.", npcName);
 				return null;
 			}
 
@@ -1019,10 +1019,10 @@ namespace Faolan.GameServer.World
 				vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			}
 
-			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.Npc?.Name ?? npcName, vitals);
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.NpcTemplate?.Name ?? npcName, vitals);
 			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
 			entity.Level = npc.Level;
-			entity.Disposition = npc.Npc?.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
+			entity.Disposition = npc.NpcTemplate?.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)
@@ -1047,7 +1047,7 @@ namespace Faolan.GameServer.World
 					await SendWorldSpawn(viewer.Client, entity);
 			}
 
-			_logger.LogInformation("Spawn: spawned {Npc} 0x{Handle:X8} for {Player} at {Pos}.", entity.Name, handle, player.Name, player.Position);
+			_logger.LogInformation("Spawn: spawned {NpcTemplate} 0x{Handle:X8} for {Player} at {Pos}.", entity.Name, handle, player.Name, player.Position);
 			return entity;
 		}
 
@@ -1055,7 +1055,7 @@ namespace Faolan.GameServer.World
 		// the FA015807 is assembled from the type's columns (StatCore + Equipment + Morphs) via TryBuildFromType at the
 		// summoner's position, then streamed to nearby viewers. The PetIIR owner-assign + follow are done by the caller
 		// (SummonPetForPlayer). Returns null if the type carries no lifted stat core (not yet imported/lifted).
-		public async Task<WorldEntity> SpawnPetForPlayer(INetworkClient client, Npc npcType)
+		public async Task<WorldEntity> SpawnPetForPlayer(INetworkClient client, NpcTemplate npcType)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || npcType?.StatCore?.IirHeader == null)

@@ -262,7 +262,7 @@ namespace Faolan.GameServer.World
 			await _output.PushVitals(client, vitals);
 
 			if (vitals.IsDead)
-				_logger.LogInformation("Combat: {Player} was killed by {Npc}.", character.Name, npc.Name);
+				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}.", character.Name, npc.Name);
 		}
 
 		// A caster NPC's tick action (#232): cast a spell at the target player (ApplySpell from the NPC handle) and
@@ -324,7 +324,7 @@ namespace Faolan.GameServer.World
 			await _output.PushVitals(client, vitals);
 
 			if (vitals.IsDead)
-				_logger.LogInformation("Combat: {Player} was killed by {Npc}'s spell.", character.Name, npc.Name);
+				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}'s spell.", character.Name, npc.Name);
 		}
 
 		// Discovers any resurrection point a living player has walked near (so they can respawn there later). Run at the

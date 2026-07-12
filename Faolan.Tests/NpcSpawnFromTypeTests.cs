@@ -10,8 +10,8 @@ using Xunit.Abstractions;
 namespace Faolan.Tests
 {
 	// #307: a summon-only creature (pet/mount) has no NpcSpawn placement - it builds wholly from its TYPE columns
-	// (StatCore + Npc.Equipment + Npc.Morphs + recordCount) via NpcSpawnBuilder.TryBuildFromType. This is the gate
-	// that every lifted type produces a parseable body carrying its equipment/appearance, with no Npc.Data blob.
+	// (StatCore + NpcTemplate.Equipment + NpcTemplate.Morphs + recordCount) via NpcSpawnBuilder.TryBuildFromType. This is the gate
+	// that every lifted type produces a parseable body carrying its equipment/appearance, with no NpcTemplate.Data blob.
 	public class NpcSpawnFromTypeTests
 	{
 		private readonly ITestOutputHelper _out;
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			// The summon-only types: those carrying their own equipment/morphs (a plain map-NPC type has none - its
 			// placements do). Covers the pet family; mounts too when that opt-in module is imported.
 			var types = ctx
-				.Npcs.Include(n => n.StatCore)
+				.NpcTemplates.Include(n => n.StatCore)
 				.Include(n => n.Equipment)
 				.ThenInclude(e => e.Item) // the worn item's identity (quad + hash) lives in Items via the FK
 				.Include(n => n.Morphs)

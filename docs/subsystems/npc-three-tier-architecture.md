@@ -12,12 +12,12 @@ An NPC in the world is three separate concerns; the code keeps them in three sep
 
 | tier | store | lifetime | holds |
 |------|-------|----------|-------|
-| **`Npc`** (template) | DB (`Npcs`) | permanent | The creature TYPE: the canonical stat core shared by every spawn of that type — `ProtoCoreCharacterIIR` fields that are constant across a type (race/sex, monster mesh/data, senses, profession, faction/community, flags, the animation *blend* flags, …). One row per type. |
-| **`NpcSpawn`** (spawn point) | DB (`NpcSpawns`) | permanent, **static** | WHERE and WHAT should spawn in the world: map + position + rotation + a ref to the `Npc` template (`NpcId`), plus the per-spawn STATIC config that varies between placements of the same type (level and level-scaled pools, monster scale, voice, faction override). **No gameplay/runtime state.** This table must not change as the world is played. |
+| **`NpcTemplate`** (template) | DB (`NpcTemplates`) | permanent | The creature TYPE: the canonical stat core shared by every spawn of that type — `ProtoCoreCharacterIIR` fields that are constant across a type (race/sex, monster mesh/data, senses, profession, faction/community, flags, the animation *blend* flags, …). One row per type, keyed by `TemplateId` (the stable RDB `NpcStats.f4` id — a natural-key catalog like `Item`/`Spell`/`Map`). |
+| **`NpcSpawn`** (spawn point) | DB (`NpcSpawns`) | permanent, **static** | WHERE and WHAT should spawn in the world: map + position + rotation + a ref to the `NpcTemplate` (`NpcTemplateId`), plus the per-spawn STATIC config that varies between placements of the same type (level and level-scaled pools, monster scale, voice, faction override). **No gameplay/runtime state.** This table must not change as the world is played. |
 | **`WorldEntity`** (live) | **in-memory** (`Faolan/GameServer/World/WorldEntity.cs`) | ephemeral (per session) | The active instance: `Handle`, current `Position`, current HP (`EntityVitals`), behaviour state, `InstanceId`, `OwnerHandle`. Built at spawn, mutated by gameplay, gone on restart. Pets, summons (`OwnerHandle`) and loot bags live ONLY here — they have no `NpcSpawn` row. |
 
 The live tier is deliberately **not persisted**. Runtime state is ephemeral: on restart every active spawn
-is regenerated from the static `NpcSpawn` placement + the `Npc` template, and the world boots clean. A
+is regenerated from the static `NpcSpawn` placement + the `NpcTemplate` template, and the world boots clean. A
 persisted "live NPC" table would be write-hot and buy nothing (you don't want NPC HP/positions to survive a
 reboot).
 
@@ -49,11 +49,11 @@ every world entry (see the memory `spawn_playfield_token_per_send`).
 
 ## Type-level vs instance-level fields (the split)
 
-Determined empirically by decoding every spawn's stat core and grouping by `NpcId` (which fields are
+Determined empirically by decoding every spawn's stat core and grouping by `NpcTemplateId` (which fields are
 constant across a type's spawns vs which vary). This is the source of truth for which column goes on which
 table:
 
-**Type-level → `Npc`:** `Race`, `Sex`, `HeadMesh`, `MonsterData`, `Flags`, `ChatId`, `CarsGroup`,
+**Type-level → `NpcTemplate`:** `Race`, `Sex`, `HeadMesh`, `MonsterData`, `Flags`, `ChatId`, `CarsGroup`,
 `OrientationMode`, `Radius`, `Side`, `SoundScryScript`, `Bcc`, `BloodType`, `LooksPackage`, `Mount*`,
 `MovementMultiplier` (CharacterStats) · `NpcFlags`, `NpcType`, `Normalset`, `Profession*`, `SmellingSkill`,
 `SuperFamily`, `Community`, `TemplateId` (NpcStats) · the `Anim*Blend` / `AnimFlags` / `AnimForced*` flags (Bcc).
@@ -76,7 +76,7 @@ Decoding all 1043 captured stat cores confirmed the lift can be byte-exact:
 - Root `ProtoCoreCharacterIIR` scalars beyond the sub-messages: `Name` (already lifted), `CanFall` +
   `MovementMode` (set on every row), and `PetOwnerInstance`/`PetType`/`PetPoints` (pets only → runtime tier).
 - The runtime fields (`Anim*Id`/`Timer` phase, `BccState`, current HP) are emitted **canonical** at spawn, so
-  they are NOT stored; `AnimIdleId` (the creature's idle clip) is type-level and lives on `Npc`.
+  they are NOT stored; `AnimIdleId` (the creature's idle clip) is type-level and lives on `NpcTemplate`.
 
 ## Migration status (#244)
 
@@ -136,7 +136,7 @@ from typed columns.
 - [x] Migrate the remaining `Npc.Community`/`Level` readers to `StatCore`, then DROP the duplicate
       `Npc.Community`/`Level`/`Race`/`Sex` columns (`6ca6061c`). Verified redundant first: 0 rows carried data
       `StatCore` lacked. The last readers (`WorldBroadcaster` ×3, `Faolan.Mcp/DatabaseTools`) now read
-      `StatCore`, and the importer's duplicate writes (`ImportOps`, pet/mount importers) are gone. `Npc` is now
+      `StatCore`, and the importer's duplicate writes (`ImportOps`, pet/mount importers) are gone. `NpcTemplate` is now
       just `Id`/`Name`/`TemplateId` + its navigations. `NpcStatCore.Sex` is the `Sex` enum (wire code
       `None=0`/`Male=2`/`Female=3`); `NpcStatCore.Race` stays a raw `uint` (creature model-race 0..98 — a
       different domain from the 3-value player `Race` enum).

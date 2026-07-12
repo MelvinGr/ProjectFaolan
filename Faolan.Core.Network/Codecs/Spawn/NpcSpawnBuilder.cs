@@ -12,8 +12,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Builds a wire FA015807 (SimpleCharFullUpdate) NPC spawn body wholly from typed storage (#243/#244) - the
 	// captured `Data` blob is retired. From a placement (TryBuildLive off an NpcSpawn row) or a creature TYPE
-	// (TryBuildFromType off an Npc, for summoned pets/mounts): the transform from the row's columns, the CharacterIIR
-	// stat core from Npc.StatCore, worn equipment from the *Equipment rows, morphs from the *Morph rows, and the
+	// (TryBuildFromType off an NpcTemplate, for summoned pets/mounts): the transform from the row's columns, the CharacterIIR
+	// stat core from NpcTemplate.StatCore, worn equipment from the *Equipment rows, morphs from the *Morph rows, and the
 	// pre-IIR/post-IIR scaffolds GENERATED from scratch (BuildBody + NpcSpawnScaffold). This is the unit the
 	// world-entry/interest path calls per NPC.
 	public static class NpcSpawnBuilder
@@ -68,7 +68,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			var msg = new ProtoCoreCharacterIIR
 			{
-				Name = row.Npc?.Name ?? ""
+				Name = row.NpcTemplate?.Name ?? ""
 			};
 			ApplyStatCore(msg, row);
 			if (row.Equipment is { Count: > 0 })
@@ -81,8 +81,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// Constructs the WHOLE ProtoCoreCharacterIIR for a creature TYPE (#307): Name + the stat core straight from
-		// Npc.StatCore (no per-placement overrides - a type has no placement) + worn equipment from Npc.Equipment.
-		public static ProtoCoreCharacterIIR BuildMessageFromType(Npc npc)
+		// NpcTemplate.StatCore (no per-placement overrides - a type has no placement) + worn equipment from NpcTemplate.Equipment.
+		public static ProtoCoreCharacterIIR BuildMessageFromType(NpcTemplate npc)
 		{
 			var core = npc.StatCore;
 			var msg = new ProtoCoreCharacterIIR
@@ -107,11 +107,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO world
 		// placement (#244/#307). This is what a summoned PET/MOUNT uses: the creature type carries the lifted stat core
-		// (Npc.StatCore), worn equipment (Npc.Equipment), appearance morphs (Npc.Morphs) and the no-morph recordCount,
+		// (NpcTemplate.StatCore), worn equipment (NpcTemplate.Equipment), appearance morphs (NpcTemplate.Morphs) and the no-morph recordCount,
 		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
 		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
 		// lifted stat core.
-		public static bool TryBuildFromType(Npc npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
+		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
 		{
 			body = null;
 			if (npc?.StatCore?.IirHeader is not { } x)
@@ -141,7 +141,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body)
 		{
 			body = null;
-			if (row?.Npc?.StatCore?.IirHeader is not { } x)
+			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
 				return false;
 
 			var morphs = row
@@ -162,14 +162,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 
 			// No-morph spawn: build the minimal form with the type's fresh record count (1 or 2) when known.
-			if (row.Npc.StatCore.MinimalPostIirRecordCount is not { } minimalRecordCount)
+			if (row.NpcTemplate.StatCore.MinimalPostIirRecordCount is not { } minimalRecordCount)
 				return false;
 
 			body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs, minimalRecordCount);
 			return true;
 		}
 
-		// Constructs the CharacterIIR stat core (#244) from the type-level Npc.StatCore + this placement's overrides,
+		// Constructs the CharacterIIR stat core (#244) from the type-level NpcTemplate.StatCore + this placement's overrides,
 		// replacing whatever was parsed from Data. Type-level fields (senses defaults, flags, race, anim clips, ...)
 		// come from the StatCore; the per-placement values override from the NpcSpawn columns: the always-present pools
 		// (Health/Life/Mana/... + Level/scale/voice/mesh) are set unconditionally, and the sparse ones (GuildId +
@@ -177,7 +177,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// spawn that lacks one doesn't inherit the representative's. No-op when the type hasn't been lifted yet.
 		private static void ApplyStatCore(ProtoCoreCharacterIIR msg, NpcSpawn row)
 		{
-			if (row?.Npc?.StatCore is not { } core)
+			if (row?.NpcTemplate?.StatCore is not { } core)
 				return;
 
 			var s = NpcStatCoreCodec.ToStats(core);
