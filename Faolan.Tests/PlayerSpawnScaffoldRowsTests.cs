@@ -201,5 +201,19 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, rebuilt));
 			return PlayerSpawnScaffoldCodec.Generate(rebuilt);
 		}
+
+		// The vanity hidden-slots mask rides PreFrame[18..22] big-endian (bit = base equip slot id). Byte-locked to the
+		// vanity login dumps: hiding Head (slot 2) => 00000004, Chest (slot 5) => 00000020, and a fresh frame => 0.
+		[Theory]
+		[InlineData(0u, "00000000")]
+		[InlineData(1u << 2, "00000004")] // Head (slot 2), from vanity-head-selected
+		[InlineData(1u << 5, "00000020")] // Chest (slot 5), from vanity-chest-selected
+		[InlineData((1u << 5) | (1u << 31), "80000020")] // chest + global master (slot 31)
+		public void FreshPreFrame_WritesVanityMaskBigEndian(uint mask, string expectedHex)
+		{
+			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.Assassin, mask);
+			var off = PlayerSpawnScaffoldRows.VanityHiddenMaskOffset;
+			Assert.Equal(expectedHex, Convert.ToHexString(frame.AsSpan(off, 4).ToArray()).ToLowerInvariant());
+		}
 	}
 }

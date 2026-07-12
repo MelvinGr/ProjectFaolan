@@ -15,7 +15,7 @@ namespace Faolan.Tests
 			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Tokens, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon, CharacterEquipmentSlot.Belt,
 			CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing, CharacterEquipmentSlot.Cape, CharacterEquipmentSlot.Shoulder,
 			CharacterEquipmentSlot.Boots, CharacterEquipmentSlot.Hands, CharacterEquipmentSlot.Legs, CharacterEquipmentSlot.Wrist, CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo,
-			CharacterEquipmentSlot.VanityHead, CharacterEquipmentSlot.VanityBelt, CharacterEquipmentSlot.VanityCape, CharacterEquipmentSlot.VanityBoots, CharacterEquipmentSlot.VanityWrist
+			CharacterEquipmentSlot.VanityHead, CharacterEquipmentSlot.VanityChest, CharacterEquipmentSlot.VanityBelt, CharacterEquipmentSlot.VanityCape, CharacterEquipmentSlot.VanityBoots, CharacterEquipmentSlot.VanityWrist
 		];
 
 		[Fact]
@@ -46,6 +46,30 @@ namespace Faolan.Tests
 			{
 				Id = 1
 			});
+		}
+
+		// The vanity hide filter is a bitmask (bit = the toggle wire slot arg = base equip slot id), emitted verbatim in
+		// the spawn. Capture-confirmed by the vanity login dumps: hiding Head (slot 2) sets bit 2, Chest (slot 5) sets
+		// bit 5, and the "toggle vanity global" master is slot 31 -> bit 31. Lock the bit mapping so it can't drift.
+		[Fact]
+		public void SetVanityFilter_SetsCapturedMaskBits()
+		{
+			var e = new CharacterEquipment();
+
+			Assert.True(e.SetVanityFilter((uint)CharacterEquipmentSlot.Head, true)); // slot 2 -> bit 2
+			Assert.Equal(1u << 2, e.VanityHiddenMask);
+
+			Assert.True(e.SetVanityFilter((uint)CharacterEquipmentSlot.Chest, true)); // slot 5 -> bit 5 (additive)
+			Assert.Equal((1u << 2) | (1u << 5), e.VanityHiddenMask);
+
+			Assert.True(e.SetVanityFilter((uint)CharacterEquipmentSlot.Head, false)); // clearing one leaves the other
+			Assert.Equal(1u << 5, e.VanityHiddenMask);
+
+			Assert.True(e.SetVanityFilter(CharacterEquipment.VanityFilterMainSlot, true)); // global master -> bit 31
+			Assert.Equal((1u << 5) | (1u << 31), e.VanityHiddenMask);
+
+			Assert.Equal(31, CharacterEquipment.VanityFilterMainSlot);
+			Assert.False(e.SetVanityFilter(32, true)); // out of range -> no-op
 		}
 
 		[Fact]

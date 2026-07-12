@@ -118,7 +118,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<int> SetCreationSpawn(Character character);
 		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
 		Task SetMailMoney(ulong mailId, ulong money);
-		Task<bool> SetVanityFilter(uint characterId, uint slot, bool hidden);
+		Task<bool> SetVanityFilter(uint characterId, uint slot, bool toggleState);
 		Task SetMailRead(ulong mailId, bool read);
 		Task SetTradepostListingPrice(ulong saleId, ulong price);
 		Task<bool> UpdateLastInfo(Account account, string ipAddress);
@@ -535,6 +535,7 @@ namespace Faolan.Core.Database.Repositories
 				.Include(c => c.ScaffoldPairs)
 				.Include(c => c.Body)
 				.Include(c => c.BodyResources)
+				.Include(c => c.Equipment) // the vanity hidden-slots mask rides the spawn PreFrame (#336)
 				.FirstOrDefaultAsync(c => c.Id == characterId);
 		}
 
@@ -1492,15 +1493,15 @@ namespace Faolan.Core.Database.Repositories
 			return true;
 		}
 
-		// Persists one ToggleVanityArmorFilter (0x200B) choice onto the character's equipment vanity flags so the
-		// appearance survives relog. The wire 'slot' -> flag mapping lives on the entity (CharacterEquipment.
-		// SetVanityFilter). Returns false if nothing changed: the character has no equipment row, or the slot is an
-		// appearance slot beyond our five (+ master) that we don't model.
-		public async Task<bool> SetVanityFilter(uint characterId, uint slot, bool hidden)
+		// Persists one ToggleVanityArmorFilter (0x200B) choice into the character's VanityHiddenMask (bit = wire slot)
+		// so the appearance survives relog - the spawn emits the mask on the next world entry. The slot->bit set lives
+		// on the entity (CharacterEquipment.SetVanityFilter). Returns false if nothing changed: the character has no
+		// equipment row, or the slot is out of range (> 31).
+		public async Task<bool> SetVanityFilter(uint characterId, uint slot, bool toggleState)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var equipment = await ctx.CharacterEquipment.FirstOrDefaultAsync(e => e.CharacterId == characterId);
-			if (equipment == null || !equipment.SetVanityFilter(slot, hidden))
+			if (equipment == null || !equipment.SetVanityFilter(slot, toggleState))
 				return false;
 
 			await ctx.SaveChangesAsync();

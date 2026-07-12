@@ -25,11 +25,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteUInt32(s.FieldA)
 				.WriteByte(0x2C)
 				.WriteByte(0x0A)
-				.WriteByte((byte)s.Vec3.Length)
-				.WriteArray(s.Vec3)
+				.WriteArrayByteLength(s.Vec3)
 				.WriteByte(0x12)
-				.WriteByte((byte)s.Quat.Length)
-				.WriteArray(s.Quat);
+				.WriteArrayByteLength(s.Quat);
 			if (s.Scale != null)
 				payload.WriteByte(0x25).WriteArray(s.Scale);
 

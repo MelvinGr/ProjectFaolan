@@ -70,6 +70,11 @@ namespace Faolan.Core
 			return (T)Enum.ToObject(typeof(T), ReadByte());
 		}
 
+		/*public bool ReadByte()
+		{
+			return Convert.ToBoolean(this.ReadByte());
+		}*/
+
 		public float ReadFloat()
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(float)];

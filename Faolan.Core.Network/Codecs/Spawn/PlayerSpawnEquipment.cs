@@ -49,11 +49,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (item == null || item.Hash == 0) // only fully-buildable items (real identity + hash)
 					continue;
 
-				// A vanity slot filtered OFF (ToggleVanityArmorFilter) is withheld so the real worn item shows through -
-				// this is what makes the toggle survive relog (the client re-reads the state from the snapshot equipment).
-				if (equipment.IsVanityHidden(slot))
-					continue;
-
+				// Every worn + vanity item ships - NOTHING is withheld for the vanity hide filter. Hiding a slot is done
+				// purely by the hidden-slots bitmask in the spawn header (CharacterEquipment.VanityHiddenMask, emitted by
+				// PlayerSpawnScaffoldRows); the client renders the show/hide off that mask (#336).
 				entries.Add(BuildEntry(slot, item));
 			}
 

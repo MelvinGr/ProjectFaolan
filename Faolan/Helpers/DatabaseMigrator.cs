@@ -1,8 +1,10 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.Helpers
 {
@@ -12,16 +14,31 @@ namespace Faolan.Helpers
 	public class DatabaseMigrator : BackgroundService
 	{
 		private readonly IDbContextFactory<DatabaseContext> _contextFactory;
+		private readonly IHostApplicationLifetime _lifetime;
+		private readonly ILogger<DatabaseMigrator> _logger;
 
-		public DatabaseMigrator(IDbContextFactory<DatabaseContext> contextFactory)
+		public DatabaseMigrator(IDbContextFactory<DatabaseContext> contextFactory, IHostApplicationLifetime lifetime, ILogger<DatabaseMigrator> logger)
 		{
 			_contextFactory = contextFactory;
+			_lifetime = lifetime;
+			_logger = logger;
 		}
 
 		protected override async Task ExecuteAsync(CancellationToken cancellationToken)
 		{
-			await using var ctx = _contextFactory.CreateDbContext();
-			await ctx.Database.MigrateAsync(cancellationToken);
+			try
+			{
+				await using var ctx = _contextFactory.CreateDbContext();
+				await ctx.Database.MigrateAsync(cancellationToken);
+			}
+			catch (Exception ex)
+			{
+				// A failed migration leaves the schema half-applied; refuse to run on a broken DB rather than
+				// limping on (a BackgroundService exception is otherwise swallowed and the server keeps going).
+				_logger.LogCritical(ex, "Database migration failed - stopping the server to avoid running on a broken schema.");
+				_lifetime.StopApplication();
+				throw;
+			}
 		}
 	}
 }

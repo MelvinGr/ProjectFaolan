@@ -68,7 +68,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Vec3 = [0D x][15 y][1D z], each a little-endian fixed32 - the transform's protobuf float triple (15 bytes).
 		private static byte[] EncodeVec3(Vector3 v)
 		{
-			return new FaolanStream().WriteByte(VecField1).WriteFloatLittleEndian(v.X).WriteByte(VecField2).WriteFloatLittleEndian(v.Y).WriteByte(VecField3).WriteFloatLittleEndian(v.Z).ToArray();
+			return new FaolanStream()
+				.WriteByte(VecField1)
+				.WriteFloatLittleEndian(v.X)
+				.WriteByte(VecField2)
+				.WriteFloatLittleEndian(v.Y)
+				.WriteByte(VecField3)
+				.WriteFloatLittleEndian(v.Z)
+				.ToArray();
 		}
 	}
 }

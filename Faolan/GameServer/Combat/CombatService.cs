@@ -1,5 +1,7 @@
 using System;
 using System.Buffers.Binary;
+using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -93,6 +95,38 @@ namespace Faolan.GameServer.Combat
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
+		}
+
+		// The blast radius (world units) a ground-targeted AoE damages around its reticle position.
+		// [V0: a single interim radius - the real per-spell AoE radius is not in the RDB spell record or any bulk
+		// source we import (Spell has only Range = cast distance). Source it per spell + model the channel's per-tick
+		// DoT (Deathly Blizzard ticks over its ~10s channel; we resolve one hit on completion) - see Gitea follow-up.]
+		public const float GroundAoeRadiusUnits = 5f;
+
+		// Resolves a GROUND-TARGETED AoE cast (#236): the spell is aimed at a reticle POSITION, not a locked entity, so
+		// damage every attackable NPC within GroundAoeRadiusUnits of that point. Friendly NPCs (civilians / quest-givers,
+		// Disposition == Friendly) are spared so a stray blast doesn't kill them; hostile + neutral NPCs are hit. On
+		// empty ground this is a no-op, exactly like retail (the demonstrated casts landed on open ground). Players are
+		// never hit (no PvP damage model yet). The ApplySpell cast VFX is broadcast by the caller.
+		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var casterLevel = client.Session.Character?.Level ?? 1;
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+
+			var victims = _sim.World.ZoneForEntity(player)
+				.EntitiesInRange(target, GroundAoeRadiusUnits, casterHandle)
+				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
+				.Select(e => e.Handle)
+				.ToList();
+
+			foreach (var handle in victims)
+				await ApplyNpcDamage(client, handle, damage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
+
+			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, victims.Count, damage);
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the

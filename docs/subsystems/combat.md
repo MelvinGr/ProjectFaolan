@@ -234,6 +234,26 @@ invariant):
   `0x01316cee` on NPC targets) to the observer, framed to the observer's endpoint. Verbatim-relay + Known-gating
   locked by `CrossPlayerSpellRelayTests` against the captured body. **2-client in-client confirmation pending.**
 
+## Spell cast FSM (#236)
+A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in
+`GameServerListener.Inbound.cs`. The real spell id rides the action **trailer** (`[u32 from][u32 spellId]`), not
+the protobuf `SpellTarget.SpellId` (that field is the constant `0xC350` type-word). The BCC **state word** (the
+`u16` before `actionType`) is `3` = begin, `2` = **cancel** — capture-derived (`actions-described-in-chat`:
+begin×2 / cancel×1; every cast in the ice-strike/casilda/casting captures is begin=3).
+
+- **Timing:** begin → echo-ack (renders the cast bar) → hold the spell's `CastTime` (`Task.RunAfter`) →
+  complete-ack (form-`0x0a`) → resolve the effect. `CastTime 0` resolves immediately.
+- **Interrupt / move-cancel:** each begin captures a per-session `ActiveCastToken` (`NetworkClientSession`); a
+  cancel (the client sends `CastSpell` with state `2` when the player moves mid-cast — "move cancels the cast",
+  #346/#347) bumps the token, so the deferred resolve sees a mismatch and aborts (no complete-ack, no damage).
+  Verified in-capture by the "Casting Deathly Blizzard … then moving to interrupt" cast.
+- **Ground-targeted AoE:** a spell aimed at a reticle POSITION (no locked entity) carries the target Vector3 in
+  the trailer (`[u8 kind=0][f32 X/Y/Z BE]…`) and has **no** `SpellTarget`; `CastGroundTarget.TryParse` reads it
+  (an entity cast sends `kind=1` and a garbage position). `CombatService.ResolveGroundAoe` then damages every
+  attackable NPC (Disposition ≠ Friendly) within `GroundAoeRadiusUnits` of the reticle — on empty ground it is a
+  no-op like retail. **[V0]** the AoE radius is a single interim constant (no per-spell radius in the RDB spell
+  record) and the channel's per-tick DoT is resolved as one hit on completion — both are Gitea follow-ups.
+
 ## Starting gear (#220)
 A brand-new beach character is seeded its slave outfit in `EnsureBeachStarterEquipment`
 (`GameServerListener.WorldEntry.cs`), from the `StartingData` constants harvested from the `*create*` captures

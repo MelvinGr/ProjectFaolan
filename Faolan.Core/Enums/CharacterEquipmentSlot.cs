@@ -26,8 +26,10 @@ namespace Faolan.Core.Enums
 		RangedWeapon = 20, // main_hand_right (bow/crossbow/thrown)
 		Ammo = 21, // off_hand_right (quiver/bolts)
 
-		// prob. all the same + 1000 still have to check
+		// Vanity ("costume") item slots = 1000 + the base equip slot id. VanityHead (1002) and VanityChest (1005) are
+		// capture-confirmed by the ToggleVanityArmorFilter slot arg (base slot 2/5); the rest are extrapolated.
 		VanityHead = 1002,
+		VanityChest = 1005,
 		VanityBelt = 1007,
 		VanityCape = 1011,
 		VanityBoots = 1014,

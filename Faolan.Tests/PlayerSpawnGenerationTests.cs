@@ -188,11 +188,11 @@ namespace Faolan.Tests
 				}, entries.Select(e => (e.Pos, e.Item.Template1)).ToArray());
 		}
 
-		// ToggleVanityArmorFilter (0x200B): a vanity slot toggled off is WITHHELD from the spawn snapshot (so the real
-		// worn item shows through), which is how the toggle survives relog. SetVanityFilter maps the wire 'slot' to the
-		// right flag - Head via base slot id 2, the master via VanityFilterMainSlot - and rejects a slot we don't model.
+		// ToggleVanityArmorFilter (0x200B) does NOT withhold anything from the spawn: every worn + vanity item always
+		// ships, and hiding a slot is carried purely by the VanityHiddenMask bitmask in the spawn header (the client
+		// renders the show/hide off it). So the snapshot equipment is invariant under the toggle - only the mask moves.
 		[Fact]
-		public void PlayerSpawnEquipment_WithheldVanitySlots_DropOutOfTheSnapshot()
+		public void PlayerSpawnEquipment_ShipsAllItems_HideIsMaskOnly()
 		{
 			var equipment = new CharacterEquipment
 			{
@@ -201,27 +201,21 @@ namespace Faolan.Tests
 				VanityCape = new Item { Id = 0x30, Key = new ProtoDecryptionKey { Key1 = 0x30 }, Hash = 0x30 }
 			};
 
-			// Nothing filtered: both vanity pieces ride the snapshot alongside the worn head.
-			var posOf = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
-			Assert.Contains((uint)CharacterEquipmentSlot.VanityHead, posOf);
-			Assert.Contains((uint)CharacterEquipmentSlot.VanityCape, posOf);
+			var before = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
+			Assert.Contains((uint)CharacterEquipmentSlot.VanityHead, before);
+			Assert.Contains((uint)CharacterEquipmentSlot.VanityCape, before);
+			Assert.Contains((uint)CharacterEquipmentSlot.Head, before);
 
-			// Per-slot: toggling the head vanity (wire slot 2 = base Head id) withholds only the vanity head.
+			// Toggle head + the global master: the mask picks up bits 2 and 31, but the shipped entries are unchanged.
 			Assert.True(equipment.SetVanityFilter((uint)CharacterEquipmentSlot.Head, true));
-			posOf = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
-			Assert.DoesNotContain((uint)CharacterEquipmentSlot.VanityHead, posOf);
-			Assert.Contains((uint)CharacterEquipmentSlot.VanityCape, posOf);
-			Assert.Contains((uint)CharacterEquipmentSlot.Head, posOf); // the real worn head still shows
-
-			// Master toggle withholds every vanity piece at once.
 			Assert.True(equipment.SetVanityFilter(CharacterEquipment.VanityFilterMainSlot, true));
-			posOf = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
-			Assert.DoesNotContain((uint)CharacterEquipmentSlot.VanityHead, posOf);
-			Assert.DoesNotContain((uint)CharacterEquipmentSlot.VanityCape, posOf);
-			Assert.Contains((uint)CharacterEquipmentSlot.Head, posOf);
+			Assert.Equal((1u << 2) | (1u << 31), equipment.VanityHiddenMask);
 
-			// A slot we don't model (an appearance slot beyond our five) is rejected, changing nothing.
-			Assert.False(equipment.SetVanityFilter(30, true));
+			var after = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
+			Assert.Equal(before, after); // nothing withheld
+
+			// An out-of-range slot is rejected, changing nothing.
+			Assert.False(equipment.SetVanityFilter(32, true));
 		}
 
 		// The dynamic reader locates the CharacterIIR in any spawn; on the Strie template it must agree with the fixed

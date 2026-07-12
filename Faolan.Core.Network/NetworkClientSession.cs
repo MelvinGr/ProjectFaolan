@@ -83,6 +83,12 @@ namespace Faolan.Core.Network
 		// capture it increments by 1 per player swing-ack; the client uses it to sequence the behaviour responses.
 		int NormalAttackAckPhase { get; set; }
 
+		// Invalidation token for the in-flight spell cast (#236 interrupt handling). Bumped on every cast BEGIN (the
+		// deferred effect resolve captures the value it was started with) and bumped AGAIN whenever the cast is
+		// cancelled - the client's cancel BCC (CastSpell with state=2) or the player moving mid-cast - so a resolve
+		// that fires after a cancel sees a mismatched token and aborts. This is what makes "move cancels the cast".
+		uint ActiveCastToken { get; set; }
+
 		// The Spellweaving(1) buff STACK level: each time the component picker reappears a fresh stack is applied at
 		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
 		int SpellweaveBuffStack { get; set; }
@@ -159,6 +165,7 @@ namespace Faolan.Core.Network
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
+		public uint ActiveCastToken { get; set; }
 		public int SpellweaveBuffStack { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> WeaveComponents { get; } = [];

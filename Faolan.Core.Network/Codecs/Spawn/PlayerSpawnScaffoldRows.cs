@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
@@ -175,10 +176,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// TryApplyFrom reconstructs them from Character.Class - see FreshPreFrame + docs/re/fa015807-spawn-reader.md.
 		}
 
-		public static byte[] FreshPreFrame(Class @class)
+		// Offset of the vanity hidden-slots bitmask within the 239-byte PreFrame (4 bytes, big-endian; bit = base equip
+		// slot id). 0 = nothing hidden (the fresh default); the FA015807 self-spawn carries it so a hidden piece
+		// survives relog - the client renders the show/hide off it (#336).
+		public const int VanityHiddenMaskOffset = 18;
+
+		public static byte[] FreshPreFrame(Class @class, uint vanityHiddenMask = 0)
 		{
 			var f = new byte[239];
 			f[0] = 0x05;
+			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(VanityHiddenMaskOffset, 4), vanityHiddenMask); // vanity hide mask (#336)
 			f[70] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
 			f[71] = (byte)@class; // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
 			f[76] = 0x6F; // constant marker
@@ -252,10 +259,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (character?.Attributes == null || character.Attributes.Count == 0)
 				return false;
 
-			// The frame + EntryTableX are CONSTRUCTED, not stored: FreshPreFrame(class) is the constant skeleton with
-			// the archetype/class island written from the character's class; EntryTableX is the constant 0xB7. The
-			// captured session islands (RDB script char buffer, buff/timer table) are transient and correctly absent.
-			scaffold.PreFrame = FreshPreFrame(character.Class);
+			// The frame + EntryTableX are CONSTRUCTED, not stored: FreshPreFrame(class, vanityMask) is the constant
+			// skeleton with the archetype/class island written from the character's class and the vanity hidden-slots
+			// mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden piece survives
+			// relog); EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
+			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityHiddenMask ?? 0);
 			scaffold.EntryTableX = 0xB7;
 			scaffold.BuffRecords.Clear();
 

@@ -382,6 +382,20 @@ namespace Faolan.GameServer
 
 							case ActionType.CastSpell:
 							{
+								// The BCC "state" word (unk1) tells begin from cancel: 3 = begin, 2 = CANCEL. The client sends
+								// the cancel when the cast is interrupted (moving mid-cast - "move cancels the cast", #346/#347),
+								// so honor it by invalidating any in-flight resolve (bump the token so the deferred Resolve below
+								// aborts) and acking the cancel. State values are capture-derived (actions-described-in-chat:
+								// begin=3 x2, cancel=2 x1; every cast in the ice-strike/casilda/casting captures is begin=3).
+								const ushort castStateCancel = 2;
+								if (unk1 == castStateCancel)
+								{
+									client.Session.ActiveCastToken++; // a pending Resolve() now sees a mismatched token and aborts
+									await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+									Logger.LogInformation("CastSpell CANCEL (interrupted/moved) - pending cast aborted.");
+									break;
+								}
+
 								// The real spell id rides the action TRAILER (`target`, the uint32 read after the protobuf
 								// args), NOT args.SpellTarget.SpellId - that protobuf field is the constant 0xC350 type-word, 								// so casts logged as "spell 50000" and ApplySpell carried a non-existent id (no effect shown).
 								// Decoded from the ice-strike capture (c2s 0x642CD3D6 cast): trailer = [u32 from=1][u32 spellId];
@@ -392,7 +406,16 @@ namespace Faolan.GameServer
 								var casterHandle = client.Session.Account.ClientInstance;
 								var targetHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
 
-								Logger.LogInformation($"CastSpell spell=0x{spellId:X} target=0x{targetHandle:X} {args}");
+								// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
+								// trailer instead of a locked entity: it has NO SpellTarget and the trailer's kind byte is 0.
+								// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
+								var isGroundCast = CastGroundTarget.TryParse(unk2, out var groundTarget) && args.SpellTarget == null;
+
+								// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
+								// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
+								var castToken = ++client.Session.ActiveCastToken;
+
+								Logger.LogInformation($"CastSpell spell=0x{spellId:X} target=0x{targetHandle:X}{(isGroundCast ? $" ground={groundTarget}" : "")} {args}");
 
 								// Cast-begin ack (#236): retail answers the cast behavior with a BCC echo right away, which
 								// is what makes the client enter the channel state + render the cast bar (without it the
@@ -424,6 +447,12 @@ namespace Faolan.GameServer
 								// mana, and on an offensive cast apply damage + push the target's vitals (#69).
 								async Task Resolve()
 								{
+									// Interrupted mid-cast (the player moved / sent the cancel BCC): ActiveCastToken was bumped
+									// after we captured castToken, so skip the effect entirely - no complete-ack, no damage. This
+									// is what makes the move-interrupt stick (the "then moving to interrupt" cast in the capture).
+									if (client.Session.ActiveCastToken != castToken)
+										return;
+
 									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
 									// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
 									// (cast-state complete). Without this the bar fills then hangs.
@@ -447,6 +476,17 @@ namespace Faolan.GameServer
 										Logger.LogInformation("CastSpell 0x{Spell:X} pet-summon '{Template}' -> {Result}.", spellId, petSummon.PetTemplate, pet != null
 											? $"0x{pet.Handle:X8}"
 											: "no spawnable template (pet-creature import needed)");
+										return;
+									}
+
+									// GROUND-TARGETED AoE: damage attackable NPCs around the reticle instead of applying a single
+									// target debuff or a self-buff. The blizzard/AoE VFX is rendered client-side from the cast
+									// behavior itself (retail sent no ApplySpell on the empty-ground casts - only the complete-ack,
+									// the DispatchLockTemplate unlocks, and the mana push), so there is no ApplySpell carrier here.
+									if (isGroundCast)
+									{
+										await _combat.SpendCasterMana(client, spellId);
+										await _combat.ResolveGroundAoe(client, casterHandle, groundTarget, spellId);
 										return;
 									}
 
@@ -1515,11 +1555,13 @@ namespace Faolan.GameServer
 
 			var slot = packet.Body.ReadUInt32();
 			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-			var toggleState = packet.Body.ReadByte();
-			var hidden = toggleState != 0; // [V0] polarity guess: filter set -> vanity withheld; flip if in-client is inverted
+			// Polarity CONFIRMED in-client (Melvin): checkbox ON (the slot's vanity toggle enabled / its vanity item is
+			// shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
+			// (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
+			var toggleState = Convert.ToBoolean(packet.Body.ReadByte());
 
-			var applied = await Database.SetVanityFilter(character.Id, slot, hidden);
-			Logger.LogDebug("ToggleVanityArmorFilter(slot={Slot}, hidden={Hidden}) {Applied}.", slot, hidden,
+			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);
+			Logger.LogDebug("ToggleVanityArmorFilter(slot={Slot}, toggleState={toggleState}) {Applied}.", slot, toggleState,
 				applied ? "persisted" : "(unmodelled appearance slot, ignored)");
 		}
 

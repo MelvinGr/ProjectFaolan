@@ -12,6 +12,10 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId))]
 	public class CharacterEquipment
 	{
+		// The ToggleVanityArmorFilter 'slot' arg / bitmask bit that means the MAIN ("global" hide-all) toggle - slot 31,
+		// capture-confirmed (the "toggle vanity global" toggle carries slot 31).
+		public const int VanityFilterMainSlot = 31;
+
 		public uint? BeltId { get; set; }
 
 		[ForeignKey(nameof(BeltId))]
@@ -117,8 +121,13 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(VanityCapeId))]
 		public virtual Item? VanityCape { get; set; }
 
+		public uint? VanityChestId { get; set; }
+
+		[ForeignKey(nameof(VanityChestId))]
+		public virtual Item? VanityChest { get; set; }
+
 		// Vanity ("costume") slots - override the worn item's APPEARANCE only. Retail exposes them at slot ids 1000 +
-		// the base slot (VanityHead 1002, VanityBelt 1007, VanityCape 1011, VanityBoots 1014, VanityWrist 1018).
+		// the base slot (VanityHead 1002, VanityChest 1005, VanityBelt 1007, VanityCape 1011, VanityBoots 1014, VanityWrist 1018).
 		public uint? VanityHeadId { get; set; }
 
 		[ForeignKey(nameof(VanityHeadId))]
@@ -161,11 +170,12 @@ namespace Faolan.Core.Database.Tables
 					CharacterEquipmentSlot.RangedWeapon  => MainHandRight,
 					CharacterEquipmentSlot.Ammo          => OffHandRight,
 					CharacterEquipmentSlot.VanityHead    => VanityHead,
+					CharacterEquipmentSlot.VanityChest   => VanityChest,
 					CharacterEquipmentSlot.VanityBelt    => VanityBelt,
 					CharacterEquipmentSlot.VanityCape    => VanityCape,
 					CharacterEquipmentSlot.VanityBoots   => VanityBoots,
 					CharacterEquipmentSlot.VanityWrist   => VanityWrist,
-					_                                    => null
+					_                                    => throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot")
 				};
 			set
 			{
@@ -279,6 +289,12 @@ namespace Faolan.Core.Database.Tables
 						break;
 					}
 
+					case CharacterEquipmentSlot.VanityChest:
+					{
+						VanityChest = value;
+						break;
+					}
+
 					case CharacterEquipmentSlot.VanityBelt:
 					{
 						VanityBelt = value;
@@ -305,62 +321,37 @@ namespace Faolan.Core.Database.Tables
 
 					default:
 					{
-						throw new ArgumentOutOfRangeException(nameof(slot), slot, "not a valid equipment slot");
+						throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot");
 					}
 				}
 			}
 		}
 
-		// --- vanity ("costume") armour FILTER toggles (client method ToggleVanityArmorFilter, GameCharAgentProject
-		// 0x200B). A vanity slot is just its equipment slot + a show/hide toggle: when a slot is filtered the
-		// character's vanity item for that slot is withheld from the spawn snapshot so the real worn item shows
-		// through. VanityAllHidden is the "main" master toggle (filter every vanity piece at once). Persisted so the
-		// choice survives relog - the client renders the show/hide itself and reads the state back from the equipment
-		// carried in the character snapshot (PlayerCharacterIir), not a dedicated wire field.
-		public bool VanityAllHidden { get; set; }
-		public bool VanityHeadHidden { get; set; }
-		public bool VanityBeltHidden { get; set; }
-		public bool VanityCapeHidden { get; set; }
-		public bool VanityBootsHidden { get; set; }
-		public bool VanityWristHidden { get; set; }
+		// --- vanity ("costume") armour hide filter (client method ToggleVanityArmorFilter, GameCharAgentProject 0x200B).
+		// The per-slot "is this slot's piece hidden" toggles are stored as ONE bitmask: bit N set = slot N hidden. The
+		// bit index IS the toggle's wire `slot` arg = the BASE equip slot id, so any slot round-trips by construction
+		// (incl. the still-unidentified 29/30 and the 31 master). This value is emitted VERBATIM to the client on world
+		// entry - the FA015807 self-spawn's PlayerSpawnScaffold PreFrame carries it as 4 bytes big-endian - so the hide
+		// survives relog (the client renders the show/hide itself off the mask). Capture-confirmed by the vanity-head/
+		// -chest login dumps: hiding Head (slot 2) sets bit 2, hiding Chest (slot 5) sets bit 5; the "global" toggle is
+		// slot 31 -> bit 31. toggleState polarity is confirmed too (both toggled OFF - not visible - sent 0, so
+		// toggleState 0 = hidden). See PlayerSpawnScaffoldRows + docs/subsystems/vanity-armor-filter.md (#336).
+		public uint VanityHiddenMask { get; set; }
 
-		// The ToggleVanityArmorFilter 'slot' arg that means the MAIN (hide-all) toggle rather than a single slot.
-		// [V0: best guess - the most frequent lone value across captures (2/29/30/31 seen); the per-slot toggles use
-		// the BASE equip slot id (slot=2 -> Head is capture-confirmed). Verify the master id + the 30/31 slots + the
-		// toggleState polarity in-client, then correct these constants - see Gitea #336.]
-		public const uint VanityFilterMainSlot = 29; // TODO: Check me
-
-		// Apply one ToggleVanityArmorFilter(slot, toggleState) to the stored per-slot filter. Maps the wire 'slot' to
-		// the matching vanity toggle (main or one of the five modelled vanity slots, keyed by BASE equip slot id).
-		// Returns false for a slot we don't model (an appearance slot beyond our five) so the caller can log it.
-		public bool SetVanityFilter(uint slot, bool hidden)
+		// Apply one ToggleVanityArmorFilter(slot, hidden): set/clear the slot's bit in the mask. The wire `slot` is the
+		// bit index directly (0..31), so no per-slot mapping is needed. Returns false for an out-of-range slot.
+		public bool SetVanityFilter(uint slot, bool toggleState)
 		{
-			switch (slot)
-			{
-				case VanityFilterMainSlot: VanityAllHidden = hidden; return true;
-				case (uint)CharacterEquipmentSlot.Head: VanityHeadHidden = hidden; return true;
-				case (uint)CharacterEquipmentSlot.Belt: VanityBeltHidden = hidden; return true;
-				case (uint)CharacterEquipmentSlot.Cape: VanityCapeHidden = hidden; return true;
-				case (uint)CharacterEquipmentSlot.Boots: VanityBootsHidden = hidden; return true;
-				case (uint)CharacterEquipmentSlot.Wrist: VanityWristHidden = hidden; return true;
-				default: return false;
-			}
-		}
+			if (slot > 31)
+				return false;
 
-		// Whether the given VANITY slot's item should be WITHHELD from the appearance (its own toggle, or the master,
-		// is set). Non-vanity slots are never hidden by this filter.
-		public bool IsVanityHidden(CharacterEquipmentSlot slot)
-		{
-			// The master (VanityAllHidden) only withholds VANITY slots - never the real worn gear, which always ships.
-			return slot switch
-			{
-				CharacterEquipmentSlot.VanityHead => VanityAllHidden || VanityHeadHidden,
-				CharacterEquipmentSlot.VanityBelt => VanityAllHidden || VanityBeltHidden,
-				CharacterEquipmentSlot.VanityCape => VanityAllHidden || VanityCapeHidden,
-				CharacterEquipmentSlot.VanityBoots => VanityAllHidden || VanityBootsHidden,
-				CharacterEquipmentSlot.VanityWrist => VanityAllHidden || VanityWristHidden,
-				_ => false
-			};
+			var bit = 1u << (int)slot;
+			if (toggleState)
+				VanityHiddenMask |= bit;
+			else
+				VanityHiddenMask &= ~bit;
+
+			return true;
 		}
 	}
 }

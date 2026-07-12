@@ -20,12 +20,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// PlayerSpawnScaffoldRows.FreshPreFrame builds the fresh-character variant.
 		public byte[] PreFrame { get; set; }
 
-		public byte[] Quat { get; set; } // Todo: convert to vector3 or 3 floats
+		public byte[] Quat { get; set; } // TODO: columnize
 		public byte[] Scale { get; set; } // null when absent
 
 		// Transform component payloads (the 0x2C group), kept as raw field payloads: 0x0A vec3 (3 x fixed32),
 		// 0x12 quat (4 x fixed32), optional 0x25 scale (4 bytes), 0x18 playfield varint.
-		public byte[] Vec3 { get; set; } // Todo: convert to vector3 or 3 floats
+		public byte[] Vec3 { get; set; } // TODO: columnize`
 
 		// Post-IIR stream. Buff/timer records are 60-byte transient state (only on captured chars with active
 		// buffs); the entry table / ID list / end pairs are the per-character skill+feat scaffold.
