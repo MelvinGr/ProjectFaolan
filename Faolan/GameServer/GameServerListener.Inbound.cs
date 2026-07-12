@@ -82,7 +82,10 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case (GameServer0X2000Opcodes)GameCharAgentOpcodes.QueuePetCommand: // #354: verify routing (vs HandleGameCharAgentPacket for 0x205B)
+				// 0x205B arrives as a GameAgent PassBlob INNER subopcode (client -> GameAgent/PassBlob -> Handle0X2000 ->
+				// this switch), not a GameCharAgent-endpoint packet, so HandleGameCharAgentPacket never sees it - this is
+				// the correct handler. The name only lives in GameCharAgentOpcodes; the value is dispatched here. (#354)
+				case (GameServer0X2000Opcodes)GameCharAgentOpcodes.QueuePetCommand:
 				{
 					await HandlePetCommand(client, packet);
 					break;
