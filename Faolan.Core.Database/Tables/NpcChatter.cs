@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -18,7 +19,9 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(NpcTemplateId))]
 		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
 
-		// The verbatim <remoteformat> XML sent as the CharacterChat (0x0022) message.
+		// The verbatim <remoteformat> XML sent as the CharacterChat (0x0022) message. ~150 chars in practice (the
+		// token + group name + per-line key); 512 leaves generous headroom for longer groups/keys.
+		[MaxLength(512)]
 		public string RemoteFormat { get; set; } = null!;
 	}
 }
