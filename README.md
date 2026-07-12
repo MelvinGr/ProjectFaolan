@@ -62,7 +62,10 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
 - ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes; faction disposition (friendly/neutral
   NPCs never aggro and render green names, hostiles red)
-- ✅ Interactive world objects — doors/gates open on use
+- ✅ Interactive world objects — doors/gates open on use; interacting with a prop with no behavior floats a
+  "nothing to interact with here yet" bubble instead of a silent no-op
+- 🟡 Sit on benches — the sit/stand/hold-state animations are decoded + built byte-exact, but the pose reverts
+  to standing after the animation (does not yet hold in-client) (#355)
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
   client-side movement jitter (#272)
 - 🟡 Per-map playfield token — sourced per-map from `Map.PlayfieldToken` (seeded with a captured token per map);
