@@ -1,6 +1,6 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Server.ChatServer;
 
@@ -19,72 +19,43 @@ namespace Faolan.Core.Network.Server.GameServer
 	/// </summary>
 	public sealed class GameServerDispatcher : IGameServerDispatcher
 	{
-		private readonly List<IGameServerProvider> _providers = []; // TODO: use a concurrent collection instead of locking
-		private readonly Lock _lock = new Lock();
+		// Registration is set-semantics (deduped, order-independent) and reads vastly outnumber the rare
+		// register/unregister, so a concurrent set gives lock-free enumeration. The byte value is unused - only
+		// the keys matter (a routed character lives in exactly one provider, so iteration order never matters).
+		private readonly ConcurrentDictionary<IGameServerProvider, byte> _providers = new();
 
 		public void Register(IGameServerProvider provider)
 		{
-			lock (_lock)
-			{
-				if (!_providers.Contains(provider))
-					_providers.Add(provider);
-			}
+			_providers.TryAdd(provider, 0);
 		}
 
 		public void Unregister(IGameServerProvider provider)
 		{
-			lock (_lock)
-			{
-				_providers.Remove(provider);
-			}
+			_providers.TryRemove(provider, out _);
 		}
 
 		public bool DisconnectCharacter(uint characterId)
 		{
-			IGameServerProvider[] providers;
-			lock (_lock)
-			{
-				providers = _providers.ToArray();
-			}
-
 			var disconnected = false;
-			foreach (var provider in providers)
+			foreach (var provider in _providers.Keys)
 				disconnected |= provider.DisconnectCharacter(characterId);
 			return disconnected;
 		}
 
 		public CharacterLiveState GetCharacterLiveState(uint characterId)
 		{
-			IGameServerProvider[] providers;
-			lock (_lock)
-			{
-				providers = _providers.ToArray();
-			}
-
-			return providers.Select(p => p.GetCharacterLiveState(characterId)).FirstOrDefault(s => s != null);
+			return _providers.Keys.Select(p => p.GetCharacterLiveState(characterId)).FirstOrDefault(s => s != null);
 		}
 
 		public IReadOnlyList<SessionInfo> GetSessions()
 		{
-			IGameServerProvider[] providers;
-			lock (_lock)
-			{
-				providers = _providers.ToArray();
-			}
-
-			return providers.SelectMany(p => p.GetSessions()).ToArray();
+			return _providers.Keys.SelectMany(p => p.GetSessions()).ToArray();
 		}
 
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
-			IGameServerProvider[] providers;
-			lock (_lock)
-			{
-				providers = _providers.ToArray();
-			}
-
 			// The listeners share one world simulation, so the first non-empty view is THE view.
-			foreach (var provider in providers)
+			foreach (var provider in _providers.Keys)
 			{
 				var entities = provider.GetZoneEntities(mapId);
 				if (entities.Count > 0)
@@ -96,13 +67,7 @@ namespace Faolan.Core.Network.Server.GameServer
 
 		public async Task<bool> RunGmCommand(uint characterId, string commandText)
 		{
-			IGameServerProvider[] providers;
-			lock (_lock)
-			{
-				providers = _providers.ToArray();
-			}
-
-			foreach (var provider in providers)
+			foreach (var provider in _providers.Keys)
 			{
 				if (await provider.RunGmCommand(characterId, commandText))
 					return true;
@@ -113,13 +78,7 @@ namespace Faolan.Core.Network.Server.GameServer
 
 		public async Task<bool> SendGuildTag(uint characterId, string guildName)
 		{
-			IGameServerProvider[] providers;
-			lock (_lock)
-			{
-				providers = _providers.ToArray();
-			}
-
-			foreach (var provider in providers)
+			foreach (var provider in _providers.Keys)
 			{
 				if (await provider.SendGuildTag(characterId, guildName))
 					return true;

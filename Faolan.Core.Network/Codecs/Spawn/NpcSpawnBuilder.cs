@@ -37,7 +37,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			var body = new FaolanStream()
 				.WriteUInt32(0) // body length placeholder (set below)
-				.WriteUInt32(0xFA015807u) // TODO: Add subOpcode (SimpleCharFullUpdate)
+				.WriteUInt32((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR) // the entity-spawn subop ("Spawn")
 				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // fieldA

@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.World
@@ -110,14 +111,14 @@ namespace Faolan.Core.Network.Codecs.World
 		// (one distinct tag per SubOpcode across the whole capture set), so it is derived here rather than stored.
 		public static uint TypeTagForClass(uint subOpcode)
 		{
-			return subOpcode switch // TODO: We have contsts for these somehwere right? Use those
+			return subOpcode switch
 			{
-				0x1FD6412Bu => 0x0000C87Du, // ClimbingDynel
-				0x33A56FB0u => 0x0000C748u, // ZoneLabel
-				0x66AEDD50u => 0x0000C878u, // SimpleDynel
-				0x6BD56736u => 0x0000C879u, // Destructible
-				0xF096251Eu => 0x0000C87Au, // Container
-				_           => 0x0000C878u
+				(uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR => EntityClass.ClimbingDynel,
+				(uint)GameServer0X2000Opcodes.DoorFullUpdateIIR          => EntityClass.ZoneLabel,
+				(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR   => EntityClass.SimpleDynel,
+				(uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR  => EntityClass.Destructible,
+				(uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR       => EntityClass.LootBag,
+				_                                                        => EntityClass.SimpleDynel
 			};
 		}
 	}
