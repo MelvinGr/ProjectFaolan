@@ -117,10 +117,13 @@ namespace Faolan.GameServer.World
 		// replayed verbatim - retail does NOT walk a continuous route, see Patrols/NextWanderPoint).
 		public byte[] PatrolBody { get; set; }
 
-		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client - for a player,
-		// captured when they entered the world; for an NPC, built from its NpcSpawn row at load. Re-framed per recipient
-		// by the broadcaster (cross-player spawn, NPC respawn). Null until captured / for entities with no spawn.
-		[Obsolete]
+		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client. Constructed
+		// FROM SCRATCH - never a verbatim capture: NPCs via NpcSpawnBuilder.TryBuildLive from the typed NpcSpawn columns
+		// (the old captured NpcSpawn.Data blob is retired), pets via TryBuildFromType, loot via WorldObjectBuilder, and
+		// players via PlayerSpawnBuilder.BuildFromScratch (stashed by CaptureOwnSpawnBody at entry). This is a RUNTIME,
+		// in-memory cache of that built body - never persisted, never touched by the importer - which the broadcaster
+		// re-frames per recipient (current position + live playfield token) in SendWorldSpawn, so it isn't rebuilt for
+		// every viewer. Null until built / for entities with no spawn.
 		public byte[] SpawnBody { get; set; }
 
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
