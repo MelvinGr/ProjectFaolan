@@ -77,22 +77,29 @@ namespace Faolan.Importer.Captures
 				.ToList();
 			var allMaps = perCap.SelectMany(p => p.All.Select(e => e.MapId)).Distinct().ToList();
 
-			var morphsByName = new Dictionary<string, IReadOnlyList<NpcAppearanceMorph>>();
+			// Keyed by TEMPLATE ID, not name (#244): many NPCs share a placeholder INTERNAL name - e.g. "Halen van
+			// Dummy" is the internal name of ~16 unrelated templates (the level-10 castle Child 14543, a dummy 14535,
+			// a quest-giver, ...). Keying the richest-set backfill by name leaked a geared level-80 same-named NPC's
+			// gear + morphs onto the level-10 child, which its own captured spawn doesn't carry (floating gear). The
+			// template id is the stable per-type key: distinct templates stay separate, while genuinely-same NPCs
+			// (same template across captures) still merge.
+			var morphsByTemplate = new Dictionary<uint, IReadOnlyList<NpcAppearanceMorph>>();
 			foreach (var e in perCap.SelectMany(p => p.All))
 			{
-				if (e.Morphs.Count > 0 && (!morphsByName.TryGetValue(e.Name ?? "", out var cur) || e.Morphs.Count > cur.Count))
-					morphsByName[e.Name ?? ""] = e.Morphs;
+				if (e.Morphs.Count > 0 && (!morphsByTemplate.TryGetValue(e.TemplateId, out var cur) || e.Morphs.Count > cur.Count))
+					morphsByTemplate[e.TemplateId] = e.Morphs;
 			}
 
-			// Richest worn-equipment set per name (#267): the burst-truth dedup can pick a session where an NPC wears
+			// Richest worn-equipment set per TEMPLATE (#267): the burst-truth dedup can pick a session where an NPC wears
 			// FEWER pieces than another capture of the same NPC - e.g. Casilda at the post wears 4 (incl. slot-18
 			// tpl402981, the CHAINS that make her look chained), but while FOLLOWING the player she wears only 3. Keep
 			// the fullest loadout so the chosen spawn isn't stripped of state-specific gear it has in another capture.
-			var equipByName = new Dictionary<string, IReadOnlyList<NpcSpawnEquipment>>();
+			// (Per template, so it never leaks across the shared-placeholder-name templates above.)
+			var equipByTemplate = new Dictionary<uint, IReadOnlyList<NpcSpawnEquipment>>();
 			foreach (var e in perCap.SelectMany(p => p.All))
 			{
-				if (e.Equipment.Count > 0 && (!equipByName.TryGetValue(e.Name ?? "", out var cur) || e.Equipment.Count > cur.Count))
-					equipByName[e.Name ?? ""] = e.Equipment;
+				if (e.Equipment.Count > 0 && (!equipByTemplate.TryGetValue(e.TemplateId, out var cur) || e.Equipment.Count > cur.Count))
+					equipByTemplate[e.TemplateId] = e.Equipment;
 			}
 
 			var spawns = new List<NpcSpawnEntry>();
@@ -153,7 +160,7 @@ namespace Faolan.Importer.Captures
 						};
 					}
 
-					if (e.Morphs.Count == 0 && morphsByName.TryGetValue(e.Name ?? "", out var backfillMorphs))
+					if (e.Morphs.Count == 0 && morphsByTemplate.TryGetValue(e.TemplateId, out var backfillMorphs))
 					{
 						e = e with
 						{
@@ -161,7 +168,7 @@ namespace Faolan.Importer.Captures
 						};
 					}
 
-					if (equipByName.TryGetValue(e.Name ?? "", out var fullEquip) && fullEquip.Count > e.Equipment.Count)
+					if (equipByTemplate.TryGetValue(e.TemplateId, out var fullEquip) && fullEquip.Count > e.Equipment.Count)
 					{
 						e = e with
 						{
