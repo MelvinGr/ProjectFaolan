@@ -66,7 +66,6 @@ namespace Faolan.GameServer
 			// don't instantiate (the dynel is byte-exact + its mesh 347243 is in the RDB, but nothing runs the scene
 			// script) and why the gate never resolves. Gated to the beach so a non-Tortage login isn't steered into
 			// the intro destiny flow.
-			var onBeach = client.Session.Character?.MapId == Map.TortageBeachId;
 
 			// record 3: 0x00002000, 35-byte body - the GameCode script-message (script id 0x5F376, no name string, 			// unlike record 2 StartFixed3d / record 4 WelcomeTutorial) that triggers the on-screen TUTORIAL overlay.
 			// DISABLED (if(false)) so the tutorial no longer pops on world entry; re-enable to restore it. (Note: this
@@ -93,7 +92,7 @@ namespace Faolan.GameServer
 
 			// #267: if this character has ALREADY freed Casilda (relog after the beach talk stage), drop the chain-wall
 			// collision up-front so they aren't re-blocked by the world-entry burst's chain dynel.
-			if (onBeach)
+			if (client.Session.Character?.MapId == Map.TortageBeachId)
 				await _broadcaster.SendBeachGateOnEntry(client);
 
 			Logger.LogInformation("Sent the post-0x2024 login records.");
