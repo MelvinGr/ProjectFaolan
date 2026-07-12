@@ -913,14 +913,17 @@ namespace Faolan.GameServer.World
 		// The map's real playfield-instance token (#305), threaded through map-change/spawn/world-objects/snapshot so
 		// they agree by construction. Sourced per-map from Map.PlayfieldToken (the value the client scopes the
 		// character to when it loads that playfield; the client keys per-area behaviour on it - e.g. mount permission,
-		// so a wrong token makes Old Tarantia read as the no-mount Tortage beach). Falls back to the beach default when
-		// a map has no captured token yet, preserving the prior single-token behaviour for un-sourced maps.
+		// so a wrong token makes Old Tarantia read as the no-mount Tortage beach). A missing MAP is a hard error and
+		// throws; a found map with an un-captured token (0) falls back to the standard playfield token - that 0 is a
+		// documented "no per-map override" state (most maps), not a lookup failure, so it is a real default rather than
+		// a fallback masking a missing thing.
 		public async Task<uint> ResolveMapPlayfieldToken(uint mapId)
 		{
-			var token = (await _database.GetMap(mapId))?.PlayfieldToken ?? 0;
-			return token != 0
-				? token
-				: WorldState.DefaultPlayfieldToken; // TODO: remove this fallback when possible (Or just throw?)
+			var map = await _database.GetMap(mapId)
+				?? throw new InvalidOperationException($"ResolveMapPlayfieldToken: map {mapId} not found");
+			return map.PlayfieldToken != 0
+				? map.PlayfieldToken
+				: WorldState.DefaultPlayfieldToken;
 		}
 
 		// On world entry: re-send the player's persisted active quests so their journal is restored.

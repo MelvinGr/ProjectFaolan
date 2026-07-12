@@ -297,7 +297,8 @@ namespace Faolan.GameServer
 								// animation end. Confirmed NOT server-side - retail sends nothing extra during the dismount window (only
 								// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
 								// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
-								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default; // TODO: No fallback
+								var mount = MountCatalog.ForId(from)
+									?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in MountCatalog)");
 								var playerEntity = PlayerWorldEntity(client);
 								var dismounting = playerEntity?.IsMounted ?? false;
 								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
