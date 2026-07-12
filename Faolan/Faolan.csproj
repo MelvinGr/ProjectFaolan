@@ -27,8 +27,5 @@
 		<EmbeddedResource Include="GameServer\CreateFlow\CreateEditorAvatarSnapshot.bin">
 			<LogicalName>Faolan.CreateEditorAvatarSnapshot.bin</LogicalName>
 		</EmbeddedResource>
-		<EmbeddedResource Include="GameServer\NewCharacterAccessWindow.bin">
-			<LogicalName>Faolan.NewCharacterAccessWindow.bin</LogicalName>
-		</EmbeddedResource>
 	</ItemGroup>
 </Project>

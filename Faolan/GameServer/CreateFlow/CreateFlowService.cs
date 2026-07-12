@@ -149,7 +149,10 @@ namespace Faolan.GameServer.CreateFlow
 			// #234: the beach cutscene's PlayOrSkipResultPlay (scryType 8) carries NO name token. On the create-world
 			// connection it's the cue to bind the cinematic actor - retail sends ThisIsKalanthes in RESPONSE to
 			// PlayResult (AFTER the player commits to playing the cutscene), not before. Route it explicitly.
-			if (token == null && scryType == ProtoScryScriptIIR.Type.PlayOrSkipResultPlay && IsCreateWorldConnection(client))
+			// NB the ProtoScryScriptIIR getter returns "" (not null) for an absent token, so test for empty, not null -
+			// a `token == null` here silently killed PlayResult (and the intro/actor bind -> black screen) after the
+			// 585a789f protobuf-reader refactor.
+			if (string.IsNullOrEmpty(token) && scryType == ProtoScryScriptIIR.Type.PlayOrSkipResultPlay && IsCreateWorldConnection(client))
 			{
 				await SendCreateCutsceneStep(client, "PlayResult", 0);
 				return;
