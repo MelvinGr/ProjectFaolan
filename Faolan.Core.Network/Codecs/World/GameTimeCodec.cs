@@ -4,7 +4,8 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	// GameTimeIIR - the world clock. Global (no map/player data); the client advances it locally, so a fixed
 	// snapshot is emitted. Body = [subop][TypeTag=0][Handle=0][FieldA][17-byte time body]. See
-	// GameServerListener.BuildGameTime. TODO: derive the time fields from the server clock for a live time-of-day.
+	// GameServerListener.BuildGameTime. Live day/night cycle (advance dayTime at rate) is #351 - blocked on
+	// pinning dayTime's unit + the cycle length in-client. FieldA + the first body u32 are really one u64 dayTime.
 	public static class GameTimeCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameTimeIIR;

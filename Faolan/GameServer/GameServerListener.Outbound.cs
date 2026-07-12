@@ -206,7 +206,7 @@ namespace Faolan.GameServer
 		}
 
 		// 0x4F57DC08 GameTime - the world clock. Global (no map/player data); the client advances it locally, so a
-		// fixed snapshot is emitted. TODO: derive the time fields from the server clock for a live time-of-day.
+		// fixed snapshot is emitted. Live day/night cycle is #351 (advance dayTime at rate; pin its unit in-client).
 		internal static byte[] BuildGameTime(INetworkClient client)
 		{
 			var ps = new PacketStream();
