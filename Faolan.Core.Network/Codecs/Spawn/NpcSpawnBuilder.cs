@@ -221,7 +221,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// The transform quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
-		[Obsolete("Use FaolanStream")]
 		private static byte[] EncodeQuat(Quaternion q)
 		{
 			return new FaolanStream()

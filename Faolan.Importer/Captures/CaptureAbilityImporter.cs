@@ -29,7 +29,7 @@ namespace Faolan.Importer.Captures
 	{
 		private const uint ChangeClassSubOpcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR; // client->server character-editor script callback
 		private const uint ComboBookSubOpcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
-		private const ushort AddSpecialAbilityOpcode = 0x2052; // TODO: Move to enum
+		private const ushort AddSpecialAbilityOpcode = (ushort)GameCharInterfaceOpcodes.DispatchAddSpecialAbility;
 		private const ushort IirCarrierOpcode = 0x2000; // ComboBookIIR rides the 0x2000 world-conversation carrier
 
 		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive

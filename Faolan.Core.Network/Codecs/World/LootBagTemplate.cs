@@ -1,4 +1,5 @@
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
@@ -18,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +
 		// size are spliced per drop (WithLootContents). Loot ops key on the bag ENTITY handle, not this id.
-		private const uint LootContainerKind = 115; // TODO: Add to ContainerKind?
+		private const uint LootContainerKind = (uint)ContainerKind.Loot;
 
 		// The loot bag's kd-tree / spatial-bounds node, decoded from the captured loot-bag tail and CONSTANT across all
 		// 10 captured bags (Captures/scripts, every *-login/gameplay bag). A single leaf node:
