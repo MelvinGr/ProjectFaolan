@@ -157,7 +157,7 @@ namespace Faolan.GameServer.World
 			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
 				.Select(s => WorldBroadcastBodies.Record(def, s))
 				.ToArray();
-			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, state, def.AreaId, refs, def.GoalId, Global.NowUnixTimeSeconds, def.MapId, def.MarkerX,
+			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, state, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), def.MapId, def.MarkerX,
 				def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
 			return new PacketStream()
@@ -1039,7 +1039,7 @@ namespace Faolan.GameServer.World
 		public async Task SendBeachGateOnEntry(INetworkClient client) // #353: extract to a quest-handler service
 		{
 			var character = client.Session?.Character;
-			if (character == null || character.MapId != Map.TortageBeachId)
+			if (character?.MapId != Map.TortageBeachId)
 				return;
 
 			if (await IsCasildaFreed(character.Id))
@@ -1095,10 +1095,10 @@ namespace Faolan.GameServer.World
 				vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			}
 
-			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.NpcTemplate?.Name ?? npcName, vitals);
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.NpcTemplate.Name ?? npcName, vitals);
 			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
 			entity.Level = npc.Level;
-			entity.Disposition = npc.NpcTemplate?.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
+			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)

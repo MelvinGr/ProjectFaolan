@@ -12,7 +12,6 @@ using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
-using Microsoft.EntityFrameworkCore;
 using ProtoBuf;
 using Xunit;
 

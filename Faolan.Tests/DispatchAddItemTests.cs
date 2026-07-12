@@ -9,7 +9,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.GameServer;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
-using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests

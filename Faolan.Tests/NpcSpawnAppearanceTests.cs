@@ -79,7 +79,7 @@ namespace Faolan.Tests
 			var runtime = new byte[40];
 			new Random(1).NextBytes(runtime);
 			runtime[0] = 0xFF; // ensure bytes[12..17] can't be mistaken for the empty record1 (strict must decline)
-			var runtimePost = new FaolanStream().WriteUInt32(0u).WriteUInt32((uint)runtime.Length).WriteUInt32(1u).WriteArray(runtime).WriteArray(tableAndTerminator).ToArray();
+			var runtimePost = new FaolanStream().WriteUInt32(0u).WriteUInt32(runtime.Length).WriteUInt32(1u).WriteArray(runtime).WriteArray(tableAndTerminator).ToArray();
 
 			var runtimeBody = new byte[postStart + runtimePost.Length];
 			Array.Copy(body, runtimeBody, postStart);

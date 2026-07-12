@@ -2,9 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -54,7 +52,7 @@ namespace Faolan.GameServer
 		// delivers, only its name in the mail text degrades.
 		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
 		{
-			var now = Global.NowUnixTimeSeconds;
+			var now = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
 			var mail = new Mail
 			{
@@ -428,7 +426,7 @@ namespace Faolan.GameServer
 			// these three bank-slot stat updates (decoded from the capture, F376/F377): price, timestamp, and the
 			// listed flag. It only leaves the seller's bank when someone BUYS it (HandleTradepostBuy clears the cell).
 			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatPrice, (uint)price);
-			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, Global.NowUnixTimeSeconds);
+			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagListed);
 
 			// Retail pushes a 0x2005 wallet refresh after a listing - but the balance is UNCHANGED: there is NO
@@ -475,8 +473,8 @@ namespace Faolan.GameServer
 				BodyXml = bodyText,
 				FooterWord = MailConstants.FooterUnread,
 				Money = money,
-				Timestamp1 = Global.NowUnixTimeSeconds,
-				Timestamp2 = Global.NowUnixTimeSeconds + MailConstants.ExpirySeconds
+				Timestamp1 = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+				Timestamp2 = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds() + MailConstants.ExpirySeconds
 			};
 
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the

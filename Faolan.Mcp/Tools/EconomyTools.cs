@@ -1,11 +1,9 @@
-using Faolan.Core.Protobuf;
 using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Economy;
@@ -61,7 +59,7 @@ namespace Faolan.Mcp.Tools
 				InstanceField = 0,
 				ItemHandle = 0,
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
-				Timestamp = Global.NowUnixTimeSeconds,
+				Timestamp = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
 				Template = item.Id, // the key lives in Items (FK on Template); no inline copy
 				ItemLevel = item.Level,
 				ItemHash = item.Hash
@@ -145,7 +143,7 @@ namespace Faolan.Mcp.Tools
 			if (recipient?.Name == null)
 				return $"No character with id {recipientCharacterId}.";
 
-			var now = Global.NowUnixTimeSeconds;
+			var now = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
 			var mail = new Mail
 			{

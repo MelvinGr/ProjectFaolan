@@ -380,17 +380,21 @@ namespace Faolan.GameServer
 			{
 				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
 				Endpoints.TradepostAgentType => HandleTradepostPacket(client, packet),
+
 				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
 				// screen (without the reply the client retries forever + never opens chat). Existing-character world login
 				// only - the create-editor/create-world flows own this class during their own handshake and must not divert.
 				Endpoints.GameCharAgentProjectType => !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession && client.Session.Character?.Name != null
 					? HandleGameCharAgentProject(client, packet)
 					: Task.CompletedTask,
+
 				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
 				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
 				Endpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet),
+
 				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
 				Endpoints.GameAgentType => HandleGameAgentPacket(client, packet),
+
 				_ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
 			};
 		}

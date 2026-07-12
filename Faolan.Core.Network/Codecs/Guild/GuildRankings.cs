@@ -98,7 +98,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 			s.WriteUInt32(ListWord(CategoryCount));
 			for (var category = 0; category < CategoryCount; category++)
 			{
-				s.WriteUInt32((uint)category).WriteUInt32(ListWord(Sections[category].Count));
+				s.WriteUInt32(category).WriteUInt32(ListWord(Sections[category].Count));
 				foreach (var e in Sections[category])
 					s.WriteUInt32(GuildClass).WriteUInt32(e.Id).WriteUInt64(e.Renown).WriteUInt32(e.PrevRank);
 			}

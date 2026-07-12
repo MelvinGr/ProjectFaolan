@@ -37,7 +37,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			var body = new FaolanStream()
 				.WriteUInt32(0) // body length placeholder (set below)
-				.WriteUInt32((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR) // the entity-spawn subop ("Spawn")
+				.WriteUInt32(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR) // the entity-spawn subop ("Spawn")
 				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // fieldA
@@ -51,7 +51,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteArray(preIir)
 				.WriteByte(0x41)
 				.WriteUInt32(iirHeader)
-				.WriteUInt32((uint)msgBytes.Length) // CoreChar header
+				.WriteUInt32(msgBytes.Length) // CoreChar header
 				.WriteArray(msgBytes)
 				.WriteArray(postIir)
 				.ToArray();

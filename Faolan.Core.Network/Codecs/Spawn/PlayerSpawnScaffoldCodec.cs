@@ -31,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (s.Scale != null)
 				payload.WriteByte(0x25).WriteArray(s.Scale);
 
-			payload.WriteByte(0x18).WriteVarint(s.Playfield).WriteArray(s.PreFrame).WriteUInt32((uint)s.CharacterIir.Length).WriteArray(s.CharacterIir).WriteArray(post);
+			payload.WriteByte(0x18).WriteVarint(s.Playfield).WriteArray(s.PreFrame).WriteUInt32(s.CharacterIir.Length).WriteArray(s.CharacterIir).WriteArray(post);
 
 			return new FaolanStream().WriteArrayUInt32Length(payload.ToArray()).ToArray();
 		}
@@ -61,7 +61,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			foreach (var rec in s.BuffRecords)
 				b.WriteArray(rec);
 
-			b.WriteUInt32((uint)count).WriteUInt32(s.EntryTableX);
+			b.WriteUInt32(count).WriteUInt32(s.EntryTableX);
 			if (count > 0)
 				b.WriteUInt32(0x3F800000);
 			foreach (var entry in s.Entries)
@@ -79,9 +79,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			foreach (var pairs in new[] { s.EndPairs, s.EndPairs2 })
 			{
-				b.WriteUInt32((uint)pairs.Count);
+				b.WriteUInt32(pairs.Count);
 				foreach (var pair in pairs)
-					b.WriteUInt32(pair.Id).WriteUInt32((uint)pair.Value);
+					b.WriteUInt32(pair.Id).WriteUInt32(pair.Value);
 			}
 
 			b.WriteUInt32(Marker);

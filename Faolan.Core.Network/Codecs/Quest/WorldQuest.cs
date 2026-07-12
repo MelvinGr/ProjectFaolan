@@ -185,10 +185,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 				w.WriteArray(rec);
 			w.WriteArray(Encoding.ASCII.GetBytes(RrlMagic));
 			w.WriteUInt32(0);
-			w.WriteUInt32((uint)entries.Count);
+			w.WriteUInt32(entries.Count);
 			for (var i = 0; i < entries.Count; i++)
 			{
-				w.WriteUInt32((uint)(i + 1)); // 1-based index
+				w.WriteUInt32((i + 1)); // 1-based index
 				w.WriteUInt32(entries[i].QuestId);
 				w.WriteUInt32(ChapterTag);
 				w.WriteArray(entries[i].TitleRecord);
@@ -216,10 +216,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(1);
 			w.WriteUInt32(areaId);
 			w.WriteUInt32(trackedQuestId);
-			w.WriteUInt32((uint)questIds.Count);
+			w.WriteUInt32(questIds.Count);
 			for (var i = 0; i < questIds.Count; i++)
 			{
-				w.WriteUInt32((uint)(i + 1));
+				w.WriteUInt32((i + 1));
 				w.WriteUInt32(questIds[i]);
 			}
 

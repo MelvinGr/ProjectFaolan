@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Attributes;

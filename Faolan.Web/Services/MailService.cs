@@ -1,9 +1,7 @@
-using Faolan.Core.Protobuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
@@ -69,7 +67,7 @@ namespace Faolan.Web.Services
 			if (recipient == null)
 				return (false, $"No character named '{recipientName}'.");
 
-			var now = Global.NowUnixTimeSeconds;
+			var now = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 			var mail = new Mail
 			{
 				MailId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
