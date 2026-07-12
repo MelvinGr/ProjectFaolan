@@ -66,8 +66,9 @@ Faolan.ClientLauncher [options]
                       Required value. Replaces an /etc/hosts override; persists (undo with --restore)
   --cdn <url>         point the three LocalConfig.xml CDN keys at <url> (each -> <url>/<tag>/upm), e.g.
                       http://127.0.0.1:7081 (the local Faolan.Web.Content). Required value; persists
-  --launcher-notes <url>  redirect the client's dead hardcoded launcher-notes URL to <url> (keep the two %s).
-                      Required value; on-disk exe patch, covered by the .bak
+  --launcher-notes <url>  redirect the client's dead hardcoded launcher-notes URL to <url> (keep the two %s;
+                      http:// only - the client's libcurl has no SSL). Required value; on-disk exe patch,
+                      covered by the .bak
   --patch-login       patch the DH key (Funcom -> CELLAO) on disk before launch so the server can validate the
                       real password. Cross-platform; the exe is backed up to .bak
   --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml from their .bak, then exit
@@ -109,7 +110,9 @@ By default any password is accepted. To enforce the real password, the client mu
 - **`--patch-login`** overwrites the client's embedded Funcom DH pubkey with
   CELLAO_PUB in the `AgeOfConan.exe` file — a plain byte swap, cross-platform (no ptrace/process memory). The exe is
   backed up to `.bak` first, so `--restore` puts it back. `--launcher-notes <url>` similarly redirects the client's
-  dead hardcoded launcher-notes URL (keep the two `%s`).
+  dead hardcoded launcher-notes URL (keep the two `%s`; **http:// only** — the exe's statically-linked
+  libcurl 7.19.7 has no SSL backend, so an https URL fails in-client with cURL error 1
+  `CURLE_UNSUPPORTED_PROTOCOL`; front https content with a plain-http proxy such as `Faolan.Web.Content`).
 - Server side: `Faolan.Core.Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
 

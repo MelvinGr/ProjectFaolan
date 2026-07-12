@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -84,12 +85,21 @@ namespace Faolan.ClientLauncher
 				: Result.NotFound;
 		}
 
-		// A launcher-notes replacement is valid when it matches the client's fixed format contract: EXACTLY two %s (the
+		// A launcher-notes replacement is valid when it matches the client's fixed format contract: http:// only (the
+		// exe statically links libcurl 7.19.7 with NO SSL backend, so https fails at runtime with cURL error 1
+		// CURLE_UNSUPPORTED_PROTOCOL - front an https source with a plain-http proxy instead), EXACTLY two %s (the
 		// UniverseName + Language the client sprintf-substitutes, in that order) and no other % conversion (a stray %,
 		// or a third %s, makes the client read past the two args -> crash/garbage), and it must fit the fixed on-disk
 		// buffer (ASCII, < the original region length, leaving room for the null terminator).
 		public static bool ValidateNotesUrl(string url, out string error)
 		{
+			if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+			{
+				error = "must be an http:// URL - the client's built-in libcurl 7.19.7 has no SSL, so https (or any "
+					+ "other scheme) fails in-client with cURL error 1; proxy https content through a plain-http endpoint instead";
+				return false;
+			}
+
 			var percents = url.Count(c => c == '%');
 			var placeholders = url.Split("%s").Length - 1;
 			if (placeholders != 2 || percents != 2)
