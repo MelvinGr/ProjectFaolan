@@ -1,4 +1,3 @@
-using Faolan.Core.Protobuf;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +6,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
 

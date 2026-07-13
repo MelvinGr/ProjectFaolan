@@ -177,12 +177,12 @@ namespace Faolan.Mcp.Tools
 			[Description("Z coordinate on the current map (requires x and y; ignored if mapId is given)")] float? z = null)
 		{
 			string command, success;
-			if (mapId is uint map)
+			if (mapId is { } map)
 			{
 				command = $".teleport {map}";
 				success = $"Teleported character {characterId} to map {map}.";
 			}
-			else if (x is float px && y is float py && z is float pz)
+			else if (x is { } px && y is { } py && z is { } pz)
 			{
 				var i = CultureInfo.InvariantCulture;
 				command = $".teleport {px.ToString(i)} {py.ToString(i)} {pz.ToString(i)}";

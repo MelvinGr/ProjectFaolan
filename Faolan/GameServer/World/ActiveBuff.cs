@@ -8,7 +8,7 @@ namespace Faolan.GameServer.World
 	// applyFrom. DurationSeconds null = lives until cancelled or the session ends, a value = the tick expires it
 	// (and sends the retail end-twin removal). Durations come from the ApplySpell payload (offset +8, ms) or the
 	// spell's RDB DurationMs (#274).
-	public sealed record ActiveBuff(uint BuffId, uint CasterHandle, DateTimeOffset AppliedAt, double? DurationSeconds)
+	public sealed record ActiveBuff(uint BuffId, uint CasterHandle, DateTimeOffset AppliedAt, float? DurationSeconds)
 	{
 		public DateTimeOffset LastDotTick { get; set; }
 
@@ -27,11 +27,11 @@ namespace Faolan.GameServer.World
 
 		// The absolute instant this buff expires, so its remaining time can be persisted across a relog. Null = it has
 		// no server duration (lives until cancelled).
-		public DateTimeOffset? ExpiresAt => DurationSeconds is double d ? AppliedAt.AddSeconds(d) : null;
+		public DateTimeOffset? ExpiresAt => DurationSeconds is { } d ? AppliedAt.AddSeconds(d) : null;
 
 		public bool Expired(DateTimeOffset now)
 		{
-			return DurationSeconds is double d && (now - AppliedAt).TotalSeconds >= d;
+			return DurationSeconds is { } d && (now - AppliedAt).TotalSeconds >= d;
 		}
 
 		// The per-application effect nonce carried at the END of an ApplySpell payload (the last big-endian u32 -

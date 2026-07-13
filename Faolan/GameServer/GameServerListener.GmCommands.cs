@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
@@ -401,7 +400,7 @@ namespace Faolan.GameServer
 		private async Task RecallToBindCommand(INetworkClient client, string flavor = "The Totem of Origin pulls you home...")
 		{
 			var character = client.Session.Character;
-			if (character.BindRespawnPointId is not uint pointId)
+			if (character.BindRespawnPointId is not { } pointId)
 			{
 				await _agentServerDispatcher.SendSystemMessage(character.Id, "You have no bind point. Use .bind to set one.");
 				return;

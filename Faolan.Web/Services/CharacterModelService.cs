@@ -684,7 +684,7 @@ namespace Faolan.Web.Services
 			var q = db.Items.AsNoTracking().Where(i => i.Name != null && i.Name != "");
 			if (!string.IsNullOrWhiteSpace(query))
 				q = q.Where(i => EF.Functions.Like(i.Name, $"%{query.Trim()}%"));
-			if (type is int t)
+			if (type is { } t)
 				q = q.Where(i => (int)i.Type == t);
 
 			var total = q.Count();

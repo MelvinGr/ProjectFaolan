@@ -127,7 +127,7 @@ namespace Faolan.GameServer
 			foreach (var buff in buffs)
 			{
 				uint remainingCs = 0;
-				if (buff.ExpiresAt is DateTimeOffset expiresAt)
+				if (buff.ExpiresAt is { } expiresAt)
 				{
 					var remaining = (expiresAt - now).TotalSeconds;
 					remainingCs = remaining > 0 ? (uint)Math.Min(remaining * 100, uint.MaxValue) : 0;
@@ -172,7 +172,7 @@ namespace Faolan.GameServer
 				? ShieldOfTheRisenBase2  // 10h shared/open-world
 				: ShieldOfTheRisenBase1; // 1h instanced
 
-			if (client.Session.ActiveShieldSpellBase is uint prior && prior != desired)
+			if (client.Session.ActiveShieldSpellBase is { } prior && prior != desired)
 				await SendBuffRemoval(client, self, self, prior << 8);
 
 			await SendShieldBuff(client, self, desired);
@@ -187,7 +187,7 @@ namespace Faolan.GameServer
 		// (so a plain self-buff cast, which never sets ActiveShieldSpellBase, leaves it untouched).
 		private async Task BreakShieldOnAggression(INetworkClient client)
 		{
-			if (client.Session?.ActiveShieldSpellBase is not uint shieldBase)
+			if (client.Session?.ActiveShieldSpellBase is not { } shieldBase)
 				return;
 
 			var self = client.Session.Account.ClientInstance;
@@ -325,7 +325,7 @@ namespace Faolan.GameServer
 				if (entity != null && entity.Handle == applyTo)
 				{
 					entity.ActiveBuffs[spellId] = new ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, durationMs > 0
-						? durationMs / 1000.0
+						? durationMs / 1000f
 						: null)
 					{
 						// Preserve the wire shape so the buff can be reconstructed byte-compatibly on relog (#274).

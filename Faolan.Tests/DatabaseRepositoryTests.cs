@@ -1,4 +1,3 @@
-using Faolan.Core.Protobuf;
 using System;
 using System.IO;
 using System.Linq;
@@ -9,6 +8,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;

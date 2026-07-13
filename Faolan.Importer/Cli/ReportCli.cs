@@ -1041,7 +1041,7 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				var fields = ReadIncreasingFields(body.AsSpan(12));
-				if (wanted is uint id && e.Id == id)
+				if (wanted is { } id && e.Id == id)
 				{
 					Console.WriteLine($"spell {e.Id} '{name}':");
 					foreach (var kv in fields.OrderBy(k => k.Key))

@@ -43,7 +43,7 @@ namespace Faolan.Importer.Captures
 			{
 				if (existing.TryGetValue(id, out var map))
 				{
-					if (flags is uint f && map.PlayfieldFlags != f)
+					if (flags is { } f && map.PlayfieldFlags != f)
 					{
 						map.PlayfieldFlags = f;
 						reflagged++;

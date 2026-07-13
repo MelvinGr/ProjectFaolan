@@ -1721,7 +1721,7 @@ namespace Faolan.GameServer
 			// wayfarer); an unbound character (or one whose point vanished) falls back to its current map.
 			var character = client.Session.Character;
 			var bindMapId = character?.MapId ?? Map.TortageBeachId;
-			if (character?.BindRespawnPointId is uint bindPointId)
+			if (character?.BindRespawnPointId is { } bindPointId)
 				bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 
 			await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);

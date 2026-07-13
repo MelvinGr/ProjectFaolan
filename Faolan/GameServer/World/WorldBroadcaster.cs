@@ -6,7 +6,6 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -928,7 +927,7 @@ namespace Faolan.GameServer.World
 				return new UsedObjectInteraction(InteractAction.None, default);
 
 			var name = obj.Name ?? obj.DisplayName ?? "?";
-			var teleport = obj.DestinationMapId is uint destMap
+			var teleport = obj.DestinationMapId is { } destMap
 				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
 				: new ZoneLineDestination(0, null, name);
 			return new UsedObjectInteraction(obj.InteractAction, teleport);

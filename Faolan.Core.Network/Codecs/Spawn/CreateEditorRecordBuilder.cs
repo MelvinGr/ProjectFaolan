@@ -57,19 +57,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			uint? field4 = null, uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = 0x0004)
 		{
 			var pb = new FaolanStream().WriteByte(0x08).WriteVarint(behaviorId);
-			if (field2 is uint f2)
+			if (field2 is { } f2)
 				pb.WriteByte(0x10).WriteVarint(f2);
 			pb.WriteByte(0x18).WriteVarint(phase);
-			if (field4 is uint f4)
+			if (field4 is { } f4)
 				pb.WriteByte(0x20).WriteVarint(f4);
 			pb.WriteByte(0x28).WriteVarint(field5).WriteByte(0x30).WriteVarint(field6);
-			if (field11 is uint f11)
+			if (field11 is { } f11)
 				pb.WriteByte(0x58).WriteVarint(f11);
-			if (field12 is uint f12)
+			if (field12 is { } f12)
 				pb.WriteByte(0x60).WriteVarint(f12);
 
 			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(form).WriteUInt32(slot).WriteArrayUInt32Length(pb.ToArray());
-			if (boundA is uint a)
+			if (boundA is { } a)
 				s.WriteUInt32(a).WriteUInt32(boundB ?? 0u).WriteArray(new byte[12]);
 			return s.ToArray();
 		}

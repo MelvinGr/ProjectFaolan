@@ -232,7 +232,7 @@ namespace Faolan.GameServer
 		private async Task RestoreMount(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character?.MountId is not uint mountId)
+			if (character?.MountId is not { } mountId)
 				return;
 
 			var map = await Database.GetMap(character.MapId);
@@ -480,7 +480,7 @@ namespace Faolan.GameServer
 			// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry
 			// yet, so re-assert it here - the client applies it the same way. (After the snapshot, like the
 			// wallet sync - keep the burst -> snapshot gap clean.)
-			if (client.Session.Character.GuildId is uint guildId)
+			if (client.Session.Character.GuildId is { } guildId)
 			{
 				var guild = await Database.GetGuild(guildId);
 				if (guild != null)

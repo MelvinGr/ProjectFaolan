@@ -307,7 +307,7 @@ namespace Faolan.GameServer.World
 				// Attach the DoT effect (Spell.DotDelta, captured StatDamageIIR) so the tick bleeds the player's health
 				// while the debuff is active - Rend -8/tick etc. Looked up by base spell id (wire id >> 8). #274
 				var (dotDelta, dotType) = await DotEffect(spell.SpellId >> 8);
-				target.ActiveBuffs[spell.SpellId] = new ActiveBuff(spell.SpellId, npc.Handle, DateTimeOffset.UtcNow, debuffMs / 1000.0)
+				target.ActiveBuffs[spell.SpellId] = new ActiveBuff(spell.SpellId, npc.Handle, DateTimeOffset.UtcNow, debuffMs / 1000f)
 				{
 					DotDelta = dotDelta,
 					DotType = dotType,

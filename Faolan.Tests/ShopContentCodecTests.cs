@@ -1,8 +1,8 @@
-using Faolan.Core.Protobuf;
 using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Protobuf;
 using Xunit;
 
 namespace Faolan.Tests

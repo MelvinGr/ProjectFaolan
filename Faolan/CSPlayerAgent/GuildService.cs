@@ -123,7 +123,7 @@ namespace Faolan.CSPlayerAgent
 			var targetId = packet.Body.ReadUInt32();
 
 			var target = await _database.GetCharacter(targetId);
-			if (target?.GuildId is not uint targetGuildId)
+			if (target?.GuildId is not { } targetGuildId)
 				return;
 
 			if (client.Session.Character?.GuildId == targetGuildId)
@@ -231,7 +231,7 @@ namespace Faolan.CSPlayerAgent
 		public async Task HandleGuildLeave(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character?.GuildId is not uint guildId)
+			if (character?.GuildId is not { } guildId)
 				return;
 
 			if (!await _database.SetCharacterGuild(character.Id, null, 0))
@@ -249,7 +249,7 @@ namespace Faolan.CSPlayerAgent
 		public async Task HandleGuildMessageOfTheDay(INetworkClient client, ConanPacket packet)
 		{
 			var character = client.Session.Character;
-			if (character?.GuildId is not uint guildId)
+			if (character?.GuildId is not { } guildId)
 				return;
 
 			var motd = packet.Body.ReadString();
@@ -290,7 +290,7 @@ namespace Faolan.CSPlayerAgent
 		public async Task SendGuildStateOnLogin(INetworkClient client, ConanPacket packet)
 		{
 			var character = client.Session.Character;
-			if (character?.GuildId is not uint guildId)
+			if (character?.GuildId is not { } guildId)
 				return;
 
 			var guild = await _database.GetGuild(guildId);
@@ -317,7 +317,7 @@ namespace Faolan.CSPlayerAgent
 		private async Task InviteCharacterToGuild(INetworkClient client, Character target, string targetLabel)
 		{
 			var inviter = client.Session.Character;
-			if (inviter?.GuildId is not uint guildId)
+			if (inviter?.GuildId is not { } guildId)
 			{
 				_logger.LogWarning("Guild invite by {Inviter}: inviter is not in a guild.", inviter?.Name);
 				return;

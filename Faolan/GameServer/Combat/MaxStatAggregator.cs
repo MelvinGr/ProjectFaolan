@@ -38,7 +38,7 @@ namespace Faolan.GameServer.Combat
 			foreach (var item in equippedItems)
 			foreach (var (bonus, wireStatId) in AttributeBonuses)
 			{
-				if (bonus(item) is int amount)
+				if (bonus(item) is { } amount)
 					totals[wireStatId] = totals.GetValueOrDefault(wireStatId) + amount;
 			}
 
