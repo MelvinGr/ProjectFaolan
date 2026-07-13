@@ -582,6 +582,53 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Per-map area name (#348): the FIFO banner id shown on entering a playfield, harvested from captured
+	// GenericDisplayAreaName feedback. Enriches Map.AreaNameId by map id.
+	public sealed class AreaNamesModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
+
+		public string Description => "Per-map area name (FIFO banner shown on playfield entry).";
+		public string Name => "area-names";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var harvested = AreaNameExtractor.Merge(ctx.Captures.SelectMany(c => AreaNameExtractor.Extract(c.Packets)));
+			var byMap = harvested.ToDictionary(a => a.MapId, a => a.AreaNameId);
+
+			var cleared = 0;
+			if (ctx.ModeFor(Name) == WriteMode.Overwrite)
+			{
+				foreach (var m in await ctx.Db.Maps.Where(m => m.AreaNameId != null).ToListAsync())
+				{
+					m.AreaNameId = null;
+					cleared++;
+				}
+			}
+
+			var updated = 0;
+			foreach (var map in await ctx.Db.Maps.ToListAsync())
+			{
+				if (byMap.TryGetValue(map.Id, out var areaId) && map.AreaNameId != areaId)
+				{
+					map.AreaNameId = areaId;
+					updated++;
+				}
+			}
+
+			await ctx.Db.SaveChangesAsync();
+			var prefix = cleared > 0 ? $"cleared {cleared}; " : "";
+			return new ImportResult($"{prefix}{byMap.Count} map area name(s) harvested, {updated} maps set.");
+		}
+	}
+
 	// Static world objects (decor/containers/zones).
 	public sealed class WorldObjectsModule : IImportModule
 	{

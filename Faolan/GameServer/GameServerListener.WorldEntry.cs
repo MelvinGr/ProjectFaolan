@@ -366,6 +366,10 @@ namespace Faolan.GameServer
 			// so #274 arms a matching expiry and they clear on schedule. Rendered top-of-screen by the client.
 			await SendShieldOfTheRisen(client);
 
+			// #348: the top-of-screen area-name FIFO banner for this playfield, post-0x2024 like retail's on-entry
+			// reveal. Re-armed on teleport/changemap re-entry too, so entering a new playfield re-banners.
+			await SendAreaNameBanner(client, client.Session.Character.MapId);
+
 			// The post-0x2024 login record stream (world state / quest / UI) retail sends right after ReadyForPlayScreen
 			// + abilities - the records that let the client leave the loading screen. Rebuilt from the Strie 4010 login
 			// capture as explicit PacketStream sends: the live player instance is written inline (the receiver is built via

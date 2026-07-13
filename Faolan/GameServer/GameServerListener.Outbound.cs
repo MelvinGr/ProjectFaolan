@@ -423,6 +423,18 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 		}
 
+		// #348: the top-of-screen FIFO banner with the playfield's area name, shown on entry (retail does this on
+		// playfield entry + sub-region crossings; we do entry, from the harvested Map.AreaNameId). No-op for a map with
+		// no captured area name.
+		private async Task SendAreaNameBanner(INetworkClient client, uint mapId)
+		{
+			var map = await Database.GetMap(mapId);
+			if (map?.AreaNameId is not { } areaId)
+				return;
+
+			await SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaId)));
+		}
+
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
 		private static async Task SendRemoveItem(INetworkClient client, ContainerKind containerType, uint itemPos, uint amountToRemove = 0)
 		{
