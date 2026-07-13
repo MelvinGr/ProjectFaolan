@@ -88,15 +88,32 @@ namespace Faolan.GameServer.Combat
 			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
 		}
 
-		// Resolves an offensive cast: shows the floating DamageResult number (0xFEC4158A) over the target and applies
-		// the damage to its live vitals (a 0x96B8DC59 update moves the health bar). The ApplySpell VFX is broadcast by
-		// the caller. Without the DamageResult the HP bar moved but no number floated (looked like "no damage").
+		// The stat a spell-damage StatDamageIIR reports against (retail's outgoing spell hits use statId 0x0a in the
+		// casting-combat capture). Distinct from the melee DamageResult path - the client renders a spell hit's number
+		// from StatDamage (the same IIR that renders incoming DoT numbers on the player), NOT DamageResult.
+		private const uint SpellDamageStatId = 0x0A;
+
+		// The floating number + combat-log line for a SPELL hit on an NPC. Retail carries spell damage on
+		// StatDamageIIR (0xE9F24184) - the LockedToChanged -> StatDamage -> ApplySpell bundle, with NO DamageResult
+		// (casting-combat capture) - so a spell hit must use StatDamage, not the melee DamageResult (which the client
+		// only floats after a BCC attack behavior arms the target). Mirrors the incoming DoT-tick StatDamage that
+		// already renders on the player: statValue = the target's resulting health, delta = -damage, caster = the
+		// player, spellBase = the wire id >> 8. Call AFTER ApplyNpcDamage so the health is the post-hit value.
+		private Task SendSpellDamageNumber(INetworkClient client, uint npcHandle, uint casterHandle, int damage, uint spellId)
+		{
+			var vitals = ResolveNpcVitals(client, npcHandle, out _);
+			return SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, spellId >> 8);
+		}
+
+		// Resolves an offensive cast: applies the damage to the target's live vitals (a 0x96B8DC59 update moves the
+		// health bar) and shows the spell hit's floating number via StatDamage (see SendSpellDamageNumber). The
+		// ApplySpell VFX is broadcast by the caller.
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
-			await SendDamageNumber(client, targetHandle, casterHandle, (uint)damage);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
+			await SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId);
 		}
 
 		// The blast radius (world units) a ground-targeted AoE damages around its reticle position.
@@ -126,8 +143,8 @@ namespace Faolan.GameServer.Combat
 
 			foreach (var handle in victims)
 			{
-				await SendDamageNumber(client, handle, casterHandle, (uint)tickDamage);
 				await ApplyNpcDamage(client, handle, tickDamage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
+				await SendSpellDamageNumber(client, handle, casterHandle, tickDamage, spellId);
 			}
 
 			return victims.Count;
