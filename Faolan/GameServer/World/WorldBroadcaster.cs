@@ -614,24 +614,16 @@ namespace Faolan.GameServer.World
 			// completes the LootFromNpc goal, which matches on the bag's source NPC, not its contents).
 			if (questDrop || items.Count > 0 || cash > 0)
 			{
-				// #265: drop the bag at the KILLER's live position when we can resolve it, NOT the NPC's death spot. A mob
-				// that chased the player dies wherever it walked to, and that server position can be off the client's
-				// ground (the MoveTask Z drift, [[npc_spawn_movetask_position]]/#190) - the bag's mesh then clips into
-				// terrain and only its spawn particle renders. The killer is provably on valid ground (they're standing
-				// there, rendering), and that is exactly the proven-good `.spawnbag` path. Fall back to the death spot
-				// when the attacker can't be resolved (expired session, environmental death).
-				var dropPos = deadNpc.Position;
-				var dropRot = deadNpc.Rotation;
-				if (deadNpc.LastAttackerHandle != 0 && _sim.World.ZoneForEntity(deadNpc).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
-				{
-					dropPos = killer.Position;
-					dropRot = killer.Rotation;
-				}
+				// Drop the bag at the NPC's death spot (its corpse position) - where the player expects it. NOT at the
+				// killer: a ranged/AoE kill would otherwise drop the bag at the player's feet, far from the mob. The
+				// corpse renders lying at this exact position (the death-pose MoveTask, #204), so it's client-valid ground
+				// - which retires the old #265 killer-position workaround for the MoveTask Z drift (#190) that clipped the
+				// bag into terrain; the corpse itself now sits there fine. (LastAttackerHandle still owns the bag below.)
 
-				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, dropRot, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, deadNpc.Position, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
 				_logger.LogInformation(
-					"Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).", deadNpc.Name,
-					deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
+					"Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at death spot {Drop}.", deadNpc.Name,
+					deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, deadNpc.Position);
 			}
 
 			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
