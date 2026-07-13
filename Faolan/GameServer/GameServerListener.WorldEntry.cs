@@ -26,6 +26,19 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		// Suppress the auto-opening item-shop browser (itemshopbrowser_swf) on world entry. The client runs level/login
+		// milestone Lua from its OWN RDB LuaArchive that calls player:OpenSiteInBrowser("http://aocshop.funcom.com/
+		// showitem?...") - a Funcom-store upsell - which it renders in the itemshopbrowser SWF. Each open is gated on
+		// `not player:HasTag(X)` (a "this bundle was already shown" flag) plus the PvPSagaBundles game tweak. No tweak
+		// value skips them all (scripts 396 and 2240 open a bundle whether the tweak reads <1 OR >0), so the only
+		// universal suppressor is the tag gate - and the client learns a character's tags from the FullChar snapshot we
+		// send at entry. Pre-seeding the "already shown" flag for every shop-open branch makes HasTag(X) true, so the
+		// browser never opens. The gating tag ids were recovered from the RDB shop scripts (393/395/396/2239/2240/2287-
+		// 2298): 6617-6620 are the i<1 bundles, 7316 + 7416-7421 the i>0 bundles. Purely cosmetic "seen" flags - safe to
+		// force on a private server that has no Funcom store.
+		// TODO: Confirm
+		private static readonly uint[] ItemShopSuppressTags = []; //6617, 6618, 6619, 6620, 7316, 7416, 7417, 7418, 7419, 7420, 7421];
+
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on
 		// the row's captured handle + the live playfield instance (the rewrite the live splice path applies).
 		private IEnumerable<byte[]> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance)
@@ -654,8 +667,10 @@ namespace Faolan.GameServer
 			var inventoryRows = character != null
 				? await Database.GetCharacterInventory(character.Id)
 				: [];
+			// Union in the item-shop-suppression flags (see ItemShopSuppressTags) so the client's shop-open Lua sees
+			// HasTag(X)==true and never auto-opens the itemshopbrowser on entry.
 			var characterTags = character != null
-				? (await Database.GetCharacterTags(character.Id)).OrderBy(t => t).ToArray()
+				? (await Database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray()
 				: [];
 			var scaffoldCharacter = await EnsureSpawnScaffoldRows(character);
 			var worldObjectRows = await Database.GetWorldObjects(mapId);
