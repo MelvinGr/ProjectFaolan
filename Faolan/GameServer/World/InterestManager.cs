@@ -49,10 +49,17 @@ namespace Faolan.GameServer.World
 					if (other.IsLoot)
 						continue; // loot bags have their own open/fade lifecycle, not interest streaming
 					if (other.IsDead)
-						continue; // #246: a killed NPC awaiting respawn must NOT be re-streamed - interest would spawn it
-
-					// ALIVE at its death spot (well before the 15s timer), and that re-add to Known then gates
-					// out the real respawn's relocate-to-spawn, pinning it at the death location for good.
+					{
+						// A dead NPC the mover ALREADY knows is a corpse still in its death-animation linger (pre-conversion):
+						// keep it in range so the move-prune below does NOT despawn it early - before it has hit the floor -
+						// which happens whenever the player moves during the ~3s linger. Do NOT add a dead NPC the mover does
+						// NOT know: interest would spawn it ALIVE at its death spot and that re-add to Known would gate out the
+						// real respawn's relocate-to-spawn (#246). ConvertCorpseToLoot removes the corpse from Known, so an
+						// awaiting-respawn NPC (post-linger, t=3..15s) is no longer in Known and is correctly skipped here.
+						if (mover.Known.Contains(other.Handle))
+							inRange.Add(other.Handle);
+						continue;
+					}
 					if (!other.IsVisibleTo(mover))
 						continue; // #261: a quest-gated NPC the mover doesn't yet qualify for - treat as not in range
 
