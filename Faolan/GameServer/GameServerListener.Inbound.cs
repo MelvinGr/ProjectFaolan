@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -121,6 +122,9 @@ namespace Faolan.GameServer
 							// isn't in the world model yet.
 							var moveEntity = PlayerWorldEntity(client);
 
+							// The pre-move position, so a real TRANSLATION below can interrupt an in-flight cast (#347).
+							var previousPosition = moveEntity?.Position ?? sessionCharacter.Position;
+
 							// A seated player who MOVES AWAY from the bench stands up first (the sit capture triggers standup
 							// on movement, not a second click). Gated on distance from the seat, NOT the packet type: the
 							// client streams position syncs (and a small seat-snap) while seated that must not stand it up.
@@ -147,6 +151,18 @@ namespace Faolan.GameServer
 
 							var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
 							var liveRotation = moveEntity?.Rotation.ToVector3() ?? sessionCharacter.Rotation.ToVector3();
+
+							// Moving cancels an in-flight cast (#347): a real translation (the position actually changed -
+							// turning in place leaves it unchanged, so aiming a ground-target reticle like Deadly Blizzard
+							// never self-cancels) bumps the cast token so the deferred Resolve() aborts. Server-side, so it
+							// works for BOTH locked-target and ground casts regardless of whether the client sends its own
+							// cancel BCC (it does for locked casts, not for the ground AoE). While spellweaving the position
+							// is pinned above (delta 0), so an attempted move can't cancel the trance/weave.
+							// A real translation aborts the deferred effect server-side (the Resolve() token check). The
+							// client drives the cast bar itself: it sends its own cancel BCC on the move (handled above,
+							// which sends the state=0x0007 abort back). So here we only invalidate the pending resolve.
+							if (Vector3.DistanceSquared(previousPosition, livePosition) > CastMoveCancelEpsilonSq)
+								client.Session.ActiveCastToken++;
 
 							// The CharDCMove carrier's movingType u16 is [u8 env][u8 flag1] (docs/re/chardcmove-grammar.md):
 							// the client streams its move with env=0x01 (the "I am the controlling client" flag); the
@@ -406,8 +422,18 @@ namespace Faolan.GameServer
 								if (unk1 == castStateCancel)
 								{
 									client.Session.ActiveCastToken++; // a pending Resolve() now sees a mismatched token and aborts
-									await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
-									Logger.LogInformation("CastSpell CANCEL (interrupted/moved) - pending cast aborted.");
+									var beginArgs = client.Session.PendingCastArgs;
+									client.Session.PendingCastArgs = null;
+
+									// Retail answers the cancel with a state=0x0007 abort BCC (NOT an echo of the cancel) - that
+									// is what drops the cast bar, cancels the animation and pops the client's "Interrupted" text
+									// (#347, cast-interupt idx1013). The old echo of the cancel payload left the bar running. Needs
+									// the stored BEGIN args; fall back to the plain echo if it's missing.
+									if (beginArgs != null)
+										await CombatService.SendCastInterruptAbort(client, beginArgs, rawPayload, client.Session.PendingCastMode);
+									else
+										await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+									Logger.LogInformation("CastSpell CANCEL (interrupted/moved) - abort ack sent, cast bar cleared.");
 									break;
 								}
 
@@ -450,13 +476,20 @@ namespace Faolan.GameServer
 								// Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
 								// elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
 								// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
-								// resolves immediately. NB cast interruption on movement is not modelled yet (interim).
+								// resolves immediately. Movement mid-cast interrupts it (the cancel branch above / the move
+								// handler's token bump); the abort BCC drops the client bar (#347).
 								var spell = await Database.GetSpell(spellId);
 								var castMs = spell?.CastTime ?? 0;
 								if (castMs == 0)
 									await Resolve();
 								else
 								{
+									// Hold the begin's args (only) so the cast-cancel handler can build the state=0x0007 abort that
+									// stops the client's cast bar (#347). The rest of the abort comes from the cancel packet.
+									// Cleared on resolve/cancel.
+									var castArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+									client.Session.PendingCastArgs = rawPayload[26..(26 + castArgsLen)];
+									client.Session.PendingCastMode = (uint)args.Mode;
 									Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
 									{
 										if (client.Session?.Account != null)
@@ -475,6 +508,8 @@ namespace Faolan.GameServer
 									// is what makes the move-interrupt stick (the "then moving to interrupt" cast in the capture).
 									if (client.Session.ActiveCastToken != castToken)
 										return;
+
+									client.Session.PendingCastArgs = null; // cast completed; no abort needed
 
 									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
 									// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3

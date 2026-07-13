@@ -44,6 +44,22 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void CastInterruptAbort_MatchesCapture() // NecroL80_..._cast-interupt idx988 begin + idx1006 cancel -> idx1013
+		{
+			// A ground-target Deadly Blizzard cast, interrupted by movement: the client sends the cancel (state=2) and
+			// retail answers with the state=0x0007 abort that drops the cast bar + pops "Interrupted". The abort carries
+			// the begin's args with phase=Mode(2) spliced in, at wire state 7, with the cancel's tail (last byte cleared).
+			// Only the begin's ARGS block feed the builder; behaviorId + tail come from the cancel packet.
+			var beginArgs = Hex("08c1e80a1002280a3000609a08"); // idx988 args (13 bytes)
+			var cancel = Hex(
+				"0000004a642cd3d60000c3500802e5d40002000000040000001208c1e80a1002180220e45f280a3000609a080000002d0002348e004378e0e141bfe148436ed78c00000000032047a70000041a01");
+			var expected = Hex(
+				"642cd3d60000c3500802e5d40007000000040000000f08c1e80a10021802280a3000609a080000002d0002348e004378e0e141bfe148436ed78c00000000032047a70000041a00");
+
+			Assert.Equal(expected, BehaviorAckBody.BuildCastInterruptAbort(beginArgs, cancel, 0x0802E5D4, 2));
+		}
+
+		[Fact]
 		public void UnarmedAirSwing_AckMatchesCapture() // frames 481 -> 486, Mode 8
 		{
 			var request = Hex("00000040642cd3d60000c350021663dd0003000000110000000e08c6d3061008280a300058326024000000000000000000000001000000000000000000000000000bbc46");

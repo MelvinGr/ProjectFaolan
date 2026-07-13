@@ -268,10 +268,17 @@ begin×2 / cancel×1; every cast in the ice-strike/casilda/casting captures is b
 
 - **Timing:** begin → echo-ack (renders the cast bar) → hold the spell's `CastTime` (`Task.RunAfter`) →
   complete-ack (form-`0x0a`) → resolve the effect. `CastTime 0` resolves immediately.
-- **Interrupt / move-cancel:** each begin captures a per-session `ActiveCastToken` (`NetworkClientSession`); a
-  cancel (the client sends `CastSpell` with state `2` when the player moves mid-cast — "move cancels the cast",
-  #346/#347) bumps the token, so the deferred resolve sees a mismatch and aborts (no complete-ack, no damage).
-  Verified in-capture by the "Casting Deathly Blizzard … then moving to interrupt" cast.
+- **Interrupt / move-cancel (#347):** each begin captures a per-session `ActiveCastToken` (`NetworkClientSession`).
+  The client sends its own `CastSpell` **state `2`** cancel when the player moves mid-cast (for both a locked cast
+  and a ground-target AoE); the server also bumps the token from the move handler when it sees a real translation
+  (`GameServerListener.Inbound.cs` `CharDCMoveIIR`, position delta > `CastMoveCancelEpsilonSq` so turning-in-place
+  to aim doesn't self-cancel). Either way the deferred resolve sees a mismatched token and aborts (no complete-ack,
+  no damage). The **client cast bar** is stopped by answering the cancel with retail's **state `0x0007` abort BCC**
+  (`BehaviorAckBody.BuildCastInterruptAbort` / `CombatService.SendCastInterruptAbort`) — the begin's args (held as
+  `Session.PendingCastArgs`) re-emitted at state `0x0007` with the cancel packet's tail; this drops the bar, cancels
+  the animation and pops the client's "Interrupted" floating text (client-generated — no separate feedback packet).
+  Byte-exact against `NecroL80_..._cast-interupt` (begin idx988 + cancel idx1006 → abort idx1013), golden-tested in
+  `BehaviorAckTests`. Echoing the cancel back (the old behaviour) left the bar running.
 - **Ground-targeted AoE:** a spell aimed at a reticle POSITION (no locked entity) carries the target Vector3 in
   the trailer (`[u8 kind=0][f32 X/Y/Z BE]…`) and has **no** `SpellTarget`; `CastGroundTarget.TryParse` reads it
   (an entity cast sends `kind=1` and a garbage position). `CombatService.ResolveGroundAoe` then damages every

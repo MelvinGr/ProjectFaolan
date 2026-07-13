@@ -70,9 +70,14 @@ namespace Faolan.Core
 			return (T)Enum.ToObject(typeof(T), ReadByte());
 		}
 
-		/*public bool ReadByte()
+		/*public T ReadByte<T>() where T : IConvertible
 		{
-			return Convert.ToBoolean(this.ReadByte());
+			if(typeof(T).IsEnum)
+				return (T)Enum.ToObject(typeof(T), ReadByte());
+			if(typeof(T) == typeof(bool))
+				return (T)(object)Convert.ToBoolean(ReadByte());
+
+			return (T)(object)ReadByte();
 		}*/
 
 		public float ReadFloat()

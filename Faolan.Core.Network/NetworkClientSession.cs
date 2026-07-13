@@ -94,6 +94,13 @@ namespace Faolan.Core.Network
 		// that fires after a cancel sees a mismatched token and aborts. This is what makes "move cancels the cast".
 		uint ActiveCastToken { get; set; }
 
+		// The in-flight cast's begin ARGS block + its Mode, held only while a timed cast is pending (#347). The client
+		// cancels the cast on a mid-cast move (its own cancel BCC); the server answers with the state=0x0007 abort that
+		// drops the cast bar - and that abort echoes the begin's args (with the phase=Mode field spliced in). Only the
+		// args are begin-specific; the rest of the abort comes from the cancel packet. Cleared on resolve/cancel.
+		byte[] PendingCastArgs { get; set; }
+		uint PendingCastMode { get; set; }
+
 		// The Spellweaving(1) buff STACK level: each time the component picker reappears a fresh stack is applied at
 		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
 		int SpellweaveBuffStack { get; set; }
@@ -180,6 +187,8 @@ namespace Faolan.Core.Network
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
 		public uint ActiveCastToken { get; set; }
+		public byte[] PendingCastArgs { get; set; }
+		public uint PendingCastMode { get; set; }
 		public int SpellweaveBuffStack { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> WeaveComponents { get; } = [];

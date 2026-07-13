@@ -44,6 +44,38 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return s.ToArray();
 		}
 
+		// The cast-INTERRUPT abort BccAck (#347). When the client cancels an in-flight cast (CastSpell state=2, sent
+		// when the player moves mid-cast - the ground-target AoE included), retail answers with a single state=0x0007
+		// BCC that drops the cast bar, cancels the animation and pops the client's "Interrupted" floating text (no
+		// separate feedback packet - it is client-generated from this). Byte-exact against NecroL80_..._cast-interupt
+		// (idx988 begin + idx1006 cancel -> idx1013): the begin's ARGS with the phase=Mode field spliced in after
+		// field2, carried at wire state 0x0007, with the CANCEL's TAIL (which carries the client's interrupt marker)
+		// and its trailing c2s direction byte cleared to 0x00. Only the args are begin-specific (held on the session
+		// as PendingCastArgs); the behaviorId + tail come from the cancel packet in hand (behaviorId is identical
+		// either way - it's the same cast behavior).
+		public static byte[] BuildCastInterruptAbort(byte[] beginArgs, byte[] cancelPayload, uint instance, uint phase)
+		{
+			var echoedArgs = InsertBehaviorPhaseField(beginArgs, phase);
+
+			var behaviorId = BinaryPrimitives.ReadUInt32BigEndian(cancelPayload.AsSpan(18, 4));
+			var cancelArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(cancelPayload.AsSpan(22, 4));
+			var tail = cancelPayload[(26 + cancelArgsLen)..]; // the range copy is fresh - safe to mutate
+			if (tail.Length > 0)
+				tail[^1] = 0x00; // s2c direction byte (the c2s cancel carried 0x01)
+
+			using var s = new FaolanStream();
+			s
+				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
+				.WriteUInt32(0x0000C350u)
+				.WriteUInt32(instance)
+				.WriteUInt16(0x0007)
+				.WriteUInt32(behaviorId)
+				.WriteUInt32(echoedArgs.Length)
+				.WriteArray(echoedArgs)
+				.WriteArray(tail);
+			return s.ToArray();
+		}
+
 		// Decoupled relay: acks the raw behaviour request for `instance` (was BehaviorAckBody.BuildBehaviorRelayBody
 		// taking the live client). Null when the payload is too short. The phase is the request's own mode (or 1).
 		public static byte[] BuildBehaviorRelayBody(uint instance, byte[] rawPayload, uint mode)

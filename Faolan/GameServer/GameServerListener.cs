@@ -76,6 +76,11 @@ namespace Faolan.GameServer
 		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
 		private const uint ShieldOfTheRisenBase2 = 3666828; // 10h (wire (base<<8) = 0x37F38C00)
 
+		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
+		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
+		// step, so any genuine step cancels the cast while aiming a ground-target reticle does not.
+		private const float CastMoveCancelEpsilonSq = 0.04f; // (0.2 world units)^2
+
 		// The snapshot record's TypeTag - the 0x0000C350 constant every 0x737A6DF9 carrier carries (= the IIR
 		// conversation tag, shared with the 0x201C handshake bodies).
 		private const uint SnapshotTypeTag = 0x0000C350;

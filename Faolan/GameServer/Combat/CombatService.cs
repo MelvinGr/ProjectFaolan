@@ -513,6 +513,15 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, phase));
 		}
 
+		// Sends the cast-interrupt abort BccAck (#347): the state=0x0007 reply to the client's cast-cancel that drops
+		// the cast bar, cancels the animation and pops the "Interrupted" text client-side. Built from the stored cast
+		// BEGIN args + the incoming cancel payload (behaviorId + tail). Phase = the begin's Mode.
+		public static Task SendCastInterruptAbort(INetworkClient client, byte[] beginArgs, byte[] cancelPayload, uint phase)
+		{
+			var instance = client.Session.Account.ClientInstance;
+			return SendWorldPacket(client, BehaviorAckBody.BuildCastInterruptAbort(beginArgs, cancelPayload, instance, phase));
+		}
+
 		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
 		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
 		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
