@@ -282,12 +282,10 @@ namespace Faolan.GameServer
 			{
 				["save"] = (client, _) => SaveChanges(client.Session.Character.Id),
 				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
-				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id),
+				["maps"] = (client, arguments) => SendListAllMaps(client.Session.Character.Id, arguments),
 				["teleport"] = TeleportCommand,
 				["position"] = (client, _) => PositionCommand(client),
 				["recall"] = (client, _) => RecallToBindCommand(client),
-				["setstat"] = SetStatCommand,
-				["setstatrange"] = SetStatRangeCommand,
 				["level"] = SetLevelCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
@@ -297,7 +295,6 @@ namespace Faolan.GameServer
 				["removeitem"] = RemoveItemCommand,
 				["claim"] = ClaimCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
-				["areaname"] = AreaNameCommand,
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
@@ -442,7 +439,7 @@ namespace Faolan.GameServer
 
 		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist, 		// and push the Level stat + refreshed vitals so the change shows without a relog (the persisted level also
 		// rides the next login snapshot). Test-bootstrap convenience for level-gated features (e.g. #206 Totem of
-		// Origin's min-20). Mirrors .setstat/.vitals; the stat's wire scale is applied at send.
+		// Origin's min-20). The stat's wire scale is applied at send.
 		private async Task SetLevelCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -498,22 +495,6 @@ namespace Faolan.GameServer
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
-		}
-
-		// .areaname <textId> - push the GenericDisplayAreaName FIFO banner (top-of-screen zone-name reveal) for a
-		// client localized-text id. The test bootstrap for #348 (area-name banner on entering areas): the auto-on-entry
-		// trigger needs the per-region text-id map from the client's region volumes, so this lets us verify the wire
-		// form + discover which id renders which area name in-client (ids seen in captures: 3373519-23, 3474586, ...).
-		private async Task AreaNameCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length != 1 || !uint.TryParse(parts[0], out var textId))
-			{
-				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Usage: .areaname &lt;localizedTextId&gt;  (e.g. 3474586)");
-				return;
-			}
-
-			await SendAreaNameBanner(client, textId);
 		}
 
 		// .syschat - push a world/system chat line into the chat window via ChatTextIIR (#103). Sends the captured
@@ -638,31 +619,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
 				? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
 				: "Invisible <span style=\"color: red;\">OFF</span>.");
-		}
-
-		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
-		// Level to 25). The stat's wire scale is applied automatically.
-		private static Task SetStatCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var statId = (CharacterStatId)Convert.ToUInt32(parts[0], 16);
-			var value = uint.Parse(parts[1]);
-
-			return SendStatUpdate(client, new CharacterStatBlock().Set(statId, value));
-		}
-
-		// .setstatrange <startHex> <endHex> <value>  - DEBUG sweep: push every stat id in [start, end] set to `value`
-		// in one 0x96B8DC59 update, to bisect which stat a client behaviour keys off (e.g. the spell-usability level).
-		private static Task SetStatRangeCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var start = Convert.ToUInt32(parts[0], 16);
-			var end = Convert.ToUInt32(parts[1], 16);
-			var value = uint.Parse(parts[2]);
-			var block = new CharacterStatBlock();
-			for (var id = start; id <= end; id++)
-				block.Set((CharacterStatId)id, value);
-			return SendStatUpdate(client, block);
 		}
 
 		private delegate Task GmCommandDelegate(INetworkClient client, string arguments);

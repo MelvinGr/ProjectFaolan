@@ -43,8 +43,8 @@ schema since squashed into the `InitialCreate` migration), seeded on creation vi
 rough class/level defaults anchored on assassinl23 (Assassin lvl 23 ≈ 1281/1143/73 vs sheet 1270/1148/74); legacy
 characters with no row fall back to computed defaults in-memory. The create-editor commits the chosen class
 before naming, so `CommitCharacterName` calls `Character.RegenerateMaxStats()` (updates the seeded row in place)
-to replace the level-1 rogue baseline with the chosen class's vitals. GM command `.setstat <statIdHex> <value>`
-(and `.setstatrange`) for live testing (the earlier `.vitals` command has since been removed). Round-trip tests
+to replace the level-1 rogue baseline with the chosen class's vitals. (The `.setstat` / `.setstatrange` / `.vitals`
+GM commands used for live stat testing have since been removed.) Round-trip tests
 (`CharacterStatBlockTests`, `CharacterMaxStatsTests`, `DatabaseRepositoryTests.CreateCharacter_SeedsDefaultMaxStats`)
 cover bytes, defaults, and cascade. `ApplySpell` (0x6B87E316) was already implemented (caster + `0000` + spellId +
 `0000C350` + target + data); its builders now live in `Faolan.Core.Network/Codecs/Combat/` (`SelfBuffCodec`,

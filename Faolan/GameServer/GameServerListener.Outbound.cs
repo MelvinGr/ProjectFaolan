@@ -186,10 +186,22 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
 		}
 
-		private async Task SendListAllMaps(uint characterId)
+		// Lists maps for `.maps`, optionally filtered to those whose name CONTAINS `search` (case-insensitive) -
+		// e.g. `.maps castle`. A blank search lists all maps.
+		private async Task SendListAllMaps(uint characterId, string search = null)
 		{
-			var maps = await Database.GetMaps();
-			await _agentServerDispatcher.SendSystemMessage(characterId, maps.OrderBy(m => m.Name).Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
+			var maps = (await Database.GetMaps()).OrderBy(m => m.Name).AsEnumerable();
+			if (!string.IsNullOrWhiteSpace(search))
+				maps = maps.Where(m => m.Name != null && m.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+			var matches = maps.ToList();
+			if (matches.Count == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No map matching '{search?.Trim()}'.</span>");
+				return;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, matches.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
 		}
 
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
@@ -409,14 +421,6 @@ namespace Faolan.GameServer
 			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
-		}
-
-		// Pushes the GenericDisplayAreaName FIFO banner (the top-of-screen zone/area-name reveal) for a client
-		// localized-text id. The auto-on-entry / region-crossing trigger is #348 (needs the per-region text-id map from
-		// the client's region volumes); this sender is the mechanism, exercised via the .areaname GM command.
-		private static Task SendAreaNameBanner(INetworkClient client, uint textId)
-		{
-			return SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildAreaNameXml(textId)));
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
