@@ -66,8 +66,9 @@ namespace Faolan.Importer.Captures
 					AccountId = accountId,
 					ItemTemplateId = claim.ItemTemplateId,
 					Level = claim.Level,
-					Quantity = claim.Quantity,
-					MaxCharges = claim.MaxQuantity,
+					// Wire 0 = infinite -> null charges.
+					Quantity = claim.Quantity == 0 ? null : claim.Quantity,
+					MaxCharges = claim.MaxQuantity == 0 ? null : claim.MaxQuantity,
 					Code = claim.Code,
 					ClaimType = claim.Type
 				});

@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// LEVEL, not the stack count - redeeming idx 6 (Level 5) delivered ONE Slavemaster's Staff (the DispatchAddItem
 	// carried no stat-26 stack count). Each redeem hands over exactly ONE item.
 	//
-	// The tail carries a CHARGE pair [Quantity remaining][MaxQuantity]. For a single-use item claim both are 0 (the
+	// The tail carries a CHARGE pair [Quantity remaining][MaxQuantity]. Both 0 = INFINITE charges (stored null server-side; the
 	// "Amount" column shows ∞); for a multi-charge claim ("Double XP", 20 potions) they start equal (20/20) and the
 	// remaining word decrements on each redeem - retail re-sends the row via the sub-0x05 ack with [remaining-1][max]
 	// (frames 396/540 show 19/20 then 18/20), removing it at 0. In the INITIAL list remaining == max, so a captured

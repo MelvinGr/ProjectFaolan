@@ -92,8 +92,7 @@ namespace Faolan.GameServer
 
 			// Each redeem delivers exactly ONE of the item (proven by the capture: the delivered DispatchAddItem carries
 			// no stat-26 stack count). The Type is the BINDING (6 account / 4 character), not item-vs-currency. Claim
-			// items carry a key but no hash, so allow the hashless live add (the DispatchAddItem is also the client's
-			// "claim collected" signal that clears a single-use row).
+			// items carry a key but no hash, so allow the hashless live add.
 			var slot = await GrantItemToBackpack(client, claim.ItemTemplateId, 1, allowHashless: true);
 			if (slot == null)
 			{
@@ -103,17 +102,23 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Multi-charge claim (MaxCharges > 0, e.g. "Double XP" x20): decrement the remaining charges and, while any
-			// remain, refresh the client's row in place with the sub-0x05 ack ([remaining][max]) instead of removing it.
-			// The row is dropped only when the last charge is spent. A single-use claim (MaxCharges 0) just drops now -
-			// its DispatchAddItem already told the client to remove it.
-			if (claim.MaxCharges > 0 && claim.Quantity > 1)
+			// Infinite claim (Quantity == null, the ∞ Amount): never consumed - deliver and leave the row. The client
+			// keeps an ∞ row after the DispatchAddItem, so nothing else to send.
+			if (claim.Quantity is not { } remaining)
 			{
-				var remaining = claim.Quantity - 1;
-				await Database.SetAccountClaimQuantity(claim.Id, remaining);
-				await SendRedeemAck(client, claim, index, remaining);
+				Logger.LogInformation("Account {AccountId} redeemed infinite claim {ClaimId} (template {Template}).", client.Session.Account.Id, claim.Id, claim.ItemTemplateId);
+				return;
+			}
+
+			// Finite multi-charge claim ("Double XP" x20): decrement and, while any remain, refresh the client's row in
+			// place with the sub-0x05 ack ([remaining][max]) instead of removing it. Dropped only when the last charge
+			// is spent (its DispatchAddItem then tells the client to remove it).
+			if (remaining > 1)
+			{
+				await Database.SetAccountClaimQuantity(claim.Id, remaining - 1);
+				await SendRedeemAck(client, claim, index, remaining - 1);
 				Logger.LogInformation("Account {AccountId} redeemed 1 charge of claim {ClaimId} (template {Template}); {Remaining} left.",
-					client.Session.Account.Id, claim.Id, claim.ItemTemplateId, remaining);
+					client.Session.Account.Id, claim.Id, claim.ItemTemplateId, remaining - 1);
 				return;
 			}
 
@@ -127,7 +132,7 @@ namespace Faolan.GameServer
 		{
 			var guid = DeriveBytes($"claim-batch:{client.Session.Account.Id}", ClaimEntry.BatchGuidLength);
 			var code = string.IsNullOrEmpty(claim.Code) ? DeriveCode(claim.Id) : claim.Code;
-			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges);
+			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
@@ -163,7 +168,8 @@ namespace Faolan.GameServer
 				var row = rows[i];
 				var key = ItemKeyBytes(row.Item);
 				var code = string.IsNullOrEmpty(row.Code) ? DeriveCode(row.Id) : row.Code;
-				entries.Add(new ClaimEntry((uint)(i + 1), row.ItemTemplateId, row.Level, code, key, guid, row.ClaimType, row.Quantity, row.MaxCharges));
+				// Infinite (null) charges go on the wire as 0 (the ∞ Amount).
+				entries.Add(new ClaimEntry((uint)(i + 1), row.ItemTemplateId, row.Level, code, key, guid, row.ClaimType, row.Quantity ?? 0, row.MaxCharges ?? 0));
 			}
 
 			return entries;
@@ -228,7 +234,7 @@ namespace Faolan.GameServer
 				for (var i = 0; i < rows.Count; i++)
 				{
 					var item = await Database.GetItem(rows[i].ItemTemplateId);
-					var qty = rows[i].Quantity == 0 ? 1 : rows[i].Quantity;
+					var qty = rows[i].Quantity?.ToString() ?? "∞"; // null = infinite charges
 					await _agentServerDispatcher.SendSystemMessage(characterId, $"#{i + 1}: {qty}x '{item?.Name ?? "?"}' (template {rows[i].ItemTemplateId})");
 				}
 
@@ -251,15 +257,15 @@ namespace Faolan.GameServer
 
 			var template = await Database.GetItem(itemId);
 			// Level is cosmetic (the client shows the item's own level from its RDB); seed it from our Items row if we
-			// have it. Quantity 0 = a single item (matches the wire for every item claim in the capture).
+			// have it. count <= 1 = an ordinary INFINITE item claim (null charges, shown as ∞); count > 1 = a finite
+			// multi-charge claim.
 			await Database.CreateAccountClaim(new AccountClaim
 			{
 				AccountId = accountId,
 				ItemTemplateId = itemId,
 				Level = template?.Level ?? 0,
-				// count <= 1 = a single-use item claim (0 charges, shown as ∞); count > 1 = a multi-charge claim.
-				Quantity = count <= 1 ? 0u : count,
-				MaxCharges = count <= 1 ? 0u : count
+				Quantity = count <= 1 ? null : count,
+				MaxCharges = count <= 1 ? null : count
 			});
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Added claim: {(count == 0 ? 1 : count)}x '{template?.Name ?? "?"}' (template {itemId}). Open the Claims/Redeem window to collect it.");
 		}

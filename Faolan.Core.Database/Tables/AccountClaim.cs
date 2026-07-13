@@ -31,14 +31,16 @@ namespace Faolan.Core.Database.Tables
 		// capture's redeem delivered ONE item despite Level 5 (see ClaimEntry). Cosmetic server-side; sent verbatim.
 		public ulong Level { get; set; } // TODO: Just use item.level?
 
-		// Remaining charges - the "Amount" column. 0 = a single-use item claim (shown as ∞, delivered once then the
-		// row is dropped). A multi-charge claim ("Double XP", 20) delivers ONE per redeem and decrements this until it
-		// hits 0, when the row is removed. On the wire it is the first of the tail pair [remaining][max].
-		public uint Quantity { get; set; }
+		// Remaining charges - the "Amount" column. NULL = INFINITE (shown as ∞; the claim is not consumed on redeem, so
+		// an ordinary item claim can be collected any number of times). A finite value N is a multi-charge claim
+		// ("Double XP", 20) that delivers ONE per redeem and decrements until it hits 0, when the row is removed. On the
+		// wire (the first of the tail pair [remaining][max]) infinite is 0.
+		public uint? Quantity { get; set; }
 
-		// Max charges - the second tail word [remaining][MAX]. Equals Quantity when the claim is fresh (so the initial
-		// list has remaining == max); stays fixed as Quantity decrements, so the sub-0x05 redeem ack sends [remaining][max].
-		public uint MaxCharges { get; set; }
+		// Max charges - the second tail word [remaining][MAX]. NULL (wire 0) = infinite. For a finite claim it equals
+		// Quantity when fresh (so the initial list has remaining == max) and stays fixed as Quantity decrements, so the
+		// sub-0x05 redeem ack sends [remaining][max].
+		public uint? MaxCharges { get; set; }
 
 		[MaxLength(4)]
 		public string Code { get; set; } = "";

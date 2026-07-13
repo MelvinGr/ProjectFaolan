@@ -33,7 +33,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Account?> GetAccount(string userName);
 		Task<AccountClaim?> GetAccountClaim(uint claimId);
 		Task<List<AccountClaim>> GetAccountClaims(uint accountId);
-		Task SetAccountClaimQuantity(uint claimId, uint quantity);
+		Task SetAccountClaimQuantity(uint claimId, uint? quantity);
 		Task SetAccountClaimsAvailable(uint accountId, bool available);
 		Task<Character?> GetCharacter(uint id);
 		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
@@ -312,8 +312,8 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.AccountClaims.Include(c => c.Item).FirstOrDefaultAsync(c => c.Id == claimId);
 		}
 
-		// Sets a claim's remaining charge count (a multi-charge redeem decrements it; the row is deleted at 0).
-		public async Task SetAccountClaimQuantity(uint claimId, uint quantity)
+		// Sets a claim's remaining charge count (a finite multi-charge redeem decrements it; the row is deleted at 0).
+		public async Task SetAccountClaimQuantity(uint claimId, uint? quantity)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.AccountClaims.Where(c => c.Id == claimId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Quantity, quantity));
