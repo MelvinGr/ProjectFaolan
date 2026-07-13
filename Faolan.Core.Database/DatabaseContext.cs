@@ -21,6 +21,7 @@ namespace Faolan.Core.Database
 		DbSet<Character> Characters { get; }
 		DbSet<CharacterAbility> CharacterAbilities { get; }
 		DbSet<CharacterAttribute> CharacterAttributes { get; }
+		DbSet<CharacterBuff> CharacterBuffs { get; }
 		DbSet<CharacterBody> CharacterBodies { get; }
 		DbSet<CharacterBodyResource> CharacterBodyResources { get; }
 		DbSet<CharacterCombo> CharacterCombos { get; }
@@ -91,6 +92,7 @@ namespace Faolan.Core.Database
 		public DbSet<Character> Characters { get; set; }
 		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
 		public DbSet<CharacterAttribute> CharacterAttributes { get; set; }
+		public DbSet<CharacterBuff> CharacterBuffs { get; set; }
 		public DbSet<CharacterBody> CharacterBodies { get; set; }
 		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
 		public DbSet<CharacterCombo> CharacterCombos { get; set; }
@@ -250,6 +252,11 @@ namespace Faolan.Core.Database
 			// Learned spells delete with the character (a character knows a given spell at most once - now the
 			// (CharacterId, SpellId) compound primary key).
 			modelBuilder.Entity<CharacterSpell>().HasOne(s => s.Character).WithMany(c => c.Spells).OnDelete(DeleteBehavior.Cascade);
+
+			// Persisted self-buffs (#274) delete with the character; keyed by (CharacterId, BuffId). Unlike CharacterSpell
+			// the BuffId is NOT a catalog FK - the spell BASE (BuffId >> 8) is what the Spells catalog holds, and a live
+			// buff can carry an id with no persisted duration, so this is pure per-character savegame state.
+			modelBuilder.Entity<CharacterBuff>().HasOne(b => b.Character).WithMany(c => c.Buffs).OnDelete(DeleteBehavior.Cascade);
 
 			// Guild membership: deleting a guild releases its members back to guildless instead of deleting them.
 			modelBuilder.Entity<Character>().HasOne(c => c.Guild).WithMany(g => g.Members).OnDelete(DeleteBehavior.SetNull);

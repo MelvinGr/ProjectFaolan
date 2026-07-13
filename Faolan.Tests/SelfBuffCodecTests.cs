@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.GameServer.World;
 using Xunit;
 
 namespace Faolan.Tests
@@ -39,6 +40,27 @@ namespace Faolan.Tests
 		{
 			var bytes = SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce);
 			Assert.Equal(expected.Replace(" ", ""), Convert.ToHexStringLower(bytes));
+		}
+
+		// The buff-persistence save side (#274) recovers the nonce + short/long form back out of the constructed
+		// payload (ActiveBuff.NonceFromPayload / IsLongFormPayload), so RestoreBuffs can rebuild a byte-compatible
+		// packet on relog. This is the inverse of the two builders above.
+		[Fact]
+		public void PayloadExtractors_RecoverNonceAndForm_FromBothBuffForms()
+		{
+			var shortForm = SelfBuffCodec.BuildBuffData(145534, 1277478, 0x14C5C912);
+			Assert.Equal(50, shortForm.Length);
+			Assert.False(ActiveBuff.IsLongFormPayload(shortForm));
+			Assert.Equal(0x14C5C912u, ActiveBuff.NonceFromPayload(shortForm));
+
+			var longForm = SelfBuffCodec.BuildBuffDataLong(0x37F298, 640000, 0x195DA1FE);
+			Assert.Equal(54, longForm.Length);
+			Assert.True(ActiveBuff.IsLongFormPayload(longForm));
+			Assert.Equal(0x195DA1FEu, ActiveBuff.NonceFromPayload(longForm));
+
+			// The empty removal twin carries no duration/nonce - the extractors must not read off the end.
+			Assert.Equal(0u, ActiveBuff.NonceFromPayload([]));
+			Assert.False(ActiveBuff.IsLongFormPayload([]));
 		}
 	}
 }

@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Microsoft.Extensions.Logging;
 
@@ -58,6 +61,23 @@ namespace Faolan.GameServer.World
 				character.Position = entity.Position;
 				character.Rotation = entity.Rotation;
 				await _database.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation, entity.MapId);
+
+				// Snapshot the live self-buffs with their absolute expiry so a relog restores them with the time left
+				// (#274). Only the buffs no dedicated re-applier owns (shield/mount are excluded) and that haven't
+				// already expired; RestoreBuffs re-sends them at world entry. Replace-all, like the transform above -
+				// the row set always mirrors what's currently active.
+				var now = DateTimeOffset.UtcNow;
+				var buffs = entity.ActiveBuffs.Values
+					.Where(b => GameServerListener.ShouldPersistBuff(entity, b) && !b.Expired(now))
+					.Select(b => new CharacterBuff
+					{
+						BuffId = b.BuffId,
+						Nonce = b.Nonce,
+						IsLongForm = b.IsLongForm,
+						ExpiresAt = b.ExpiresAt
+					})
+					.ToList();
+				await _database.SaveCharacterBuffs(character.Id, buffs);
 				return true;
 			}
 			catch (Exception ex)

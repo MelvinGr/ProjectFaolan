@@ -81,6 +81,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterShortcut> Shortcuts { get; set; } = [];
 		public virtual ICollection<CharacterSkill> Skills { get; set; } = [];
 		public virtual ICollection<CharacterSpell> Spells { get; set; } = [];
+		public virtual ICollection<CharacterBuff> Buffs { get; set; } = [];
 		public virtual ICollection<CharacterTag> Tags { get; set; } = [];
 
 		// True once a bind point has been set (an unbound character recalls to / reports its current map).

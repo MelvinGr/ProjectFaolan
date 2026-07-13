@@ -349,6 +349,10 @@ namespace Faolan.GameServer
 			// AND on every teleport/changemap re-entry (this flush is re-armed on both), so riding into a no-mount
 			// area dismounts and riding back re-mounts, and a relog restores the mount.
 			await RestoreMount(client);
+			// Re-apply the persisted self-buffs with their remaining time (#274) - the buff counterpart to RestoreMount.
+			// Runs BEFORE SendShieldOfTheRisen (which owns the shield buffs, excluded from persistence) so ordering is
+			// moot; the mount ride buff is likewise excluded and owned by RestoreMount above.
+			await RestoreBuffs(client);
 			// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
 			// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
 			// the pre-snapshot GrantCharacterSpells re-send is absorbed silently. (The old PendingSpellLearns

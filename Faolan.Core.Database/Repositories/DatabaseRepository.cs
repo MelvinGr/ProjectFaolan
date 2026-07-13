@@ -48,6 +48,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterScaffold(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
+		Task<CharacterBuff[]> GetCharacterBuffs(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
 		Task<Ability[]> GetClassAbilities(uint level, Class @class);
@@ -106,6 +107,7 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterBind(uint characterId, uint respawnPointId);
 		Task SaveCharacterDeadState(uint characterId, bool isDead);
 		Task SaveCharacterMount(uint characterId, uint? mountId);
+		Task SaveCharacterBuffs(uint characterId, IReadOnlyCollection<CharacterBuff> buffs);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
@@ -616,6 +618,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterSpells.Where(s => s.CharacterId == characterId).OrderBy(s => s.SpellId).ToArrayAsync();
+		}
+
+		// The character's persisted self-buffs (#274); RestoreBuffs re-applies each non-expired one at world entry,
+		// recomputing its remaining time from ExpiresAt.
+		public async Task<CharacterBuff[]> GetCharacterBuffs(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterBuffs.Where(b => b.CharacterId == characterId).OrderBy(b => b.BuffId).ToArrayAsync();
 		}
 
 		// The character's stat sheet (CharacterStat) in wire order (Ordinal) - the FullChar snapshot's stat block,
@@ -1275,6 +1285,24 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.MountId, mountId));
+		}
+
+		// Replaces the character's persisted self-buffs wholesale (delete-and-insert) with the live snapshot taken at
+		// logout/autosave (#274). Replace-all because buffs expire and are cancelled between saves, so the row set
+		// tracks whatever is currently active - the same shape as SaveCharacterScaffold.
+		public async Task SaveCharacterBuffs(uint characterId, IReadOnlyCollection<CharacterBuff> buffs)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			ctx.CharacterBuffs.RemoveRange(ctx.CharacterBuffs.Where(b => b.CharacterId == characterId));
+			foreach (var buff in buffs)
+			{
+				buff.CharacterId = characterId;
+				buff.Character = null!; // detached snapshot; the FK column carries the link, the nav must not re-attach a graph
+				ctx.CharacterBuffs.Add(buff);
+			}
+
+			await ctx.SaveChangesAsync();
 		}
 
 		public async Task SaveCharacterEquipment(CharacterEquipment equipment)

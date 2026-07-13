@@ -18,9 +18,35 @@ namespace Faolan.GameServer.World
 		public int DotDelta { get; init; }
 		public uint DotType { get; init; }
 
+		// The bits needed to reconstruct this buff's ApplySpell payload on relog (#274): the per-application effect
+		// Nonce (last u32 of the payload) and whether it used the 54-byte LONG form (spellweave) vs the 50-byte short
+		// form. Set at apply from the constructed payload; persisted to CharacterBuff for a self-buff. Default 0/false
+		// for the NPC-cast debuffs (which are never persisted).
+		public uint Nonce { get; init; }
+		public bool IsLongForm { get; init; }
+
+		// The absolute instant this buff expires, so its remaining time can be persisted across a relog. Null = it has
+		// no server duration (lives until cancelled).
+		public DateTimeOffset? ExpiresAt => DurationSeconds is double d ? AppliedAt.AddSeconds(d) : null;
+
 		public bool Expired(DateTimeOffset now)
 		{
 			return DurationSeconds is double d && (now - AppliedAt).TotalSeconds >= d;
+		}
+
+		// The per-application effect nonce carried at the END of an ApplySpell payload (the last big-endian u32 -
+		// offset 46 in the 50-byte short form, 50 in the 54-byte long form). Returns 0 for a payload too short to
+		// carry one (e.g. the empty removal twin). (#274)
+		public static uint NonceFromPayload(byte[] payload)
+		{
+			return payload is { Length: >= 4 } ? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(payload.Length - 4, 4)) : 0;
+		}
+
+		// True for the 54-byte LONG buff-data form (spellweave/mount/shield), false for the 50-byte short form
+		// (ordinary self-buffs) - the client rejects the wrong shape, so it must survive a relog. (#274)
+		public static bool IsLongFormPayload(byte[] payload)
+		{
+			return payload is { Length: >= 54 };
 		}
 
 		// The buff duration encoded in an ApplySpell (0x6B87E316) effect payload: a u32 big-endian at offset +8, in

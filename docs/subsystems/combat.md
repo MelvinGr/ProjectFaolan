@@ -210,6 +210,16 @@ ApplySpell packets in it): mount up = self ApplySpell **`0x31EB1500`** + a **54-
 **buff** apply/remove is a real oracle now — distinct from the demol80 `0x3BAD7D` summon. The mount **entity
 spawn** is still gated on the mid-session-spawn blocker (#26), so the buff renders but the horse model does not.
 
+**Buff persistence across relog (#274).** Self-buffs survive a logout **with their remaining time**. The live
+`WorldEntity.ActiveBuffs` is savegame state, so `PlayerPersistenceService.SavePlayerState` (logout + the 5-min
+autosave) snapshots each self-buff to the `CharacterBuff` table — `BuffId`, the effect `Nonce`, the short/long
+form flag, and an absolute `ExpiresAt` — and `RestoreBuffs` re-applies them in the post-`0x205F` world-entry flush
+(beside `RestoreMount`). Restore rebuilds the `ApplySpell` payload from those columns via `SelfBuffCodec` (not a
+stored blob) with the duration recomputed to the time left, so the client counts down the **remaining** seconds and
+the tick expires it on schedule. Only self-buffs persist (NPC-cast debuffs carry a volatile caster handle + a DoT
+and are dropped); buffs owned by a dedicated re-applier — the login shield and the mount ride buff — are excluded
+at save time so they aren't double-applied on entry (`GameServerListener.ShouldPersistBuff`).
+
 **Persistent login shield (#221) — CURRENTLY DISABLED.** The `GrantStartingBuffs` call in
 `FlushPendingPost205FFollowUp` (which re-applied a class-agnostic shield self-buff to every character, right after
 the ability/spell re-grants, and re-armed on each teleport/changemap re-entry) is **commented out as of

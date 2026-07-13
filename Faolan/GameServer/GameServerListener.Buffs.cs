@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -80,6 +81,69 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffData(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
+		}
+
+		// The buff ids owned by a dedicated per-entry re-applier - Shield of the Risen (SendShieldOfTheRisen) and the
+		// mount ride buff (RestoreMount). These are re-asserted on EVERY world entry from that flush, so the generic
+		// buff persistence must skip them or the client would render a duplicate icon on relog (#274/#221).
+		private static readonly HashSet<uint> DedicatedRestoreBuffIds =
+		[
+			ShieldOfTheRisenBase1 << 8,
+			ShieldOfTheRisenBase2 << 8,
+			MountCatalog.RideSpell
+		];
+
+		// Whether PlayerPersistenceService should persist a live buff for relog (#274): only a SELF-buff (caster is the
+		// entity itself) that no dedicated re-applier already owns. NPC-cast debuffs carry a session-volatile caster
+		// handle plus a DoT and deliberately do not resume across a relog. Pure predicate - the persistence service
+		// (World layer) calls it without otherwise reaching into the listener.
+		public static bool ShouldPersistBuff(WorldEntity entity, ActiveBuff buff)
+		{
+			return buff.CasterHandle == entity.Handle && !DedicatedRestoreBuffIds.Contains(buff.BuffId);
+		}
+
+		// Re-applies a player's persisted self-buffs at world entry with their REMAINING time (#274). Reads the
+		// CharacterBuff snapshot taken at the last logout/autosave, drops any that lapsed while offline, rebuilds each
+		// ApplySpell payload from the persisted base id / effect nonce / short-or-long form with a duration recomputed
+		// to the time left, and sends it through SendMagicBuffIir - which re-registers the live ActiveBuff so the world
+		// tick expires it on schedule and the client counts down the correct remaining time. Runs in the post-0x205F
+		// flush beside RestoreMount / SendShieldOfTheRisen, which own their own buffs (excluded at save), so nothing is
+		// double-applied. A permanent buff (ExpiresAt == null) restores with a 0 duration (lives until cancelled).
+		private async Task RestoreBuffs(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var buffs = await Database.GetCharacterBuffs(character.Id);
+			if (buffs.Length == 0)
+				return;
+
+			var now = DateTimeOffset.UtcNow;
+			var self = client.Session.Account.ClientInstance;
+			var restored = 0;
+
+			foreach (var buff in buffs)
+			{
+				uint remainingCs = 0;
+				if (buff.ExpiresAt is DateTimeOffset expiresAt)
+				{
+					var remaining = (expiresAt - now).TotalSeconds;
+					remainingCs = remaining > 0 ? (uint)Math.Min(remaining * 100, uint.MaxValue) : 0;
+					if (remainingCs == 0)
+						continue; // lapsed (or < 1cs left) while logged out - don't re-apply
+				}
+
+				var spellBase = buff.BuffId >> 8;
+				var payload = buff.IsLongForm
+					? SelfBuffCodec.BuildBuffDataLong(spellBase, remainingCs, buff.Nonce)
+					: SelfBuffCodec.BuildBuffData(spellBase, remainingCs, buff.Nonce);
+				await SendMagicBuffIir(client, self, self, buff.BuffId, payload);
+				restored++;
+			}
+
+			if (restored > 0)
+				Logger.LogInformation("Restored {Count} persisted buff(s) for {Name}.", restored, character.Name);
 		}
 
 		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh
@@ -235,7 +299,12 @@ namespace Faolan.GameServer
 				{
 					entity.ActiveBuffs[spellId] = new ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, durationMs > 0
 						? durationMs / 1000.0
-						: null);
+						: null)
+					{
+						// Preserve the wire shape so the buff can be reconstructed byte-compatibly on relog (#274).
+						Nonce = ActiveBuff.NonceFromPayload(payload),
+						IsLongForm = ActiveBuff.IsLongFormPayload(payload)
+					};
 				}
 			}
 		}

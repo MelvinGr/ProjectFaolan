@@ -96,6 +96,64 @@ namespace Faolan.Tests
 			}
 		}
 
+		// Persisted self-buffs (#274) round-trip with their absolute expiry, and SaveCharacterBuffs is replace-all -
+		// the second snapshot wholly replaces the first, so a cancelled/expired buff drops out. This is the data-layer
+		// contract behind PlayerPersistenceService (snapshot on logout) + RestoreBuffs (re-apply on entry).
+		[Fact]
+		public async Task CharacterBuffs_RoundTrip_AndReplaceAllOnResave()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-buffs-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint accountId = 1;
+				const uint realmId = 1;
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					await ctx.SaveChangesAsync();
+				}
+
+				var character = await repo.CreateCharacter(accountId, realmId);
+				var expiry = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+
+				// First snapshot: a timed short-form buff + a permanent long-form buff (null expiry).
+				await repo.SaveCharacterBuffs(character.Id,
+				[
+					new CharacterBuff { BuffId = 0x02387E03, Nonce = 0x14C5C912, IsLongForm = false, ExpiresAt = expiry },
+					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, IsLongForm = true, ExpiresAt = null }
+				]);
+
+				var loaded = await repo.GetCharacterBuffs(character.Id);
+				Assert.Equal(2, loaded.Length);
+				var timed = Assert.Single(loaded, b => b.BuffId == 0x02387E03);
+				Assert.Equal(0x14C5C912u, timed.Nonce);
+				Assert.False(timed.IsLongForm);
+				Assert.Equal(expiry, timed.ExpiresAt);
+				var permanent = Assert.Single(loaded, b => b.BuffId == 0x0037F298);
+				Assert.True(permanent.IsLongForm);
+				Assert.Null(permanent.ExpiresAt);
+
+				// Re-save with only the permanent buff (the timed one expired): replace-all drops the missing row.
+				await repo.SaveCharacterBuffs(character.Id,
+				[
+					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, IsLongForm = true, ExpiresAt = null }
+				]);
+
+				var after = await repo.GetCharacterBuffs(character.Id);
+				Assert.Equal(0x0037F298u, Assert.Single(after).BuffId);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
 		[Fact]
 		public async Task ChatMessages_PersistAndQueryRecent_NewestFirst_AndByChannel()
 		{
