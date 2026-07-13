@@ -12,8 +12,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// snapshot (docs/re/player-spawn-generation-plan.md "FullChar"):
 	//   - the root carries exactly 4 ProtoInventoryGame containers, kind order Equipped=101, Bag=104,
 	//     Resource=112, Quest=113; inventory_id = { type: kind, instance: the character's client instance };
-	//     max_size 1028/24/48/48 (24 = the starter bag; upgrades grow it) and disabled_slots_count 0/0/12/0
-	//     are constant and always serialized (0 included);
+	//     max_size 1028/24/48/48 for a fresh char and disabled_slots_count 0/0/12/0, always serialized (0 included).
+	//     The Bag max_size is dynamic: 24 base + the equipped bag's Item.BagExtraSlots (#12); the rest are constant;
 	//   - entry ids: retail itemIds are 0x20D82B63 (epoch) in the high 32 bits + a server allocation counter,
 	//     record ids (stat 23) another counter. Generated ids derive deterministically from instance+slot so
 	//     they are unique within the character and stable across logins (equip persistence keys on template
@@ -38,6 +38,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// The first bag cell of a fresh character's snapshot is pos 1 (Strie's captured starter bag).
 		private const uint BagFirstPos = 1;
+
+		// Backpack sizing: the base backpack is 24 slots; the bag equipped in the bag slot (equip slot 3) adds its
+		// Item.BagExtraSlots (RDB field 104) on top - Burlap Sack +24 (=48), Bag of Holding +20 (=44), Veteran's Bag
+		// +35 (=59). Confirmed against fresh vs. lvl-80 snapshots. #12.
+		private const uint BaseBackpackSlots = 24;
+		private const ulong BagEquipSlot = (ulong)CharacterEquipmentSlot.Tokens;
 		private const ulong ItemIdEpoch = 0x20D82B63UL << 32;
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
@@ -61,10 +67,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Hash)> equipped, (Item Item, uint Hash)? bagFirst,
 			IReadOnlyCollection<CharacterInventory> inventoryRows = null)
 		{
+			// The backpack grows by the bag equipped in the bag slot (slot 3): base 24 + its BagExtraSlots.
+			var backpackSlots = BaseBackpackSlots
+			                    + (equipped.TryGetValue(BagEquipSlot, out var bagItem) ? bagItem.Item.BagExtraSlots ?? 0 : 0);
+
 			var containers = new List<ProtoInventoryGame>
 			{
 				NewContainer(EquippedKind, 1028, 0, instance),
-				NewContainer(BagKind, 24, 0, instance),
+				NewContainer(BagKind, backpackSlots, 0, instance),
 				NewContainer(ResourceKind, 48, 12, instance),
 				NewContainer(QuestKind, 48, 0, instance)
 			};

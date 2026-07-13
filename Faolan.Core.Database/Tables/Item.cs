@@ -71,5 +71,11 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey(nameof(OnUseSpell))]
 		public virtual Spell? OnUseSpellDefinition { get; set; }
+
+		// For a BAG item (equipped in the bag slot, equip slot 3): the extra backpack slots it adds - the "+N slots"
+		// the client tooltip shows. The backpack container's max_size = 24 (base) + this. RDB item-template property
+		// field 104 (= the Bag container kind, 0x68); validated: Burlap Sack 24 (24->48), Bag of Holding 20 (->44),
+		// Veteran's Bag 35 (->59). NULL = not a bag. Extracted by RdbItemImporter; see FullPlayerCharacterBuilder.
+		public uint? BagExtraSlots { get; set; }
 	}
 }
