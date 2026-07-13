@@ -58,7 +58,7 @@ namespace Faolan.Importer.Captures
 					db.CharacterInventory.Add(new CharacterInventory
 					{
 						CharacterId = characterId,
-						Container = (ContainerKind)kind,
+						Container = kind,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
 						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1

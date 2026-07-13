@@ -88,34 +88,35 @@ namespace Faolan.GameServer.Combat
 			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
 		}
 
-		// Resolves an offensive cast: applies damage to the target's live vitals and pushes a 0x96B8DC59 update so
-		// its health bar moves. The ApplySpell cast itself is broadcast by the caller.
+		// Resolves an offensive cast: shows the floating DamageResult number (0xFEC4158A) over the target and applies
+		// the damage to its live vitals (a 0x96B8DC59 update moves the health bar). The ApplySpell VFX is broadcast by
+		// the caller. Without the DamageResult the HP bar moved but no number floated (looked like "no damage").
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			await SendDamageNumber(client, targetHandle, casterHandle, (uint)damage);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
 		}
 
 		// The blast radius (world units) a ground-targeted AoE damages around its reticle position.
 		// [V0: a single interim radius - the real per-spell AoE radius is not in the RDB spell record or any bulk
-		// source we import (Spell has only Range = cast distance). Source it per spell + model the channel's per-tick
-		// DoT (Deathly Blizzard ticks over its ~10s channel; we resolve one hit on completion) - see Gitea follow-up.]
+		// source we import (Spell has only Range = cast distance). Source it per spell - see Gitea follow-up.]
 		public const float GroundAoeRadiusUnits = 5f;
 
-		// Resolves a GROUND-TARGETED AoE cast (#236): the spell is aimed at a reticle POSITION, not a locked entity, so
-		// damage every attackable NPC within GroundAoeRadiusUnits of that point. Friendly NPCs (civilians / quest-givers,
-		// Disposition == Friendly) are spared so a stray blast doesn't kill them; hostile + neutral NPCs are hit. On
-		// empty ground this is a no-op, exactly like retail (the demonstrated casts landed on open ground). Players are
-		// never hit (no PvP damage model yet). The ApplySpell cast VFX is broadcast by the caller.
-		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
+		// The channel tick interval (ms) for a channeled ground AoE. [V0: a gameplay approximation - the exact retail
+		// cadence is muddied in the mixed casting-combat capture; each tick's DamageResult packet is byte-exact.]
+		private const int GroundAoeTickIntervalMs = 1500;
+
+		// Damages every attackable NPC within GroundAoeRadiusUnits of `target` for one tick: shows the floating
+		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Friendly NPCs (civilians /
+		// quest-givers, Disposition == Friendly) are spared; hostile + neutral are hit; players never (no PvP model).
+		// Re-evaluated each call so NPCs that wander in/out of the blast are picked up per tick. Returns the count hit.
+		private async Task<int> ApplyAoeTick(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int tickDamage)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
-				return;
-
-			var casterLevel = client.Session.Character?.Level ?? 1;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+				return 0;
 
 			var victims = _sim.World.ZoneForEntity(player)
 				.EntitiesInRange(target, GroundAoeRadiusUnits, casterHandle)
@@ -124,9 +125,56 @@ namespace Faolan.GameServer.Combat
 				.ToList();
 
 			foreach (var handle in victims)
-				await ApplyNpcDamage(client, handle, damage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
+			{
+				await SendDamageNumber(client, handle, casterHandle, (uint)tickDamage);
+				await ApplyNpcDamage(client, handle, tickDamage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
+			}
 
-			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, victims.Count, damage);
+			return victims.Count;
+		}
+
+		// Resolves an INSTANT ground-targeted AoE (#236) - a single blast on completion. Empty ground is a no-op like
+		// retail. Channeled AoEs (a cast time) go through ChannelGroundAoe instead so they tick.
+		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
+		{
+			var casterLevel = client.Session.Character?.Level ?? 1;
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			var count = await ApplyAoeTick(client, casterHandle, target, spellId, damage);
+			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, count, damage);
+		}
+
+		// Channeled ground AoE (#349): ticks damage over the cast/channel duration so the client sees a floating number
+		// each tick - retail's Deathly Blizzard ticks each NPC repeatedly over its ~10.5s channel (casting-combat
+		// capture: DamageResultIIR 0xFEC4158A per target, ~1-2s apart), where we used to apply one silent hit at the
+		// end. The spell's damage is spread across the ticks; the blast area is re-checked each tick. Stops early when
+		// the cast is interrupted (ActiveCastToken bumped by a move / the client's cancel) or the player disconnects.
+		// Fire-and-forget from cast begin. The tick CADENCE is interim; each tick's DamageResult packet is byte-exact.
+		public async Task ChannelGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int channelMs, uint castToken)
+		{
+			var casterLevel = client.Session.Character?.Level ?? 1;
+			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			var tickCount = Math.Max(1, channelMs / GroundAoeTickIntervalMs);
+			var perTick = Math.Max(1, total / tickCount);
+
+			try
+			{
+				for (var tick = 0; tick < tickCount; tick++)
+				{
+					await Task.Delay(GroundAoeTickIntervalMs);
+					if (client.Session?.Account == null)
+						return; // disconnected
+					if (client.Session.ActiveCastToken != castToken)
+						return; // interrupted (moved / cancelled) - stop ticking
+
+					await ApplyAoeTick(client, casterHandle, target, spellId, perTick);
+				}
+
+				_logger.LogInformation("Ground AoE channel spell 0x{Spell:X} at {Pos}: {Ticks} ticks of {Dmg} each.", spellId, target, tickCount, perTick);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogWarning(ex, "Ground AoE channel failed.");
+			}
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -222,7 +270,7 @@ namespace Faolan.GameServer.Combat
 				.SendAsync(client);
 
 			// 2) DamageResultIIR - the hit / floating number.
-			await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
+			await SendDamageNumber(client, targetHandle, instance, damage);
 
 			// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
 			// lifecycle (despawn + scheduled respawn) on death.
@@ -288,7 +336,7 @@ namespace Faolan.GameServer.Combat
 
 			foreach (var secondary in CombatTargeting.CleaveTargets(zone, primary, CombatTargeting.DefaultCleaveRadius, CombatTargeting.DefaultMaxCleaveTargets))
 			{
-				await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, secondary.Handle, damage));
+				await SendDamageNumber(client, secondary.Handle, instance, damage);
 				await ApplyNpcDamage(client, secondary.Handle, (int)damage, $"melee cleave from 0x{instance:X8}");
 			}
 		}
@@ -486,7 +534,7 @@ namespace Faolan.GameServer.Combat
 		// stamina update (the retail post-ack trio of the armed swing path).
 		private async Task SendSwingDamage(INetworkClient client, uint instance, uint targetHandle, uint damage)
 		{
-			await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
+			await SendDamageNumber(client, targetHandle, instance, damage);
 
 			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
@@ -600,5 +648,6 @@ namespace Faolan.GameServer.Combat
 				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
+
 	}
 }

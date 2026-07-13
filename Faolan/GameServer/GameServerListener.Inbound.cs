@@ -487,9 +487,17 @@ namespace Faolan.GameServer
 									// Hold the begin's args (only) so the cast-cancel handler can build the state=0x0007 abort that
 									// stops the client's cast bar (#347). The rest of the abort comes from the cancel packet.
 									// Cleared on resolve/cancel.
-									var castArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+									var castArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4)); // TODO: just read the packet with FaolanStream instead of rawPayload
 									client.Session.PendingCastArgs = rawPayload[26..(26 + castArgsLen)];
 									client.Session.PendingCastMode = (uint)args.Mode;
+
+									// A channeled ground AoE (Deathly Blizzard) ticks damage DURING the channel, not one hit at
+									// the end (#349) - kick the tick loop now; it stops itself if the cast is interrupted (the
+									// castToken it captured gets bumped). The complete-ack + mana still fire from Resolve at the
+									// channel's end.
+									if (isGroundCast)
+										_ = _combat.ChannelGroundAoe(client, casterHandle, groundTarget, spellId, castMs, castToken);
+
 									Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
 									{
 										if (client.Session?.Account != null)
@@ -544,7 +552,11 @@ namespace Faolan.GameServer
 									if (isGroundCast)
 									{
 										await _combat.SpendCasterMana(client, spellId);
-										await _combat.ResolveGroundAoe(client, casterHandle, groundTarget, spellId);
+										// A channeled AoE (castMs > 0) already ticked its damage during the channel
+										// (ChannelGroundAoe, kicked at begin); only an INSTANT ground cast resolves its
+										// single blast here (#349).
+										if (castMs == 0)
+											await _combat.ResolveGroundAoe(client, casterHandle, groundTarget, spellId);
 										return;
 									}
 
@@ -628,6 +640,7 @@ namespace Faolan.GameServer
 										// Float the bubble over the clicked object so the client shows it in place.
 										var usedMapId = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
 										var usedObj = await Database.GetWorldObject(usedMapId, target);
+
 										await _agentServerDispatcher.CharacterSay(target,
 											$"({usedObj?.Name ?? "object"}: not imported yet)", [client.Session.Character.Id]);
 
