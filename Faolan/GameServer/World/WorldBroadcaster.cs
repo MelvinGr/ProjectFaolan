@@ -1301,9 +1301,12 @@ namespace Faolan.GameServer.World
 						// the player accepts/completes (e.g. Casilda shows ! then ? after the quest is done).
 						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot)
 							await SendQuestMarkerIfGiver(recipient, ev.Subject);
-						// #266: a patrolling NPC walks its captured route - issue the patrol MoveTask now it's in view.
-						if (ev.Subject.Patrols)
-							await SendPatrol(recipient, ev.Subject);
+						// NOTE: we deliberately do NOT replay the captured patrol route (SendPatrol) on spawn. That route is
+						// a CLIENT-only walk the SERVER can't track - it left entity.Position pinned at spawn while the client
+						// walked the NPC around its loop, so the server placed the NPC's death-pose, loot bag, and aggro at
+						// SPAWN, not where the player saw it (a killed patroller teleported its corpse back to spawn). The NPC
+						// still moves via the server-driven wander (TickPatrolCycle, #266), which updates entity.Position so
+						// death/loot/aggro land where the client actually has it.
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
 						if (!ev.Subject.IsPlayer && ev.Subject.Name == "Casilda" && recipient.Session?.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))

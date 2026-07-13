@@ -556,6 +556,16 @@ namespace Faolan.GameServer.World
 					// wire-visible effects (NPC respawns, loot expiry, NPC attacks) for us to broadcast.
 					foreach (var effect in World.Tick(dt))
 					{
+						// A dead NPC must emit NO live broadcast (move / patrol / follow / heartbeat / chatter / attack /
+						// combat-mode). A move effect generated the tick it died - or one processed across an await after
+						// the player's kill ran OnNpcKilled and sent the death-pose - would otherwise override that
+						// death-pose and walk / re-animate the corpse, so a patrolling NPC appears to walk off and vanish
+						// instead of dying in place. Only the corpse-lifecycle effects (linger->loot, respawn, fade) apply
+						// once dead.
+						if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootable
+							or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
+							continue;
+
 						switch (effect.Type)
 						{
 							case WorldTickEffectType.NpcRespawned:
