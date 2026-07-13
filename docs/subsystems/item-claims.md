@@ -65,10 +65,10 @@ sending a wrong/synthetic key renders the row as "No name" (confirmed against It
 
 **Field semantics (`level` vs `quantity`)**: the u64 is the item level, proven by the redeem — claiming
 idx 6 (Level 5) delivered ONE Slavemaster's Staff (its `DispatchAddItem` carried no stat-26 stack count).
-`quantity` is the mirrored tail pair: the "Amount" column shows ∞ when it is 0 (single-use item claims) and
-the number otherwise. The one type-4 row is "Double XP" — **Character**-bound, Amount 20 — a multi-charge
-potion: each redeem hands over ONE and retail re-sends the row via **sub 0x05** with Amount−1 until it hits 0
-(that decrement is a known gap, `[V0:]` — we grant one and drop the whole claim).
+The tail is a charge pair `[remaining][max]`: the "Amount" column shows ∞ when remaining is 0 (single-use item
+claims) and the number otherwise. The one type-4 row is "Double XP" — **Character**-bound, Amount 20 — a
+multi-charge potion: each redeem hands over ONE and re-sends the row via the **sub 0x05** ack with
+`[remaining−1][max]` (`SendRedeemAck`), dropping it only at 0.
 
 ### No hash on the wire
 
@@ -104,10 +104,10 @@ list is requested. Before this it was pushed unconditionally, so the button lit 
 - **Seeding:** the `.claim add <itemId> [count]` GM command (`.claim list` to inspect). Item-shop / reward
   grants that populate claims for real are a follow-up.
 
-## Follow-ups (`[V0:]`)
+## Follow-ups
 
-- **Render-by-key on relog** — the login snapshot is hash-gated, so a redeemed hash-less claim item (no hash
-  exists in the protocol) drops on relog. Render it from the key like the client does.
-- **Multi-charge decrement** — the Double XP potion is a 20-charge claim; retail hands over one per redeem and
-  re-sends the row via `0x05` with Amount−1 until 0 (and no-ops if you already hold one). We grant one and
-  drop the whole claim.
+- **Render-by-key on relog (Gitea #359)** — the login snapshot is hash-gated, so a redeemed hash-less claim
+  item (no hash exists in the protocol) drops on relog. Render it from the key like the client does.
+- **Double XP "already held" rule (Gitea #360)** — the multi-charge decrement + `0x05` ack and the potion's
+  on-use Double XP buff (`ItemUseType.XpBoost`) are implemented; the retail no-op-if-you-already-hold-one gate
+  is not.
