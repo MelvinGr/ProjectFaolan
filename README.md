@@ -101,10 +101,15 @@ we've seen_, and names the gaps). Regenerate with
 
 - ✅ Inventory (DB containers, equip, move, starting gear)
 - ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
+- ✅ Item claims / Redeem window (`CoreClaimIIR`) — the per-account claim list + redeem (Claim / Claim All),
+  infinite vs. multi-charge (Double XP) claims, delivered to the backpack; item keys harvested from the claim
+  list (render-by-key on relog is #359)
+- ✅ Consumable use — right-click a potion/food/drink to apply its on-use buff + consume one, data-driven from
+  `Items.OnUseSpell` (harvested from captures), no-op if the buff is already active
 - 🟡 Shop-OPEN trigger — decoded flow implemented, awaits in-client confirm (#134)
 - 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — item attribute modifiers imported + summed
   (`ItemStat` + `MaxStatAggregator`); the vital/HP field + wire scale still need a reference tooltip (#3)
-- 🟡 Data-driven item-use categorization — currently a per-id map (#207) · guild bank — bodies uncaptured (#132)
+- 🟡 Guild bank — bodies uncaptured (#132)
 - ⬜ Tradeskills: gathering nodes + crafting professions (#148) · worn-only "bag-poison" item rendering (#14)
 - ⬜ Gems / item socketing — gem slots that grant attribute bonuses (#311)
 
