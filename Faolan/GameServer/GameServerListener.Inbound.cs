@@ -616,6 +616,12 @@ namespace Faolan.GameServer
 									case InteractAction.Teleport:
 									case InteractAction.ProxyTeleport:
 									{
+										// The client sends a door-use as TWO BCC phases (begin 0x0003 then release 0x0002); retail teleports
+										// only on the begin phase (Hoxxling inn: the IntendedTeleport follows the 0x0003 record). Acting on
+										// both double-fires the teleport - a redundant relocation / extra loading flash. Ignore the release.
+										if (unk1 != 0x0003)
+											break;
+
 										// Hand the player off to the destination playfield - or, if this teleporter's
 										// destination hasn't been captured yet, surface a message (like the missing-vendor
 										// case) rather than a silent no-op.
@@ -628,7 +634,7 @@ namespace Faolan.GameServer
 											// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
 											await _simulation.RelocateSameMap(client, samePos);
 										else
-											await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition);
+											await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition); // TODO: Move DoTeleport into _simulation like RelocateSameMap
 
 										break;
 									}
@@ -652,7 +658,7 @@ namespace Faolan.GameServer
 										var usedObj = await Database.GetWorldObject(usedMapId, target);
 
 										await _agentServerDispatcher.CharacterSay(target,
-											$"({usedObj?.Name ?? "object"}: not imported yet)", [client.Session.Character.Id]);
+											$"({usedObj?.Name ?? "object"}: not imported yet)", [client.Session.Character.Id]); // TODO: Why this this also print when looting the item? check InteractAction value
 
 										break;
 									}
