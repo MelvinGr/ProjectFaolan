@@ -74,15 +74,23 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Combat
 
-- ✅ Melee attack FSM, weapon draw, damage, vitals; spell-cast FSM; threat / hate list
+- ✅ Melee & spell-cast FSM, weapon draw, damage, vitals; threat / hate list
+- ✅ Floating damage numbers + combat-log lines for player→NPC hits — melee via `DamageResultIIR`, spell via
+  `StatDamageIIR` (retail's two distinct damage packets)
+- ✅ Moving cancels an in-progress cast — the client's cancel is answered with retail's state-`0x0007` abort BCC,
+  which drops the cast bar + plays the "Interrupted" text (#347)
 - ✅ Death window + resurrect/respawn
-- ✅ Buff application, damage-over-time, buff-expiry lifecycle (timers), and right-click cancel (server-driven
-  icon removal)
-- ✅ Shield of the Risen — the top-of-screen protection buff, re-applied on login and every map change
-- 🟡 Debuff icon-clear at 0 + non-health effect application — built, awaits in-client confirm (#274)
+- ✅ Buff application, damage-over-time, buff-expiry lifecycle (timers clear the icon at 0), and right-click cancel
+  (server-driven icon removal)
+- ✅ Shield of the Risen — the top-of-screen protection buff, re-applied on login and every map change; dispels on
+  the first aggressive action with the `LostGraceEffect` toast (#361)
+- 🟡 Ground-targeted AoE (Deathly Blizzard) — ticks damage over its channel with floating numbers; the per-spell
+  blast radius + tick cadence are still interim constants (not in the RDB spell record) (#349)
+- 🟡 Non-health debuff effect application — awaits in-client confirm (#274)
 - 🟡 Spell cooldowns — client-side semantics fully RE'd; the server-authored builder is capture-blocked (#271)
 - 🟡 Spellweaving (necromancer) — byte-exact builders; energy-bar drop still open (#141)
 - 🟡 Combat shields — server-side broadcast exists; the client guard-arc render is not yet decoded (#20)
+- 🟡 NPC death animations
 - ⬜ Directional combat + defensive shield arcs ("real combat", #20) · Fatalities (#140)
 
 ### Character progression
@@ -279,4 +287,3 @@ captures against the local server (no root needed) and retail-session captures a
   (#309, #310, #311)
 
 Contributing such captures is the single highest-leverage way to move the blocked items.
-
