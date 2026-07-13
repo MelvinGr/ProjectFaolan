@@ -11,7 +11,7 @@ namespace Faolan.Core.Database.Tables
 	//
 	// The wire row also carries a 16-byte opaque token and a per-account batch guid; both are display-only (redeem
 	// targets the 1-based list position, never the token), so they are generated deterministically at send time from
-	// (AccountId, Id) rather than stored. IsNew drives the "new claims available" glow (CoreClaimCodec, sub 0x0009):
+	// (AccountId, Id) rather than stored. The "new claims available" glow (sub 0x0009) is a single per-account flag (Account.ClaimsAvailable):
 	// true until the account first opens the list, then cleared - matching retail (glow only for unseen claims).
 	[Index(nameof(AccountId))]
 	public class AccountClaim : BaseEntity
@@ -45,8 +45,5 @@ namespace Faolan.Core.Database.Tables
 
 		// Wire claim type: 6 = plain item claim; 4 = account-currency / point grant.
 		public uint ClaimType { get; set; } = 6; // TODO: make Enum
-
-		// Whether this claim is still "new" (unseen) - lights the client's claims button until the list is opened.
-		public bool IsNew { get; set; } = true;
 	}
 }

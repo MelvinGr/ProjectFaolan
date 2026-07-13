@@ -85,9 +85,10 @@ not exist to harvest. Tracked as a follow-up.
 
 `CoreClaimCodec.Build` (proven by `CoreClaimCodecTests`) is the short 14-byte push that lights the claims
 button. Retail sends it at world entry **only when the account has unseen claims** — present in the Faolanx
-login capture (new claims), absent in the NecroL80 capture (claims already viewed). The server gates it on the
-`AccountClaim.IsNew` flag (`GameServerListener.SendNewClaimsGlowIfAny`), which is cleared the first time the
-list is requested. Before this it was pushed unconditionally, so the button lit up for every account.
+login capture (new claims), absent in the NecroL80 capture (claims already viewed). The server gates it on a
+single per-account flag `Account.ClaimsAvailable` (`GameServerListener.SendNewClaimsGlowIfAny`) — set true
+when a claim is added, cleared the first time the Claims window is opened. Before this it was pushed
+unconditionally, so the button lit up for every account.
 
 ## Server implementation
 

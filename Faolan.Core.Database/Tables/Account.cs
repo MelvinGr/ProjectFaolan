@@ -15,6 +15,12 @@ namespace Faolan.Core.Database.Tables
 		public ulong LongId => 0x0000271200000000u + Id; // As used by the client
 
 		public virtual ICollection<Character> Characters { get; set; } = [];
+
+		// Whether the account has UNSEEN claims - drives the "new claims available" glow on the client's claims button
+		// (CoreClaimIIR sub 0x0009). Set true when a claim is added; cleared when the player opens the Claims window
+		// (the list request). One flag per account, not per-claim. See GameServerListener.Claims.cs / #359.
+		public bool ClaimsAvailable { get; set; }
+
 		public virtual ICollection<AccountClaim> Claims { get; set; } = [];
 
 		[ConstrainToEnumValues]

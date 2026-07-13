@@ -69,10 +69,12 @@ namespace Faolan.Importer.Captures
 					Quantity = claim.Quantity,
 					MaxCharges = claim.MaxQuantity,
 					Code = claim.Code,
-					ClaimType = claim.Type,
-					IsNew = true
+					ClaimType = claim.Type
 				});
 			}
+
+			// Flag the account's glow (one per account, not per claim) so the client lights the button next login.
+			await db.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ClaimsAvailable, true));
 
 			await db.SaveChangesAsync();
 			logger?.LogInformation("CaptureClaimImporter: wrote {Count} claims to account {AccountId} (cleared {Stale}).", claims.Count, accountId, stale.Count);

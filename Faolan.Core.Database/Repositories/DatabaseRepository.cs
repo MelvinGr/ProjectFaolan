@@ -34,7 +34,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<AccountClaim?> GetAccountClaim(uint claimId);
 		Task<List<AccountClaim>> GetAccountClaims(uint accountId);
 		Task SetAccountClaimQuantity(uint claimId, uint quantity);
-		Task MarkAccountClaimsSeen(uint accountId);
+		Task SetAccountClaimsAvailable(uint accountId, bool available);
 		Task<Character?> GetCharacter(uint id);
 		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
 		Task<Character?> GetCharacterByName(string name, uint realmId);
@@ -292,12 +292,14 @@ namespace Faolan.Core.Database.Repositories
 			return await LoadGuild(ctx, guild.Id);
 		}
 
-		// Persists a new item claim onto an account's Claims/Redeem window (docs/subsystems/item-claims.md). Returns
-		// the saved row (Id populated). Seeded by the .claim GM command (and, later, by shop/reward grants).
+		// Persists a new item claim onto an account's Claims/Redeem window (docs/subsystems/item-claims.md) and flags the
+		// account as having unseen claims (the button glow). Returns the saved row (Id populated). Seeded by the .claim
+		// GM command (and, later, by shop/reward grants).
 		public async Task<AccountClaim> CreateAccountClaim(AccountClaim claim)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			ctx.AccountClaims.Add(claim);
+			await ctx.Accounts.Where(a => a.Id == claim.AccountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ClaimsAvailable, true));
 			await ctx.SaveChangesAsync();
 			return claim;
 		}
@@ -326,12 +328,12 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.AccountClaims.Include(c => c.Item).Where(c => c.AccountId == accountId).OrderBy(c => c.Id).ToListAsync();
 		}
 
-		// Clears the "new" flag on all of an account's claims once it has opened the list - the glow shows only for
-		// unseen claims (matches retail: present on a fresh login, absent once viewed).
-		public async Task MarkAccountClaimsSeen(uint accountId)
+		// Sets the account's "unseen claims" glow flag: true when a claim is added, false once the player opens the
+		// Claims window (matches retail: the glow shows on a fresh login with new claims, gone once viewed).
+		public async Task SetAccountClaimsAvailable(uint accountId, bool available)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx.AccountClaims.Where(c => c.AccountId == accountId && c.IsNew).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsNew, false));
+			await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ClaimsAvailable, available));
 		}
 
 		// Removes a claim once it is redeemed (or revoked). No-op if it is already gone.

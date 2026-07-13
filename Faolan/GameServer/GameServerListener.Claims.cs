@@ -64,7 +64,10 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))
 				.SendAsync(client);
 
-			await Database.MarkAccountClaimsSeen(accountId);
+			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
+			// so a re-entry this session doesn't re-glow).
+			await Database.SetAccountClaimsAvailable(accountId, false);
+			client.Session.Account.ClaimsAvailable = false;
 
 			Logger.LogInformation("Sent {Count} claim(s) to account {AccountId}.", entries.Count, accountId);
 		}
@@ -132,12 +135,12 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
-		// Push the "new claims available" glow (sub 0x0009) at world entry, but only when the account has unseen
-		// claims - retail sends this on a fresh login with new claims and omits it once they've been viewed.
+		// Push the "new claims available" glow (sub 0x0009) at world entry, but only when the account has UNSEEN claims
+		// (Account.ClaimsAvailable) - retail sends this on a fresh login with new claims and omits it once viewed. The
+		// session account is loaded at login, so the flag is current here.
 		private async Task SendNewClaimsGlowIfAny(INetworkClient client)
 		{
-			var rows = await Database.GetAccountClaims(client.Session.Account.Id);
-			if (!rows.Exists(c => c.IsNew))
+			if (!client.Session.Account.ClaimsAvailable)
 				return;
 
 			await new PacketStream()
@@ -226,7 +229,7 @@ namespace Faolan.GameServer
 				{
 					var item = await Database.GetItem(rows[i].ItemTemplateId);
 					var qty = rows[i].Quantity == 0 ? 1 : rows[i].Quantity;
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"#{i + 1}: {qty}x '{item?.Name ?? "?"}' (template {rows[i].ItemTemplateId}){(rows[i].IsNew ? " [new]" : "")}");
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"#{i + 1}: {qty}x '{item?.Name ?? "?"}' (template {rows[i].ItemTemplateId})");
 				}
 
 				return;
