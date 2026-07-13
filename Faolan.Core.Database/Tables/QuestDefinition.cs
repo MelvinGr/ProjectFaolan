@@ -28,9 +28,9 @@ namespace Faolan.Core.Database.Tables
 
 		// The next stage in a multi-stage quest CHAIN (Gitea #261): completing this quest's goal SUPERSEDES it with
 		// NextQuestId (QuestProgressionService sends QuestGoal + QuestIIR 2->4 + QuestFullUpdate(next) and sets the next
-		// quest Active). 0 = no successor (a standalone quest, or the last stage of a chain). The Tortage intro chain is
-		// 13479 (kill Tuut) -> 13563 (loot key) -> 13480 (free/talk Casilda) -> 12407 (escort) -> 0.
-		public uint NextQuestId { get; set; }
+		// quest Active). null = no successor (a standalone quest, or the last stage of a chain). The Tortage intro chain
+		// is 13479 (kill Tuut) -> 13563 (loot key) -> 13480 (free/talk Casilda) -> 12407 (escort) -> null.
+		public uint? NextQuestId { get; set; }
 
 		// The RDB quest id (e.g. 13479) - the primary key (natural key; see the class note).
 		[Key]

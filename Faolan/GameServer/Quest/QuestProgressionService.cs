@@ -219,7 +219,7 @@ namespace Faolan.GameServer.Quest
 		// share one code path. Does NOT run RefreshQuestVisibility - the caller does that once after its loop.
 		private async Task CompleteObjective(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint required)
 		{
-			if (def.NextQuestId != 0)
+			if (def.NextQuestId is not null)
 				await CompleteAndSupersede(client, character, quest, def);
 			else if (goal.GoalType == QuestGoalType.Kill)
 				await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
@@ -248,9 +248,11 @@ namespace Faolan.GameServer.Quest
 			await SendStageCompletion(client, quest.QuestId, def.GoalId, required);
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Completed, required, required, quest.GoalTargetName);
 
-			var nextDef = await _database.GetQuestDefinition(def.NextQuestId);
+			// Reached only via CompleteObjective's `NextQuestId is not null` guard, so the successor id is present.
+			var nextQuestId = def.NextQuestId!.Value;
+			var nextDef = await _database.GetQuestDefinition(nextQuestId);
 			var nextGoal = nextDef?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-			await _database.SetCharacterQuest(character.Id, def.NextQuestId, QuestState.Active, 0, nextGoal?.RequiredCount ?? 0, nextGoal?.TargetName);
+			await _database.SetCharacterQuest(character.Id, nextQuestId, QuestState.Active, 0, nextGoal?.RequiredCount ?? 0, nextGoal?.TargetName);
 			if (nextDef != null)
 				await _outbound.SendQuestFullUpdate(client, nextDef);
 
@@ -260,7 +262,7 @@ namespace Faolan.GameServer.Quest
 			if (nextGoal?.GoalType == QuestGoalType.TalkToNpc && !string.IsNullOrEmpty(nextGoal.TargetName))
 				await _outbound.RefreshQuestMarkerByName(client, nextGoal.TargetName);
 
-			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).", quest.QuestId, character.Name, def.NextQuestId, nextGoal?.GoalType,
+			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).", quest.QuestId, character.Name, nextQuestId, nextGoal?.GoalType,
 				nextGoal?.TargetName ?? "-");
 			await _agents.SendSystemMessage(character.Id, "Quest updated.");
 		}

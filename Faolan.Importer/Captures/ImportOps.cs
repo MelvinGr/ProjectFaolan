@@ -775,7 +775,7 @@ namespace Faolan.Importer.Captures
 			if (quest == null)
 				return;
 
-			quest.NextQuestId = nextQuestId;
+			quest.NextQuestId = nextQuestId == 0 ? null : nextQuestId;
 
 			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == goalId) ?? quest.Goals.FirstOrDefault();
 			if (goal == null)
