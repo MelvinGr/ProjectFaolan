@@ -1220,7 +1220,7 @@ namespace Faolan.GameServer.World
 				var def = await _database.GetQuestDefinition(quest.QuestId);
 				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 				if (goal is { GoalType: QuestGoalType.LootFromNpc } && string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
-					return goal.QuestItemId;
+					return goal.QuestItemId ?? 0u; // 0 = goal present but no specific key item (distinct from null = no goal)
 			}
 
 			return null;

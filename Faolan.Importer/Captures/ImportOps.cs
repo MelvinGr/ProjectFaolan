@@ -791,7 +791,7 @@ namespace Faolan.Importer.Captures
 			goal.GoalType = goalType;
 			goal.TargetName = target;
 			goal.RequiredCount = required;
-			goal.QuestItemId = questItemId;
+			goal.QuestItemId = questItemId == 0 ? null : questItemId;
 			if (goal.Sequence == 0)
 				goal.Sequence = 1;
 

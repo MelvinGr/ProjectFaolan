@@ -345,7 +345,7 @@ namespace Faolan.Importer.Modules
 	public sealed class CharacterQuestsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(QuestsModule)];
+		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(QuestsModule), nameof(MapsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

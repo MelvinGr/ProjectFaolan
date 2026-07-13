@@ -86,6 +86,9 @@ namespace Faolan.Tests
 						Id = Map.TortageBeachId,
 						Name = "Beach"
 					});
+					// CharacterSpell.SpellId FKs Spells - the granted spell must be in the catalog (in production the
+					// scrape/cast modules populate it; uncataloged grants are skipped, not seeded).
+					db.Spells.Add(new Spell { Id = 0x4213cd, Name = "" });
 					await db.SaveChangesAsync();
 					// DemoL80 is the grant's target; the other character must NOT receive the spell.
 					db.Characters.Add(new Character

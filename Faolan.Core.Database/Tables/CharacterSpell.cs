@@ -19,5 +19,8 @@ namespace Faolan.Core.Database.Tables
 
 		// The RDB spell id (e.g. 0x4213CD); the client resolves the spell's name/icon/effect from this.
 		public uint SpellId { get; set; }
+
+		[ForeignKey(nameof(SpellId))]
+		public virtual Spell Spell { get; set; } = null!;
 	}
 }

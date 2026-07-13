@@ -7,25 +7,35 @@ namespace Faolan.Core.Database.Tables
 	// Captures/scripts/decode_snapshot_609.py, codec QuestObjectiveRegion). Construct, don't replay: the numeric fields +
 	// the two text refs (objective cat 50304, trailing cat 51200 remoteformat / 51000 localized) regenerate the
 	// per-goal record byte-exact via QuestObjectiveGoal.BuildSingle.
-	public class QuestGoalDefinition : BaseEntity
+	public class QuestGoalDefinition
 	{
+		// The goal's wire objective id - globally unique, so it is the PK (no synthetic Id / BaseEntity dropped). It is
+		// what CharacterQuestGoal.GoalId FKs, and what QuestGoal echoes on the wire.
+		[Key]
 		public uint GoalId { get; set; }
 
+		// The map the goal's objective/marker sits on (all goal maps are in the Maps catalog).
 		public uint MapId { get; set; }
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; } = null!;
 
 		// The objective text (always a <remoteformat category=50304>).
 		public uint ObjectiveRefId { get; set; }
 
+		public uint QuestDefinitionId { get; set; }
+
 		[ForeignKey(nameof(QuestDefinitionId))]
 		public virtual QuestDefinition Quest { get; set; } = null!;
 
-		public uint QuestDefinitionId { get; set; }
-
 		// For a LootFromNpc goal: the quest item (the "key") the TargetName NPC's corpse bag must contain, as an
-		// Items.Id (#261). 0 = no specific item (the goal still completes on looting the bag - it matches on the source
-		// NPC, not contents). When set, the bag-drop guarantees this item so the player can actually SEE and take the key
-		// (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's key item drops the same way.
-		public uint QuestItemId { get; set; }
+		// Items.Id (#261). NULL = no specific item (the goal still completes on looting the bag - it matches on the
+		// source NPC, not contents). When set, the bag-drop guarantees this item so the player can actually SEE and take
+		// the key (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's key item drops the same way.
+		public uint? QuestItemId { get; set; }
+
+		[ForeignKey(nameof(QuestItemId))]
+		public virtual Item? QuestItem { get; set; }
 
 		public uint SubId { get; set; } // the trailing record's id echoed in the header (= TrailingRefId)
 

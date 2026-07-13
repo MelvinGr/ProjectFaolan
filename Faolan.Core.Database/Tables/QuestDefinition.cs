@@ -56,7 +56,7 @@ namespace Faolan.Core.Database.Tables
 		public uint IndexTableField2 { get; set; }
 		public uint IndexTableField3 { get; set; }
 		public uint IndexTrailerWord { get; set; }
-		public uint MarkerX { get; set; }
+		public uint MarkerX { get; set; } // TODO: Vector2?
 		public uint MarkerY { get; set; }
 		public uint SnapshotField28 { get; set; }
 		public uint SnapshotFieldEc { get; set; }

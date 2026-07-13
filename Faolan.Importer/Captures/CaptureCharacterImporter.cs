@@ -537,10 +537,20 @@ namespace Faolan.Importer.Captures
 				return 0;
 
 			var existing = (await db.CharacterSpells.Where(s => s.CharacterId == characterId).Select(s => s.SpellId).ToListAsync()).ToHashSet();
+			var spellbookIds = known.Records.Where(r => r.Type == KnownSpellList.SpellType).Select(r => r.Id).Distinct().ToList();
+
+			// CharacterSpell.SpellId FKs Spells. A spellbook id resolves in-client by RDB id regardless of our catalog,
+			// so an id with no Spell row is a gap in our (incomplete) catalog, not a fake spell (e.g. NecroL80's Corrupted
+			// Soul rank 222682). Skip it (logged) rather than FK-fault; the gap is closed by completing the Spell catalog.
+			var cataloged = (await db.Spells.Where(s => spellbookIds.Contains(s.Id)).Select(s => s.Id).ToListAsync()).ToHashSet();
+			var uncataloged = spellbookIds.Where(id => !cataloged.Contains(id)).ToList();
+			if (uncataloged.Count > 0)
+				Console.WriteLine($"Spellbook: character {characterId} - {uncataloged.Count} spell id(s) skipped (not in the Spell catalog): {string.Join(", ", uncataloged)}.");
+
 			var added = 0;
-			foreach (var id in known.Records.Where(r => r.Type == KnownSpellList.SpellType).Select(r => r.Id).Distinct())
+			foreach (var id in spellbookIds)
 			{
-				if (!existing.Add(id))
+				if (!cataloged.Contains(id) || !existing.Add(id))
 					continue;
 
 				db.CharacterSpells.Add(new CharacterSpell

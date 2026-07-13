@@ -227,6 +227,17 @@ namespace Faolan.Importer.Captures
 			if (byCharacter.Count == 0)
 				return (0, 0);
 
+			// CharacterSpell.SpellId is a FK into Spells. A learned spell is real and resolves in-client by RDB id
+			// whether or not our (incomplete) Spell catalog has a row for it - so a learned id with no catalog row is a
+			// gap in Spells, not a fake spell (cf. CaptureCharacterImporter.ImportKnownSpells, the spellbook path).
+			// Skip it (logged) rather than fabricate an empty-name stub or FK-fault; the gap is closed by completing the
+			// Spell catalog, not here.
+			var learnedIds = byCharacter.Values.SelectMany(s => s).ToHashSet();
+			var cataloged = (await db.Spells.Where(s => learnedIds.Contains(s.Id)).Select(s => s.Id).ToListAsync()).ToHashSet();
+			var uncataloged = learnedIds.Where(id => !cataloged.Contains(id)).ToList();
+			if (uncataloged.Count > 0)
+				logger?.LogWarning("CaptureSpellImporter: {Count} learned spell ids not in the Spell catalog, skipped: {Ids}. (complete the Spell catalog to seed them)", uncataloged.Count, string.Join(", ", uncataloged));
+
 			var charactersSeeded = 0;
 			var inserted = 0;
 			foreach (var (characterId, spellIds) in byCharacter)
@@ -239,6 +250,9 @@ namespace Faolan.Importer.Captures
 				var added = false;
 				foreach (var spellId in spellIds)
 				{
+					if (!cataloged.Contains(spellId))
+						continue; // uncataloged (warned above) - skip so the FK holds
+
 					if (!existing.Add(spellId))
 						continue;
 

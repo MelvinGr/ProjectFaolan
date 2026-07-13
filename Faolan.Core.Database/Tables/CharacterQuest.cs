@@ -15,7 +15,7 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; } = null!;
 
-		// The RDB quest id (e.g. 13479); the client renders the quest's text from this.
+		// The RDB quest id
 		public uint QuestId { get; set; }
 
 		[ConstrainToEnumValues]
