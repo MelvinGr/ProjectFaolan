@@ -356,7 +356,7 @@ namespace Faolan.Web.Services
 				.Include(x => x.Legs)
 				.Include(x => x.MainHandLeft)
 				.Include(x => x.OffHandLeft)
-				.Include(x => x.Tokens)
+				.Include(x => x.Bag)
 				.Include(x => x.FirstPosBag)
 				.FirstOrDefault(x => x.CharacterId == characterId);
 			if (e == null)
@@ -365,7 +365,7 @@ namespace Faolan.Web.Services
 			var map = new (string Slot, Item? Item)[]
 			{
 				("Head", e.Head), ("Neck", e.Neck), ("Shoulder", e.Shoulder), ("Cloak", e.Cloak), ("Chest", e.Chest), ("Wrist", e.Wrist), ("Hands", e.Hands), ("Belt", e.Belt), ("Boots", e.Boots),
-				("Ring L", e.RingLeft), ("Ring R", e.RingRight), ("Legs", e.Legs), ("Main Hand", e.MainHandLeft), ("Off Hand", e.OffHandLeft), ("Tokens", e.Tokens), ("Bag", e.FirstPosBag)
+				("Ring L", e.RingLeft), ("Ring R", e.RingRight), ("Legs", e.Legs), ("Main Hand", e.MainHandLeft), ("Off Hand", e.OffHandLeft), ("Tokens", e.Bag), ("Bag", e.FirstPosBag)
 			};
 
 			var result = new Dictionary<string, ItemInfo>();
@@ -592,7 +592,7 @@ namespace Faolan.Web.Services
 				.Include(e => e.Wrist)
 				.Include(e => e.Belt)
 				.Include(e => e.Cloak)
-				.Include(e => e.Tokens)
+				.Include(e => e.Bag)
 				.FirstOrDefault(e => e.CharacterId == characterId);
 			if (eq == null)
 				return [];
@@ -601,7 +601,7 @@ namespace Faolan.Web.Services
 			var slots = new (string Slot, Item? Item)[]
 			{
 				("Head", eq.Head), ("Chest", eq.Chest), ("Legs", eq.Legs), ("Hands", eq.Hands), ("Boots", eq.Boots), ("Shoulder", eq.Shoulder), ("Wrist", eq.Wrist), ("Belt", eq.Belt),
-				("Cloak", eq.Cloak), ("Tokens", eq.Tokens)
+				("Cloak", eq.Cloak), ("Tokens", eq.Bag)
 			};
 
 			var rdb = Reader();

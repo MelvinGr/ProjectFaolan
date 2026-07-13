@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	{
 		private static readonly CharacterEquipmentSlot[] MappedSlots =
 		[
-			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Tokens, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon, CharacterEquipmentSlot.Belt,
+			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Bag, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon, CharacterEquipmentSlot.Belt,
 			CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing, CharacterEquipmentSlot.Cape, CharacterEquipmentSlot.Shoulder,
 			CharacterEquipmentSlot.Boots, CharacterEquipmentSlot.Hands, CharacterEquipmentSlot.Legs, CharacterEquipmentSlot.Wrist, CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo,
 			CharacterEquipmentSlot.VanityHead, CharacterEquipmentSlot.VanityChest, CharacterEquipmentSlot.VanityBelt, CharacterEquipmentSlot.VanityCape, CharacterEquipmentSlot.VanityBoots, CharacterEquipmentSlot.VanityWrist

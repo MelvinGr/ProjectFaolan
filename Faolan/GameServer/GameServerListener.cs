@@ -102,7 +102,7 @@ namespace Faolan.GameServer
 		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
 		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =
 		[
-			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Tokens), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft),
+			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Bag), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft),
 			(0x09, e => e.RingLeft), (0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist),
 			(0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
 		];

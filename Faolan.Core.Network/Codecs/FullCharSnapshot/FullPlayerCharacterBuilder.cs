@@ -43,7 +43,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// Item.BagExtraSlots (RDB field 104) on top - Burlap Sack +24 (=48), Bag of Holding +20 (=44), Veteran's Bag
 		// +35 (=59). Confirmed against fresh vs. lvl-80 snapshots. #12.
 		private const uint BaseBackpackSlots = 24;
-		private const ulong BagEquipSlot = (ulong)CharacterEquipmentSlot.Tokens;
+		private const ulong BagEquipSlot = (ulong)CharacterEquipmentSlot.Bag;
 		private const ulong ItemIdEpoch = 0x20D82B63UL << 32;
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -

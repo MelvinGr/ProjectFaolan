@@ -101,10 +101,11 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(ShoulderId))]
 		public virtual Item? Shoulder { get; set; }
 
-		public uint? TokensId { get; set; }
+		// The equipped BAG (equip slot 3, was mislabeled "Tokens"): its Item.BagExtraSlots sizes the backpack.
+		public uint? BagId { get; set; }
 
-		[ForeignKey(nameof(TokensId))]
-		public virtual Item? Tokens { get; set; }
+		[ForeignKey(nameof(BagId))]
+		public virtual Item? Bag { get; set; }
 
 		public uint? VanityBeltId { get; set; }
 
@@ -154,7 +155,7 @@ namespace Faolan.Core.Database.Tables
 				{
 					CharacterEquipmentSlot.Neck          => Neck,
 					CharacterEquipmentSlot.Head          => Head,
-					CharacterEquipmentSlot.Tokens        => Tokens,
+					CharacterEquipmentSlot.Bag           => Bag,
 					CharacterEquipmentSlot.Chest         => Chest,
 					CharacterEquipmentSlot.MainWeapon    => MainHandLeft,
 					CharacterEquipmentSlot.Belt          => Belt,
@@ -193,9 +194,9 @@ namespace Faolan.Core.Database.Tables
 						break;
 					}
 
-					case CharacterEquipmentSlot.Tokens:
+					case CharacterEquipmentSlot.Bag:
 					{
-						Tokens = value;
+						Bag = value;
 						break;
 					}
 

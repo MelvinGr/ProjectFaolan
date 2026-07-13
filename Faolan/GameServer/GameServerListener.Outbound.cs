@@ -60,8 +60,9 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// The first free backpack cell (0..23), skipping persisted rows + the legacy starter-bag cell while it renders.
-		// Null = bag full. Read-only DB helper (mirrors AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
+		// The first free backpack cell, skipping persisted rows + the legacy starter-bag cell while it renders. The
+		// backpack size is 24 base + the equipped bag's extra slots (#12), so a grown bag can be filled. Null = full.
+		// Read-only DB helper (mirrors AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
 		private async Task<int?> FindFreeBagSlot(uint characterId)
 		{
 			var equipment = await Database.GetCharacterEquipment(characterId);
@@ -69,23 +70,26 @@ namespace Faolan.GameServer
 			var taken = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BagKind).Select(r => r.Slot).ToHashSet();
 			if (equipment?.FirstPosBag is { Hash: not 0 })
 				taken.Add(1);
-			return Enumerable.Range(0, 24).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
+			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
+			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}
 
-		// The first free cell (0..capacity-1) in `container`, skipping persisted rows. For the backpack it also skips the
-		// legacy starter-bag cell (pos 1) while the FirstPosBag item still renders there. Null = container full.
-		private async Task<int?> FindFreeContainerSlot(uint characterId, int container, int capacity)
+		// The first free cell (0..capacity-1) in `container`, skipping persisted rows.
+		private async Task<int?> FindFreeContainerSlot(uint characterId, ContainerKind container, int capacity)
 		{
 			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == (ContainerKind)container).Select(r => r.Slot).ToHashSet();
-			if (container == (int)FullPlayerCharacterBuilder.BagKind)
-			{
-				var equipment = await Database.GetCharacterEquipment(characterId);
-				if (equipment?.FirstPosBag is { Hash: not 0 })
-					taken.Add(1);
-			}
-
+			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
+		}
+
+		// The backpack's slot count: base 24 + the equipped bag's Item.BagExtraSlots (equip slot 3 / Bag) - the same
+		// sizing the snapshot uses (FullPlayerCharacterBuilder), so a grown bag can actually be filled. #12.
+		private const uint BaseBackpackSlots = 24;
+
+		private async Task<int> BackpackCapacity(uint characterId)
+		{
+			var equipment = await Database.GetCharacterEquipment(characterId);
+			return (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
 		}
 
 		// Grants an item to the player's backpack: persists it to a free CharacterInventory bag cell (so it
@@ -119,9 +123,9 @@ namespace Faolan.GameServer
 				? FullPlayerCharacterBuilder.QuestKind
 				: FullPlayerCharacterBuilder.BagKind;
 			var capacity = isQuestItem
-				? 48
-				: 24; // quest tab holds 48 (NewContainer(QuestKind, 48)); bag 24
-			var slot = await FindFreeContainerSlot(characterId, (int)kind, capacity);
+				? 48 // quest tab holds 48 (NewContainer(QuestKind, 48))
+				: await BackpackCapacity(characterId); // backpack = 24 base + the equipped bag's extra slots
+			var slot = await FindFreeContainerSlot(characterId, kind, capacity);
 			if (slot == null)
 				return null;
 

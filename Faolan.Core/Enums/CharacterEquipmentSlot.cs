@@ -3,14 +3,14 @@ namespace Faolan.Core.Enums
 	// The worn-equipment slot ids as they appear on the wire (spawn InventoryEntry.pos / the inventory
 	// snapshot's equipped-container slot bytes / the archive player_items column order). All 17 retail slots
 	// are mapped from captures - the layout is the melee pair (6/8), the ranged pair (20/21) and gaps at
-	// 4/13/19; 17 is the bag (FirstPosBag, handled separately). necrol80 wears items in every slot incl.
-	// Tokens (3), OffHandWeapon (8, Ceremonial Dagger), RangedWeapon (20, Executioner Crossbow) and
-	// Ammo (21, Bolt Quiver).
+	// 4/13/19; 17 is the legacy starter-bag cell (FirstPosBag, handled separately). necrol80 wears items in every
+	// slot incl. Bag (3, the equipped bag that sizes the backpack - was mislabeled "Tokens"), OffHandWeapon
+	// (8, Ceremonial Dagger), RangedWeapon (20, Executioner Crossbow) and Ammo (21, Bolt Quiver).
 	public enum CharacterEquipmentSlot : uint
 	{
 		Neck = 1,
 		Head = 2,
-		Tokens = 3,
+		Bag = 3,
 		Chest = 5,
 		MainWeapon = 6, // main_hand_left (melee main hand)
 		Belt = 7,
