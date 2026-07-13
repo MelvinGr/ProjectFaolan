@@ -19,6 +19,7 @@ namespace Faolan.Importer.Cli
 			new CharactersModule(), new ConversationsModule(), new CharacterStateModule(), new LearnedSpellsModule(), new CharacterAbilitiesModule(), new CharacterQuestsModule(),
 			new CharacterBankModule(), new ShopsModule(), new NpcsModule(), new NpcDispositionModule(), new NpcChatterModule(), new WorldObjectsModule(), new WorldTeleportsModule(), new MapLootModule(), new QuestsModule(), new MountsModule(), // opt-in
 			new PetsModule(), // opt-in (#307)
+			new ConsumableUsesModule(), // consumable on-use spells -> Items.OnUseSpell
 			new ClaimsModule(), // opt-in (account claims -> AccountClaim)
 			new RecipesModule(), // opt-in (crafting recipe book)
 			// --- tsv modules ---

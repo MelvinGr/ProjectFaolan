@@ -1,23 +1,23 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.GameServer.Inventory;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// The "Double XP" buff spell base (Spells 4552864, 12h). The Double XP potion applies it on use; the wire
-		// ApplySpell id is this << 8 (the (base<<8)|rank convention). Confirmed in the …use-double-xp-potion capture.
-		private const uint DoubleXpSpellBase = 4552864;
+		// Totem of Origins template (faolan.db): a non-spell on-use item that recalls to the bind point (#206). The
+		// only special-cased use left - buff consumables are all data-driven via Items.OnUseSpell.
+		private const uint TotemOfOriginsId = 3514741; // TODO: Move to consts
 
 		// The domain side of a player USING (right-clicking) an item from a bag (#206/#64): the RightClickItem Inbound
-		// handler resolves the item by its inventory location and this routes by item-use CATEGORY. Today the Totem of
-		// Origin recalls the player to their bind point; future consumables (potions, food, scrolls...) plug in here.
-		// (Folded in from the former ItemUseService - it already depended back on the listener via RecallToBindCommand.)
+		// handler resolves the item by its inventory location and this routes on the item's on-use effect. Buff
+		// consumables (potions/food/drink/Double XP) are DATA-DRIVEN via Items.OnUseSpell; the Totem recall is the one
+		// remaining non-spell special case. (Folded in from the former ItemUseService / ItemUseClassifier.)
 		private async Task UseInventoryItem(INetworkClient client, ContainerKind container, int slot)
 		{
 			var character = client.Session.Character;
@@ -31,31 +31,54 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Dispatch on the item's use CATEGORY (ItemUseClassifier maps the stable template id), not its name.
-			switch (ItemUseClassifier.Classify(item))
+			if (item.Id == TotemOfOriginsId)
 			{
-				case ItemUseType.TotemRecall:
-					await RecallToBindCommand(client); // Totem of Origin -> recall to the bound resurrection point (#206)
-					break;
-
-				case ItemUseType.XpBoost:
-					// Double XP potion: apply the "Double XP" self-buff (Spell 4552864, 12h) and consume one. Wire spell
-					// id = base<<8. This buff uses the LONG (54-byte) MagicBuffIIR blob (BuildBuffDataLong) - the client
-					// rejects the 50-byte short self-buff form for it (runs off the end), same as Shield/spellweave/mount
-					// buffs; the …use-double-xp-potion capture (frame 509) is 54-byte, duration 0x41EB00 (=12h) matching
-					// Spells 4552864. Retail's "does nothing if you already hold one" rule is a follow-up.
-					var self = client.Session.Account.ClientInstance;
-					var xpSpell = await Database.GetSpell(DoubleXpSpellBase);
-					var durationCs = (xpSpell?.DurationMs ?? 0) / 10;
-					var nonce = 0x14000000u | (DoubleXpSpellBase & 0x00FFFFFF);
-					await SendMagicBuffIir(client, self, self, DoubleXpSpellBase << 8, SelfBuffCodec.BuildBuffDataLong(DoubleXpSpellBase, durationCs, nonce));
-					await RemoveItemFromBackpack(client, slot, 1);
-					break;
-
-				default:
-					Logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
-					break;
+				await RecallToBindCommand(client); // Totem of Origin -> recall to the bound resurrection point (#206)
+				return;
 			}
+
+			// A consumable with an on-use spell (Items.OnUseSpell) applies that self-buff and is consumed - the
+			// data-driven path for potions/food/drink/Double XP.
+			if (item.OnUseSpell is { } spellBase && spellBase != 0)
+			{
+				await UseConsumable(client, item, slot, spellBase);
+				return;
+			}
+
+			// Surface the gap in-client (no-fallbacks rule, like the "no dialogue or shop imported yet" bubble) so an
+			// un-wired consumable says so instead of silently doing nothing.
+			Logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
+			await _agentServerDispatcher.SendSystemMessage(character.Id, $"('{item.Name}' has no on-use effect wired yet - id {item.Id}, no Items.OnUseSpell)");
+		}
+
+		// Apply a consumable's on-use self-buff (Spell `spellBase`, wire id base<<8) and consume one from the slot. The
+		// buff uses the LONG (54-byte) MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) - the client rejects the
+		// 50-byte short self-buff form for these (runs off the end), same as Shield/spellweave/mount buffs; confirmed
+		// against the …use-consumables / …use-double-xp-potion captures. Retail no-ops (no apply, no consume) when the
+		// same buff is already active - the reason the last consumable in the capture "did nothing".
+		private async Task UseConsumable(INetworkClient client, Item item, int slot, uint spellBase)
+		{
+			var self = client.Session.Account.ClientInstance;
+			var wireSpellId = spellBase << 8;
+
+			if (_simulation.PlayerWorldEntity(client)?.ActiveBuffs.ContainsKey(wireSpellId) == true)
+			{
+				Logger.LogInformation("UseConsumable: '{Item}' buff {Spell} already active - no-op.", item.Name, spellBase);
+				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"You already have the '{item.Name}' effect.");
+				return;
+			}
+
+			var spell = await Database.GetSpell(spellBase);
+			if (spell == null)
+			{
+				Logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
+				return;
+			}
+
+			var durationCs = spell.DurationMs / 10;
+			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
+			await SendMagicBuffIir(client, self, self, wireSpellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+			await RemoveItemFromBackpack(client, slot, 1);
 		}
 	}
 }

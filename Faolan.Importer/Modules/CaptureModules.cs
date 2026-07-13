@@ -755,6 +755,30 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Consumable ON-USE spells (Items.OnUseSpell): pairs each used item's TemplateActionIIR with the self-ApplySpell it
+	// emits, so a use-a-consumable capture teaches the DB what buff a potion/food/drink applies. Depends on items (the
+	// rows it sets the column on). Upsert - it only writes items already present.
+	public sealed class ConsumableUsesModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule), nameof(SpellsModule)];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
+
+		public string Description => "Consumable on-use spells (TemplateActionIIR + ApplySpell) -> Items.OnUseSpell.";
+		public string Name => "consumable-uses";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (harvested, set) = await CaptureItemUseImporter.ImportAsync(ctx.Db, ctx.Captures.Select(c => (IReadOnlyList<byte[]>)c.Packets.Select(p => p.Bytes).ToList()));
+			return new ImportResult($"{harvested} on-use spells harvested, {set} set on Items.");
+		}
+	}
+
 	// Account CLAIMS (CoreClaimIIR 0x06EC1255) -> AccountClaim rows, attached to the shared "captured" account. Opt-in
 	// like the other account-state seeds. The item TEA keys the claims reference are harvested into Items by the items
 	// module (ItemHashHarvester's claim-list source), so this depends on `items` for the FK + the key the server

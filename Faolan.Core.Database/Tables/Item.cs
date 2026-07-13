@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
@@ -60,5 +61,15 @@ namespace Faolan.Core.Database.Tables
 		// RDB-imported, or a template whose property table doesn't carry field 74) - callers fall back to the
 		// provisional level-based price.
 		public uint Value { get; set; }
+
+		// The self-buff spell this item applies when USED (right-clicked) - a consumable's on-use effect (Health/Mana
+		// potion, food, drink, Double XP potion, ...). The BASE spell id (Spells.Id); the wire ApplySpell id is
+		// base<<8. NULL = not a use-a-spell consumable. Harvested from captures (CaptureItemUseImporter pairs the item's
+		// TemplateActionIIR 0x6C300937 with the adjacent ApplySpell 0x6B87E316); the scalable long-term source is the
+		// RDB item-template on-use field (undecoded). Drives GameServerListener.UseInventoryItem (data, not a per-id switch).
+		public uint? OnUseSpell { get; set; }
+
+		[ForeignKey(nameof(OnUseSpell))]
+		public virtual Spell? OnUseSpellDefinition { get; set; }
 	}
 }
