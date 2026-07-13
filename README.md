@@ -106,7 +106,7 @@ we've seen_, and names the gaps). Regenerate with
   list (render-by-key on relog is #359)
 - ✅ Consumable use — right-click a potion/food/drink to apply its on-use buff + consume one, data-driven from
   `Items.OnUseSpell` (harvested from captures), no-op if the buff is already active
-- 🟡 Shop-OPEN trigger — decoded flow implemented, awaits in-client confirm (#134)
+- ✅ Shop-OPEN trigger — interacting with a vendor opens its shop window
 - 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — item attribute modifiers imported + summed
   (`ItemStat` + `MaxStatAggregator`); the vital/HP field + wire scale still need a reference tooltip (#3)
 - 🟡 Guild bank — bodies uncaptured (#132)
