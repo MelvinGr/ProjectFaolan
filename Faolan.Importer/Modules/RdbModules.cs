@@ -234,7 +234,7 @@ namespace Faolan.Importer.Modules
 				? null
 				: ctx.DumpTemplatesDir;
 			var r = await RdbItemImporter.ImportAsync(ctx.Db, ctx.RdbDir!, dump, ctx.RdbProxyBase);
-			return new ImportResult($"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.CategoriesAdded} categories, {r.ValuesAdded} values, {r.StatsAdded} stat mods.");
+			return new ImportResult($"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.CategoriesAdded} categories, {r.ValuesAdded} values, {r.QualitiesAdded} qualities, {r.StatsAdded} stat mods.");
 		}
 	}
 }

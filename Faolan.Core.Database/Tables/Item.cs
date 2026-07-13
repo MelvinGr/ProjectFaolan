@@ -72,6 +72,13 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(OnUseSpell))]
 		public virtual Spell? OnUseSpellDefinition { get; set; }
 
+		// The item's quality/rarity tier (Mundane..Legendary) = RDB item-template property field 499 (the client's own
+		// tier id; see ItemQuality). Extracted by RdbItemImporter with the same strictly-decreasing property-table parse
+		// as Value (field 74). NULL when the template carries no field 499 (or the item was never RDB-imported) - the
+		// generated CHECK admits NULL (a closed enum, so the values are constrained; unset stays NULL).
+		[ConstrainToEnumValues]
+		public ItemQuality? Quality { get; set; }
+
 		// For a BAG item (equipped in the bag slot, equip slot 3): the extra backpack slots it adds - the "+N slots"
 		// the client tooltip shows. The backpack container's max_size = 24 (base) + this. RDB item-template property
 		// field 104 (= the Bag container kind, 0x68); validated: Burlap Sack 24 (24->48), Bag of Holding 20 (->44),

@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -89,7 +90,7 @@ namespace Faolan.Importer.Rdb
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
 
-			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0, bagsAdded = 0;
+			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0, qualitiesAdded = 0, bagsAdded = 0;
 			var firstSampleShown = false;
 			var parsedStats = new List<ItemStat>();
 
@@ -155,6 +156,16 @@ namespace Faolan.Importer.Rdb
 					valuesAdded++;
 				}
 
+				// The item QUALITY/rarity tier = property field 499 (the client's own ItemQuality id; White Gown 1,
+				// raid gear 4, Mythical Band 5). Same strictly-decreasing property-table parse as field 74. Only accept
+				// the known 1..Legendary range; an out-of-range/absent 499 leaves Quality NULL.
+				if (TryReadPropertyField(template.AsSpan(12), 499, out var quality) && quality is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary
+				    && item.Quality != (ItemQuality)quality)
+				{
+					item.Quality = (ItemQuality)quality;
+					qualitiesAdded++;
+				}
+
 				// The VALIDATED primary-attribute modifier (docs/rdb/item-template-stats.md, #3): field 972 = the wire
 				// stat id (only ever 804/806/808/810/814 = Str/Con/Int/Wis/Dex across all 1964 templates), field 971 =
 				// the amount (+1/+2/+3). Recorded as an ItemStat - the (statId, amount) foundation the MaxStatAggregator
@@ -210,13 +221,13 @@ namespace Faolan.Importer.Rdb
 				db.ItemStats.AddRange(parsedStats);
 			}
 
-			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || statsAdded > 0 || bagsAdded > 0)
+			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0)
 				await db.SaveChangesAsync();
 
 			if (bagsAdded > 0)
 				Console.WriteLine($"  bag capacities (field 104) set on {bagsAdded} item(s).");
 
-			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, statsAdded);
+			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, qualitiesAdded, statsAdded);
 		}
 
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
@@ -314,6 +325,6 @@ namespace Faolan.Importer.Rdb
 				: s;
 		}
 
-		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded, int StatsAdded);
+		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded, int QualitiesAdded, int StatsAdded);
 	}
 }
