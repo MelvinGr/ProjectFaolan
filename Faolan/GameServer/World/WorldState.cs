@@ -480,9 +480,10 @@ namespace Faolan.GameServer.World
 					continue; // was never streamed to - else the player takes hits from an invisible body
 				if (MathF.Abs(player.Position.Y - npc.Position.Y) > NpcAggroVerticalRange) // #284 tier 1: not through a floor/drop
 					continue;
-				// #284 tier 2: real terrain occlusion - don't aggro a player behind a hill / across a ridge. Fails open
-				// (no block) when terrain is unavailable, so this only ever REMOVES false aggros the tier-1 gate missed.
-				if (_terrain != null && !_terrain.HasTerrainLineOfSight(zone.MapId, npc.Position, player.Position))
+				// #284 tier 2/3: real occlusion - don't aggro a player behind a hill/ridge (terrain heightmap) or a
+				// building wall (PhysX collision mesh). Fails open when the assets are unavailable, so this only ever
+				// REMOVES false aggros the range + tier-1 vertical gate would have wrongly allowed.
+				if (_terrain != null && !_terrain.HasLineOfSight(zone.MapId, npc.Position, player.Position))
 					continue;
 
 				var dist = Vector3.Distance(player.Position, npc.Position);

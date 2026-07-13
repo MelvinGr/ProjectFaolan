@@ -25,6 +25,10 @@ namespace Faolan.GameServer.World
 		private readonly ConcurrentDictionary<uint, RdbHeightmap> _maps = new();
 		private readonly ConcurrentDictionary<uint, byte> _missing = new();
 
+		// mapId -> collision mesh (walls/buildings, #284 tier-3). Same lazy-load + missing-cache scheme as the heightmap.
+		private readonly ConcurrentDictionary<uint, RdbCollisionMesh> _collision = new();
+		private readonly ConcurrentDictionary<uint, byte> _collisionMissing = new();
+
 		// LoS sampling: how many intermediate ground samples along the sightline, and how far a hill must rise above
 		// the eye-line to actually block (a little slack so a gentle slope or a 1u bump doesn't read as a wall).
 		private const int LineOfSightSamples = 24;
@@ -60,11 +64,17 @@ namespace Faolan.GameServer.World
 			return Heightmap(mapId)?.HeightAt(x, z);
 		}
 
-		// True if terrain does NOT block the straight line from `from` to `to` (an NPC's eye to a player). Samples the
-		// ground along the horizontal path; if it rises above the eye-line by more than the margin at any intermediate
-		// point, the target is occluded by a hill / on the far side of a drop. Fails OPEN (true) when terrain is
-		// unavailable so aggro still works without the client assets.
-		public bool HasTerrainLineOfSight(uint mapId, Vector3 from, Vector3 to)
+		// True if nothing blocks the straight eye-line from `from` to `to` (an NPC to a player): neither the terrain
+		// (a hill / ridge / the far side of a drop) NOR the collision geometry (a building wall). Both endpoints are
+		// lifted to eye height so you can see over small bumps / low sills. Fails OPEN (returns true) whenever the
+		// relevant asset is unavailable, so aggro still works without the client RDB - this only ever REMOVES aggros
+		// that the range + tier-1 vertical gate would have wrongly allowed.
+		public bool HasLineOfSight(uint mapId, Vector3 from, Vector3 to)
+		{
+			return HasTerrainLineOfSight(mapId, from, to) && HasCollisionLineOfSight(mapId, from, to);
+		}
+
+		private bool HasTerrainLineOfSight(uint mapId, Vector3 from, Vector3 to)
 		{
 			var hm = Heightmap(mapId);
 			if (hm == null)
@@ -87,6 +97,19 @@ namespace Faolan.GameServer.World
 			}
 
 			return true;
+		}
+
+		// True if no collision-mesh wall/building intersects the eye-line. Raycasts the segment against the per-map
+		// PhysX trimesh (grid-indexed). Both endpoints at eye height so a chest-high wall occludes but the floor doesn't.
+		private bool HasCollisionLineOfSight(uint mapId, Vector3 from, Vector3 to)
+		{
+			var col = Collision(mapId);
+			if (col == null)
+				return true;
+
+			var eyeFrom = new Vector3(from.X, from.Y + EyeHeight, from.Z);
+			var eyeTo = new Vector3(to.X, to.Y + EyeHeight, to.Z);
+			return !col.SegmentBlocked(eyeFrom, eyeTo);
 		}
 
 		private RdbHeightmap Heightmap(uint mapId)
@@ -120,6 +143,44 @@ namespace Faolan.GameServer.World
 			catch (Exception ex)
 			{
 				_logger.LogDebug(ex, "Terrain: failed to load heightmap for map {Map}.", mapId);
+				return null;
+			}
+		}
+
+		private RdbCollisionMesh Collision(uint mapId)
+		{
+			if (_rdb == null || _collisionMissing.ContainsKey(mapId))
+				return null;
+			if (_collision.TryGetValue(mapId, out var cached))
+				return cached;
+
+			var loaded = LoadCollision(mapId);
+			if (loaded == null)
+				_collisionMissing.TryAdd(mapId, 0);
+			else
+				_collision.TryAdd(mapId, loaded);
+
+			return loaded;
+		}
+
+		private RdbCollisionMesh LoadCollision(uint mapId)
+		{
+			try
+			{
+				if (!_rdb.TryGet(RdbCollisionMesh.ResourceType, mapId, out var entry) || !entry.IsLocal)
+					return null;
+
+				var body = _rdb.ReadDecompressed(entry);
+				if (!RdbCollisionMesh.TryParse(body, out var mesh))
+					return null;
+
+				// First-touch cost: decompress (~12 MB) + parse + grid build. One-time per map, then cached.
+				_logger.LogInformation("Terrain: loaded collision mesh for map {Map} ({Tris} triangles).", mapId, mesh.TriangleCount);
+				return mesh;
+			}
+			catch (Exception ex)
+			{
+				_logger.LogDebug(ex, "Terrain: failed to load collision mesh for map {Map}.", mapId);
 				return null;
 			}
 		}
