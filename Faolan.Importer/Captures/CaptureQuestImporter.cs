@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -20,25 +22,35 @@ namespace Faolan.Importer.Captures
 	//   - QuestIIR (0x97E02314): per-quest STATE events; the last state per (char, quest) WINS over the log-list Active
 	//     entry - retail sends a completed quest as Active then Completed, so this is what marks a quest Completed.
 	//   - QuestGoal (0x0774C8C1): goal progress count for the matching quest.
+	//   - the FullChar SNAPSHOT (0x737A6DF9, DispatchPassBlob): the login snapshot embeds the character's COMPLETED-quest
+	//     log - hundreds of quests for a high-level char, one <remoteformat category=50301> title record each (the
+	//     lvl-80 necro's is a 625 KB snapshot with ~1540 of them). These are entered Completed; the snapshot is addressed
+	//     to the player, so Receiver.Instance == the character id. This is the only source of the completed archive - the
+	//     incremental QuestIIR/log-list packets only ever carry the currently-held quests.
 	// A char's quest ids are unioned across ALL captures (different sessions hold different quests). No QuestDefinition
 	// is required - CharacterQuest.QuestId has no FK - so quests we have no journal-content for still record as held.
 	// Idempotent: updates an existing row, else inserts. Only characters already in the DB are touched.
 	public static class CaptureQuestImporter
 	{
+		// The completed-quest title records in the snapshot log: <remoteformat id="<questId>" category="50301" ...>.
+		private static readonly Regex CompletedTitleRx = new(@"<remoteformat id=""(\d+)"" category=""50301""", RegexOptions.Compiled);
+
 		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> wire state
 			var progressByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> goal count
 			var logListByChar = new Dictionary<uint, HashSet<uint>>(); // char -> quest ids from the QuestLogList (the J-panel log)
+			var completedByChar = new Dictionary<uint, HashSet<uint>>(); // char -> completed quest ids from the snapshot log
 			foreach (var packet in rawPackets)
-				TryRead(packet, stateByChar, progressByChar, logListByChar);
+				TryRead(packet, stateByChar, progressByChar, logListByChar, completedByChar);
 
-			if (stateByChar.Count == 0 && logListByChar.Count == 0)
+			if (stateByChar.Count == 0 && logListByChar.Count == 0 && completedByChar.Count == 0)
 				return (0, 0);
 
-			// The full set of characters we saw ANY quest data for (log list and/or state events).
+			// The full set of characters we saw ANY quest data for (completed log, active log list, and/or state events).
 			var allChars = new HashSet<uint>(stateByChar.Keys);
 			allChars.UnionWith(logListByChar.Keys);
+			allChars.UnionWith(completedByChar.Keys);
 
 			var charactersSeeded = 0;
 			var questsWritten = 0;
@@ -47,9 +59,13 @@ namespace Faolan.Importer.Captures
 				if (!await db.Characters.AnyAsync(c => c.Id == characterId))
 					continue;
 
-				// Merge the two sources into questId -> state: the log list seeds every held quest Active, then any
-				// QuestIIR state (Active/Completed) overrides it.
+				// Merge the sources into questId -> state, least- to most-authoritative (last wins): the snapshot log
+				// seeds Completed, the active log list overrides to Active (a re-taken/repeatable quest), then an
+				// explicit QuestIIR state event wins.
 				var merged = new Dictionary<uint, QuestState>();
+				if (completedByChar.TryGetValue(characterId, out var completedIds))
+					foreach (var id in completedIds)
+						merged[id] = QuestState.Completed;
 				if (logListByChar.TryGetValue(characterId, out var logIds))
 					foreach (var id in logIds)
 						merged[id] = QuestState.Active;
@@ -96,7 +112,9 @@ namespace Faolan.Importer.Captures
 			return (charactersSeeded, questsWritten);
 		}
 
-		private static void TryRead(byte[] packetBytes, Dictionary<uint, Dictionary<uint, uint>> stateByChar, Dictionary<uint, Dictionary<uint, uint>> progressByChar, Dictionary<uint, HashSet<uint>> logListByChar)
+		private const uint SnapshotSubOpcode = 0x737A6DF9;
+
+		private static void TryRead(byte[] packetBytes, Dictionary<uint, Dictionary<uint, uint>> stateByChar, Dictionary<uint, Dictionary<uint, uint>> progressByChar, Dictionary<uint, HashSet<uint>> logListByChar, Dictionary<uint, HashSet<uint>> completedByChar)
 		{
 			try
 			{
@@ -105,6 +123,24 @@ namespace Faolan.Importer.Captures
 					return;
 
 				var inner = packet.Body.ReadArrayUInt32Length();
+
+				// The FullChar snapshot embeds the completed-quest log (one category-50301 title record per completed
+				// quest). It's addressed to the player, so Receiver.Instance is the character id.
+				if (inner.Length >= 4 && System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) == SnapshotSubOpcode)
+				{
+					var charId = packet.Receiver.Instance;
+					if (charId == 0)
+						return;
+
+					var text = Encoding.Latin1.GetString(inner);
+					if (!completedByChar.TryGetValue(charId, out var set))
+						completedByChar[charId] = set = new HashSet<uint>();
+					foreach (Match mm in CompletedTitleRx.Matches(text))
+						if (uint.TryParse(mm.Groups[1].Value, out var qid) && qid != 0)
+							set.Add(qid);
+					return;
+				}
+
 				if (WorldQuest.TryParseQuestLogList(inner, out var logHandle, out _, out var logIds))
 				{
 					if (!logListByChar.TryGetValue(logHandle, out var set))

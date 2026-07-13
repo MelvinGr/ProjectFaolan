@@ -16,7 +16,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	{
 		// byte-exact test signals: golden loads + hex/byte asserts. "ToHex" covers both Convert.ToHexString and the
 		// local ToHex() helpers several test classes define (CharacterStatBlockTests, CombatTests, ...).
-		private static readonly string[] ByteExactMarkers = { "Golden.Bytes", "ToHex", "TestPaths.Asset", "SequenceEqual" };
+		private static readonly string[] ByteExactMarkers = ["Golden.Bytes", "ToHex", "TestPaths.Asset", "SequenceEqual"];
 
 		// A scope (whole test file, or one method body) is byte-exact for `codec` if it carries one of the explicit
 		// markers above, OR it loads a captured hex oracle (Convert.FromHexString) and compares it against a serialize
@@ -41,7 +41,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		public Dictionary<string, string> BuiltIn { get; } = new(StringComparer.Ordinal);                   // IIR type -> representative file (inline builders)
 		public Dictionary<string, bool> CodecGolden { get; } = new(StringComparer.Ordinal);                 // codec -> has a byte-exact test
 		public Dictionary<string, string> CodecGoldenMethod { get; } = new(StringComparer.Ordinal);         // codec -> "TestClass.Method" (byte-exact), when found
-		public List<(string Name, uint Value)> IirTypes { get; } = new();                                   // the 32-bit carrier types (value >= 0x10000)
+		public List<(string Name, uint Value)> IirTypes { get; } = [];                                   // the 32-bit carrier types (value >= 0x10000)
 		public Dictionary<uint, string> NameByValue { get; } = new();
 
 		public int RpcOpcodeTotal { get; private set; }
@@ -86,7 +86,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				if (iirs.Count == 0)
 					continue;
 
-				idx.CodecToIir.TryAdd(t.Name, new HashSet<string>());
+				idx.CodecToIir.TryAdd(t.Name, []);
 				idx.CodecToIir[t.Name].UnionWith(iirs);
 				foreach (var iir in iirs)
 				{

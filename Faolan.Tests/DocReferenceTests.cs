@@ -26,11 +26,11 @@ namespace Faolan.Tests
 		// A backtick `XxxSuffix` that is not a defined type is almost always a stale rename, not prose. Kept narrow
 		// on purpose - a suffix here should read as "this is a class", not a common English word.
 		private static readonly string[] TypeSuffixes =
-		{
+		[
 			"Tests", "Service", "Builder", "Codec", "Codecs", "Reader", "Catalog", "Listener", "Repository",
 			"Importer", "Handler", "Dispatcher", "Scaffold", "Harvester", "Migrator", "Broadcaster", "Resolver",
 			"Manager", "Simulation", "Extractor", "Framer"
-		};
+		];
 
 		// References intentionally kept for the HISTORICAL record, each with its reason. A doc that documents removed
 		// code (a before/after narrative) legitimately names symbols/paths that no longer exist.
