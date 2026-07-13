@@ -98,7 +98,7 @@ namespace Faolan.GameServer
 		// NO inventory-add for normal loot - the client moves the looted item from the bag to the backpack LOCALLY
 		// (confirmed by LootRemoveItems), so a server push would double it. Loot still PERSISTS here (DB write) so the
 		// item survives relog via the world-entry snapshot.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool pushLiveAdd = true)
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool pushLiveAdd = true, bool allowHashless = false)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
@@ -108,9 +108,11 @@ namespace Faolan.GameServer
 
 			// Quest items (Type 113, e.g. the Scavenger's Key) route to the QUEST container, not the backpack, so they
 			// land in the player's quest-items tab (#261). They are kept even with hash 0 (quest items often have
-			// none); normal bag items still require an hash so the snapshot can render them.
+			// none); normal bag items still require an hash so the snapshot can render them - EXCEPT when allowHashless
+			// (claim redeems): a claim list carries the item's key but no hash, so the item delivers live (the 0x2020
+			// path renders by template without a hash) but won't survive a relog until we harvest its hash. See #claims.
 			var isQuestItem = item.Type == ItemType.Quest;
-			if (!isQuestItem && item.Hash == 0)
+			if (!isQuestItem && item.Hash == 0 && !allowHashless)
 				return null;
 
 			var kind = isQuestItem

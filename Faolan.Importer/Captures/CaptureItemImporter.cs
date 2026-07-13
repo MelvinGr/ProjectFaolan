@@ -48,7 +48,10 @@ namespace Faolan.Importer.Captures
 				item.Key.Key2 = ci.Data2;
 				item.Key.Key3 = ci.Data3;
 				item.Key.Key4 = ci.Data4;
-				item.Hash = ci.Hash;
+				// Never downgrade a real hash to 0: some sources (loot bags, claim lists) carry the identity quad but no
+				// hash, and must not clobber a hash another source already set (e.g. the same item seen worn/in a bag).
+				if (ci.Hash != 0)
+					item.Hash = ci.Hash;
 
 				// Classify Quest/Resource items by the container they were captured in; only ever UPGRADE from the
 				// default Normal so a classification survives a later capture that holds the item in a bag.

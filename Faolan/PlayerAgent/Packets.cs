@@ -75,7 +75,7 @@ namespace Faolan.PlayerAgent
 				aBuffer.WriteString(character.Language); // enEN
 				aBuffer.WriteUInt32(0x00000000);
 				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteString(character.AuthChallenge); // 8f58a8a3cd66eb5c5e20c15d4ec6f978 for conanhimself
+				aBuffer.WriteString(character.AuthChallenge);
 				aBuffer.WriteUInt32(0x00000000);
 				aBuffer.WriteUInt32(0x00000001);
 			}

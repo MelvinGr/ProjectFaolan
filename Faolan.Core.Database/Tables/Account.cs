@@ -15,6 +15,7 @@ namespace Faolan.Core.Database.Tables
 		public ulong LongId => 0x0000271200000000u + Id; // As used by the client
 
 		public virtual ICollection<Character> Characters { get; set; } = [];
+		public virtual ICollection<AccountClaim> Claims { get; set; } = [];
 
 		[ConstrainToEnumValues]
 		public AccountState State { get; set; }
@@ -32,8 +33,8 @@ namespace Faolan.Core.Database.Tables
 		public DateTimeOffset CreationDate { get; set; }
 		public DateTimeOffset? LastConnection { get; set; }
 
-		public int CreateCounter { get; set; }
-		public int CreateState { get; set; }
+		public int CreateCounter { get; set; } // TODO: delete, not used
+		public int CreateState { get; set; } // TODO: delete, not used
 
 		[MaxLength(32)]
 		public string? AuthChallenge { get; set; }

@@ -296,6 +296,7 @@ namespace Faolan.GameServer
 				["kill"] = KillCommand,
 				["additem"] = AddItemCommand,
 				["removeitem"] = RemoveItemCommand,
+				["claim"] = ClaimCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
 				["areaname"] = AreaNameCommand,
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),

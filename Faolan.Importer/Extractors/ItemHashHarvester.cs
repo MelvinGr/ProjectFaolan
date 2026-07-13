@@ -124,6 +124,19 @@ namespace Faolan.Importer.Extractors
 				// not a parseable mail packet
 			}
 
+			// Eighth source: the Claims/Redeem list (CoreClaimIIR 0x06EC1255, sub 0x0001). Each claim row carries the
+			// item's ProtoDecryptionKey (the Data quad) - the SAME key the client needs to decrypt the template - so a
+			// claim capture is a key source for the (often shop-only) items it offers. No hash on the wire here (hash 0);
+			// the item still redeems via the live DispatchAddItem path and the client renders it from the key.
+			try
+			{
+				ExtractFromClaimList(packetBytes, found);
+			}
+			catch
+			{
+				// not a parseable claim-list packet
+			}
+
 			foreach (var (template, item) in found)
 			{
 				if (into.TryGetValue(template, out var existing))
@@ -134,6 +147,36 @@ namespace Faolan.Importer.Extractors
 				}
 
 				into[template] = item;
+			}
+		}
+
+		// Recovers (template -> CapturedItem) from a Claims/Redeem list (0x2000 packet whose payload sub-opcode is the
+		// CoreClaimIIR 0x06EC1255, sub 0x0001). Each 106-byte entry's 16-byte token IS the item's ProtoDecryptionKey
+		// (4×u32 big-endian = the Data quad). Hash is not carried here, so it stays 0 (the item redeems via live add).
+		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2000)
+				return;
+
+			var payload = packet.Body.ReadArrayUInt32Length();
+			if (!CoreClaimListCodec.TryParse(payload, out _, out var claims))
+				return;
+
+			foreach (var claim in claims)
+			{
+				var key = claim.DecryptionKey;
+				if (claim.ItemTemplateId == 0 || key.Length < ClaimEntry.KeyLength)
+					continue;
+
+				var d1 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(0));
+				var d2 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(4));
+				var d3 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(8));
+				var d4 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(12));
+				if ((d1 | d2 | d3 | d4) == 0)
+					continue;
+
+				into.TryAdd(claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0));
 			}
 		}
 

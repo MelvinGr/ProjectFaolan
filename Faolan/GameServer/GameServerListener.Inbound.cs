@@ -878,7 +878,9 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.CoreClaimIIR:
 				{
-					var data = packet.Body.ReadRemainingArray();
+					// The Claims/Redeem window: sub 0x0007 requests the list, sub 0x0003 redeems a claim. See
+					// GameServerListener.Claims.cs / docs/subsystems/item-claims.md.
+					await HandleCoreClaim(client, packet);
 
 					break;
 				}

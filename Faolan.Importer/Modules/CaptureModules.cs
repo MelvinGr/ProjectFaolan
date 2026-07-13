@@ -755,6 +755,37 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Account CLAIMS (CoreClaimIIR 0x06EC1255) -> AccountClaim rows, attached to the shared "captured" account. Opt-in
+	// like the other account-state seeds. The item TEA keys the claims reference are harvested into Items by the items
+	// module (ItemHashHarvester's claim-list source), so this depends on `items` for the FK + the key the server
+	// re-sends on the wire. Overwrite = rebuild the account's claim set cleanly. See docs/subsystems/item-claims.md.
+	public sealed class ClaimsModule : IImportModule
+	{
+		private const string CapturedAccountName = "captured"; // CaptureCharacterImporter.ImportAccountName
+
+		public bool InDefaultSet => false;
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Overwrite
+		};
+
+		public string Description => "Account claims (CoreClaimIIR list) -> AccountClaim (opt-in).";
+		public string Name => "claims";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var account = await ctx.Db.Accounts.FirstOrDefaultAsync(a => a.UserName == CapturedAccountName);
+			if (account == null)
+				return new ImportResult($"no '{CapturedAccountName}' account - run the characters module first; skipped.");
+
+			var (parsed, written) = await CaptureClaimImporter.ImportAsync(ctx.Db, ctx.RawPackets, account.Id);
+			return new ImportResult($"{parsed} claims parsed, {written} written to account '{CapturedAccountName}'.");
+		}
+	}
+
 	// Summonable PET creatures (#307): lifts each pet's captured FA015807 stat core onto its creature TYPE (NpcTemplate.Data)
 	// so a pet-summon spell spawns it FROM THE TYPE (no world placement). Opt-in like mounts; run against a pet-summon
 	// capture, e.g. `--only pets`.

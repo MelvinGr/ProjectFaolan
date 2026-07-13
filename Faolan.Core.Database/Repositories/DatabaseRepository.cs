@@ -14,10 +14,12 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
 		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<bool> CheckLogin(string username, string password);
+		Task<AccountClaim> CreateAccountClaim(AccountClaim claim);
 		Task<Character> CreateCharacter(uint accountId, uint realmId);
 		Task<Guild?> CreateGuild(string name, uint leaderCharacterId);
 		Task<Mail> CreateMail(Mail mail);
 		Task CreateTradepostListing(TradepostListing listing);
+		Task DeleteAccountClaim(uint claimId);
 		Task<bool> DeleteCharacter(uint characterId);
 		Task DeleteMail(ulong mailId);
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
@@ -29,6 +31,10 @@ namespace Faolan.Core.Database.Repositories
 		Task<Ability?> GetAbility(uint id);
 		Task<Account?> GetAccount(uint id);
 		Task<Account?> GetAccount(string userName);
+		Task<AccountClaim?> GetAccountClaim(uint claimId);
+		Task<List<AccountClaim>> GetAccountClaims(uint accountId);
+		Task SetAccountClaimQuantity(uint claimId, uint quantity);
+		Task MarkAccountClaimsSeen(uint accountId);
 		Task<Character?> GetCharacter(uint id);
 		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
 		Task<Character?> GetCharacterByName(string name, uint realmId);
@@ -284,6 +290,55 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.SaveChangesAsync();
 
 			return await LoadGuild(ctx, guild.Id);
+		}
+
+		// Persists a new item claim onto an account's Claims/Redeem window (docs/subsystems/item-claims.md). Returns
+		// the saved row (Id populated). Seeded by the .claim GM command (and, later, by shop/reward grants).
+		public async Task<AccountClaim> CreateAccountClaim(AccountClaim claim)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			ctx.AccountClaims.Add(claim);
+			await ctx.SaveChangesAsync();
+			return claim;
+		}
+
+		// A single claim by its id (the redeem path resolves the session's slot snapshot to an id, then loads it here).
+		// Includes the item so a multi-charge redeem ack can re-emit its key.
+		public async Task<AccountClaim?> GetAccountClaim(uint claimId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.AccountClaims.Include(c => c.Item).FirstOrDefaultAsync(c => c.Id == claimId);
+		}
+
+		// Sets a claim's remaining charge count (a multi-charge redeem decrements it; the row is deleted at 0).
+		public async Task SetAccountClaimQuantity(uint claimId, uint quantity)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.AccountClaims.Where(c => c.Id == claimId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Quantity, quantity));
+		}
+
+		// The account's unredeemed claims, in stable Id order (the order the list is sent, so the client's 1-based
+		// redeem index maps back to the same row).
+		public async Task<List<AccountClaim>> GetAccountClaims(uint accountId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			// Include the item so the claim list can emit its real TEA key (Item.Key1..4) as the decryption token.
+			return await ctx.AccountClaims.Include(c => c.Item).Where(c => c.AccountId == accountId).OrderBy(c => c.Id).ToListAsync();
+		}
+
+		// Clears the "new" flag on all of an account's claims once it has opened the list - the glow shows only for
+		// unseen claims (matches retail: present on a fresh login, absent once viewed).
+		public async Task MarkAccountClaimsSeen(uint accountId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.AccountClaims.Where(c => c.AccountId == accountId && c.IsNew).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsNew, false));
+		}
+
+		// Removes a claim once it is redeemed (or revoked). No-op if it is already gone.
+		public async Task DeleteAccountClaim(uint claimId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.AccountClaims.Where(c => c.Id == claimId).ExecuteDeleteAsync();
 		}
 
 		// Persists a new mail (with its attachments) - the buy->mail delivery creates a system mail to the buyer

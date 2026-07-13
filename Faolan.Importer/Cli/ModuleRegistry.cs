@@ -19,6 +19,7 @@ namespace Faolan.Importer.Cli
 			new CharactersModule(), new ConversationsModule(), new CharacterStateModule(), new LearnedSpellsModule(), new CharacterAbilitiesModule(), new CharacterQuestsModule(),
 			new CharacterBankModule(), new ShopsModule(), new NpcsModule(), new NpcDispositionModule(), new NpcChatterModule(), new WorldObjectsModule(), new WorldTeleportsModule(), new MapLootModule(), new QuestsModule(), new MountsModule(), // opt-in
 			new PetsModule(), // opt-in (#307)
+			new ClaimsModule(), // opt-in (account claims -> AccountClaim)
 			new RecipesModule(), // opt-in (crafting recipe book)
 			// --- tsv modules ---
 			new EllathaLevelsModule(), new EllathaCombosModule(), new WikiClassSpellsModule(), new WikiSpellLevelsModule(),

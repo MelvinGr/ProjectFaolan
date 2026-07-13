@@ -145,6 +145,11 @@ namespace Faolan.Core.Network
 
 		uint SeatedOnHandle { get; set; }
 		System.Numerics.Vector3 SeatedPosition { get; set; }
+
+		// The AccountClaim ids in the order last sent in the claims list (CoreClaimIIR sub 0x0001), so a redeem
+		// (sub 0x0003) resolves its 1-based index against a STABLE snapshot - "Claim All" fires one redeem per row
+		// using the original indices, and deleting rows as they redeem would otherwise shift every later index.
+		System.Collections.Generic.IReadOnlyList<uint>? ClaimSlots { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
@@ -197,5 +202,9 @@ namespace Faolan.Core.Network
 		// The player's position at the moment they sat: standup only fires once they've moved away from it (the client
 		// keeps streaming position syncs while seated - and a small seat-snap - which must NOT be read as leaving).
 		public System.Numerics.Vector3 SeatedPosition { get; set; }
+
+		// The claim ids in the order last sent to this client (see the interface), so "Claim All"'s per-row redeems
+		// resolve their original 1-based index even as rows are deleted mid-batch.
+		public System.Collections.Generic.IReadOnlyList<uint>? ClaimSlots { get; set; }
 	}
 }
