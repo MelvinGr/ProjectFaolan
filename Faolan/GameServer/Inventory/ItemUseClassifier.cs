@@ -16,6 +16,10 @@ namespace Faolan.GameServer.Inventory
 		// Totem of Origins template (faolan.db). Recall item; future totem tiers add their ids to this case.
 		private const uint TotemOfOriginsId = 3514741;
 
+		// Double XP potion template (the claim capture's type-4 row). On use it applies the "Double XP" self-buff
+		// (Spell 4552864, 12h) and consumes one - see GameServerListener.UseInventoryItem.
+		public const uint DoubleXpPotionId = 4552866;
+
 		public static ItemUseType Classify(Item item)
 		{
 			if (item == null)
@@ -24,6 +28,7 @@ namespace Faolan.GameServer.Inventory
 			return item.Id switch
 			{
 				TotemOfOriginsId => ItemUseType.TotemRecall,
+				DoubleXpPotionId => ItemUseType.XpBoost,
 				_                => ItemUseType.None
 			};
 		}

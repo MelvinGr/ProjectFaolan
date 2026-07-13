@@ -8,7 +8,9 @@ namespace Faolan.Core.Enums
 	{
 		None = 0, // not a usable item (no on-use action wired)
 
-		TotemRecall // Totem of Origin -> recall to the bound resurrection point (#206)
-		// HealthPotion, ManaPotion, Food, XpBoost, ... land here as the on-use effect is decoded/wired.
+		TotemRecall, // Totem of Origin -> recall to the bound resurrection point (#206)
+
+		XpBoost // Double XP potion -> apply the Double XP self-buff (ApplySpell) and consume one
+		// HealthPotion, ManaPotion, Food, ... land here as the on-use effect is decoded/wired.
 	}
 }

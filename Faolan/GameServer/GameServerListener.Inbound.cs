@@ -382,7 +382,7 @@ namespace Faolan.GameServer
 
 							case ActionType.RightClickItem:
 							{
-								Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", from, target, args);
+								Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", (ContainerKind)from, target, args);
 
 								// Every behavior gets an echo-ack (docs/subsystems/combat.md rule 1); the item-use domain logic
 								// lives in UseInventoryItem (GameServerListener.ItemUse.cs). The used item is identified by its inventory location - from =
@@ -390,7 +390,7 @@ namespace Faolan.GameServer
 								// capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
 								// is the capture's "long loading screen").
 								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
-								await UseInventoryItem(client, (int)from, (int)target);
+								await UseInventoryItem(client, (ContainerKind)from, (int)target);
 
 								break;
 							}
