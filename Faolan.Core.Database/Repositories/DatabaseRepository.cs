@@ -947,7 +947,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId != 0 && n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
+			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId > 0 && n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
 
 			var killTargets = await ctx
 				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.TargetName != null && g.TargetName != "")
@@ -969,7 +969,7 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var grants = await ctx
-				.ConversationNodes.Where(n => n.GrantQuestId != 0 && n.NpcName != null)
+				.ConversationNodes.Where(n => n.GrantQuestId > 0 && n.NpcName != null)
 				.Select(n => new
 				{
 					n.NpcName,
@@ -977,7 +977,7 @@ namespace Faolan.Core.Database.Repositories
 				})
 				.Distinct()
 				.ToListAsync();
-			return grants.GroupBy(g => g.NpcName!).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId));
+			return grants.GroupBy(g => g.NpcName!).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
 		}
 
 		// A random sample of snapshot-buildable gear/normal items (Hash != 0, so SnapshotItemBuilder can

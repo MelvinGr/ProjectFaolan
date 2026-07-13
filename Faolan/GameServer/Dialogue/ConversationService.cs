@@ -240,11 +240,14 @@ namespace Faolan.GameServer.Dialogue
 			if (character == null)
 				return null;
 
+			if (node.GrantQuestId is not { } questId)
+				return null; // this screen grants no quest
+
 			var existing = await _database.GetCharacterQuests(character.Id);
-			if (existing.Any(q => q.QuestId == node.GrantQuestId))
+			if (existing.Any(q => q.QuestId == questId))
 				return null; // already accepted (active) or completed - don't re-grant
 
-			var def = await _database.GetQuestDefinition(node.GrantQuestId);
+			var def = await _database.GetQuestDefinition(questId);
 
 			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
 			// count (QuestGoalDefinition.RequiredCount), GoalTargetName = the seeded kill target (QuestGoalDefinition.
@@ -257,8 +260,8 @@ namespace Faolan.GameServer.Dialogue
 				: 0u;
 			var goalTargetName = firstGoal?.TargetName;
 
-			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
-			_logger.LogInformation("Quest {QuestId} granted to {Name} from {NpcTemplate}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired,
+			await _database.SetCharacterQuest(character.Id, questId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {NpcTemplate}'s dialogue (goalRequired={Req}, target={Target}).", questId, character.Name, node.NpcName, goalRequired,
 				goalTargetName ?? "-");
 			return def;
 		}
@@ -310,7 +313,7 @@ namespace Faolan.GameServer.Dialogue
 			// AppendText -> QuestLogList (0x504B7924, the J-panel list) -> QuestFullUpdate (0x63268258, the detail) ->
 			// AnswerList, with NO QuestIIR and NO QuestJournal (capture randochar-login-get-casilda-quest frame 687-688).
 			// The QuestLogList is what POPULATES the log; sending only the full-update (the detail) leaves the log empty.
-			var grantDef = node.GrantQuestId != 0
+			var grantDef = node.GrantQuestId is > 0
 				? await PrepareQuestGrant(client, node)
 				: null;
 			var grantSent = false;

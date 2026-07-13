@@ -205,7 +205,7 @@ namespace Faolan.Importer.Captures
 					NpcTemplateId = e.NpcTemplateId is { } t && knownTemplates.Contains(t) ? t : null,
 					CapturedInstance = e.CapturedInstance,
 					ConditionScript = e.ConditionScript,
-					GrantQuestId = e.GrantQuestId,
+					GrantQuestId = e.GrantQuestId == 0 ? null : e.GrantQuestId,
 					Packets = e.Packets.Select((p, i) => BuildPacket(p, i)).ToList()
 				});
 			}

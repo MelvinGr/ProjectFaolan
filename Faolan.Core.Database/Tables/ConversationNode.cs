@@ -10,12 +10,15 @@ namespace Faolan.Core.Database.Tables
 	// ConversationReplay (which routes a live KnubotAnswer index along the AnswerPath).
 	public class ConversationNode : BaseEntity
 	{
-		// The RDB quest id this screen GRANTS when reached (0 = none). Harvested from the captures: a QuestFullUpdate /
+		// The RDB quest id this screen GRANTS when reached (NULL = none). Harvested from the captures: a QuestFullUpdate /
 		// QuestIIR-add for a quest arrived while this screen's responses were being collected (i.e. the player walked
 		// the accept branch). When the runtime serves this screen it persists the quest (active) for the player and
 		// sends its journal content - this is how "talk to NPC -> accept quest -> it appears in the J-panel" works,
 		// generically for any NPC (not just Casilda). See QuestDefinition / WorldBroadcaster.SendQuestFullUpdate.
-		public uint GrantQuestId { get; set; }
+		public uint? GrantQuestId { get; set; }
+
+		[ForeignKey(nameof(GrantQuestId))]
+		public virtual QuestDefinition? GrantQuest { get; set; }
 
 		public uint TypeId { get; set; }
 		public virtual ICollection<ConversationPacket> Packets { get; set; } = [];
