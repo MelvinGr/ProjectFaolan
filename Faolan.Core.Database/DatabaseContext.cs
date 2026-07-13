@@ -27,6 +27,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterInventory> CharacterInventory { get; }
 		DbSet<CharacterMaxStats> CharacterMaxStats { get; }
 		DbSet<CharacterQuest> CharacterQuests { get; }
+		DbSet<CharacterQuestGoal> CharacterQuestGoals { get; }
 		DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; }
 		DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; }
 		DbSet<CharacterShortcut> CharacterShortcuts { get; }
@@ -96,6 +97,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterInventory> CharacterInventory { get; set; }
 		public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
 		public DbSet<CharacterQuest> CharacterQuests { get; set; }
+		public DbSet<CharacterQuestGoal> CharacterQuestGoals { get; set; }
 		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
 		public DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; set; }
 		public DbSet<CharacterShortcut> CharacterShortcuts { get; set; }

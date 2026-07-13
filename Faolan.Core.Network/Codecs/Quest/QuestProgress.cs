@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Quest
@@ -6,30 +8,25 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// Pure quest objective-tracking rules (docs/re/quests-and-combat.md) - testable without the DB/network.
 	public static class QuestProgress
 	{
-		// True if a trigger of `triggerType` against `targetName` advances this quest's goal (#261): the quest is Active,
-		// its first goal is of that type and names that target, and the objective isn't already complete. The trigger
-		// fires per goal type - a kill (CombatService), a corpse-bag loot (LootService), or a talk (ConversationService).
-		// Required is clamped to >= 1 so a goal seeded with RequiredCount 0 still completes on the first trigger.
-		public static bool Advances(CharacterQuest quest, QuestGoalDefinition goal, QuestGoalType triggerType, string targetName)
+		// The goal a trigger of `triggerType` against `targetName` advances (#357): the first (lowest-Sequence) goal of
+		// that type naming that target. Multi-goal quests can have several goals; a trigger fires the one it matches, not
+		// always goal[0]. Returns null if no goal matches (wrong type/target, or an unsourced target). The Sequence order
+		// makes the choice deterministic when two goals share a type+target (rare).
+		public static QuestGoalDefinition MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName)
 		{
-			return quest.State == QuestState.Active && goal != null && goal.GoalType == triggerType && !string.IsNullOrEmpty(goal.TargetName) && !string.IsNullOrEmpty(targetName) &&
-			       goal.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase) && quest.GoalProgress < Math.Max(quest.GoalRequired, 1);
+			if (goals == null || string.IsNullOrEmpty(targetName))
+				return null;
+
+			return goals.OrderBy(g => g.Sequence).FirstOrDefault(g =>
+				g.GoalType == triggerType && !string.IsNullOrEmpty(g.TargetName) && g.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase));
 		}
 
-		// True if a Lua `SolveGoal(goalId)` effect (the RDB quest engine, #356) completes this quest's goal: the quest is
-		// Active, its first goal IS goal `goalId`, and the objective isn't already complete. Unlike Advances, a Lua solve
-		// is not gated on a target NAME - the script itself decided the goal is solved, so any goal type resolves.
-		public static bool SolvesGoal(CharacterQuest quest, QuestGoalDefinition goal, uint goalId)
+		// True when EVERY goal of the quest has reached its RequiredCount (#357) - the completion gate for a multi-goal
+		// quest. `progressOf` returns a goal's current progress (the primary goal's scalar, or a secondary's per-goal
+		// row). RequiredCount is clamped to >= 1 (a goal seeded 0 completes on its first tick). Empty goal set = complete.
+		public static bool AllGoalsComplete(IEnumerable<QuestGoalDefinition> goals, Func<QuestGoalDefinition, uint> progressOf)
 		{
-			return quest.State == QuestState.Active && goal != null && goalId != 0 && goal.GoalId == goalId &&
-			       quest.GoalProgress < Math.Max(quest.GoalRequired, 1);
-		}
-
-		// True if killing an NPC named `npcName` advances this quest's kill objective (active, matching, not yet done).
-		public static bool AdvancesOnKill(CharacterQuest quest, string npcName)
-		{
-			return quest.State == QuestState.Active && !string.IsNullOrEmpty(quest.GoalTargetName) && !string.IsNullOrEmpty(npcName) &&
-			       quest.GoalTargetName.Equals(npcName, StringComparison.OrdinalIgnoreCase) && quest.GoalProgress < quest.GoalRequired;
+			return goals.All(g => progressOf(g) >= Math.Max(g.RequiredCount, 1));
 		}
 	}
 }

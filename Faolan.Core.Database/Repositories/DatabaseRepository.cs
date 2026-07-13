@@ -37,6 +37,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
+		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 		Task<Character?> GetCharacterScaffold(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
@@ -114,6 +115,7 @@ namespace Faolan.Core.Database.Repositories
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
+		Task SetCharacterQuestGoal(uint characterId, uint questId, uint goalId, uint progress);
 		Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId);
 		Task<int> SetCreationSpawn(Character character);
 		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
@@ -511,6 +513,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterQuests.Where(q => q.CharacterId == characterId).ToArrayAsync();
+		}
+
+		// Per-goal progress rows for one of a character's quests (#357). Holds only the SECONDARY goals of a multi-goal
+		// quest; the primary goal lives in the scalar CharacterQuest fields. Empty for a single-goal quest.
+		public async Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterQuestGoals.Where(g => g.CharacterId == characterId && g.QuestId == questId).ToArrayAsync();
 		}
 
 		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)
@@ -1458,6 +1468,30 @@ namespace Faolan.Core.Database.Repositories
 				row.GoalProgress = goalProgress;
 				row.GoalRequired = goalRequired;
 				row.GoalTargetName = goalTargetName;
+			}
+
+			await ctx.SaveChangesAsync();
+		}
+
+		// Upserts a character's progress on a SECONDARY quest goal (#357). Keyed by (character, quest, goal); the primary
+		// goal is NOT stored here (it uses SetCharacterQuest's scalar fields).
+		public async Task SetCharacterQuestGoal(uint characterId, uint questId, uint goalId, uint progress)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterQuestGoals.FirstOrDefaultAsync(g => g.CharacterId == characterId && g.QuestId == questId && g.GoalId == goalId);
+			if (row == null)
+			{
+				ctx.CharacterQuestGoals.Add(new CharacterQuestGoal
+				{
+					CharacterId = characterId,
+					QuestId = questId,
+					GoalId = goalId,
+					Progress = progress
+				});
+			}
+			else
+			{
+				row.Progress = progress;
 			}
 
 			await ctx.SaveChangesAsync();

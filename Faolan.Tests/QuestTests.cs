@@ -19,79 +19,37 @@ namespace Faolan.Tests
 	{
 		private static readonly string CapturesDir = FindCaptures();
 
-		// --- Multi-stage chain supersession predicate (#261) ----------------------------------------------------------
+		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------
 
 		[Fact]
-		public void Advances_MatchesGoalTypeAndTarget()
+		public void MatchingGoal_PicksByTypeAndTarget_NotAlwaysFirst()
 		{
-			// The Casilda chain's three captured trigger stages: each matches only its own goal TYPE + target.
-			Assert.True(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.Kill, "Scavenger Tuut"), QuestGoalType.Kill, "Scavenger Tuut"));
-			Assert.True(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.LootFromNpc, "Scavenger Tuut"), QuestGoalType.LootFromNpc, "scavenger tuut")); // case-insensitive
-			Assert.True(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.TalkToNpc, "Casilda"), QuestGoalType.TalkToNpc, "Casilda"));
+			// A two-goal quest: the trigger fires the goal it matches, not goal[0].
+			var goals = new[] { GoalSeq(1, 100, QuestGoalType.Kill, "Wolf"), GoalSeq(2, 200, QuestGoalType.TalkToNpc, "Casilda") };
+			Assert.Equal(200u, QuestProgress.MatchingGoal(goals, QuestGoalType.TalkToNpc, "casilda")?.GoalId); // second goal, case-insensitive
+			Assert.Equal(100u, QuestProgress.MatchingGoal(goals, QuestGoalType.Kill, "Wolf")?.GoalId);
+			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.LootFromNpc, "Wolf")); // right target, wrong type
+			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.Kill, "")); // empty target
+			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.TalkToNpc, "Nobody")); // no such target
 		}
 
 		[Fact]
-		public void Advances_RejectsWrongTypeTargetOrState()
+		public void AllGoalsComplete_RequiresEveryGoalAtRequired()
 		{
-			var lootGoal = Goal(QuestGoalType.LootFromNpc, "Scavenger Tuut");
-			Assert.False(QuestProgress.Advances(Live(0, 1), lootGoal, QuestGoalType.Kill, "Scavenger Tuut")); // a kill must not fire a loot goal
-			Assert.False(QuestProgress.Advances(Live(0, 1), lootGoal, QuestGoalType.LootFromNpc, "Casilda")); // wrong target NPC
-			Assert.False(QuestProgress.Advances(Live(1, 1), lootGoal, QuestGoalType.LootFromNpc, "Scavenger Tuut")); // objective already complete
-			Assert.False(QuestProgress.Advances(Live(0, 1, QuestState.Completed), lootGoal, QuestGoalType.LootFromNpc, "Scavenger Tuut")); // not active
-			Assert.False(QuestProgress.Advances(Live(0, 1), null, QuestGoalType.LootFromNpc, "Scavenger Tuut")); // no goal definition
-			Assert.False(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.LootFromNpc, null), QuestGoalType.LootFromNpc, "Scavenger Tuut")); // unsourced target
+			var goals = new[] { GoalReq(100, 1), GoalReq(200, 3) };
+			var progress = new System.Collections.Generic.Dictionary<uint, uint> { [100] = 1, [200] = 2 };
+			Assert.False(QuestProgress.AllGoalsComplete(goals, g => progress[g.GoalId])); // goal 200 still 2/3
+			progress[200] = 3;
+			Assert.True(QuestProgress.AllGoalsComplete(goals, g => progress[g.GoalId])); // now every goal met
 		}
 
 		[Fact]
-		public void Advances_TreatsZeroRequiredAsOne()
+		public void AllGoalsComplete_EmptyIsComplete_ZeroRequiredClampsToOne()
 		{
-			// A goal seeded with RequiredCount 0 still completes on the first trigger (the predicate clamps to >= 1).
-			Assert.True(QuestProgress.Advances(Live(0, 0), Goal(QuestGoalType.TalkToNpc, "Casilda"), QuestGoalType.TalkToNpc, "Casilda"));
-		}
-
-		[Fact]
-		public void SolvesGoal_MatchesGoalIdRegardlessOfType()
-		{
-			// A Lua player:SolveGoal(goalId) resolves whichever goal carries that id, no target-name match needed
-			// (the script already decided it's solved) - so even a Kill goal with no seeded target resolves.
-			Assert.True(QuestProgress.SolvesGoal(Live(0, 1), GoalWithId(5744, QuestGoalType.TalkToNpc, "Casilda"), 5744));
-			Assert.True(QuestProgress.SolvesGoal(Live(0, 3), GoalWithId(5744, QuestGoalType.Kill, null), 5744)); // unsourced target still solves
-		}
-
-		[Fact]
-		public void SolvesGoal_RejectsWrongIdCompleteOrInactive()
-		{
-			var goal = GoalWithId(5744, QuestGoalType.TalkToNpc, "Casilda");
-			Assert.False(QuestProgress.SolvesGoal(Live(0, 1), goal, 9999)); // different goal id
-			Assert.False(QuestProgress.SolvesGoal(Live(0, 1), goal, 0)); // goalId 0 never matches
-			Assert.False(QuestProgress.SolvesGoal(Live(1, 1), goal, 5744)); // objective already complete
-			Assert.False(QuestProgress.SolvesGoal(Live(0, 1, QuestState.Completed), goal, 5744)); // not active
-			Assert.False(QuestProgress.SolvesGoal(Live(0, 1), null, 5744)); // no goal definition
-		}
-
-		[Fact]
-		public void AdvancesOnKill_MatchesActiveIncompleteTarget()
-		{
-			Assert.True(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5), "Scavenger Lackey"));
-			Assert.True(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 4, 5), "scavenger lackey")); // case-insensitive
-		}
-
-		[Fact]
-		public void AdvancesOnKill_RejectsNonMatching()
-		{
-			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5), "Wolf")); // wrong target
-			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 5, 5), "Scavenger Lackey")); // already done
-			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5, QuestState.Completed), "Scavenger Lackey")); // completed
-			Assert.False(QuestProgress.AdvancesOnKill(KillQuest(null, 0, 5), "Scavenger Lackey")); // no kill objective
-		}
-
-		[Fact]
-		public void AdvancesOnKill_SingleKillObjective_TheCasildaShape()
-		{
-			// Casilda's quest 13479 seeds RequiredCount=1, GoalTargetName="Scavenger Tuut" (#47): one kill of Tuut
-			// must advance (0<1) and the next state is complete (1>=1, so a second kill no longer advances).
-			Assert.True(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Tuut", 0, 1), "Scavenger Tuut"));
-			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Tuut", 1, 1), "Scavenger Tuut"));
+			Assert.True(QuestProgress.AllGoalsComplete(Array.Empty<QuestGoalDefinition>(), _ => 0)); // no goals -> complete
+			var goals = new[] { GoalReq(100, 0) };
+			Assert.False(QuestProgress.AllGoalsComplete(goals, _ => 0)); // RequiredCount 0 treated as 1
+			Assert.True(QuestProgress.AllGoalsComplete(goals, _ => 1));
 		}
 
 		[Fact]
@@ -317,47 +275,23 @@ namespace Faolan.Tests
 			throw new DirectoryNotFoundException("Captures/ not found above " + AppContext.BaseDirectory);
 		}
 
-		private static QuestGoalDefinition Goal(QuestGoalType type, string target)
+		private static QuestGoalDefinition GoalSeq(uint sequence, uint goalId, QuestGoalType type, string target)
 		{
 			return new QuestGoalDefinition
 			{
+				Sequence = sequence,
+				GoalId = goalId,
 				GoalType = type,
-				TargetName = target,
-				Sequence = 1
+				TargetName = target
 			};
 		}
 
-		private static QuestGoalDefinition GoalWithId(uint goalId, QuestGoalType type, string target)
+		private static QuestGoalDefinition GoalReq(uint goalId, uint required)
 		{
 			return new QuestGoalDefinition
 			{
 				GoalId = goalId,
-				GoalType = type,
-				TargetName = target,
-				Sequence = 1
-			};
-		}
-
-		private static CharacterQuest KillQuest(string target, uint progress, uint required, QuestState state = QuestState.Active)
-		{
-			return new CharacterQuest
-			{
-				QuestId = 1,
-				State = state,
-				GoalTargetName = target,
-				GoalProgress = progress,
-				GoalRequired = required
-			};
-		}
-
-		private static CharacterQuest Live(uint progress, uint required, QuestState state = QuestState.Active)
-		{
-			return new CharacterQuest
-			{
-				QuestId = 1,
-				State = state,
-				GoalProgress = progress,
-				GoalRequired = required
+				RequiredCount = required
 			};
 		}
 
