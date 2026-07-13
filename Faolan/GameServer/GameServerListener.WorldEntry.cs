@@ -706,6 +706,10 @@ namespace Faolan.GameServer
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
 
+			// Warm this map's terrain heightmap + collision mesh off the tick (#284) so the first aggro/loot doesn't
+			// stall the game loop with the ~12 MB decompress + grid build. Fire-and-forget; the caches are thread-safe.
+			_ = Task.Run(() => _simulation.Terrain?.Warm(mapId));
+
 			// Mark this connection as having entered the world. The conversation system (ConversationService), the
 			// 0x2020 -> 0x2008 spawn-check (GameServerListener), and the dialogue-close fallback (Handle0x2000) are
 			// all gated on this - without it NPC dialogue silently never opens.

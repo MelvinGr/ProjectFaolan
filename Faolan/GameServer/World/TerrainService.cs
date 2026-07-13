@@ -57,6 +57,17 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// Pre-load a map's terrain assets into the cache. Called fire-and-forget from world entry so the first aggro /
+		// loot on a map doesn't pay the ~12 MB decompress + grid build synchronously inside the game tick.
+		public void Warm(uint mapId)
+		{
+			if (_rdb == null)
+				return;
+
+			Heightmap(mapId);
+			Collision(mapId);
+		}
+
 		// The terrain ground height at world (x, z) on `mapId`, or null when unavailable (no RDB, no heightmap for that
 		// map, or the point is off the grid). Callers fall back to their own default when null.
 		public float? GroundHeight(uint mapId, float x, float z)
