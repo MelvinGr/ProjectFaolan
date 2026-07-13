@@ -54,6 +54,16 @@ namespace Faolan.Tests
 			Assert.All(fresh.Counters64C, c => Assert.Equal(0ul, c));
 			Assert.Equal(GuildRenownBlock.StatSlotIds, fresh.StatIds); // scaffold preserved
 			Assert.Equal(GuildRenownBlock.Length, fresh.Encode().Length); // still 277 bytes -> roster stays aligned
+
+			// #335: a fresh guild carries NONE of the Sepulchra placeholder's feat/city stats - those are all zero.
+			Assert.All(fresh.Group1, v => Assert.Equal(0u, v));
+			Assert.All(fresh.Group3, v => Assert.Equal(0u, v));
+			Assert.All(fresh.Counters64B, v => Assert.Equal(0ul, v));
+			Assert.Equal(0u, fresh.Group4[0]);
+			// ...but the structural constants stay: the create-time feat defaults + the two hard caps.
+			Assert.Equal(new uint[] { 0x410, 0x816, 0xBEA }, fresh.List2);
+			Assert.Equal(30000000u, fresh.Group4[1]);
+			Assert.Equal(975000000ul, fresh.Counters64D);
 		}
 
 		// The live path builds the block from Guild.Renown: the total lands in RenownCounters[1] (the proven slot),

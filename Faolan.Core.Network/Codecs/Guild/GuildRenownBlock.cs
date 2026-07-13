@@ -148,17 +148,24 @@ namespace Faolan.Core.Network.Codecs.Guild
 			return b;
 		}
 
-		// A fresh-guild block: the placeholder scaffold (stat-ids, caps) with the accumulating renown counters
-		// zeroed - what a brand-new guild must show. RenownCounters + Counters64C are the proven renown groups
-		// (RenownCounters[1] is the total that ticked between snapshots; Counters64C are the large renown
-		// sub-totals); the rest (caps, feat/city slots) are kept since their per-guild-vs-constant split needs the
-		// stat-id meanings (a follow-up). Cosmetic and in-client unverified - see #219.
+		// A brand-new guild's block (#335). A fresh guild has NO accumulated feats, guild CITY, or renown - only the
+		// structural scaffold (the 13 stat-slot ids + the create-time feat-default List2 = 0x410/0x816/0xBEA, which
+		// both the captured create AND full-update blocks carry) and the two hard CAPS the client expects (Group4[1] =
+		// 30,000,000 and Counters64D = 975,000,000, identified as constants, not per-guild values). EVERYTHING else
+		// stays zero. This is built explicitly rather than as "CapturedPlaceholder with a few fields cleared" because
+		// that left the Sepulchra guild's feat/city stats (Group1/Group3/Group4[0]/Counters64B) in place - which is why
+		// a freshly-created guild rendered a guild city + feats it never built (Melvin's "Faolan" guild). Cosmetic and
+		// in-client unverified for the still-opaque slots, but a fresh guild with them ZERO is unambiguously correct.
 		public static GuildRenownBlock ForFreshGuild()
 		{
-			var b = CapturedPlaceholder();
-			Array.Clear(b.RenownCounters);
-			Array.Clear(b.Counters64C);
-			return b;
+			return new GuildRenownBlock
+			{
+				Flag = 0x01,
+				BoolA = 1,
+				List2 = [0x410, 0x816, 0xBEA],
+				Group4 = [0, 30000000],
+				Counters64D = 975000000
+			};
 		}
 
 		// A guild's block built from its stored renown total: the fresh-guild scaffold with the accumulated total
