@@ -4,9 +4,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Server-side gear-stat aggregation (#3): the MaxStatAggregator sums a character's equipped items' ItemStat
-	// modifiers by wire stat id. The DATA (which stat, how much) is the decode-first-validated primary-attribute
-	// modifier (RDB field 972/971); this pins the summing.
+	// Server-side gear-stat aggregation (#3): the MaxStatAggregator sums a character's equipped items' primary-attribute
+	// bonus columns (Item.*Bonus) by wire stat id. The DATA (which stat, how much) is the decode-first-validated
+	// primary-attribute modifier (RDB field 972/971); this pins the summing.
 	public class MaxStatAggregatorTests
 	{
 		private const uint Str = 804, Dex = 814;
@@ -16,9 +16,9 @@ namespace Faolan.Tests
 		{
 			var equipped = new[]
 			{
-				new ItemStat { ItemId = 1, WireStatId = Str, Amount = 2 },
-				new ItemStat { ItemId = 2, WireStatId = Str, Amount = 3 }, // two +Str pieces stack
-				new ItemStat { ItemId = 3, WireStatId = Dex, Amount = 1 }
+				new Item { Id = 1, StrengthBonus = 2 },
+				new Item { Id = 2, StrengthBonus = 3 }, // two +Str pieces stack
+				new Item { Id = 3, DexterityBonus = 1 }
 			};
 
 			var totals = MaxStatAggregator.AggregateGearBonuses(equipped);

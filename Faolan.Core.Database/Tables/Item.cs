@@ -79,6 +79,19 @@ namespace Faolan.Core.Database.Tables
 		[ConstrainToEnumValues]
 		public ItemQuality? Quality { get; set; }
 
+		// The primary-ATTRIBUTE bonus this item grants when equipped (+1/+2/+3), one nullable column per attribute -
+		// the flattened replacement for the old per-(item,stat) ItemStat rows. Decoded from the RDB item-template
+		// property table (RdbItemImporter, docs/rdb/item-template-stats.md): field 972 = the wire stat id
+		// (804=Str / 806=Con / 808=Int / 810=Wis / 814=Dex), field 971 = the amount. Each template carries at most one
+		// primary-attribute modifier today, so an item sets at most one of these. NULL = no bonus for that attribute.
+		// MaxStatAggregator sums them (by wire stat id) across a character's equipped gear (#3). The amounts are the raw
+		// decoded values; the wire ×10 attribute scale is applied at the aggregator/wire, not baked in here.
+		public int? StrengthBonus { get; set; }
+		public int? ConstitutionBonus { get; set; }
+		public int? IntelligenceBonus { get; set; }
+		public int? WisdomBonus { get; set; }
+		public int? DexterityBonus { get; set; }
+
 		// For a BAG item (equipped in the bag slot, equip slot 3): the extra backpack slots it adds - the "+N slots"
 		// the client tooltip shows. The backpack container's max_size = 24 (base) + this. RDB item-template property
 		// field 104 (= the Bag container kind, 0x68); validated: Burlap Sack 24 (24->48), Bag of Holding 20 (->44),

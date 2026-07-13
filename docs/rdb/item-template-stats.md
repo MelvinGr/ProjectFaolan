@@ -45,13 +45,17 @@ In practice only Str (178) and Dex (75) appear as the *primary* attribute.
 ## Status / next step
 
 - Decoded + validated: primary-attribute modifier (`972`/`971`).
-- **IMPORTED (2026-07-10):** the `ItemStat` table (`ItemId`, `WireStatId`, `Amount`) is populated by `RdbItemImporter`
-  from field 972/971 - **359 rows** across 2412 decrypted templates, all clean: `WireStatId` only ever Str (804, 248)
-  or Dex (814, 111), `Amount` only +1/+2/+3 (matching this doc). `MaxStatAggregator.AggregateGearBonuses` sums a
-  character's equipped `ItemStat` rows by wire stat id (unit-tested). This is the decode-first-clean foundation.
+- **IMPORTED:** the modifier is stored on flattened `Item` columns - `StrengthBonus` / `ConstitutionBonus` /
+  `IntelligenceBonus` / `WisdomBonus` / `DexterityBonus` (nullable `int`, `NULL` = no bonus), populated by
+  `RdbItemImporter` from field 972/971. Clean across the decrypted templates: field 972 only ever Str (804) or Dex
+  (814), `Amount` only +1/+2/+3 (matching this doc) - 306 +Str and 157 +Dex items. Each template carries at most one
+  primary attribute, so `SetAttributeBonus` sets one column and clears the other four. `MaxStatAggregator.AggregateGearBonuses`
+  sums a character's equipped `Item` bonus columns by wire stat id (unit-tested). This is the decode-first-clean
+  foundation. (These replaced the old per-`(item,stat)` `ItemStat` table, flattened to columns in
+  `FlattenItemStatsToItemColumns`.)
 - **STILL OPEN (reference-gated, needs an item tooltip):**
-  1. the **secondary-modifier list** semantics + the **vital/HP bonus** field - not decoded, so not in `ItemStat`
-     (they slot into the same table + aggregator sum when a known-tooltip reference pins them);
+  1. the **secondary-modifier list** semantics + the **vital/HP bonus** field - not decoded, so not stored yet
+     (they slot in as further `Item` columns + the same aggregator sum when a known-tooltip reference pins them);
   2. the **wire application** - adding the gear bonus onto the character's base attribute IN the stat block. The
      base attributes are currently the fixed baseline (`SubClassStatBlock`, e.g. `Strength = 0xA`), and the exact
      ×10 scale a +N modifier displays as isn't proven without a reference, so the aggregator's total is not yet

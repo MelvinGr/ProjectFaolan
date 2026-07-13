@@ -35,7 +35,7 @@ namespace Faolan.Importer.Rdb
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
 		// The 5 primary-attribute wire stat ids field 972 is validated to hold (Str/Con/Int/Wis/Dex) - the guard that
-		// keeps the ItemStat import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
+		// keeps the attribute-bonus import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
 		private static readonly HashSet<uint> AttributeStatIds = [804u, 806u, 808u, 810u, 814u];
 
 		public static string ExtractName(ReadOnlySpan<byte> template)
@@ -90,9 +90,8 @@ namespace Faolan.Importer.Rdb
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
 
-			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0, qualitiesAdded = 0, bagsAdded = 0;
+			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0, qualitiesAdded = 0, statsAdded = 0, bagsAdded = 0;
 			var firstSampleShown = false;
-			var parsedStats = new List<ItemStat>();
 
 			foreach (var item in items)
 			{
@@ -168,12 +167,14 @@ namespace Faolan.Importer.Rdb
 
 				// The VALIDATED primary-attribute modifier (docs/rdb/item-template-stats.md, #3): field 972 = the wire
 				// stat id (only ever 804/806/808/810/814 = Str/Con/Int/Wis/Dex across all 1964 templates), field 971 =
-				// the amount (+1/+2/+3). Recorded as an ItemStat - the (statId, amount) foundation the MaxStatAggregator
-				// sums over equipped gear. Same property-table parse as field 74. (The secondary-modifier list + the
-				// vital/HP bonus need a reference tooltip to decode, so they are deliberately NOT imported here.)
+				// the amount (+1/+2/+3). Stored on the matching Item.*Bonus column - the (attribute, amount) foundation
+				// the MaxStatAggregator sums over equipped gear. Same property-table parse as field 74. (The
+				// secondary-modifier list + the vital/HP bonus need a reference tooltip to decode, so they are NOT
+				// imported here.)
 				if (TryReadPropertyField(template.AsSpan(12), 972, out var statId) && AttributeStatIds.Contains(statId)
-				    && TryReadPropertyField(template.AsSpan(12), 971, out var amount) && amount is > 0 and <= 100)
-					parsedStats.Add(new ItemStat { ItemId = item.Id, WireStatId = statId, Amount = (int)amount });
+				    && TryReadPropertyField(template.AsSpan(12), 971, out var amount) && amount is > 0 and <= 100
+				    && SetAttributeBonus(item, statId, (int)amount))
+					statsAdded++;
 
 				// BAG capacity: property field 104 (= the Bag container kind 0x68) holds the extra backpack slots a bag
 				// adds when equipped (the "+N slots" tooltip) - Burlap 24 / Bag of Holding 20 / Veteran's Bag 35. It sits
@@ -210,17 +211,9 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			// Idempotent: replace the ItemStat rows for every item we parsed a modifier for (re-import overwrites, so a
-			// changed/removed modifier doesn't leave a stale row). Items with no modifier keep whatever they had.
-			var statsAdded = parsedStats.Count;
-			if (statsAdded > 0)
-			{
-				var statItemIds = parsedStats.Select(s => s.ItemId).Distinct().ToList();
-				var stale = await db.ItemStats.Where(s => statItemIds.Contains(s.ItemId)).ToListAsync();
-				db.ItemStats.RemoveRange(stale);
-				db.ItemStats.AddRange(parsedStats);
-			}
-
+			// The *Bonus columns were set on tracked Item entities above, so they save with everything else. (The old
+			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
+			// other four, so a changed/moved modifier can't leave a stale value.)
 			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0)
 				await db.SaveChangesAsync();
 
@@ -228,6 +221,34 @@ namespace Faolan.Importer.Rdb
 				Console.WriteLine($"  bag capacities (field 104) set on {bagsAdded} item(s).");
 
 			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, qualitiesAdded, statsAdded);
+		}
+
+		// Sets the item's primary-attribute bonus for wire stat id `statId` (804/806/808/810/814) to `amount`, and
+		// clears the other four (a template carries at most one primary attribute, so a modifier that MOVED to a
+		// different attribute leaves no stale column). Returns whether anything actually changed (drives the counter +
+		// the save). Mirrors how Value/Quality are written onto the tracked Item.
+		private static bool SetAttributeBonus(Item item, uint statId, int amount)
+		{
+			int? str = null, con = null, @int = null, wis = null, dex = null;
+			switch (statId)
+			{
+				case 804: str = amount; break;
+				case 806: con = amount; break;
+				case 808: @int = amount; break;
+				case 810: wis = amount; break;
+				case 814: dex = amount; break;
+			}
+
+			if (item.StrengthBonus == str && item.ConstitutionBonus == con && item.IntelligenceBonus == @int
+			    && item.WisdomBonus == wis && item.DexterityBonus == dex)
+				return false;
+
+			item.StrengthBonus = str;
+			item.ConstitutionBonus = con;
+			item.IntelligenceBonus = @int;
+			item.WisdomBonus = wis;
+			item.DexterityBonus = dex;
+			return true;
 		}
 
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
