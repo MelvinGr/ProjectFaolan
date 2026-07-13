@@ -63,6 +63,22 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BuildLostGraceEffectXml_MatchesCapturedLine()
+		{
+			// The "lost the grace" line (shown when the Shield of the Risen is lost to an aggressive action) is a fixed
+			// token+key string - rebuild the whole captured LostGraceBody from BuildLostGraceEffectXml() + the captured
+			// instance/typeFlags/footer. Proves the key is a constant, not a per-send nonce (same bytes in two captures).
+			var captured = Convert.FromHexString(LostGraceBody);
+			var p = FormatFeedbackCodec.Parse(captured);
+
+			var xml = FormatFeedbackCodec.BuildLostGraceEffectXml();
+			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, xml);
+
+			Assert.Equal(LostGraceBody, Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(FormatFeedbackCodec.EffectLineTypeFlags, p.TypeFlags);
+		}
+
+		[Fact]
 		public void Parse_DecodesTheFifoBanner()
 		{
 			var p = FormatFeedbackCodec.Parse(Convert.FromHexString(AreaNameBody));

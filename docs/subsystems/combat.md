@@ -220,14 +220,29 @@ the tick expires it on schedule. Only self-buffs persist (NPC-cast debuffs carry
 and are dropped); buffs owned by a dedicated re-applier — the login shield and the mount ride buff — are excluded
 at save time so they aren't double-applied on entry (`GameServerListener.ShouldPersistBuff`).
 
-**Persistent login shield (#221) — CURRENTLY DISABLED.** The `GrantStartingBuffs` call in
-`FlushPendingPost205FFollowUp` (which re-applied a class-agnostic shield self-buff to every character, right after
-the ability/spell re-grants, and re-armed on each teleport/changemap re-entry) is **commented out as of
-2026-06-19** (`GameServerListener.WorldEntry.cs`): the capture-proven id `0x000B9000` renders in-client as the
-"Exhausted" DEBUFF and, applied persistently with no working expiry, never clears. It stays off until the
-expected duration/clear-point is pinned. The wire grammar is validated against the captured mount buff above, so
-the shape is sound, but **"Shield of the Risen" is in no capture** — its exact id/payload is unknown.
-**Blocked on #221** (buff expiry) before re-enabling.
+**Shield of the Risen (#221) — RESOLVED + in-client verified.** `SendShieldOfTheRisen`
+(`GameServerListener.Buffs.cs`) applies the newbie-protection self-buff from `FlushPendingPost205FFollowUp`, which
+is re-armed on each teleport/changemap re-entry, so it re-asserts on login AND every playfield change. The real
+ids are bases **`4061768` (1h)** + **`3666828` (10h)**, both named "Shield of the Risen" in `Spells` with real
+durations (`NecroL80_..._conans-castle-exit` rec#165/#736) — the old `0x000B9000` claim was WRONG (that id is the
+"Exhausted" debuff). It uses the **LONG 54-byte** `SelfBuffCodec.BuildBuffDataLong` form (the client rejects the
+short form), and retail shows exactly **one at a time**, picked by playfield type: the 1h on an instanced
+playfield, the 10h in the shared open world (we select by `Map.InstanceMode`, tracked in
+`Session.ActiveShieldSpellBase`). The client renders it TOP-of-screen (protection banner) and auto-generates the
+"You are protected …" line from the ApplySpell itself. It clears three ways: the **10h/1h timer** (the generic
+`TickBuffExpiry`, like any timed buff), a manual `CancelBuff`, or — the newbie-protection rule — the **first
+aggressive action**.
+
+**Shield breaks on the first aggressive action.** `BreakShieldOnAggression` (`GameServerListener.Buffs.cs`) drops
+the shield the instant the player commits an aggressive action — an offensive cast (target ≠ self), a ground AoE,
+or a melee/unarmed swing — matching retail's "protected until you attack." For a *cast* it fires at **cast begin**
+(the aggression is known upfront from the target/ground-cast), not when the cast time elapses. It sends the
+**`LostGraceEffect`** on-screen feedback line (byte-exact `FormatFeedbackCodec.BuildLostGraceEffectXml`, verified
+against `NecroL80_..._conans-castle-exit` rec#508 where the loss happens mid-combat) **before** the rank-1 removal
+twin, then drops the live buff and clears `Session.ActiveShieldSpellBase`. A self-buff cast never breaks it (the
+helper no-ops when no shield is tracked). A pure **playfield swap** of the shield does NOT send `LostGraceEffect`
+(rec#206/#1750 swap the 1h↔10h silently) — the toast means the grace was genuinely lost. The **timer-expiry**
+path deliberately does not send `LostGraceEffect` (no capture oracle for the 10h duration).
 
 ## Cross-player action visibility (#48 + spell effects)
 A player's combat/cast packets are framed to the **actor** only, so without relaying they are invisible to

@@ -68,6 +68,10 @@ from the session** — not just a verbatim replay.
   path (`SendFeedback`) remains and now fires from the level-up attribute feedback below.
 - ✅ **`AttributeChanged` level-up feedback** (#209): byte-exact builder `AttributeChangedFeedback` + golden test +
   decode script, wired into the GM `.level` and combat ding paths. Awaits in-client verification (`needs-testing`).
+- ✅ **`LostGraceEffect` shield-loss line**: byte-exact `FormatFeedbackCodec.BuildLostGraceEffectXml` (typeFlags
+  `0x42000020`, footer `1`) + golden test, sent by `BreakShieldOnAggression` right before the Shield-of-the-Risen
+  removal twin when the shield is lost to an aggressive action (see combat.md). The token+key is a fixed constant
+  (byte-identical in two independent captures), not a per-send nonce.
 - ⬜ **Arbitrary literal text**: the FIFO templates reference a localized RDB string id (the area-name points at
   string 3474586), so showing custom text needs either a literal-text FIFO template or injecting an RDB string id.
   The plain-token lines (`AttributeChanged`, ...) are also token-driven. A literal-text path is the remaining

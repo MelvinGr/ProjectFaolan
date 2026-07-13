@@ -439,6 +439,14 @@ namespace Faolan.GameServer
 								// once, below, after the cast time.
 								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 
+								// Shield of the Risen breaks the moment an AGGRESSIVE cast is COMMITTED (cast begin), not when
+								// the cast time elapses (#361) - a ground AoE (Deathly Blizzard) or an offensive cast at another
+								// entity. A self-buff / self-target cast never breaks it (BreakShieldOnAggression is a no-op with
+								// no shield tracked anyway). Done here at begin so the protection drops as the player starts to
+								// attack, matching retail; the effect itself still resolves after castMs below.
+								if (isGroundCast || (targetHandle != 0 && targetHandle != casterHandle))
+									await BreakShieldOnAggression(client);
+
 								// Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
 								// elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
 								// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
@@ -518,6 +526,7 @@ namespace Faolan.GameServer
 							{
 								// The melee swing / auto-attack: ack the behavior + resolve the hit (see
 								// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
+								await BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
 								await _combat.SendNormalAttackResponse(client, rawPayload, (uint)(args.SpellTarget?.TargetHandle ?? 0), (uint)args.Mode);
 
 								break;
@@ -529,6 +538,7 @@ namespace Faolan.GameServer
 								// Retail's reply is the plain behavior echo-ack - no result block (combat capture
 								// 2026-06-12); targeted damage reuses the armed path (the capture's unarmed swings
 								// hit air, so the damage part is an extension pending in-client validation).
+								await BreakShieldOnAggression(client); // an unarmed swing is aggressive - drops the shield (#361)
 								await _combat.SendUnarmedAttackResponse(client, rawPayload, (uint)args.Mode, (uint)(args.SpellTarget?.TargetHandle ?? 0));
 
 								break;

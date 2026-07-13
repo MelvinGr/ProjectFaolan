@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -176,6 +177,32 @@ namespace Faolan.GameServer
 
 			await SendShieldBuff(client, self, desired);
 			client.Session.ActiveShieldSpellBase = desired;
+		}
+
+		// Shield of the Risen also drops the instant the player commits an AGGRESSIVE action - an offensive cast, a
+		// ground AoE, or a melee/unarmed swing. Retail's newbie protection breaks on the first attack, not only when
+		// its timer (1h/10h, expired by TickBuffExpiry) runs out. Removes the tracked shield's icon with the rank-1
+		// end twin (the client does NOT self-remove it, same as .cancelbuff), drops it from the live registry, and
+		// forgets the session tracking so the next playfield entry re-applies cleanly. No-op when no shield is active
+		// (so a plain self-buff cast, which never sets ActiveShieldSpellBase, leaves it untouched).
+		private async Task BreakShieldOnAggression(INetworkClient client)
+		{
+			if (client.Session?.ActiveShieldSpellBase is not uint shieldBase)
+				return;
+
+			var self = client.Session.Account.ClientInstance;
+			var appliedId = shieldBase << 8;
+
+			// Retail shows the "lost the grace" on-screen line the instant the shield is LOST to an aggressive action,
+			// sent right BEFORE the buff-removal twin (conans-castle-exit rec#508). Without it the icon vanishes with no
+			// notification. Only fired here (the aggression loss), not on a playfield swap (SendShieldOfTheRisen).
+			await SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildLostGraceEffectXml()),
+				FormatFeedbackCodec.EffectLineTypeFlags);
+			await SendBuffRemoval(client, self, self, appliedId);
+
+			_simulation.PlayerWorldEntity(client)?.ActiveBuffs.TryRemove(appliedId, out _);
+			client.Session.ActiveShieldSpellBase = null;
+			Logger.LogInformation("Shield of the Risen broken by aggressive action for {Name}.", client.Session.Character?.Name);
 		}
 
 		private async Task SendShieldBuff(INetworkClient client, uint self, uint spellBase)

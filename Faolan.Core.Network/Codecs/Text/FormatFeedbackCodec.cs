@@ -29,8 +29,23 @@ namespace Faolan.Core.Network.Codecs.Text
 	{
 		// typeFlags value of the GenericDisplayAreaName / FIFO-banner messages (the top-of-screen overlay).
 		public const uint FifoBannerTypeFlags = 0x00000000;
+		// typeFlags of the buff/effect feedback LINES (not the FIFO banner) - e.g. LostGraceEffect, AttributeChanged.
+		public const uint EffectLineTypeFlags = 0x42000020;
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
 		private const byte LeadFlag = 0x01;
+
+		// The LostGraceEffect feedback XML - the "you have lost the grace" on-screen line retail shows the instant a
+		// player LOSES the Shield of the Risen protection (an aggressive action), sent right before the buff-removal
+		// twin (NecroL80_..._conans-castle-exit rec#508: LostGraceEffect feedback -> 0x37f38c01 shield remove, while the
+		// aggro-status stream shows the player in combat). NOT sent on a playfield swap of the shield (rec#206/#1750
+		// swap the 1h<->10h with no LostGraceEffect). Byte-exact against that record; send via
+		// Build(instance, EffectLineTypeFlags, 1, xml). The key is the capture-verbatim per-token key (same treatment
+		// as BuildAreaNameXml's fixed key).
+		public static byte[] BuildLostGraceEffectXml()
+		{
+			return System.Text.Encoding.ASCII.GetBytes(
+				"<remoteformat token=\"LostGraceEffect\" category=\"100\" key=\"RO5SQlZn.h/DvvaH&#36;WGu\" knubot=\"0\"  ></remoteformat>");
+		}
 
 		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml)
 		{
