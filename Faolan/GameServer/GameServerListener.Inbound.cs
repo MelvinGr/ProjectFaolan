@@ -179,20 +179,26 @@ namespace Faolan.GameServer
 							// So suppress the move echo + relay while seated in place - there is nothing to render anyway.
 							if (client.Session.SeatedOnHandle == 0)
 							{
-								// send to all (nearby) clients? (single client for now -> the session conversation;
-								// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
-								// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
-								// nearby players is the next step.
+								// Echo the move back VERBATIM with only the env byte cleared - retail's s2c CharDCMove IS the
+								// c2s move with its env byte flipped 0x01 -> 0x00 (same length, same body), NOT a reconstruction.
+								// Rebuilding it from the parsed pos/rot (round-tripping the rotation through a quaternion)
+								// produced a body the client's CharDCMoveIIR reader REJECTS ("ReadSubClass failed ... Blob data
+								// may be inconsistant" in the client log), so it fell back to prediction -> the movement jitter
+								// (#272). While spellweaving the position is PINNED (trance root #141) - the client does NOT self-root
+								// (verified: without this overwrite you can walk during a weave), so overwrite the echoed position
+								// floats with the accepted (pinned) position; otherwise the client's own move rides back unchanged.
+								var echoBody = rawPayload[4..]; // drop the u32 pbLength: [opcode][c350][inst][movingType][pos][rot][tail]
+								echoBody[12] = 0x00; // clear the env byte (the movingType u16's high byte)
+								if (client.Session.IsSpellweaving && echoBody.Length >= 26)
+								{
+									BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(14, 4), acceptedPosition.X);
+									BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(18, 4), acceptedPosition.Y);
+									BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(22, 4), acceptedPosition.Z);
+								}
+
 								await new PacketStream()
 									.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-									.WriteArrayUInt32Length(s => s
-										.WriteUInt32(pbOpcode)
-										.WriteUInt32(dataobjdec)
-										.WriteUInt32(dataclientinst)
-										.WriteUInt16(relayMovingType)
-										.WriteVector3(livePosition)
-										.WriteVector3(liveRotation)
-										.WriteArray(datadat))
+									.WriteArrayUInt32Length(echoBody)
 									.SendAsync(client);
 
 								// Interest-managed broadcast: spawn this player to newly-near players and forward the move
