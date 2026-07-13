@@ -180,13 +180,19 @@ namespace Faolan.Importer.Rdb
 				// adds when equipped (the "+N slots" tooltip) - Burlap 24 / Bag of Holding 20 / Veteran's Bag 35. It sits
 				// in the table's non-monotonic tail (after the strictly-decreasing run), so it needs the dedicated scan.
 				// Only real bags carry it; used server-side only for the item equipped in the bag slot (equip slot 3).
-				if (TryReadBagSlots(template.AsSpan(12), out var bagSlots))
+				if (TryReadBagSlots(template.AsSpan(12), BagPropertyField, out var bagSlots) && item.BagExtraSlots != bagSlots)
 				{
-					if (item.BagExtraSlots != bagSlots)
-					{
-						item.BagExtraSlots = bagSlots;
-						bagsAdded++;
-					}
+					item.BagExtraSlots = bagSlots;
+					bagsAdded++;
+				}
+
+				// RESOURCE-bag capacity: property field 1331 (the resource-bag analogue of field 104, same non-monotonic
+				// tail). Only real resource bags carry it; used server-side only for the item in the resource-bag slot
+				// (equip slot 26). Max Resource Bag = 102.
+				if (TryReadBagSlots(template.AsSpan(12), ResourceBagPropertyField, out var resourceSlots) && item.ResourceBagExtraSlots != resourceSlots)
+				{
+					item.ResourceBagExtraSlots = resourceSlots;
+					bagsAdded++;
 				}
 
 				// Fill the display name only when we don't already have one (captured names are authoritative).
@@ -262,17 +268,19 @@ namespace Faolan.Importer.Rdb
 			return true;
 		}
 
-		// Bag capacity = property field 104 (= the Bag container kind, 0x68). Unlike Value/attributes it sits in the
-		// property table's non-monotonic tail, so TryReadPropertyField (strictly-decreasing) can't reach it. Scan for
-		// the first [104][value] u32 LE pair whose value is a plausible slot count (1..512). Validated on all three
-		// captured bags (Burlap 24 / Bag of Holding 20 / Veteran's Bag 35). Non-bag templates virtually never carry
-		// field 104, and the value is only ever used for an item equipped in the bag slot, so a stray match is inert.
-		private static bool TryReadBagSlots(ReadOnlySpan<byte> body, out uint slots)
+		// Bag capacity = property field 104 (= the Bag container kind, 0x68) for the normal backpack bag, or field 1331
+		// for a RESOURCE bag. Unlike Value/attributes these sit in the property table's non-monotonic tail, so
+		// TryReadPropertyField (strictly-decreasing) can't reach them. Scan for the first [fieldId][value] u32 LE pair
+		// whose value is a plausible slot count (1..512). Validated: the normal bags (Burlap 24 / Bag of Holding 20 /
+		// Veteran's Bag 35 / Max Inventory 216) via 104, and the Max Resource Bag (102) via 1331. Non-bag templates
+		// virtually never carry these fields, and the value is only ever used for an item in the matching bag slot, so
+		// a stray match is inert.
+		private static bool TryReadBagSlots(ReadOnlySpan<byte> body, uint fieldId, out uint slots)
 		{
 			slots = 0;
 			for (var i = 0; i + 8 <= body.Length; i += 4)
 			{
-				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) != BagPropertyField)
+				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) != fieldId)
 					continue;
 
 				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
@@ -287,6 +295,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		private const uint BagPropertyField = 104; // = ContainerKind.Bag (0x68)
+		private const uint ResourceBagPropertyField = 1331; // the resource-bag capacity field (no ContainerKind analogue)
 
 		// Reads the value of property-table field `fieldId` from a decrypted template body (the span AFTER the
 		// 12-byte RDB-Id header). The property table is the longest run of [fieldId u32][value u32] LE pairs with

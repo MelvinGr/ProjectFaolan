@@ -530,6 +530,7 @@ namespace Faolan.Core.Database.Repositories
 				.CharacterEquipment.Include(e => e.Neck)
 				.Include(e => e.Head)
 				.Include(e => e.Bag)
+				.Include(e => e.ResourceBag)
 				.Include(e => e.Chest)
 				.Include(e => e.MainHandLeft)
 				.Include(e => e.MainHandRight)
@@ -1318,6 +1319,7 @@ namespace Faolan.Core.Database.Repositories
 			tracked.Neck = await ResolveItem(ctx, equipment.Neck?.Id);
 			tracked.Head = await ResolveItem(ctx, equipment.Head?.Id);
 			tracked.Bag = await ResolveItem(ctx, equipment.Bag?.Id);
+			tracked.ResourceBag = await ResolveItem(ctx, equipment.ResourceBag?.Id);
 			tracked.Chest = await ResolveItem(ctx, equipment.Chest?.Id);
 			tracked.MainHandLeft = await ResolveItem(ctx, equipment.MainHandLeft?.Id);
 			tracked.MainHandRight = await ResolveItem(ctx, equipment.MainHandRight?.Id);
@@ -1790,6 +1792,7 @@ namespace Faolan.Core.Database.Repositories
 				.CharacterEquipment.Include(e => e.Neck)
 				.Include(e => e.Head)
 				.Include(e => e.Bag)
+				.Include(e => e.ResourceBag)
 				.Include(e => e.Chest)
 				.Include(e => e.MainHandLeft)
 				.Include(e => e.MainHandRight)

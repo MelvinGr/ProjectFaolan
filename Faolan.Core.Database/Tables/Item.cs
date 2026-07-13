@@ -97,5 +97,13 @@ namespace Faolan.Core.Database.Tables
 		// field 104 (= the Bag container kind, 0x68); validated: Burlap Sack 24 (24->48), Bag of Holding 20 (->44),
 		// Veteran's Bag 35 (->59). NULL = not a bag. Extracted by RdbItemImporter; see FullPlayerCharacterBuilder.
 		public uint? BagExtraSlots { get; set; }
+
+		// For a RESOURCE BAG item (equipped in the resource-bag slot, equip slot 26): the extra RESOURCE-container slots
+		// it adds - the sibling of BagExtraSlots for the backpack. The resource container's max_size = 48 (base) + this.
+		// RDB item-template property field 1331 (unlike the normal bag's field 104 = Bag kind, resource bags carry their
+		// capacity here - live-confirmed: Max Resource Bag = [1331]=102, matching its "(102 slots)" name). Sits in the
+		// same non-monotonic tail as field 104. NULL = not a resource bag. Extracted by RdbItemImporter; see
+		// FullPlayerCharacterBuilder.
+		public uint? ResourceBagExtraSlots { get; set; }
 	}
 }

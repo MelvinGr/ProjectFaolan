@@ -81,6 +81,31 @@ namespace Faolan.Tests
 			Assert.Empty(containers[3].Items);
 		}
 
+		// The equipped bag/resource-bag grow their containers: the backpack (kind 104) by Item.BagExtraSlots and the
+		// resource container (kind 112) by Item.ResourceBagExtraSlots, the same base+extra sizing (#12).
+		[Fact]
+		public void BuildContainers_EquippedBagsGrowTheirContainers()
+		{
+			var backpackBag = new Item { Id = 5061820, Key = new ProtoDecryptionKey { Key1 = 9 }, Hash = 0x35555043, BagExtraSlots = 216 };
+			var resourceBag = new Item { Id = 5061819, Key = new ProtoDecryptionKey { Key1 = 10 }, Hash = 0x46555044, ResourceBagExtraSlots = 102 };
+
+			var equipped = new Dictionary<ulong, (Item, uint)>
+			{
+				[(ulong)CharacterEquipmentSlot.Bag] = (backpackBag, backpackBag.Hash),                 // slot 3
+				[(ulong)CharacterEquipmentSlot.ResourceBag] = (resourceBag, resourceBag.Hash)          // slot 26
+			};
+
+			var containers = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, null);
+
+			// backpack 24+216=240, resource 48+102=150; equipped/quest unchanged; disabled_slots unchanged.
+			Assert.Equal(new uint[] { 1028, 240, 150, 48 }, containers.Select(c => c.MaxSize));
+			Assert.Equal(new uint[] { 0, 0, 12, 0 }, containers.Select(c => c.DisabledSlotsCount));
+
+			// both bags render as worn items in the equipped container at their slots.
+			Assert.Contains(containers[0].Items, e => e.Pos == (ulong)CharacterEquipmentSlot.Bag);
+			Assert.Contains(containers[0].Items, e => e.Pos == (ulong)CharacterEquipmentSlot.ResourceBag);
+		}
+
 		// Persisted CharacterInventory rows fill their container by kind: bag rows render at their cells (the
 		// seeded FirstPosBag yields its cell to a persisted row), entries stay pos-ascending, and rows without
 		// buildable identity are absent.

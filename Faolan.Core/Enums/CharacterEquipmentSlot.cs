@@ -25,6 +25,15 @@ namespace Faolan.Core.Enums
 		Wrist = 18,
 		RangedWeapon = 20, // main_hand_right (bow/crossbow/thrown)
 		Ammo = 21, // off_hand_right (quiver/bolts)
+		ResourceBag = 26, // the equipped RESOURCE bag - sizes the resource container (kind 112), the sibling of Bag (3)
+		                  // for the backpack. Live-confirmed: equipping a Max Resource Bag sent InventoryToEquipped
+		                  // target 26. Its extra slots come from Item.ResourceBagExtraSlots (RDB field 1331), added on
+		                  // top of the 48-slot base.
+
+		// NOTE: there is apparently also a QUEST bag - the third sibling, growing the quest container (kind 113) the way
+		// Bag grows the backpack and ResourceBag grows the resource container. Its equip slot id is UNKNOWN: no quest
+		// bag exists in the DB to equip and read the target slot from (the resource bag's slot 26 was recovered that
+		// way). Add the enum member + the CharacterEquipment slot + the quest-container sizing once one surfaces.
 
 		// Vanity ("costume") item slots = 1000 + the base equip slot id. VanityHead (1002) and VanityChest (1005) are
 		// capture-confirmed by the ToggleVanityArmorFilter slot arg (base slot 2/5); the rest are extrapolated.

@@ -44,6 +44,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// +35 (=59). Confirmed against fresh vs. lvl-80 snapshots. #12.
 		private const uint BaseBackpackSlots = 24;
 		private const ulong BagEquipSlot = (ulong)CharacterEquipmentSlot.Bag;
+
+		// Resource-container sizing, the sibling of the backpack: base 48 slots + the resource bag equipped in the
+		// resource-bag slot (equip slot 26) adds its Item.ResourceBagExtraSlots (RDB field 1331) - Max Resource Bag
+		// +102. Mirrors the backpack's BaseBackpackSlots + BagExtraSlots.
+		private const uint BaseResourceSlots = 48;
+		private const uint ResourceDisabledSlots = 12;
+		private const ulong ResourceBagEquipSlot = (ulong)CharacterEquipmentSlot.ResourceBag;
 		private const ulong ItemIdEpoch = 0x20D82B63UL << 32;
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
@@ -71,11 +78,16 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			var backpackSlots = BaseBackpackSlots
 			                    + (equipped.TryGetValue(BagEquipSlot, out var bagItem) ? bagItem.Item.BagExtraSlots ?? 0 : 0);
 
+			// The resource container grows by the resource bag equipped in the resource-bag slot (slot 26): base 48 +
+			// its ResourceBagExtraSlots - the sibling of the backpack sizing above.
+			var resourceSlots = BaseResourceSlots
+			                    + (equipped.TryGetValue(ResourceBagEquipSlot, out var resItem) ? resItem.Item.ResourceBagExtraSlots ?? 0 : 0);
+
 			var containers = new List<ProtoInventoryGame>
 			{
 				NewContainer(EquippedKind, 1028, 0, instance),
 				NewContainer(BagKind, backpackSlots, 0, instance),
-				NewContainer(ResourceKind, 48, 12, instance),
+				NewContainer(ResourceKind, resourceSlots, ResourceDisabledSlots, instance),
 				NewContainer(QuestKind, 48, 0, instance)
 			};
 

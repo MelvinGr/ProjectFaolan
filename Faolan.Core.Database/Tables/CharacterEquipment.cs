@@ -107,6 +107,13 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(BagId))]
 		public virtual Item? Bag { get; set; }
 
+		// The equipped RESOURCE bag (equip slot 26): its Item.ResourceBagExtraSlots sizes the resource container, the
+		// sibling of Bag for the backpack.
+		public uint? ResourceBagId { get; set; }
+
+		[ForeignKey(nameof(ResourceBagId))]
+		public virtual Item? ResourceBag { get; set; }
+
 		public uint? VanityBeltId { get; set; }
 
 		[ForeignKey(nameof(VanityBeltId))]
@@ -156,6 +163,7 @@ namespace Faolan.Core.Database.Tables
 					CharacterEquipmentSlot.Neck          => Neck,
 					CharacterEquipmentSlot.Head          => Head,
 					CharacterEquipmentSlot.Bag           => Bag,
+					CharacterEquipmentSlot.ResourceBag   => ResourceBag,
 					CharacterEquipmentSlot.Chest         => Chest,
 					CharacterEquipmentSlot.MainWeapon    => MainHandLeft,
 					CharacterEquipmentSlot.Belt          => Belt,
@@ -197,6 +205,12 @@ namespace Faolan.Core.Database.Tables
 					case CharacterEquipmentSlot.Bag:
 					{
 						Bag = value;
+						break;
+					}
+
+					case CharacterEquipmentSlot.ResourceBag:
+					{
+						ResourceBag = value;
 						break;
 					}
 
