@@ -163,16 +163,7 @@ namespace Faolan.GameServer.Dialogue
 			if (variants.Count == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
 				return variants[0]; // GetConversationScreens orders the unconditional fallback last
 
-			var character = client.Session.Character;
-			var tags = character != null
-				? await _database.GetCharacterTags(character.Id)
-				: [];
-			var quests = character != null
-				? await _database.GetCharacterQuests(character.Id)
-				: [];
-			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
-			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
-			var player = new GameLuaPlayer(tags, completed, active);
+			var player = await BuildLuaPlayer(client.Session.Character);
 
 			ConversationNode fallback = null;
 			foreach (var v in variants)
@@ -191,6 +182,52 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			return fallback;
+		}
+
+		// Builds the GameLuaPlayer for the live character (preloaded tags + completed/active quests - script calls are
+		// sync, so state is read up front). Shared by the condition gate (PickConversationScreen) and the effect run
+		// (ApplyScreenEffect). Returns an empty-state player when there's no character (pre-login create flow).
+		private async Task<GameLuaPlayer> BuildLuaPlayer(Character character)
+		{
+			if (character == null)
+				return new GameLuaPlayer([], []);
+
+			var tags = await _database.GetCharacterTags(character.Id);
+			var quests = await _database.GetCharacterQuests(character.Id);
+			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
+			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
+			return new GameLuaPlayer(tags, completed, active);
+		}
+
+		// #356: runs the screen's EffectScript (the RDB quest engine's state mutation) and PERSISTS what it recorded:
+		// AddTag -> CharacterTag, SolveGoal -> QuestProgressionService.SolveGoal (advances/supersedes the owning quest).
+		// SpawnItem/CastSpell are recorded but deferred (no resource resolver yet). No-op when the screen has no effect.
+		// This is the conversation half of closing the Lua effect->quest-state loop; the .lua run GM command shares the
+		// same apply shape for out-of-dialogue testing.
+		private async Task ApplyScreenEffect(INetworkClient client, ConversationNode node)
+		{
+			if (string.IsNullOrEmpty(node.EffectScript))
+				return;
+
+			var character = client.Session?.Character;
+			if (character == null)
+				return;
+
+			var player = await BuildLuaPlayer(character);
+			if (!LuaScriptVm.RunEffect(node.EffectScript, player))
+			{
+				_logger.LogWarning("Conversation: effect script failed for npc={Name} path='{Path}'.", node.NpcName, node.AnswerPath);
+				return;
+			}
+
+			foreach (var tag in player.AddedTags)
+				await _database.AddCharacterTag(character.Id, (uint)tag);
+			foreach (var goalId in player.SolvedGoals)
+				await _questProgression.SolveGoal(client, (uint)goalId);
+
+			if (player.AddedTags.Count > 0 || player.SolvedGoals.Count > 0)
+				_logger.LogInformation("Conversation: effect (npc={Name} path='{Path}') +tags [{Tags}], solved goals [{Goals}] for {Char}.", node.NpcName, node.AnswerPath,
+					string.Join(",", player.AddedTags), string.Join(",", player.SolvedGoals), character.Name);
 		}
 
 		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
@@ -321,6 +358,12 @@ namespace Faolan.GameServer.Dialogue
 				// quest) - re-run interest so they stream in immediately, not only after the player next moves.
 				await _broadcaster.RefreshQuestVisibility(client);
 			}
+
+			// #356: run this screen's Lua EFFECT (if any) and persist what it did - the RDB quest engine's state
+			// mutation (SolveGoal advances the owning quest, AddTag records progress). Runs AFTER the grant so a screen
+			// that both grants and solves finds the just-granted quest active. Before the terminal return so a
+			// close-only screen still fires its effect.
+			await ApplyScreenEffect(client, node);
 
 			// A pure terminal screen (a CloseChatWindow with NO AnswerList) ENDS the dialogue: the window is now shut
 			// on the client. Recording it as the active position left the session "inside" a finished conversation,

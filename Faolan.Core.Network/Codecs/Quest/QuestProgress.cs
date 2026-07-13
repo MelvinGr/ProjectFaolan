@@ -16,6 +16,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 			       goal.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase) && quest.GoalProgress < Math.Max(quest.GoalRequired, 1);
 		}
 
+		// True if a Lua `SolveGoal(goalId)` effect (the RDB quest engine, #356) completes this quest's goal: the quest is
+		// Active, its first goal IS goal `goalId`, and the objective isn't already complete. Unlike Advances, a Lua solve
+		// is not gated on a target NAME - the script itself decided the goal is solved, so any goal type resolves.
+		public static bool SolvesGoal(CharacterQuest quest, QuestGoalDefinition goal, uint goalId)
+		{
+			return quest.State == QuestState.Active && goal != null && goalId != 0 && goal.GoalId == goalId &&
+			       quest.GoalProgress < Math.Max(quest.GoalRequired, 1);
+		}
+
 		// True if killing an NPC named `npcName` advances this quest's kill objective (active, matching, not yet done).
 		public static bool AdvancesOnKill(CharacterQuest quest, string npcName)
 		{

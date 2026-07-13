@@ -372,6 +372,10 @@ namespace Faolan.GameServer
 			var ok = LuaScriptVm.RunEffect(script.Source, player);
 			foreach (var t in player.AddedTags)
 				await Database.AddCharacterTag(characterId, (uint)t);
+			// #356: apply solved goals too (not just report them) - route each through the quest engine so a script's
+			// player:SolveGoal(goalId) actually advances/supersedes the owning quest, same as an in-dialogue effect.
+			foreach (var g in player.SolvedGoals)
+				await _questProgression.SolveGoal(client, (uint)g);
 
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");

@@ -34,6 +34,14 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(256)]
 		public string ConditionScript { get; set; } = "";
 
+		// A Lua EFFECT source (run against the live player via LuaScriptVm.RunEffect) that fires when this screen is
+		// served - the RDB quest engine's state mutation (player:SolveGoal/AddTag/SpawnItem/CastSpell). "" = no effect
+		// (the current behaviour). The runtime persists the recorded effects: AddTag -> CharacterTag, SolveGoal ->
+		// QuestProgressionService.SolveGoal (advances the owning quest). Closes the Lua effect->quest-state loop (#356)
+		// so scripted accept/branch/turn-in advance without bespoke C#; the importer harvests it per reached screen.
+		[MaxLength(256)]
+		public string EffectScript { get; set; } = "";
+
 		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. Display/routing hint;
 		// the runtime now gates on NpcTemplateId (below), not the name alone.
 		[MaxLength(128)]

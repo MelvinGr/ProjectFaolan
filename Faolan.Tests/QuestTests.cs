@@ -50,6 +50,26 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void SolvesGoal_MatchesGoalIdRegardlessOfType()
+		{
+			// A Lua player:SolveGoal(goalId) resolves whichever goal carries that id, no target-name match needed
+			// (the script already decided it's solved) - so even a Kill goal with no seeded target resolves.
+			Assert.True(QuestProgress.SolvesGoal(Live(0, 1), GoalWithId(5744, QuestGoalType.TalkToNpc, "Casilda"), 5744));
+			Assert.True(QuestProgress.SolvesGoal(Live(0, 3), GoalWithId(5744, QuestGoalType.Kill, null), 5744)); // unsourced target still solves
+		}
+
+		[Fact]
+		public void SolvesGoal_RejectsWrongIdCompleteOrInactive()
+		{
+			var goal = GoalWithId(5744, QuestGoalType.TalkToNpc, "Casilda");
+			Assert.False(QuestProgress.SolvesGoal(Live(0, 1), goal, 9999)); // different goal id
+			Assert.False(QuestProgress.SolvesGoal(Live(0, 1), goal, 0)); // goalId 0 never matches
+			Assert.False(QuestProgress.SolvesGoal(Live(1, 1), goal, 5744)); // objective already complete
+			Assert.False(QuestProgress.SolvesGoal(Live(0, 1, QuestState.Completed), goal, 5744)); // not active
+			Assert.False(QuestProgress.SolvesGoal(Live(0, 1), null, 5744)); // no goal definition
+		}
+
+		[Fact]
 		public void AdvancesOnKill_MatchesActiveIncompleteTarget()
 		{
 			Assert.True(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5), "Scavenger Lackey"));
@@ -301,6 +321,17 @@ namespace Faolan.Tests
 		{
 			return new QuestGoalDefinition
 			{
+				GoalType = type,
+				TargetName = target,
+				Sequence = 1
+			};
+		}
+
+		private static QuestGoalDefinition GoalWithId(uint goalId, QuestGoalType type, string target)
+		{
+			return new QuestGoalDefinition
+			{
+				GoalId = goalId,
 				GoalType = type,
 				TargetName = target,
 				Sequence = 1

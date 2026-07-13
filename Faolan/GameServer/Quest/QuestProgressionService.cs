@@ -47,6 +47,33 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.Kill, npcName);
 		}
 
+		// #356: a Lua EFFECT script resolved goal `goalId` (player:SolveGoal(goalId)) - the RDB quest engine's way of
+		// completing an objective. Finds the active quest whose first goal IS `goalId` and completes it through the same
+		// supersession machinery the trigger path uses (no target-name match: the script already decided it's solved).
+		// This is what closes the Lua effect->quest-state loop so scripted quests advance without bespoke C#.
+		public async Task SolveGoal(INetworkClient client, uint goalId)
+		{
+			var character = client?.Session?.Character;
+			if (character == null || goalId == 0)
+				return;
+
+			var changed = false;
+			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			{
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				if (!QuestProgress.SolvesGoal(quest, goal, goalId))
+					continue;
+
+				changed = true;
+				await CompleteObjective(client, character, quest, def, goal, Math.Max(quest.GoalRequired, 1));
+				_logger.LogInformation("Quest {Quest} goal {Goal} solved by Lua effect for {Char}.", quest.QuestId, goalId, character.Name);
+			}
+
+			if (changed)
+				await _outbound.RefreshQuestVisibility(client);
+		}
+
 		// The player looted `sourceNpcName`'s corpse bag: advance any active loot-from-NPC goal targeting it. The quest
 		// item (the scavenger's key) is RDB content we don't materialise, so the bag's SOURCE NPC name is the match key.
 		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName)
@@ -96,30 +123,40 @@ namespace Faolan.GameServer.Quest
 					continue;
 				}
 
-				if (def.NextQuestId != 0)
-					await CompleteAndSupersede(client, character, quest, def);
-				else if (triggerType == QuestGoalType.Kill)
-					await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
-				else
-					await CompleteFinal(client, character, quest, def, required); // chainless loot/talk -> just complete
-
-				// #262: talking to Casilda is what FREES her - on that talk-goal completion she becomes the player's
-				// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
-				// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
-				if (triggerType == QuestGoalType.TalkToNpc && string.Equals(targetName, "Casilda", StringComparison.OrdinalIgnoreCase))
-				{
-					_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, true);
-					// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
-					// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
-					// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
-					await _questHandler.DropBeachWall(client);
-				}
+				await CompleteObjective(client, character, quest, def, goal, required);
 			}
 
 			// #261: a stage change can un-gate or re-gate NPCs (e.g. completing Casilda's kill stage despawns Tuut) -
 			// re-run the player's interest pass so gated visibility tracks the new quest state immediately.
 			if (changed)
 				await _outbound.RefreshQuestVisibility(client);
+		}
+
+		// The objective for `quest`'s goal has hit its required count: complete the stage. Shared by the trigger path
+		// (Advance) and the Lua-solve path (SolveGoal) - the completion is identical, only how the objective is REACHED
+		// differs. Supersede to the next stage, hold for turn-in (legacy #47 chainless kill), or complete outright, then
+		// run the goal's completion side-effects. Keyed off the GOAL (its type + target), not the trigger, so both callers
+		// share one code path. Does NOT run RefreshQuestVisibility - the caller does that once after its loop.
+		private async Task CompleteObjective(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint required)
+		{
+			if (def.NextQuestId != 0)
+				await CompleteAndSupersede(client, character, quest, def);
+			else if (goal.GoalType == QuestGoalType.Kill)
+				await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
+			else
+				await CompleteFinal(client, character, quest, def, required); // chainless loot/talk -> just complete
+
+			// #262: talking to Casilda is what FREES her - on that talk-goal completion she becomes the player's
+			// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
+			// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
+			if (goal.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
+			{
+				_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, true);
+				// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
+				// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
+				// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
+				await _questHandler.DropBeachWall(client);
+			}
 		}
 
 		// Complete stage N and supersede it with stage N+1: the captured wire sequence + the state flip (mark N
