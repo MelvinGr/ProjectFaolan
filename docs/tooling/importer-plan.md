@@ -120,8 +120,8 @@ Rules and edge cases:
   `upsert` and an `overwrite` guarded by `--force` (it cascades to 12 child tables incl. live player
   progress) is the tracked step-2a follow-up.
 - **Scope of `overwrite` = the module's own tables only.** It must never touch another module's data. The NPC
-  reseed models this (it wipes only `NpcSpawns`/morphs/equipment/patrol, leaving the Tortage prune and
-  `NpcSpells` intact). The committed seeds (beach burst 4010, pruned world set) stay exempt.
+  reseed models this (it wipes only `NpcSpawns`/morphs/equipment/patrol, leaving `NpcSpells` and the other
+  modules' tables intact). The committed seeds (e.g. the beach burst 4010) stay exempt.
 - **Per-module override.** Global `--mode` sets the default; `--mode npcs=overwrite,items=insert` overrides
   individual modules in one run.
 - **Default stays `upsert`** so a no-flag run reproduces the committed-DB workflow with no surprises.

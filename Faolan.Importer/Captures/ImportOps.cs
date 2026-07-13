@@ -404,10 +404,10 @@ namespace Faolan.Importer.Captures
 		// Quest journal-content definitions, refreshed per harvested quest; un-harvested quests untouched.
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
 		{
-			// The world is pruned to Tortage, so some harvested quests point their map marker at a playfield that isn't
-			// in the (pruned) Maps catalog (e.g. quest 19522 -> map 30200). QuestDefinition.MapId is a required FK to
-			// Maps, so importing those would fail the FK. Skip them with a clear line rather than silently — they'll
-			// re-import once/if their map is added back.
+			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a
+			// playfield that isn't in the Maps catalog (e.g. a marker for a map the rdb-maps module didn't pull). Those
+			// would fail the FK, so skip them with a clear line rather than silently — they'll re-import once/if their
+			// map is added to the catalog.
 			var knownMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
 			var skipped = 0;
 
