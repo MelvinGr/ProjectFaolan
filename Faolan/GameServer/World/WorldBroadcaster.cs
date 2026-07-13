@@ -750,6 +750,11 @@ namespace Faolan.GameServer.World
 				entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 				entity.Hostile = entity.Disposition == WorldEntity.DispositionHostile;
 
+				// The creature's death animation (#362): use the type's harvested death behaviorId, else the humanoid
+				// default. Sent in the death BccIIR by CombatService.OnNpcKilled so demons/beasts play their own death.
+				if (npc.NpcTemplate.DeathBehaviorId is { } deathBehavior)
+					entity.DeathBehaviorId = deathBehavior;
+
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
 				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE

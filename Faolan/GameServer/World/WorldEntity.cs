@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.GameServer.Combat;
 
 namespace Faolan.GameServer.World
@@ -201,6 +202,11 @@ namespace Faolan.GameServer.World
 		// conversations without the shared-placeholder-name collision (many NPCs share an internal name, e.g. 25 share
 		// "Halen van Dummy"). 0 for players (they aren't shop/conversation NPCs).
 		public uint NpcTemplateId { get; init; }
+
+		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
+		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
+		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.
+		public uint DeathBehaviorId { get; set; } = WorldDeath.HumanoidDeathBehaviorId;
 
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the .spawnbag player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever

@@ -442,7 +442,7 @@ namespace Faolan.GameServer.Combat
 				// local release/resurrect UI). Send both to the killer right after the killing-blow vitals so the
 				// lingering corpse plays its death anim.
 				await SendWorldPacket(killer, WorldDeath.BuildDeathPose(targetHandle, npcEntity.Position));
-				await SendWorldPacket(killer, WorldDeath.BuildDeathBcc(targetHandle, WorldDeath.NpcDeathVariant));
+				await SendWorldPacket(killer, WorldDeath.BuildDeathBcc(targetHandle, npcEntity.DeathBehaviorId, WorldDeath.NpcDeathVariant));
 
 				await AwardKillXp(killer, npcEntity.Level);
 

@@ -46,5 +46,10 @@ namespace Faolan.Core.Database.Tables
 		// The creature's display name (the stable join key conversations/shops/spells use).
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
+
+		// The creature's death-animation behaviorId (the death BccIIR field-1, #362) - harvested per type from captured
+		// NPC deaths (Faolan.Importer NpcDeathBehaviorExtractor): 41877 = humanoid biped, 17036 = demon/large caster,
+		// 215333 = quadruped/beast. NULL = un-harvested type; the runtime falls back to the humanoid 41877.
+		public uint? DeathBehaviorId { get; set; }
 	}
 }

@@ -33,11 +33,23 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact()
 		{
-			// The death-behavior BccIIR (0x642CD3D6, behaviorId 41877) retail sends for a dying NPC from
-			// NecroL80_..._casting-combat pkt#5162: dying handle 0x0004EFE7, form 0x0004, slot 0x1F, protobuf with the
-			// NPC death variant (field-3 byte 0x05). The carrier prepends the u32 length 0x00000023.
-			var body = WorldDeath.BuildDeathBcc(0x0004EFE7, WorldDeath.NpcDeathVariant);
+			// The death-behavior BccIIR (0x642CD3D6, behaviorId 41877 = humanoid biped death) retail sends for a dying
+			// NPC from NecroL80_..._casting-combat pkt#5162: dying handle 0x0004EFE7, form 0x0004, slot 0x1F, protobuf with
+			// the NPC death variant (field-3 byte 0x05). The carrier prepends the u32 length 0x00000023.
+			var body = WorldDeath.BuildDeathBcc(0x0004EFE7, WorldDeath.HumanoidDeathBehaviorId, WorldDeath.NpcDeathVariant);
 			Assert.Equal("642cd3d60000c3500004efe700040000001f0000000d0895c70218052808300060f001", Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		[Theory]
+		[InlineData(41877u, "0895c702")]   // humanoid biped (Picts, Nemedians, pirates, ...)
+		[InlineData(17036u, "088c8501")]   // demon / large caster (Arcanist, Bat Demon, Corruptor, Reaper, ...)
+		[InlineData(215333u, "08a5920d")]  // quadruped / beast (Ape King, Jungle Ape, Panther)
+		public void BuildDeathBcc_EncodesCreatureDeathBehaviorId_AsVarint(uint behaviorId, string field1Hex)
+		{
+			// The behaviorId (protobuf field 1) is the creature's death animation, harvested per NpcTemplate (#362).
+			// Only field1 changes; field3 (variant 0x05), field5=8, field6=0, field12=240 stay constant.
+			var body = WorldDeath.BuildDeathBcc(0x00040000, behaviorId, WorldDeath.NpcDeathVariant);
+			Assert.Equal($"642cd3d60000c3500004000000040000001f0000000d{field1Hex}18052808300060f001", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]

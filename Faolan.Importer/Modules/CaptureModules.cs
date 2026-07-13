@@ -530,6 +530,58 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Per-creature death animation (the death BccIIR behaviorId), harvested from captured NPC kills (#362). Enriches
+	// NpcTemplate.DeathBehaviorId by name; un-harvested types keep NULL and the runtime falls back to the humanoid id.
+	public sealed class NpcDeathBehaviorsModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+
+		// No hard DependsOn (mirrors NpcDispositionModule): enriches whatever NpcTemplates exist; registration order
+		// sequences it after `npcs`. No-ops on an empty DB.
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
+
+		public string Description => "Per-creature death animation (death BccIIR behaviorId from captured NPC kills).";
+		public string Name => "npc-death-behaviors";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var harvested = NpcDeathBehaviorExtractor.Merge(ctx.Captures.SelectMany(c => NpcDeathBehaviorExtractor.Extract(c.Packets)));
+			var byName = harvested.ToDictionary(d => d.Name, d => d.BehaviorId, StringComparer.OrdinalIgnoreCase);
+
+			var cleared = 0;
+			if (ctx.ModeFor(Name) == WriteMode.Overwrite)
+			{
+				foreach (var t in await ctx.Db.NpcTemplates.Where(t => t.DeathBehaviorId != null).ToListAsync())
+				{
+					t.DeathBehaviorId = null;
+					cleared++;
+				}
+			}
+
+			// A name can map to several templates (e.g. two "Nemedian Archer" types) - every matching type gets the id.
+			var updated = 0;
+			foreach (var template in await ctx.Db.NpcTemplates.ToListAsync())
+			{
+				if (template.Name != null && byName.TryGetValue(template.Name, out var behaviorId) && template.DeathBehaviorId != behaviorId)
+				{
+					template.DeathBehaviorId = behaviorId;
+					updated++;
+				}
+			}
+
+			await ctx.Db.SaveChangesAsync();
+			var distinct = byName.Values.Distinct().Count();
+			var prefix = cleared > 0 ? $"cleared {cleared}; " : "";
+			return new ImportResult($"{prefix}{byName.Count} creature(s) harvested ({distinct} distinct death anims), {updated} templates set.");
+		}
+	}
+
 	// Static world objects (decor/containers/zones).
 	public sealed class WorldObjectsModule : IImportModule
 	{
