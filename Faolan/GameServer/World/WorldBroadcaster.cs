@@ -615,13 +615,15 @@ namespace Faolan.GameServer.World
 			if (questDrop || items.Count > 0 || cash > 0)
 			{
 				// Bag at the NPC's death spot HORIZONTALLY (X/Z - where the player expects it, not at the killer's feet
-				// on a ranged/AoE kill), but the KILLER's ground Y: the NPC's death-moment Y varies by creature (tall /
-				// flying / MoveTask Z-drift #190), so a static bag mesh placed at it floats or sinks ("random heights").
-				// The killer is provably on valid ground nearby. This is an INTERIM: the correct fix is to snap Y to the
-				// terrain at the death X/Z, which needs the heightmap / collision geometry tracked on #284 (LOS). Fall
-				// back to the NPC's own Y when the killer can't be resolved (expired session / environmental death).
+				// on a ranged/AoE kill), snapped to the terrain GROUND Y so a static bag mesh sits on the floor instead
+				// of at the creature's death-moment Y (which varies by creature: tall / flying / MoveTask Z-drift #190 ->
+				// bags float or sink). #284: the ground height is the RDB heightmap sample at the death X/Z. When terrain
+				// is unavailable (no client RDB), fall back to the KILLER's Y (they're on valid ground nearby), then to
+				// the NPC's own Y.
 				var dropPos = deadNpc.Position;
-				if (deadNpc.LastAttackerHandle != 0 && _sim.World.ZoneForEntity(deadNpc).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
+				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY)
+					dropPos = new Vector3(deadNpc.Position.X, groundY, deadNpc.Position.Z);
+				else if (deadNpc.LastAttackerHandle != 0 && _sim.World.ZoneForEntity(deadNpc).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
 					dropPos = new Vector3(deadNpc.Position.X, killer.Position.Y, deadNpc.Position.Z);
 
 				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);

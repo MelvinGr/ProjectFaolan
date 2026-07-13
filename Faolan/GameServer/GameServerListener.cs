@@ -55,6 +55,11 @@ namespace Faolan.GameServer
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
 		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
 
+		// Default client-RDB path for the terrain heightmap (#284) when `RdbDir` isn't set in faolan.json - the standard
+		// dev install, so ground-snap/LoS work out of the box. A deployment without the client RDB just leaves the
+		// directory absent and TerrainService disables itself (no error).
+		private const string DefaultRdbDir = "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
 		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
@@ -229,7 +234,11 @@ namespace Faolan.GameServer
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
-			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
+			// Server-side terrain (RDB heightmap) for ground-snap + terrain line-of-sight (#284). Optional: reads the
+			// client RDB directly at runtime (heightmaps are ~9 MB each - too big to import); degrades gracefully when
+			// RdbDir is unset or the client RDB is absent. Default to the standard install path so it "just works" in dev.
+			var terrain = new TerrainService(configuration["RdbDir"] ?? DefaultRdbDir, logger);
+			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			// Constructed before the broadcaster (needs only the sim + DB) so the broadcaster's interest stream can call

@@ -79,14 +79,20 @@ namespace Faolan.GameServer.World
 		public ConcurrentDictionary<INetworkClient, WorldEntity> Players { get; } = new ConcurrentDictionary<INetworkClient, WorldEntity>();
 
 		// The live world model + the connected players' authoritative world entities (transform + vitals).
-		public WorldState World { get; } = new WorldState();
+		public WorldState World { get; }
 
-		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger)
+		// Server-side terrain (RDB heightmap): ground-height snapping + terrain line-of-sight (#284). Reached by the
+		// broadcaster (loot-bag Y) and the WorldState tick (aggro line-of-sight).
+		public TerrainService Terrain { get; }
+
+		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, TerrainService terrain = null)
 		{
 			_output = output;
 			_database = database;
 			_agents = agents;
 			_logger = logger;
+			Terrain = terrain;
+			World = new WorldState(terrain);
 		}
 
 		// The player's live world entity for this connection (authoritative transform + vitals), or null if not in the

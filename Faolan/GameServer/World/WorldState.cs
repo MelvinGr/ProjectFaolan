@@ -82,6 +82,15 @@ namespace Faolan.GameServer.World
 		// to it and behave exactly as before instancing existed.
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new ConcurrentDictionary<(uint MapId, uint InstanceId), Zone>();
 
+		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight below (#284). Null = terrain
+		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
+		private readonly TerrainService _terrain;
+
+		public WorldState(TerrainService terrain = null)
+		{
+			_terrain = terrain;
+		}
+
 		private uint _nextPlayfieldToken = 0x00A00000;
 
 		// The idle-heartbeat cadence (#225): every live NPC (re-)asserts its short-form BehaviorControlCenterIIR this
@@ -459,7 +468,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// The closest player within `range` of the NPC (its aggro target), or null if none.
-		private static WorldEntity NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
+		private WorldEntity NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
 		{
 			WorldEntity nearest = null;
 			var nearestDist = float.MaxValue;
@@ -469,7 +478,11 @@ namespace Faolan.GameServer.World
 					continue;
 				if (!npc.IsVisibleTo(player)) // a quest-gated NPC (e.g. Scavenger Tuut) must not aggro/attack a player it
 					continue; // was never streamed to - else the player takes hits from an invisible body
-				if (MathF.Abs(player.Position.Y - npc.Position.Y) > NpcAggroVerticalRange) // #284: not through a floor/drop
+				if (MathF.Abs(player.Position.Y - npc.Position.Y) > NpcAggroVerticalRange) // #284 tier 1: not through a floor/drop
+					continue;
+				// #284 tier 2: real terrain occlusion - don't aggro a player behind a hill / across a ridge. Fails open
+				// (no block) when terrain is unavailable, so this only ever REMOVES false aggros the tier-1 gate missed.
+				if (_terrain != null && !_terrain.HasTerrainLineOfSight(zone.MapId, npc.Position, player.Position))
 					continue;
 
 				var dist = Vector3.Distance(player.Position, npc.Position);
