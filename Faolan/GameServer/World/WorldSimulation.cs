@@ -444,6 +444,30 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Combat: {Player} relocated to '{Spot}' {Dest} (token 0x{Token:X}).", character.Name, point.Name, dest, liveToken);
 		}
 
+		// A same-MAP (same-playfield) teleport: relocate the player to `destination` on their CURRENT map with NO
+		// loading screen, reusing the death-revive same-map path (IntendedTeleport with the LIVE playfield token +
+		// n3Teleport). This is how a same-playfield zone-line door works - e.g. the Thirsty Dog Inn, whose UseObject
+		// (door handle 0xBEB) resolves to IntendedTeleport destMap == the current map + an N3Teleport, with NO reconnect
+		// (Hoxxling_..._gameplay2: door 0xBEB -> arrival (45, 158.05, 124) on map 4020, the player already on 4020).
+		// Contrast DoTeleport, which cross-maps via a full 0x2002 handoff + reconnect (loading screen). The position is
+		// persisted so it survives relog.
+		public async Task RelocateSameMap(INetworkClient client, Vector3 destination)
+		{
+			var entity = PlayerWorldEntity(client);
+			var character = client?.Session?.Character;
+			if (entity == null || character == null)
+				return;
+
+			entity.Position = destination;
+			character.Position = destination;
+			await _database.SaveCharacterTransform(character.Id, destination, character.Rotation, character.MapId);
+
+			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
+			await _output.SendReviveTeleport(client, entity.Handle, character.MapId, liveToken);
+			await _output.SendReviveDestination(client, entity.Handle, character.MapId, destination, 1f, 0f);
+			_logger.LogInformation("World: {Player} same-map relocated to {Dest} on map {Map} (token 0x{Token:X}).", character.Name, destination, character.MapId, liveToken);
+		}
+
 		// On death: show the client the release screen (DispatchValidResurrectionSpots) so the player can pick where to
 		// resurrect, instead of silently sitting at 0 HP until the auto-timer fires. We send the single closest known
 		// point (the captures only ever carried one spot; the multi-spot framing isn't pinned). The client replies with

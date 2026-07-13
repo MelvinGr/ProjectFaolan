@@ -620,9 +620,13 @@ namespace Faolan.GameServer
 										// destination hasn't been captured yet, surface a message (like the missing-vendor
 										// case) rather than a silent no-op.
 										var dest = interaction.Teleport;
+										var currentMap = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
 										if (dest.DestMapId == 0)
 											await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 												$"<span style=\"color: red;\">Zone-line '{dest.DestinationName}' has no known destination yet.</span>");
+										else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
+											// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
+											await _simulation.RelocateSameMap(client, samePos);
 										else
 											await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition);
 

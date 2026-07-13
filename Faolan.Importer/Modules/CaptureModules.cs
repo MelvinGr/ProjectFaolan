@@ -559,7 +559,6 @@ namespace Faolan.Importer.Modules
 	// server surfaces a message on use. Depends on world-objects (the rows it enriches must exist).
 	public sealed class WorldTeleportsModule : IImportModule
 	{
-		private const uint ZoneLineSubOpcode = (uint)GameServer0X2000Opcodes.DoorFullUpdateIIR; // 0x33A56FB0
 		private const float PositionTolerance = 1.0f; // burst pos vs stored row pos (both from the same import)
 
 		public ImportSource Source => ImportSource.Captures;
@@ -596,7 +595,9 @@ namespace Faolan.Importer.Modules
 				}
 			}
 
-			var zoneLines = await ctx.Db.WorldObjects.Where(o => o.SubOpcode == ZoneLineSubOpcode).ToListAsync();
+			// Enrich BOTH door classes the extractor harvests: DoorFullUpdateIIR zone-lines AND the SimpleDynel doors
+			// (e.g. the Thirsty Dog Inn) - WorldTeleportExtractor.DoorSubOpcodes.
+			var zoneLines = await ctx.Db.WorldObjects.Where(o => WorldTeleportExtractor.DoorSubOpcodes.Contains(o.SubOpcode)).ToListAsync();
 
 			var matched = 0;
 			var misses = 0;

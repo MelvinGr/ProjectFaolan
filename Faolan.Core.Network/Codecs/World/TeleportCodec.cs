@@ -75,12 +75,14 @@ namespace Faolan.Core.Network.Codecs.World
 				.ToArray();
 		}
 
-		// The same-map REVIVE destination announce (#214): the n3Teleport (0x5A32F0D7) retail sends right after the
-		// revive IntendedTeleport - THIS is the packet that actually relocates the player to the res point (no loading
-		// screen, same map). Its grammar DIFFERS from the cross-map BuildDestination: the spawn position is right after
-		// env (not in a trailing length-prefixed blob), the proxy carries 0xC7A0 (not 0xC79C) + map + player handle
-		// with the instance slots ZERO, and there's no leading 6-zero/1.0f block. Decoded byte-for-byte from the beach
-		// resurrect (Stihetfv #1277, 92 bytes, map 0xFAA):
+		// The SAME-MAP destination announce: the n3Teleport (0x5A32F0D7) that actually relocates the player on their
+		// CURRENT playfield with no loading screen. Retail sends it for BOTH the death revive (#214, after the revive
+		// IntendedTeleport) AND a same-playfield zone-line door - e.g. the Thirsty Dog Inn, which repositions within
+		// City of Tortage rather than change-mapping (WorldSimulation.RelocateSameMap reaches it via SendReviveDestination;
+		// WorldTeleportExtractor decodes this same variant). Its grammar DIFFERS from the cross-map BuildDestination: the
+		// spawn position is right after env (not in a trailing length-prefixed blob), the proxy carries 0xC7A0 (not
+		// 0xC79C) + map + player handle with the instance slots ZERO, and there's no leading 6-zero/1.0f block. Decoded
+		// byte-for-byte from the beach resurrect (Stihetfv #1277, 92 bytes, map 0xFAA):
 		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=0]
 		//   [f32 X][f32 Y][f32 Z]                         # res point position
 		//   [u32 0][f32 facingX][u32 0][f32 facingZ]      # 2D heading
@@ -115,9 +117,11 @@ namespace Faolan.Core.Network.Codecs.World
 				.ToArray();
 		}
 
-		// The same-map REVIVE teleport (#214): the single IntendedTeleport (0x10D27BC0) retail sends after the
-		// RespawnMe revive to relocate the player to the chosen res point WITHOUT a loading screen. ONE record, NO
-		// position (the client positions off the RespawnMe spawnPointId / its RDB). The PlayfieldProxy is pinned to
+		// The SAME-MAP teleport begin (#214): the single IntendedTeleport (0x10D27BC0) that pins the target playfield
+		// for a same-map relocation WITHOUT a loading screen - retail sends it for the death revive AND same-playfield
+		// zone-line doors (the inn; via WorldSimulation.RelocateSameMap -> SendReviveTeleport). ONE record, NO
+		// position (the client positions off the RespawnMe spawnPointId / its RDB / the following n3Teleport). The
+		// PlayfieldProxy is pinned to
 		// the CURRENT playfield: map + the player's own handle in slot3 + the ready flag + the LIVE playfield token in
 		// slot7. CRITICAL: playfieldToken MUST be the token the client currently holds (Zone.PlayfieldToken, captured
 		// from the burst-less world-entry snapshot - the same one SpawnPlayfieldRewriter stamps into rendered spawns),
