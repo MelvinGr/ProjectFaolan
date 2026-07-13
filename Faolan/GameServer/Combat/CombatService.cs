@@ -435,11 +435,14 @@ namespace Faolan.GameServer.Combat
 				// range - retail's NewAllowedLooterIIR is a loot-PERMISSION grant (#263).
 				npcEntity.LastAttackerHandle = killer.Session.Account.ClientInstance;
 
-				// #204: the health=0 StatUpdate alone does NOT play the death animation (in-client verified) - the
-				// client needs the explicit SimpleCharKilledByUpdateIIR (0xB066AFC2) kill record (docs/subsystems/combat.md,
-				// decoded from AssassinL23_..._resurect). Send it right after the killing-blow vitals so the lingering
-				// corpse plays its death anim. Killer = the player who landed the blow.
-				await SendWorldPacket(killer, WorldDeath.BuildKilledBy(targetHandle, killer.Session.Account.ClientInstance));
+				// #204/#349: the health=0 StatUpdate alone does NOT play the death animation. Retail drives an NPC
+				// death with a death-pose MoveTask (type 0x06, freezes the corpse in place) + a death-behavior BccIIR
+				// (behaviorId 41877) on the dying handle - decoded from NecroL80_..._casting-combat, where EVERY NPC kill
+				// carries exactly this pair (and NO SimpleCharKilledBy: that record is player-death-only, driving the
+				// local release/resurrect UI). Send both to the killer right after the killing-blow vitals so the
+				// lingering corpse plays its death anim.
+				await SendWorldPacket(killer, WorldDeath.BuildDeathPose(targetHandle, npcEntity.Position));
+				await SendWorldPacket(killer, WorldDeath.BuildDeathBcc(targetHandle, WorldDeath.NpcDeathVariant));
 
 				await AwardKillXp(killer, npcEntity.Level);
 

@@ -31,6 +31,16 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact()
+		{
+			// The death-behavior BccIIR (0x642CD3D6, behaviorId 41877) retail sends for a dying NPC from
+			// NecroL80_..._casting-combat pkt#5162: dying handle 0x0004EFE7, form 0x0004, slot 0x1F, protobuf with the
+			// NPC death variant (field-3 byte 0x05). The carrier prepends the u32 length 0x00000023.
+			var body = WorldDeath.BuildDeathBcc(0x0004EFE7, WorldDeath.NpcDeathVariant);
+			Assert.Equal("642cd3d60000c3500004efe700040000001f0000000d0895c70218052808300060f001", Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		[Fact]
 		public void BuildKilledBy_ReproducesCapturedRecord_ByteExact()
 		{
 			// The IIR record (the carrier prepends the u32 length): dying handle 0x08006F31, killer endpoint 0x000406F9.

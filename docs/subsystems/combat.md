@@ -37,8 +37,10 @@ identity quad would go (behavior acks, the 0xF result block, 0x2052 grants).
 ## NPC death lifecycle (corpse linger -> loot bag -> respawn)
 
 A killed NPC no longer instant-pops. The killing blow pushes the `health=0` vitals (`ApplyNpcDamage`), then
-`CombatService.OnNpcKilled` `MarkDead`s the world entity (+ XP + kill quests) and sends the explicit death
-trigger `SimpleCharKilledByUpdateIIR` (0xB066AFC2) so the client plays the death anim (#204, see above). The
+`CombatService.OnNpcKilled` `MarkDead`s the world entity (+ XP + kill quests) and plays the death anim via the
+retail NPC-death pair — a **death-pose `MoveTaskIIR`** (0x96C46740, movement-type 0x06, freezes the corpse in
+place) + a **death-behavior `BehaviorControlCenterIIR`** (0x642CD3D6, behaviorId 41877) on the dying handle
+(`WorldDeath.BuildDeathPose`/`BuildDeathBcc`, #204/#349, see below). The
 world tick (`WorldState.Tick`) drives two independent timers off the death:
 1. **corpse linger** (`WorldEntity.CorpseLingerSeconds`, ~3s): the corpse stays the dying creature so the
    client plays its death animation. When it elapses the tick emits `NpcCorpseLootable` ->
@@ -60,13 +62,27 @@ world tick (`WorldState.Tick`) drives two independent timers off the death:
 players baked into the pcap). A
 neutral named entity deletes every same-name row on the map; a faction mob only the rows at its spot (commit `576c007`).
 
-Death trigger (#204 NPC death anim + #214 player release screen) — **WIRED 2026-06-19 (commit f5bcb5e).** A
-`health=0` StatUpdate alone does NOT drive the client's death state (verified in-client 2026-06-17: NPCs despawned
-with no anim; the player release screen never showed). The explicit trigger is `SimpleCharKilledByUpdateIIR_t`
-(**0xB066AFC2**) — decoded from `AssassinL23_..._resurect` as the packet right before the death `0x2024`. Record:
-`[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `WorldDeath.BuildKilledBy`
-(byte-exact golden). `CombatService.OnNpcKilled` sends it for the dying NPC (after the killing-blow vitals);
-`WorldSimulation.SendDeathScreen` sends it for the player BEFORE `DispatchValidResurrectionSpots`.
+Death trigger (#204 NPC death anim + #214 player release screen). A `health=0` StatUpdate alone does NOT drive
+the client's death state (verified in-client 2026-06-17: NPCs despawned with no anim; the player release screen
+never showed). **NPC death and player death use DIFFERENT triggers** — decoded from
+`NecroL80_..._casting-combat` (NPC) vs `AssassinL23_..._resurect`/`Stihetfv_..._beach` (player):
+
+- **NPC death** (#204/#349) = a **death-pose `MoveTaskIIR`** (0x96C46740, movement-type 0x06 — freezes the
+  corpse where it fell) followed by a **death-behavior `BehaviorControlCenterIIR`** (0x642CD3D6) on the dying
+  handle. In `NecroL80_..._casting-combat` **every** NPC kill carries exactly this pair and **NO
+  `SimpleCharKilledBy`** (validated by `Captures/scripts/decode_npc_death.py`). The death is identified by the
+  BccIIR **envelope** — form **0x0004**, slot **0x0000001F**, a 13-byte protobuf `08 <behaviorId> 18 <variant>
+  28 08 30 00 60 <f12>`; the **behaviorId is creature-specific** (that creature's own death animation — 41877
+  for the common humanoid mobs, 17036 for the F023 creature) and the field-3 `<variant>` byte varies per kill
+  (a hit-direction/ragdoll selector). Built by `WorldDeath.BuildDeathPose` + `BuildDeathBcc(handle,
+  NpcDeathVariant)` (byte-exact goldens), sent by `CombatService.OnNpcKilled` after the killing-blow vitals. We
+  send the common humanoid death (behaviorId 41877, `NpcDeathVariant` = 0x05); per-creature death behaviorIds
+  need per-NPC behavior data we don't yet carry (follow-up).
+- **Player death** (#214) uses `SimpleCharKilledByUpdateIIR_t` (**0xB066AFC2**) — the "you were killed by X"
+  record that drives the local release/resurrect UI, ABSENT from NPC kills. Record:
+  `[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `WorldDeath.BuildKilledBy`
+  (byte-exact golden). `WorldSimulation.SendDeathScreen` sends it (along with the death-pose + death-Bcc) for the
+  player BEFORE `DispatchValidResurrectionSpots`.
 
 **Player death/resurrect — COMPLETE + verified in-client, #214 CLOSED 2026-06-20.** Full flow: release window
 (`CharacterStats.bcc_state=29`) → **instant** respawn (the `killerEndpoint` MUST be the actual mob, not the

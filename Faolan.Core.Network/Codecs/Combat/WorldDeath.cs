@@ -51,12 +51,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// SimpleCharKilledBy + 0x2024 + death effect alone left the avatar standing and the release UI closed (#214).
 		private const uint MoveTaskOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
 
-		// The in-session DEATH action retail sends to put the player into the dead state (bcc_state 29) - the inverse
-		// of BuildRevive. Decoded from the retail beach death (Stihetfv #1292, right after the death-effect ApplySpell):
-		// a form-0x0004 BccIIR, protobuf behaviorId 41877 (the death animation), no tail. Capture-derived verbatim
-		// except the player handle. Needed because a login-while-dead char gets bcc_state=29 from its spawn, but an
-		// IN-SESSION death has no spawn re-send - this BccIIR is how the dead state transitions on the live SimpleChar.
-		private static readonly byte[] DeathBccProtobuf = [0x08, 0x95, 0xC7, 0x02, 0x18, 0x03, 0x28, 0x08, 0x30, 0x00, 0x60, 0xF0, 0x01];
+		// The death-behavior BccIIR (0x642CD3D6, behaviorId 41877 = "the death animation") that transitions a dying
+		// SimpleChar - PLAYER or NPC - into the dead state and plays its death animation. A form-0x0004 record on the
+		// dying handle, slot 0x1F, protobuf behaviorId 41877, no tail. Retail sends it to BOTH:
+		//   * the dying PLAYER (Stihetfv beach #1292, right after the death-effect ApplySpell) - drives the dead state
+		//     (bcc_state 29). A login-while-dead char gets bcc_state=29 from its spawn, but an IN-SESSION death has no
+		//     spawn re-send, so this is how the live SimpleChar transitions; variant 0x03.
+		//   * every dying NPC (NecroL80_..._casting-combat: EVERY kill = death-pose MoveTask(0x06) + this BccIIR, and NO
+		//     SimpleCharKilledBy). The protobuf's field-3 byte varies per NPC kill (0x05/0x09/0x0F/0x12 observed - most
+		//     likely a hit-direction / ragdoll-impulse selector); the death anim is driven by behaviorId 41877
+		//     regardless, so we send a representative constant (NpcDeathVariant).
+		public const byte PlayerDeathVariant = 0x03;
+		public const byte NpcDeathVariant = 0x05;
 
 		private static readonly byte[] DeathEffectPayload =
 		[
@@ -66,16 +72,17 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		private static readonly byte[] ReviveBccProtobuf = [0x08, 0x98, 0xC3, 0x02, 0x18, 0x04, 0x28, 0x08, 0x30, 0x00, 0x60, 0x64];
 
-		public static byte[] BuildDeathBcc(uint handle)
+		public static byte[] BuildDeathBcc(uint handle, byte deathVariant = PlayerDeathVariant)
 		{
+			byte[] protobuf = [0x08, 0x95, 0xC7, 0x02, 0x18, deathVariant, 0x28, 0x08, 0x30, 0x00, 0x60, 0xF0, 0x01];
 			return new FaolanStream()
 				.WriteUInt32(BccIirOpcode)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0004) // form
 				.WriteUInt32(0x0000001F) // slot
-				.WriteUInt32(DeathBccProtobuf.Length)
-				.WriteArray(DeathBccProtobuf)
+				.WriteUInt32((uint)protobuf.Length)
+				.WriteArray(protobuf)
 				.ToArray();
 		}
 
