@@ -16,7 +16,6 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer.Combat;
-using Faolan.GameServer.Scripting;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -299,7 +298,6 @@ namespace Faolan.GameServer
 				["removeitem"] = RemoveItemCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
 				["areaname"] = AreaNameCommand,
-				["lua"] = LuaCommand,
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
@@ -343,42 +341,6 @@ namespace Faolan.GameServer
 
 			await _combat.KillNpc(client, targetHandle);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Killed target 0x{targetHandle:X8}.");
-		}
-
-		// .lua run <scriptId>  - run an RDB LuaArchive script against the player (the conversation/quest VM engine):
-		// reads the player's tags/quests, runs the script, persists any tags it adds, and reports its effects. Proves
-		// the Lua VM end-to-end on a real character (see protocol_conversation_routing).
-		private async Task LuaCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length < 2 || !parts[0].Equals("run", StringComparison.OrdinalIgnoreCase) || !uint.TryParse(parts[1], out var scriptId))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .lua run <scriptId>");
-				return;
-			}
-
-			var script = await Database.GetLuaScript(scriptId);
-			if (script?.Source == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No Lua script {scriptId} (run --rdb-lua to import).</span>");
-				return;
-			}
-
-			var tags = await Database.GetCharacterTags(characterId);
-			var completed = (await Database.GetCharacterQuests(characterId)).Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
-			var player = new GameLuaPlayer(tags, completed);
-
-			var ok = LuaScriptVm.RunEffect(script.Source, player);
-			foreach (var t in player.AddedTags)
-				await Database.AddCharacterTag(characterId, (uint)t);
-			// #356: apply solved goals too (not just report them) - route each through the quest engine so a script's
-			// player:SolveGoal(goalId) actually advances/supersedes the owning quest, same as an in-dialogue effect.
-			foreach (var g in player.SolvedGoals)
-				await _questProgression.SolveGoal(client, (uint)g);
-
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
 		}
 
 		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger

@@ -186,27 +186,6 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
-	public sealed class RdbLuaModule : IImportModule
-	{
-		public ImportSource Source => ImportSource.Rdb;
-		public IReadOnlyList<string> DependsOn => [];
-
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
-		{
-			WriteMode.Insert,
-			WriteMode.Upsert
-		};
-
-		public string Description => "LuaArchive conversation/quest scripts from the RDB.";
-		public string Name => "rdb-lua";
-
-		public async Task<ImportResult> RunAsync(ImportContext ctx)
-		{
-			var n = await RdbLuaImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
-			return new ImportResult($"{n} scripts imported.");
-		}
-	}
-
 	// Resurrection points; on-demand records fetched from the CDN. Under --dry-run the CDN blob archive
 	// (--store) is suppressed (an out-of-DB write the transaction rollback can't undo).
 	public sealed class RdbRespawnsModule : IImportModule

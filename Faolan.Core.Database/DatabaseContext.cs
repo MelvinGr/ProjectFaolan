@@ -47,7 +47,6 @@ namespace Faolan.Core.Database
 		DbSet<Guild> Guilds { get; }
 		DbSet<Item> Items { get; }
 		DbSet<ItemStat> ItemStats { get; }
-		DbSet<LuaScript> LuaScripts { get; }
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
 		DbSet<Map> Maps { get; }
@@ -117,7 +116,6 @@ namespace Faolan.Core.Database
 		public DbSet<Guild> Guilds { get; set; }
 		public DbSet<Item> Items { get; set; }
 		public DbSet<ItemStat> ItemStats { get; set; }
-		public DbSet<LuaScript> LuaScripts { get; set; }
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }
 		public DbSet<Map> Maps { get; set; }
@@ -171,7 +169,6 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Combo>().Property(c => c.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Item>().Property(i => i.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Map>().Property(m => m.Id).ValueGeneratedNever();
-			modelBuilder.Entity<LuaScript>().Property(l => l.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Recipe>().Property(r => r.Id).ValueGeneratedNever();
 			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Recipe).WithMany(r => r.Items).HasForeignKey(ri => ri.RecipeId).OnDelete(DeleteBehavior.Cascade);
 

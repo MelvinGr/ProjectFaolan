@@ -58,7 +58,6 @@ namespace Faolan.Core.Database.Repositories
 		Task<List<Guild>> GetGuilds(uint realmId);
 		Task<Item?> GetItem(uint id);
 		Task<uint?> GetItemSearchCategory(uint template);
-		Task<LuaScript?> GetLuaScript(uint scriptId);
 		Task<Mail?> GetMailByWireId(ulong mailId);
 		Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId);
 		Task<Map?> GetMap(uint id);
@@ -752,12 +751,6 @@ namespace Faolan.Core.Database.Repositories
 				return null;
 
 			return categories.GroupBy(c => c).OrderByDescending(g => g.Count()).First().Key;
-		}
-
-		public async Task<LuaScript?> GetLuaScript(uint scriptId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.LuaScripts.FirstOrDefaultAsync(s => s.Id == scriptId);
 		}
 
 		// One mail by its wire MailId (the GetMailByID / GetMailItem target), attachments eager-loaded.

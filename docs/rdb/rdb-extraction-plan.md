@@ -75,10 +75,14 @@ index and (b) lets us pull resources by **type id**.
 > So a faithful RDB conversation engine needs a **Lua interpreter + a player-tag/quest-state system + TextStrings(TDC2)
 > resolution + Knubot script extraction + a server Knubot VM** — a major multi-session subsystem entangled with quests.
 >
-> **ENGINE BUILT (2026-06-11) — the VM is no longer pinned (`lua_vm` memory).** The 1992 LuaArchive scripts are
-> extracted (`--rdb-lua` → `LuaScripts` table); a `CharacterTag` store backs `player:HasTag/AddTag`; `LuaScriptVm`
-> (MoonSharp, sandboxed) runs real scripts against a character (the full `player` API: HasTag/AddTag/HasCompletedQuest/
-> GetIntStat/Count/SpawnItem/SolveGoal/CastSpell), proven by `LuaVmTests` + `.lua run <id>` / `.tag` GM commands.
+> **ENGINE BUILT (2026-06-11) — the VM is no longer pinned (`lua_vm` memory).** A `CharacterTag` store backs
+> `player:HasTag/AddTag`; `LuaScriptVm` (MoonSharp, sandboxed) runs real scripts against a character (the full `player`
+> API: HasTag/AddTag/HasCompletedQuest/GetIntStat/Count/SpawnItem/SolveGoal/CastSpell), proven by `LuaVmTests` + the
+> `.tag` GM command. Conversation Lua is authored INLINE on `ConversationNode.ConditionScript`/`EffectScript`.
+> (The 1992 RDB LuaArchive scripts WERE bulk-imported to a `LuaScripts` table, but that table + its `--rdb-lua`
+> importer + the `.lua run` command were REMOVED as near-worthless: ~59% are one-line `player:AddTag(n)`, the rest
+> mostly Funcom-shop upsells / PvP-saga / event cruft, and none are linked to our dialogue, so they were never a
+> usable corpus.)
 > REMAINING — and **WALLED (checked 2026-06-11):** wiring the VM into conversations/quests needs the TREE definition
 > (which node runs which script, which option → which next node, which quest has which goals). That tree is **NOT in
 > the client RDB** — inventoried all 195 types: the RDB has the SCRIPTS (LuaArchive) + TEXT (TextStrings) but no
