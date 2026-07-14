@@ -52,6 +52,11 @@ namespace Faolan.Core.Network.Server.GameServer
 			return _providers.Keys.SelectMany(p => p.GetSessions()).ToArray();
 		}
 
+		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
+		{
+			return _providers.Keys.SelectMany(p => p.GetWorldSessions()).ToArray();
+		}
+
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
 			// The listeners share one world simulation, so the first non-empty view is THE view.

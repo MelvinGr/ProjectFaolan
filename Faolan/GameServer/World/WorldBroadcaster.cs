@@ -675,6 +675,32 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
+		// GM .delete of a static WORLD OBJECT (chest/door/dynel): these aren't in the live entity model (they stream
+		// once at world entry), so a handle that isn't a live entity may still be one. Despawns it live for nearby
+		// players AND deletes its DB row so it's gone on relog too. Returns the deleted row, or null if the handle isn't
+		// a known world object on the player's map.
+		public async Task<WorldObject> DeleteWorldObjectForPlayer(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return null;
+
+			var obj = await _database.GetWorldObject(player.MapId, handle);
+			if (obj == null)
+				return null;
+
+			// World objects aren't tracked in Known, so we can't use that #245 gate; instead only despawn for viewers
+			// that have ENTERED the world (they received the world-object burst, so the handle is safe to quit for them).
+			var zone = _sim.World.ZoneForEntity(player);
+			foreach (var viewer in zone.PlayersInRange(obj.Position, WorldSimulation.PlayerInterestRange))
+				if (viewer.Client?.Session?.WorldEntered == true)
+					await SendWorldDespawn(viewer.Client, zone.PlayfieldToken, handle);
+
+			var deleted = await _database.DeleteWorldObject(player.MapId, handle);
+			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", obj.DisplayName ?? obj.Name, handle, deleted, player.Name);
+			return obj;
+		}
+
 		// Loads a map's NPCs from NpcSpawns into the world model ONCE (on first entry), so the server has an
 		// authoritative shared view of the map's NPCs - the model fix at the heart of the roadmap (NPCs are otherwise
 		// only per-player burst replays the server doesn't track). The tick/AI/combat will drive these; clients still

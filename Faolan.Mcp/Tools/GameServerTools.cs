@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
+using System.Text.Json.Serialization;
 using Faolan.Core.Network.Server.GameServer;
 using ModelContextProtocol.Server;
+using System.Threading.Tasks;
 
 namespace Faolan.Mcp.Tools
 {
@@ -18,6 +20,14 @@ namespace Faolan.Mcp.Tools
 		private static readonly JsonSerializerOptions JsonOptions = new()
 		{
 			WriteIndented = true
+		};
+
+		// The full-session dump (list_world_sessions) walks the live INetworkClientSession, whose Account/Character are
+		// EF entities with navigation cycles - IgnoreCycles keeps the serializer from throwing on those back-references.
+		private static readonly JsonSerializerOptions SessionJsonOptions = new()
+		{
+			WriteIndented = true,
+			ReferenceHandler = ReferenceHandler.IgnoreCycles
 		};
 
 		private readonly IGameServerDispatcher _dispatcher;
@@ -96,13 +106,32 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		[McpServerTool(Name = "list_world_sessions"), Description("List clients connected to the live GameServer (world) listeners, with account/character identity and source ip. Read-only.")]
-		public string ListWorldSessions()
+		[McpServerTool(Name = "list_world_sessions"),
+		 Description(
+			 "List clients connected to the live GameServer (world) listeners, dumping each client's COMPLETE session state (selected target handle, energy, conversation, entry mode, account + character, …), not just the identity summary. Read-only. Pass `filter` to narrow to sessions whose character name, account name, or character/account id matches (case-insensitive substring).")]
+		public string ListWorldSessions([Description("Optional case-insensitive filter on character name, account name, or character/account id; empty = all sessions.")] string filter = "")
 		{
-			var sessions = _dispatcher.GetSessions();
+			var sessions = _dispatcher.GetWorldSessions();
+			if (!string.IsNullOrWhiteSpace(filter))
+			{
+				var f = filter.Trim();
+				sessions = sessions.Where(s =>
+					Contains(s.Character?.Name, f) ||
+					Contains(s.Account?.UserName, f) ||
+					Contains(s.Character?.Id.ToString(CultureInfo.InvariantCulture), f) ||
+					Contains(s.Account?.Id.ToString(CultureInfo.InvariantCulture), f)).ToArray();
+			}
+
 			return sessions.Count == 0
-				? "No clients are currently connected to the GameServer."
-				: JsonSerializer.Serialize(sessions, JsonOptions);
+				? string.IsNullOrWhiteSpace(filter)
+					? "No clients are currently connected to the GameServer."
+					: $"No connected session matches filter '{filter}'."
+				: JsonSerializer.Serialize(sessions, SessionJsonOptions);
+		}
+
+		private static bool Contains(string haystack, string needle)
+		{
+			return haystack != null && haystack.Contains(needle, System.StringComparison.OrdinalIgnoreCase);
 		}
 
 		[McpServerTool(Name = "list_zone_entities"),

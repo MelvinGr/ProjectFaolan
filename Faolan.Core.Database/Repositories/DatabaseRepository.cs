@@ -23,6 +23,10 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> DeleteCharacter(uint characterId);
 		Task DeleteMail(ulong mailId);
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
+
+		/// <summary>Durably deletes the world-object row(s) on a map with the given captured handle (GM .delete of a
+		/// chest/door/dynel). Returns the number of rows removed.</summary>
+		Task<int> DeleteWorldObject(uint mapId, uint capturedHandle);
 		Task DeleteTradepostListing(ulong saleId);
 		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
 		Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds);
@@ -411,6 +415,12 @@ namespace Faolan.Core.Database.Repositories
 			}
 
 			return await query.ExecuteDeleteAsync();
+		}
+
+		public async Task<int> DeleteWorldObject(uint mapId, uint capturedHandle)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.CapturedHandle == capturedHandle).ExecuteDeleteAsync();
 		}
 
 		// Removes a listing once it is bought (or cancelled). No-op if it is already gone.

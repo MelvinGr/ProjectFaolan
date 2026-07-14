@@ -29,6 +29,14 @@ namespace Faolan.Core.Network.Server.GameServer
 		IReadOnlyList<SessionInfo> GetSessions();
 
 		/// <summary>
+		///     The COMPLETE live <see cref="INetworkClientSession" /> of every client connected to this listener -
+		///     the full session state (selected target, energy, conversation, entry mode, account/character, …), unlike
+		///     the projected <see cref="GetSessions" /> summary. Read-only inspection (e.g. the MCP list_world_sessions
+		///     tool); do not mutate the returned objects.
+		/// </summary>
+		IReadOnlyList<INetworkClientSession> GetWorldSessions();
+
+		/// <summary>
 		///     Snapshot of the live world model for a map: every entity in the zone (players, NPCs, loot bags)
 		///     with vitals/transform. Cheap, read-only; empty when this listener tracks nothing on the map.
 		/// </summary>

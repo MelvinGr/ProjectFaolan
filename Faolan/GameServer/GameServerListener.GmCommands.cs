@@ -142,7 +142,15 @@ namespace Faolan.GameServer
 			var entity = await _broadcaster.DespawnEntityForPlayer(client, handle);
 			if (entity == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"No deletable entity 0x{handle:X8} in this zone (target an NPC first; players can't be deleted).");
+				// Not a live entity - it may be a static WORLD OBJECT (chest/door/dynel), which lives only in the DB.
+				var obj = await _broadcaster.DeleteWorldObjectForPlayer(client, handle);
+				if (obj != null)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted world object {obj.DisplayName ?? obj.Name ?? "(unnamed)"} (0x{handle:X8}) - removed live + DB row (gone on relog too).");
+					return;
+				}
+
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"No deletable entity or world object 0x{handle:X8} in this zone (players can't be deleted).");
 				return;
 			}
 
@@ -209,6 +217,62 @@ namespace Faolan.GameServer
 			await Database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
 			var linked = await Database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
+		}
+
+		// .target  - print info about the player's currently SELECTED target (last in-game LookAt/SelectDeselect):
+		// name, wire handle, kind, template id, level, vitals, hostility, position, and the spawn area/group it belongs
+		// to (the #363 labeling aid - read the group without the nameplate toggle). Reported in-game via system message.
+		private async Task TargetInfoCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var handle = client.Session.SelectedTargetHandle;
+			if (handle == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "No target selected - click an NPC/object in-world first, then .target.");
+				return;
+			}
+
+			var player = _simulation.PlayerWorldEntity(client);
+			if (player == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world.");
+				return;
+			}
+
+			// A live ENTITY (player / NPC / loot bag) in the zone entity model.
+			if (_simulation.World.ZoneForEntity(player).TryGet(handle, out var t))
+			{
+				var kind = t.IsPlayer ? "player" : t.IsLoot ? "loot" : "npc";
+				var vitals = t.Vitals != null ? $"{t.Vitals.Health}/{t.Vitals.MaxHealth} hp" : "no vitals";
+				var group = t.OverheadNameOverride ?? (t.SpawnAreaId is { } id ? $"area #{id} (unlabeled)" : "none");
+				await _agentServerDispatcher.SendSystemMessage(characterId, string.Join("<br>",
+				[
+					$"<b>{t.Name}</b>  (handle 0x{handle:X8}, {kind})",
+					$"template {t.NpcTemplateId} · level {t.Level} · {vitals} · {(t.Hostile ? "hostile" : "friendly")} (disp {t.Disposition})",
+					$"pos ({t.Position.X:F1}, {t.Position.Y:F1}, {t.Position.Z:F1}) · map {t.MapId} / instance 0x{t.InstanceId:X8}",
+					$"spawn group: {group}"
+				]));
+				return;
+			}
+
+			// Not a live entity - a static WORLD OBJECT (chest/door/dynel) isn't in the entity model; it lives in the DB
+			// keyed by its captured handle. Resolve it there so a selected chest/door still reports.
+			var obj = await Database.GetWorldObject(player.MapId, handle);
+			if (obj != null)
+			{
+				var oname = obj.DisplayName ?? obj.Name ?? "(unnamed object)";
+				var dest = obj.DestinationPosition is { } dp ? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})" : "";
+				await _agentServerDispatcher.SendSystemMessage(characterId, string.Join("<br>",
+				[
+					$"<b>{oname}</b>  (handle 0x{handle:X8}, world-object)",
+					$"objectId {obj.ObjectId} · item template {obj.TemplateItemId?.ToString() ?? "none"} · subop 0x{obj.SubOpcode:X8} · {(obj.IsClosed ? "closed" : "open")}",
+					$"interact {obj.InteractAction} · carsGroup {obj.CarsGroup}{dest}",
+					$"pos ({obj.Position.X:F1}, {obj.Position.Y:F1}, {obj.Position.Z:F1}) · map {obj.MapId}"
+				]));
+				return;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Selected handle 0x{handle:X8} isn't a live entity or a known world object in your zone (it may have despawned).");
 		}
 
 		// .togglenpcgroup  - toggle the dev spawn-area nameplate labels (#363) live for this session: each NPC that
@@ -449,6 +513,7 @@ namespace Faolan.GameServer
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false),
 				["setnpcgroup"] = SetNpcGroupCommand,
+				["target"] = (client, _) => TargetInfoCommand(client),
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand
 			};
