@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Numerics;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -7,11 +8,12 @@ namespace Faolan.Core.Database.Tables
 	// 1010506, #332/#363). A child of NpcSpawnArea - the per-group facts (bounds, count, creature) live once on the
 	// area; this table is only the geometry. Kept for spawn-position fidelity; an ambient spawner may instead scatter
 	// within the area's bounds, in which case these become optional.
-	public class NpcSpawnAreaPoint // TODO: Make compound key NpcSpawnAreaId_PointIndex & remove Column attributes so that they get renamed automatically by EF Core migrations
+	// Compound key (NpcSpawnAreaId, PointIndex). No surrogate Id: a point has no identity beyond its slot within its
+	// area, and the pair is the natural key (stable across re-imports).
+	[PrimaryKey(nameof(NpcSpawnAreaId), nameof(PointIndex))]
+	public class NpcSpawnAreaPoint
 	{
-		public int Id { get; set; }
-
-		public int NpcSpawnAreaId { get; set; }
+		public uint NpcSpawnAreaId { get; set; }
 
 		[ForeignKey(nameof(NpcSpawnAreaId))]
 		public virtual NpcSpawnArea Area { get; set; } = null!;
@@ -19,11 +21,8 @@ namespace Faolan.Core.Database.Tables
 		// The 0-based index of this point within its group - stable across re-imports.
 		public int PointIndex { get; set; }
 
-		[Column("X")]
 		public float PositionX { get; set; }
-		[Column("Y")]
 		public float PositionY { get; set; }
-		[Column("Z")]
 		public float PositionZ { get; set; }
 
 		[NotMapped]
