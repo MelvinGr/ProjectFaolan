@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Read a character's ABILITY/SKILL SCAFFOLD out of the capture dumps (Gitea #251).
 
-CORRECTION: this reads the SKILL/ability scaffold, NOT the feat tree. Feats ride a SEPARATE record, FeatIIR
-(0x28da68a0) - a 0x3F1-framed feat-id list with a 0x04(c2s request)->0x05(s2c ack) train/unlock handshake, a
-different id-space (feat ids 112700/109488/410600 are absent here). Proof: unlocking the Hellfire feat left this
-scaffold byte-identical. See the feat_trees_decode_251 memory. This tool + the scaffold still matter (the list
-gates spell usability, #298), it's just skills, not feats.
+This reads the SKILL/ability scaffold, NOT the feat tree (this file was formerly mis-named `decode_feats.py`).
+The scaffold is the player spawn's POST-IIR id-list; the FEAT tree is a different region + id-space (the spawn's
+PRE-IIR feat list - see `decode_unlocked_feats.py` - plus the FeatIIR 0x28da68a0 train record). Feat ids
+(112700/109488/410600/80004/...) are ABSENT here. Proof: unlocking the Hellfire feat left this scaffold
+byte-identical (the pre-IIR feat list is what changed). See the feat_trees_decode_251 memory. This tool + the
+scaffold still matter (the list gates spell usability, #298), it's just skills, not feats.
 
 The ability/skill list a high-level character carries is the tail ID-list of its own FA015807 player spawn:
 5-byte `[u8 rank][u32 featId]` groups, ascending featId, terminated by id 0x3F1 (the same list the C# codec
@@ -26,14 +27,14 @@ points) still needs the wiki or a feat-window 0x207E capture; here it is surface
 
 NB the scaffold feat ids are GDB ability ids (302303, 1445000, ...); they do NOT join the RDB 1000020 feat
 CATALOG id-space (2353, 2964, ...) - the spell<->feat and id<->name maps live server-side and are never streamed
-(see the feat_trees_decode_251 memory). So this reads the unlocked feat STATE (id + rank); resolving names/trees
-is a later step (the wiki tree structure + a feat-window 0x207E capture).
+(see the feat_trees_decode_251 memory). So this reads the SKILL scaffold STATE (id + tag); resolving names/trees
+is a later step. (For the actual unlocked FEAT set, use `decode_unlocked_feats.py`.)
 
 Usage:
-  python3 Captures/scripts/decode_feats.py                 # per-class best (largest) feat dump across all captures
-  python3 Captures/scripts/decode_feats.py discover         # every player spawn: (capture, idx, class, #feats)
-  python3 Captures/scripts/decode_feats.py dump <capture> [spawnIdx=0]   # full (tag, id) list for one spawn
-  python3 Captures/scripts/decode_feats.py json [outfile]   # structured per-class catalog {class:[{id,tag}]} (source of truth)
+  python3 Captures/scripts/decode_skill_scaffold.py                 # per-class best (largest) scaffold across all captures
+  python3 Captures/scripts/decode_skill_scaffold.py discover         # every player spawn: (capture, idx, class, #ids)
+  python3 Captures/scripts/decode_skill_scaffold.py dump <capture> [spawnIdx=0]   # full (tag, id) list for one spawn
+  python3 Captures/scripts/decode_skill_scaffold.py json [outfile]   # structured per-class catalog {class:[{id,tag}]}
 """
 import importlib.util
 import json
