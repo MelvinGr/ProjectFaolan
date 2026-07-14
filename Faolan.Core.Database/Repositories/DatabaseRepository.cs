@@ -75,7 +75,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
-		Task<bool> SetNpcSpawnAreaCreature(int areaId, uint templateId);
+		Task<bool> SetNpcSpawnAreaCreature(int areaId, uint? templateId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
@@ -945,9 +945,11 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// Manually assign a spawn area's creature (#363 `.setnpcgroup`): sets NpcTemplateId + marks it Manual (the
-		// highest-confidence provenance, never overwritten by the resolver on a re-import). False if the area is gone.
-		public async Task<bool> SetNpcSpawnAreaCreature(int areaId, uint templateId)
+		// Manually assign (or CLEAR) a spawn area's creature (#363 `.setnpcgroup`). A non-null templateId sets it +
+		// marks it Manual (highest-confidence provenance, never overwritten by the resolver on a re-import); null clears
+		// it back to unresolved (NpcTemplateId null, ResolvedBy None), so the next resolver run may re-guess it. False if
+		// the area is gone.
+		public async Task<bool> SetNpcSpawnAreaCreature(int areaId, uint? templateId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var area = await ctx.NpcSpawnAreas.FindAsync(areaId);
@@ -955,7 +957,9 @@ namespace Faolan.Core.Database.Repositories
 				return false;
 
 			area.NpcTemplateId = templateId;
-			area.ResolvedBy = SpawnResolutionSource.Manual;
+			area.ResolvedBy = templateId.HasValue
+				? SpawnResolutionSource.Manual
+				: SpawnResolutionSource.None;
 			await ctx.SaveChangesAsync();
 			return true;
 		}

@@ -155,11 +155,14 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
 		}
 
-		// .setnpcgroup [<group name>]  - manual creature assignment for an RDB spawn AREA (#363). Target/select an NPC
-		// standing in the area (its type IS what the area spawns), then run this: with no arg it assigns the SELECTED
-		// NPC's creature to the area the NPC stands in; with an arg it assigns to the named area on that map. Sets the
-		// area's NpcTemplateId + marks it Manual (never re-guessed by the resolver). The dev nameplate labels
-		// (DebugSpawnAreaLabels) show each NPC's area so you know what to type.
+		// .setnpcgroup [<group name>] [clear]  - manual creature assignment for an RDB spawn AREA (#363). Target/select
+		// an NPC standing in the area (its type IS what the area spawns), then run this:
+		//   .setnpcgroup                 -> assign the SELECTED NPC's creature to the area the NPC stands in
+		//   .setnpcgroup <group>         -> assign it to the named area on that map
+		//   .setnpcgroup clear           -> CLEAR the area the NPC stands in (back to unresolved)
+		//   .setnpcgroup <group> clear   -> clear the named area
+		// A set marks the area Manual (never re-guessed); a clear reverts NpcTemplateId to null so the resolver may
+		// re-guess it. The dev nameplate labels (DebugSpawnAreaLabels) show each NPC's area so you know what to type.
 		private async Task SetNpcGroupCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -167,7 +170,7 @@ namespace Faolan.GameServer
 			var handle = client.Session.SelectedTargetHandle;
 			if (player == null || handle == 0 || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;]  (no arg = the area the NPC stands in).");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;] [clear]  (no arg = the area the NPC stands in).");
 				return;
 			}
 
@@ -178,15 +181,26 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var arg = (arguments ?? "").Trim();
-			var area = arg.Length > 0
-				? areas.Where(a => string.Equals(a.GroupName, arg, StringComparison.OrdinalIgnoreCase)).OrderBy(a => AreaDistanceSq(a, npc.Position)).FirstOrDefault()
+			// A trailing "clear"/"none"/"-" makes this a CLEAR; the rest (if any) is the target group name.
+			var tokens = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+			var clearing = tokens.Length > 0 && tokens[^1] is "clear" or "none" or "-";
+			var groupName = string.Join(' ', clearing ? tokens[..^1] : tokens);
+
+			var area = groupName.Length > 0
+				? areas.Where(a => string.Equals(a.GroupName, groupName, StringComparison.OrdinalIgnoreCase)).OrderBy(a => AreaDistanceSq(a, npc.Position)).FirstOrDefault()
 				: NearestContainingArea(areas, npc.Position);
 			if (area == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, arg.Length > 0
-					? $"No spawn area named '{arg}' on map {npc.MapId}."
+				await _agentServerDispatcher.SendSystemMessage(characterId, groupName.Length > 0
+					? $"No spawn area named '{groupName}' on map {npc.MapId}."
 					: $"'{StripAreaLabel(npc.Name)}' isn't inside any spawn area on map {npc.MapId} - pass the group name explicitly.");
+				return;
+			}
+
+			if (clearing)
+			{
+				await Database.SetNpcSpawnAreaCreature(area.Id, null);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) cleared - creature unassigned.");
 				return;
 			}
 
