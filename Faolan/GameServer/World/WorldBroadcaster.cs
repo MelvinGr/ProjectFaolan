@@ -794,9 +794,10 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
 		}
 
-		// #363 dev label: the group name of the RDB spawn area a position sits in (nearest by centroid when several
-		// overlap), or null when it's outside every area. Bounds are padded so an NPC just outside its roam box still
-		// labels. X/Z only (Y is ground height). See NpcSpawnArea / SpawnAreaResolver.
+		// #363 dev label: "<group name> · <resolution tier>" of the RDB spawn area a position sits in (nearest by
+		// centroid when several overlap), or null when it's outside every area - e.g. "Ape2 · id-prop" or
+		// "PictCamp · unresolved" so a manual pass can spot which areas still need a creature. Bounds are padded so an
+		// NPC just outside its roam box still labels. X/Z only (Y is ground height). See NpcSpawnArea / SpawnAreaResolver.
 		private static string AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
 		{
 			const float pad = 5f;
@@ -817,8 +818,20 @@ namespace Faolan.GameServer.World
 				}
 			}
 
-			return best?.GroupName;
+			return best == null
+				? null
+				: $"{best.GroupName} · {ResolvedTag(best.ResolvedBy)} · ×{best.MaxCount}";
 		}
+
+		// Short nameplate-friendly tag for a spawn area's creature-resolution provenance (#363).
+		private static string ResolvedTag(SpawnResolutionSource resolvedBy) => resolvedBy switch
+		{
+			SpawnResolutionSource.Name => "name",
+			SpawnResolutionSource.Containment => "contain",
+			SpawnResolutionSource.IdPropagation => "id-prop",
+			SpawnResolutionSource.Manual => "manual",
+			_ => "unresolved"
+		};
 
 		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW
 		// per the decoded flow (protocol_loot_interaction): assign the player as the current looter and send the
