@@ -238,7 +238,9 @@ u32   listKey        # = questId (the List A map key; read by the outer loop, no
 --- Quest_c record (FUN_0091df50): ---
 u32   ver     == 1   # @0x?? guard (else stream-error, bail)
 u32   questId        # @0x0c  (10238)
-u32   state          # @0x10  (1 = active; same field as QuestFullUpdate state)
+u32   level          # @0x10  (=1; the quest's LEVEL, not a state - same field as the QuestFullUpdate level word,
+                     #         see QuestDefinition.Level / #352. Beach 10238 = lvl 1; the snapshot carries it as
+                     #         QuestDefinition.SnapshotState, which is therefore also the level.)
 u32   reserved == 0  # @0x114
 u32   N              # @0x118 (4 — journal goal/line count)
 u32   marker == 0x412# @0x14  (constant; also emitted by WorldQuest.BuildQuestFullUpdate)
