@@ -1769,9 +1769,10 @@ namespace Faolan.GameServer.World
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
 		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle,
-			string lootSourceName = null)
+			string lootSourceName = null, LootBagTemplate.Variant variant = null)
 		{
-			var template = GetLootTemplate();
+			// #363 container variant: default is the generic bag; a boss/raid drop passes a bigger chest (LargeChest, …).
+			var template = GetLootTemplate(variant ?? LootBagTemplate.Bag);
 			if (template == null)
 				return null;
 
@@ -1865,11 +1866,9 @@ namespace Faolan.GameServer.World
 		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
 		// SCRATCH by WorldObjectBuilder.BuildBody - map-independent, needs NO captured loot-bag WorldObject in
 		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
-		private static WorldObject GetLootTemplate()
+		private static WorldObject GetLootTemplate(LootBagTemplate.Variant variant = null)
 		{
-			return LootBagTemplate.IsAvailable
-				? LootBagTemplate.Create()
-				: null;
+			return LootBagTemplate.Create(variant ?? LootBagTemplate.Bag);
 		}
 
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on

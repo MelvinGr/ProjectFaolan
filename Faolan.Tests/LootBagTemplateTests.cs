@@ -38,9 +38,8 @@ namespace Faolan.Tests
 				ReadLE(golden, SpawnPacketBuilder.RotWOffset));
 			const uint playfieldToken = 0x01EA9852; // the captured bag's transform playfield varint (d2 b0 aa 0f)
 
-			Assert.True(LootBagTemplate.IsAvailable);
 			Assert.True(LootBagMessageCodec.TryParse(golden.AsSpan(8), out _, out var contentsStart));
-			Assert.True(WorldObjectBuilder.BuildBody(LootBagTemplate.Create(), handle, pos, rot, typeTag, playfieldToken, out var body));
+			Assert.True(WorldObjectBuilder.BuildBody(LootBagTemplate.Create(LootBagTemplate.Bag), handle, pos, rot, typeTag, playfieldToken, out var body));
 
 			// Identity message + kd-tree geometry (everything up to the content blob) are byte-identical to the capture.
 			// (The carrier length at [0..4] and the content blob differ: the from-scratch bag carries a clean EMPTY

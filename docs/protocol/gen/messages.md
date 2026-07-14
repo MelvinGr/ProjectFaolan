@@ -54,7 +54,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTradeCodec` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
 | V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
 | V3 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` | [V3: ShopOpenBuilderTests.BuildTradeSelectEcho_IsByteIdenticalToFrame1189] |
-| V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootBagTemplate` | [V3: LootBagTemplateTests.BuildBounds_ReproducesTheCapturedKdTreeGeometry_ByteForByte] |
+| V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootBagTemplate` | [V3: LootBagMessageTests.BuildContents_RoundTripsByteExact] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_EmptyPayload_IsTheBuffRemovalEndTwin] |
 | V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskBuilderTests.BuildPatrol_FromCapturedWaypoints_IsByteIdentical] |
