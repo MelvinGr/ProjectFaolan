@@ -73,6 +73,12 @@ we've seen_, and names the gaps). Regenerate with
   server never touches the client RDB at runtime); awaits in-client confirm (#284)
 - ✅ Interactive world objects — doors/gates open on use; interacting with a prop with no behavior floats a
   "nothing to interact with here yet" bubble instead of a silent no-op
+- ✅ Zone-line / teleport doors — using a door that changes location teleports the player (same-playfield and
+  cross-playfield, in-client verified), destinations auto-imported from captured UseObject→teleport sequences;
+  the ~52 un-harvested zone-lines still fall through to the open animation (#341) and the GameAction type ids are
+  placeholders (#338)
+- 🟡 Area-name banners — entering a named area/region floats the on-screen area title (`GenericDisplayAreaName`
+  via `FormatFeedbackIIR`), harvested per map from captures into `Map.AreaNameId`; awaits in-client confirm (#348)
 - 🟡 Sit on benches — the sit/stand/hold-state animations are decoded + built byte-exact, but the pose reverts
   to standing after the animation (does not yet hold in-client) (#355)
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
