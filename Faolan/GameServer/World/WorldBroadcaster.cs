@@ -781,7 +781,7 @@ namespace Faolan.GameServer.World
 				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE
 				// token per-send (SpawnPlayfieldRewriter), since that token isn't known until the player enters.
 				var areaLabel = DebugAreaLabels
-					? AreaLabelFor(spawnAreas, npc.Position)
+					? AreaLabelFor(spawnAreas, npc)
 					: null;
 				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody, areaLabel))
 					entity.SpawnBody = spawnBody;
@@ -842,7 +842,7 @@ namespace Faolan.GameServer.World
 				var level = type.StatCore.Level ?? 0;
 				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, level,
 					level > 0 ? CombatResolver.NpcMaxHealthForLevel(level) : 1u,
-					type.StatCore.Disposition ?? WorldEntity.DispositionFriendly);
+					type.StatCore.Disposition ?? WorldEntity.DispositionFriendly, FormatAreaLabel(area));
 				pools.Add(pool);
 
 				// The captured spawns LINKED to this area (tagged in the load loop above) are already in the zone as pool
@@ -871,7 +871,10 @@ namespace Faolan.GameServer.World
 		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
 		{
 			var handle = (uint)NextRuntimeHandle();
-			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
+			var label = DebugAreaLabels
+				? pool.Label
+				: null;
+			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body, label))
 				return null;
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
@@ -947,13 +950,32 @@ namespace Faolan.GameServer.World
 		}
 
 		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
-		private sealed record AmbientPool(int AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition);
+		// Label is the dev nameplate tag (FormatAreaLabel), applied to members when DebugAreaLabels is on.
+		private sealed record AmbientPool(int AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
 
-		// #363 dev label: "<group name> · <resolution tier>" of the RDB spawn area a position sits in (nearest by
-		// centroid when several overlap), or null when it's outside every area - e.g. "Ape2 · id-prop" or
-		// "PictCamp · unresolved" so a manual pass can spot which areas still need a creature. Bounds are padded so an
-		// NPC just outside its roam box still labels. X/Z only (Y is ground height). See NpcSpawnArea / SpawnAreaResolver.
-		private static string AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
+		// #363 dev label for a captured spawn's nameplate: LINK-first - the area it's a confirmed MEMBER of
+		// (NpcSpawnAreaId), even if it sits outside the bounds (a hand-linked stray); else the area its POSITION lands in
+		// (so an unlinked NPC still previews which area it's in). Null when neither. See FormatAreaLabel.
+		private static string AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, NpcSpawn npc)
+		{
+			NpcSpawnArea area = null;
+			if (npc.NpcSpawnAreaId is { } id)
+				area = areas.FirstOrDefault(a => a.Id == id);
+
+			area ??= AreaContaining(areas, npc.Position);
+			return area == null
+				? null
+				: FormatAreaLabel(area);
+		}
+
+		// The nameplate label for an area: "<group> · <tier> · ×<count>" (e.g. "Ape2 · id-prop · ×8").
+		private static string FormatAreaLabel(NpcSpawnArea a)
+		{
+			return $"{a.GroupName} · {ResolvedTag(a.ResolvedBy)} · ×{a.MaxCount}";
+		}
+
+		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
+		private static NpcSpawnArea AreaContaining(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
 		{
 			const float pad = 5f;
 			NpcSpawnArea best = null;
@@ -973,9 +995,7 @@ namespace Faolan.GameServer.World
 				}
 			}
 
-			return best == null
-				? null
-				: $"{best.GroupName} · {ResolvedTag(best.ResolvedBy)} · ×{best.MaxCount}";
+			return best;
 		}
 
 		// Short nameplate-friendly tag for a spawn area's creature-resolution provenance (#363).

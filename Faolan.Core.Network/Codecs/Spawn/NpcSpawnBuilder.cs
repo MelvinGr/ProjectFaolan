@@ -111,7 +111,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
 		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
 		// lifted stat core.
-		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
+		// `nameLabel` (dev-only, #363) is appended to the overhead nameplate when set - e.g. " [Ape2 · id-prop · ×8]" -
+		// so the ambient spawner's members show their area, same as the captured-spawn label path (TryBuildLive).
+		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body, string nameLabel = null)
 		{
 			body = null;
 			if (npc?.StatCore?.IirHeader is not { } x)
@@ -126,8 +128,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Text = m.Text ?? ""
 				})
 				.ToList();
+			var message = BuildMessageFromType(npc);
+			if (!string.IsNullOrEmpty(nameLabel))
+				message.Name = $"{message.Name} [{nameLabel}]";
+
 			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
-			body = BuildBody(handle, x, position, rotation, 0, BuildMessageFromType(npc), morphs, minimalRc);
+			body = BuildBody(handle, x, position, rotation, 0, message, morphs, minimalRc);
 			return true;
 		}
 
