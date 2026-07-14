@@ -38,9 +38,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void TheTwoSpecialCases_CarryNoStandardId()
 		{
-			// SmallCharList sends a 3-byte 0x94A760; Ox1A07 rides the ServiceConnection with a session header-extra.
+			// SmallCharList sends a 3-byte 0x94A760; OverrideGameTweaks rides the ServiceConnection with a session header-extra.
 			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.SmallCharList));
-			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.Ox1A07));
+			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.OverrideGameTweaks));
 		}
 	}
 }

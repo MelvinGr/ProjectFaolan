@@ -58,7 +58,7 @@ namespace Faolan.Core.Network.Packets
 		// PlayerInterface s2c: this interface uniquely carries a 32-bit method id in the header after the opcode.
 		// This overload appends it automatically from PlayerAgentMethodIds (the single source), so senders never
 		// hand-roll the 4-byte array. Byte-identical to WriteHeader(sender, receiver, opcode,
-		// PlayerAgentMethodIds.HeaderId((ushort)opcode)). (SmallCharList / Ox1A07 carry a non-standard header-extra
+		// PlayerAgentMethodIds.HeaderId((ushort)opcode)). (SmallCharList / OverrideGameTweaks carry a non-standard header-extra
 		// and keep passing it explicitly via the generic overload.)
 		public PacketStream WriteHeader(byte[] sender, byte[] receiver, PlayerInterfaceOpcodes opcode)
 		{

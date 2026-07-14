@@ -111,7 +111,7 @@ namespace Faolan.ChatServer
 					await new FaolanStream().WriteUInt32(0x00050000).SendAsync(client);
 
 					await new FaolanStream()
-						.WriteUInt16(ChatServerInterfaceOpcodes.Ox0014)
+						.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 						.WriteArrayUInt16Length(s => s
 							.WriteUInt32(client.Session.Account.ClientInstance)
 							.WriteUInt32(0x00000000)
@@ -203,7 +203,7 @@ namespace Faolan.ChatServer
 					}
 
 					await new FaolanStream()
-						.WriteUInt16(ChatServerInterfaceOpcodes.Ox0014)
+						.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 						.WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName))
 						.SendAsync(target);
 					await target.SendAsync(BuildWhisper(senderId, message));
@@ -214,7 +214,7 @@ namespace Faolan.ChatServer
 				case ChatServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
-					await new FaolanStream().WriteUInt16(ChatServerInterfaceOpcodes.Ox0064).WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray())).SendAsync(client);
+					await new FaolanStream().WriteUInt16(ChatServerInterfaceOpcodes.ChatReadyAck).WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray())).SendAsync(client);
 
 					break;
 				}

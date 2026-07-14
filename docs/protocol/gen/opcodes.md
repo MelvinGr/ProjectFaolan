@@ -385,13 +385,13 @@ ChatServer chat — **no RpcHeader** (raw opcode) · S2C
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x0014` | `Ox0014` | sender id + name; also sent before a ChannelChat so the client can show the speaker |
+| `0x0014` | `ChatSenderInfo` | sender id + name; also sent before a ChannelChat so the client can show the speaker |
 | `0x001E` | `Whisper` | incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info |
 | `0x0022` | `CharacterChat` |  |
 | `0x0023` | `SystemMessage` |  |
-| `0x003C` | `Ox003C` |  |
+| `0x003C` | `ChannelSubscription` |  |
 | `0x0041` | `ChannelChat` | a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000] |
-| `0x0064` | `Ox0064` | echo of the client's chat-init handshake |
+| `0x0064` | `ChatReadyAck` | echo of the client's chat-init handshake |
 
 ## ChatServerOpcodes
 
@@ -879,7 +879,7 @@ RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x1A07` | `Ox1A07` | OverrideGameTweaks - rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim |
+| `0x1A07` | `OverrideGameTweaks` | rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim |
 | `0x208C` | `SendCharacterRealmData` | id 0xCBC6FC04 |
 | `0x2091` | `InitAuth` | id 0x9386EE05 |
 | `0x2093` | `Ox2093` | id 0xF2A5E705 |

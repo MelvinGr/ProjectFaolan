@@ -35,7 +35,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realm = await ResolveActiveRealm(client);
 			await new PacketStream()
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02])
 				.WriteUInt32(IpToLong(realm.IpAddress))
 				.WriteUInt16(realm.ChatServerPort)
@@ -107,7 +107,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realm = await ResolveActiveRealm(client);
 			await new PacketStream() // send CSPlayerAgent
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05])
 				.WriteUInt32(IpToLong(realm.IpAddress))
 				.WriteUInt16(realm.CsPlayerAgentPort)
@@ -123,7 +123,7 @@ namespace Faolan.PlayerAgent
 			var realm = await ResolveActiveRealm(client);
 
 			await new PacketStream()
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox1A07,
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D])
 				.WriteString($"{realm.IpAddress}:{realm.Port}")
 				.WriteUInt32(account.Id)

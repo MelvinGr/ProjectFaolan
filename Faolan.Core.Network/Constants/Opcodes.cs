@@ -17,9 +17,9 @@ namespace Faolan.Core.Network.Constants
 		SystemMessage = 0x0023,
 		Whisper = 0x001E, // incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info
 		ChannelChat = 0x0041, // a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000]
-		Ox0014 = 0x0014, // sender id + name; also sent before a ChannelChat so the client can show the speaker
-		Ox003C = 0x003C,
-		Ox0064 = 0x0064 // echo of the client's chat-init handshake
+		ChatSenderInfo = 0x0014, // sender id + name; also sent before a ChannelChat so the client can show the speaker
+		ChannelSubscription = 0x003C,
+		ChatReadyAck = 0x0064 // echo of the client's chat-init handshake
 	}
 
 	// Client->server methods - the COMPLETE recovered CSPlayerAgent.client_to_server table. The 16-bit opcode
@@ -797,7 +797,7 @@ namespace Faolan.Core.Network.Constants
 
 	public enum PlayerInterfaceOpcodes : ushort
 	{
-		Ox1A07 = 0x1A07, // OverrideGameTweaks - rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim
+		OverrideGameTweaks = 0x1A07, // rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim
 		SendCharacterRealmData = 0x208C,
 		InitAuth = 0x2091,
 		Ox2093 = 0x2093,

@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Constants
 	// the dumps):
 	//   - PlayerInterfaceOpcodes.SmallCharList (0x20A5): a 3-byte header-extra `94 A7 60` (88/88 captures), not a
 	//     4-byte id — sent verbatim at its call site.
-	//   - PlayerInterfaceOpcodes.Ox1A07 (OverrideGameTweaks): not on the PlayerInterface endpoint at all — it rides
+	//   - PlayerInterfaceOpcodes.OverrideGameTweaks: not on the PlayerInterface endpoint at all — it rides
 	//     the ServiceConnection with a 13-byte session-specific header-extra — sent verbatim at its call site.
 	public static class PlayerAgentMethodIds
 	{

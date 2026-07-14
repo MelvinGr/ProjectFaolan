@@ -44,7 +44,7 @@ namespace Faolan.ChatServer
 			foreach (var client in NetworkClients)
 			{
 				await new FaolanStream()
-					.WriteUInt16(ChatServerInterfaceOpcodes.Ox0014)
+					.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 					.WriteArrayUInt16Length(s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName))
 					.SendAsync(client);
 
@@ -72,7 +72,7 @@ namespace Faolan.ChatServer
 				return false;
 
 			await new FaolanStream()
-				.WriteUInt16(ChatServerInterfaceOpcodes.Ox0014)
+				.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 				.WriteArrayUInt16Length(s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName))
 				.SendAsync(target);
 			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
@@ -113,7 +113,7 @@ namespace Faolan.ChatServer
 			foreach (var client in NetworkClients)
 			{
 				await new FaolanStream()
-					.WriteUInt16(ChatServerInterfaceOpcodes.Ox0014)
+					.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 					.WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName))
 					.SendAsync(client);
 
@@ -140,7 +140,7 @@ namespace Faolan.ChatServer
 		private static Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
 		{
 			return new FaolanStream()
-				.WriteUInt16(ChatServerInterfaceOpcodes.Ox003C)
+				.WriteUInt16(ChatServerInterfaceOpcodes.ChannelSubscription)
 				.WriteArrayUInt16Length(s => s.WriteByte(type).WriteUInt32(id).WriteString(name).WriteUInt32(flag).WriteUInt16(0x0000))
 				.SendAsync(client);
 		}
