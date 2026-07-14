@@ -17,21 +17,24 @@ import java.util.*;
 public class DumpVtableReaders extends GhidraScript {
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00)
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
+    // #251 batch: the remaining backlog gameplay IIRs (all suffix forms - vtableAddr returns null for the wrong ones).
     static final String[] TARGETS = {
-        "n3TeleportIIR_t::vftable",
-        "IntendedTeleportIIR_c::vftable",
-        "FlushRDBCachesIIR_c::vftable",
-        "GMStatIIR_c::vftable",
-        "HiveDebugIIR_c::vftable",
-        "IIRDebugView::vftable",
-        "IIRStatListViewItem::vftable",
-        "NPCDebugManagerIIR_c::vftable",
-        "PlayfieldDebugManagerIIR_c::vftable",
-        "RequestDebugInfoIIR_c::vftable",
-        "ServerPosDebugInfoIIR_c::vftable",
-        "ProtoCoreCharacterIIR::vftable",
-        "ProtoFullCharacterIIR::vftable",
-        "ProtoSimpleDynelIIR::vftable",
+        "n3TeleportIIR_t::vftable", // sanity anchor (already known)
+        "BccIIR::vftable", "BccIIR_c::vftable", "BccIIR_t::vftable",
+        "ContainerAddItemIIR::vftable", "ContainerAddItemIIR_c::vftable", "ContainerAddItemIIR_t::vftable",
+        "LootBagIIR::vftable", "LootBagIIR_c::vftable", "LootBagIIR_t::vftable",
+        "PatrolIIR::vftable", "PatrolIIR_c::vftable", "PatrolIIR_t::vftable",
+        "MoveToPosIIR::vftable", "MoveToPosIIR_c::vftable", "MoveToPosIIR_t::vftable",
+        "HealthDamageIIR::vftable", "HealthDamageIIR_c::vftable", "HealthDamageIIR_t::vftable",
+        "ThreatMeterDataIIR::vftable", "ThreatMeterDataIIR_c::vftable", "ThreatMeterDataIIR_t::vftable",
+        "ScryLuaIIR::vftable", "ScryLuaIIR_c::vftable", "ScryLuaIIR_t::vftable",
+        "MassivePvpScoreIIR::vftable", "MassivePvpScoreIIR_c::vftable", "MassivePvpScoreIIR_t::vftable",
+        "AutoToggleCombatIIR::vftable", "AutoToggleCombatIIR_c::vftable", "AutoToggleCombatIIR_t::vftable",
+        "SprintRegenIIR::vftable", "SprintRegenIIR_c::vftable", "SprintRegenIIR_t::vftable",
+        "ToolMessageIIR::vftable", "ToolMessageIIR_c::vftable", "ToolMessageIIR_t::vftable",
+        "ConstructionMenuIIR::vftable", "ConstructionMenuIIR_c::vftable", "ConstructionMenuIIR_t::vftable",
+        "FanaticCommandIIR::vftable", "FanaticCommandIIR_c::vftable", "FanaticCommandIIR_t::vftable",
+        "KnubotBaseIIR::vftable", "KnubotBaseIIR_c::vftable", "KnubotBaseIIR_t::vftable",
     };
 
     Address vtableAddr(String full) {
