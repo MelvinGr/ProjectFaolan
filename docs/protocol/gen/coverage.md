@@ -71,7 +71,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
 | V3 | `LockedToChangedIIR` | `LockedToChangedCodec` |
 | V3 | `LookAtIIR` | `ShopOpenBuilder` |
-| V3 | `LootBagFullUpdateIIR` | `LootBagMessageCodec`, `LootBagTemplate` |
+| V3 | `LootBagFullUpdateIIR` | `LootBagMessageCodec`, `LootContainerTemplate` |
 | V3 | `LootRemoveItemsIIR` | `WorldLoot` |
 | V3 | `MagicBuffIIR` | `NpcSpellCastBuilder`, `WorldDeath` |
 | V3 | `MoveTaskIIR` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` |

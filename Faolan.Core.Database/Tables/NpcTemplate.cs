@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Faolan.Core.Database.Attributes;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -51,5 +53,8 @@ namespace Faolan.Core.Database.Tables
 		// NPC deaths (Faolan.Importer NpcDeathBehaviorExtractor): 41877 = humanoid biped, 17036 = demon/large caster,
 		// 215333 = quadruped/beast. NULL = un-harvested type; the runtime falls back to the humanoid 41877.
 		public uint? DeathBehaviorId { get; set; }
+
+		[ConstrainToEnumValues]
+		public LootContainerTemplateId LootContainerTemplateId { get; set; } = LootContainerTemplateId.Bag;
 	}
 }

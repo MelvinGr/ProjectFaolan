@@ -644,7 +644,7 @@ namespace Faolan.GameServer.World
 				else if (deadNpc.LastAttackerHandle != 0 && _sim.World.ZoneForEntity(deadNpc).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
 					dropPos = new Vector3(deadNpc.Position.X, killer.Position.Y, deadNpc.Position.Z);
 
-				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name, deadNpc.LootContainer);
 				_logger.LogInformation(
 					"Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).", deadNpc.Name,
 					deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
@@ -804,6 +804,10 @@ namespace Faolan.GameServer.World
 				if (npc.NpcTemplate.DeathBehaviorId is { } deathBehavior)
 					entity.DeathBehaviorId = deathBehavior;
 
+				// The loot container this type drops on death (Bag by default, a bigger chest for bosses) - picked by
+				// the kill-drop path (SpawnLootBagAt) via its LootContainerTemplate variant.
+				entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId;
+
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
 				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE
@@ -917,6 +921,7 @@ namespace Faolan.GameServer.World
 			entity.Level = pool.Level;
 			entity.Disposition = pool.Disposition;
 			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
+			entity.LootContainer = pool.Type.LootContainerTemplateId; // drop this type's container on death
 			entity.SpawnBody = body;
 			entity.SpawnAreaId = pool.AreaId;
 			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on
@@ -1334,6 +1339,7 @@ namespace Faolan.GameServer.World
 			entity.Level = npc.Level;
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
+			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
 			entity.SpawnBody = body;
 			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.GameServer.Combat;
@@ -219,6 +220,11 @@ namespace Faolan.GameServer.World
 		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
 		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.
 		public uint DeathBehaviorId { get; set; } = WorldDeath.HumanoidDeathBehaviorId;
+
+		// The loot CONTAINER this creature drops on death (from its NpcTemplate.LootContainerTemplateId): a plain Bag
+		// by default, a bigger chest for bosses/elites. Read by the kill-drop path (OnNpcKilled -> SpawnLootBagAt) to
+		// pick the LootContainerTemplate variant. Stamped at spawn from the type; harmless (unused) on players.
+		public LootContainerTemplateId LootContainer { get; set; } = LootContainerTemplateId.Bag;
 
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the .spawnbag player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever
