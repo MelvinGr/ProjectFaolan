@@ -64,6 +64,11 @@ namespace Faolan.GameServer.World
 		// it's in. Set from config (IConfiguration.DebugSpawnAreaLabels) at startup; a zone reloads to pick up a change.
 		public static bool DebugAreaLabels;
 
+		// The live AMBIENT spawner (#363): when true, each RESOLVED NpcSpawnArea spawns its creature at every RDB spawn
+		// point on zone load. OFF by default (experimental - overlaps the captured NpcSpawn set until graduation, wander
+		// not yet wired). Set from config (IConfiguration.AmbientSpawnsEnabled) at startup.
+		public static bool AmbientSpawns;
+
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
@@ -791,7 +796,58 @@ namespace Faolan.GameServer.World
 				zone.Add(entity);
 			}
 
+			if (AmbientSpawns)
+				await LoadAmbientSpawns(mapId, instanceId, zone);
+
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
+		}
+
+		// #363 live ambient spawner (OFF by default, WorldBroadcaster.AmbientSpawns): the capture-INDEPENDENT open-world
+		// population - each RESOLVED NpcSpawnArea spawns its creature at every one of its RDB spawn points (~one per
+		// point, the group's MaxCount). Built WHOLE from the creature TYPE (TryBuildFromType, the pet/summon path), added
+		// to the zone alongside the captured NpcSpawns so the interest stream renders them. Handles come from the runtime
+		// low-range allocator (NextLootHandle), distinct from captured (0x000818xx) and player (0x02000000+) ranges.
+		// KNOWN interim: density overlaps the captured set until graduation (#363), and roam/wander within the area bounds
+		// isn't wired yet - they hold at their spawn points until a heartbeat/wander MoveTask is added.
+		private async Task LoadAmbientSpawns(uint mapId, uint instanceId, Zone zone)
+		{
+			var areas = await _database.GetResolvedSpawnAreas(mapId);
+			var spawned = 0;
+			foreach (var area in areas)
+			{
+				var type = area.NpcTemplate;
+				if (type?.StatCore?.IirHeader == null)
+					continue; // the resolved creature has no buildable stat core - skip (can't construct its body)
+
+				var level = type.StatCore.Level ?? 0;
+				var maxHealth = level > 0
+					? CombatResolver.NpcMaxHealthForLevel(level)
+					: 1u;
+				var disposition = type.StatCore.Disposition ?? WorldEntity.DispositionFriendly;
+
+				foreach (var pt in area.Points)
+				{
+					var pos = new Vector3(pt.X, pt.Y, pt.Z);
+					var handle = (uint)NextLootHandle();
+					if (!NpcSpawnBuilder.TryBuildFromType(type, handle, pos, Quaternion.Identity, out var body))
+						break; // this type won't build (shouldn't happen given IirHeader) - stop trying its points
+
+					var entity = WorldEntity.ForNpc(handle, mapId, pos, Quaternion.Identity, type.Name, EntityVitals.FromMax(maxHealth, 0, maxHealth), type.TemplateId);
+					entity.InstanceId = instanceId;
+					entity.Level = level;
+					entity.Disposition = disposition;
+					entity.Hostile = disposition == WorldEntity.DispositionHostile;
+					entity.SpawnBody = body;
+					foreach (var s in type.Spells)
+						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
+
+					zone.Add(entity);
+					spawned++;
+				}
+			}
+
+			if (spawned > 0)
+				_logger.LogInformation("World: +{Count} ambient NPC(s) from {Areas} resolved spawn area(s) on map {Map}.", spawned, areas.Length, mapId);
 		}
 
 		// #363 dev label: "<group name> · <resolution tier>" of the RDB spawn area a position sits in (nearest by

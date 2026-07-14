@@ -75,6 +75,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
+		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 		Task<bool> SetNpcSpawnAreaCreature(int areaId, uint? templateId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
@@ -942,6 +943,19 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx
 				.NpcSpawnAreas.Include(a => a.NpcTemplate)
 				.Where(a => a.MapId == mapId)
+				.ToArrayAsync();
+		}
+
+		// The RESOLVED spawn areas on a map (a creature assigned) with everything the live ambient spawner needs to
+		// build the creature from its TYPE (#363): the NpcTemplate stat core + caster spells + the spawn-point anchors.
+		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawnAreas.Include(a => a.NpcTemplate).ThenInclude(t => t!.StatCore)
+				.Include(a => a.NpcTemplate).ThenInclude(t => t!.Spells)
+				.Include(a => a.Points)
+				.Where(a => a.MapId == mapId && a.NpcTemplateId != null)
 				.ToArrayAsync();
 		}
 
