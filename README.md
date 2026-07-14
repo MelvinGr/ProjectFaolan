@@ -62,6 +62,12 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
 - ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes; faction disposition (friendly/neutral
   NPCs never aggro and render green names, hostiles red)
+- 🟡 Open-world ambient spawn layout — the authoritative per-playfield spawn groups (roam area + population
+  count) decoded from the client RDB (type 1010506) into `NpcSpawnArea` (2,664 groups across 119 playfields).
+  The creature TYPE isn't in the client (it's server-authoritative), so it's inferred from captures (~21% of
+  groups: name / in-bounds vote / guarded id-propagation) then confirmed by hand — a dev nameplate label
+  (`DebugSpawnAreaLabels`, shows `group · tier · ×count` over each NPC) + the `.setnpcgroup` GM command assign
+  the rest. Not yet consumed by the live spawner (#332 done, #363)
 - 🟡 NPC line-of-sight — NPCs don't aggro over a hill / across a drop / through a building wall, and loot bags +
   corpses snap to the ground, driven by a baked per-map terrain file (heightmap + PhysX collision mesh; the game
   server never touches the client RDB at runtime); awaits in-client confirm (#284)
