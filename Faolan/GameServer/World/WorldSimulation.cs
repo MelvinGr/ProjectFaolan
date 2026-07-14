@@ -52,6 +52,10 @@ namespace Faolan.GameServer.World
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
 
+		// #363 ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member
+		// is replaced on the next pass, so ~15s matches the DefaultRespawnDelaySeconds mobs use.
+		private const double AmbientMaintainIntervalSeconds = 15.0;
+
 		// How close a player must get to discover a resurrection point.
 		private const float RespawnDiscoveryRange = 15f;
 
@@ -549,6 +553,7 @@ namespace Faolan.GameServer.World
 		{
 			using var timer = new PeriodicTimer(TimeSpan.FromSeconds(BaseTickSeconds));
 			var regen = new TickAccumulator(RegenIntervalSeconds);
+			var ambientMaintain = new TickAccumulator(AmbientMaintainIntervalSeconds);
 			var lastTimestamp = Stopwatch.GetTimestamp();
 			try
 			{
@@ -690,6 +695,10 @@ namespace Faolan.GameServer.World
 						await RegenerateConnectedPlayers(regenElapsed);
 						await DiscoverNearbyRespawnPoints();
 					}
+
+					// #363: keep the ambient spawn-group pools at strength (respawn killed members). No-op when disabled.
+					if (ambientMaintain.Advance(dt, out _))
+						await _output.MaintainAmbientPools();
 				}
 			}
 			catch (OperationCanceledException)

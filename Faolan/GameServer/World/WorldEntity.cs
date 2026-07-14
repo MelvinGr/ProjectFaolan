@@ -203,6 +203,12 @@ namespace Faolan.GameServer.World
 		// "Halen van Dummy"). 0 for players (they aren't shop/conversation NPCs).
 		public uint NpcTemplateId { get; init; }
 
+		// #363 ambient spawner: the NpcSpawnArea this NPC is a member of (its spawn-group pool), or null for a
+		// capture-placed / named / summoned NPC. When set, the area POOL maintains this creature's population (respawns
+		// a replacement at a free area point when it dies) instead of the per-entity respawn - and its wander waypoints
+		// are the area's points, so it roams the group's area.
+		public int? SpawnAreaId { get; set; }
+
 		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
 		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
 		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.

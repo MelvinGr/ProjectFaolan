@@ -73,6 +73,10 @@ namespace Faolan.GameServer.World
 		// to that copy - each instance gets its own NPC population) (#268).
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
 
+		// #363 ambient spawn-group pools per loaded zone (built in LoadAmbientSpawns on the entry thread, iterated by
+		// MaintainAmbientPools on the tick thread - concurrent so the tick doesn't throw mid-load).
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), List<AmbientPool>> _ambientPools = new();
+
 		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
@@ -86,15 +90,16 @@ namespace Faolan.GameServer.World
 		// Quest-giver NPC name -> granted quest id, cached once (small set).
 		private Dictionary<string, uint> _questGivers;
 
-		// Monotonic allocator for dropped-loot / summoned-entity handles. CRITICAL: the value must be in the SAME
-		// LOW range retail assigns mid-session entity handles - the client only tracks/polls handles in that range,
-		// and the render of a mid-session spawn is completed by the client polling 0x2020 for the entity's handle
-		// (-> server SpawnCheck 0x2008). Captured retail mid-session spawns (the mount + interest NPCs) use
-		// 0x000286xx; the burst NPCs use 0x000818xx; the player/char-id is ~0x0802xxxx. A high value (the old
+		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs, GM
+		// `.spawnnpc`, and the #363 ambient pool members (not loot-specific despite the range's origin). CRITICAL: the
+		// value must be in the SAME LOW range retail assigns mid-session entity handles - the client only tracks/polls
+		// handles in that range, and the render of a mid-session spawn is completed by the client polling 0x2020 for the
+		// entity's handle (-> server SpawnCheck 0x2008). Captured retail mid-session spawns (the mount + interest NPCs)
+		// use 0x000286xx; the burst NPCs use 0x000818xx; the player/char-id is ~0x0802xxxx. A high value (the old
 		// 0x40000000, or even 0x0F000000) is FAR above any real handle, so the client never polls it and the entity
 		// silently never renders. 0x00090000 sits just above the burst NPCs (0x000818xx) and well below the char-id
 		// range (0x02000000+) - small, valid, collision-free. (Matches the RetailLoginReplay built-NPC test handle.)
-		private int _nextLootHandle = 0x00090000;
+		private int _nextRuntimeHandle = 0x00090000;
 
 		// _questHandler is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
 		// call into it (Casilda's captive pose on stream-in) without a construction cycle.
@@ -803,15 +808,16 @@ namespace Faolan.GameServer.World
 		}
 
 		// #363 live ambient spawner (OFF by default, WorldBroadcaster.AmbientSpawns): the capture-INDEPENDENT open-world
-		// population - each RESOLVED NpcSpawnArea spawns its creature at every one of its RDB spawn points (~one per
-		// point, the group's MaxCount). Built WHOLE from the creature TYPE (TryBuildFromType, the pet/summon path), added
-		// to the zone alongside the captured NpcSpawns so the interest stream renders them. Handles come from the runtime
-		// low-range allocator (NextLootHandle), distinct from captured (0x000818xx) and player (0x02000000+) ranges.
-		// KNOWN interim: density overlaps the captured set until graduation (#363), and roam/wander within the area bounds
-		// isn't wired yet - they hold at their spawn points until a heartbeat/wander MoveTask is added.
+		// population, managed as spawn-group POOLS. Each RESOLVED NpcSpawnArea becomes an AmbientPool that keeps ~MaxCount
+		// of its creature alive within the group's area: the initial fill spawns one per RDB point, each member roams the
+		// group's points (its PatrolWaypoints -> the #266 wander) and fades on death (NoRespawn); MaintainAmbientPools
+		// then respawns the deficit at a free point. Built WHOLE from the creature TYPE (TryBuildFromType, the pet path).
+		// Worked example - Tortage beach (4010): the four T_Crocodile-* areas become four Crocodile pools (8/7/8/11)
+		// that each hold that many crocs roaming their stretch of shore, refilled as the player kills them.
 		private async Task LoadAmbientSpawns(uint mapId, uint instanceId, Zone zone)
 		{
 			var areas = await _database.GetResolvedSpawnAreas(mapId);
+			var pools = new List<AmbientPool>();
 			var spawned = 0;
 			foreach (var area in areas)
 			{
@@ -819,36 +825,109 @@ namespace Faolan.GameServer.World
 				if (type?.StatCore?.IirHeader == null)
 					continue; // the resolved creature has no buildable stat core - skip (can't construct its body)
 
+				var points = area.Points.Select(p => new Vector3(p.X, p.Y, p.Z)).ToArray();
+				if (points.Length == 0)
+					continue;
+
 				var level = type.StatCore.Level ?? 0;
-				var maxHealth = level > 0
-					? CombatResolver.NpcMaxHealthForLevel(level)
-					: 1u;
-				var disposition = type.StatCore.Disposition ?? WorldEntity.DispositionFriendly;
+				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, level,
+					level > 0 ? CombatResolver.NpcMaxHealthForLevel(level) : 1u,
+					type.StatCore.Disposition ?? WorldEntity.DispositionFriendly);
+				pools.Add(pool);
 
-				foreach (var pt in area.Points)
-				{
-					var pos = new Vector3(pt.X, pt.Y, pt.Z);
-					var handle = (uint)NextLootHandle();
-					if (!NpcSpawnBuilder.TryBuildFromType(type, handle, pos, Quaternion.Identity, out var body))
-						break; // this type won't build (shouldn't happen given IirHeader) - stop trying its points
-
-					var entity = WorldEntity.ForNpc(handle, mapId, pos, Quaternion.Identity, type.Name, EntityVitals.FromMax(maxHealth, 0, maxHealth), type.TemplateId);
-					entity.InstanceId = instanceId;
-					entity.Level = level;
-					entity.Disposition = disposition;
-					entity.Hostile = disposition == WorldEntity.DispositionHostile;
-					entity.SpawnBody = body;
-					foreach (var s in type.Spells)
-						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
-
-					zone.Add(entity);
-					spawned++;
-				}
+				foreach (var pt in points)
+					if (SpawnAmbientMember(pool, pt, zone) != null)
+						spawned++;
 			}
 
+			_ambientPools[(mapId, instanceId)] = pools;
 			if (spawned > 0)
-				_logger.LogInformation("World: +{Count} ambient NPC(s) from {Areas} resolved spawn area(s) on map {Map}.", spawned, areas.Length, mapId);
+				_logger.LogInformation("World: +{Count} ambient NPC(s) across {Pools} spawn-area pool(s) on map {Map}.", spawned, pools.Count, mapId);
 		}
+
+		// Builds one member of an ambient pool at `pos` and adds it to the zone (no wire send - the interest stream, or
+		// the maintenance caller, does that). The member roams the pool's points and fades-not-revives on death so the
+		// POOL owns its respawn. Returns the entity, or null if the type won't build.
+		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
+		{
+			var handle = (uint)NextRuntimeHandle();
+			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
+				return null;
+
+			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
+			entity.InstanceId = zone.InstanceId;
+			entity.Level = pool.Level;
+			entity.Disposition = pool.Disposition;
+			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
+			entity.SpawnBody = body;
+			entity.SpawnAreaId = pool.AreaId;
+			entity.NoRespawn = true;              // corpse fades on death; the POOL respawns a replacement (below)
+			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
+			entity.ArmPatrolCycle();              // stagger the first wander so they don't all step at once
+			foreach (var s in pool.Type.Spells)
+				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
+
+			zone.Add(entity);
+			return entity;
+		}
+
+		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
+		// MaxCount. A killed member fades + is removed (LootExpired), dropping the pool's live count; here we respawn ONE
+		// replacement per under-strength pool per pass (a gentle trickle - the cadence IS the respawn delay) at a free
+		// point, streamed to nearby players. No-op unless the ambient spawner is enabled.
+		public async Task MaintainAmbientPools()
+		{
+			if (!AmbientSpawns)
+				return;
+
+			foreach (var ((mapId, instanceId), pools) in _ambientPools)
+			{
+				var zone = _sim.World.ZoneFor(mapId, instanceId);
+				foreach (var pool in pools)
+				{
+					var live = zone.Entities.Where(e => e.SpawnAreaId == pool.AreaId && !e.IsDead).ToList();
+					if (live.Count >= pool.MaxCount)
+						continue;
+
+					var pos = FreeAmbientPoint(pool, live);
+					var entity = SpawnAmbientMember(pool, pos, zone);
+					if (entity == null)
+						continue;
+
+					foreach (var viewer in zone.PlayersInRange(pos, WorldSimulation.PlayerInterestRange))
+						if (viewer.Client != null && viewer.Known.Add(entity.Handle))
+							await SendWorldSpawn(viewer.Client, entity);
+				}
+			}
+		}
+
+		// A pool point with no live member sitting on it (so a refill lands on an empty spot, not on top of a survivor);
+		// falls back to a random point when they're all occupied.
+		private static Vector3 FreeAmbientPoint(AmbientPool pool, IReadOnlyList<WorldEntity> live)
+		{
+			foreach (var pt in pool.Points)
+			{
+				var occupied = false;
+				foreach (var e in live)
+				{
+					var dx = e.Position.X - pt.X;
+					var dz = e.Position.Z - pt.Z;
+					if (dx * dx + dz * dz < 4f)
+					{
+						occupied = true;
+						break;
+					}
+				}
+
+				if (!occupied)
+					return pt;
+			}
+
+			return pool.Points[Random.Shared.Next(pool.Points.Length)];
+		}
+
+		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
+		private sealed record AmbientPool(int AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition);
 
 		// #363 dev label: "<group name> · <resolution tier>" of the RDB spawn area a position sits in (nearest by
 		// centroid when several overlap), or null when it's outside every area - e.g. "Ape2 · id-prop" or
@@ -1154,7 +1233,7 @@ namespace Faolan.GameServer.World
 				return null;
 
 			var npc = await _database.GetNpcSpawnByName(npcName);
-			var handle = NextLootHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
+			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
 										   // Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
 										   // baked ones are just placeholders (the player's zone token here).
 			if (npc == null || !NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken, out var body))
@@ -1214,7 +1293,7 @@ namespace Faolan.GameServer.World
 			if (player == null || npcType?.StatCore?.IirHeader == null)
 				return null;
 
-			var handle = NextLootHandle();
+			var handle = NextRuntimeHandle();
 			if (!NpcSpawnBuilder.TryBuildFromType(npcType, handle, player.Position, player.Rotation, out var body))
 			{
 				_logger.LogInformation("Pet spawn: creature type '{Type}' has no buildable stat core.", npcType.Name);
@@ -1462,9 +1541,9 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		private uint NextLootHandle()
+		private uint NextRuntimeHandle()
 		{
-			return (uint)Interlocked.Increment(ref _nextLootHandle);
+			return (uint)Interlocked.Increment(ref _nextRuntimeHandle);
 		}
 
 		// Resolves the rolled item templates to the ones the loot window can DISPLAY (in the item table AND
@@ -1578,7 +1657,7 @@ namespace Faolan.GameServer.World
 			if (template == null)
 				return null;
 
-			var handle = NextLootHandle();
+			var handle = NextRuntimeHandle();
 
 			// Resolve the rolled templates to the items the loot window can actually DISPLAY (Hash != 0, present in
 			// the item table) ONCE, here - so the bag's LootItems and the spliced display list share ONE ordering. A
