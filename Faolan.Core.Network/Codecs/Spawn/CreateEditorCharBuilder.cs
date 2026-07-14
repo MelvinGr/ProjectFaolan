@@ -10,9 +10,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// the TRANSFORM from the typed ProtoVec3/ProtoQuat pose and the IDENTITY by decoding + re-encoding the
 	// ProtoCoreCharacterIIR (both byte-identical round-trips). The session HANDLE is preserved and the per-session
 	// PLAYFIELD INSTANCE (the transform's `18 <varint>`) is threaded in. The still-un-lifted pre-IIR scaffold
-	// block + post-IIR scaffold are carried verbatim from the record itself (the #185/#54 lift gates DB-sourcing
-	// these like the dynels - the captured NpcSpawns rows are from a different session, so their pre-IIR blocks
-	// don't match the burst). Reconstructing a record from its own bytes reproduces it byte-for-byte
+	// block + post-IIR scaffold are carried verbatim from the record itself (#364): the pedestals' pre-IIR holds
+	// irreducible per-session heap pointers/handles (no DB source), and 5 of 6 post-IIR tables are the larger
+	// runtime-state form NpcSpawnAppearanceCodec refuses - so byte-exact-from-DB is impossible; retiring the
+	// self-reconstruction needs a #210-style construct-minimal + in-client pass, not the #185 lift (which only
+	// covers the clean-appearance shape). Reconstructing a record from its own bytes reproduces it byte-for-byte
 	// (CreateEditorSceneCharTests), so this is a construction oracle, not a replay: the transform + identity are
 	// genuinely rebuilt, and the playfield is parameterized for the live session.
 	public static class CreateEditorCharBuilder

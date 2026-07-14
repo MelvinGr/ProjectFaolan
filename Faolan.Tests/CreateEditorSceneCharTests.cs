@@ -12,12 +12,13 @@ namespace Faolan.Tests
 	// streams) are CONSTRUCTED, not replayed: CreateEditorCharBuilder.Reconstruct rebuilds each from its own bytes
 	// (transform from the typed pose + ProtoCoreCharacterIIR round-trip, pre-IIR scaffold carried verbatim, the
 	// session playfield threaded) and reproduces the captured record byte-for-byte (issue #189, "the 5 remaining").
-	// DB-sourcing these like the dynels is blocked on the pre-IIR scaffold (#185/#54): the captured record carries
-	// session-specific runtime values there (spawn timestamps/handles, e.g. 0x7151E7E0, + a recurring 0x015B6090)
+	// DB-sourcing these like the dynels is blocked on the pre-IIR scaffold (#364): the captured record carries
+	// session-specific runtime values there (heap pointers/handles, e.g. 0x7151E7E0, + a recurring 0x015B6090)
 	// that no DB column holds, so NpcSpawnBuilder's minimal scaffold zeros them (verified 0/5 byte-exact - identical
-	// length + structure, diff only in the scaffold ~offset 71). The NpcSpawns rows DO match by handle/position;
-	// it's those scaffold values that aren't reproducible - so self-reconstruction from each record's own bytes stays
-	// the byte-exact path.
+	// length + structure, diff only in the scaffold ~offset 71). The #185 lift only covers the clean-appearance
+	// shape; a probe confirmed 5 of 6 post-IIR tables are the larger runtime-state form the appearance codec
+	// refuses, so byte-exact-from-DB is impossible. Retiring this needs a #210-style construct-minimal + in-client
+	// pass; until then, self-reconstruction from each record's own bytes stays the byte-exact path.
 	public class CreateEditorSceneCharTests
 	{
 		private readonly ITestOutputHelper _o;
