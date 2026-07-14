@@ -33,8 +33,9 @@ send path that depends on the meaning.
 PlayerInterface **additionally** carries a 32-bit method hash on the wire. This is a dump task, not a hash to reverse: the
 login-critical method set is recovered and verified end-to-end (a Frida-under-Wine hook on the client send path correlated
 with a loopback capture) and carried as real associated ids (`PlayerAgentMethodIds`, appended by `WriteHeader`; tests lock
-the bytes). The interface is only PARTIALLY enumerated in `gen/opcodes.md` — the methods the server does not implement
-(character create/delete/rename, Facebook token, hardcore, offline-levels, …) still lack their wire (opcode, id) pairs,
+the bytes). `PlayerAgentMethodIds` maps 9 c2s methods (auth, startup, login, character create/delete, …) plus the
+observed s2c responses. The interface is only PARTIALLY enumerated in `gen/opcodes.md` — the methods never yet observed
+on the wire (character rename, Facebook-token save, hardcore, offline-levels, …) still lack their (opcode, id) pairs,
 harvestable via the same Frida technique. Remove this V0 once all 17 interfaces are fully covered.
 
 ---

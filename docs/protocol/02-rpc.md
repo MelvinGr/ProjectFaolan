@@ -71,9 +71,10 @@ The full per-interface catalog — 819 entries across 16 enums, with direction a
 PlayerAgent/PlayerInterface additionally carries a **32-bit method hash** on the wire (alongside the 16-bit
 opcode), not the `0x2000 + index` scheme alone. It is a dump task, not a hash to reverse: the login-critical
 method set is recovered and verified end-to-end (a Frida-under-Wine hook on the client send path correlated with
-a loopback capture) and carried as real associated ids (`PlayerAgentMethodIds`, appended by `WriteHeader`). Only
-the methods the server does not implement (character create/delete/rename, Facebook token, hardcore, …) are still
-un-enumerated, harvestable by the same technique. [V0: PlayerAgent 32-bit hash dispatch]
+a loopback capture) and carried as real associated ids (`PlayerAgentMethodIds` — 9 c2s methods incl. character
+create/delete, appended by `WriteHeader`). Only the methods never yet observed on the wire (character rename,
+Facebook-token save, hardcore, offline-levels, …) still lack their (opcode, hash) pair, harvestable by the same
+technique. [V0: PlayerAgent 32-bit hash dispatch]
 
 ## Multiplexing
 
