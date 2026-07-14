@@ -62,6 +62,9 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
 - ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes; faction disposition (friendly/neutral
   NPCs never aggro and render green names, hostiles red)
+- 🟡 NPC line-of-sight — NPCs don't aggro over a hill / across a drop / through a building wall, and loot bags +
+  corpses snap to the ground, driven by a baked per-map terrain file (heightmap + PhysX collision mesh; the game
+  server never touches the client RDB at runtime); awaits in-client confirm (#284)
 - ✅ Interactive world objects — doors/gates open on use; interacting with a prop with no behavior floats a
   "nothing to interact with here yet" bubble instead of a silent no-op
 - 🟡 Sit on benches — the sit/stand/hold-state animations are decoded + built byte-exact, but the pose reverts
@@ -90,7 +93,9 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 Spell cooldowns — client-side semantics fully RE'd; the server-authored builder is capture-blocked (#271)
 - 🟡 Spellweaving (necromancer) — byte-exact builders; energy-bar drop still open (#141)
 - 🟡 Combat shields — server-side broadcast exists; the client guard-arc render is not yet decoded (#20)
-- 🟡 NPC death animations
+- ✅ NPC death animations — the death-pose MoveTask + death-behavior BCC play on kill (no more disappear /
+  teleport-to-spawn / attack-while-dead for patrolling NPCs); per-creature death anim (humanoid/demon/beast)
+  harvested per NPC, awaits in-client confirm (#362)
 - ⬜ Directional combat + defensive shield arcs ("real combat", #20) · Fatalities (#140)
 
 ### Character progression
@@ -226,6 +231,16 @@ migrates and reads it. To rebuild its content from the packet captures and clien
 
 ```sh
 dotnet run --project Faolan.Importer -- --skip characters    # module-based; --list to see modules, --dry-run to preview
+```
+
+## World terrain files (line-of-sight)
+
+NPC line-of-sight + ground-snap (#284) read a baked per-map terrain file from `Terrain/` — the game server never
+touches the client RDB at runtime. These files are large (~555 MB) and **not committed**, so generate them once
+from the client RDB (they're optional: without them the server still runs and every terrain query degrades open):
+
+```sh
+dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terrain/<mapId>.terrain (one per map)
 ```
 
 ## Project layout
