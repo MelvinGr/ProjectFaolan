@@ -77,6 +77,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 		Task<bool> SetNpcSpawnAreaCreature(int areaId, uint? templateId);
+		Task<int> LinkNpcSpawnsToArea(int areaId, uint templateId, float selectedX, float selectedZ);
+		Task<int> UnlinkNpcSpawnsFromArea(int areaId);
 		Task<int> GraduateSpawnArea(int areaId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
@@ -979,25 +981,52 @@ namespace Faolan.Core.Database.Repositories
 			return true;
 		}
 
-		// GRADUATE a resolved spawn area (#363 `.graduatenpcgroup`): delete the CAPTURED NpcSpawn rows that belong to it
-		// - same creature (the area's NpcTemplateId), inside its bounds - so the ambient POOL becomes the sole source of
-		// that population and the captured/ambient density overlap goes away. Only deletes spawns of the area's own
-		// creature, so a quest/named NPC standing in the area is untouched. Returns the number of spawn rows removed, or
-		// -1 if the area doesn't exist / isn't resolved. NB re-running the `npcs` importer resurrects captured rows.
-		public async Task<int> GraduateSpawnArea(int areaId)
+		// LINK captured NpcSpawns to a spawn area (#363 `.setnpcgroup`): materialize which captured spawns the area owns,
+		// so graduation is a clean FK delete. Links every spawn of the area's creature (`templateId`) inside its bounds,
+		// PLUS the specific spawn at (selectedX, selectedZ) even if it sits outside the bounds (a path-caught stray the
+		// GM explicitly assigned). Returns the number linked.
+		public async Task<int> LinkNpcSpawnsToArea(int areaId, uint templateId, float selectedX, float selectedZ)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var area = await ctx.NpcSpawnAreas.FindAsync(areaId);
-			if (area?.NpcTemplateId is not { } templateId)
-				return -1;
+			if (area == null)
+				return 0;
 
 			const float pad = 5f;
-			var doomed = await ctx
+			const float sel = 2f; // tolerance to match the selected NPC's spawn row by position
+			var toLink = await ctx
 				.NpcSpawns.Where(s => s.MapId == area.MapId && s.NpcTemplateId == templateId
-				                      && s.PositionX >= area.BoundsMinX - pad && s.PositionX <= area.BoundsMaxX + pad
-				                      && s.PositionZ >= area.BoundsMinZ - pad && s.PositionZ <= area.BoundsMaxZ + pad)
+				                      && ((s.PositionX >= area.BoundsMinX - pad && s.PositionX <= area.BoundsMaxX + pad
+				                           && s.PositionZ >= area.BoundsMinZ - pad && s.PositionZ <= area.BoundsMaxZ + pad)
+				                          || (s.PositionX >= selectedX - sel && s.PositionX <= selectedX + sel
+				                              && s.PositionZ >= selectedZ - sel && s.PositionZ <= selectedZ + sel)))
 				.ToListAsync();
 
+			foreach (var s in toLink)
+				s.NpcSpawnAreaId = areaId;
+			await ctx.SaveChangesAsync();
+			return toLink.Count;
+		}
+
+		// Un-link every captured NpcSpawn from an area (#363 `.setnpcgroup ... clear`): the area no longer owns them.
+		public async Task<int> UnlinkNpcSpawnsFromArea(int areaId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var linked = await ctx.NpcSpawns.Where(s => s.NpcSpawnAreaId == areaId).ToListAsync();
+			foreach (var s in linked)
+				s.NpcSpawnAreaId = null;
+			await ctx.SaveChangesAsync();
+			return linked.Count;
+		}
+
+		// GRADUATE a spawn area (#363 `.graduatenpcgroup`): delete the captured NpcSpawn rows LINKED to it, so the
+		// ambient POOL becomes the sole source of that population and the captured/ambient density overlap goes away. A
+		// clean FK delete on the materialized membership (LinkNpcSpawnsToArea / the resolver's auto-link) - no bounds
+		// re-derivation. Returns the number of spawn rows removed. NB re-running the `npcs` importer resurrects them.
+		public async Task<int> GraduateSpawnArea(int areaId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var doomed = await ctx.NpcSpawns.Where(s => s.NpcSpawnAreaId == areaId).ToListAsync();
 			ctx.NpcSpawns.RemoveRange(doomed); // Morphs/Equipment/PatrolPath cascade
 			await ctx.SaveChangesAsync();
 			return doomed.Count;

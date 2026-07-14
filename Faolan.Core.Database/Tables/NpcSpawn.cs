@@ -39,6 +39,16 @@ namespace Faolan.Core.Database.Tables
 		// with the spawn.
 		public virtual PatrolPath? PatrolPath { get; set; }
 
+		// #363 MEMBERSHIP of an RDB ambient spawn AREA: set when this captured spawn is confirmed to belong to a spawn
+		// group the area's pool replaces (by the resolver's auto-link, or by hand via `.setnpcgroup`). `.graduatenpcgroup`
+		// then just deletes the rows linked to an area (a clean FK delete, no bounds re-derivation). Null = an
+		// independent placement (named/quest NPC, or a mob no area owns). SetNull on area delete, so a re-import that
+		// wipes the areas simply un-links these rather than deleting them.
+		public int? NpcSpawnAreaId { get; set; }
+
+		[ForeignKey(nameof(NpcSpawnAreaId))]
+		public virtual NpcSpawnArea? NpcSpawnArea { get; set; }
+
 		// Race/Sex moved to the NpcTemplate TYPE table (#287): they are type-level identity (every placement of a type shares
 		// them), so they live on `NpcTemplate` now and are reached via the `NpcTemplate` navigation.
 

@@ -234,7 +234,7 @@ namespace Faolan.Importer.Modules
 			var res = r.Resolved;
 			return new ImportResult(
 				$"{r.Areas} spawn areas ({r.Points} points) across {r.Maps} playfields ({r.EmptyMaps} empty, {r.Unreadable} unreadable); " +
-				$"resolved {res.Total}/{res.Areas} areas (name {res.Name}, containment {res.Containment}, id-prop {res.IdProp}).");
+				$"resolved {res.Total}/{res.Areas} areas (name {res.Name}, containment {res.Containment}, id-prop {res.IdProp}); linked {res.Linked} captured spawns.");
 		}
 	}
 

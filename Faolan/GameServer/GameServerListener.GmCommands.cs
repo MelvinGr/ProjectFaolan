@@ -201,19 +201,21 @@ namespace Faolan.GameServer
 			if (clearing)
 			{
 				await Database.SetNpcSpawnAreaCreature(area.Id, null);
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) cleared - creature unassigned.");
+				var unlinked = await Database.UnlinkNpcSpawnsFromArea(area.Id);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) cleared - creature unassigned, {unlinked} captured spawn(s) un-linked.");
 				return;
 			}
 
 			await Database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual].");
+			var linked = await Database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
 		}
 
-		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows that
-		// belong to it (its creature, inside its bounds) so the ambient POOL becomes the sole source of that population -
-		// removing the captured/ambient density overlap. Only touches the area's own creature (a named/quest NPC in the
-		// area is safe). Durable (a DB delete); takes effect on the next zone reload. NB re-running the `npcs` importer
-		// resurrects the captured rows.
+		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows
+		// LINKED to it (materialized by the resolver's auto-link + `.setnpcgroup`) so the ambient POOL becomes the sole
+		// source of that population - removing the captured/ambient density overlap. A clean FK delete on the membership
+		// link, so a named/quest NPC in the area (never linked) is safe. Durable; takes effect on the next zone reload.
+		// NB re-running the `npcs` importer resurrects the captured rows.
 		private async Task GraduateNpcGroupCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;

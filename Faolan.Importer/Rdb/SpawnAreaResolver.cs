@@ -151,7 +151,41 @@ namespace Faolan.Importer.Rdb
 			}
 
 			await db.SaveChangesAsync();
-			return new ResolveStats(name, contain, idprop, name + contain + idprop, areas.Count);
+
+			// #363 auto-link: materialize which captured NpcSpawns each resolved area OWNS (same creature, inside the
+			// bounds), so graduation is a clean FK delete instead of a re-derived bounds match. Runs on the maps that
+			// have resolved areas (the captured ones); uncaptured maps have no spawns to link.
+			var linked = await LinkCapturedSpawns(db, areas);
+
+			return new ResolveStats(name, contain, idprop, name + contain + idprop, areas.Count, linked);
+		}
+
+		// Links captured NpcSpawns to the resolved area whose creature + bounds they match. Resets links on the touched
+		// maps first (idempotent), so a re-resolve reflects the current creature assignments.
+		private static async Task<int> LinkCapturedSpawns(DatabaseContext db, List<NpcSpawnArea> areas)
+		{
+			const float pad = 5f;
+			var resolved = areas.Where(a => a.NpcTemplateId != null).ToList();
+			var maps = resolved.Select(a => a.MapId).ToHashSet();
+			var linked = 0;
+			foreach (var mapId in maps)
+			{
+				var mapAreas = resolved.Where(a => a.MapId == mapId).ToList();
+				foreach (var s in await db.NpcSpawns.Where(s => s.MapId == mapId).ToListAsync())
+				{
+					var area = mapAreas.FirstOrDefault(a => a.NpcTemplateId == s.NpcTemplateId
+					                                        && s.PositionX >= a.BoundsMinX - pad && s.PositionX <= a.BoundsMaxX + pad
+					                                        && s.PositionZ >= a.BoundsMinZ - pad && s.PositionZ <= a.BoundsMaxZ + pad);
+					var newLink = area?.Id;
+					if (s.NpcSpawnAreaId != newLink)
+						s.NpcSpawnAreaId = newLink;
+					if (newLink != null)
+						linked++;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return linked;
 		}
 
 		private static (float X0, float X1, float Z0, float Z1) ContainmentRegion(NpcSpawnArea a)
@@ -224,5 +258,5 @@ namespace Faolan.Importer.Rdb
 		}
 	}
 
-	public readonly record struct ResolveStats(int Name, int Containment, int IdProp, int Total, int Areas);
+	public readonly record struct ResolveStats(int Name, int Containment, int IdProp, int Total, int Areas, int Linked);
 }

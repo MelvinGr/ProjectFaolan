@@ -329,6 +329,10 @@ namespace Faolan.Core.Database
 			// An NPC's worn equipment (CharacterIIR f23, #185), cascade-deletes with its NpcSpawn.
 			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Equipment).WithOne(e => e.NpcSpawn).HasForeignKey(e => e.NpcSpawnId).OnDelete(DeleteBehavior.Cascade);
 
+			// #363: a captured spawn's membership of an ambient spawn AREA. SetNull so wiping the areas (a re-import)
+			// un-links these rows rather than deleting them; `.graduatenpcgroup` deletes the linked rows explicitly.
+			modelBuilder.Entity<NpcSpawn>().HasOne(n => n.NpcSpawnArea).WithMany().HasForeignKey(n => n.NpcSpawnAreaId).OnDelete(DeleteBehavior.SetNull);
+
 			// The NPC TYPE table (#244): one row per TemplateId, deduping the type identity duplicated across every
 			// placement. A spawn (instance) and a spell point at their type by the NpcTemplate PK (NpcTemplateId); SetNull keeps the
 			// instance/spell if the type is ever removed (the type is reference data, not a cascade parent).
