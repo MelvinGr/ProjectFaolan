@@ -702,11 +702,11 @@ namespace Faolan.Core.Network.Constants
 		// GAMEPLAY (43) - the real backlog of unseen record types:
 		//   AddToGroupIIR                0x0DF44B73  [auth: AddToGroupIIR_c]
 		//   AutoToggleCombatIIR          0x107E921F  [auth: AutoToggleCombatIIR_c]
-		//   BccIIR                       bare 0x76410BD0  _c 0xEA2D63B4  [unverified]  (abbrev of BehaviorControlCenter? verify)
+		//   BccIIR                       [alias] = BehaviorControlCenterIIR 0x642CD3D6 (Bcc), already emitted
 		//   ClonedFeatsIIR               0xF7BF33DC  [auth: ClonedFeatsIIR_c]  (candidate: full feat set at login, #251)
 		//   ConstructionMenuIIR          0xAF084AA6  [auth: ConstructionMenuIIR_c]
 		//   ConstructionOrderIIR         0x8AD083D9  [auth: ConstructionOrderIIR_c]
-		//   ContainerAddItemIIR          bare 0xD7F5BE9F  _c 0xB1809EC3  [unverified]
+		//   ContainerAddItemIIR          [alias] we deliver via the DispatchAddItem METHOD 0x2020 (AddItemBody), not this IIR
 		//   FanaticCommandIIR            0xEE4AA85C  [auth: FanaticCommandIIR_t]
 		//   FanaticIIR                   0x1C4528A7  [auth: FanaticIIR_t]
 		//   FloatStatIIR                 0x09012E82  [auth: FloatStatIIR]
@@ -716,7 +716,7 @@ namespace Faolan.Core.Network.Constants
 		//   HealthDamageIIR              bare 0xA62BE247  _c 0xCABC786B  [unverified]
 		//   Int32StatIIR                 0xA2F53610  [auth: Int32StatIIR]
 		//   KnubotBaseIIR                0x9ECCA4B0  [auth: KnubotBaseIIR_c]
-		//   LootBagIIR                   bare 0x4895B312  _c 0x79F54276  [unverified]
+		//   LootBagIIR                   [alias] base of LootBagFullUpdateIIR 0xF096251E, already emitted
 		//   LootCharNeedGreedUpdateIIR   0x8ACD1AC8  [auth: LootCharNeedGreedUpdateIIR_c]
 		//   LootDeleteItemsIIR           0x6AC7B325  [auth: LootDeleteItemsIIR]
 		//   LootSpecialLootUpdateIIR     0xE9EB9694  [auth: LootSpecialLootUpdateIIR_c]
@@ -724,9 +724,9 @@ namespace Faolan.Core.Network.Constants
 		//   MassivePvPDamageLocationIIR  0x156687CC  [auth: MassivePvPDamageLocationIIR_c]
 		//   MassivePvpScoreIIR           0x3C5DDB2A  [auth: MassivePvpScoreIIR_c]
 		//   MasterLooterOpenIIR          0x26D0EDD5  [auth: MasterLooterOpenIIR_c]
-		//   MoveToPosIIR                 bare 0x8CFDDDCA  _c 0x44FD9F2E  [unverified]
+		//   MoveToPosIIR                 [alias] movement; we emit MoveTaskIIR 0x96C46740
 		//   PVPDropItemIIR               0x7057225B  [auth: PVPDropItemIIR_t]
-		//   PatrolIIR                    bare 0x72DE6546  _c 0x34DA37AA  [unverified]
+		//   PatrolIIR                    [alias] NPC roam; drives MoveTaskIIR 0x96C46740 movement (no distinct wire record)
 		//   PlayfieldAnarchyFIIR         bare 0x9D6CB2FC  _c 0xF50BEFE0  [unverified]
 		//   QuestCooldownIIR             0x9CC129C5  [auth: QuestCooldownIIR]
 		//   QuestRewardNotifyIIR         0x8BB2799C  [auth: QuestRewardNotifyIIR_c]
