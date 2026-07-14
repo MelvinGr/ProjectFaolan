@@ -11,6 +11,13 @@ the hand list dropped.
 The character's CLASS is self-identified: the FIRST feat id is the profession feat == (Class enum value) * 100
 (Necromancer 0x29 -> 4100, Demonologist 0x2C -> 4400, Assassin 0x22 -> 3400, HeraldOfXotli 0x2B -> 4300, ...).
 
+The 5-byte group's leading byte (the codec calls it `Rank`) is really a per-FEAT TAG, not a per-character trained
+rank: across all captures it is INVARIANT per feat id (153/156 distinct ids carry one value; only 3 vary, all
+between 0x00 and their nonzero tag). It is 0x00 on a base-scaffold entry and a feat-specific nonzero tag once the
+feat is trained (e.g. 326000 is always 0x49, 331300 always 0x0a). Bands seen: 0x03 (the 1.4M-range spell-grant
+feats), 0x08, 0x0a, and a 0x41..0x4b band on the mid-tier feat-tree feats. Its exact meaning (tier / tree-tab /
+points) still needs the wiki or a feat-window 0x207E capture; here it is surfaced verbatim as `tag`.
+
 NB the scaffold feat ids are GDB ability ids (302303, 1445000, ...); they do NOT join the RDB 1000020 feat
 CATALOG id-space (2353, 2964, ...) - the spell<->feat and id<->name maps live server-side and are never streamed
 (see the feat_trees_decode_251 memory). So this reads the unlocked feat STATE (id + rank); resolving names/trees
@@ -19,9 +26,11 @@ is a later step (the wiki tree structure + a feat-window 0x207E capture).
 Usage:
   python3 Captures/scripts/decode_feats.py                 # per-class best (largest) feat dump across all captures
   python3 Captures/scripts/decode_feats.py discover         # every player spawn: (capture, idx, class, #feats)
-  python3 Captures/scripts/decode_feats.py dump <capture> [spawnIdx=0]   # full (rank, id) list for one spawn
+  python3 Captures/scripts/decode_feats.py dump <capture> [spawnIdx=0]   # full (tag, id) list for one spawn
+  python3 Captures/scripts/decode_feats.py json [outfile]   # structured per-class catalog {class:[{id,tag}]} (source of truth)
 """
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -103,11 +112,36 @@ def cmd_perclass():
         print(f'{cls:<14} {len(feats):>6} {trained:>7}  {name}[{idx}]')
 
 
+def cmd_json(outfile=None):
+    # Per class, the most-progressed player spawn's feat list, as structured records (the seed for a DB feat model).
+    best = {}
+    for cap in sorted((ROOT / 'Captures').glob('*.tshark.json')):
+        for idx, body in player_spawns(cap):
+            cls, feats = feats_of_spawn(body)
+            if cls and (cls not in best or len(feats) > len(best[cls]['feats'])):
+                best[cls] = {'source': f'{cap.name}[{idx}]', 'feats': feats}
+    catalog = {
+        cls: {
+            'source': best[cls]['source'],
+            'feats': [{'id': fid, 'tag': tag} for fid, tag in best[cls]['feats']],
+        }
+        for cls in sorted(best)
+    }
+    text = json.dumps(catalog, indent=2)
+    if outfile:
+        Path(outfile).write_text(text)
+        print(f'wrote {outfile} ({len(catalog)} classes)')
+    else:
+        print(text)
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'perclass'
     if cmd == 'discover':
         cmd_discover()
     elif cmd == 'dump':
         cmd_dump(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else 0)
+    elif cmd == 'json':
+        cmd_json(sys.argv[2] if len(sys.argv) > 2 else None)
     else:
         cmd_perclass()
