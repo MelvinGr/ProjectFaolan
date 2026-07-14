@@ -9,7 +9,10 @@ records parse to EOF (0 failures), **119 carry spawn groups** (2,664 groups / 23
 whose NPCs are server-scripted and never appear here). The RDB record id **== the playfield id** (== `Map.Id`).
 
 Ported to C# as `NpcSpawnLayout` and imported by `RdbNpcSpawnImporter` (the opt-in `rdb-npc-spawns` module) into
-the `RdbSpawnPoint` table, keyed by the stable `(MapId, GroupOrdinal, PointIndex)` triple.
+the `NpcSpawnArea` table — one row per group carrying the roam AABB + population count + (once resolved) the
+creature `NpcTemplateId`, keyed by the stable `(MapId, GroupOrdinal)` pair, with the individual anchors as child
+`NpcSpawnAreaPoint` rows. The creature is inferred by `SpawnAreaResolver` (name / gated containment / guarded
+id-propagation, #363) since 1010506 carries no template — see the resolution note below.
 
 ## Container
 
@@ -75,10 +78,15 @@ be correlated from captures. `NpcSpawnLayout.SpawnGroup` keeps the raw `Id` stri
 
 - **Empty for scripted/instanced playfields.** The Castle of King Conan (map 2040) and the Tortage interiors are
   `version=1, groupCount=0` — their NPCs are server-scripted, not in the RDB, so they remain capture-only.
-- **1010506 carries no creature template** (except `Name` groups), so `RdbSpawnPoint` is placement geometry +
-  grouping only. Matching a captured NPC to its nearest authoritative point (to assign the stable id / snap the
-  position / infer per-group density) is the #332 follow-up and is **not** wired into the capture-derived
-  `NpcSpawn` set yet — the two sets are kept separate for now.
+- **1010506 carries no creature template** (except `Name` groups): the creature `TemplateId` is
+  server-authoritative (sent on the wire at spawn), and is **not** in the client RDB — confirmed via the empty
+  spawn-export types (`1000077/78/79`), MonsterData being a many-to-one render model, and the 4-char code being
+  absent from every other resource. So the creature can only be inferred from captures (`SpawnAreaResolver`:
+  name / gated containment / guarded id-propagation), which resolves ~500 of the 2,664 areas; the rest await
+  captures or a manual pass. See #363.
+- **`NpcSpawnArea` is kept separate from the capture-derived `NpcSpawn` set** — the former is the RDB-authoritative
+  ambient population (roaming groups), the latter is exact hand-placed / named / scripted entities. The long-term
+  plan is for a captured NPC confirmed to belong to an area to graduate out of `NpcSpawn` into its area.
 
 Worked example — Tarantia Noble District (map 2010): `Brawlers`/Community `295`/3 points, `RoamingCitizens1`/
 Community `257`/41 points (with 5 roam paths of 51/46/39/51/39 points), `RoamingCitizens2`/Community `257`/20

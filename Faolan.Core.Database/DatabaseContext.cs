@@ -69,9 +69,10 @@ namespace Faolan.Core.Database
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
 		DbSet<Realm> Realms { get; }
+		DbSet<NpcSpawnArea> NpcSpawnAreas { get; }
+		DbSet<NpcSpawnAreaPoint> NpcSpawnAreaPoints { get; }
 		DbSet<Recipe> Recipes { get; }
 		DbSet<RecipeItem> RecipeItems { get; }
-		DbSet<RdbSpawnPoint> RdbSpawnPoints { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
@@ -140,9 +141,10 @@ namespace Faolan.Core.Database
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
 		public DbSet<Realm> Realms { get; set; }
+		public DbSet<NpcSpawnArea> NpcSpawnAreas { get; set; }
+		public DbSet<NpcSpawnAreaPoint> NpcSpawnAreaPoints { get; set; }
 		public DbSet<Recipe> Recipes { get; set; }
 		public DbSet<RecipeItem> RecipeItems { get; set; }
-		public DbSet<RdbSpawnPoint> RdbSpawnPoints { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
 		public DbSet<Shop> Shops { get; set; }
 		public DbSet<ShopItem> ShopItems { get; set; }
@@ -198,17 +200,19 @@ namespace Faolan.Core.Database
 			// sends + the client echoes in RespawnMe), so it must be the real RDB value, not EF-generated (#214).
 			modelBuilder.Entity<RespawnPoint>().Property(r => r.Id).ValueGeneratedNever();
 
-			// The authoritative open-world spawn points from RDB 1010506 (#332), keyed by the stable (playfield, group
-			// ordinal, point index) triple. Restrict on the map FK, same rationale as RespawnPoint: a map referenced by
-			// spawn points can't be deleted out from under them.
-			modelBuilder.Entity<RdbSpawnPoint>().HasOne(p => p.Map).WithMany().HasForeignKey(p => p.MapId).OnDelete(DeleteBehavior.Restrict);
+			// The authoritative open-world ambient spawn groups from RDB 1010506 (#332/#363), keyed by the stable
+			// (playfield, group ordinal) pair. Restrict on the map FK (a map referenced by an area can't be deleted out
+			// from under it); SetNull on the resolved-creature FK (removing a type reverts the area to unresolved, never
+			// deletes it). The child anchor points cascade-delete with their area.
+			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.Map).WithMany().HasForeignKey(a => a.MapId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.NpcTemplate).WithMany().HasForeignKey(a => a.NpcTemplateId).OnDelete(DeleteBehavior.SetNull);
+			modelBuilder.Entity<NpcSpawnArea>().HasMany(a => a.Points).WithOne(p => p.Area).HasForeignKey(p => p.NpcSpawnAreaId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder
-				.Entity<RdbSpawnPoint>()
-				.HasIndex(p => new
+				.Entity<NpcSpawnArea>()
+				.HasIndex(a => new
 				{
-					p.MapId,
-					p.GroupOrdinal,
-					p.PointIndex
+					a.MapId,
+					a.GroupOrdinal
 				})
 				.IsUnique();
 

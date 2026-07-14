@@ -225,13 +225,16 @@ namespace Faolan.Importer.Modules
 			WriteMode.Overwrite
 		};
 
-		public string Description => "Authoritative open-world NPC spawn points (RDB 1010506 layout, #332).";
+		public string Description => "Authoritative open-world ambient spawn areas (RDB 1010506 layout, #332/#363).";
 		public string Name => "rdb-npc-spawns";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var r = await RdbNpcSpawnImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
-			return new ImportResult($"{r.Points} spawn points across {r.Maps} playfields ({r.Groups} groups; {r.EmptyMaps} empty, {r.Unreadable} unreadable).");
+			var res = r.Resolved;
+			return new ImportResult(
+				$"{r.Areas} spawn areas ({r.Points} points) across {r.Maps} playfields ({r.EmptyMaps} empty, {r.Unreadable} unreadable); " +
+				$"resolved {res.Total}/{res.Areas} areas (name {res.Name}, containment {res.Containment}, id-prop {res.IdProp}).");
 		}
 	}
 

@@ -2,18 +2,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// Imports the authoritative open-world NPC spawn points from the client RDB "NPC roam/movement" layout (type
-	// 1010506 = NpcSpawnLayout, #332). These records are LOCAL (in the NN.rdbdata files) and their id == the playfield
-	// id; only maps present in the DB Maps catalog are imported (FK target). Empty records (scripted/instanced
-	// playfields, groupCount == 0) contribute nothing. The set is fully derived from fixed client content, so this is
-	// a clean rebuild each run. Stores only the PRIMARY spawn points (the group's placement anchors); the per-group
-	// AABB + roam paths the parser also decodes are not persisted (movement data isn't consumed yet).
+	// Imports the authoritative open-world ambient spawn GROUPS from the client RDB "NPC roam/movement" layout (type
+	// 1010506 = NpcSpawnLayout, #332/#363) into NpcSpawnArea (+ child NpcSpawnAreaPoint anchors). Each group becomes one
+	// area carrying its roam AABB + population count; the resolver then pre-fills the creature (NpcTemplateId) where it
+	// can. Records are LOCAL and their id == the playfield id; only maps in the DB Maps catalog are imported. Empty
+	// records (scripted/instanced playfields, groupCount == 0) contribute nothing. Clean rebuild each run (the set is
+	// fully derived from the fixed client RDB).
 	public static class RdbNpcSpawnImporter
 	{
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
@@ -21,11 +22,11 @@ namespace Faolan.Importer.Rdb
 			using var rdb = new RdbReader(rdbDir);
 			var ourMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
 
-			// Clean rebuild: the set is fully derived from the (fixed) client RDB, so a re-run replaces it wholesale.
-			db.RdbSpawnPoints.RemoveRange(db.RdbSpawnPoints);
+			// Clean rebuild: child points cascade with their area, so clearing the areas clears everything.
+			db.NpcSpawnAreas.RemoveRange(db.NpcSpawnAreas);
 			await db.SaveChangesAsync();
 
-			int maps = 0, groups = 0, points = 0, emptyMaps = 0, unreadable = 0;
+			int maps = 0, areas = 0, points = 0, emptyMaps = 0, unreadable = 0;
 			foreach (var e in rdb.EntriesOfType(NpcSpawnLayout.ResourceType).Where(e => e.IsLocal && ourMaps.Contains(e.Id)))
 			{
 				byte[] dec;
@@ -45,45 +46,60 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				var mapPoints = 0;
+				if (layout.Groups.Count == 0)
+				{
+					emptyMaps++;
+					continue;
+				}
+
 				for (var gi = 0; gi < layout.Groups.Count; gi++)
 				{
-					var grp = layout.Groups[gi];
-					for (var pi = 0; pi < grp.SpawnPoints.Count; pi++)
+					var g = layout.Groups[gi];
+					var area = new NpcSpawnArea
 					{
-						var pt = grp.SpawnPoints[pi];
-						db.RdbSpawnPoints.Add(new RdbSpawnPoint
+						MapId = e.Id,
+						GroupOrdinal = gi,
+						GroupName = g.Name,
+						Category = g.Category,
+						GroupKey = g.Id,
+						CommunityId = g.CommunityId,
+						BoundsMinX = g.BoundsMin.X,
+						BoundsMinY = g.BoundsMin.Y,
+						BoundsMinZ = g.BoundsMin.Z,
+						BoundsMaxX = g.BoundsMax.X,
+						BoundsMaxY = g.BoundsMax.Y,
+						BoundsMaxZ = g.BoundsMax.Z,
+						MaxCount = g.SpawnPoints.Count,
+						ResolvedBy = SpawnResolutionSource.None
+					};
+					for (var pi = 0; pi < g.SpawnPoints.Count; pi++)
+					{
+						var pt = g.SpawnPoints[pi];
+						area.Points.Add(new NpcSpawnAreaPoint
 						{
-							MapId = e.Id,
-							GroupOrdinal = gi,
 							PointIndex = pi,
-							GroupName = grp.Name,
-							Category = grp.Category,
-							GroupKey = grp.Id,
-							CommunityId = grp.CommunityId,
 							X = pt.X,
 							Y = pt.Y,
 							Z = pt.Z
 						});
-						mapPoints++;
 					}
 
-					groups++;
+					db.NpcSpawnAreas.Add(area);
+					areas++;
+					points += g.SpawnPoints.Count;
 				}
 
-				if (mapPoints > 0)
-				{
-					maps++;
-					points += mapPoints;
-				}
-				else
-					emptyMaps++;
+				maps++;
 			}
 
 			await db.SaveChangesAsync();
-			return new Result(maps, groups, points, emptyMaps, unreadable);
+
+			// Infer the creature (NpcTemplateId) per area where we can - name / gated containment / guarded id-prop.
+			var resolved = await SpawnAreaResolver.ResolveAsync(db);
+
+			return new Result(maps, areas, points, emptyMaps, unreadable, resolved);
 		}
 
-		public readonly record struct Result(int Maps, int Groups, int Points, int EmptyMaps, int Unreadable);
+		public readonly record struct Result(int Maps, int Areas, int Points, int EmptyMaps, int Unreadable, ResolveStats Resolved);
 	}
 }
