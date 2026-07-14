@@ -669,6 +669,7 @@ namespace Faolan.Core.Network.Constants
 		SetMorphValueIIR = 0xBADF5A4B, // SetMorphValueIIR_c  (x101) - character-creator morph ack
 		SetNameIIR = 0xADCE0CDA, // SetNameIIR_t  (x4) - name commit in the create flow
 		SetPosIIR = 0x04B80B24, // SetPosIIR_c  (x29)
+		SetShadowCoverageIIR = 0xD6C1F0CC, // SetShadowCoverageIIR_c (BKDR-31 of "SetShadowCoverageIIR_c") - environment/lighting update
 		SimpleCharFullUpdateIIR = 0xFA015807, // SimpleCharFullUpdateIIR_t  (x3407) - entity spawn ("Spawn")
 		SimpleCharKilledByUpdateIIR = 0xB066AFC2, // SimpleCharKilledByUpdateIIR_t  (x2) - kill/death
 		SimpleDynelFullUpdateIIR = 0x66AEDD50, // SimpleDynelFullUpdateIIR_c  (x1575) - world object spawn ("SpawnObject")

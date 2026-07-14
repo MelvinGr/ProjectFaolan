@@ -15,7 +15,7 @@ recomputing the hash over candidates derived from our member name (± `_c`/`_t`,
 so a filled cell is a self-contained proof: `BKDR-31(name) == id`. This holds without parsing any
 external doc; the enum + the hash function are the whole source.
 
-- **75** ids: client type name recovered + BKDR-31-verified.
+- **76** ids: client type name recovered + BKDR-31-verified.
 - **1** ids: 32-bit hash (V1-recovered from the client) whose exact source string our name doesn't reproduce.
 
 | Type id | Recovered client name | Our enum name | Note |
@@ -86,6 +86,7 @@ external doc; the enum + the hash function are the whole source.
 | `0xCE30BE4E` | `AreaFormulaIIR_t` ✓ | `AreaFormulaIIR` | AreaFormulaIIR_t  (x42) |
 | `0xCFFD0519` | `CombatShieldIIR_c` ✓ | `CombatShieldIIR` | CombatShieldIIR_c  (x79) |
 | `0xD06568C8` | `NewCurrentLooterIIR_c` ✓ | `NewCurrentLooterIIR` | NewCurrentLooterIIR_c  (x60) |
+| `0xD6C1F0CC` | `SetShadowCoverageIIR_c` ✓ | `SetShadowCoverageIIR` | SetShadowCoverageIIR_c (BKDR-31 of "SetShadowCoverageIIR_c") - environment/lighting update |
 | `0xD751EBB4` | `StopIIR_c` ✓ | `StopIIR` | StopIIR_c  (x2097) - stop moving |
 | `0xE0B51102` | `ChatTextIIR_t` ✓ | `ChatTextIIR` | ChatTextIIR_t  (x1) |
 | `0xE7F4F8F8` | `SimpleDynelVisualChangeIIR_c` ✓ | `SimpleDynelVisualChangeIIR` | SimpleDynelVisualChangeIIR_c  (x548) |
