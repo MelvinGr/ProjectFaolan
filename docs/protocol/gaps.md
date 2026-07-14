@@ -29,10 +29,13 @@ send path that depends on the meaning.
 ## RPC
 
 ### PlayerAgent 32-bit hash dispatch
-**Tracked: Gitea #320.** Every RPC interface dispatches on a 16-bit method index (`0x2000 + registration index`) **except**
-PlayerAgent/PlayerInterface, which uses a 32-bit hash. The login flow works because we hard-code the handful of
-values we observed; the hashing function has not been recovered, so we cannot enumerate the interface the way
-`gen/opcodes.md` enumerates the other 16.
+**Tracked: Gitea #320.** Every RPC interface dispatches on a 16-bit method index (`0x2000 + registration index`); PlayerAgent/
+PlayerInterface **additionally** carries a 32-bit method hash on the wire. This is a dump task, not a hash to reverse: the
+login-critical method set is recovered and verified end-to-end (a Frida-under-Wine hook on the client send path correlated
+with a loopback capture) and carried as real associated ids (`PlayerAgentMethodIds`, appended by `WriteHeader`; tests lock
+the bytes). The interface is only PARTIALLY enumerated in `gen/opcodes.md` — the methods the server does not implement
+(character create/delete/rename, Facebook token, hardcore, offline-levels, …) still lack their wire (opcode, id) pairs,
+harvestable via the same Frida technique. Remove this V0 once all 17 interfaces are fully covered.
 
 ---
 

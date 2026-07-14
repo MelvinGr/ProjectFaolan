@@ -68,9 +68,12 @@ The full per-interface catalog — 819 entries across 16 enums, with direction a
 
 ### The one exception
 
-PlayerAgent/PlayerInterface dispatches on a **32-bit hash**, not the `0x2000 + index` scheme. Login works because
-the handful of observed values are hard-coded; the hash function is not recovered, so this interface cannot be
-enumerated. [V0: PlayerAgent 32-bit hash dispatch]
+PlayerAgent/PlayerInterface additionally carries a **32-bit method hash** on the wire (alongside the 16-bit
+opcode), not the `0x2000 + index` scheme alone. It is a dump task, not a hash to reverse: the login-critical
+method set is recovered and verified end-to-end (a Frida-under-Wine hook on the client send path correlated with
+a loopback capture) and carried as real associated ids (`PlayerAgentMethodIds`, appended by `WriteHeader`). Only
+the methods the server does not implement (character create/delete/rename, Facebook token, hardcore, …) are still
+un-enumerated, harvestable by the same technique. [V0: PlayerAgent 32-bit hash dispatch]
 
 ## Multiplexing
 
