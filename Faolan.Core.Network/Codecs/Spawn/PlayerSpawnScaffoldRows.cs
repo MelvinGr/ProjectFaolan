@@ -32,14 +32,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			[Class.HeraldOfXotli] = [4300, 6100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 13600, 14600, 114800, 328700, 328900, 331300]
 		};
 
-		// The FULL feat/ability scaffold a high-level character of the class carries, harvested from the captured
+		// The FULL ability/skill scaffold a high-level character of the class carries, harvested from the captured
 		// retail chars (NecroL80 L80 Necro, DemoL80 L80 Demo, AssassinL23 L23 Assassin, Hakotep L24 Herald). A spell's
-		// in-client usability is gated on the char having the feat that unlocks it - and that spell->feat mapping
-		// lives ONLY in the server GDB (never transmitted; the client just receives the resulting feat-id LIST). So
-		// we can't grant the ONE exact feat per spell; instead we replicate a working char's whole scaffold, which
-		// makes every class spell the char has learned castable. Over-grants feats (no per-level GDB breakdown), and
-		// only covers the classes we have a high-level capture for. See [[feat_trees_decode_251]] (GDB-mapping-
-		// blocked, NOT RDB-key-blocked) and Gitea #298/#251/#74. Ascending ids (the wire/codec require it).
+		// in-client usability is gated on the char carrying the matching ABILITY/SKILL scaffold entry - and that
+		// spell->ability mapping is server-side, so we replicate a working char's whole scaffold, which makes every
+		// class spell the char has learned castable. NOTE: this scaffold is the ability/skill list, NOT the feat
+		// tree - feats ride a SEPARATE record (FeatIIR 0x28da68a0, its own id-space; an earlier RE wrongly conflated
+		// the two). Over-grants (no per-level breakdown), and only covers classes we have a high-level capture for.
+		// See [[feat_trees_decode_251]] (feats-vs-skills correction) and Gitea #298/#251/#74. Ascending ids (the
+		// wire/codec require it).
 		private static readonly Dictionary<Class, uint[]> FullSkillIdsByClass = new Dictionary<Class, uint[]>
 		{
 			[Class.Necromancer] =

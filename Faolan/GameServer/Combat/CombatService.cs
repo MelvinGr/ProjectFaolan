@@ -530,8 +530,9 @@ namespace Faolan.GameServer.Combat
 					await _database.AddCharacterSpell(character.Id, spellId);
 				}
 
-				// Feat scaffold (#298/#251): grant the harvested class scaffold so the just-learned spells become
-				// castable (the client gates usability on feat presence; the exact spell->feat map is server-GDB-only).
+				// Ability/skill scaffold (#298/#251): grant the harvested class scaffold so the just-learned spells
+				// become castable (the client gates usability on the ability/skill entry). NB this is the skill list,
+				// NOT the feat tree - feats ride a separate FeatIIR (0x28da68a0); see [[feat_trees_decode_251]].
 				var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
 				if (fullScaffold != null)
 					await _database.EnsureCharacterSkills(character.Id, fullScaffold);

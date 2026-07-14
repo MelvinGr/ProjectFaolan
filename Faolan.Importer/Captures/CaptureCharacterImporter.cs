@@ -291,8 +291,9 @@ namespace Faolan.Importer.Captures
 			db.Characters.Add(character);
 			await db.SaveChangesAsync();
 
-			// The full spawn scaffold (entry table / feat ids / pair lists / pre-frame) - the captured
-			// character's appearance + progression scaffold, byte-exact regenerable.
+			// The full spawn scaffold (entry table / ability-skill ids / pair lists / pre-frame) - the captured
+			// character's appearance + progression scaffold, byte-exact regenerable. (The id list is the ability/skill
+			// scaffold, NOT the feat tree - feats ride a separate FeatIIR 0x28da68a0; see [[feat_trees_decode_251]].)
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
 
 			// Worn equipment: every IIR InventoryEntry whose template is a DB item.

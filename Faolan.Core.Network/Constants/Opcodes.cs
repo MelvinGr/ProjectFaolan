@@ -629,6 +629,7 @@ namespace Faolan.Core.Network.Constants
 		DestructibleFullUpdateIIR = 0x6BD56736, // DestructibleFullUpdateIIR_c  (x189)
 		DoorFullUpdateIIR = 0x33A56FB0, // DoorFullUpdateIIR_c  (x89) - world door/object full update
 		EnergyIIR = 0x40749B8A, // EnergyIIR  (x1039)
+		FeatIIR = 0x28DA68A0, // FeatIIR (BKDR-31 of "FeatIIR") - feat train/unlock: 0x3F1-framed feat-id list; c2s state 0x04 request, s2c 0x05 ack (#251)
 		FeedbackIIR = 0xBA1FD222, // FeedbackIIR_t  (x5)
 		FormatFeedbackIIR = 0x8D5A8B6B, // FormatFeedbackIIR_t  (x68)
 		FullPlayerCharacterIIR = 0x737A6DF9, // FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below

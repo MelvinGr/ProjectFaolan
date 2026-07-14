@@ -626,9 +626,9 @@ namespace Faolan.GameServer
 					await Database.AddCharacterSpell(character.Id, spellId);
 				}
 
-				// Feat scaffold (#298/#251): a learned spell only becomes CASTABLE once the char carries the feat that
-				// unlocks it. That spell->feat map is server-GDB-only (never on the wire), so we grant the whole
-				// harvested class scaffold instead of the one exact feat. Rides the scaffold on the next spawn (relog).
+				// Ability/skill scaffold (#298/#251): a learned spell only becomes CASTABLE once the char carries the
+				// matching ability/skill scaffold entry, so we grant the whole harvested class scaffold. NB this is the
+				// skill list, NOT the feat tree (feats ride a separate FeatIIR 0x28da68a0). Rides the next spawn (relog).
 				var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
 				if (fullScaffold != null)
 					await Database.EnsureCharacterSkills(character.Id, fullScaffold);

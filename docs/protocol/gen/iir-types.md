@@ -15,7 +15,7 @@ recomputing the hash over candidates derived from our member name (± `_c`/`_t`,
 so a filled cell is a self-contained proof: `BKDR-31(name) == id`. This holds without parsing any
 external doc; the enum + the hash function are the whole source.
 
-- **74** ids: client type name recovered + BKDR-31-verified.
+- **75** ids: client type name recovered + BKDR-31-verified.
 - **1** ids: 32-bit hash (V1-recovered from the client) whose exact source string our name doesn't reproduce.
 
 | Type id | Recovered client name | Our enum name | Note |
@@ -37,6 +37,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x1FD6412B` | `ClimbingDynelFullUpdateIIR_c` ✓ | `ClimbingDynelFullUpdateIIR` | ClimbingDynelFullUpdateIIR_c  (x87) |
 | `0x2550C99A` | `GuildUpdateIIR_c` ✓ | `GuildUpdateIIR` | GuildUpdateIIR_c  (x3) |
 | `0x28D0AC99` | `RegenIIR_c` ✓ | `RegenIIR` | RegenIIR_c  (x554) |
+| `0x28DA68A0` | `FeatIIR` ✓ | `FeatIIR` | FeatIIR (BKDR-31 of "FeatIIR") - feat train/unlock: 0x3F1-framed feat-id list; c2s state 0x04 request, s2c 0x05 ack (#251) |
 | `0x2A8A1B49` | `MoveInventoryItemIIR_t` ✓ | `MoveInventoryItemIIR` | MoveInventoryItemIIR_t  (x16) - "MoveItemInInventory" |
 | `0x30536411` | `UpdateSimpleDynelIIR_c` ✓ | `UpdateSimpleDynelIIR` | UpdateSimpleDynelIIR_c  (x30) |
 | `0x33A56FB0` | `DoorFullUpdateIIR_c` ✓ | `DoorFullUpdateIIR` | DoorFullUpdateIIR_c  (x89) - world door/object full update |

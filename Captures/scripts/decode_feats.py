@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""Read a character's UNLOCKED FEAT LIST out of the capture dumps (Gitea #251, feat-tree subsystem).
+"""Read a character's ABILITY/SKILL SCAFFOLD out of the capture dumps (Gitea #251).
 
-The feat/ability list a high-level character carries is the tail ID-list of its own FA015807 player spawn:
+CORRECTION: this reads the SKILL/ability scaffold, NOT the feat tree. Feats ride a SEPARATE record, FeatIIR
+(0x28da68a0) - a 0x3F1-framed feat-id list with a 0x04(c2s request)->0x05(s2c ack) train/unlock handshake, a
+different id-space (feat ids 112700/109488/410600 are absent here). Proof: unlocking the Hellfire feat left this
+scaffold byte-identical. See the feat_trees_decode_251 memory. This tool + the scaffold still matter (the list
+gates spell usability, #298), it's just skills, not feats.
+
+The ability/skill list a high-level character carries is the tail ID-list of its own FA015807 player spawn:
 5-byte `[u8 rank][u32 featId]` groups, ascending featId, terminated by id 0x3F1 (the same list the C# codec
 PlayerSpawnScaffoldCodec parses into ScaffoldIdEntry(Rank, Id), and that PlayerSpawnScaffoldRows maps to
 CharacterSkill(SkillId, Rank)). This tool surfaces that list per character straight from the captures - the

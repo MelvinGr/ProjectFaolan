@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**75** IIR carrier types · **72 V3** (72 with an auto-cited golden). The
+**76** IIR carrier types · **72 V3** (72 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -93,6 +93,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryMoveCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
 | V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
+| V1 | `FeatIIR` | `0x28DA68A0` | — |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
 [`gaps.md`](../gaps.md)). A V3 row with an empty golden column is byte-exact via a codec whose test the
