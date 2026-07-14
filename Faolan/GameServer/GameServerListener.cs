@@ -32,8 +32,8 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, IGameServerProvider
 	{
-		// SendPostReadyBurst (the post-0x2024 login record stream) is built as explicit PacketStream sends
-		// in PostReadyBurst.cs.
+		// Existing-character login no longer emits an opaque post-0x2024 record stream: world entry is CONSTRUCTED
+		// from the DB (#210 burst-less entry, SendWorldEntry). The create-editor still has a verbatim burst (#190).
 		// Inventory container ID32 types seen in the captured DispatchAddItem inventoryID (these equal the ContainerKind
 		// numbers: 0x68 = 104 Bag, 0x71 = 113 Quest). The Casilda-chain captures (casilda_quest_first_stage /
 		// compeltefirstquest) deliver the quest key via a live add to 0x71 - the quest-items tab (#261).
