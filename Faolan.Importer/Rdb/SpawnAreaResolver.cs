@@ -174,8 +174,8 @@ namespace Faolan.Importer.Rdb
 				foreach (var s in await db.NpcSpawns.Where(s => s.MapId == mapId).ToListAsync())
 				{
 					var area = mapAreas.FirstOrDefault(a => a.NpcTemplateId == s.NpcTemplateId
-					                                        && s.PositionX >= a.BoundsMinX - pad && s.PositionX <= a.BoundsMaxX + pad
-					                                        && s.PositionZ >= a.BoundsMinZ - pad && s.PositionZ <= a.BoundsMaxZ + pad);
+															&& s.PositionX >= a.BoundsMinX - pad && s.PositionX <= a.BoundsMaxX + pad
+															&& s.PositionZ >= a.BoundsMinZ - pad && s.PositionZ <= a.BoundsMaxZ + pad);
 					var newLink = area?.Id;
 					if (s.NpcSpawnAreaId != newLink)
 						s.NpcSpawnAreaId = newLink;
@@ -197,10 +197,10 @@ namespace Faolan.Importer.Rdb
 			var z1 = a.BoundsMaxZ;
 			foreach (var p in a.Points)
 			{
-				x0 = Math.Min(x0, p.X);
-				x1 = Math.Max(x1, p.X);
-				z0 = Math.Min(z0, p.Z);
-				z1 = Math.Max(z1, p.Z);
+				x0 = Math.Min(x0, p.PositionX);
+				x1 = Math.Max(x1, p.PositionX);
+				z0 = Math.Min(z0, p.PositionZ);
+				z1 = Math.Max(z1, p.PositionZ);
 			}
 
 			return (x0 - ContainPad, x1 + ContainPad, z0 - ContainPad, z1 + ContainPad);

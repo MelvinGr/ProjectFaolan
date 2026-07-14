@@ -207,7 +207,7 @@ namespace Faolan.GameServer.World
 		// capture-placed / named / summoned NPC. When set, the area POOL maintains this creature's population (respawns
 		// a replacement at a free area point when it dies) instead of the per-entity respawn - and its wander waypoints
 		// are the area's points, so it roams the group's area.
-		public int? SpawnAreaId { get; set; }
+		public uint? SpawnAreaId { get; set; }
 
 		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
 		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
@@ -414,7 +414,7 @@ namespace Faolan.GameServer.World
 			MoveOrigin = SpawnPosition;
 			MoveFrom = SpawnPosition;
 			Moving = false; // a fresh NPC starts stationary (#272); the next chase/return re-seeds the move anchor
-			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
+							// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
 			CashTin = 0;
 			LootItems.Clear();
 			_corpseConverted = false;

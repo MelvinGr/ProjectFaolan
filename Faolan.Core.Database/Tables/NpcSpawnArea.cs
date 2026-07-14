@@ -18,10 +18,8 @@ namespace Faolan.Core.Database.Tables
 	// 1010506 carries WHERE + how many, never WHICH creature (that is server-authoritative). So NpcTemplateId is
 	// NULLABLE and inferred by the resolver (name / containment / id-propagation) then confirmed by hand; ResolvedBy
 	// records the provenance so a machine guess is distinguishable from a human-verified assignment.
-	public class NpcSpawnArea
+	public class NpcSpawnArea : BaseEntity
 	{
-		public int Id { get; set; }
-
 		// The playfield (the RDB record id == the playfield id == Map.Id).
 		public uint MapId { get; set; }
 

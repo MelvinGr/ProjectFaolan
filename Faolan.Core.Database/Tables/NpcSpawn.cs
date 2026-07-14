@@ -44,7 +44,7 @@ namespace Faolan.Core.Database.Tables
 		// then just deletes the rows linked to an area (a clean FK delete, no bounds re-derivation). Null = an
 		// independent placement (named/quest NPC, or a mob no area owns). SetNull on area delete, so a re-import that
 		// wipes the areas simply un-links these rather than deleting them.
-		public int? NpcSpawnAreaId { get; set; }
+		public uint? NpcSpawnAreaId { get; set; }
 
 		[ForeignKey(nameof(NpcSpawnAreaId))]
 		public virtual NpcSpawnArea? NpcSpawnArea { get; set; }

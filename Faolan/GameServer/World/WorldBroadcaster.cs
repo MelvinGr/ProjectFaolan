@@ -835,7 +835,7 @@ namespace Faolan.GameServer.World
 				if (type?.StatCore?.IirHeader == null)
 					continue; // the resolved creature has no buildable stat core - skip (can't construct its body)
 
-				var points = area.Points.Select(p => new Vector3(p.X, p.Y, p.Z)).ToArray();
+				var points = area.Points.Select(p => new Vector3(p.PositionX, p.PositionY, p.PositionZ)).ToArray();
 				if (points.Length == 0)
 					continue;
 
@@ -951,7 +951,7 @@ namespace Faolan.GameServer.World
 
 		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
 		// Label is the dev nameplate tag (FormatAreaLabel), applied to members when DebugAreaLabels is on.
-		private sealed record AmbientPool(int AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
+		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
 
 		// #363 dev label for a captured spawn's nameplate: LINK-first - the area it's a confirmed MEMBER of
 		// (NpcSpawnAreaId), even if it sits outside the bounds (a hand-linked stray); else the area its POSITION lands in
@@ -1274,8 +1274,8 @@ namespace Faolan.GameServer.World
 
 			var npc = await _database.GetNpcSpawnByName(npcName);
 			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-										   // Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
-										   // baked ones are just placeholders (the player's zone token here).
+											  // Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
+											  // baked ones are just placeholders (the player's zone token here).
 			if (npc == null || !NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken, out var body))
 			{
 				_logger.LogInformation("Spawn: no spawnable '{NpcTemplate}' template found.", npcName);
@@ -1523,7 +1523,7 @@ namespace Faolan.GameServer.World
 				{
 					case InterestEventType.Spawn when ev.Subject.SpawnBody != null:
 					{
-					// Register a streamed-in NPC's handle -> name + template so clicking it routes to the right
+						// Register a streamed-in NPC's handle -> name + template so clicking it routes to the right
 						// conversation/shop by the stable template key (the same map the world-burst spawns use; players
 						// are not conversation targets).
 						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot && ev.Subject.Name != null)
@@ -1792,16 +1792,6 @@ namespace Faolan.GameServer.World
 			return LootBagTemplate.IsAvailable
 				? LootBagTemplate.Create()
 				: null;
-		}
-
-		// Maps each FA015807 NPC the burst renders to (rounded position) -> the wire handle it renders under, by
-		// rebuilding the burst record and reading the spawn body's transform. EnsureZoneNpcs uses this to give the
-		// model NPC at that position the same handle the client already knows, so Known-seeding lines up.
-		// Quantizes a world position to a stable integer key (×100, rounded) - the same scheme RetailLoginReplay uses
-		// to match burst packets to NpcSpawns rows, so the two agree on which NPC sits at a given spot.
-		private static (int, int, int) PositionKey(float x, float y, float z)
-		{
-			return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
 		}
 
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
