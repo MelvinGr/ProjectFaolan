@@ -47,9 +47,9 @@ namespace Faolan.GameServer.World
 		// no loot bag can be built for the map.
 		Task ConvertCorpseToLoot(WorldEntity npc);
 
-		// #363: top up the ambient spawn-group pools of every loaded zone to their MaxCount (respawn killed members).
-		// Called on a slow cadence from the sim tick; no-op unless the ambient spawner is enabled.
-		Task MaintainAmbientPools();
+		// #363: advance each ambient spawn-group pool's respawn timer by `dt` and respawn any that are due (per-pool
+		// timing). Called on a short cadence from the sim tick; no-op unless the ambient spawner is enabled.
+		Task MaintainAmbientPools(double dt);
 
 		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
 		Task PushVitals(INetworkClient client, EntityVitals vitals);

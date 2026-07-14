@@ -44,9 +44,9 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcRespawn(npc);
 		}
 
-		Task IWorldOutbound.MaintainAmbientPools()
+		Task IWorldOutbound.MaintainAmbientPools(double dt)
 		{
-			return _broadcaster.MaintainAmbientPools();
+			return _broadcaster.MaintainAmbientPools(dt);
 		}
 
 		Task IWorldOutbound.BroadcastNpcStop(WorldEntity npc)
