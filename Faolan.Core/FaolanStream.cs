@@ -62,7 +62,11 @@ namespace Faolan.Core
 
 		public new byte ReadByte()
 		{
-			return checked((byte)base.ReadByte());
+			var ret = base.ReadByte();
+			if (ret == -1)
+				throw new EndOfStreamException("Attempted to read past the end of the stream.");
+
+			return checked((byte)ret);
 		}
 
 		public T ReadByte<T>() where T : Enum
