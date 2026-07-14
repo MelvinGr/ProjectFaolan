@@ -48,5 +48,23 @@ namespace Faolan.Tests
 			Assert.False(FeatIirCodec.TryParse([0x01, 0x02, 0x03], out _, out _, out _));
 			Assert.False(FeatIirCodec.TryParse(Convert.FromHexString("deadbeef0000c3501101b4f50004000000000000000003f1"), out _, out _, out _));
 		}
+
+		// The untrain-all confirm dialog, locked to the captured exchange.
+		[Fact]
+		public void UntrainMessageBox_Build_MatchesCapture()
+		{
+			// s2c DispatchFeatUntrainMessageBox: [kind 1][value 0x1A3BDA][0][token 0x48018760].
+			var body = FeatUntrainMessageBoxCodec.Build(1, 0x001A3BDA, 0x48018760);
+			Assert.Equal("00000001001a3bda0000000048018760", Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		[Fact]
+		public void UntrainMessageBox_ParseAnswer_ReadsCapture()
+		{
+			// c2s FeatUntrainAnswer: [answer 0x01][the 16-byte payload echoed]; token = the echo's 4th u32.
+			Assert.True(FeatUntrainMessageBoxCodec.TryParseAnswer(Convert.FromHexString("0100000001001a3bda0000000048018760"), out var answer, out var token));
+			Assert.Equal(FeatUntrainMessageBoxCodec.AnswerConfirm, answer);
+			Assert.Equal(0x48018760u, token);
+		}
 	}
 }

@@ -1369,12 +1369,16 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameCharAgentOpcodes.UntrainFeat: // "untrain all feats" (reset)
-				case GameCharAgentOpcodes.FeatUntrainAnswer: // the confirm-dialog answer for the same
+				case GameCharAgentOpcodes.UntrainFeat: // "untrain all feats" -> send the confirm messagebox
 				{
-					// Reset ALL trained feats + reload the world so the cleared list takes effect. See
-					// GameServerListener.Feats.cs / docs/subsystems/feats.md.
-					await HandleFeatReset(client);
+					await HandleFeatUntrainRequest(client);
+
+					break;
+				}
+
+				case GameCharAgentOpcodes.FeatUntrainAnswer: // confirm-dialog answer -> reset if confirmed
+				{
+					await HandleFeatUntrainAnswer(client, packet);
 
 					break;
 				}

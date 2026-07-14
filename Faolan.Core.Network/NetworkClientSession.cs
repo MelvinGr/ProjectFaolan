@@ -157,6 +157,10 @@ namespace Faolan.Core.Network
 		// (sub 0x0003) resolves its 1-based index against a STABLE snapshot - "Claim All" fires one redeem per row
 		// using the original indices, and deleting rows as they redeem would otherwise shift every later index.
 		System.Collections.Generic.IReadOnlyList<uint>? ClaimSlots { get; set; }
+
+		// The token embedded in a pending feat-untrain confirm dialog (DispatchFeatUntrainMessageBox); the client
+		// echoes it in FeatUntrainAnswer, so the reset only fires when the answer matches an outstanding request.
+		uint? PendingFeatUntrainToken { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
@@ -215,5 +219,8 @@ namespace Faolan.Core.Network
 		// The claim ids in the order last sent to this client (see the interface), so "Claim All"'s per-row redeems
 		// resolve their original 1-based index even as rows are deleted mid-batch.
 		public System.Collections.Generic.IReadOnlyList<uint>? ClaimSlots { get; set; }
+
+		// The outstanding feat-untrain confirm token (see the interface); null when no untrain dialog is pending.
+		public uint? PendingFeatUntrainToken { get; set; }
 	}
 }

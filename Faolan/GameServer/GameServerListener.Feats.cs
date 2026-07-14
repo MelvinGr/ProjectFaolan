@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Feats;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Conan;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -40,7 +43,13 @@ namespace Faolan.GameServer
 			if (character == null)
 				return;
 
-			var added = await Database.AddCharacterFeats(character.Id, featIds);
+			var added = await TrainWithinBudget(character.Id, character.Level, featIds);
+			if (added < 0)
+			{
+				// Over the feat-point budget (safety net; the client normally pre-validates). Don't add or ack.
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "Not enough feat points to train that.");
+				return;
+			}
 
 			// Ack: echo the requested id list back (state 0x05), byte-for-byte as retail does. The client renders the
 			// trained feats off this; the next spawn regenerates them from the persisted CharacterFeat rows.
@@ -52,19 +61,77 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Character {CharacterId} trained {Added} feat(s) [{Ids}].", character.Id, added, string.Join(",", featIds));
 		}
 
-		// c2s UntrainFeat (0x2041) / FeatUntrainAnswer (0x203E): reset ALL trained feats. Retail confirms via a dialog
-		// first (not yet built), so we act on either signal. Clears CharacterFeat, then reloads the world so the client
-		// re-reads the (now empty) feat list from the fresh spawn - the same loading screen the retail untrain triggers.
-		private async Task HandleFeatReset(INetworkClient client)
+		// Trains `requested` onto the character iff the resulting feat set stays within its feat-point budget
+		// (FeatRules). Returns the number of feats added, or -1 when the train is rejected as over-budget.
+		private async Task<int> TrainWithinBudget(uint characterId, ushort level, IReadOnlyList<uint> requested)
+		{
+			var existing = await Database.GetCharacterFeats(characterId);
+			var after = existing.Concat(requested.Where(id => !existing.Contains(id)));
+			if (!FeatRules.WithinBudget(level, after))
+			{
+				Logger.LogWarning("Character {CharacterId} feat train rejected: {Spent} points > budget {Budget} (level {Level}).",
+					characterId, FeatRules.TotalCost(existing.Concat(requested)), FeatRules.PointBudget(level), level);
+				return -1;
+			}
+
+			return await Database.AddCharacterFeats(characterId, requested);
+		}
+
+		// c2s UntrainFeat (0x2041): the client clicked "untrain all feats". Retail answers with a CONFIRM messagebox
+		// (DispatchFeatUntrainMessageBox 0x2064) and only resets once the client confirms - so we send the dialog and
+		// remember its token; the reset happens in HandleFeatUntrainAnswer. No feats -> nothing to confirm.
+		private async Task HandleFeatUntrainRequest(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return;
 
+			var feats = await Database.GetCharacterFeats(character.Id);
+			if (feats.Length == 0)
+				return;
+
+			var token = character.Id; // a per-request token the client echoes back in the answer (player handle == id)
+			client.Session.PendingFeatUntrainToken = token;
+
+			await new PacketStream()
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchFeatUntrainMessageBox)
+				.WriteArray(FeatUntrainMessageBoxCodec.Build(1, 0, token)) // kind 1 = untrain-all; value 0 = free (no cost model yet)
+				.SendAsync(client);
+
+			Logger.LogInformation("Sent feat untrain-all confirm to character {CharacterId} ({Count} feats).", character.Id, feats.Length);
+		}
+
+		// c2s FeatUntrainAnswer (0x203E): the confirm-dialog reply. Reset ALL feats only when the player CONFIRMED and
+		// the echoed token matches the outstanding request (guards against a stray/replayed answer).
+		private async Task HandleFeatUntrainAnswer(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var body = packet.Body.ReadRemainingArray();
+			if (!FeatUntrainMessageBoxCodec.TryParseAnswer(body, out var answer, out var token))
+				return;
+
+			var pending = client.Session.PendingFeatUntrainToken;
+			client.Session.PendingFeatUntrainToken = null;
+			if (answer != FeatUntrainMessageBoxCodec.AnswerConfirm || pending == null || token != pending)
+			{
+				Logger.LogDebug("Feat untrain answer {Answer:X2} (token {Token:X8}, pending {Pending:X8}) - not confirming.", answer, token, pending ?? 0);
+				return;
+			}
+
+			await ResetFeats(client, character);
+		}
+
+		// Clear ALL of the character's trained feats and reload the world so the fresh spawn carries the cleared list
+		// (the "loading screen" the retail untrain triggers). Shared by the confirm-dialog answer and the .feat GM reset.
+		private async Task ResetFeats(INetworkClient client, Core.Database.Tables.Character character)
+		{
 			var cleared = await Database.ClearCharacterFeats(character.Id);
 			Logger.LogInformation("Character {CharacterId} reset {Cleared} feat(s).", character.Id, cleared);
 			if (cleared > 0)
-				await DoTeleport(character.Id, character.MapId, character.Position); // reload so the cleared list takes effect
+				await DoTeleport(character.Id, character.MapId, character.Position);
 		}
 
 		// .feat list | .feat train <id> [<id>...] | .feat reset  - the test bootstrap for the feat subsystem (the retail
@@ -101,7 +168,14 @@ namespace Faolan.GameServer
 						return;
 					}
 
-					var added = await Database.AddCharacterFeats(character.Id, ids);
+					var added = await TrainWithinBudget(character.Id, character.Level, ids);
+					if (added < 0)
+					{
+						await _agentServerDispatcher.SendSystemMessage(character.Id,
+							$"Not enough feat points (budget {FeatRules.PointBudget(character.Level)} at level {character.Level}).");
+						return;
+					}
+
 					await _agentServerDispatcher.SendSystemMessage(character.Id, $"Trained {added} new feat(s); reloading...");
 					await DoTeleport(character.Id, character.MapId, character.Position);
 					return;
@@ -109,10 +183,8 @@ namespace Faolan.GameServer
 
 				case "reset":
 				{
-					var cleared = await Database.ClearCharacterFeats(character.Id);
-					await _agentServerDispatcher.SendSystemMessage(character.Id, $"Reset {cleared} feat(s); reloading...");
-					if (cleared > 0)
-						await DoTeleport(character.Id, character.MapId, character.Position);
+					await _agentServerDispatcher.SendSystemMessage(character.Id, "Resetting feats; reloading...");
+					await ResetFeats(client, character); // GM reset bypasses the confirm dialog
 					return;
 				}
 
