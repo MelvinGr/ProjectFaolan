@@ -65,13 +65,9 @@ namespace Faolan.GameServer.World
 		public static bool DebugAreaLabels;
 
 		// The live AMBIENT spawner (#363): when true, each RESOLVED NpcSpawnArea spawns its creature at every RDB spawn
-		// point on zone load. OFF by default (experimental - overlaps the captured NpcSpawn set until graduation). Set
-		// from config (IConfiguration.AmbientSpawnsEnabled) at startup.
+		// point on zone load. OFF by default (experimental - overlaps the captured NpcSpawn set until graduation, wander
+		// not yet wired). Set from config (IConfiguration.AmbientSpawnsEnabled) at startup.
 		public static bool AmbientSpawns;
-
-		// Per-pool respawn delay: how long after a pool member dies before the pool respawns a replacement. One default
-		// for every pool for now (each pool still counts down independently); a per-creature curve could set it later.
-		private const double AmbientRespawnDelaySeconds = 15.0;
 
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).
@@ -802,6 +798,16 @@ namespace Faolan.GameServer.World
 				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
 					entity.ChatterLines = chatter.Select(c => c.RemoteFormat).Where(x => !string.IsNullOrEmpty(x)).ToArray();
 
+				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
+				// to graduating/deleting it). It renders with its captured appearance but the POOL owns its respawn (fades
+				// on death, replaced by the pool), and it counts toward MaxCount so the pool only tops up the DEFICIT -
+				// no captured/ambient overlap. Only when the ambient spawner is on; otherwise it's an ordinary spawn.
+				if (AmbientSpawns && npc.NpcSpawnAreaId is { } linkedAreaId)
+				{
+					entity.SpawnAreaId = linkedAreaId;
+					entity.NoRespawn = true;
+				}
+
 				zone.Add(entity);
 			}
 
@@ -839,9 +845,19 @@ namespace Faolan.GameServer.World
 					type.StatCore.Disposition ?? WorldEntity.DispositionFriendly);
 				pools.Add(pool);
 
-				foreach (var pt in points)
-					if (SpawnAmbientMember(pool, pt, zone) != null)
-						spawned++;
+				// The captured spawns LINKED to this area (tagged in the load loop above) are already in the zone as pool
+				// members - the "obsolete npcspawns" that fill the pool first; only spawn the DEFICIT up to MaxCount, at
+				// points not already occupied. So a resolved area with captured members doesn't double-populate.
+				var members = zone.Entities.Where(e => e.SpawnAreaId == area.Id).ToList();
+				for (var i = members.Count; i < pool.MaxCount; i++)
+				{
+					var member = SpawnAmbientMember(pool, FreeAmbientPoint(pool, members), zone);
+					if (member == null)
+						break;
+
+					members.Add(member);
+					spawned++;
+				}
 			}
 
 			_ambientPools[(mapId, instanceId)] = pools;
@@ -875,13 +891,11 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// #363 pool maintenance (called on a short cadence from the sim tick with the elapsed `dt`): keep each loaded
-		// zone's ambient pools at MaxCount, each on its OWN respawn timer. A killed member fades + is removed
-		// (LootExpired), dropping the pool's live count; the pool then counts its RespawnRemaining down by dt and, on
-		// elapse, respawns ONE replacement at a free point (re-arming the timer) - so a pool refills ~RespawnDelay after
-		// its kill, independent of every other pool. A full pool keeps its timer armed for the next death. No-op unless
-		// the ambient spawner is enabled.
-		public async Task MaintainAmbientPools(double dt)
+		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
+		// MaxCount. A killed member fades + is removed (LootExpired), dropping the pool's live count; here we respawn ONE
+		// replacement per under-strength pool per pass (a gentle trickle - the cadence IS the respawn delay) at a free
+		// point, streamed to nearby players. No-op unless the ambient spawner is enabled.
+		public async Task MaintainAmbientPools()
 		{
 			if (!AmbientSpawns)
 				return;
@@ -893,18 +907,10 @@ namespace Faolan.GameServer.World
 				{
 					var live = zone.Entities.Where(e => e.SpawnAreaId == pool.AreaId && !e.IsDead).ToList();
 					if (live.Count >= pool.MaxCount)
-					{
-						pool.RespawnRemaining = pool.RespawnDelay; // full: hold the timer armed for the next death
 						continue;
-					}
-
-					pool.RespawnRemaining -= dt;
-					if (pool.RespawnRemaining > 0)
-						continue; // still counting down this pool's respawn delay
 
 					var pos = FreeAmbientPoint(pool, live);
 					var entity = SpawnAmbientMember(pool, pos, zone);
-					pool.RespawnRemaining = pool.RespawnDelay; // re-arm for the next missing member
 					if (entity == null)
 						continue;
 
@@ -940,14 +946,8 @@ namespace Faolan.GameServer.World
 			return pool.Points[Random.Shared.Next(pool.Points.Length)];
 		}
 
-		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains,
-		// plus its OWN respawn countdown (armed at RespawnDelay while full; on a death it ticks down and, on elapse,
-		// respawns one member and re-arms - so each pool respawns ~RespawnDelay after ITS own kills, not on a shared clock).
-		private sealed record AmbientPool(int AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition)
-		{
-			public double RespawnRemaining { get; set; }
-			public double RespawnDelay { get; set; } = AmbientRespawnDelaySeconds;
-		}
+		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
+		private sealed record AmbientPool(int AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition);
 
 		// #363 dev label: "<group name> · <resolution tier>" of the RDB spawn area a position sits in (nearest by
 		// centroid when several overlap), or null when it's outside every area - e.g. "Ape2 · id-prop" or
