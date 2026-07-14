@@ -71,6 +71,7 @@ namespace Faolan.Core.Database
 		DbSet<Realm> Realms { get; }
 		DbSet<Recipe> Recipes { get; }
 		DbSet<RecipeItem> RecipeItems { get; }
+		DbSet<RdbSpawnPoint> RdbSpawnPoints { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
@@ -141,6 +142,7 @@ namespace Faolan.Core.Database
 		public DbSet<Realm> Realms { get; set; }
 		public DbSet<Recipe> Recipes { get; set; }
 		public DbSet<RecipeItem> RecipeItems { get; set; }
+		public DbSet<RdbSpawnPoint> RdbSpawnPoints { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
 		public DbSet<Shop> Shops { get; set; }
 		public DbSet<ShopItem> ShopItems { get; set; }
@@ -195,6 +197,20 @@ namespace Faolan.Core.Database
 			// RespawnPoint.Id is the client RDB resurrection-point Guid (the spawnPointId the 0x2024 release screen
 			// sends + the client echoes in RespawnMe), so it must be the real RDB value, not EF-generated (#214).
 			modelBuilder.Entity<RespawnPoint>().Property(r => r.Id).ValueGeneratedNever();
+
+			// The authoritative open-world spawn points from RDB 1010506 (#332), keyed by the stable (playfield, group
+			// ordinal, point index) triple. Restrict on the map FK, same rationale as RespawnPoint: a map referenced by
+			// spawn points can't be deleted out from under them.
+			modelBuilder.Entity<RdbSpawnPoint>().HasOne(p => p.Map).WithMany().HasForeignKey(p => p.MapId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder
+				.Entity<RdbSpawnPoint>()
+				.HasIndex(p => new
+				{
+					p.MapId,
+					p.GroupOrdinal,
+					p.PointIndex
+				})
+				.IsUnique();
 
 			// ItemType.Normal (104) is the default classification - existing item rows backfill to Normal when the
 			// column is added; the importer reclassifies quest/resource items by the container they were seen in.

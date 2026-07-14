@@ -213,6 +213,28 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Authoritative open-world NPC spawn points from the RDB "NPC roam/movement" layout (type 1010506, #332). Clean
+	// rebuild - the set is fully derived from the fixed client RDB, so Overwrite-only.
+	public sealed class RdbNpcSpawnsModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Rdb;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Overwrite
+		};
+
+		public string Description => "Authoritative open-world NPC spawn points (RDB 1010506 layout, #332).";
+		public string Name => "rdb-npc-spawns";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var r = await RdbNpcSpawnImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			return new ImportResult($"{r.Points} spawn points across {r.Maps} playfields ({r.Groups} groups; {r.EmptyMaps} empty, {r.Unreadable} unreadable).");
+		}
+	}
+
 	// Decrypts each keyed item's RDB template. Under --dry-run the --dump-templates disk write is suppressed.
 	public sealed class RdbItemsModule : IImportModule
 	{

@@ -139,7 +139,7 @@ fields (compressed on-disk bytes).
 | 1010503 | ANIMSYS LMXB (anim data) | 57 | 57 | 0 | 23.9 KB |
 | 1010504 | ANIMSYS LMXB (anim data) | 72 | 72 | 0 | 148.1 KB |
 | 1010505 | ANIMSYS LMXB (movement/anim data) | 9,320 | 9,320 | 0 | 5.4 MB |
-| 1010506 | NPC roam/movement data | 817 | 237 | 580 | 10.2 MB |
+| 1010506 | * NPC roam/movement data (open-world spawn layout, #332 — [decoded](npc-spawn-layout-1010506.md)) | 817 | 237 | 580 | 10.2 MB |
 | 1010508 | Fatality group defs | 61 | 0 | 61 | 28.8 KB |
 | 1010510 | ANIMSYS LMXB (anim data, CDN) | 1,072 | 0 | 1,072 | 23.7 MB |
 | 1010511 | * ANIMSYS clip metadata (LMXB; clip->skeleton/rdbname/duration, #292) | 739 | 739 | 0 | 4.0 MB |
