@@ -163,7 +163,7 @@ namespace Faolan.GameServer
 		//   .setnpcgroup clear           -> CLEAR the area the NPC stands in (back to unresolved)
 		//   .setnpcgroup <group> clear   -> clear the named area
 		// A set marks the area Manual (never re-guessed); a clear reverts NpcTemplateId to null so the resolver may
-		// re-guess it. The dev nameplate labels (DebugSpawnAreaLabels) show each NPC's area so you know what to type.
+		// re-guess it. The dev nameplate labels (.togglenpcgroup) show each NPC's area so you know what to type.
 		private async Task SetNpcGroupCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -209,6 +209,17 @@ namespace Faolan.GameServer
 			await Database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
 			var linked = await Database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
+		}
+
+		// .togglenpcgroup  - toggle the dev spawn-area nameplate labels (#363) live for this session: each NPC that
+		// resolves to an RDB spawn AREA shows that area's "group | tier xN" over its head (pushed via SetNameIIR, since
+		// the client draws NPC names from the template LDB and ignores the spawn name). Pairs with .setnpcgroup: read
+		// the area off the nameplate, assign with .setnpcgroup. Off by default; the toggle re-applies to nearby NPCs now.
+		private async Task ToggleNpcGroupCommand(INetworkClient client)
+		{
+			var (on, affected) = await _broadcaster.ToggleAreaLabels(client);
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+				$"Spawn-area nameplate labels {(on ? "ON" : "OFF")} - {affected} nearby NPC(s) updated. Walk to re-stream the rest.");
 		}
 
 		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows
@@ -438,6 +449,7 @@ namespace Faolan.GameServer
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false),
 				["setnpcgroup"] = SetNpcGroupCommand,
+				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand
 			};
 		}

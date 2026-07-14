@@ -66,7 +66,7 @@ we've seen_, and names the gaps). Regenerate with
   count) decoded from the client RDB (type 1010506) into `NpcSpawnArea` (2,664 groups across 119 playfields).
   The creature TYPE isn't in the client (it's server-authoritative), so it's inferred from captures (~21% of
   groups: name / in-bounds vote / guarded id-propagation) then confirmed by hand — a dev nameplate label
-  (`DebugSpawnAreaLabels`, shows `group · tier · ×count` over each NPC) + the `.setnpcgroup` GM command assign
+  (`.togglenpcgroup`, shows `group | tier xcount` over each NPC via a SetNameIIR override) + the `.setnpcgroup` GM command assign
   the rest. Not yet consumed by the live spawner (#332 done, #363)
 - 🟡 NPC line-of-sight — NPCs don't aggro over a hill / across a drop / through a building wall, and loot bags +
   corpses snap to the ground, driven by a baked per-map terrain file (heightmap + PhysX collision mesh; the game

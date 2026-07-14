@@ -240,6 +240,27 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(0x03).WriteByte(0x01).WriteUInt32(0u).WriteStringByteLength(name).ToArray();
 		}
 
+		// In-WORLD SetNameIIR (0xADCE0CDA), grammar recovered byte-exact from n3InfoItemRemote::Construct (FUN_005b9d30)
+		// + SetNameIIR_t::ReadSubClass (FUN_007ae1d0), #363 - the live-entity path, DISTINCT from BuildSetNameIir above
+		// (the create-editor's reader). Construct reads the identity + an isToBePassed flag BEFORE the subclass:
+		//   [u32 type][u32 handle][u8 isToBePassed=0]   <- Construct (isToBePassed must be 0 or 1)
+		//   [u32 nameType=3][u8 0x01][u8 0x01]          <- ReadSubClass fields (this+0x48 u32, this+0x4c/0x4e bools)
+		//   [u32 nameLen][ASCII name]                   <- nameLen read as a U32, HARD-CAPPED at 0x20 (must be 1..31),
+		//                                                  else the client reads len 0, skips the name and rejects the
+		//                                                  blob. Omitting the isToBePassed byte shifts everything by one
+		//                                                  and corrupts nameLen (the "datasize left in stream" reject).
+		// nameType (this+0x48) is applied by Activate->FUN_006ed100(nameType, this+0x4e): it MUST be 1..4 (0 hits the
+		// switch default and the name is silently DROPPED), and 3 or 4 (with the last bool set) also REFRESH the live
+		// nameplate (FUN_006dbc00/FUN_00447ba0) - the entity's OverheadText was built from the LDB hash at spawn and
+		// only re-reads the custom name on that refresh. So 3/1/1 is what makes an already-spawned NPC show the name.
+		public static byte[] BuildWorldSetNameIir(uint handle, string name, uint type = EntityClass.Character)
+		{
+			var bytes = Encoding.ASCII.GetBytes(name ?? "");
+			if (bytes.Length > 31)
+				bytes = bytes[..31];
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(0x00).WriteUInt32(3u).WriteByte(0x01).WriteByte(0x01).WriteUInt32((uint)bytes.Length).WriteArray(bytes).ToArray();
+		}
+
 		// StatIIR (0xF98E10B3): a single stat set on an entity. 17 bytes:
 		//   [u32 type][u32 handle][u8 flag][u32 statId][u32 value]
 		// flag is 0 or 1 in every capture (set vs. continue/append - the editor streams runs of flag=1 for one stat

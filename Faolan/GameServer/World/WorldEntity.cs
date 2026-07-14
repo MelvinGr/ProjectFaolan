@@ -209,6 +209,12 @@ namespace Faolan.GameServer.World
 		// are the area's points, so it roams the group's area.
 		public uint? SpawnAreaId { get; set; }
 
+		// #363 dev nameplate override: the FULL labelled overhead name ("Crocodile [Ape2 | id-prop x8]") to push via a
+		// SetNameIIR right after this NPC's spawn, when DebugAreaLabels is on. The client resolves an NPC's floating
+		// nameplate from its template_id LDB name and IGNORES the free spawn-body `Name` string, so the label can only
+		// be shown by a SetNameIIR (0xADCE0CDA) - the same per-entity name-commit the create flow uses. Null = no label.
+		public string OverheadNameOverride { get; set; }
+
 		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
 		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
 		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.

@@ -17,11 +17,6 @@ namespace Faolan.Core.Extensions
 
 			public string DatabasePath => Path.GetFullPath(config["DatabasePath"]);
 
-			// Dev visualization (#363): when true, an NPC that stands inside an RDB spawn AREA gets that area's group
-			// name appended to its overhead nameplate (e.g. "Jungle Ape [Ape2]"), so a manual creature-labeling pass can
-			// see which area it's standing in. Off by default; set "DebugSpawnAreaLabels": true in faolan.json.
-			public bool DebugSpawnAreaLabels => bool.TryParse(config["DebugSpawnAreaLabels"], out var on) && on;
-
 			// The live AMBIENT spawner (#363): when true, each RESOLVED NpcSpawnArea spawns its creature at every one of
 			// its RDB spawn points on zone load (the capture-independent open-world population). OFF by default - it's
 			// experimental (density overlaps the captured NpcSpawn set until graduation, wander not yet wired). Set

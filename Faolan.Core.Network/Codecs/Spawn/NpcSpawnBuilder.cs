@@ -111,9 +111,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
 		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
 		// lifted stat core.
-		// `nameLabel` (dev-only, #363) is appended to the overhead nameplate when set - e.g. " [Ape2 · id-prop · ×8]" -
-		// so the ambient spawner's members show their area, same as the captured-spawn label path (TryBuildLive).
-		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body, string nameLabel = null)
+		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
 		{
 			body = null;
 			if (npc?.StatCore?.IirHeader is not { } x)
@@ -129,8 +127,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				})
 				.ToList();
 			var message = BuildMessageFromType(npc);
-			if (!string.IsNullOrEmpty(nameLabel))
-				message.Name = $"{message.Name} [{nameLabel}]";
 
 			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
 			body = BuildBody(handle, x, position, rotation, 0, message, morphs, minimalRc);
@@ -144,9 +140,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// with that count, #243). Returns false only for a row with no lifted type (no StatCore.IirHeader) or a no-morph
 		// spawn whose type recordCount was never derived - neither occurs in the shipped DB (988/988 build). The returned
 		// body already carries the live token, so the caller never post-patches it.
-		// `nameLabel` (dev-only, #363) is appended to the overhead nameplate when set - e.g. " [Ape2]" so a manual pass
-		// can see the NPC's RDB spawn area in-world. The overhead name is a free protobuf string, so this is byte-safe.
-		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body, string nameLabel = null)
+		// NB the dev nameplate LABEL (#363) is NOT baked into the spawn name here: the client draws an NPC's floating
+		// name from its template_id LDB, ignoring the spawn-body Name, so the label is pushed separately as a
+		// SetNameIIR after the spawn (WorldBroadcaster.SendWorldSpawn / CreateEditorRecordBuilder.BuildWorldSetNameIir).
+		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body)
 		{
 			body = null;
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
@@ -163,8 +160,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 
 			var message = BuildMessageFromColumns(row);
-			if (!string.IsNullOrEmpty(nameLabel))
-				message.Name = $"{message.Name} [{nameLabel}]";
 
 			// Animal or morph-humanoid: minimal record count is 1 (unused when morphs are present).
 			if (!row.HasEquipment || morphs.Count > 0)

@@ -59,9 +59,9 @@ namespace Faolan.GameServer.World
 		// a stance/mode code; 1 is the value the captured player carries on combat entry). 0 sheathes.
 		private const uint PlayerCombatModeValue = 1;
 
-		// Dev visualization (#363): when true, an NPC standing inside an RDB spawn AREA gets that area's group name
-		// appended to its overhead nameplate ("Jungle Ape [Ape2]"), so a manual creature-labeling pass sees which area
-		// it's in. Set from config (IConfiguration.DebugSpawnAreaLabels) at startup; a zone reloads to pick up a change.
+		// Dev visualization (#363): when true, an NPC that resolves to an RDB spawn AREA has that area's label pushed as
+		// its overhead nameplate (via SetNameIIR after spawn) so a manual creature-labeling pass sees which area it's in.
+		// Off by default; toggled live per-session by the `.togglenpcgroup` GM command (ToggleAreaLabels) - no config.
 		public static bool DebugAreaLabels;
 
 		// The live AMBIENT spawner (#363): when true, each RESOLVED NpcSpawnArea spawns its creature at every RDB spawn
@@ -687,10 +687,10 @@ namespace Faolan.GameServer.World
 			var npcs = await _database.GetNpcSpawns(mapId);
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
-			// #363 dev labels: the map's RDB spawn areas, so each NPC's nameplate can show the area it stands in.
-			var spawnAreas = DebugAreaLabels
-				? await _database.GetNpcSpawnAreas(mapId)
-				: [];
+			// #363 dev labels: the map's RDB spawn areas, so each NPC carries its area label ready for the live
+			// `.togglenpcgroup` toggle. Computed at load (a cheap query, stored as a string) so the toggle is instant and
+			// also catches NPCs that stream in while it's on - the toggle only gates whether the label is SENT.
+			var spawnAreas = await _database.GetNpcSpawnAreas(mapId);
 
 			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
@@ -707,6 +707,8 @@ namespace Faolan.GameServer.World
 			// a collision gets a fresh handle below - the last real dedup this loop still needs, for wire correctness.
 			var usedHandles = new HashSet<uint>();
 			var nextFreeHandle = npcs.Length == 0 ? 1u : npcs.Max(n => n.CapturedHandle) + 1u;
+			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
+			string labelSample = null;
 			foreach (var npc in npcs)
 			{
 				// The type identity (name/community) lives on the NpcTemplate type now (#244); a spawn with no type is a phantom
@@ -780,10 +782,18 @@ namespace Faolan.GameServer.World
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
 				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE
 				// token per-send (SpawnPlayfieldRewriter), since that token isn't known until the player enters.
-				var areaLabel = DebugAreaLabels
-					? AreaLabelFor(spawnAreas, npc)
-					: null;
-				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody, areaLabel))
+				// #363 dev label: the client ignores the spawn-body free `Name` for an NPC's floating nameplate (it uses
+				// the template_id LDB name), so we DON'T bake the label into the spawn body - we push the AREA LABEL via a
+				// SetNameIIR after the spawn (SendWorldSpawn), gated on the .togglenpcgroup toggle. The client hard-caps a
+				// SetNameIIR name at 31 bytes, so we show the label alone (group | tier xN, ~24 chars) - the group name is
+				// what a labeling pass needs. Stashed here unconditionally so the toggle is instant.
+				if (AreaLabelFor(spawnAreas, npc) is { } areaLabel)
+				{
+					entity.OverheadNameOverride = areaLabel;
+					labelledCount++;
+					labelSample ??= areaLabel;
+				}
+				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody))
 					entity.SpawnBody = spawnBody;
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
@@ -815,6 +825,8 @@ namespace Faolan.GameServer.World
 				await LoadAmbientSpawns(mapId, instanceId, zone);
 
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
+			_logger.LogDebug("World: #363 {Labelled}/{Total} captured spawns have a spawn-area label on map {Map} (.togglenpcgroup to show; sample: {Sample}).",
+				labelledCount, npcs.Length, mapId, labelSample ?? "<none>");
 		}
 
 		// #363 live ambient spawner (OFF by default, WorldBroadcaster.AmbientSpawns): the capture-INDEPENDENT open-world
@@ -871,10 +883,7 @@ namespace Faolan.GameServer.World
 		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
 		{
 			var handle = (uint)NextRuntimeHandle();
-			var label = DebugAreaLabels
-				? pool.Label
-				: null;
-			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body, label))
+			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
 				return null;
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
@@ -884,6 +893,7 @@ namespace Faolan.GameServer.World
 			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
 			entity.SpawnBody = body;
 			entity.SpawnAreaId = pool.AreaId;
+			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on
 			entity.NoRespawn = true;              // corpse fades on death; the POOL respawns a replacement (below)
 			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
 			entity.ArmPatrolCycle();              // stagger the first wander so they don't all step at once
@@ -968,10 +978,12 @@ namespace Faolan.GameServer.World
 				: FormatAreaLabel(area);
 		}
 
-		// The nameplate label for an area: "<group> · <tier> · ×<count>" (e.g. "Ape2 · id-prop · ×8").
+		// The nameplate label for an area: "<group> | <tier> x<count>" (e.g. "Ape2 | id-prop x8"). ASCII-only on
+		// purpose (#363): the client's nameplate font doesn't render the "·"/"×" glyphs, and our own PlayerSpawnReader
+		// rejects a non-ASCII overhead name - both broke the dev label silently, so keep it 7-bit.
 		private static string FormatAreaLabel(NpcSpawnArea a)
 		{
-			return $"{a.GroupName} · {ResolvedTag(a.ResolvedBy)} · ×{a.MaxCount}";
+			return $"{a.GroupName} | {ResolvedTag(a.ResolvedBy)} x{a.MaxCount}";
 		}
 
 		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
@@ -1683,6 +1695,46 @@ namespace Faolan.GameServer.World
 				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArray(body)
 				.SendAsync(recipient);
+
+			// #363 dev nameplate: the client draws an NPC's floating name from its template_id LDB name and ignores the
+			// spawn-body `Name`, so overriding the visible name needs a SetNameIIR (0xADCE0CDA). Sent right AFTER the
+			// spawn (in TCP order) so the entity + its OverheadText exist before the name lands. Dev-only, gated on the
+			// live `.togglenpcgroup` toggle, so it never touches retail parity.
+			if (DebugAreaLabels && subject.OverheadNameOverride is { } overrideName)
+				await SendSetName(recipient, subject.Handle, overrideName);
+		}
+
+		// #363 pushes a SetNameIIR (0xADCE0CDA) to `recipient` overriding entity `handle`'s floating nameplate with
+		// `name` - the in-world grammar recovered in CreateEditorRecordBuilder.BuildWorldSetNameIir (nameType 3 applies
+		// the name AND refreshes the already-built OverheadText). Used by the spawn path and the .togglenpcgroup toggle.
+		private static Task SendSetName(INetworkClient recipient, uint handle, string name)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.SetNameIIR).WriteArray(CreateEditorRecordBuilder.BuildWorldSetNameIir(handle, name)))
+				.SendAsync(recipient);
+		}
+
+		// #363 `.togglenpcgroup`: flip the dev spawn-area nameplate labels for the WHOLE server, then immediately
+		// re-apply to every labelled NPC the caller already knows in their zone - pushing the area label when turning ON,
+		// or restoring the plain creature name (which matches the client's LDB name) when turning OFF - so the toggle is
+		// visible without a re-stream. NPCs that stream in later pick it up in SendWorldSpawn. Returns (nowOn, affected).
+		public async Task<(bool On, int Affected)> ToggleAreaLabels(INetworkClient client)
+		{
+			DebugAreaLabels = !DebugAreaLabels;
+			var player = _sim.PlayerWorldEntity(client);
+			var affected = 0;
+			if (player != null)
+				foreach (var npc in _sim.World.ZoneForEntity(player).Entities)
+				{
+					if (npc.OverheadNameOverride is not { } label || !player.Known.Contains(npc.Handle))
+						continue;
+
+					await SendSetName(client, npc.Handle, DebugAreaLabels ? label : npc.Name ?? "");
+					affected++;
+				}
+
+			return (DebugAreaLabels, affected);
 		}
 
 		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled
