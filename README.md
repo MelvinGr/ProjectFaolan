@@ -47,7 +47,7 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 Intermittent wrong appearance on a new character (hair/mustache/size) — late appearance edits were not
   persisted; fixed, awaits in-client confirm (#314)
 - 🟡 Create→world intro cutscene — plays, and Kalanthes speaks (stock-phrase response decoded); some scene
-  actors are still verbatim capture bytes (blocked on clean per-type captures, #234 / #185)
+  actors are still verbatim capture bytes (blocked on clean per-type captures, #234)
 
 ### Realms & deployment
 
@@ -83,9 +83,10 @@ we've seen_, and names the gaps). Regenerate with
   to standing after the animation (does not yet hold in-client) (#355)
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
   client-side movement jitter (#272)
-- 🟡 Per-map playfield token — sourced per-map from `Map.PlayfieldToken` (seeded with a captured token per map);
-  the tokens are session-minted instance ids pooled by region, so the seed is a representative value (#305)
-- 🟡 Playfield instancing — world keyed by `(mapId, instanceId)`; no per-map Solo instance yet (#268)
+- ✅ Per-map playfield token — sourced per-map from `Map.PlayfieldToken` (seeded with a captured token per map;
+  the tokens are session-minted instance ids pooled by region, so the seed is a representative value) (#305)
+- ✅ Playfield instancing — world keyed by `(mapId, instanceId)`; a Solo map (e.g. the beach) gives each player
+  their own instance (verified in-client with two clients) (#268)
 
 ### Combat
 
@@ -113,14 +114,18 @@ we've seen_, and names the gaps). Regenerate with
 ### Character progression
 
 - ✅ Learned-spell grant on login; level-up spell / ability / combo grants; starting abilities & combos
-- 🟡 Combos persist across relog — fixed, awaits in-client confirm (#299)
+- ✅ Combos persist across relog — re-emitted on every world entry, not just on level-up (#299)
 - 🟡 XP curve — provisional ramp; real thresholds only partially harvested (#297)
 - 🟡 Class spell/combo catalog data — sparse (#296) · abilities panel completeness — mount/travel/class-inherent
   abilities are client-RDB-derived (#303) · a few spellbook entries render nameless — legit `0x200A` grants whose
   names live in the LDB string index, so blocked on #291 (#300)
-- ⬜ Feat trees / talent system — the spell↔feat map is server-GDB-only, not in the RDB (#251, blocks #298)
-- ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144) ·
-  ranger tracking (#145)
+- 🟡 Feat trees / talent system — feat **training + reset are wired to the live protocol**: training adds feats
+  (`FeatIIR` 0x28DA68A0 state 4 → byte-exact ack) and reset/untrain clears them (`UntrainFeat` 0x2041 → world
+  reload), driveable via the `.feat` GM command (list / train / reset). Still open: the tree structure, feat
+  points + prerequisites, and the per-class tree definitions — the RDB feat catalog (type 1000020) is ~21% decoded
+  plaintext (tree + rank + name), the rest TEA-encrypted, and the spell↔feat map level-gated casting needs is
+  server-GDB-only, not in the RDB (#251, blocks #298)
+- ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144)
 
 ### Items & economy
 
@@ -128,14 +133,14 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
 - ✅ Item claims / Redeem window (`CoreClaimIIR`) — the per-account claim list + redeem (Claim / Claim All),
   infinite vs. multi-charge (Double XP) claims, delivered to the backpack; item keys harvested from the claim
-  list (render-by-key on relog is #359)
+  list, rendered by key on relog (#359)
 - ✅ Consumable use — right-click a potion/food/drink to apply its on-use buff + consume one, data-driven from
   `Items.OnUseSpell` (harvested from captures), no-op if the buff is already active
 - ✅ Shop-OPEN trigger — interacting with a vendor opens its shop window
 - 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — item attribute modifiers imported + summed
   (`ItemStat` + `MaxStatAggregator`); the vital/HP field + wire scale still need a reference tooltip (#3)
 - 🟡 Guild bank — bodies uncaptured (#132)
-- ⬜ Tradeskills: gathering nodes + crafting professions (#148) · worn-only "bag-poison" item rendering (#14)
+- ⬜ Tradeskills: gathering nodes + crafting professions (#148)
 - ⬜ Gems / item socketing — gem slots that grant attribute bonuses (#311)
 
 ### Social & guilds
@@ -156,7 +161,7 @@ we've seen_, and names the gaps). Regenerate with
 ### Mounts & pets
 
 - ✅ Necromancer pets/minions — `.pet`, type-based spawn + follow
-- 🟡 Mounts — a mount is a player-cast summon spell; needs the cast FSM wired to the summon (#26)
+- 🟡 Mounts — Work but need more dumps to import
 - ⬜ Mounted combat (#142)
 
 ### Group PvE content (not started)
@@ -165,8 +170,9 @@ we've seen_, and names the gaps). Regenerate with
   scripting; #309)
 - ⬜ Factions & reputation — the Khitai / _Rise of the Godslayer_ system: faction ranks, faction vendors, and
   faction companions (#310). The client's **Factions window already populates** for imported characters: the
-  per-faction standings ride the player-spawn scaffold's first ending pair list (faction id → signed standing).
-  What's missing is the semantic layer — a faction catalog and standing _changes_ from quests/kills (#315)
+  per-faction standings are stored + sent, riding the player-spawn scaffold's first ending pair list (faction id →
+  signed standing) (#315). What's missing is the semantic layer — a faction catalog and standing _changes_ from
+  quests/kills (#310)
 
 ### Guild base & large-scale (not started)
 
