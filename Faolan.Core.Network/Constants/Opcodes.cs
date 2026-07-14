@@ -713,7 +713,7 @@ namespace Faolan.Core.Network.Constants
 		//   FlushRDBCachesIIR            0x45ECFD79  [auth: FlushRDBCachesIIR_c]
 		//   GMStatIIR                    0xBF12AA7C  [auth: GMStatIIR_c]
 		//   GroundEffectIIR              0x45675F8F  [auth: GroundEffectIIR_t]
-		//   HealthDamageIIR              bare 0xA62BE247  _c 0xCABC786B  [unverified]
+		//   HealthDamageIIR              [alias] combat damage; we emit DamageResultIIR 0xFEC4158A / StatDamageIIR 0xE9F24184
 		//   Int32StatIIR                 0xA2F53610  [auth: Int32StatIIR]
 		//   KnubotBaseIIR                0x9ECCA4B0  [auth: KnubotBaseIIR_c]
 		//   LootBagIIR                   [alias] base of LootBagFullUpdateIIR 0xF096251E, already emitted
@@ -727,7 +727,7 @@ namespace Faolan.Core.Network.Constants
 		//   MoveToPosIIR                 [alias] movement; we emit MoveTaskIIR 0x96C46740
 		//   PVPDropItemIIR               0x7057225B  [auth: PVPDropItemIIR_t]
 		//   PatrolIIR                    [alias] NPC roam; drives MoveTaskIIR 0x96C46740 movement (no distinct wire record)
-		//   PlayfieldAnarchyFIIR         bare 0x9D6CB2FC  _c 0xF50BEFE0  [unverified]
+		//   PlayfieldAnarchyFIIR         [alias] playfield/map change; we emit PlayfieldFIIR 0x5D85BFC7
 		//   QuestCooldownIIR             0x9CC129C5  [auth: QuestCooldownIIR]
 		//   QuestRewardNotifyIIR         0x8BB2799C  [auth: QuestRewardNotifyIIR_c]
 		//   QuestRewardSelectionIIR      0x80138D7B  [auth: QuestRewardSelectionIIR_c]
@@ -735,7 +735,7 @@ namespace Faolan.Core.Network.Constants
 		//   ScriptTextIIR                0xE6C3CCEF  [auth: ScriptTextIIR_t]
 		//   ScryLuaIIR                   0x55ACD7D1  [auth: ScryLuaIIR]
 		//   SkillIIR                     0xD558FF16  [auth: SkillIIR_t]  (candidate: the SKILL record, #251)
-		//   SprintRegenIIR               bare 0x14305E2F  _c 0xC9919A53  [unverified]
+		//   SprintRegenIIR               [alias] stamina/sprint regen; we emit RegenIIR 0x28D0AC99
 		//   StringStatIIR                0xC415E6ED  [auth: StringStatIIR]
 		//   TeleportFailedIIR            0x78BB8C2E  [auth: TeleportFailedIIR_c]
 		//   ThreatMeterDataIIR           0x8753247D  [auth: ThreatMeterDataIIR_c]
