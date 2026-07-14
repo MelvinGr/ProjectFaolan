@@ -71,6 +71,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Guild?> GetGuildByName(string name, uint realmId);
 		Task<List<Guild>> GetGuilds(uint realmId);
 		Task<Item?> GetItem(uint id);
+		Task<List<Item>> GetItems(params IReadOnlyList<uint> ids);
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<Mail?> GetMailByWireId(ulong mailId);
 		Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId);
@@ -854,6 +855,12 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
+		}
+
+		public async Task<List<Item>> GetItems(params IReadOnlyList<uint> ids)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Items.Where(i => ids.Contains(i.Id)).ToListAsync();
 		}
 
 		// The AH search CATEGORY (the item-type-search id the client queries by, e.g. 30000 / 30030 - NOT the item

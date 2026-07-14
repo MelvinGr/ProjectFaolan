@@ -67,7 +67,9 @@ we've seen_, and names the gaps). Regenerate with
   The creature TYPE isn't in the client (it's server-authoritative), so it's inferred from captures (~21% of
   groups: name / in-bounds vote / guarded id-propagation) then confirmed by hand — a dev nameplate label
   (`.togglenpcgroup`, shows `group | tier xcount` over each NPC via a SetNameIIR override) + the `.setnpcgroup` GM command assign
-  the rest. Not yet consumed by the live spawner (#332 done, #363)
+  the rest. A live **area-managed ambient spawner** now consumes these pools — per-pool respawn/refill timers
+  keep each group at its population count, and members roam their area between spawn anchors (preferring a free
+  anchor so they stop stacking); disabled by default until a group's creature type is confirmed (#332 done, #363)
 - 🟡 NPC line-of-sight — NPCs don't aggro over a hill / across a drop / through a building wall, and loot bags +
   corpses snap to the ground, driven by a baked per-map terrain file (heightmap + PhysX collision mesh; the game
   server never touches the client RDB at runtime); awaits in-client confirm (#284)
@@ -136,6 +138,10 @@ we've seen_, and names the gaps). Regenerate with
   list, rendered by key on relog (#359)
 - ✅ Consumable use — right-click a potion/food/drink to apply its on-use buff + consume one, data-driven from
   `Items.OnUseSpell` (harvested from captures), no-op if the buff is already active
+- ✅ Creature loot drops — a killed NPC drops a lootable container, its variant chosen per-type from
+  `NpcTemplate.LootContainerTemplateId` (a bag by default, or a Large Chest — both ship as the same
+  `LootBagFullUpdateIIR`, differing only by model / overhead name / bounds; the raid-chest variant awaits a
+  captured template) (#363)
 - ✅ Shop-OPEN trigger — interacting with a vendor opens its shop window
 - 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — item attribute modifiers imported + summed
   (`ItemStat` + `MaxStatAggregator`); the vital/HP field + wire scale still need a reference tooltip (#3)

@@ -1630,30 +1630,6 @@ namespace Faolan.GameServer.World
 			return (uint)Interlocked.Increment(ref _nextRuntimeHandle);
 		}
 
-		// Resolves the rolled item templates to the ones the loot window can DISPLAY (in the item table AND
-		// Hash != 0 - a 0-hash template has no inventory entry the client can render). Filtering here, before
-		// the bag is built, keeps the bag's LootItems and the spliced display list in ONE shared order so the single-drag
-		// take index matches the client's display Pos (#226). Preserves the rolled order; drops unknown/non-buildable.
-		private async Task<List<(uint TemplateId, Item Item)>> ResolveBuildableLoot(IReadOnlyList<uint> itemTemplateIds)
-		{
-			var resolved = new List<(uint, Item)>();
-			foreach (var templateId in itemTemplateIds ?? [])
-			{
-				var item = await _database.GetItem(templateId);
-				// Keep any resolvable, NAMED item - the window can display it and (since LootItems + the splice both come
-				// from this one list) the display order stays consistent (#226). The old `Hash == 0` skip also
-				// dropped legitimate quest items (e.g. Scavenger's Key, hash 0) inserted as quest-goal keys (#261);
-				// random loot is already hash-filtered at the source (GetRandomBuildableItems), so this only let the
-				// quest key through.
-				if (item == null || string.IsNullOrEmpty(item.Name))
-					continue;
-
-				resolved.Add((templateId, item));
-			}
-
-			return resolved;
-		}
-
 		// A few random snapshot-buildable item templates (Hash != 0) for a loot bag. Drops from the MAP's loot pool
 		// (#273) - the items that map's captured bags actually carried - falling back to the all-items random sample when
 		// the map has no captured pool (so a map we have no loot data for still drops something). Empty when count <= 0.
@@ -1789,7 +1765,7 @@ namespace Faolan.GameServer.World
 			// non-buildable template dropped only at splice-time (the old behaviour) shifted every later display slot,
 			// so a single-drag (TakeBagItem indexes LootItems by the client's display Pos) removed/granted the WRONG
 			// item and the window showed one fewer than it held (#226 / handoff Problems 2+3).
-			var loot = await ResolveBuildableLoot(itemTemplates);
+			var loot = await _database.GetItems(itemTemplates);
 
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
@@ -1797,21 +1773,21 @@ namespace Faolan.GameServer.World
 			if (!WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, LootContainerTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
 				return null;
 
-			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1
+			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l))]); // OUR items/cash, Pos 0..n-1
 
 			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
 			bag.InstanceId = instanceId; // the bag lives in the same map COPY as whatever dropped it (#268)
 			bag.CashTin = cashTin;
 			bag.AllowedLooterHandle = allowedLooterHandle;
 			bag.LootSourceName = lootSourceName; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
-			bag.LootItems.AddRange(loot.Select(l => l.TemplateId)); // exactly the displayed set, same order as the window
+			bag.LootItems.AddRange(loot.Select(l => l.Id)); // exactly the displayed set, same order as the window
 			_sim.World.ZoneFor(mapId, instanceId).Add(bag);
 
 			// Log the contents by display Pos so an in-client single-drag test can confirm the client's source-Pos maps
 			// to the item the player actually clicked (TryLootItem 0x2046 is not in any capture - the Pos mapping is
 			// verified live, not from a golden).
 			if (loot.Count > 0)
-				_logger.LogInformation("Loot: bag 0x{Handle:X8} contents by Pos: {Items}", handle, string.Join(", ", loot.Select((l, i) => $"#{i}=0x{l.TemplateId:X}({l.Item.Name})")));
+				_logger.LogInformation("Loot: bag 0x{Handle:X8} contents by Pos: {Items}", handle, string.Join(", ", loot.Select((l, i) => $"#{i}=0x{l.Id:X}({l.Name})")));
 
 			foreach (var viewer in _sim.World.ZoneFor(mapId, instanceId).PlayersInRange(position, WorldSimulation.PlayerInterestRange))
 			{
