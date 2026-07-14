@@ -39,6 +39,20 @@ namespace Faolan.Tests
 			Assert.Equal(objectId, entry.ObjectId);
 		}
 
+		// #363: a LootBagFullUpdateIIR object is kept ONLY when it carries a world-builder [script-tag] (a PLACED
+		// container); every tagless one is a transient DROP - including boss/raid chests named exactly like a placed
+		// one, which is why keying on the "chest" name wrongly baked the "Large Chest" drops.
+		[Theory]
+		[InlineData("Chest [N7FU]", false)]
+		[InlineData("aquilonian_treasure_chest [QRON]", false)]
+		[InlineData("Large Chest", true)]
+		[InlineData("Chest", true)]
+		[InlineData("Bag of loot", true)]
+		public void IsTransientLootContainer_KeepsOnlyScriptTaggedPlacements(string name, bool transient)
+		{
+			Assert.Equal(transient, WorldObjectExtractor.IsTransientLootContainer(name));
+		}
+
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var content = new byte[38];

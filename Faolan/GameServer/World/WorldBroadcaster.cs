@@ -1769,10 +1769,10 @@ namespace Faolan.GameServer.World
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
 		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle,
-			string lootSourceName = null, LootBagTemplate.Variant variant = null)
+			string lootSourceName = null, LootContainerTemplateId variant = LootContainerTemplateId.Bag)
 		{
 			// #363 container variant: default is the generic bag; a boss/raid drop passes a bigger chest (LargeChest, …).
-			var template = GetLootTemplate(variant ?? LootBagTemplate.Bag);
+			var template = GetLootTemplate(variant);
 			if (template == null)
 				return null;
 
@@ -1788,7 +1788,7 @@ namespace Faolan.GameServer.World
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
 			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
-			if (!WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
+			if (!WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, LootContainerTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
 				return null;
 
 			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1
@@ -1866,9 +1866,9 @@ namespace Faolan.GameServer.World
 		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
 		// SCRATCH by WorldObjectBuilder.BuildBody - map-independent, needs NO captured loot-bag WorldObject in
 		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
-		private static WorldObject GetLootTemplate(LootBagTemplate.Variant variant = null)
+		private static WorldObject GetLootTemplate(LootContainerTemplateId variant = LootContainerTemplateId.Bag)
 		{
-			return LootBagTemplate.Create(variant ?? LootBagTemplate.Bag);
+			return LootContainerTemplate.Create(variant);
 		}
 
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on

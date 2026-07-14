@@ -65,13 +65,14 @@ namespace Faolan.Importer.Extractors
 				var (objectId, name) = ReadMessage(body);
 				var displayName = WorldObjectBuilder.ReadIdentity(body);
 
-				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-bag DROPS and static lootable
-				// CHESTS. A drop ("Bag of loot", or a bag named after its single item content) spawns dynamically on a
-				// kill and fades after ~120s (WorldBroadcaster.LootBagExpirySeconds) - it must NOT be imported as a
-				// permanent WorldObject (else it stands around forever, e.g. the "Bag of loot" heaps stuck on the
-				// Tortage beach). Static containers share the subopcode but are named as a chest or carry a [script-tag]
-				// identity; keep those, drop the drops.
-				if (subop == (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR && IsTransientLootBag(name, displayName))
+				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-container DROPS and static
+				// world-builder-PLACED containers. A drop - a plain "Bag of loot" OR a boss/raid CHEST ("Large Chest",
+				// "Chest") - spawns dynamically on a kill and fades after ~120s (WorldBroadcaster.LootBagExpirySeconds);
+				// it must NOT be baked as a permanent WorldObject (that was how a stray "Large Chest" ended up standing
+				// on the Tortage beach - #363). Placed containers are constructed the SAME way (bigger container is just
+				// a bigger LootBagTemplate.Variant), so the NAME can't tell a drop from a placement; the signal is the
+				// world-builder [script-tag] in the name ([N7FU]/[QRON]/...), which only a PLACED object carries.
+				if (subop == (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR && IsTransientLootContainer(name))
 					continue;
 
 				entries.Add(new WorldObjectEntry(currentMap, subop, handle, ReadLE(body, SpawnPacketBuilder.PosXOffset), ReadLE(body, SpawnPacketBuilder.PosYOffset),
@@ -90,14 +91,14 @@ namespace Faolan.Importer.Extractors
 			return entries;
 		}
 
-		// A LootBagFullUpdateIIR object is a TRANSIENT loot-bag drop (skip it) rather than a static lootable container
-		// (keep it) when its identity is neither a chest nor a scripted object: a drop is named "Bag of loot" or after
-		// its single item content, while every static container in the corpus is named as a chest or carries a
-		// bracketed [script-tag] identity.
-		private static bool IsTransientLootBag(string name, string displayName)
+		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container DROP (skip it) unless it was PLACED by the world
+		// builder, which every placed/scripted container in the corpus signals with a bracketed [script-tag] in its
+		// NAME ([N7FU], [QRON], ...). The container NAME alone is NOT the signal: a boss-drop chest is named exactly
+		// like a placed one ("Chest", "Large Chest"), so keying on "chest" wrongly baked the Large Chest drops (#363);
+		// only the [script-tag] distinguishes a placement from a drop.
+		internal static bool IsTransientLootContainer(string name)
 		{
-			var identity = (name ?? "") + " " + (displayName ?? "");
-			return !identity.Contains("chest", StringComparison.OrdinalIgnoreCase) && !identity.Contains('[');
+			return !(name ?? "").Contains('[');
 		}
 
 		// Dedup by (map, spawn point, identity); keep the first seen. Identity (the display_name) is part of the key
