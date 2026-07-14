@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.GameServer.World;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
@@ -208,6 +209,51 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual].");
 		}
 
+		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows that
+		// belong to it (its creature, inside its bounds) so the ambient POOL becomes the sole source of that population -
+		// removing the captured/ambient density overlap. Only touches the area's own creature (a named/quest NPC in the
+		// area is safe). Durable (a DB delete); takes effect on the next zone reload. NB re-running the `npcs` importer
+		// resurrects the captured rows.
+		private async Task GraduateNpcGroupCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var name = (arguments ?? "").Trim();
+			if (name.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .graduatenpcgroup &lt;group name&gt;  (removes the captured spawns the area's ambient pool replaces).");
+				return;
+			}
+
+			var mapId = _simulation.PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
+			var matches = (await Database.GetNpcSpawnAreas(mapId)).Where(a => string.Equals(a.GroupName, name, StringComparison.OrdinalIgnoreCase)).ToList();
+			if (matches.Count == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"No spawn area named '{name}' on map {mapId}.");
+				return;
+			}
+
+			var resolved = matches.Where(a => a.NpcTemplateId != null).ToList();
+			if (resolved.Count == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Area '{name}' has no creature assigned yet - resolve it with .setnpcgroup first (nothing to graduate).");
+				return;
+			}
+
+			var removed = 0;
+			foreach (var area in resolved)
+			{
+				var n = await Database.GraduateSpawnArea(area.Id);
+				if (n > 0)
+					removed += n;
+			}
+
+			var creature = resolved[0].NpcTemplate?.Name ?? "?";
+			var note = WorldBroadcaster.AmbientSpawns
+				? " Takes effect on zone reload (relog)."
+				: " Takes effect on zone reload - NB the ambient spawner is OFF, so the area is empty until you enable it.";
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Graduated '{name}' ({creature}) on map {mapId}: removed {removed} captured spawn row(s); the ambient pool now owns this population.{note}");
+		}
+
 		// The RDB spawn area a position sits in (nearest centroid; bounds padded), or null when outside every area.
 		private static NpcSpawnArea NearestContainingArea(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
 		{
@@ -388,7 +434,8 @@ namespace Faolan.GameServer
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false),
-				["setnpcgroup"] = SetNpcGroupCommand
+				["setnpcgroup"] = SetNpcGroupCommand,
+				["graduatenpcgroup"] = GraduateNpcGroupCommand
 			};
 		}
 

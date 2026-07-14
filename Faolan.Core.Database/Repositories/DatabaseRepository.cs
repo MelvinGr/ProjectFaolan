@@ -77,6 +77,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 		Task<bool> SetNpcSpawnAreaCreature(int areaId, uint? templateId);
+		Task<int> GraduateSpawnArea(int areaId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
@@ -976,6 +977,30 @@ namespace Faolan.Core.Database.Repositories
 				: SpawnResolutionSource.None;
 			await ctx.SaveChangesAsync();
 			return true;
+		}
+
+		// GRADUATE a resolved spawn area (#363 `.graduatenpcgroup`): delete the CAPTURED NpcSpawn rows that belong to it
+		// - same creature (the area's NpcTemplateId), inside its bounds - so the ambient POOL becomes the sole source of
+		// that population and the captured/ambient density overlap goes away. Only deletes spawns of the area's own
+		// creature, so a quest/named NPC standing in the area is untouched. Returns the number of spawn rows removed, or
+		// -1 if the area doesn't exist / isn't resolved. NB re-running the `npcs` importer resurrects captured rows.
+		public async Task<int> GraduateSpawnArea(int areaId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var area = await ctx.NpcSpawnAreas.FindAsync(areaId);
+			if (area?.NpcTemplateId is not { } templateId)
+				return -1;
+
+			const float pad = 5f;
+			var doomed = await ctx
+				.NpcSpawns.Where(s => s.MapId == area.MapId && s.NpcTemplateId == templateId
+				                      && s.PositionX >= area.BoundsMinX - pad && s.PositionX <= area.BoundsMaxX + pad
+				                      && s.PositionZ >= area.BoundsMinZ - pad && s.PositionZ <= area.BoundsMaxZ + pad)
+				.ToListAsync();
+
+			ctx.NpcSpawns.RemoveRange(doomed); // Morphs/Equipment/PatrolPath cascade
+			await ctx.SaveChangesAsync();
+			return doomed.Count;
 		}
 
 		// The spells a caster NPC casts (keyed by its stable name), for the sim's NPC spell-casting (#232).
