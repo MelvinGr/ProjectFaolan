@@ -76,6 +76,24 @@ def main():
     for (dr, o), n in unnamed.most_common():
         print(f'  {dr} {o}  x{n}')
 
+    # 4) IIR CLASSES the client defines (exe RTTI) that have NO enum member and whose hash forms are all undefined
+    #    - i.e. record types we've never named AND never seen in a dump. Match by NAME or any {bare,_c,_t} hash so
+    #    records we already have under a different enum name (MagicBuffIIR==ApplySpell, PetIIR, …) are not re-flagged.
+    have_names = {m.lower() for m in re.findall(r'(\w+IIR)\s*=\s*0x', op)}
+    junk = {'AnyIIR', 'SendIIR', 'AVIIR'}
+    raw = set(re.findall(r'[A-Za-z_][A-Za-z0-9_]*IIR(?:_[ct])?', open(EXE, 'rb').read().decode('latin1'))) if Path(EXE).exists() else set()
+    exe = {re.sub(r'_[ct]$', '', re.sub(r'^AV', '', n)) for n in raw}
+    exe = {n for n in exe if n.endswith('IIR') and len(n) > 5 and n[0].isupper() and n not in junk}
+
+    def known(n):
+        return n.lower() in have_names or any(bkdr31(n + s) in defined for s in ('', '_c', '_t'))
+
+    unseen = sorted(n for n in exe if not known(n))
+    print(f'\nIIR classes in the client (exe RTTI) that we have NEVER named or seen: {len(unseen)}')
+    for n in unseen:
+        tag = ' [debug]' if 'Debug' in n else (' [base/proto?]' if n.startswith(('Core', 'Full', 'Proto', 'GameCodeDynel', 'V')) else '')
+        print(f'  {n:<30} bare=0x{bkdr31(n):08X} _c=0x{bkdr31(n + "_c"):08X}{tag}')
+
 
 if __name__ == '__main__':
     main()
