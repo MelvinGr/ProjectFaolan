@@ -20,6 +20,15 @@ namespace Faolan.Core.Database.Tables
 		// The primary objective's goal id (e.g. 0x1670 = 5744), echoed in QuestGoal and the full-update.
 		public uint GoalId { get; set; }
 
+		// The quest's LEVEL, carried in the QuestFullUpdate (0x63268258) as the u32 after the second questId - a quest
+		// PROPERTY, constant across its lifecycle. (Earlier read as a "state/category" enum; the harvest across faolan.db
+		// disproved that - the values track level, not state: Tortage starter quests 1/3/4/5, open-world zones 23/24,
+		// endgame 80, and two quests in the SAME zone can be 23 and 80. It is never the QuestIIR StateActive value 2.)
+		// Harvested from the wire by QuestDefinitionExtractor (#352); 0 means "not seen in a captured full-update" and the
+		// sender falls back to WorldQuest.DefaultQuestLevel. The client silently DROPS a full-update whose level word is
+		// wrong (e.g. the QuestIIR state 2), leaving the journal empty - the bug that first surfaced this field.
+		public uint Level { get; set; }
+
 		// The objective's world-marker (map id + x/y) shown on the map; 0 when the quest has no map marker.
 		public uint MapId { get; set; }
 

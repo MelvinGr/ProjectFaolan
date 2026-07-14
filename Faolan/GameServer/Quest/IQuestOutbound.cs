@@ -23,7 +23,9 @@ namespace Faolan.GameServer.Quest
 		Task RefreshQuestVisibility(INetworkClient client);
 
 		// QuestFullUpdate (0x63268258): one quest's full detail - the supersession packet that swaps the displayed quest.
-		Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint state = WorldQuest.FullUpdateStateActive);
+		// `level` defaults to the quest's harvested QuestDefinition.Level (per-quest constant, #352); pass an explicit
+		// value only to override.
+		Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null);
 
 		// QuestGoal (0x0774C8C1): the objective counter for `questId` is now `count`.
 		Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count);

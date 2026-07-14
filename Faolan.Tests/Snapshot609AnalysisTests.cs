@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			// whereas the template region is 559 B starting [0x0BD3][1][9][instance]... - a different grammar.
 			var def = await LoadDefinition(10238);
 			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }.Select(s => Record(def, s)).ToArray();
-			var full = WorldQuest.BuildQuestFullUpdate(0x02165EFF, def.QuestId, WorldQuest.FullUpdateStateActive, def.AreaId, refs, def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId,
+			var full = WorldQuest.BuildQuestFullUpdate(0x02165EFF, def.QuestId, WorldQuest.DefaultQuestLevel, def.AreaId, refs, def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId,
 				def.MarkerX, def.MarkerY, Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
 			var block = full[WorldQuest.QuestFullUpdateContentOffset..^1];
 

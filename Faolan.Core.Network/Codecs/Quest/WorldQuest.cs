@@ -39,14 +39,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// login at this stage the follow is restored (BurstlessWorldEntry). Completing it ends the escort (she stops).
 		public const uint CasildaEscortQuestId = 12407;
 
-		// The QuestFullUpdate (0x63268258) carries its OWN per-quest "state/category" field (the u32 after the second
-		// questId) - a DIFFERENT enum from the QuestIIR StateActive above. It is CONSTANT per quest across its whole
-		// lifecycle (every captured 13479 full-update uses 3, on grant and on every re-display: frames 687/8876/9947/
-		// 10129), so it is a quest property, not a dynamic state. Passing the QuestIIR value (2) here makes the client
-		// silently DROP the full-update (journal stays empty) - the bug behind the dialogue-grant not rendering.
-		// Harvest this per quest into QuestDefinition (#352); 3 is the captured value for Casilda's 13479 (and the only
-		// value observed for active quests so far - a different quest 0x..27 used 1).
-		public const uint FullUpdateStateActive = 3;
+		// The QuestFullUpdate (0x63268258) carries the quest's LEVEL (the u32 after the second questId) - a quest PROPERTY,
+		// CONSTANT per quest across its whole lifecycle (every captured 13479 full-update uses 3, on grant and on every
+		// re-display: frames 687/8876/9947/10129). It was earlier read as a "state/category" enum, but the harvest across
+		// faolan.db tracks LEVEL, not state (Tortage starter 1/3/4/5, open-world 23/24, endgame 80; two quests in the same
+		// zone can be 23 and 80; never the QuestIIR StateActive value 2). Passing the QuestIIR state (2) here makes the
+		// client silently DROP the full-update (journal stays empty) - the bug that first surfaced this field. Now
+		// harvested per quest into QuestDefinition.Level (#352); this const is the FALLBACK the sender uses only for a
+		// quest with no captured full-update (Level == 0) - 3 is Casilda 13479's level, a sane Tortage default.
+		public const uint DefaultQuestLevel = 3;
 
 		// --- Journal CONTENT packets (Captures/scripts/decode_quest.py, byte-exact golden tests) ----------
 		//
@@ -71,13 +72,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 		private const uint ListFrame = 0x000003F1; // the (count+1)*0x3F1 list-framing invariant; 0x3F1 = an empty list
 
 		// QuestFullUpdate: one quest's full record (description, summary, objective + world marker).
-		//   header: [00000000][01][questId][00000001][questId][state][00000000][00000003][0x412]
+		//   header: [00000000][01][questId][00000001][questId][level][00000000][00000003][0x412]
 		//   <title 50301> <summary 50302> <areaTitle 50300> <region 52000> <map 52000>
 		//   <stat/objective run carrying areaId, questId, goalId, player, acceptTime, map+x+y marker>
 		//   <objective text 50304> <objective localized> [00]
 		// The mid-run scalars (0x50/0x64/0x7e2/0x0c ...) are not yet semantically pinned; they are
 		// reproduced as a documented template and locked by the golden test.
-		public static byte[] BuildQuestFullUpdate(uint playerHandle, uint questId, uint state, uint areaId, IReadOnlyList<byte[]> textRefs, uint goalId, ulong acceptTime, uint mapId, uint markerX,
+		public static byte[] BuildQuestFullUpdate(uint playerHandle, uint questId, uint level, uint areaId, IReadOnlyList<byte[]> textRefs, uint goalId, ulong acceptTime, uint mapId, uint markerX,
 			uint markerY, byte[] objectiveText, byte[] objectiveLocalized)
 		{
 			var w = new FaolanStream();
@@ -87,7 +88,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(questId);
 			w.WriteUInt32(1);
 			w.WriteUInt32(questId);
-			w.WriteUInt32(state);
+			w.WriteUInt32(level);
 			w.WriteUInt32(0);
 			w.WriteUInt32(3);
 			w.WriteUInt32(0x412);

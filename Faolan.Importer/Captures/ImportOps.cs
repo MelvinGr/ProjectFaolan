@@ -432,6 +432,7 @@ namespace Faolan.Importer.Captures
 
 				existing.AreaId = def.AreaId;
 				existing.GoalId = def.GoalId;
+				existing.Level = def.Level;
 				existing.MapId = def.MapId;
 				existing.MarkerX = def.MarkerX;
 				existing.MarkerY = def.MarkerY;

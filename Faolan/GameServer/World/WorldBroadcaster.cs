@@ -129,12 +129,15 @@ namespace Faolan.GameServer.World
 
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
 		// its seeded definition. acceptTime is the per-character "accepted at" stamp (display/sort field).
-		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint state = WorldQuest.FullUpdateStateActive)
+		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null)
 		{
+			// The per-quest level is a constant harvested into the definition (#352); fall back to the captured default
+			// only when this quest had no full-update in the captures (Level == 0).
+			var levelValue = level ?? (def.Level != 0 ? def.Level : WorldQuest.DefaultQuestLevel);
 			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
 				.Select(s => WorldBroadcastBodies.Record(def, s))
 				.ToArray();
-			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, state, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), def.MapId, def.MarkerX,
+			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), def.MapId, def.MarkerX,
 				def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
 			return new PacketStream()

@@ -124,6 +124,12 @@ namespace Faolan.Importer.Extractors
 			def.AreaId = areaTitle.Id;
 			def.GoalId = objective.Id;
 
+			// The per-quest LEVEL word sits after the second questId: with the [u32 len] prefix InnerBody keeps, that is
+			// body[33..37] (subop 4, ack 4, player 4, [len 4] all counted). Harvested straight off the wire, see
+			// QuestDefinition.Level (the values track quest level, not the seeded SnapshotState).
+			if (body.Length >= 37)
+				def.Level = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(33, 4));
+
 			// The two 52000 refs are region (smaller id, e.g. 4) then map (the map id). Map id also gates the marker.
 			var region = region52000.OrderBy(r => r.Id).FirstOrDefault();
 			var map = region52000.OrderByDescending(r => r.Id).FirstOrDefault();
