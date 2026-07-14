@@ -847,7 +847,7 @@ namespace Faolan.GameServer.World
 				if (type?.StatCore?.IirHeader == null)
 					continue; // the resolved creature has no buildable stat core - skip (can't construct its body)
 
-				var points = area.Points.Select(p => new Vector3(p.PositionX, p.PositionY, p.PositionZ)).ToArray();
+				var points = area.Points.Select(p => p.Position).ToArray();
 				if (points.Length == 0)
 					continue;
 

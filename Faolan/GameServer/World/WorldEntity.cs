@@ -324,20 +324,37 @@ namespace Faolan.GameServer.World
 			Moving = false; // a mid-chase death stops moving (the corpse doesn't stream a trailing move, #272)
 		}
 
-		// The next wander destination: a captured anchor point other than where we already are (so the move isn't a no-op).
-		public Vector3 NextWanderPoint()
+		// The next wander destination: an anchor point other than where we already are (so the move isn't a no-op).
+		// `isOccupied` (#363 ambient pools): when supplied, PREFER an anchor no other entity is parked on, so pool
+		// members spread across their area's points instead of stacking; falls back to any non-current anchor when
+		// every free one is taken. Null (captured patrols) keeps the plain random-non-current pick.
+		public Vector3 NextWanderPoint(Func<Vector3, bool> isOccupied = null)
 		{
 			if (PatrolWaypoints.Count == 1)
 				return PatrolWaypoints[0];
 
-			Vector3 p;
-			do
+			// Scan the anchors from a random offset (keeps the pick random) and take the first that isn't where we
+			// already stand; among those, a FREE one wins, else remember the first taken anchor as the fallback.
+			var start = Random.Shared.Next(PatrolWaypoints.Count);
+			var fallback = Position;
+			var haveFallback = false;
+			for (var i = 0; i < PatrolWaypoints.Count; i++)
 			{
-				p = PatrolWaypoints[Random.Shared.Next(PatrolWaypoints.Count)];
-			}
-			while (Vector3.DistanceSquared(p, Position) < 1f);
+				var p = PatrolWaypoints[(start + i) % PatrolWaypoints.Count];
+				if (Vector3.DistanceSquared(p, Position) < 1f)
+					continue; // a no-op move to where we already are
 
-			return p;
+				if (isOccupied == null || !isOccupied(p))
+					return p;
+
+				if (!haveFallback)
+				{
+					fallback = p;
+					haveFallback = true;
+				}
+			}
+
+			return fallback;
 		}
 
 		// Advances the attack cooldown by dt; returns true (and re-arms for `interval`) when a swing is ready. Used by

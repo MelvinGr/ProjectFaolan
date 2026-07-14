@@ -310,7 +310,26 @@ namespace Faolan.GameServer.World
 						if (entity.Patrols && entity.TickPatrolCycle(deltaSeconds))
 						{
 							entity.MoveFrom = entity.Position;
-							entity.Position = entity.NextWanderPoint();
+							// #363 ambient anti-stacking: an area-managed pool member (SpawnAreaId set) avoids drifting onto a
+							// point another live entity already occupies (within ~2u, matching FreeAmbientPoint), so a pool
+							// spreads across its area instead of piling up. Captured patrols (no SpawnAreaId) keep their route.
+							Func<Vector3, bool> occupied = entity.SpawnAreaId == null
+								? null
+								: pt =>
+								{
+									foreach (var other in zone.Entities)
+									{
+										if (ReferenceEquals(other, entity) || other.IsDead || other.IsLoot)
+											continue;
+										var odx = other.Position.X - pt.X;
+										var odz = other.Position.Z - pt.Z;
+										if (odx * odx + odz * odz < 4f)
+											return true;
+									}
+
+									return false;
+								};
+							entity.Position = entity.NextWanderPoint(occupied);
 							entity.ArmPatrolCycle();
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
 						}

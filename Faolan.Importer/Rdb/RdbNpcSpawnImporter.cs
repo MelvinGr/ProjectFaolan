@@ -78,9 +78,7 @@ namespace Faolan.Importer.Rdb
 						area.Points.Add(new NpcSpawnAreaPoint
 						{
 							PointIndex = pi,
-							PositionX = pt.X,
-							PositionY = pt.Y,
-							PositionZ = pt.Z
+							Position = pt
 						});
 					}
 
