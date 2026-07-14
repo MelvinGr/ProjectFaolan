@@ -425,6 +425,7 @@ namespace Faolan.GameServer
 				["position"] = (client, _) => PositionCommand(client),
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["level"] = SetLevelCommand,
+				["feat"] = FeatCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
 				["delete"] = DeleteCommand,

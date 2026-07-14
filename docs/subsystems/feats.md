@@ -102,9 +102,17 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 ## Current server state
 
 - **Per-character unlocked-feat list: modeled + generated (2026-07-14).** `CharacterFeat` rows carry each char's
-  trained feats; the player spawn regenerates the pre-IIR feat list from them (`PlayerSpawnScaffoldRows`). Still
-  missing: a `Feat` **definition** table (tree/tier/prereqs/costs — the wiki job), **feat points**, and the **training**
-  protocol. `DoSkillSellback` (`0x205C`) is still a debug-log stub.
+  trained feats; the player spawn regenerates the pre-IIR feat list from them (`PlayerSpawnScaffoldRows`).
+- **Train + reset: implemented (2026-07-14).** `GameServerListener.Feats.cs`:
+  - **Train** — c2s `FeatIIR` state `0x04` → `Database.AddCharacterFeats` (append, dedup) → s2c `FeatIIR` state
+    `0x05` ack (echoes the list, byte-exact via `FeatIirCodec`).
+  - **Reset** (untrain-all) — c2s `UntrainFeat` (`0x2041`) / `FeatUntrainAnswer` (`0x203E`) → `Database.ClearCharacterFeats`
+    → world reload (`DoTeleport` to the current spot), so the fresh spawn carries the cleared list (retail's "loading
+    screen"). The confirm dialog (`DispatchFeatUntrainMessageBox`) is not yet built, so we act on either signal.
+  - GM command `.feat list | train <id>... | reset` is the test bootstrap (the retail trigger is the client's Feats
+    window + its point economy, which the server can't drive).
+- Still missing: a `Feat` **definition** table (tree/tier/prereqs/costs — the wiki job) and **feat points**.
+  `DoSkillSellback` (`0x205C`) is still a debug-log stub.
 - The skills scaffold (`CharacterSkill`) is imported per captured char by `CaptureCharacterImporter` (via
   `PlayerSpawnScaffoldRows.ExtractTo`) and hand-transcribed per class in `PlayerSpawnScaffoldRows.FullSkillIdsFor`
   (from Necro/Demo/Assassin/Herald high-level captures). On level-up / a GM command, the class scaffold is granted so
@@ -146,6 +154,9 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 2. **Tree structure.** Ingest the wiki tree (trees / tiers / prereqs / point costs / names) as reference data — the RDB
    can't give costs/prereqs (encrypted), the wiki can. A `Feat` definition table (id → name/tree/tier) is the join
    target for `CharacterFeat.FeatId`.
+3. ~~**Training protocol.**~~ **DONE 2026-07-14** — `FeatIIR` 0x04→0x05 train + `UntrainFeat`/`FeatUntrainAnswer`
+   reset (`GameServerListener.Feats.cs`). Remaining polish: build the `DispatchFeatUntrainMessageBox` confirm dialog,
+   and enforce feat points/prereqs once the `Feat` definition table exists.
 3. **Training protocol.** Implement `AdjustSkill` (`0x202E`) train / `UntrainFeat` (`0x2041`) / the feat-window
    request-reply, emitting `FeatIIR` on train (its builder is grammar-complete) and updating the per-char feat table
    so the next spawn reflects it.

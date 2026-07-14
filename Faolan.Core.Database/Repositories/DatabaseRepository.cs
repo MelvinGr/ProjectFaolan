@@ -26,6 +26,9 @@ namespace Faolan.Core.Database.Repositories
 		Task DeleteTradepostListing(ulong saleId);
 		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
 		Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds);
+		Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds);
+		Task<int> ClearCharacterFeats(uint characterId);
+		Task<uint[]> GetCharacterFeats(uint characterId);
 		Task Execute(Func<IDatabaseContext, Task> work);
 		Task<Ability[]> GetAbilities();
 		Task<Ability?> GetAbility(uint id);
@@ -459,6 +462,43 @@ namespace Faolan.Core.Database.Repositories
 			if (added > 0)
 				await ctx.SaveChangesAsync();
 			return added;
+		}
+
+		// Adds the given feat ids to the character's UNLOCKED FEAT set (train), appending any not already present to
+		// the end of the wire/train order. Idempotent. Returns the number of newly-added feats. See CharacterFeat.
+		public async Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var existing = await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).ToListAsync();
+			var have = existing.Select(f => f.FeatId).ToHashSet();
+			var nextSeq = existing.Count == 0 ? 0 : existing.Max(f => f.Sequence) + 1;
+			var added = 0;
+			foreach (var id in featIds)
+			{
+				if (!have.Add(id))
+					continue;
+
+				ctx.CharacterFeats.Add(new CharacterFeat { CharacterId = characterId, FeatId = id, Sequence = nextSeq++ });
+				added++;
+			}
+
+			if (added > 0)
+				await ctx.SaveChangesAsync();
+			return added;
+		}
+
+		// Clears ALL of the character's unlocked feats (the "untrain all" / reset). Returns the number removed.
+		public async Task<int> ClearCharacterFeats(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).ExecuteDeleteAsync();
+		}
+
+		// The character's unlocked feat ids in wire/train order.
+		public async Task<uint[]> GetCharacterFeats(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
 		}
 
 		public async Task Execute(Func<IDatabaseContext, Task> work)

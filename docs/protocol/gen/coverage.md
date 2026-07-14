@@ -8,8 +8,8 @@
 ## Headline
 
 - **821** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **77** IIR carrier types: **72 V3** (byte-exact builder), **3 V2** (built, no golden), **2 V1** (no builder found).
-- **60** codec classes, **58** with a byte-exact test.
+- **77** IIR carrier types: **73 V3** (byte-exact builder), **3 V2** (built, no golden), **1 V1** (no builder found).
+- **61** codec classes, **59** with a byte-exact test.
 - **43** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -53,6 +53,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `DestructibleFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `DoorFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `EnergyIIR` | `CombatPacketCodec` |
+| V3 | `FeatIIR` | `FeatIirCodec` |
 | V3 | `FeedbackIIR` | `FeedbackIirCodec` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
 | V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterBuilder` |
@@ -110,5 +111,4 @@ the margins, but never invents a golden that isn't there.
 | V2 | `DeleteItemIIR` | `InventoryMoveCodec` |
 | V2 | `MoveInventoryItemIIR` | `InventoryMoveCodec` |
 | V2 | `PlayfieldFIIR` | `MapChangeCodec` |
-| V1 | `FeatIIR` | — |
 | V1 | `SetShadowCoverageIIR` | — |

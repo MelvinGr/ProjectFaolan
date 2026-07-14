@@ -959,6 +959,15 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServer0X2000Opcodes.FeatIIR:
+				{
+					// Feat TRAIN: state 0x04 [feat ids] -> add to CharacterFeat -> s2c FeatIIR state 0x05 ack. See
+					// GameServerListener.Feats.cs / docs/subsystems/feats.md.
+					await HandleFeatTrain(client, rawPayload);
+
+					break;
+				}
+
 				case GameServer0X2000Opcodes.TradeskillRequestIIR:
 				{
 					// The client opened the Crafting -> Recipes book and is asking for its recipe list. Answer with
@@ -1356,6 +1365,16 @@ namespace Faolan.GameServer
 				case GameCharAgentOpcodes.TryLootItem: // single drag of one item out of the loot window
 				{
 					await _loot.HandleLootItem(client, packet);
+
+					break;
+				}
+
+				case GameCharAgentOpcodes.UntrainFeat: // "untrain all feats" (reset)
+				case GameCharAgentOpcodes.FeatUntrainAnswer: // the confirm-dialog answer for the same
+				{
+					// Reset ALL trained feats + reload the world so the cleared list takes effect. See
+					// GameServerListener.Feats.cs / docs/subsystems/feats.md.
+					await HandleFeatReset(client);
 
 					break;
 				}
