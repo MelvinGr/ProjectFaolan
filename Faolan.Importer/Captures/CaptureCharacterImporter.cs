@@ -38,7 +38,10 @@ namespace Faolan.Importer.Captures
 		// the client's auto-enter flow (observed with the smoke account).
 		public static uint AccountId = 0;
 
-		public static async Task<(int Seen, int Added, int Skipped)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures)
+		// minLevel (0 = no filter): captured characters at or below this level are skipped as fresh/tutorial chars
+		// (no trained feats, base ability scaffold). The module sets the reference-set policy; direct callers/tests
+		// default to importing every level.
+		public static async Task<(int Seen, int Added, int Skipped)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0)
 		{
 			// Best (largest) parseable player spawn body per character name, with the map active when it
 			// spawned and the capture's FullChar snapshot for the same instance (the carried inventory -
@@ -157,6 +160,17 @@ namespace Faolan.Importer.Captures
 				if (!Enum.IsDefined((Class)classId))
 				{
 					Console.WriteLine($"Characters: skipped '{name}' - invalid/unset class {classId} (captured pre-class-selection).");
+					skipped++;
+					continue;
+				}
+
+				// Skip low-level captures (when a minLevel policy is set): fresh/tutorial characters carry no
+				// meaningful progression - base ability scaffold, no trained feats - and only clutter the reference
+				// set. The kept chars are the leveled retail captures (NecroL80/DemoL80 L80, Hakotep L24, AssassinL23 L23).
+				var level = read.Message?.Stats?.Level ?? 0;
+				if (minLevel > 0 && level <= minLevel)
+				{
+					Console.WriteLine($"Characters: skipped '{name}' - level {level} (<= {minLevel}, fresh/tutorial).");
 					skipped++;
 					continue;
 				}
@@ -291,9 +305,9 @@ namespace Faolan.Importer.Captures
 			db.Characters.Add(character);
 			await db.SaveChangesAsync();
 
-			// The full spawn scaffold (entry table / ability-skill ids / pair lists / pre-frame) - the captured
-			// character's appearance + progression scaffold, byte-exact regenerable. (The id list is the ability/skill
-			// scaffold, NOT the feat tree - feats ride a separate FeatIIR 0x28da68a0; see [[feat_trees_decode_251]].)
+			// The full spawn scaffold - the captured character's appearance + progression, byte-exact regenerable:
+			// the entry table (appearance), the post-IIR id list = the ability/SKILL scaffold, the pair lists, AND the
+			// pre-IIR UNLOCKED FEAT list (a different region + id-space; see [[feat_trees_decode_251]] / feats.md).
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
 
 			// Worn equipment: every IIR InventoryEntry whose template is a DB item.
@@ -363,7 +377,7 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 
 			Console.WriteLine(
-				$"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {knownSpells} spells, {statSlots} stat slots, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
+				$"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {knownSpells} spells, {statSlots} stat slots, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids, {character.Feats.Count} feats.");
 		}
 
 		private static async Task<uint> FindOrCreateImportAccount(DatabaseContext db)

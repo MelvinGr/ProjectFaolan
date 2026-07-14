@@ -37,6 +37,52 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(ConstructedForm(body, @class)), Convert.ToHexString(RoundTripThroughRows(body, @class)));
 		}
 
+		// The unlocked FEAT list (spawn pre-IIR) extracts to CharacterFeat rows in wire/train order - a DIFFERENT
+		// region + id-space than the post-IIR skill scaffold (CharacterSkill). NecroL80 (L80 Necro) carries 25 feats;
+		// the ids + order are locked to the capture (Captures/scripts/decode_unlocked_feats.py). Feats and skills
+		// share NO ids.
+		[Fact]
+		public void ExtractTo_ReadsTheUnlockedFeatList_InTrainOrder()
+		{
+			uint[] expected =
+			[
+				80004, 82704, 410604, 80200, 80104, 81603, 84004, 84104, 410204, 81804, 82801, 410104, 81702, 80401,
+				82904, 83401, 85700, 410901, 80800, 80902, 82202, 83000, 85400, 81001, 82500
+			];
+
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroL80KingsCastle"), out var scaffold, out _));
+			var character = new Character { Id = 0x0200000A, Class = Class.Necromancer };
+			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
+
+			Assert.Equal(expected, character.Feats.OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArray());
+			Assert.Empty(character.Feats.Select(f => f.FeatId).Intersect(character.Skills.Select(s => s.SkillId))); // feats != skills
+		}
+
+		// A fresh character (and the fresh-scaffold Dikketest capture) carries no trained feats: the pre-IIR feat
+		// list is the bare 0x3F1 marker, so the frame stays byte-identical to the old constant-239 fresh frame.
+		[Fact]
+		public void FreshCharacter_HasNoFeats_AndAnEmptyFeatFrame()
+		{
+			var character = new Character { Id = 0x0200000B, Class = Class.Necromancer };
+			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+			Assert.Empty(character.Feats);
+
+			Assert.Equal(239, PlayerSpawnScaffoldRows.FreshPreFrame(Class.Necromancer).Length);
+			Assert.Empty(PlayerSpawnScaffoldRows.ExtractPreFrameFeats(PlayerSpawnScaffoldRows.FreshPreFrame(Class.Necromancer)));
+		}
+
+		// FreshPreFrame(feats) and ExtractPreFrameFeats are exact inverses, and the frame grows by 4 bytes per feat
+		// (126-byte head incl. the marker + 4*count + 113-byte tail).
+		[Fact]
+		public void FreshPreFrame_And_ExtractPreFrameFeats_RoundTrip()
+		{
+			uint[] feats = [110004, 110100, 111304, 111402, 110300, 112700]; // hakotep (hox) unlocked set
+			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.HeraldOfXotli, 0, feats);
+
+			Assert.Equal(126 + 4 * feats.Length + 113, frame.Length);
+			Assert.Equal(feats, PlayerSpawnScaffoldRows.ExtractPreFrameFeats(frame).ToArray());
+		}
+
 		[Fact]
 		public void FreshCloser_Assassin_Is0x3F10()
 		{
@@ -170,7 +216,10 @@ namespace Faolan.Tests
 		private static byte[] ConstructedForm(byte[] body, Class @class)
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var s, out _));
-			s.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(@class);
+			// The frame is reconstructed, but the unlocked FEAT list it carries IS character data and survives the row
+			// round-trip - so the constructed form keeps the captured feats (spliced into the canonical frame).
+			var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(s.PreFrame);
+			s.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, feats);
 			s.EntryTableX = 0xB7;
 			s.BuffRecords.Clear();
 			return PlayerSpawnScaffoldCodec.Generate(s);

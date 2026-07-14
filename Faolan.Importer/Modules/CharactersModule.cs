@@ -23,10 +23,14 @@ namespace Faolan.Importer.Modules
 		public string Description => "Captured characters (incl. other players) and their bodies/gear.";
 		public string Name => "characters";
 
+		// Fresh/tutorial captures (level <= 5) are skipped: they carry no trained feats and only a base ability
+		// scaffold, so they add nothing to the reference set. The kept chars are the leveled retail captures.
+		private const uint MinLevel = 5;
+
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var (seen, added, skipped) = await CaptureCharacterImporter.ImportAsync(ctx.Db, ctx.Captures.Select(c => c.Packets));
-			return new ImportResult($"{seen} captured, {added} added, {skipped} already in DB.");
+			var (seen, added, skipped) = await CaptureCharacterImporter.ImportAsync(ctx.Db, ctx.Captures.Select(c => c.Packets), MinLevel);
+			return new ImportResult($"{seen} captured, {added} added, {skipped} already in DB or below level {MinLevel}.");
 		}
 	}
 }

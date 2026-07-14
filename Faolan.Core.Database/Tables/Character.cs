@@ -80,6 +80,10 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterScaffoldPair> ScaffoldPairs { get; set; } = [];
 		public virtual ICollection<CharacterShortcut> Shortcuts { get; set; } = [];
 		public virtual ICollection<CharacterSkill> Skills { get; set; } = [];
+
+		// The unlocked FEAT (talent-tree) ids - the spawn's pre-IIR feat list, distinct from Skills (the post-IIR
+		// ability scaffold). See CharacterFeat + docs/subsystems/feats.md.
+		public virtual ICollection<CharacterFeat> Feats { get; set; } = [];
 		public virtual ICollection<CharacterSpell> Spells { get; set; } = [];
 		public virtual ICollection<CharacterBuff> Buffs { get; set; } = [];
 		public virtual ICollection<CharacterTag> Tags { get; set; } = [];

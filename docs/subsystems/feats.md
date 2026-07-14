@@ -101,7 +101,10 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 
 ## Current server state
 
-- **No feat model.** No feat table, no tree, no feat points, no training. `DoSkillSellback` (`0x205C`) is a debug-log stub.
+- **Per-character unlocked-feat list: modeled + generated (2026-07-14).** `CharacterFeat` rows carry each char's
+  trained feats; the player spawn regenerates the pre-IIR feat list from them (`PlayerSpawnScaffoldRows`). Still
+  missing: a `Feat` **definition** table (tree/tier/prereqs/costs — the wiki job), **feat points**, and the **training**
+  protocol. `DoSkillSellback` (`0x205C`) is still a debug-log stub.
 - The skills scaffold (`CharacterSkill`) is imported per captured char by `CaptureCharacterImporter` (via
   `PlayerSpawnScaffoldRows.ExtractTo`) and hand-transcribed per class in `PlayerSpawnScaffoldRows.FullSkillIdsFor`
   (from Necro/Demo/Assassin/Herald high-level captures). On level-up / a GM command, the class scaffold is granted so
@@ -135,12 +138,14 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 
 ## Next steps (ordered)
 
-1. **Model.** Add a feat definition + per-character feat table (distinct from `CharacterSkill`), seeded from the
-   captured chars' pre-IIR feat lists (Necro/Demo/Hox have real data; `decode_unlocked_feats.py perchar` is the source).
-   Regenerate the pre-IIR feat list in `PlayerSpawnScaffoldCodec` from that table (currently kept raw), with a
-   byte-exact golden test against the captures.
+1. ~~**Model + generation.**~~ **DONE 2026-07-14.** `CharacterFeat` table (a per-character unlocked-feat list,
+   distinct from `CharacterSkill`; `FeatId` composite + `Sequence` for the train order), migration `AddCharacterFeat`.
+   `PlayerSpawnScaffoldRows.ExtractPreFrameFeats` / `FreshPreFrame(class, mask, feats)` extract & regenerate the
+   pre-IIR feat list; `ExtractTo`/`TryApplyFrom` map it to/from rows (golden tests in `PlayerSpawnScaffoldRowsTests`).
+   The importer seeds it from captures (`CaptureCharacterImporter`, `>` level 5 only): NecroL80/DemoL80 25, Hakotep 6.
 2. **Tree structure.** Ingest the wiki tree (trees / tiers / prereqs / point costs / names) as reference data — the RDB
-   can't give costs/prereqs (encrypted), the wiki can.
+   can't give costs/prereqs (encrypted), the wiki can. A `Feat` definition table (id → name/tree/tier) is the join
+   target for `CharacterFeat.FeatId`.
 3. **Training protocol.** Implement `AdjustSkill` (`0x202E`) train / `UntrainFeat` (`0x2041`) / the feat-window
    request-reply, emitting `FeatIIR` on train (its builder is grammar-complete) and updating the per-char feat table
    so the next spawn reflects it.

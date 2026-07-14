@@ -145,6 +145,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				})
 				.ToList();
 			character.ScaffoldPairs = new List<CharacterScaffoldPair>();
+			character.Feats = new List<CharacterFeat>(); // a fresh character has trained no feats
 			return true;
 		}
 
@@ -172,9 +173,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 
 			character.ScaffoldPairs = scaffold.EndPairs.Select(p => Pair(character.Id, 0, p)).Concat(scaffold.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
-			// The pre-IIR frame + EntryTableX are NOT extracted: they're not character data (the frame is a constant
-			// skeleton + the archetype/class island + the transient RDB script char buffer; EntryTableX is const 0xB7).
-			// TryApplyFrom reconstructs them from Character.Class - see FreshPreFrame + docs/re/fa015807-spawn-reader.md.
+
+			// The unlocked FEAT list lives in the pre-IIR frame (not the post-IIR IdList, which is skills). It IS
+			// character data, so extract it to CharacterFeat rows (in wire/train order); the rest of the frame +
+			// EntryTableX are constants reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
+			character.Feats = ExtractPreFrameFeats(scaffold.PreFrame)
+				.Select((id, sequence) => new CharacterFeat
+				{
+					CharacterId = character.Id,
+					FeatId = id,
+					Sequence = sequence
+				})
+				.ToList();
 		}
 
 		// Offset of the vanity hidden-slots bitmask within the 239-byte PreFrame (4 bytes, big-endian; bit = base equip
@@ -182,9 +192,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// survives relog - the client renders the show/hide off it (#336).
 		public const int VanityHiddenMaskOffset = 18;
 
-		public static byte[] FreshPreFrame(Class @class, uint vanityHiddenMask = 0)
+		// Offset of the u32 feat-list count marker within the PreFrame. The pre-IIR frame carries the character's
+		// UNLOCKED FEAT list here: [u32 (featCount+1)*0x3F1][featCount x u32 featId BE]. Everything up to & including
+		// the marker is the 126-byte HEAD; the feats splice in after it; a constant 113-byte TAIL (zero padding + the
+		// 41 00 00 82 08 closer) follows. So PreFrame length = 126 + 4*featCount + 113. See docs/subsystems/feats.md
+		// + Captures/scripts/decode_unlocked_feats.py.
+		public const int FeatMarkerOffset = 122;
+		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
+		private const int PreFrameTail = 113;
+
+		public static byte[] FreshPreFrame(Class @class, uint vanityHiddenMask = 0, IReadOnlyList<uint> feats = null)
 		{
-			var f = new byte[239];
+			var featCount = feats?.Count ?? 0;
+			var f = new byte[PreFrameHead + 4 * featCount + PreFrameTail];
 			f[0] = 0x05;
 			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(VanityHiddenMaskOffset, 4), vanityHiddenMask); // vanity hide mask (#336)
 			f[70] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
@@ -193,14 +213,43 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			f[81] = 0x41; // constant marker 0x4170
 			f[82] = 0x70;
 			f[94] = 0x08; // u16 island @93 = 0x0008 (the one byte that differed between fresh captures)
-			f[113] = 0x07; // constant 0x7E2 (2018)
+			f[113] = 0x07; // constant 0x7E2 (2018) landmark preceding the feat marker
 			f[114] = 0xE2;
-			f[124] = 0x03; // constant 0x3F1
-			f[125] = 0xF1;
-			f[234] = 0x41; // closer 41 00 00 82 08
-			f[237] = 0x82;
-			f[238] = 0x08;
+
+			// Feat list: [u32 (count+1)*0x3F1] then count x u32 feat id (train order). Empty (count 0) writes the bare
+			// 0x3F1 marker and no ids - byte-identical to the old constant-239 fresh frame.
+			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(FeatMarkerOffset, 4), 0x3F1 * ((uint)featCount + 1));
+			for (var k = 0; k < featCount; k++)
+				BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(PreFrameHead + 4 * k, 4), feats[k]);
+
+			var tail = PreFrameHead + 4 * featCount;
+			f[tail + 108] = 0x41; // closer 41 00 00 82 08
+			f[tail + 111] = 0x82;
+			f[tail + 112] = 0x08;
 			return f;
+		}
+
+		// Reads the unlocked-feat id list out of a captured (or generated) PreFrame - the inverse of FreshPreFrame's
+		// feat splice. Returns an empty list when the frame carries no feat list (fresh char / a non-standard frame
+		// such as the 228-byte create-editor variant). Order is preserved (the wire order is train order, NOT sorted).
+		public static List<uint> ExtractPreFrameFeats(byte[] preFrame)
+		{
+			var feats = new List<uint>();
+			if (preFrame == null || preFrame.Length < PreFrameHead)
+				return feats;
+
+			var marker = BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(FeatMarkerOffset, 4));
+			if (marker == 0 || marker % 0x3F1 != 0)
+				return feats;
+
+			var count = marker / 0x3F1 - 1;
+			if (PreFrameHead + 4 * (long)count > preFrame.Length)
+				return feats;
+
+			for (var k = 0; k < count; k++)
+				feats.Add(BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(PreFrameHead + 4 * (int)k, 4)));
+
+			return feats;
 		}
 
 		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
@@ -260,11 +309,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (character?.Attributes == null || character.Attributes.Count == 0)
 				return false;
 
-			// The frame + EntryTableX are CONSTRUCTED, not stored: FreshPreFrame(class, vanityMask) is the constant
-			// skeleton with the archetype/class island written from the character's class and the vanity hidden-slots
-			// mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden piece survives
-			// relog); EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
-			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityHiddenMask ?? 0);
+			// The frame + EntryTableX are CONSTRUCTED, not stored: FreshPreFrame(class, vanityMask, feats) is the
+			// constant skeleton with the archetype/class island written from the character's class, the vanity
+			// hidden-slots mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden
+			// piece survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
+			// EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
+			var feats = character.Feats?.OrderBy(f => f.Sequence).Select(f => f.FeatId).ToList();
+			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityHiddenMask ?? 0, feats);
 			scaffold.EntryTableX = 0xB7;
 			scaffold.BuffRecords.Clear();
 

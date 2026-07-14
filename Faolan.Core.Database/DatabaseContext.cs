@@ -26,6 +26,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterBodyResource> CharacterBodyResources { get; }
 		DbSet<CharacterCombo> CharacterCombos { get; }
 		DbSet<CharacterEquipment> CharacterEquipment { get; }
+		DbSet<CharacterFeat> CharacterFeats { get; }
 		DbSet<CharacterInventory> CharacterInventory { get; }
 		DbSet<CharacterMaxStats> CharacterMaxStats { get; }
 		DbSet<CharacterQuest> CharacterQuests { get; }
@@ -98,6 +99,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
 		public DbSet<CharacterCombo> CharacterCombos { get; set; }
 		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
+		public DbSet<CharacterFeat> CharacterFeats { get; set; }
 		public DbSet<CharacterInventory> CharacterInventory { get; set; }
 		public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
 		public DbSet<CharacterQuest> CharacterQuests { get; set; }
