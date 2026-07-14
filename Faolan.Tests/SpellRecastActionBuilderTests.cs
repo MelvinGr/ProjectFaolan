@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;

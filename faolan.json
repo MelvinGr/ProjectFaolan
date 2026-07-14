@@ -10,6 +10,6 @@
 
 	"WelcomeString": "Welcome to Project Faolan!",
 
-	"DebugSpawnAreaLabels": false,
-	"AmbientSpawnsEnabled": false
+	"DebugSpawnAreaLabels": true,
+	"AmbientSpawnsEnabled": true
 }

@@ -25,10 +25,8 @@ namespace Faolan.Core.Network.Packets.ChatServer
 					? $"{packet.Opcode} ({opcode.ToHex()})"
 					: opcode.ToHex();
 
-				_logger.LogInformation("<= [ChatServer {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length);
-
-				if (_logger.IsEnabled(LogLevel.Debug) && packet.Body?.Length > 0)
-					_logger.LogDebug("<= [ChatServer {OpcodeName}] body ({BodyLength} bytes): {Body}", opcodeName, packet.Body.Length, packet.Body.ToArray().ToHex());
+				var bytesSuffix = PacketLogOptions.BytesSuffix(_logger, ("body", packet.Body?.ToArray()));
+				_logger.LogInformation("<= [ChatServer {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length, bytesSuffix);
 			}
 			catch (Exception ex)
 			{

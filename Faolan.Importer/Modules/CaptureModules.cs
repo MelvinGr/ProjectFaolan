@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Constants;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Extractors;

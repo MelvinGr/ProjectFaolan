@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Faolan.Core;
 using Faolan.Core.Network.Codecs.World;
 
 namespace Faolan.Core.Network.Codecs.Combat

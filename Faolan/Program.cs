@@ -13,6 +13,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Helpers;
+using Faolan.Core.Network;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.CSPlayerAgent;
@@ -69,6 +70,10 @@ namespace Faolan
 			builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
 			builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"));
 			builder.Configuration.AddCommandLine(args);
+
+			// Packet trace bytes: each packet logs on a single line; set "LogPacketBytes": false (faolan.json or
+			// --LogPacketBytes false) to drop the raw headerData/body hex dump and keep just the opcode + lengths.
+			PacketLogOptions.IncludeBytes = builder.Configuration.GetValue("LogPacketBytes", true);
 
 			builder.Logging.SetMinimumLevel(Global.IsDebug
 				? LogLevel.Debug

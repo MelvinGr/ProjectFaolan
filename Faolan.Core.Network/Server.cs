@@ -157,9 +157,11 @@ namespace Faolan.Core.Network
 			return NetworkClients.FirstOrDefault(nc => nc.Session?.Account?.ClientInstance == characterId || nc.Session?.Character?.Id == characterId);
 		}
 
+		// Extra, opcode-specific body dump some inbound handlers emit on their own line. Gated on the global
+		// LogPacketBytes switch so disabling packet bytes silences these too.
 		protected void LogPacketBodyDebug(string label, byte[] bytes)
 		{
-			if (bytes?.Length > 0 && Logger.IsEnabled(LogLevel.Debug))
+			if (bytes?.Length > 0 && PacketLogOptions.ShouldLogBytes(Logger))
 				Logger.LogDebug("{Label} ({Length} bytes): {Bytes}", label, bytes.Length, bytes.ToHex());
 		}
 
@@ -169,9 +171,8 @@ namespace Faolan.Core.Network
 				? opcode.ToString()
 				: "Unknown";
 
-			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
-				packet.Bytes?.Length ?? 0);
-			LogPacketBodyDebug($"=> [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
+			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
+				packet.Bytes?.Length ?? 0, PacketLogOptions.BytesSuffix(Logger, ("body", packet.Body?.ToArray())));
 		}
 
 		protected void LogUnknownPacket(Packet packet, Enum opcode)
@@ -180,16 +181,14 @@ namespace Faolan.Core.Network
 				? opcode.ToString()
 				: "Unknown";
 
-			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
-				packet.Bytes?.Length ?? 0);
-			LogPacketBodyDebug($"Unhandled packet [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
+			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
+				packet.Bytes?.Length ?? 0, PacketLogOptions.BytesSuffix(Logger, ("body", packet.Body?.ToArray())));
 		}
 
 		protected void LogUnknownPacket(Packet packet, ushort opcode, string opcodeName = "Unknown")
 		{
-			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
-				packet.Bytes?.Length ?? 0);
-			LogPacketBodyDebug($"Unhandled packet [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
+			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
+				packet.Bytes?.Length ?? 0, PacketLogOptions.BytesSuffix(Logger, ("body", packet.Body?.ToArray())));
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, TPacket packet);

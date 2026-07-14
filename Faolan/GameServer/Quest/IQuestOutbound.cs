@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.GameServer.Quest
 {

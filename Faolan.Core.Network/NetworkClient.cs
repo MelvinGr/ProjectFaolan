@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Packets;
@@ -79,7 +78,6 @@ namespace Faolan.Core.Network
 			ArgumentNullException.ThrowIfNull(value);
 
 			_outgoingPacketLogger.Log(value);
-			LogRawPacket("<=", value);
 
 			_sendLock.Wait();
 			try
@@ -107,7 +105,6 @@ namespace Faolan.Core.Network
 			ArgumentNullException.ThrowIfNull(value);
 
 			_outgoingPacketLogger.Log(value);
-			LogRawPacket("<=", value);
 
 			await _sendLock.WaitAsync(cancellationToken);
 			try
@@ -178,7 +175,6 @@ namespace Faolan.Core.Network
 			foreach (var frame in _messageFramer.PushBytes(data.ToArray(), data.Length))
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				LogRawPacket("=>", frame);
 
 				var packet = _packetFactory.Create(frame);
 
@@ -194,14 +190,6 @@ namespace Faolan.Core.Network
 			// The batch this recv carried is fully dispatched - signal the "batch drained" boundary (#197).
 			if (dispatchedAny && ReceivedBatchComplete != null)
 				await ReceivedBatchComplete(this);
-		}
-
-		private void LogRawPacket(string direction, byte[] bytes)
-		{
-			if (!Logger.IsEnabled(LogLevel.Debug))
-				return;
-
-			Logger.LogDebug("{Direction} {PacketType} raw ({Length} bytes): {Bytes}", direction, typeof(TPacket).Name, bytes.Length, bytes.ToHex());
 		}
 
 		private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
