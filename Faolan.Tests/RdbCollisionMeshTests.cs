@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		private static byte[] Actor(Vector3[] verts, (int, int, int)[] tris)
 		{
 			var b = new List<byte>();
-			b.AddRange(new byte[] { 0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48 }); // NXS\x01 + MESH
+			b.AddRange([0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]); // NXS\x01 + MESH
 			b.AddRange(new byte[20]);                                                   // ver/flags/3 header words (unused by us)
 			b.AddRange(System.BitConverter.GetBytes((uint)verts.Length));
 			b.AddRange(System.BitConverter.GetBytes((uint)tris.Length));
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 		{
 			// A stray NXS\x01MESH in junk bytes (bad counts) must be skipped without derailing the real actor after it.
 			var junk = new List<byte>();
-			junk.AddRange(new byte[] { 0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48 });
+			junk.AddRange([0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]);
 			junk.AddRange(new byte[4]); // truncated - no valid nVerts/nTris reachable
 			junk.AddRange(Wall());
 			Assert.True(RdbCollisionMesh.TryParse(junk.ToArray(), out var mesh));

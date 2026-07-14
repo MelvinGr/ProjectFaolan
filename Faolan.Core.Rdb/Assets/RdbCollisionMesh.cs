@@ -97,12 +97,13 @@ namespace Faolan.Core.Rdb.Assets
 			for (var i = 0; i < nTris * 3; i++)
 			{
 				var o = tStart + i * width;
-				int idx = width switch
+				var idx = width switch
 				{
 					1 => body[o],
 					2 => BinaryPrimitives.ReadUInt16LittleEndian(body[o..]),
 					_ => (int)BinaryPrimitives.ReadUInt32LittleEndian(body[o..])
 				};
+
 				if (idx >= nVerts)
 				{
 					// wrong width guess for this mesh - roll back and skip it
@@ -134,7 +135,7 @@ namespace Faolan.Core.Rdb.Assets
 				{
 					var key = Key(gx, gz);
 					if (!grid.TryGetValue(key, out var list))
-						grid[key] = list = new List<int>();
+						grid[key] = list = [];
 					list.Add(t);
 				}
 			}

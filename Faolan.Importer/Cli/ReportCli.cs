@@ -154,11 +154,89 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "terrain-export":
+				{
+					await TerrainExport(dbPath, GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB",
+						GetOption(args, "--terrain-out") ?? Path.Combine(RepoRoot, "Terrain"));
+					return 0;
+				}
+
 				default:
 				{
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
 				}
+			}
+		}
+
+		// #284: bake a compact per-map terrain file (heightmap 1066611 + collision mesh 1000012, gzipped) for every map
+		// in the DB that has terrain, so the GAME SERVER can serve ground-snap + line-of-sight from these small files
+		// instead of shipping the ~28 GB client RDB. Output: <out>/<mapId>.terrain (TerrainFile format). Run:
+		//   dotnet run --project Faolan.Importer -- --report terrain-export [--rdb <dir>] [--terrain-out <dir>]
+		private static async Task TerrainExport(string dbPath, string rdbDir, string outDir)
+		{
+			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			Directory.CreateDirectory(outDir);
+
+			var mapIds = await db.Maps.Select(m => m.Id).OrderBy(id => id).ToListAsync();
+			int written = 0, skipped = 0;
+			long totalBytes = 0;
+			foreach (var mapId in mapIds)
+			{
+				var heightmap = ReadResource(rdb, RdbHeightmap.ResourceType, mapId);
+				var collision = ReadResource(rdb, RdbCollisionMesh.ResourceType, mapId);
+				if (heightmap.Length == 0 && collision.Length == 0)
+				{
+					skipped++;
+					continue;
+				}
+
+				var extent = TilemapExtent(rdb, mapId);
+				var path = Path.Combine(outDir, $"{mapId}{TerrainFile.Extension}");
+				await using (var fs = File.Create(path))
+					TerrainFile.Write(fs, extent, heightmap, collision);
+
+				var size = new FileInfo(path).Length;
+				totalBytes += size;
+				written++;
+				Console.WriteLine($"  map {mapId}: heightmap {heightmap.Length / 1024} KB + collision {collision.Length / 1024} KB -> {size / 1024} KB");
+			}
+
+			Console.WriteLine($"terrain-export: {written} maps written ({totalBytes / 1024 / 1024} MB total), {skipped} maps with no terrain, into {outDir}.");
+		}
+
+		// The decompressed body of a per-map RDB resource, or empty when the map has no local entry of that type.
+		private static byte[] ReadResource(RdbReader rdb, uint type, uint mapId)
+		{
+			if (!rdb.TryGet(type, mapId, out var e) || !e.IsLocal)
+				return [];
+
+			try
+			{
+				return rdb.ReadDecompressed(e);
+			}
+			catch
+			{
+				return [];
+			}
+		}
+
+		// The playfield's world-unit width (1070003 <tilemap Width>), for the heightmap cell size. 0 if unavailable.
+		private static uint TilemapExtent(RdbReader rdb, uint mapId)
+		{
+			if (!rdb.TryGet(1070003, mapId, out var e) || !e.IsLocal)
+				return 0;
+
+			try
+			{
+				var xml = Encoding.Latin1.GetString(rdb.ReadDecompressed(e));
+				var m = System.Text.RegularExpressions.Regex.Match(xml, "<tilemap[^>]*Width=\"(\\d+)\"");
+				return m.Success ? uint.Parse(m.Groups[1].Value) : 0;
+			}
+			catch
+			{
+				return 0;
 			}
 		}
 

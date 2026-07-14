@@ -55,10 +55,10 @@ namespace Faolan.GameServer
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
 		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
 
-		// Default client-RDB path for the terrain heightmap (#284) when `RdbDir` isn't set in faolan.json - the standard
-		// dev install, so ground-snap/LoS work out of the box. A deployment without the client RDB just leaves the
-		// directory absent and TerrainService disables itself (no error).
-		private const string DefaultRdbDir = "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+		// Default baked-terrain dir (#284) when `TerrainDir` isn't set in faolan.json - the repo-root `Terrain/` folder
+		// the importer writes (`--report terrain-export`). The game server reads these small files, NOT the ~28 GB
+		// client RDB; if the dir is absent TerrainService disables itself (ground-snap/LoS off, no error).
+		private const string DefaultTerrainDir = "Terrain";
 
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
@@ -66,12 +66,6 @@ namespace Faolan.GameServer
 		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
 		// see snapshot_embeds_strie_quest). See CommitCharacterName / WorldQuest.BeachStarterQuestId.
 		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
-
-		// Receiver for the create-editor (clientInstance=0x021662C8) conversation family.
-		// The create-editor 0x2000 receiver is built per session from the character's real instance id -
-		// see CreateEditorReceiver(client) in GameServerListener. The editor/world bursts are constructed at
-		// send time (Burst + SendBurst in PacketBurstHelper) with the same instance written into the header and
-		// body, so auth replies and burst packets stay on one conversation.
 
 		// The per-application effect nonce a synthesized self-buff carries (the value the old verbatim Scythe-Shield
 		// blob used; the client does not validate it - #304).
@@ -234,10 +228,9 @@ namespace Faolan.GameServer
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
-			// Server-side terrain (RDB heightmap) for ground-snap + terrain line-of-sight (#284). Optional: reads the
-			// client RDB directly at runtime (heightmaps are ~9 MB each - too big to import); degrades gracefully when
-			// RdbDir is unset or the client RDB is absent. Default to the standard install path so it "just works" in dev.
-			var terrain = new TerrainService(configuration["RdbDir"] ?? DefaultRdbDir, logger);
+			// Server-side terrain (ground-snap + line-of-sight, #284) from the importer-baked terrain files - the game
+			// server does NOT read the client RDB. Degrades gracefully when the dir is unset/absent.
+			var terrain = new TerrainService(configuration["TerrainDir"] ?? DefaultTerrainDir, logger);
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);

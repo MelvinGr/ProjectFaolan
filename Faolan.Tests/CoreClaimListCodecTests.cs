@@ -19,7 +19,7 @@ namespace Faolan.Tests
 		// item level (not stack count); quantity is the mirrored tail pair (0 for the single-item claims, 20 for the
 		// one type-4 account-currency row). See ClaimEntry.
 		private static readonly (uint Index, uint Tpl, ulong Level, string Code, string Token, uint Type, uint Quantity)[] Captured =
-		{
+		[
 			(1, 4621781, 80, "9CP4", "f8f2753b3f1995b4ada92fdf16173fd1", 6, 0),
 			(2, 4592970, 1, "M3B2", "156a418124721065e15a4393f84ad05a", 6, 0),
 			(3, 4208449, 5, "UXAM", "840512e6d1bafaba5cf7cbb34c13eb21", 6, 0),
@@ -38,8 +38,8 @@ namespace Faolan.Tests
 			(16, 3535303, 19, "CU2E", "d632a37ae44055dd465df6f420ae35fc", 6, 0),
 			(17, 3514741, 5, "JBUE", "dd6127476954f064fd21008903f001cd", 6, 0),
 			(18, 4208484, 5, "VPU5", "6a41f5e76497f325ecacbb54a6254252", 6, 0),
-			(19, 4552866, 1, "RQIL", "ed414c09b038fa793b7085ead7de9b92", 4, 20),
-		};
+			(19, 4552866, 1, "RQIL", "ed414c09b038fa793b7085ead7de9b92", 4, 20)
+		];
 
 		// frame 399 inner IIR body (the captured packet minus its leading u32 length prefix 0x000007F0).
 		private const string CapturedBody =
