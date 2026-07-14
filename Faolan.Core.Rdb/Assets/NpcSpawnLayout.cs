@@ -16,9 +16,13 @@ namespace Faolan.Core.Rdb.Assets
 	//   record = [u32 version=1][u32 groupCount] groupCount*group
 	//   group  = [str name][str category][str id]
 	//            [u32 pointCount][vec3]*pointCount          <- the PRIMARY spawn points (what a placement sits on)
-	//            [vec3 boundsMin][vec3 boundsMax]           <- an AABB over the group (max.Y is padded to min.Y + 10)
-	//            [u32 pathCount] pathCount*([u32 n][vec3]*n) <- the roam/patrol paths the group's NPCs walk
+	//            [vec3 boundsMin][vec3 boundsMax]           <- the group's roam AREA (AABB; max.Y padded to min.Y + 10)
+	//            [u32 pathCount] pathCount*([u32 n][vec3]*n) <- wander-SAMPLES that fill the roam area, NOT distinct routes
 	//   vec3   = [f32 x][f32 y][f32 z]
+	//
+	// The bounds pair is the roam AREA and the pathCount sub-lists are space-filling wander samples of that same box
+	// (pathLength/span ~= 5 for every group incl. Picts; all a group's sub-lists share the decoded AABB to within a few
+	// units). Groups differ only in area SIZE, not structure - see docs/rdb/npc-spawn-layout-1010506.md.
 	// There is NO 12-byte RDB-Id header on this type: the payload begins at the [u32 version] word.
 	//
 	// The `category` selects what the `id` string means: "Community"/"Race"/"Superfamily" -> a numeric faction/family
@@ -149,7 +153,8 @@ namespace Faolan.Core.Rdb.Assets
 			return true;
 		}
 
-		// One named spawn group: its primary spawn points, its AABB, and the roam paths its NPCs patrol.
+		// One named spawn group: its primary spawn points, its roam AREA (BoundsMin/BoundsMax AABB), and the
+		// wander-sample sub-lists (RoamPaths) that fill that area - samples of the region, not distinct routes.
 		public sealed record SpawnGroup(
 			string Name,
 			string Category,

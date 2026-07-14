@@ -31,13 +31,28 @@ Decompressed via the normal `IOz1`+zlib unwrap (`RdbReader.ReadDecompressed`). U
 [str] id              meaning depends on `category` — see below
 [4]   pointCount      u32
       pointCount × vec3     the PRIMARY spawn points (a placement sits on one of these)
-[12]  boundsMin       vec3   AABB min corner over the group's points
-[12]  boundsMax       vec3   AABB max corner (max.Y is padded to min.Y + 10)
+[12]  boundsMin       vec3   the roam AREA min corner (see below)
+[12]  boundsMax       vec3   the roam AREA max corner (max.Y is padded to min.Y + 10)
 [4]   pathCount       u32
-      pathCount × ( [4] n u32, n × vec3 )   the roam/patrol paths the group's NPCs walk
+      pathCount × ( [4] n u32, n × vec3 )   wander-SAMPLES that fill the roam area (NOT distinct routes)
 ```
 
 `vec3` = `[f32 x][f32 y][f32 z]`.
+
+## Roam area, not patrol routes
+
+The `boundsMin`/`boundsMax` pair is the group's **roam AREA** (an AABB), and the `pathCount` sub-lists are
+**space-filling wander samples of that same area, not distinct patrol routes** (measured on 4010, 2026-07-14):
+
+- Every sub-list has `pathLength / bboxSpan ≈ 5` — the polyline folds back on itself ~5× within its extent
+  (crocs 5.2, apes 5.6, poachers 5.3, **Picts 5.9** — uniform across creature type), i.e. a dense random walk,
+  never a straight run.
+- All of a group's sub-lists share **one** bounding box, and that box **equals the decoded `boundsMin`/`boundsMax`
+  AABB** to within 1–4 world units. So the AABB is the roam area and the wander stays inside it.
+- Groups differ only in the *size* of that area, not its structure: a Pict camp roams an ~80u box (spread out
+  enough to read as a route network), while crocs/poachers/slavers pack the identical wander into an ~20u box
+  (reads as a solid blob). An ambient spawner therefore wants the AABB (the roam bounds) — the individual
+  sub-lists are just samples of it.
 
 ## What `id` means
 
