@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
@@ -154,6 +155,81 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
 		}
 
+		// .setnpcgroup [<group name>]  - manual creature assignment for an RDB spawn AREA (#363). Target/select an NPC
+		// standing in the area (its type IS what the area spawns), then run this: with no arg it assigns the SELECTED
+		// NPC's creature to the area the NPC stands in; with an arg it assigns to the named area on that map. Sets the
+		// area's NpcTemplateId + marks it Manual (never re-guessed by the resolver). The dev nameplate labels
+		// (DebugSpawnAreaLabels) show each NPC's area so you know what to type.
+		private async Task SetNpcGroupCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var player = _simulation.PlayerWorldEntity(client);
+			var handle = client.Session.SelectedTargetHandle;
+			if (player == null || handle == 0 || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;]  (no arg = the area the NPC stands in).");
+				return;
+			}
+
+			var areas = await Database.GetNpcSpawnAreas(npc.MapId);
+			if (areas.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Map {npc.MapId} has no RDB spawn areas (scripted/instanced playfield).");
+				return;
+			}
+
+			var arg = (arguments ?? "").Trim();
+			var area = arg.Length > 0
+				? areas.Where(a => string.Equals(a.GroupName, arg, StringComparison.OrdinalIgnoreCase)).OrderBy(a => AreaDistanceSq(a, npc.Position)).FirstOrDefault()
+				: NearestContainingArea(areas, npc.Position);
+			if (area == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, arg.Length > 0
+					? $"No spawn area named '{arg}' on map {npc.MapId}."
+					: $"'{StripAreaLabel(npc.Name)}' isn't inside any spawn area on map {npc.MapId} - pass the group name explicitly.");
+				return;
+			}
+
+			await Database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual].");
+		}
+
+		// The RDB spawn area a position sits in (nearest centroid; bounds padded), or null when outside every area.
+		private static NpcSpawnArea NearestContainingArea(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
+		{
+			const float pad = 5f;
+			NpcSpawnArea best = null;
+			var bestDistSq = float.MaxValue;
+			foreach (var a in areas)
+			{
+				if (pos.X < a.BoundsMinX - pad || pos.X > a.BoundsMaxX + pad || pos.Z < a.BoundsMinZ - pad || pos.Z > a.BoundsMaxZ + pad)
+					continue;
+
+				var d = AreaDistanceSq(a, pos);
+				if (d < bestDistSq)
+				{
+					bestDistSq = d;
+					best = a;
+				}
+			}
+
+			return best;
+		}
+
+		private static float AreaDistanceSq(NpcSpawnArea a, Vector3 pos)
+		{
+			var cx = (a.BoundsMinX + a.BoundsMaxX) * 0.5f;
+			var cz = (a.BoundsMinZ + a.BoundsMaxZ) * 0.5f;
+			return (pos.X - cx) * (pos.X - cx) + (pos.Z - cz) * (pos.Z - cz);
+		}
+
+		// Strips the " [Area]" dev-label suffix (DebugSpawnAreaLabels) from a nameplate so feedback shows the creature.
+		private static string StripAreaLabel(string name)
+		{
+			var i = name?.LastIndexOf(" [", StringComparison.Ordinal) ?? -1;
+			return i >= 0 ? name[..i] : name;
+		}
+
 		// toPosition: an explicit destination within the map (e.g. a bind/recall point); null = the map's spawn point.
 		private async Task DoTeleport(uint characterId, uint mapId, Vector3? toPosition = null)
 		{
@@ -297,7 +373,8 @@ namespace Faolan.GameServer
 				["syschat"] = (client, _) => SysChatCommand(client),
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
-				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
+				["unban"] = (client, arguments) => BanCommand(client, arguments, false),
+				["setnpcgroup"] = SetNpcGroupCommand
 			};
 		}
 

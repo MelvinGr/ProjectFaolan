@@ -17,6 +17,11 @@ namespace Faolan.Core.Extensions
 
 			public string DatabasePath => Path.GetFullPath(config["DatabasePath"]);
 
+			// Dev visualization (#363): when true, an NPC that stands inside an RDB spawn AREA gets that area's group
+			// name appended to its overhead nameplate (e.g. "Jungle Ape [Ape2]"), so a manual creature-labeling pass can
+			// see which area it's standing in. Off by default; set "DebugSpawnAreaLabels": true in faolan.json.
+			public bool DebugSpawnAreaLabels => bool.TryParse(config["DebugSpawnAreaLabels"], out var on) && on;
+
 			public string ServerIpAddress => config["ServerIpAddress"];
 
 			public string WelcomeString => config["WelcomeString"];

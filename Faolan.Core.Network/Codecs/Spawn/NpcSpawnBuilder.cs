@@ -138,7 +138,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// with that count, #243). Returns false only for a row with no lifted type (no StatCore.IirHeader) or a no-morph
 		// spawn whose type recordCount was never derived - neither occurs in the shipped DB (988/988 build). The returned
 		// body already carries the live token, so the caller never post-patches it.
-		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body)
+		// `nameLabel` (dev-only, #363) is appended to the overhead nameplate when set - e.g. " [Ape2]" so a manual pass
+		// can see the NPC's RDB spawn area in-world. The overhead name is a free protobuf string, so this is byte-safe.
+		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body, string nameLabel = null)
 		{
 			body = null;
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
@@ -154,10 +156,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				})
 				.ToList();
 
+			var message = BuildMessageFromColumns(row);
+			if (!string.IsNullOrEmpty(nameLabel))
+				message.Name = $"{message.Name} [{nameLabel}]";
+
 			// Animal or morph-humanoid: minimal record count is 1 (unused when morphs are present).
 			if (!row.HasEquipment || morphs.Count > 0)
 			{
-				body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs);
+				body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
 				return true;
 			}
 
@@ -165,7 +171,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (row.NpcTemplate.StatCore.MinimalPostIirRecordCount is not { } minimalRecordCount)
 				return false;
 
-			body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, BuildMessageFromColumns(row), morphs, minimalRecordCount);
+			body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs, minimalRecordCount);
 			return true;
 		}
 

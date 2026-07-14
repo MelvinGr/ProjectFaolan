@@ -59,6 +59,11 @@ namespace Faolan.GameServer.World
 		// a stance/mode code; 1 is the value the captured player carries on combat entry). 0 sheathes.
 		private const uint PlayerCombatModeValue = 1;
 
+		// Dev visualization (#363): when true, an NPC standing inside an RDB spawn AREA gets that area's group name
+		// appended to its overhead nameplate ("Jungle Ape [Ape2]"), so a manual creature-labeling pass sees which area
+		// it's in. Set from config (IConfiguration.DebugSpawnAreaLabels) at startup; a zone reloads to pick up a change.
+		public static bool DebugAreaLabels;
+
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
@@ -672,6 +677,11 @@ namespace Faolan.GameServer.World
 			var npcs = await _database.GetNpcSpawns(mapId);
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
+			// #363 dev labels: the map's RDB spawn areas, so each NPC's nameplate can show the area it stands in.
+			var spawnAreas = DebugAreaLabels
+				? await _database.GetNpcSpawnAreas(mapId)
+				: [];
+
 			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
 
@@ -760,7 +770,10 @@ namespace Faolan.GameServer.World
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
 				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE
 				// token per-send (SpawnPlayfieldRewriter), since that token isn't known until the player enters.
-				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody))
+				var areaLabel = DebugAreaLabels
+					? AreaLabelFor(spawnAreas, npc.Position)
+					: null;
+				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody, areaLabel))
 					entity.SpawnBody = spawnBody;
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
@@ -779,6 +792,32 @@ namespace Faolan.GameServer.World
 			}
 
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
+		}
+
+		// #363 dev label: the group name of the RDB spawn area a position sits in (nearest by centroid when several
+		// overlap), or null when it's outside every area. Bounds are padded so an NPC just outside its roam box still
+		// labels. X/Z only (Y is ground height). See NpcSpawnArea / SpawnAreaResolver.
+		private static string AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
+		{
+			const float pad = 5f;
+			NpcSpawnArea best = null;
+			var bestDistSq = float.MaxValue;
+			foreach (var a in areas)
+			{
+				if (pos.X < a.BoundsMinX - pad || pos.X > a.BoundsMaxX + pad || pos.Z < a.BoundsMinZ - pad || pos.Z > a.BoundsMaxZ + pad)
+					continue;
+
+				var cx = (a.BoundsMinX + a.BoundsMaxX) * 0.5f;
+				var cz = (a.BoundsMinZ + a.BoundsMaxZ) * 0.5f;
+				var distSq = (pos.X - cx) * (pos.X - cx) + (pos.Z - cz) * (pos.Z - cz);
+				if (distSq < bestDistSq)
+				{
+					bestDistSq = distSq;
+					best = a;
+				}
+			}
+
+			return best?.GroupName;
 		}
 
 		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW

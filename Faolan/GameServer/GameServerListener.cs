@@ -8,6 +8,7 @@ using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
@@ -238,6 +239,7 @@ namespace Faolan.GameServer
 			// into it (Casilda's captive pose) without a construction cycle.
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler);
+			WorldBroadcaster.DebugAreaLabels = configuration.DebugSpawnAreaLabels; // #363 dev nameplate labels (off by default)
 			_questProgression = new QuestProgressionService(database, _broadcaster, _questHandler, agentServerDispatcher, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
 				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)

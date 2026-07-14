@@ -74,6 +74,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
+		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
+		Task<bool> SetNpcSpawnAreaCreature(int areaId, uint templateId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
@@ -930,6 +932,32 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(pn => pn.Waypoints)
 				.Where(n => n.MapId == mapId)
 				.ToArrayAsync();
+		}
+
+		// The RDB-derived open-world spawn AREAS on a map (#363): roam bounds + population + resolved creature. Used by
+		// the dev nameplate-label visualization and the manual `.setnpcgroup` assignment.
+		public async Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawnAreas.Include(a => a.NpcTemplate)
+				.Where(a => a.MapId == mapId)
+				.ToArrayAsync();
+		}
+
+		// Manually assign a spawn area's creature (#363 `.setnpcgroup`): sets NpcTemplateId + marks it Manual (the
+		// highest-confidence provenance, never overwritten by the resolver on a re-import). False if the area is gone.
+		public async Task<bool> SetNpcSpawnAreaCreature(int areaId, uint templateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var area = await ctx.NpcSpawnAreas.FindAsync(areaId);
+			if (area == null)
+				return false;
+
+			area.NpcTemplateId = templateId;
+			area.ResolvedBy = SpawnResolutionSource.Manual;
+			await ctx.SaveChangesAsync();
+			return true;
 		}
 
 		// The spells a caster NPC casts (keyed by its stable name), for the sim's NPC spell-casting (#232).
