@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Constants;
@@ -198,7 +199,7 @@ namespace Faolan.CSPlayerAgent
 			}
 
 			character.GuildId = guild.Id;
-			character.GuildRank = Character.GuildLeaderRank;
+			character.GuildRank = GuildRank.Leader;
 
 			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character} (form 0x{Form:X2}).", guild.Name, guild.Id, character.Name, form);
 			// Retail's immediate create response is 0x2044 DispatchGuildCreated (opens the window with NO relog), not

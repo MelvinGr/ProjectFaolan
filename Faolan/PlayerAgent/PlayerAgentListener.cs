@@ -106,7 +106,7 @@ namespace Faolan.PlayerAgent
 
 					client.Session.Account.ClientInstance = characterId;
 					client.Session.Character = await Database.GetCharacter(characterId);
-					await Database.UpdateLastInfo(client.Session.Character, client.IpAddress);
+					await Database.UpdateLastInfo(client.Session.Character.Id, client.IpAddress);
 					await Database.SaveAccount(client.Session.Account);
 
 					await SendOx20B9(client);

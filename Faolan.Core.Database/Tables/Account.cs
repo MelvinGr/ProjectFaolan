@@ -64,7 +64,7 @@ namespace Faolan.Core.Database.Tables
 
 		/*public Account()
 		{
-		    CreationDate = DateTime.UtcNow;
+		    CreationDate = DateTimeOffset.UtcNow;
 		    AuthChallenge = Guid.NewGuid().ToString("N");
 		}*/
 

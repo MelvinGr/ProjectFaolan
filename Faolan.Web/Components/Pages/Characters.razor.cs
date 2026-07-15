@@ -127,7 +127,7 @@ namespace Faolan.Web.Components.Pages
 					? $"&head={head}"
 					: "") + $"&arm={_eArm}&chest={_eChest}&bosom={_eBosom}&stomach={_eStomach}&arse={_eArse}&thigh={_eThigh}&leg={_eLeg}" + (texJoined.Length > 0
 					? $"&tex={Uri.EscapeDataString(texJoined)}"
-					: "") + $"&t={DateTime.UtcNow.Ticks}";
+					: "") + $"&t={DateTimeOffset.UtcNow.Ticks}";
 			return q;
 		}
 
@@ -231,7 +231,7 @@ namespace Faolan.Web.Components.Pages
 			var hide = _hiddenSlots.Count > 0
 				? "&hide=" + Uri.EscapeDataString(string.Join(',', _hiddenSlots))
 				: "";
-			var url = $"/api/character/{_selected.Id}/model.glb?rig=1{hide}&t={DateTime.UtcNow.Ticks}";
+			var url = $"/api/character/{_selected.Id}/model.glb?rig=1{hide}&t={DateTimeOffset.UtcNow.Ticks}";
 			if (_module != null)
 				await _module.InvokeVoidAsync("show", "char-canvas", url, keepCamera);
 

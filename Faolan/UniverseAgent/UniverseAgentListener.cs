@@ -102,7 +102,7 @@ namespace Faolan.UniverseAgent
 					}
 
 					Logger.LogInformation("UniverseAgent login accepted for user {UserName} ({AccountId})", account.UserName, account.Id.ToHex());
-					await Database.UpdateLastInfo(account, client.IpAddress);
+					await Database.SetAccountLastInfo(account.Id, client.IpAddress);
 
 					await SetRegionState(client);
 					await SendPlayerAgentRealm(client);

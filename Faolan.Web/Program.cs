@@ -112,7 +112,7 @@ namespace Faolan.Web
 						UserName = username,
 						Type = AccountType.Normal,
 						State = AccountState.Active,
-						CreationDate = DateTime.UtcNow,
+						CreationDate = DateTimeOffset.UtcNow,
 						AuthChallenge = "",
 						LastIpAddress = ""
 					};

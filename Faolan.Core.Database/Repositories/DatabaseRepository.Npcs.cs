@@ -1,0 +1,246 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
+using Microsoft.EntityFrameworkCore;
+
+namespace Faolan.Core.Database.Repositories
+{
+	public partial interface IDatabaseRepository
+	{
+		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
+		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
+		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
+		Task<NpcTemplate?> GetNpcByName(string name);
+		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
+		Task<NpcSpawn?> GetNpcSpawnByName(string name);
+		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
+		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
+		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
+		Task<Dictionary<string, uint>> GetQuestGiverMap();
+		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
+		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
+		Task<int> GraduateSpawnArea(uint areaId);
+		Task<int> LinkNpcSpawnsToArea(uint areaId, uint templateId, float selectedX, float selectedZ);
+		Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50);
+		Task<bool> SetNpcSpawnAreaCreature(uint areaId, uint? templateId);
+		Task<int> UnlinkNpcSpawnsFromArea(uint areaId);
+	}
+
+	public partial class DatabaseRepository
+	{
+		public async Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = (name ?? "").ToLowerInvariant();
+			var query = ctx.NpcSpawns.Where(n => n.MapId == mapId && n.NpcTemplate != null && n.NpcTemplate.Name != null && n.NpcTemplate.Name.ToLower() == lowered);
+			if (x is { } px && y is { } py && z is { } pz)
+			{
+				query = query.Where(n =>
+					n.PositionX >= px - radius && n.PositionX <= px + radius && n.PositionY >= py - radius && n.PositionY <= py + radius && n.PositionZ >= pz - radius && n.PositionZ <= pz + radius);
+			}
+
+			return await query.ExecuteDeleteAsync();
+		}
+
+		public async Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ConversationNodes.Include(n => n.Packets)
+				.ThenInclude(p => p.Screens)
+				.ThenInclude(s => s.Parameters)
+				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId));
+		}
+
+		public async Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var nodes = await ctx
+				.ConversationNodes.Include(n => n.Packets)
+				.ThenInclude(p => p.Screens)
+				.ThenInclude(s => s.Parameters)
+				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId))
+				.ToListAsync();
+
+			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToList();
+		}
+
+		public async Task<NpcTemplate?> GetNpcByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = name.ToLowerInvariant();
+			return await ctx
+				.NpcTemplates.Include(t => t.Spells)
+				.Include(t => t.StatCore)
+				.Include(t => t.Equipment)
+				.ThenInclude(e => e.Item)
+				.Include(t => t.Morphs)
+				.Where(t => t.Name.ToLower() == lowered && t.StatCore != null)
+				.FirstOrDefaultAsync();
+		}
+
+		public async Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcSpawnAreas.Include(a => a.NpcTemplate).Where(a => a.MapId == mapId).ToArrayAsync();
+		}
+
+		public async Task<NpcSpawn?> GetNpcSpawnByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			var lowered = name.ToLowerInvariant();
+			return await ctx
+				.NpcSpawns.Include(n => n.NpcTemplate)
+				.ThenInclude(t => t.Spells)
+				.Include(n => n.NpcTemplate)
+				.ThenInclude(t => t.StatCore)
+				.Include(n => n.Morphs)
+				.Include(n => n.Equipment)
+				.ThenInclude(e => e.Item)
+				.Where(n => n.NpcTemplate.Name.ToLower() == lowered && n.NpcTemplate.StatCore != null)
+				.FirstOrDefaultAsync();
+		}
+
+		public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawns.Include(n => n.Morphs)
+				.Include(n => n.Equipment)
+				.ThenInclude(e => e.Item)
+				.Include(n => n.NpcTemplate)
+				.ThenInclude(t => t.Spells)
+				.Include(n => n.NpcTemplate)
+				.ThenInclude(t => t.Chatter)
+				.Include(n => n.NpcTemplate)
+				.ThenInclude(t => t.StatCore)
+				.Include(n => n.PatrolPath)
+				.ThenInclude(p => p!.Nodes)
+				.ThenInclude(pn => pn.Waypoints)
+				.Where(n => n.MapId == mapId)
+				.ToArrayAsync();
+		}
+
+		public async Task<List<NpcSpell>> GetNpcSpellsByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = name.ToLowerInvariant();
+			return await ctx.NpcSpells.Where(s => s.NpcTemplate.Name.ToLower() == lowered).ToListAsync();
+		}
+
+		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId > 0 && n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
+
+			var killTargets = await ctx
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.TargetName != null && g.TargetName != "")
+				.Join(ctx.QuestDefinitions, g => g.QuestDefinitionId, d => d.QuestId, (g, d) => new
+				{
+					g.TargetName,
+					d.QuestId
+				})
+				.Distinct()
+				.ToListAsync();
+
+			return killTargets.Where(x => !givers.Contains(x.TargetName)).GroupBy(x => x.TargetName!).ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
+		}
+
+		public async Task<Dictionary<string, uint>> GetQuestGiverMap()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var grants = await ctx
+				.ConversationNodes.Where(n => n.GrantQuestId > 0 && n.NpcName != null)
+				.Select(n => new
+				{
+					n.NpcName,
+					n.GrantQuestId
+				})
+				.Distinct()
+				.ToListAsync();
+			return grants.GroupBy(g => g.NpcName!).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
+		}
+
+		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawnAreas.Include(a => a.NpcTemplate)
+				.ThenInclude(t => t!.StatCore)
+				.Include(a => a.NpcTemplate)
+				.ThenInclude(t => t!.Spells)
+				.Include(a => a.Points)
+				.Where(a => a.MapId == mapId && a.NpcTemplateId != null)
+				.ToArrayAsync();
+		}
+
+		public async Task<Shop?> GetShopByTemplate(uint npcTemplateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.NpcTemplateId == npcTemplateId);
+		}
+
+		public async Task<int> GraduateSpawnArea(uint areaId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcSpawns.Where(s => s.NpcSpawnAreaId == areaId).ExecuteDeleteAsync();
+		}
+
+		public async Task<int> LinkNpcSpawnsToArea(uint areaId, uint templateId, float selectedX, float selectedZ)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var area = await ctx.NpcSpawnAreas.FindAsync(areaId);
+			if (area == null)
+				return 0;
+
+			const float pad = 5f;
+			const float sel = 2f;
+			var toLink = await ctx
+				.NpcSpawns.Where(s =>
+					s.MapId == area.MapId && s.NpcTemplateId == templateId &&
+					((s.PositionX >= area.BoundsMinX - pad && s.PositionX <= area.BoundsMaxX + pad && s.PositionZ >= area.BoundsMinZ - pad && s.PositionZ <= area.BoundsMaxZ + pad) ||
+					 (s.PositionX >= selectedX - sel && s.PositionX <= selectedX + sel && s.PositionZ >= selectedZ - sel && s.PositionZ <= selectedZ + sel)))
+				.ToListAsync();
+
+			foreach (var s in toLink)
+				s.NpcSpawnAreaId = areaId;
+			await ctx.SaveChangesAsync();
+			return toLink.Count;
+		}
+
+		public async Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = nameSubstring.ToLowerInvariant();
+			return await ctx
+				.NpcSpawns.Include(n => n.NpcTemplate)
+				.ThenInclude(t => t.StatCore)
+				.Where(n => n.NpcTemplate.Name.ToLower().Contains(lowered))
+				.OrderBy(n => n.NpcTemplate.Name)
+				.ThenBy(n => n.MapId)
+				.Take(limit)
+				.ToArrayAsync();
+		}
+
+		public async Task<bool> SetNpcSpawnAreaCreature(uint areaId, uint? templateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawnAreas.Where(a => a.Id == areaId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(sp => sp.NpcTemplateId, templateId)
+					.SetProperty(sp => sp.ResolvedBy, templateId.HasValue
+						? SpawnResolutionSource.Manual
+						: SpawnResolutionSource.None)) == 1;
+		}
+
+		public async Task<int> UnlinkNpcSpawnsFromArea(uint areaId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcSpawns.Where(s => s.NpcSpawnAreaId == areaId).ExecuteUpdateAsync(s => s.SetProperty(sp => sp.NpcSpawnAreaId, (uint?)null));
+		}
+	}
+}

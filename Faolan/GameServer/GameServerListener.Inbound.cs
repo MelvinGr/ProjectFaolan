@@ -686,7 +686,7 @@ namespace Faolan.GameServer
 								// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
 								// the greeting is swallowed and dialogue never opens.
 								if (npcHandle != 0 && args.Field3 == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
-								    await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
+									await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
 								{
 									await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
 									break;
@@ -698,9 +698,9 @@ namespace Faolan.GameServer
 								// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
 								// click it, so their own position trivially satisfies the 15-unit client proximity check.
 								if (npcHandle != 0 && args.Field3 == 0 &&
-								    client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
-								    talkedNpcName == AuctioneerNpcName &&
-								    PlayerWorldEntity(client) is { } auctioneerPlayer)
+									client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
+									talkedNpcName == AuctioneerNpcName &&
+									PlayerWorldEntity(client) is { } auctioneerPlayer)
 								{
 									await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 									break;
@@ -1137,7 +1137,7 @@ namespace Faolan.GameServer
 					{
 						// Force the Tortage intro spawn onto the character (covers resumed characters that
 						// never went through CreateCharacter), so the live SpawnPlayer uses the right position.
-						var spawnRows = await Database.SetCreationSpawn(client.Session.Character);
+						var spawnRows = await Database.SetCreationSpawn(client.Session.Character.Id);
 						Logger.LogInformation(
 							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
 							clientInstance, client.Session.Character.Id, client.Session.Character.Name, spawnRows, client.Session.Character.PositionX, client.Session.Character.PositionY,
@@ -1709,9 +1709,9 @@ namespace Faolan.GameServer
 
 			var slot = packet.Body.ReadUInt32();
 			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-			// Polarity CONFIRMED in-client (Melvin): checkbox ON (the slot's vanity toggle enabled / its vanity item is
-			// shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
-			// (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
+									  // Polarity CONFIRMED in-client (Melvin): checkbox ON (the slot's vanity toggle enabled / its vanity item is
+									  // shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
+									  // (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
 			var toggleState = Convert.ToBoolean(packet.Body.ReadByte());
 
 			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);

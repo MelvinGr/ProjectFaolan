@@ -12,11 +12,6 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(RealmId), nameof(Name), IsUnique = true)]
 	public class Character : Base3DEntity
 	{
-		// The guild-creator's rank on the wire. 4 = leader, proven by the create-guild capture (the member record
-		// in DispatchGuildCreated / GuildFullUpdate); the earlier 6 was a blind guess. No rank-comparison logic
-		// depends on the exact value, so this only affects the wire member record (now retail-accurate). See #306.
-		public const byte GuildLeaderRank = 4;
-
 		public uint AccountId { get; set; }
 
 		[ForeignKey(nameof(AccountId))]
@@ -38,6 +33,9 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey(nameof(GuildId))]
 		public virtual Guild? Guild { get; set; }
+
+		[ConstrainToEnumValues]
+		public GuildRank? GuildRank { get; set; }
 
 		// Required: a character always lives on a map; Tortage Beach is the universal fallback world.
 		public uint MapId { get; set; } = Map.TortageBeachId;
@@ -98,7 +96,7 @@ namespace Faolan.Core.Database.Tables
 		// to show the release/resurrect window (Captures/scripts/decode_death_snapshot.py). Set on death
 		// (WorldSimulation.TickPlayerDeaths), cleared on respawn (RespawnPlayer).
 		public bool IsDead { get; set; }
-		public byte GuildRank { get; set; }
+
 
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }

@@ -82,12 +82,12 @@ namespace Faolan.Mcp
 					}
 				},
 				ServerInstructions = "In-game Age of Conan chat from the Faolan server's \"Claude\" channel arrives as " +
-				                     "<channel source=\"faolan-chat\" sender=\"...\" sender_id=\"...\" mode=\"whisper|channel\">. These are " +
-				                     "players talking to you in-game. Reply with the faolan-chat reply tool (plain text, chat-length) in the " +
-				                     "SAME mode you were addressed in: when mode=\"whisper\" the player told you privately, so pass the event's " +
-				                     "sender_id as whisper_to to whisper back; when mode=\"channel\" they posted on the public channel, so OMIT " +
-				                     "whisper_to to broadcast your reply on the channel. The same log is also readable via the faolan MCP " +
-				                     "server's read_claude_channel tool (its ViaWhisper field is the same mode flag)."
+									 "<channel source=\"faolan-chat\" sender=\"...\" sender_id=\"...\" mode=\"whisper|channel\">. These are " +
+									 "players talking to you in-game. Reply with the faolan-chat reply tool (plain text, chat-length) in the " +
+									 "SAME mode you were addressed in: when mode=\"whisper\" the player told you privately, so pass the event's " +
+									 "sender_id as whisper_to to whisper back; when mode=\"channel\" they posted on the public channel, so OMIT " +
+									 "whisper_to to broadcast your reply on the channel. The same log is also readable via the faolan MCP " +
+									 "server's read_claude_channel tool (its ViaWhisper field is the same mode flag)."
 			};
 			options.ToolCollection ??= [];
 			options.ToolCollection.Add(McpServerTool.Create(Reply, new McpServerToolCreateOptions

@@ -201,7 +201,7 @@ namespace Faolan.Importer.Captures
 				AccountId = accountId,
 				Name = name,
 				AuthChallenge = Guid.NewGuid().ToString("N"),
-				CreationDate = DateTime.UtcNow,
+				CreationDate = DateTimeOffset.UtcNow,
 				Level = (ushort)Math.Max(1, stats.Level),
 				Race = (Race)stats.Race,
 				Class = (Class)classId,
