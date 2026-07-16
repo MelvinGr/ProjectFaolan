@@ -435,6 +435,14 @@ namespace Faolan.GameServer
 			return SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
 		}
 
+		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
+		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
+		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
+		private Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
+		{
+			return SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
+		}
+
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
 		private static async Task SendRemoveItem(INetworkClient client, ContainerKind containerType, uint itemPos, uint amountToRemove = 0)
 		{

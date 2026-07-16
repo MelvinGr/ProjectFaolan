@@ -56,8 +56,16 @@ namespace Faolan.GameServer.World
 		// is replaced on the next pass, so ~15s matches the DefaultRespawnDelaySeconds mobs use.
 		private const double AmbientMaintainIntervalSeconds = 15.0;
 
-		// How close a player must get to discover a resurrection point.
-		private const float RespawnDiscoveryRange = 15f;
+		// How close a player must get to discover a resurrection point. The captures can only put a FLOOR under this:
+		// at the two discovery moments they carry, the player was 13.7 and 11.6 units out, but that is where the
+		// player had already GOT to when the server noticed - it bounds the real radius from below, not above. So
+		// there is nothing to match byte-for-byte here and this is a feel call: 30 reads right in-client, where 15
+		// meant walking almost on top of a point. Contrast RestorationLevel, which the wire pins exactly.
+		//
+		// This is NOT a per-point property: the RDB's resurrectionpoint element carries no radius (its full attribute
+		// set is Guid/name/discoverable/Orientation/RestorationLevel/shady/FollowsHeightmap/HeightmapOffset/IsLocked/
+		// IsVisible/BoundingBoxColor/ShowBoundingBox + Export* metadata - see RdbRespawnImporter).
+		private const float RespawnDiscoveryRange = 30f;
 
 		// #348: how far OUTSIDE a captured area hull still counts as inside. The hull is built from the positions
 		// retail was seen firing the banner at, so it can only cover ground a captured player walked - it is always
@@ -448,29 +456,32 @@ namespace Faolan.GameServer.World
 					await _database.DiscoverRespawnPoint(character.Id, point.Id);
 					discovered.Add(point.Id);
 					newlyFound = true;
-					_logger.LogInformation("World: {Player} discovered resurrection point {Point} ('{Name}').", character.Name, point.Id, point.Name);
+
+					// The banner the player actually SEES. Only the point id crosses the wire - the client resolves
+					// the name from LDB category 270 - so nothing renders the RDB dev label ("ResurrectionAIPoint2")
+					// this used to print through a SendSystemMessage chat line that was never capture-derived.
+					//
+					// No name key: retail carries a per-point one, and we have it for only the 2 points any capture
+					// discovers, with no way to derive the other 536. It turns out not to matter - a keyless banner
+					// renders correctly in-client (verified on Conall's Valley 3711341, a point no capture covers),
+					// which fits the LDB strings being plaintext and the area-name banner's nested <localized>
+					// carrying no key either. The codec still takes one so the goldens can reproduce retail exactly.
+					await _output.SendRespawnPointDiscoveredBanner(client, point.Id, null);
+					_logger.LogInformation("World: {Player} discovered resurrection point {Point} ('{Name}').",
+						character.Name, point.Id, point.Name);
 				}
 
 				if (!newlyFound)
 					continue;
 
-				// #372: retail ANNOUNCES a discovery by re-sending the resurrection-spots list with the new point in
-				// it - the client diffs it against what it had and draws its own "discovered" toast. There is no
-				// server-sent toast to reproduce: no capture carries a discovery token (13 distinct FormatFeedback
-				// tokens across 104 captures, none of them this), because the text is CLIENT-side, exactly like the
-				// "Congratulations, you reached level N" banner that NewLevelIIR gates.
+				// Retail sends the spots list again in the SAME frame as the banner, with the new point now in it, so
+				// the client's release screen has it the next time the player dies (#372).
 				//
 				// Proven by Hoxxling_mage-heraldofxotli_login_gameplay: frame 138 carries ONE spot (0x0bf76c =
 				// 784236, the AlwaysKnown one); frame 7862 carries TWO (784237 then 784236) at the moment the player
 				// walked near the discoverable second - ALIVE and mid-walk, so this does not open the release screen
 				// (the client only shows that on the dead bcc_state). Both spots' positions match our imported
 				// RespawnPoints byte-for-byte.
-				//
-				// This replaces a `SendSystemMessage($"Resurrection point discovered: {point.Name}")` chat line that
-				// was never capture-derived - and which printed the RDB's designer label ("ResurrectionAIPoint2")
-				// because a resurrection point has no display name in the client (its real name lives in the LDB,
-				// page 211698 / category 270: "Water's Edge", "Secluded Cove", ...). Letting the client name it side-
-				// steps that entirely.
 				var known = points.Where(p => p.AlwaysKnown || discovered.Contains(p.Id)).ToList();
 				await _output.SendResurrectionSpots(client, entity.Position, known);
 			}
@@ -655,9 +666,13 @@ namespace Faolan.GameServer.World
 		}
 
 		// The server game loop (docs/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
-		// every tick with the REAL elapsed dt (NPC respawn/AI, player death timers) and runs rate-based systems (vitals
-		// regen) via a TickAccumulator at their own interval, dt-scaled. Wall-clock dt is measured so a late tick
-		// doesn't desync the rates. Cancelled on shutdown.
+		// every tick with the REAL elapsed dt (NPC respawn/AI, player death timers, boundary-crossing tests) and runs
+		// rate-based systems (vitals regen, ambient pools) via a TickAccumulator at their own interval, dt-scaled.
+		// Wall-clock dt is measured so a late tick doesn't desync the rates. Cancelled on shutdown.
+		//
+		// Hang a system where its CADENCE belongs, not on whatever block already exists: a crossing test has to sample
+		// fast to catch a boundary, a rate-based one must not. Bolting the two together silently handed discovery and
+		// the area banners the regen interval as their sampling rate, which is a bug wearing a tick's clothes.
 		private async Task RunTickLoop(CancellationToken cancellationToken)
 		{
 			using var timer = new PeriodicTimer(TimeSpan.FromSeconds(BaseTickSeconds));
@@ -798,13 +813,19 @@ namespace Faolan.GameServer.World
 					await TickBuffExpiry();
 					await TickDots();
 
+					// Boundary CROSSING tests: every base tick (10 Hz). Both used to hang off the regen accumulator
+					// below, which has nothing to do with either and sampled them at 1 Hz - a walking player covers
+					// several units between samples, so both fired late, well inside the boundary. In-client that read
+					// as having to stand on top of a resurrection point before it registered; the radius was never the
+					// problem. Cheap enough to run hot: the points/areas and the per-player discovered set are all
+					// cached, so a tick is a handful of distance checks per player, and only an actual discovery
+					// touches the DB.
+					await DiscoverNearbyRespawnPoints();
+					await TickAreaBanners();
+
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 					if (regen.Advance(dt, out var regenElapsed))
-					{
 						await RegenerateConnectedPlayers(regenElapsed);
-						await DiscoverNearbyRespawnPoints();
-						await TickAreaBanners();
-					}
 
 					// #363: keep the ambient spawn-group pools at strength (respawn killed members). No-op when disabled.
 					if (ambientMaintain.Advance(dt, out _))

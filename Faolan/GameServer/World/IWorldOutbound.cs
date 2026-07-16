@@ -106,6 +106,11 @@ namespace Faolan.GameServer.World
 		// arriving while the player was ALIVE and mid-walk - so this alone never opens the release screen.
 		Task SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots);
 
+		// The "resurrection point discovered" FIFO banner (#372) - retail's toast, sent in the same frame as the
+		// spots re-send. `nameKey` is the per-point key of the point's category-270 name string; see
+		// FormatFeedbackCodec.BuildRespawnPointDiscoveredXml.
+		Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey);
+
 		// The revive action (BccIIR 0x642CD3D6) retail sends on RespawnMe to transition the player out of the Dead
 		// substate (bcc_state 29→1) - closes the release window + revives IN PLACE, NOT a world re-entry (#214).
 		// #348: the sub-area name banner, fired by the tick when a player crosses into a MapArea.

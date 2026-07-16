@@ -24,6 +24,11 @@ namespace Faolan.GameServer
 			return SendValidResurrectionSpots(client, referencePosition, spots);
 		}
 
+		Task IWorldOutbound.SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
+		{
+			return SendRespawnPointDiscoveredBanner(client, pointId, nameKey);
+		}
+
 		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
 		{
 			return _broadcaster.BroadcastEntityFade(entity);

@@ -122,13 +122,44 @@ frames where ordering by id holds in only 16/23
 [V3: DispatchValidResurrectionSpotsTests.ValidResurrectionSpotsBody_TwoSpots_MatchCapture_OrderedNearestFirstWhateverTheInputOrder]. `spotType` (0xC7A0 login / 0xC79E create-flow / 0xC79C once)
 stays undecoded and is **not** a property of the point — point 790836 appears under both 0xC79C and 0xC7A0.
 
-**Discovery is a re-send, not a toast (#372).** Walking near an undiscovered point makes the server re-send this
-same packet with the new spot in it; the client diffs it against what it held and draws its own "discovered"
-banner, exactly like `NewLevelIIR`'s level banner. There is no server-sent toast to reproduce and no name on the
-wire — the client names the point itself. Sent with the **live** position to a **living** player, and it does not
-open the release screen (that is `SimpleCharKilledByUpdateIIR`'s job) [V2:
-`Captures/Hoxxling_mage-heraldofxotli_login_gameplay.tshark.json`]. `WorldSimulation.DiscoverNearbyRespawnPoints`
-sends it via `IWorldOutbound.SendResurrectionSpots`.
+**Discovery = a banner + a re-send (#372), verified in-client.** Walking near an undiscovered point sends TWO
+things in the same frame [V2: Hoxxling_mage-heraldofxotli_login_gameplay.tshark.json frame 7862]:
+
+1. a **`FormatFeedbackIIR` FIFO banner** — the toast the player sees (`FormatFeedbackCodec.BuildRespawnPointDiscoveredXml`,
+   `typeFlags` = FIFO banner, footer 1, same framing as the area-name banner);
+2. the **spots re-send** above, with the new point now in the list, so the release screen has it next death.
+
+The banner is sent with the **live** position to a **living** player and does not open the release screen (that is
+`SimpleCharKilledByUpdateIIR`'s job). `WorldSimulation.DiscoverNearbyRespawnPoints` drives both.
+
+The banner XML identifies its string by **`id=`**, not the `token=` every other feedback message uses:
+
+```xml
+<remoteformat id="218327236" category="100" key="KsATGOK`H%9l@@z[1mo," knubot="0">
+  <parameter value="7;&lt;localized id=&quot;784237&quot; category=&quot;270&quot; ... &gt;" />
+</remoteformat>
+```
+
+⚠️ **A scan for `remoteformat token="…"` cannot find this message, and its absence is not evidence it doesn't
+exist.** #372 was stuck for exactly that reason: a token scan came back empty, the empty result was read as "retail
+sends no toast", and a whole theory (the client toasts itself off the re-send, like `NewLevelIIR`) got built to
+explain an artifact of the search. The server bytes were byte-perfect against the capture and the client still
+showed nothing. When enumerating feedback, match `<remoteformat ` and read whichever of `id=`/`token=` is present —
+across the captures 175 frames use `token=` and 8 use `id=` (message ids 218327236, 64771509, 23).
+
+**No name crosses the wire**: the parameter is a nested `<localized>` naming the point by its own id under LDB
+category 270 ("Water's Edge", "Secluded Cove", …), and the client resolves it — a point's name-string id IS its
+point id. The nested `key` is the per-point key of that string. It is **optional**: a keyless banner renders
+correctly in-client (verified on Conall's Valley 3711341, a point no capture covers), which matters because
+captures only ever discover 784237/784238 — there is no key for the other 536 and no way to derive one. Feedback
+keys are per-string CONSTANTS, never per-send nonces: all 16 message ids/tokens across the captures carry exactly
+one key each [V3: FormatFeedbackCodecTests.BuildRespawnPointDiscoveredXml_MatchesCapture].
+
+Discovery radius is **not** capture-derivable: the two captured discoveries fire at 13.7 and 11.6 units, but that
+is where the player had already got to when the server noticed — a floor, not the value. There is no radius in the
+RDB either, so `RespawnDiscoveryRange` is a feel call (30). Both crossing tests (discovery + area banners) sample
+on the **base tick**; they previously rode the 1 Hz regen accumulator, which made them fire late and read in-client
+as a too-small radius.
 
 ## Melee cleave (#18)
 

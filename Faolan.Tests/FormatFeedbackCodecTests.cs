@@ -12,6 +12,13 @@ namespace Faolan.Tests
 	public class FormatFeedbackCodecTests
 	{
 		// showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName - the top-of-screen zone-name banner.
+		// Hoxxling_mage-heraldofxotli_login_gameplay f=7862 - discovery of point 784237, in the same frame as the
+		// 2-spot DispatchValidResurrectionSpots re-send (DispatchValidResurrectionSpotsTests pins that side).
+		private const string DiscoveredPoint784237Body = "0000012c8d5a8b6b0000c35001316e7101000000000000000000000000010d3c72656d6f7465666f726d61742069643d22323138333237323336222063617465676f72793d2231303022206b65793d224b734154474f4b604825396c40407a5b316d6f2c22206b6e75626f743d22302220203e3c706172616d657465722076616c75653d22373b266c743b6c6f63616c697a65642069643d2671756f743b3738343233372671756f743b2063617465676f72793d2671756f743b3237302671756f743b20666c6167733d2671756f743b2671756f743b206b65793d2671756f743b5674215d3026616d703b616d703b5323336354337626616d703b71756f743b2926616d703b2333393b484a65552671756f743b202667743b22202f3e3c2f72656d6f7465666f726d61743e00000001";
+
+		// ..._guild_invite_accepted-random-gameplay-other_playersvisible f=1109 - the same message for point 784238.
+		private const string DiscoveredPoint784238Body = "0000012c8d5a8b6b0000c35001316e7101000000000000000000000000010d3c72656d6f7465666f726d61742069643d22323138333237323336222063617465676f72793d2231303022206b65793d224b734154474f4b604825396c40407a5b316d6f2c22206b6e75626f743d22302220203e3c706172616d657465722076616c75653d22373b266c743b6c6f63616c697a65642069643d2671756f743b3738343233382671756f743b2063617465676f72793d2671756f743b3237302671756f743b20666c6167733d2671756f743b2671756f743b206b65793d2671756f743b533526616d703b71756f743b2926616d703b2333393b563f68566c4626616d703b2333393b5f6f52345d4c752e2671756f743b202667743b22202f3e3c2f72656d6f7465666f726d61743e00000001";
+
 		private const string AreaNameBody = "000001508d5a8b6b0000c3500802e5d40100000000000000000000000001313c72656d6f7465666f726d617420746f6b656e3d" +
 		                                    "2273686f776669666f6d65737361676566726f6d7365727665722838297c6d61696e2831297c47656e65726963446973706c61" +
 		                                    "79417265614e616d65222063617465676f72793d22353030313822206b65793d22706341644957596853586654464465354931" +
@@ -76,6 +83,25 @@ namespace Faolan.Tests
 
 			Assert.Equal(LostGraceBody, Convert.ToHexStringLower(rebuilt));
 			Assert.Equal(FormatFeedbackCodec.EffectLineTypeFlags, p.TypeFlags);
+		}
+
+		// #372: the "resurrection point discovered" banner - the toast that actually fires when a player walks near an
+		// undiscovered point, sent in the SAME frame as the spots re-send that adds it to their list. Two captured
+		// occurrences, different points: the OUTER key is identical in both (fixed per message id) while the inner
+		// per-point name key differs, which is what identifies the latter as a property of the point's category-270
+		// string rather than of the message. Rebuilt whole from the captured instance/typeFlags/footer.
+		[Theory]
+		[InlineData(784237u, "Vt!]0&amp;amp;S#3cT3v&amp;quot;)&amp;#39;HJeU", DiscoveredPoint784237Body)]
+		[InlineData(784238u, "S5&amp;quot;)&amp;#39;V?hVlF&amp;#39;_oR4]Lu.", DiscoveredPoint784238Body)]
+		public void BuildRespawnPointDiscoveredXml_MatchesCapture(uint pointId, string nameKey, string capturedBody)
+		{
+			var p = FormatFeedbackCodec.Parse(Convert.FromHexString(capturedBody));
+
+			var xml = FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey);
+			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, xml);
+
+			Assert.Equal(capturedBody, Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(FormatFeedbackCodec.FifoBannerTypeFlags, p.TypeFlags); // a FIFO banner, like the area name
 		}
 
 		[Fact]
