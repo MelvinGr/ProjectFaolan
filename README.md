@@ -228,6 +228,13 @@ we've seen_, and names the gaps). Regenerate with
 dotnet build ProjectFaolan.slnx
 ```
 
+If you intend to commit changes to `faolan.db`, enable the repo's hooks **once per clone** (git does not share
+them, and without this the `faolan.sql` mirror below silently goes stale):
+
+```sh
+git config core.hooksPath .githooks
+```
+
 ## Run the server
 
 The server loads `faolan.json` and `faolan.db` from the current working directory, and both live at the repo
@@ -240,6 +247,18 @@ dotnet run --project Faolan
 It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the PlayerAgent,
 CsPlayerAgent, ChatServer and GameServer listeners the client is handed off to in turn), migrates the
 database schema, and hosts an in-process MCP endpoint on `http://127.0.0.1:7099/mcp`.
+
+### `faolan.db` and `faolan.sql`
+
+The game data lives in **`faolan.db`** (SQLite, built by the importer, committed). Alongside it, **`faolan.sql`**
+is a plain-text `.dump` of the same database, regenerated automatically by the `.githooks/pre-commit` hook
+whenever `faolan.db` is committed — so a data change is **reviewable in a diff** instead of showing up as
+`Bin 8839168 -> 8839168 bytes`. It is generated: never hand-edit it, and don't bother regenerating it yourself
+(the hook dumps the *staged* blob, so it always matches the commit).
+
+Both are deliberately interim. The end state (#379) is a real database with the schema + seed data kept as SQL in
+the repo and the binary dropped — running the two in parallel now means that migration is a deletion rather than
+a port.
 
 For a **multi-realm** deployment (#324), split the process by role — one login/router tier and one game host
 per realm (each bound to its `Realm` row's `IpAddress`/ports), all against the shared DB:

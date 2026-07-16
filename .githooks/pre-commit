@@ -1,0 +1,34 @@
+#!/bin/sh
+# Keeps faolan.sql in step with faolan.db (#379). The binary db is the interim store; the .sql dump is the
+# reviewable mirror of it - and the thing that eventually REPLACES it, when the schema+seed move to a real
+# database and the binary is dropped. Running both in parallel means the migration is a deletion, not a port.
+#
+# Regenerates ONLY when faolan.db is actually being committed, so a normal code commit costs nothing and the
+# server's session writes (character positions, timestamps) never churn the dump on their own.
+#
+# Dumps the STAGED BLOB, not the working file, for two reasons: the working copy may hold newer session writes
+# than you are committing, and under WAL it can LAG its -wal sidecar - so dumping the file could silently mirror
+# something that is not what lands in the commit. `git show :faolan.db` is exactly what is being committed.
+set -e
+
+git diff --cached --name-only | grep -qx 'faolan.db' || exit 0
+
+if ! command -v sqlite3 >/dev/null 2>&1; then
+	echo "pre-commit: sqlite3 not found - faolan.sql would go stale against faolan.db. Install sqlite3, or" >&2
+	echo "            commit with --no-verify if you know the dump is already current." >&2
+	exit 1
+fi
+
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+git show :faolan.db > "$tmp"
+
+# Drop `CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq)`: SQLite REJECTS it on restore ("object name reserved
+# for internal use") because it owns that table - it materialises automatically with the first AUTOINCREMENT table.
+# Everything else about it survives (the DELETE/INSERTs that follow restore all 33 counters identically), so this
+# line does nothing but make a restore spit a parse error. Verified: with it gone the dump restores silently to a
+# byte-identical schema and row counts.
+sqlite3 "$tmp" .dump | sed '/^CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);$/d' > faolan.sql
+
+git add faolan.sql
+echo "pre-commit: regenerated faolan.sql from the staged faolan.db ($(wc -l < faolan.sql) lines)"
