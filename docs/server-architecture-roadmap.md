@@ -34,7 +34,11 @@ Written 2026-06-11. Grounds: the GameServer/ChatServer code as it stands; see al
 >   timer. No game loop needed for it.
 > - **Game loop** ✓ a **10 Hz base tick** (`WorldSimulation.RunTickLoop`, `BaseTickSeconds = 0.1`) measuring real wall-clock dt. Continuous systems run every
 >   tick with that dt (`WorldState.Tick`); rate-based systems run via a per-behaviour `TickAccumulator` at their own
->   interval, dt-scaled (vitals regen at 1 Hz, pushes only on change). A long stall fires a behaviour once with the
+>   interval, dt-scaled (vitals regen at 1 Hz, pushes only on change). Boundary-CROSSING tests (resurrection-point
+>   discovery, area banners) run every base tick, NOT on an accumulator — they rode the 1 Hz regen one until #372,
+>   which sampled them so coarsely that a walking player was well past a boundary before the server noticed (it read
+>   in-client as a too-small radius). Put a system where its cadence belongs, not on whatever block already exists.
+>   A long stall fires a behaviour once with the
 >   whole elapsed (no catch-up storm).
 > - **NPC AI — aggro + fight-back + hostility + leash** ✓ on the tick a **hostile** NPC (a mob — i.e. one with no
 >   conversation; quest-givers/vendors are friendly and never aggro) aggros the nearest player within `NpcAggroRange`
@@ -50,13 +54,15 @@ Written 2026-06-11. Grounds: the GameServer/ChatServer code as it stands; see al
 > - **Player death → respawn at the closest known resurrection point** ✓ when a player's vitals hit 0 (HP=0 push =
 >   the client's death state) the death/release screen is sent once (`TickPlayerDeaths`) and the player then waits;
 >   corpses don't regen and NPCs stop hitting them. Respawn is **click-driven** — the client's `RespawnMe`
->   (c2s `0x2024`) release click runs `TryRespawnNow` → `RespawnPlayer`, which revives to full
->   (`EntityVitals.ReviveToFull`) and relocates to the **closest resurrection point they KNOW** (`RespawnResolver`).
+>   (c2s `0x2024`) release click runs `TryRespawnNow` → `RespawnPlayer`, which revives at the POINT's own
+>   `RestorationLevel` (`EntityVitals.ReviveTo` — 10/50/100%, not always full, #375) and relocates to the **closest
+>   resurrection point they KNOW** (`RespawnResolver`).
 >   (The old 10s auto-revive timer was removed in #214 — it yanked the player back before the release screen could be used.)
 >   `RespawnPoint`/`CharacterRespawnPoint` tables (folded into the re-baselined `InitialCreate` migration): each point is always-known (the
 >   seeded Tortage-Beach starter) or must be **discovered** by walking near it (`DiscoverNearbyRespawnPoints`, persisted
->   + a system message); respawn falls back to the map spawn if none known. Combat loop closed both ways. A dedicated
->   death/rebirth-UI packet (if any) is undecoded; the HP=0 push is the death signal.
+>   + retail's own discovery banner + a spots re-send, #372); respawn falls back to the map spawn if none known.
+>   Combat loop closed both ways. The s2c `0x2024` body — the release screen's spot list — is fully decoded
+>   (`ResurrectionSpotsBody`, docs/subsystems/combat.md), nearest-first from the reference position.
 > - **NPC death → respawn** ✓ NPC vitals live on `WorldEntity` (seeded level-scaled at zone load, world-authoritative).
 >   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
 >   despawned for nearby players (`BroadcastEntityDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and

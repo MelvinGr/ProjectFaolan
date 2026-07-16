@@ -99,11 +99,12 @@ namespace Faolan.GameServer.World
 		// and not for the release screen:
 		//   - ON DEATH, with the death position - the client draws the release screen and replies RespawnMe(spotId)
 		//     (handled inbound). It is SimpleCharKilledByUpdateIIR that puts the client in the dead state, not this.
-		//   - ON DISCOVERY, with the LIVE position - re-sending the list with a newly-found spot in it is the whole
-		//     discovery notification (#372): the client diffs it against what it held and toasts itself. There is no
-		//     server-sent toast; the text is client-side, like NewLevelIIR's level banner.
+		//   - ON DISCOVERY, with the LIVE position - re-sent with the newly-found spot in it so the release screen has
+		//     it next death (#372). This is NOT the notification: retail pairs it with a FormatFeedbackIIR banner in
+		//     the same frame (SendRespawnPointDiscoveredBanner) and that is what the player sees. Sending this alone
+		//     puts byte-perfect bytes on the wire and shows the player nothing - measured, not assumed.
 		// Proven in Hoxxling_mage-heraldofxotli_login_gameplay: frame 138 = one spot, frame 7862 = two, the second
-		// arriving while the player was ALIVE and mid-walk - so this alone never opens the release screen.
+		// arriving while the player was ALIVE and mid-walk - so this alone never opens the release screen either.
 		Task SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots);
 
 		// The "resurrection point discovered" FIFO banner (#372) - retail's toast, sent in the same frame as the

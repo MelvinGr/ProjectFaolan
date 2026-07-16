@@ -59,7 +59,8 @@ client-side proximity check, so the access position must be within 15 units of t
 
 ```
 [strlen:u16][lang ascii e.g. "en"]
-[cat:u32 = 2018 (0x7E2)]      # category root, constant in these captures
+[cat:u32 = 2018 (0x7E2)]      # 0x7E2 again; in the REQUEST its meaning is untested (a category root, or the
+                              #   same 0x3F1 list framing with one element?). The RESPONSE head below is a count.
 [page:u32]                    # result page (1,2,3…)
 [cat2:u32 = 2018]
 [itemId:u32]                  # the item template being searched (0x7530, 0x754D, …)
@@ -71,9 +72,20 @@ client-side proximity check, so the access position must be within 15 units of t
 ## DispatchTradepostSearchResults rows (S→C `0x2005`) — VALIDATED byte-exact (full grammar 2026-06-13)
 
 ```
-[head:u32]                    # the query's category root (0x7E2 in the captures); echoed, NOT a quantity
+[head:u32]                    # the 0x3F1 LIST COUNT: (rowCount+1) * 0x3F1. NOT a category echo - see below
 [ row ]*                      # rows concatenated, sorted by price ASCENDING
 ```
+
+⚠️ **`head` was documented here as "the query's category root; echoed, NOT a quantity". That was wrong.** It is the
+protocol's shared `0x3F1` list framing — `(rowCount+1) * 0x3F1` — the same word `GuildSearchResult`,
+`TradeskillRecipeCodec`, the quest progress-sublist (`docs/re/questc-region-decode.md`) and `ResurrectionSpotsBody`
+carry. Two coincidences hid it: the search REQUEST also carries `0x7E2`, which made it look echoed, and a 1-row
+result is `2 * 0x3F1 = 0x7E2` exactly, which made it look constant. Measured across the captures' 15 search
+results: an EMPTY grid is a 4-byte body whose head is `0x3F1` (= 0 rows) with no rows at all, and head tracks the
+count all the way up (`0x17A6` = 6× → 5 rows, `0x1375F` = 79× → 78 rows). The builder call site already computes
+it correctly; only this doc and the codec comment were wrong. Same trap as #372's resurrection-spots body, where
+`0x7E2` was called a constant because only 1-element lists were ever exercised — when a "constant" equals
+`n * 0x3F1`, suspect a list count.
 Per row (all integers big-endian):
 ```
 [saleId:u64]                  # unique listing id; the buy targets this

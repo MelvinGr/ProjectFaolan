@@ -102,7 +102,16 @@ we've seen_, and names the gaps). Regenerate with
   `StatDamageIIR` (retail's two distinct damage packets)
 - ✅ Moving cancels an in-progress cast — the client's cancel is answered with retail's state-`0x0007` abort BCC,
   which drops the cast bar + plays the "Interrupted" text (#347)
-- ✅ Death window + resurrect/respawn
+- ✅ Death window + resurrect/respawn — the release screen carries the points you have discovered, ordered
+  nearest-first (the wire order retail renders), and a point revives you at its own `RestorationLevel` (10/50/100%)
+  rather than always full (#375). The spots body is fully decoded: what were three "capture-derived constants" are
+  a list count `(count+1) × 0x3F1`, a per-record terminator, and `RestorationLevel` — all three invisible while only
+  one spot was ever sent, and all three matching the RDB for every spot id in the captures, to the byte (#372)
+- ✅ Resurrection-point discovery — walking near an undiscovered point floats retail's own "point discovered"
+  banner and re-sends the spots list with the point added, both in one frame, verified in-client (#372). Works for
+  all **538** imported points, not just the 2 any capture discovers: retail carries a per-point key for the point's
+  name string, but a keyless banner renders correctly, and the rest are underivable. No name crosses the wire — the
+  banner passes the point **id** under LDB category 270 and the client resolves "Water's Edge" itself
 - ✅ Buff application, damage-over-time, buff-expiry lifecycle (timers clear the icon at 0), and right-click cancel
   (server-driven icon removal). Self-buffs and hostile debuffs both verified in-client (#274, #370)
 - ✅ Shield of the Risen — the top-of-screen protection buff, re-applied on login and every map change; dispels on

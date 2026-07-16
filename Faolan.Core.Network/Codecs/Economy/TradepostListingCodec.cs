@@ -31,9 +31,15 @@ namespace Faolan.Core.Network.Codecs.Economy
 		public const uint StatQuantity = 26;
 		public const uint StatTimestamp = 265;
 
-		// Builds the full body from DB listing rows. `head` echoes the search query's category (constant 0x7E2 in
-		// the captures); listings are emitted in the order given (the client renders them as-is - sort by price
-		// ascending at the call site to match retail).
+		// Builds the full body from DB listing rows. `head` is the shared 0x3F1 LIST COUNT - (rowCount+1) * 0x3F1, the
+		// same framing GuildSearchResult/TradeskillRecipeCodec/ResurrectionSpotsBody use - NOT, as this once claimed,
+		// an echo of the search query's category. It only looks like an echo because the query happens to carry 0x7E2
+		// too, and because a 1-row result is 2 * 0x3F1 = 0x7E2 exactly. The captures settle it: an EMPTY result is a
+		// 4-byte body carrying head 0x3F1 (= 0 rows) and nothing else, and head tracks the row count all the way up
+		// (0x1375F = 79 * 0x3F1 for a 78-row grid). The call site already computes it correctly.
+		//
+		// Listings are emitted in the order given (the client renders them as-is - sort by price ascending at the
+		// call site to match retail).
 		//
 		// `mintHandles` optionally overrides the per-row display handles (Handle + ItemHandle) by row index. The
 		// client keys the search grid by the per-row dynel handle, so rows that share one handle COLLAPSE to a single

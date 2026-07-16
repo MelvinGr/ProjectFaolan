@@ -76,5 +76,15 @@ from the session** — not just a verbatim replay.
   string 3474586), so showing custom text needs either a literal-text FIFO template or injecting an RDB string id.
   The plain-token lines (`AttributeChanged`, ...) are also token-driven. A literal-text path is the remaining
   decode (compare how the ChatServer system-message remoteformat embeds literal text).
-- ⬜ Once confirmed, replace the chat-routed `"Resurrection point discovered: X"` (`WorldSimulation`, currently
-  `SendSystemMessage`) and similar notices with on-screen FIFO banners.
+- ✅ **Resurrection-point discovered banner** (#372, verified in-client): byte-exact
+  `FormatFeedbackCodec.BuildRespawnPointDiscoveredXml` + goldens, sent by `WorldSimulation.DiscoverNearbyRespawnPoints`
+  alongside the spots re-send. Replaces a chat-routed `"Resurrection point discovered: X"` `SendSystemMessage` that
+  was never capture-derived (and printed the RDB dev label, "ResurrectionAIPoint2"). Its `<parameter>` is a nested
+  `<localized>` naming the point by its own id under category 270 — the client resolves the text, so no name crosses
+  the wire. The nested per-point `key` is OPTIONAL (a keyless banner renders), which is the only reason this works
+  for all 538 points: captures only ever discover 2, and the rest are underivable.
+- ⚠️ **`id=` vs `token=` — do not enumerate feedback by `token=` alone.** A `remoteformat` identifies its string by
+  EITHER; across the captures **175** frames use `token="…"` and **8** use `id="…"` (message ids 218327236, 64771509,
+  23). #372 scanned for `token=` only, found nothing for discovery, concluded *retail sends no discovery toast*, and
+  shipped a theory built on that absence — the message was there the whole time under `id=`. Match `<remoteformat `
+  and read whichever attribute is present. A negative search result is not evidence until the search is verified.

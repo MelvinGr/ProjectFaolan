@@ -60,9 +60,13 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 `...randomActions-resurect.json`
 - `0x642CD3D6` dominates (3632) - the death/resurrect interactions + the resurrect confirm are Interact actions.
 - `FA015807` "Inexperienced Nemedian" (the mob).
-- **DECODED 2026-06-15:** death → server sends `DispatchValidResurrectionSpots` (s2c `0x2024`, GameCharInterface):
-  `[deathPos 3 floats][u32 0x7E2][ spot: pos 3 floats + 0xC7A0 + mapId + 0 0 0 + spawnPointId + 0x0A ]* [0x00]`
-  (idx616/idx4050, 57 B, both deaths identical bar the death pos). The client shows the release screen, the player
+- **DECODED 2026-06-15, fully decoded 2026-07-16 (#372):** death → server sends `DispatchValidResurrectionSpots`
+  (s2c `0x2024`, GameCharInterface):
+  `[refPos 3 floats][u32 (count+1)*0x3F1][ spot(41B): pos 3 floats + spotType + mapId + 0 0 0 + spawnPointId +
+  restorationLevel + 0x00 ]*`, ordered nearest-first from refPos (idx616/idx4050, 57 B, both deaths identical bar
+  the death pos). ⚠️ The `0x7E2`/`0x0A` this section once called constants are the LIST COUNT and the point's
+  `RestorationLevel`, and the `0x00` is per-record — all three indistinguishable from constants in these two
+  captures because both carry exactly ONE spot. See docs/subsystems/combat.md. The client shows the release screen, the player
   picks → `RespawnMe` (c2s `0x2024`) = `[u32 spawnPointId]` (the chosen spot echoed back). NOTE: the same `0x2024` is
   sent at LOGIN (the misnamed `SendReadyForPlayScreen`) to set the spawn anchor - it only renders the release UI when
   the client is in the dead state (which needs a real combat killing-blow, not a raw health=0 push). Builder

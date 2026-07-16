@@ -452,7 +452,12 @@ namespace Faolan.GameServer
 			var recipientName = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
 			var bodyText = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
 			var money = packet.Body.ReadUInt64();
-			packet.Body.ReadUInt32(); // 0x7E2 category constant (preserved)
+			// 0x7E2: called a "category constant" because the ONE captured SendMail carries it - but 0x7E2 is also
+			// exactly 2 * 0x3F1, i.e. this protocol's list framing for a 1-element list, and that mail has exactly 1
+			// attachment. If it is the attachment-list count, a no-attachment mail sends 0x3F1 with NO slot word and
+			// the ReadUInt32 below reads off the end. Unresolved on one sample - the same degenerate-case trap that
+			// hid the resurrection-spots count (#372). See the follow-up issue.
+			packet.Body.ReadUInt32();
 			var bankSlot = (int)packet.Body.ReadUInt32();
 
 			var recipient = await Database.GetCharacterByName(recipientName, character.RealmId);

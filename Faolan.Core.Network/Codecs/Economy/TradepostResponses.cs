@@ -60,7 +60,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 
 		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
-		// Category is echoed back as the search-results `head` (const 0x7E2 in the captures).
+		// `cat` is NOT echoed back as the search-results `head`, as this used to say: that head is the protocol's
+		// 0x3F1 list count, (rowCount+1) * 0x3F1 (TradepostListingCodec). The two just both read 0x7E2 in the
+		// captures - a 1-row result is 2 * 0x3F1 = 0x7E2 exactly - which is what made it look echoed. What `cat`
+		// means in the REQUEST is untested (every captured query carries the same value).
 		public static SearchQuery ParseSearch(FaolanStream body)
 		{
 			if (body == null)
@@ -69,7 +72,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			try
 			{
 				var lang = Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
-				var cat = body.ReadUInt32(); // category root (const 0x7E2 in captures)
+				var cat = body.ReadUInt32(); // category root; 0x7E2 in every captured query, meaning untested
 				var page = body.ReadUInt32();
 				body.ReadUInt32(); // cat2 (mirror of cat)
 				var itemId = body.ReadUInt32();
