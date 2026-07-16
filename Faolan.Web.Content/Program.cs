@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
+using Faolan.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -34,9 +35,9 @@ namespace Faolan.Web.Content
 	{
 		private static readonly ImmutableDictionary<string, string> Upstreams = new Dictionary<string, string>
 		{
-			["update"] = "http://aoc-eu-update.live.ageofconan.com",
-			["gameupdate"] = "http://aoc-eu-gameupdate.live.ageofconan.com",
-			["control"] = "http://aoc-eu-control.live.ageofconan.com"
+			["update"] = AocContentCdn.Update,
+			["gameupdate"] = AocContentCdn.GameUpdate,
+			["control"] = AocContentCdn.Control
 		}.ToImmutableDictionary();
 
 		public static int Main(string[] args)

@@ -149,8 +149,9 @@ Modifiers
                        per-module override: --mode npcs=overwrite,items=insert
   --force              permit overwrite on guarded modules (e.g. characters)
                        (parsed onto ImportContext.Force; no module consumes it yet — step-2a)
-  --cdn <url>          rdb-respawns CDN base (module-specific)
-  --store <dir>        rdb-respawns blob archive (module-specific)
+  --rdb-proxy <url>    Faolan.Web.Content mirror base for on-demand (le.idx file==0xFF) RDB resources
+                       (default http://127.0.0.1:7081/gameupdate/upm/rdb) — every rdb-* module fetches
+                       CDN-only records through it, and the proxy store-and-forwards so pulls are archived
   --dump-templates <d> rdb-items: dump decrypted templates (module-specific)
 
 Reports (read-only, bypass the import runner)

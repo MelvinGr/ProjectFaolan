@@ -31,11 +31,9 @@ namespace Faolan.Importer.Cli
 		public required string CapturesDir { get; init; }
 		public string? DumpTemplatesDir { get; init; }
 
-		// rdb-* module sub-options (from --cdn / --store / --dump-templates). Out-of-DB write paths (store,
-		// dump) must be suppressed under DryRun by the module.
-		public string? RdbCdnBase { get; init; }
+		// rdb-* module sub-options (from --rdb / --dump-templates). Out-of-DB write paths (dump) must be suppressed
+		// under DryRun by the module.
 		public string? RdbDir { get; init; }
-		public string? RdbStoreDir { get; init; }
 
 		// The Faolan.Web.Content mirror-proxy base for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
 		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).

@@ -158,13 +158,20 @@ Significant de-risking — the tool and format are identified:
 > isn't packed locally — it's on-demand CDN content. **The le.idx 16-byte content hash IS the CDN path md5**:
 > `<gameupdate host>/upm/rdb/res/<h[0:2]>/<h[2:3]>/<h[3:]>` returns the SAME `IOz1`+zlib blob as the local store
 > (verified HTTP 200, byte-sizes match le.idx). So any `file==0xFF` resource is readable: take its le.idx hash → fetch
-> → UnwrapIOz1. `RdbReader.Entry` now exposes `Hash` + `IsLocal`. **Resurrection points DONE**: `Faolan.Importer --rdb
-> <dir> --rdb-respawns` (RdbRespawnImporter, host via `--cdn`) fetches type 1000090 for our maps, parses the XML
-> (`<resurrectionpoint name discoverable><position x y z>`; record id == playfield/map id; `discoverable="false"` =>
-> AlwaysKnown), and fills `RespawnPoints` — imported **351 points across 145 maps** (beach 4010 = 3 real points). The
-> SAME path now unlocks the other v6-gated types (the ~279 v6 maps, TREASUREDATA) — fetch by hash. Fetches archive to
-> the local mirror store with `--store <dir>` (store-and-forward, ContentMirror layout, read-first). NOTE most of our
-> maps' resurrection records are actually LOCAL (240 local / 784 CDN); the CDN path is only for the on-demand ones.
+> → UnwrapIOz1. `RdbReader.Entry` now exposes `Hash` + `IsLocal`. **Resurrection points DONE**: `Faolan.Importer
+> --only rdb-respawns --rdb <dir>` (`RdbRespawnImporter`) fetches type 1000090 for our maps, parses the XML
+> (`<resurrectionpoint ...><position x y z>`; record id == playfield/map id; `discoverable="false"` => AlwaysKnown),
+> and upserts `RespawnPoints` keyed on the RDB `Guid` — **557 points across 259 maps** (beach 4010 = 3 real points).
+> The SAME path now unlocks the other v6-gated types (the ~279 v6 maps, TREASUREDATA) — fetch by hash. Like every
+> rdb-* module it goes through the mirror proxy (`--rdb-proxy`, default `http://127.0.0.1:7081/gameupdate/upm/rdb`),
+> which store-and-forwards, so pulls are archived for preservation — it does NOT hand-roll its own CDN fetch. NOTE
+> most of our maps' resurrection records are actually LOCAL (240 local / 784 CDN); the CDN path is only for the
+> on-demand ones.
+>
+> The XML's `name` is the world-EDITOR object label, NOT a display name, and is not unique (95 points are
+> "ResurrectionAIPoint0"); no display-name/text-id attribute exists on the element at all, so a player-facing name is
+> not recoverable from this file (#372). Also carried: `RestorationLevel` (a percent) and `Orientation` (yaw radians),
+> both now imported.
 > (MONSTERDATA = model data, not HP — NPC HP comes from the captured spawn / Archive `Npc.Health`, not the RDB.)
 
 > **Loot tables — NOT extractable (checked 2026-06-11).** `TREASUREDATA` (1000083, 1018 recs, per-playfield XML) is
