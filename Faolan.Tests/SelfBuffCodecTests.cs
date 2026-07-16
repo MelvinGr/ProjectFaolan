@@ -5,31 +5,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gate for the MagicBuffIIR data tail. The 50-byte SHORT form (BuildBuffData) must reproduce the
-	// captured "Scythe Shield Rank 3" self-buff blob the shared ApplySpell path used to clone verbatim; the 54-byte
-	// LONG form (BuildBuffDataLong) must reproduce the captured spellweave trance/component buffs.
+	// Byte-exact gate for the MagicBuffIIR data tail: the 54-byte form (BuildBuffDataLong) must reproduce the captured
+	// spellweave trance/component buffs. It is the ONLY form retail sends - see the SelfBuffCodec class comment.
+	//
+	// A second test used to guard a 50-byte "SHORT form" against a blob captioned "captured", but that blob was our own
+	// ApplySpell path's hand-built default, so the test asserted the codec against its own output and could never fail.
+	// The client rejects that shape outright (MagicBuffIIR_c::ReadSubClass, "datasize left in stream=4, raw=76") and it
+	// occurs ZERO times across all 103 Captures/*.tshark.json, so form + test were removed (#274, 2026-07-16).
 	public class SelfBuffCodecTests
 	{
-		[Fact]
-		public void BuildBuffData_ReproducesCapturedScytheShieldR3Blob()
-		{
-			// The verbatim default from ApplySpell (Scythe Shield Rank 3): spell 145534, duration 1277478 cs,
-			// magnitude 80, effect nonce 0x14C5C912.
-			byte[] captured =
-			[
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x7E, 0x26, // duration@8 = 1277478
-				0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x38, 0x7E, // spell@22 = 145534
-				0x00, 0x00, 0x00, 0x50, // magnitude@26 = 80
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, // magnitude@38 = 80
-				0x00, 0x00, 0x00, 0x00, 0x14, 0xC5, 0xC9, 0x12 // nonce@46 = 0x14C5C912
-			];
-
-			var built = SelfBuffCodec.BuildBuffData(145534, 1277478, 0x14C5C912);
-
-			Assert.Equal(50, built.Length);
-			Assert.Equal(captured, built);
-		}
-
 		[Theory, InlineData(0x37F298u, 640000u, 0x195DA1FEu, "00000000000000000009c40000010000000100000000 0037f298 00000050 00000000 00000000 00000000 00000050 00000000 195da1fe"),
 		 InlineData(0x37E5A8u, 1200u, 0x18FC28DEu, "0000000000000000000004b0000100000001000000000037e5a800000050000000000000000000000000000000500000000018fc28de"),
 		 InlineData(0x3969D0u, 1000u, 0x18FC210Eu, "0000000000000000000003e800010000000100000000003969d000000050000000000000000000000000000000500000000018fc210e"),
@@ -42,25 +26,20 @@ namespace Faolan.Tests
 			Assert.Equal(expected.Replace(" ", ""), Convert.ToHexStringLower(bytes));
 		}
 
-		// The buff-persistence save side (#274) recovers the nonce + short/long form back out of the constructed
-		// payload (ActiveBuff.NonceFromPayload / IsLongFormPayload), so RestoreBuffs can rebuild a byte-compatible
-		// packet on relog. This is the inverse of the two builders above.
+		// The buff-persistence save side (#274) recovers the nonce back out of the constructed payload
+		// (ActiveBuff.NonceFromPayload), so RestoreBuffs can rebuild a byte-compatible packet on relog. This is the
+		// inverse of the builder above.
 		[Fact]
-		public void PayloadExtractors_RecoverNonceAndForm_FromBothBuffForms()
+		public void PayloadExtractors_RecoverNonce_FromBuffPayload()
 		{
-			var shortForm = SelfBuffCodec.BuildBuffData(145534, 1277478, 0x14C5C912);
-			Assert.Equal(50, shortForm.Length);
-			Assert.False(ActiveBuff.IsLongFormPayload(shortForm));
-			Assert.Equal(0x14C5C912u, ActiveBuff.NonceFromPayload(shortForm));
-
-			var longForm = SelfBuffCodec.BuildBuffDataLong(0x37F298, 640000, 0x195DA1FE);
-			Assert.Equal(54, longForm.Length);
-			Assert.True(ActiveBuff.IsLongFormPayload(longForm));
-			Assert.Equal(0x195DA1FEu, ActiveBuff.NonceFromPayload(longForm));
+			var payload = SelfBuffCodec.BuildBuffDataLong(0x37F298, 640000, 0x195DA1FE);
+			Assert.Equal(54, payload.Length);
+			Assert.Equal(0x195DA1FEu, ActiveBuff.NonceFromPayload(payload));
+			Assert.Equal(6400000u, ActiveBuff.DurationMsFromPayload(payload)); // 640000 cs -> ms
 
 			// The empty removal twin carries no duration/nonce - the extractors must not read off the end.
 			Assert.Equal(0u, ActiveBuff.NonceFromPayload([]));
-			Assert.False(ActiveBuff.IsLongFormPayload([]));
+			Assert.Equal(0u, ActiveBuff.DurationMsFromPayload([]));
 		}
 	}
 }

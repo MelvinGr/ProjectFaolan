@@ -121,27 +121,26 @@ namespace Faolan.Tests
 				var character = await repo.CreateCharacter(accountId, realmId);
 				var expiry = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
-				// First snapshot: a timed short-form buff + a permanent long-form buff (null expiry).
+				// First snapshot: a timed buff + a permanent buff (null expiry).
 				await repo.SaveCharacterBuffs(character.Id,
 				[
-					new CharacterBuff { BuffId = 0x02387E03, Nonce = 0x14C5C912, IsLongForm = false, ExpiresAt = expiry },
-					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, IsLongForm = true, ExpiresAt = null }
+					new CharacterBuff { BuffId = 0x02387E03, Nonce = 0x14C5C912, ExpiresAt = expiry },
+					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, ExpiresAt = null }
 				]);
 
 				var loaded = await repo.GetCharacterBuffs(character.Id);
 				Assert.Equal(2, loaded.Length);
 				var timed = Assert.Single(loaded, b => b.BuffId == 0x02387E03);
 				Assert.Equal(0x14C5C912u, timed.Nonce);
-				Assert.False(timed.IsLongForm);
 				Assert.Equal(expiry, timed.ExpiresAt);
 				var permanent = Assert.Single(loaded, b => b.BuffId == 0x0037F298);
-				Assert.True(permanent.IsLongForm);
+				Assert.Equal(0x195DA1FEu, permanent.Nonce);
 				Assert.Null(permanent.ExpiresAt);
 
 				// Re-save with only the permanent buff (the timed one expired): replace-all drops the missing row.
 				await repo.SaveCharacterBuffs(character.Id,
 				[
-					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, IsLongForm = true, ExpiresAt = null }
+					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, ExpiresAt = null }
 				]);
 
 				var after = await repo.GetCharacterBuffs(character.Id);

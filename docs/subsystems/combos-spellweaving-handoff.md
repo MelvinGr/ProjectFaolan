@@ -136,7 +136,7 @@ The whole necro flow is built and (except the energy bar) **works in-client**, b
 - `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the FSM + the trance-meter loop. Session
   state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`, `Energy`/`EnergyMax`/
   `IsSprinting`/`EnergyLoopActive`. Driven via narrow listener **seams** (ctor args): `ApplySpellweaveBuff` (the
-  correct 54-byte buff blob — the shared 50-byte one fails `MagicBuffIIR_c::ReadSubClass`), `SendWorldIir`,
+  54-byte buff blob — since #274 the shared `ApplySpell` path emits the same single form), `SendWorldIir`,
   `SendBuffRemoval` (rank-1 end-twins), `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`.
 - `SpellweaveCodec` — reactive list / stat gauge / buff-data / fire-stage builders (byte-exact).
 - `BehaviorAnimationCodec` — the trance/component/exit BCC animations (BCC `0x642CD3D6` is the generic behaviour

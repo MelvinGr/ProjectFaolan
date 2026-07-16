@@ -220,6 +220,21 @@ builds it (via `SendMagicBuffIir`, which registers `applyTo == applyFrom` casts 
 the client-initiated `CancelBuff` `0x201E` and the expiry tick can track them). The **wire spell id is `(baseId << 8) | rank`** — apply uses rank `00`,
 remove uses rank `01`; the payload embeds the same `baseId` at offset **[22..26]**.
 
+**The data tail has exactly ONE form: 54 bytes** (`SelfBuffCodec.BuildBuffDataLong`). Across all 103
+`Captures/*.tshark.json` the only s2c `MagicBuffIIR` tails are **54** bytes (×1412) and **0** (×578 — the rank-1
+end twin). A 50-byte tail occurs **zero** times. `[V2: Captures/*.tshark.json — every s2c body whose u32 length is
+followed by 6b87e316; scan reproduced by Faolan.Tests/SelfBuffCodecTests]` The client's
+`MagicBuffIIR_c::ReadSubClass` reads 4 bytes past the end of a 50-byte tail and **rejects the whole record** —
+silently, apart from the client log (`ReadSubClass for IIR 1804067606 (MagicBuffIIR_c) failed! datasize left in
+stream=4, raw=76`) — so the buff simply never renders.
+
+⚠️ Both of these bit us at once (#274, fixed 2026-07-16, in-client verified): the cast path passed `CastSpell`'s
+**bare base id** where `ApplySpell` wanted the `(base<<8)|rank` **wire** id, *and* the shared path emitted a
+50-byte tail that never existed in retail (it originated as a hand-built blob in our own code, and its golden test
+asserted the codec against that same blob, so it could never fail). Server-side the lifecycle looked perfect —
+correct durations, clean expiry, removal twins on the wire — while the client rendered nothing. **A buff bug that
+looks correct in the server log is almost always one of these two.**
+
 **Mount buff — fully captured** (`NecroL80_mage-necromancer_login_mount_move_dismount`, the only 2
 ApplySpell packets in it): mount up = self ApplySpell **`0x31EB1500`** + a **54-byte** payload
 (`…0031eb15…` at [22..26]); dismount = **`0x31EB1501`** (base|rank 01) with an **empty** payload. So the mount
@@ -228,8 +243,8 @@ spawn** is still gated on the mid-session-spawn blocker (#26), so the buff rende
 
 **Buff persistence across relog (#274).** Self-buffs survive a logout **with their remaining time**. The live
 `WorldEntity.ActiveBuffs` is savegame state, so `PlayerPersistenceService.SavePlayerState` (logout + the 5-min
-autosave) snapshots each self-buff to the `CharacterBuff` table — `BuffId`, the effect `Nonce`, the short/long
-form flag, and an absolute `ExpiresAt` — and `RestoreBuffs` re-applies them in the post-`0x205F` world-entry flush
+autosave) snapshots each self-buff to the `CharacterBuff` table — `BuffId`, the effect `Nonce`, and an absolute
+`ExpiresAt` — and `RestoreBuffs` re-applies them in the post-`0x205F` world-entry flush
 (beside `RestoreMount`). Restore rebuilds the `ApplySpell` payload from those columns via `SelfBuffCodec` (not a
 stored blob) with the duration recomputed to the time left, so the client counts down the **remaining** seconds and
 the tick expires it on schedule. Only self-buffs persist (NPC-cast debuffs carry a volatile caster handle + a DoT
@@ -241,8 +256,8 @@ at save time so they aren't double-applied on entry (`GameServerListener.ShouldP
 is re-armed on each teleport/changemap re-entry, so it re-asserts on login AND every playfield change. The real
 ids are bases **`4061768` (1h)** + **`3666828` (10h)**, both named "Shield of the Risen" in `Spells` with real
 durations (`NecroL80_..._conans-castle-exit` rec#165/#736) — the old `0x000B9000` claim was WRONG (that id is the
-"Exhausted" debuff). It uses the **LONG 54-byte** `SelfBuffCodec.BuildBuffDataLong` form (the client rejects the
-short form), and retail shows exactly **one at a time**, picked by playfield type: the 1h on an instanced
+"Exhausted" debuff). It uses `SelfBuffCodec.BuildBuffDataLong` — the 54-byte tail that is the only form retail
+sends (#274) — and retail shows exactly **one at a time**, picked by playfield type: the 1h on an instanced
 playfield, the 10h in the shared open world (we select by `Map.InstanceMode`, tracked in
 `Session.ActiveShieldSpellBase`). The client renders it TOP-of-screen (protection banner) and auto-generates the
 "You are protected …" line from the ApplySpell itself. It clears three ways: the **10h/1h timer** (the generic

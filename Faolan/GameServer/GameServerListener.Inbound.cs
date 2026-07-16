@@ -566,9 +566,13 @@ namespace Faolan.GameServer
 										return;
 									}
 
+									// ApplySpell takes the WIRE buff id ((base<<8)|rank), but the cast trailer carries the
+									// bare BASE id (the Spells key) - shift it to rank 0. Unshifted, the client resolved
+									// base=spellId>>8 / rank=spellId's low byte, neither of which is a real spell, and
+									// silently rendered no icon while the server-side lifecycle looked correct (#274).
 									await ApplySpell(client, casterHandle, targetHandle == 0
 										? casterHandle
-										: targetHandle, spellId);
+										: targetHandle, spellId << 8);
 									await _combat.SpendCasterMana(client, spellId);
 									if (targetHandle != 0 && targetHandle != casterHandle)
 										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);

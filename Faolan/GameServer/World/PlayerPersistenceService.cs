@@ -72,7 +72,6 @@ namespace Faolan.GameServer.World
 					{
 						BuffId = b.BuffId,
 						Nonce = b.Nonce,
-						IsLongForm = b.IsLongForm,
 						ExpiresAt = b.ExpiresAt
 					})
 					.ToList();

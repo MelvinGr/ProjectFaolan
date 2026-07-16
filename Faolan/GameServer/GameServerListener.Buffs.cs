@@ -72,16 +72,20 @@ namespace Faolan.GameServer
 			return entity;
 		}
 
-		// Applies a self-buff (or an offensive MagicBuff cast) by CONSTRUCTING its 50-byte MagicBuffIIR payload from
+		// Applies a self-buff (or an offensive MagicBuff cast) by CONSTRUCTING its 54-byte MagicBuffIIR payload from
 		// scratch (SelfBuffCodec): the spell's real BASE id (id >> 8, the (base<<8)|rank convention) + its RDB DURATION
 		// (Spell.DurationMs -> centiseconds at payload+8), so the client counts down the correct time AND the server
-		// expires it at the same instant (#274). Callers that need the 54-byte spellweave/ride shape build that payload
-		// themselves and call SendMagicBuffIir directly.
+		// expires it at the same instant (#274).
+		//
+		// The LONG (54-byte) form is the ONLY shape retail ever sends: across all 103 Captures/*.tshark.json the only
+		// s2c MagicBuffIIR tails are 54 bytes (x1412) and 0 (x578, the rank-1 end twin) - a 50-byte tail NEVER occurs.
+		// The old 50-byte "short form" was our own invention; the client's MagicBuffIIR_c::ReadSubClass runs 4 bytes off
+		// the end of it and rejects the record ("datasize left in stream=4, raw=76"), so nothing rendered (#274).
 		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
 		{
 			var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffData(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
 		}
 
 		// The buff ids owned by a dedicated per-entry re-applier - Shield of the Risen (SendShieldOfTheRisen) and the
@@ -105,7 +109,7 @@ namespace Faolan.GameServer
 
 		// Re-applies a player's persisted self-buffs at world entry with their REMAINING time (#274). Reads the
 		// CharacterBuff snapshot taken at the last logout/autosave, drops any that lapsed while offline, rebuilds each
-		// ApplySpell payload from the persisted base id / effect nonce / short-or-long form with a duration recomputed
+		// ApplySpell payload from the persisted base id / effect nonce with a duration recomputed
 		// to the time left, and sends it through SendMagicBuffIir - which re-registers the live ActiveBuff so the world
 		// tick expires it on schedule and the client counts down the correct remaining time. Runs in the post-0x205F
 		// flush beside RestoreMount / SendShieldOfTheRisen, which own their own buffs (excluded at save), so nothing is
@@ -136,10 +140,7 @@ namespace Faolan.GameServer
 				}
 
 				var spellBase = buff.BuffId >> 8;
-				var payload = buff.IsLongForm
-					? SelfBuffCodec.BuildBuffDataLong(spellBase, remainingCs, buff.Nonce)
-					: SelfBuffCodec.BuildBuffData(spellBase, remainingCs, buff.Nonce);
-				await SendMagicBuffIir(client, self, self, buff.BuffId, payload);
+				await SendMagicBuffIir(client, self, self, buff.BuffId, SelfBuffCodec.BuildBuffDataLong(spellBase, remainingCs, buff.Nonce));
 				restored++;
 			}
 
@@ -328,9 +329,8 @@ namespace Faolan.GameServer
 						? durationMs / 1000f
 						: null)
 					{
-						// Preserve the wire shape so the buff can be reconstructed byte-compatibly on relog (#274).
-						Nonce = ActiveBuff.NonceFromPayload(payload),
-						IsLongForm = ActiveBuff.IsLongFormPayload(payload)
+						// Preserve the effect nonce so the buff can be reconstructed byte-compatibly on relog (#274).
+						Nonce = ActiveBuff.NonceFromPayload(payload)
 					};
 				}
 			}
