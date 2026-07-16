@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,9 +13,11 @@ namespace Faolan.Core.Database.Tables
 	// region is reconstructed from where retail ACTUALLY sent each banner - `AreaNameExtractor` pairs every captured
 	// FormatFeedbackIIR with the player's position at that moment.
 	//
-	// The NAME is resolved through the LDB: the banner's `category` + text id map onto (RDB 1030002 page, string
-	// index) as `textId = pageBase + index` (#291). It is stored here so the server can log/inspect an area without
-	// the client RDB - the wire only ever carries AreaNameId.
+	// There is deliberately no NAME column. The wire only ever carries AreaNameId and the CLIENT renders the text,
+	// so a name would be for our logs alone - and filling it needs the client RDB plus a hand-found "pin" per LDB
+	// page (`textId = pageBase + index`, #291; the base is not derivable from the page header yet). One pin covers
+	// Old Tarantia; the other maps' ids sit in pages nobody has pinned, so the column would have been empty for 3 of
+	// 4 maps. The id IS the key. To read a name, decode it via #291 rather than storing a stale copy.
 	[PrimaryKey(nameof(MapId), nameof(AreaNameId))]
 	public class MapArea
 	{
@@ -29,15 +30,10 @@ namespace Faolan.Core.Database.Tables
 		// playfield's areas are identified by it, and it is what actually goes on the wire.
 		public uint AreaNameId { get; set; }
 
-		// The localized name (e.g. "Bridge of Vilerus I"), decoded from the LDB via the #291 base+index rule. Empty
-		// when no pin has resolved that id's page yet. Server-side only - never sent.
-		[MaxLength(128)]
-		public string Name { get; set; } = "";
-
-		// The axis-aligned bounds of the captured sightings, the interim region shape. This is a HULL OVER SAMPLES,
-		// not the retail trigger volume: with few sightings it under-covers, so it is deliberately paired with
-		// SampleRadius rather than used as a hard polygon. It tightens as more marked dumps land (walk in, type a
-		// chat line, dump - the trick that produced the first pin).
+		// The axis-aligned bounds of the captured sightings - the interim region shape. A HULL OVER SAMPLES, not the
+		// retail trigger volume: it can only cover ground a captured player actually walked, so it UNDER-covers by
+		// construction and WorldSimulation widens it with AreaBannerSlack rather than treating it as a hard polygon.
+		// It tightens with every new dump; no chat marker needed - a plain dump carries the banner and the position.
 		public float MinX { get; set; }
 		public float MaxX { get; set; }
 		public float MinY { get; set; }

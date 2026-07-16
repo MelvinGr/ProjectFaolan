@@ -397,7 +397,9 @@ namespace Faolan.GameServer.World
 					continue; // left an area into unnamed ground - retail shows nothing
 
                     await _output.SendAreaNameBanner(client, now);
-				_logger.LogInformation("World: {Player} entered area '{Area}' (id {Id}) on map {Map}.", client.Session.Character.Name, best!.Name, now, entity.MapId);
+				// Logged by id, not name: MapArea has no name (the client renders the text; decoding one needs a
+				// per-page LDB pin, #291). 3373519 is "Bridge of Vilerus I" if you need to read one by hand.
+				_logger.LogInformation("World: {Player} entered area {Id} on map {Map} ({Samples} captured sighting(s) back it).", client.Session.Character.Name, now, entity.MapId, best!.SampleCount);
 			}
 		}
 

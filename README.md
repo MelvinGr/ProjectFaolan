@@ -82,9 +82,10 @@ we've seen_, and names the gaps). Regenerate with
   via `FormatFeedbackIIR`), verified in-client. A playfield has many (Old Tarantia fires six: Bridge of Vilerus I,
   The East Gate, The West Gate, …), so the world tick drives it off the `MapArea` child table. The boundary triggers
   are **server-side** — no client record references a banner id — so the regions are reconstructed from captures:
-  each banner is paired with the player position it fired at, and the hull over those sightings is the region. Names
-  decode from the LDB (`textId = pageBase + index`, #291). Coverage is capture-bound (10 areas, 4 maps of 520) and
-  the hulls under-cover by construction; both improve with more dumps (#377)
+  each banner is paired with the player position it fired at, and the hull over those sightings is the region. Areas
+  are keyed by the client's localized-string id — the client renders the text, so the server never needs the name
+  (decode one via the LDB if you want to read it: `textId = pageBase + index`, #291). Coverage is capture-bound
+  (10 areas, 4 maps of 520) and the hulls under-cover by construction; both improve with more dumps (#377)
 - 🟡 Sit on benches — the sit/stand/hold-state animations are decoded + built byte-exact, but the pose reverts
   to standing after the animation (does not yet hold in-client) (#355)
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
