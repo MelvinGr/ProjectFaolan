@@ -67,7 +67,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		public static SearchQuery ParseSearch(FaolanStream body)
 		{
 			if (body == null)
-				return new SearchQuery("", 0x7e2, 0, 0);
+				return new SearchQuery("", ListFrame.ForCount(1), 0, 0);
 
 			try
 			{
@@ -80,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			}
 			catch (Exception)
 			{
-				return new SearchQuery("", 0x7e2, 0, 0);
+				return new SearchQuery("", ListFrame.ForCount(1), 0, 0);
 			}
 		}
 

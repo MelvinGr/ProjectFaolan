@@ -69,7 +69,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public const ulong SnapshotQuestAcceptTime = 0x000111D354375554UL;
 		private const string RrlMagic = "RRL3"; // record-list magic that precedes the per-quest entries
 		private const uint ChapterTag = 0x00000BD3; // per-quest grouping word, constant across Tortage quests
-		private const uint ListFrame = 0x000003F1; // the (count+1)*0x3F1 list-framing invariant; 0x3F1 = an empty list
 
 		// QuestFullUpdate: one quest's full record (description, summary, objective + world marker).
 		//   header: [00000000][01][questId][00000001][questId][level][00000000][00000003][0x412]
@@ -109,11 +108,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(0);
 			w.WriteUInt32(0);
 			w.WriteUInt32(0);
-			// ⚠️ 0x7E2 is exactly ListFrame.ForCount(1), and this template only ever carries ONE goal - so this may be
-			// a count-framed goal list rather than the constant it is written as. Left VERBATIM: the whole run is a
-			// capture-derived template and a replacement must be proven byte-for-byte first (three "constants" of this
-			// shape have already turned out to be list counts - see ListFrame). Suspect, not established.
-			w.WriteUInt32(0x7E2);
+			// A count-framed list word for ONE element, not a constant. Established from the CLIENT, not the captures:
+			// of the 136 functions that touch this word, 77 DIVIDE it by 0x3F1 to get a count and 59 multiply to build
+			// one - NONE compares it to a constant. (Which list it frames here is not decoded; the surrounding run is
+			// still a verbatim single-goal template, so this stays ForCount(1) = the captured 0x7E2, byte-identical.)
+			w.WriteUInt32(Codecs.ListFrame.ForCount(1));
 			w.WriteUInt32(1);
 			w.WriteUInt32(0x0C);
 			w.WriteUInt32(playerHandle);
@@ -244,9 +243,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			var w = new FaolanStream();
 			w.WriteUInt32(trackedQuestId);
-			w.WriteUInt32(ListFrame);
+			w.WriteUInt32(Codecs.ListFrame.Empty); // an EMPTY count-framed list
 			w.WriteUInt32(0); // list A (empty)
-			w.WriteUInt32(ListFrame);
+			w.WriteUInt32(Codecs.ListFrame.Empty); // an EMPTY count-framed list
 			w.WriteUInt32(0); // list B (empty)
 			return w.ToArray();
 		}

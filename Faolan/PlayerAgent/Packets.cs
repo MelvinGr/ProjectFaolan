@@ -6,6 +6,8 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 
+using Faolan.Core.Network.Codecs;
+
 namespace Faolan.PlayerAgent
 {
 	partial class PlayerAgentListener
@@ -52,7 +54,7 @@ namespace Faolan.PlayerAgent
 			var aBuffer = new PacketStream();
 			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterList);
 			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
-			aBuffer.WriteUInt32((characters.Length + 1) * 1009); // number of characters
+			aBuffer.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 
 			foreach (var character in characters)
 			{
@@ -174,7 +176,7 @@ namespace Faolan.PlayerAgent
 
 			var buffer = new PacketStream();
 			buffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SmallCharList, [0x94, 0xa7, 0x60]);
-			buffer.WriteUInt32((characters.Length + 1) * 1009);
+			buffer.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 
 			foreach (var character in characters)
 			{

@@ -15,6 +15,8 @@ using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
+using Faolan.Core.Network.Codecs;
+
 namespace Faolan.CSPlayerAgent
 {
 	// Guild RPC handlers + wire builders + flow state for the CsPlayerAgent connection (create / invite / accept /
@@ -41,10 +43,10 @@ namespace Faolan.CSPlayerAgent
 		// client's instance-0 endpoint back as the sender.
 		private const uint GuildServerInstance = 0x04;
 
-		// The AoC count-framed-list multiplier: every such list on the wire starts with a u32 word == (count+1)*0x3F1
-		// (the client's list readers assert word % 0x3F1 == 0 and take count = word/0x3F1 - 1). Shared by the renown
+		// The AoC count-framed-list multiplier (ListFrame.Unit): every such list on the wire starts with a u32 word ==
+		// (count+1)*0x3F1 (the client's readers divide by it - 77 such readers in the exe). Shared by the renown
 		// block's stat-lists (GuildRenownBlock), the 0x203F member list, and the 0x2038 rankings lists.
-		internal const uint GuildListMultiplier = 0x3F1;
+		internal const uint GuildListMultiplier = ListFrame.Unit;
 
 		// The reply SENDER endpoint for a CsPlayerAgent s2c packet: the class the client addressed, stamped with the
 		// guild-server instance (see GuildServerInstance).
@@ -148,7 +150,7 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			// [charId][guild ID32][03][guildId][02][05][name][u32 0x3F1][u32 0][u32 0] - constants verbatim from
+			// [charId][guild ID32][03][guildId][02][05][name][u32 0x3F1 = an EMPTY list][u32 0][u32 0] - verbatim from
 			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
 			// is a server-wide constant rather than guild data.
 			await new PacketStream()
@@ -161,7 +163,7 @@ namespace Faolan.CSPlayerAgent
 				.WriteByte(0x02)
 				.WriteByte(0x05)
 				.WriteString(guild.Name)
-				.WriteUInt32(0x3F1)
+				.WriteUInt32(ListFrame.Empty)
 				.WriteUInt32(0)
 				.WriteUInt32(0)
 				.SendAsync(client);

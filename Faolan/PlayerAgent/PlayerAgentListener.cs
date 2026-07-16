@@ -9,6 +9,8 @@ using Faolan.Core.Network.Packets.Conan;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
+using Faolan.Core.Network.Codecs;
+
 namespace Faolan.PlayerAgent
 {
 	public partial class PlayerAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
@@ -61,7 +63,14 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.FinishGetStartupData:
 				{
-					var charCount = packet.Body.ReadUInt32() / 1009 - 1; // % 1009
+					// The client's own count-framed list (ListFrame): a malformed word means we would loop on garbage,
+					// so reject it rather than trusting inbound arithmetic.
+					var word = packet.Body.ReadUInt32();
+					if (!ListFrame.TryCountOf(word, out var charCount))
+					{
+						Logger.LogWarning("FinishGetStartupData: 0x{Word:X} is not a count-framed list word; ignoring the entries.", word);
+						charCount = 0;
+					}
 
 					for (var i = 0; i < charCount; i++)
 					{

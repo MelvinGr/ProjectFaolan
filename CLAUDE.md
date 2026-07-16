@@ -154,10 +154,12 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
 - **Count-framed lists come from `ListFrame`, never a hand-rolled `0x3F1`.** A list is prefixed by a u32
   `(count + 1) * 0x3F1` (guilds, AH, quests, spell book, shortcut bar, stat lists, spawn scaffold, resurrection
   spots). ⚠️ A ONE-element list frames as `0x7E2`, and single-element lists are the common case in captures — so
-  `0x7E2` reads as magic and has been written down as a constant **three times** (resurrection spots #372, the AH
-  search `head`, `SendMail` #378). **When a "constant" equals `n * 0x3F1`, suspect a list count**, and distrust any
-  grammar pinned only by single-element captures. Enforced by `CodecConventionTests` (allowlist w/ reasons for
-  unproven verbatim payloads).
+  `0x7E2` reads as magic and has been written down as a constant repeatedly (resurrection spots #372, the AH search
+  `head`, `SendMail` #378, GameActionList). **There is no such thing as a `0x3F1`/`0x7E2` constant**: of the 136
+  functions in `AgeOfConan.exe` that touch the word, **77 divide by `0x3F1`** to read a count and **59 multiply** to
+  write one — **zero** compare it to a constant (`Captures/ghidra/DumpListFraming.java`). So when a "constant" equals
+  `n * 0x3F1` it IS a list count; distrust any grammar pinned only by single-element captures. Enforced across
+  `Codecs/` **and** `Faolan/` by `CodecConventionTests` — a wire rule must cover everywhere the wire is written.
 - Files are one-type-per-file named after that type (a tightly cohesive group may share one file, e.g.
   `FullCharSnapshot/FullCharSnapshotSubClass.cs`), filed under their domain folder.
 

@@ -18,17 +18,32 @@ namespace Faolan.Core.Network.Codecs.World
 	// frameHandle = the receiving player's instance; dynelHandle = the entity the action list is about; field3 is
 	// usually 0 (a small id in some captures, undecoded); the 0x7E2 / 4 / 1 words are constant across all 570 captures.
 	//
-	// ⚠️ SUSPECT: 0x7E2 is exactly ListFrame.ForCount(1). "Constant across 570 captures" is NOT evidence it is a
-	// constant if all 570 carry a single action - that is the same reasoning that made the resurrection-spots count
-	// look constant for months (#372), and every capture there had exactly one spot. Left VERBATIM because no capture
-	// disproves it either and the project rule is not to refactor an unproven payload; needs a multi-action capture.
+	// The 0x7E2 is NOT a constant: it is the count-framed list word for ONE GameActionData element (ListFrame). The
+	// captures cannot show this - all 1305 GameActionListIIR frames carry 0x7E2 across 28 body lengths, which fits
+	// "a constant" and "a 1-element count with variable-length blobs" equally well. The CLIENT settles it
+	// (FUN_00870500, the GameActionData list reader reached from GameActionListIIR_t::ReadSubClass FUN_008679f0):
+	//
+	//     iVar3 = ReadU32BE();
+	//     if ((iVar3 == (iVar3 / 0x3f1) * 0x3f1) && (0 < iVar3)) {   // must be a positive multiple of 0x3F1
+	//         iVar3 = iVar3 / 0x3f1 + -1;                            // count = word/0x3F1 - 1
+	//         ... "Streaming in spell list with ", iVar3, " elements"
+	//         if (iVar3 < 1000) { do { <read a GameActionData blob> } while (i < count); }
+	//         else  ... "Way too many entries.."
+	//     } else    ... "Inconsistent spell list.."
+	//
+	// So a wrong word here is not cosmetic: a non-multiple aborts the stream ("Inconsistent spell list.."), and the
+	// count decides how many blobs the client reads. We always send exactly one action, hence ForCount(1) == 0x7E2 -
+	// the same bytes we have always sent, now for the right reason and derived rather than asserted.
 	public static class GameActionListCodec
 	{
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
 
 		public const uint ConstFour = 4;
-		public const uint Head = 0x000007E2; // see the SUSPECT note above - possibly ListFrame.ForCount(1)
+		// How many GameActionData elements this codec emits/expects. The wire word is ListFrame.ForCount(ActionCount)
+		// - the client divides it by 0x3F1 and reads that many blobs (see the class comment). One, because BuildBody
+		// carries exactly one `actionTail` blob; a multi-action body would need the tail split per element first.
+		public const int ActionCount = 1;
 		public const ulong ConstOne = 1;
 
 		// Builds the GameActionList body for `dynelHandle`, delivered to `frameHandle`, carrying `actionTail` verbatim.
@@ -40,7 +55,7 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(frameHandle)
 				.WriteByte(0x00)
-				.WriteUInt32(Head)
+				.WriteUInt32(ListFrame.ForCount(1)) // one GameActionData element - `actionTail` is that one blob
 				.WriteUInt32(dynelHandle)
 				.WriteUInt32(field3)
 				.WriteUInt32(ConstFour)
@@ -49,8 +64,11 @@ namespace Faolan.Core.Network.Codecs.World
 				.ToArray();
 		}
 
-		// Parses a captured/built body back into its header fields + the verbatim action tail (the inverse of BuildBody;
-		// validates the constant 0x7E2 / 4 / 1 words so a malformed body is rejected rather than mis-framed).
+		// Parses a captured/built body back into its header fields + the verbatim action tail (the inverse of BuildBody).
+		// The list word is validated AS A COUNT (the client aborts the stream on a non-multiple - "Inconsistent spell
+		// list.."), not compared to 0x7E2: this used to demand `head == 0x7E2` exactly, which would have rejected any
+		// multi-action body as malformed. We only BUILD one element, but rejecting more on parse was asserting a
+		// constant that isn't one.
 		public static Parsed Parse(byte[] body)
 		{
 			ArgumentNullException.ThrowIfNull(body);
@@ -68,8 +86,10 @@ namespace Faolan.Core.Network.Codecs.World
 				throw new InvalidOperationException($"GameActionList: flag 0x{flag:X} != 0");
 
 			var head = r.ReadUInt32();
-			if (head != Head)
-				throw new InvalidOperationException($"GameActionList: head 0x{head:X} != 0x{Head:X}");
+			if (!ListFrame.TryCountOf(head, out var actionCount))
+				throw new InvalidOperationException($"GameActionList: head 0x{head:X} is not a count-framed list word");
+			if (actionCount != ActionCount)
+				throw new InvalidOperationException($"GameActionList: {actionCount} actions; only {ActionCount} is modelled (the tail is verbatim)");
 
 			var dynelHandle = r.ReadUInt32();
 			var field3 = r.ReadUInt32();

@@ -39,18 +39,12 @@ namespace Faolan.Tests
 		// String literals are prose (exception messages naming the word) - stripped like comments before scanning.
 		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
 
-		// Files where the word is deliberately still a literal, with the reason. NOT a place to silence the test: each
-		// entry is a capture-derived payload the project rule forbids refactoring until a replacement is proven
-		// byte-for-byte, and each is flagged in-source as a SUSPECT count.
-		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal)
-		{
-			// 0x7E2 mid-template, single-goal only; whole run is a verbatim capture template.
-			["WorldQuest.cs"] = "verbatim capture template; suspect count flagged in-source",
-			// Head = 0x7E2, "constant across 570 captures" - but possibly all single-action. Needs a multi-action capture.
-			["GameActionListCodec.cs"] = "unproven: needs a multi-action capture to tell a constant from ForCount(1)",
-			// The search REQUEST's category field; every captured query carries 0x7E2 and its meaning is untested.
-			["TradepostResponses.cs"] = "request category field, meaning untested (the response head IS ListFrame)"
-		};
+		// Files where the word is deliberately still a literal, with the reason. NOT a place to silence the test.
+		// Currently EMPTY, and that is the finding: the client never treats this word as a constant. Of the 136
+		// functions in AgeOfConan.exe that touch 0x3F1/0x7E2, 77 divide by 0x3F1 to read a count and 59 multiply to
+		// write one - ZERO compare it to a constant (Captures/ghidra/DumpListFraming.java). Every "0x7E2 constant"
+		// we ever wrote down was a 1-element list. If you are about to add an entry here, that is the prior.
+		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal);
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 
 		private static IEnumerable<Type> CodecTypes =>
@@ -161,11 +155,18 @@ namespace Faolan.Tests
 		[Fact]
 		public void CountFramedListWordComesFromListFrame_NotAHandRolled0x3F1()
 		{
-			var codecDir = TestPaths.Repo("Faolan.Core.Network", "Codecs");
+			// Codecs/ is not enough: the character-list framing lives in the PlayerAgent listener and the guild lists
+			// in CSPlayerAgent, both of which open-coded it (as decimal 1009 and a 14th local name) while this test
+			// scanned only Codecs/ and passed. A wire-shape rule has to cover everywhere the wire is written.
+			var roots = new[] { TestPaths.Repo("Faolan.Core.Network", "Codecs"), TestPaths.Repo("Faolan") };
 			var offenders = new List<string>();
 
-			foreach (var file in Directory.EnumerateFiles(codecDir, "*.cs", SearchOption.AllDirectories))
+			foreach (var file in roots.SelectMany(root => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)))
 			{
+				// EF migrations are generated + frozen; they carry no wire framing.
+				if (file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+					continue;
+
 				var name = Path.GetFileName(file);
 				if (name is "ListFrame.cs" or "NpcSpawnScaffold.cs" || ListWordLiteralAllowlist.ContainsKey(name))
 					continue;
