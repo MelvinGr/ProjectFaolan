@@ -148,6 +148,50 @@ namespace Faolan.Tests
 			Assert.Equal(v.MaxMana, v.Mana);
 		}
 
+		// #375: a resurrection point's RestorationLevel is the PERCENT of max you come back with - 344 of the 538
+		// imported points restore 10, 157 restore 100. The two edge cases matter more than the arithmetic: a point
+		// with no value must not revive you at 0% (i.e. dead), and a tiny percent of a small pool must still leave you
+		// alive rather than truncating to 0.
+		[Theory, InlineData(100f, 100u, 50u, 80u), InlineData(10f, 10u, 5u, 8u), InlineData(25f, 25u, 12u, 20u)]
+		public void ReviveTo_RestoresThePointsPercentOfEachPool(float percent, uint health, uint stamina, uint mana)
+		{
+			var v = EntityVitals.FromMax(100, 80, 50); // FromMax(health, mana, stamina)
+			v.ApplyHealthDelta(-100);
+			Assert.True(v.IsDead);
+
+			v.ReviveTo(percent);
+
+			Assert.False(v.IsDead);
+			Assert.Equal(health, v.Health);
+			Assert.Equal(stamina, v.Stamina);
+			Assert.Equal(mana, v.Mana);
+		}
+
+		[Fact]
+		public void ReviveTo_NonPositivePercentMeansNoData_AndRestoresFull()
+		{
+			var v = EntityVitals.FromMax(100, 50, 80);
+			v.ApplyHealthDelta(-100);
+
+			v.ReviveTo(0f);
+
+			Assert.Equal(v.MaxHealth, v.Health);
+			Assert.Equal(v.MaxStamina, v.Stamina);
+			Assert.Equal(v.MaxMana, v.Mana);
+		}
+
+		[Fact]
+		public void ReviveTo_NeverRevivesDead_EvenWhenThePercentTruncatesToZero()
+		{
+			var v = EntityVitals.FromMax(5, 5, 5); // 7% of 5 truncates to 0
+			v.ApplyHealthDelta(-5);
+
+			v.ReviveTo(7f);
+
+			Assert.False(v.IsDead);
+			Assert.Equal(1u, v.Health);
+		}
+
 		[Fact]
 		public void ToVitalsBlock_EmitsHealthStaminaMana_AtVitalsScale()
 		{

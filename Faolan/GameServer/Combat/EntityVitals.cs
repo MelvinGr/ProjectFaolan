@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -73,12 +74,37 @@ namespace Faolan.GameServer.Combat
 			return changed;
 		}
 
-		/// <summary>Restores all three pools to their max (a full revive, e.g. on respawn).</summary>
+		/// <summary>Restores all three pools to their max (a full revive - an NPC leashing home, or a fallback).</summary>
 		public void ReviveToFull()
 		{
 			Health = MaxHealth;
 			Stamina = MaxStamina;
 			Mana = MaxMana;
+		}
+
+		/// <summary>
+		///     Restores all three pools to <paramref name="percentOfMax" />% of their max - a resurrection point's
+		///     <c>RestorationLevel</c> (#375). Real, designed data: of the 538 imported points 344 restore 10%, 157
+		///     restore 100%, and the rest 7/20/25/30/50/70 - so the common point leaves you vulnerable and a
+		///     starter/safe point brings you back whole. Reviving everyone at full flattened that away.
+		///     Always leaves at least 1 in each pool, so a 0/garbage value can never revive a player dead. A
+		///     non-positive percent means "no data" and restores full.
+		///     The exact semantic is INFERRED: the RDB names the field but not what it scales. Health is near-certain;
+		///     whether it also scales stamina/mana is unverified, and applying it to all three is the reading that
+		///     matches the name. An in-client A/B (die near a 10% point vs a 100% one) settles it.
+		/// </summary>
+		public void ReviveTo(float percentOfMax)
+		{
+			if (percentOfMax <= 0f)
+			{
+				ReviveToFull();
+				return;
+			}
+
+			var fraction = Math.Min(percentOfMax, 100f) / 100f;
+			Health = Math.Max(1, (uint)(MaxHealth * fraction));
+			Stamina = Math.Max(1, (uint)(MaxStamina * fraction));
+			Mana = Math.Max(1, (uint)(MaxMana * fraction));
 		}
 
 		/// <summary>

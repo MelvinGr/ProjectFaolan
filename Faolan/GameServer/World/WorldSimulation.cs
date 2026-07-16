@@ -171,7 +171,9 @@ namespace Faolan.GameServer.World
 			var character = client.Session.Character;
 			var point = await _database.GetRespawnPoint(spawnPointId); // for logging/future teleport; revive works without it
 
-			vitals.ReviveToFull();
+			// Revive at the POINT's RestorationLevel, not always full (#375): 344 of the 538 imported points restore
+			// 10% and 157 restore 100%, so which spot you pick is a real choice. An unresolved point restores full.
+			vitals.ReviveTo(point?.RestorationLevel ?? 0f);
 			if (character.IsDead)
 			{
 				character.IsDead = false;
@@ -522,7 +524,6 @@ namespace Faolan.GameServer.World
 		{
 			var character = client.Session.Character;
 			var entity = PlayerWorldEntity(client);
-			vitals.ReviveToFull();
 
 			if (character.IsDead)
 			{
@@ -532,11 +533,14 @@ namespace Faolan.GameServer.World
 
 			// The point the player would respawn at (closest known, else the map's AlwaysKnown/first) - used as the
 			// BccIIR revive id. Revive in place (no teleport yet), so the character position is left at the death spot.
+			// Resolved BEFORE the vitals restore: the point's RestorationLevel decides how much comes back (#375).
 			var deathPos = entity?.Position ?? character.Position;
 			var points = await GetRespawnPointsCached(character.MapId);
 			var target = points.Length > 0
 				? RespawnResolver.ClosestKnown(deathPos, points, await GetDiscoveredRespawnCached(character.Id)) ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points.FirstOrDefault()
 				: null;
+
+			vitals.ReviveTo(target?.RestorationLevel ?? 0f); // no point resolved -> full
 
 			var handle = entity?.Handle ?? client.Session.Account.ClientInstance;
 			await _output.SendRevive(client, handle, target?.Id ?? 0);
