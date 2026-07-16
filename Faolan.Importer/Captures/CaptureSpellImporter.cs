@@ -7,6 +7,9 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -30,6 +33,12 @@ namespace Faolan.Importer.Captures
 		// character), body = [u32 spellId] (#73). The class pair disambiguates the 0x200A opcode collisions on other
 		// conversations (CharacterSearch etc.); the receiver-instance == character-id is the s2c-direction filter.
 		private const ushort LearnSpellOpcode = 0x200A;
+
+		// How many packets after its ding a grant may still be attributed to that level (#376). Real ones land in the
+		// SAME packet or ~3-4 later; the window keeps an unrelated later grant (a quest/claim reward) off the last ding.
+		private const int GrantWindow = 40;
+		private const uint WorldOpcode = 0x2000;
+		private const uint MaxLevel = 80;
 
 		// Marks each captured class's create-granted spells as its STARTER KIT (ClassSpell.IsStarter), from the 0x200A
 		// grants a create capture actually shows. So a level-1 create yields EXACTLY the capture's grant
@@ -322,6 +331,170 @@ namespace Faolan.Importer.Captures
 		}
 
 		// A create-capture DispatchLearnSpell grant id (s2c 0x200A, GameCharAgent -> GameCharInterface, [u32 spellId]).
+		// #376: the (class, spell, LEVEL) map, from capture truth. A NewLevelIIR (0x6D314743) carries the level just
+		// reached; every 0x200A grant that follows it in the same capture is a grant AT that level. That is a direct
+		// observation of what retail hands out and when - unlike the ellatha/wiki scrape, it cannot be wrong about it.
+		//
+		// The class comes from the PLAYER's own spawn: body[136] on the pre-IIR frame is the class byte
+		// (CaptureCharacterImporter, "verified 10/10"), and a player's spawn handle == its character id
+		// (player_handle_equals_character_id), so the spawn whose handle matches the ding's receiver instance IS the
+		// dinging character. Matching on the handle matters: NPC spawns carry a class byte too, and it is usually a
+		// VALID class enum (Kalanthes reads 24, Pillager 20), so "any spawn with a plausible class" would attribute a
+		// player's grants to whatever NPC was streamed first. This also works on LOGIN captures, where
+		// CaptureAbilityImporter.DetectClass cannot help (there is no create-editor callback) and where the character
+		// is usually absent from our own Characters table (Hoxxling, Blablatest, ... were never imported).
+		//
+		// Only grants AFTER a ding are attributed, which is what excludes the login re-grant burst (#74 re-grants the
+		// whole spellbook on every login - 201 such grants across the capture set, none of them level-attributable).
+		// GrantWindow additionally bounds how far a grant may sit from its ding: observed real ones land in the SAME
+		// packet or ~3-4 later, so a tight window keeps an unrelated later grant (a quest/claim reward) from being
+		// blamed on the last ding. Replace-all is deliberately NOT used - a capture that never dings must not retract
+		// what another capture proved.
+		public static async Task<(int Access, int Levels)> MarkLevelGrantsAsync(IDatabaseContext db, IReadOnlyList<NamedCapture> captures, ILogger? logger = null)
+		{
+			var proven = new Dictionary<(uint Class, uint SpellId), byte>();
+			foreach (var capture in captures)
+				CollectLevelGrants(capture.Packets, proven);
+
+			if (proven.Count == 0)
+				return (0, 0);
+
+			var known = (await db.Spells.Select(s => s.Id).ToListAsync()).ToHashSet();
+			var existing = (await db.ClassSpells.ToListAsync()).ToDictionary(c => ((uint)c.Class, c.SpellId));
+			var access = 0;
+			var levels = 0;
+
+			foreach (var ((cls, spellId), level) in proven)
+			{
+				if (!Enum.IsDefined((Class)cls) || !known.Contains(spellId))
+					continue; // an uncataloged grant id is a catalog gap (learned_spells_not_subset_of_catalog), not a fake spell - skip rather than FK-fault
+
+				if (!existing.TryGetValue((cls, spellId), out var row))
+				{
+					row = new ClassSpell { Class = (Class)cls, SpellId = spellId };
+					db.ClassSpells.Add(row);
+					existing[(cls, spellId)] = row;
+					access++;
+				}
+
+				// Lowest wins: a spell seen granted at 3 and again at 5 unlocks at 3 (the later sighting is a re-grant
+				// or a higher rank's row), mirroring CaptureAbilityImporter's min-level rule.
+				if (row.GrantLevel is { } have && have <= level)
+					continue;
+
+				row.GrantLevel = level;
+				levels++;
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("CaptureSpellImporter: {Levels} capture-proven grant levels across {Pairs} (class, spell) pairs, {Access} new access rows.", levels, proven.Count, access);
+			return (access, levels);
+		}
+
+		// Walks ONE capture in packet order, tracking each character's level from its NewLevelIIR dings and
+		// attributing the grants that follow. See MarkLevelGrantsAsync for why the handle match is required.
+		private static void CollectLevelGrants(IReadOnlyList<CapturedPacket> packets, IDictionary<(uint, uint), byte> proven)
+		{
+			var classByHandle = new Dictionary<uint, byte>();
+			foreach (var p in packets)
+			{
+				if (p.Opcode != WorldOpcode)
+					continue;
+
+				// Only PLAYER spawns parse with the scaffold codec - an NPC's FA015807 body has a different shape - so
+				// this filters the NPCs out for free. That matters: an NPC spawn's body[136] is usually a VALID class
+				// enum too (Kalanthes reads 24, Pillager 20), so a looser filter would hand a player's grants to
+				// whichever NPC streamed first.
+				var body = PacketBody(p.Bytes);
+				if (body.Length < 138 || !PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.PreFrame is { Length: 228 })
+					continue;
+
+				if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name))
+					continue;
+
+				classByHandle[scaffold.Handle] = body[136];
+			}
+
+			// instance -> the level its last ding announced, and which packet that ding was
+			var levelByInstance = new Dictionary<uint, (byte Level, int At)>();
+			for (var i = 0; i < packets.Count; i++)
+			{
+				var p = packets[i];
+				if (TryReadNewLevel(p.Bytes, out var dingInstance, out var newLevel))
+				{
+					levelByInstance[dingInstance] = (newLevel, i);
+					continue;
+				}
+
+				if (p.Opcode != LearnSpellOpcode)
+					continue;
+
+				var ids = new HashSet<uint>();
+				TryReadLearnSpellId(p.Bytes, ids);
+				if (ids.Count == 0 || !TryReadReceiverInstance(p.Bytes, out var instance))
+					continue;
+
+				if (!levelByInstance.TryGetValue(instance, out var ding) || i - ding.At > GrantWindow)
+					continue; // no ding yet (a create kit or the login re-grant burst), or too far from one to blame on it
+
+				if (!classByHandle.TryGetValue(instance, out var cls) || !Enum.IsDefined((Class)cls))
+					continue; // never saw this character's own spawn, so its class is unknown
+
+				foreach (var spellId in ids)
+					if (!proven.TryGetValue((cls, spellId), out var have) || ding.Level < have)
+						proven[(cls, spellId)] = ding.Level;
+			}
+		}
+
+		// NewLevelIIR_t on the world conversation: [u32 len][u32 6D314743][u32 0000C350][u32 instance][u8 flag]
+		// [u32 newLevel][u32 x6] - see NewLevelIirCodec.
+		private static bool TryReadNewLevel(byte[] packetBytes, out uint instance, out byte newLevel)
+		{
+			instance = 0;
+			newLevel = 0;
+			var body = PacketBody(packetBytes);
+			for (var i = 0; i + 25 <= body.Length; i++)
+			{
+				if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i, 4)) != NewLevelIirCodec.Opcode)
+					continue;
+
+				instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 8, 4));
+				var level = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 13, 4));
+				if (level == 0 || level > MaxLevel)
+					return false;
+
+				newLevel = (byte)level;
+				return true;
+			}
+
+			return false;
+		}
+
+		private static bool TryReadReceiverInstance(byte[] packetBytes, out uint instance)
+		{
+			instance = 0;
+			try
+			{
+				var packet = new ConanPacket(packetBytes);
+				instance = (uint)packet.Receiver.Instance;
+				return instance != 0;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		private static byte[] PacketBody(byte[] packet)
+		{
+			if (packet.Length < 16)
+				return [];
+
+			var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + (int)headerLen;
+			return bodyStart >= packet.Length ? [] : packet[bodyStart..];
+		}
+
 		private static void TryReadLearnSpellId(byte[] packetBytes, ISet<uint> ids)
 		{
 			try

@@ -234,13 +234,23 @@ namespace Faolan.Core.Database.Repositories
 		// 0x200A carries the spell id alone), so it is purely this gate; the client's own view comes from its RDB.
 		// This used to be faked by PINNING the kit to Level 1 and pushing the four others to 2, which overwrote real
 		// levels with sentinels. See ClassSpell.IsStarter.
+		//
+		// Above level 1 the gate prefers ClassSpell.GrantLevel - the level a capture SHOWS this class being granted
+		// this spell (#376) - and falls back to Spells.Level only where no capture has caught it. The two are
+		// different facts, not rival measurements: retail grants at or BELOW the RDB field, never above (Desecrating
+		// Essence R1 granted at 3 vs field 5; Contract of Protection R1 at 5 vs 10), so the field is a trainer /
+		// full-power level and the capture is the unlock. Only a handful of GrantLevels exist so far; every gameplay
+		// capture containing a ding adds more, and unlike a scrape they cannot be wrong about what retail granted.
 		public async Task<uint[]> GetStartingSpells(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new { cs, s })
-				.Where(x => x.cs.IsStarter || (level > 1 && x.s.Level > 1 && x.s.Level <= level))
+				.Where(x => x.cs.IsStarter
+					|| (level > 1 && (x.cs.GrantLevel != null
+						? x.cs.GrantLevel <= level
+						: x.s.Level > 1 && x.s.Level <= level)))
 				.OrderBy(x => x.s.Level)
 				.ThenBy(x => x.s.Id)
 				.Select(x => x.s.Id)

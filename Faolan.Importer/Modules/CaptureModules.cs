@@ -228,13 +228,16 @@ namespace Faolan.Importer.Modules
 			WriteMode.Overwrite
 		};
 
-		public string Description => "Mark create-granted spells as each captured class's starter kit (ClassSpell.IsStarter).";
+		public string Description => "Mark create-granted spells as each captured class's starter kit + the levels later grants land at (ClassSpell).";
 		public string Name => "starter-spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var (starters, cleared) = await CaptureSpellImporter.MarkStarterSpellsAsync(ctx.Db, ctx.CreateCaptures);
-			return new ImportResult($"{starters} create-granted starters marked, {cleared} stale flags cleared.");
+
+			// #376: the same table's other half - what a ding actually grants, from every capture (not just creates).
+			var (access, levels) = await CaptureSpellImporter.MarkLevelGrantsAsync(ctx.Db, ctx.Captures);
+			return new ImportResult($"{starters} create-granted starters marked, {cleared} stale flags cleared; {levels} capture-proven grant levels ({access} new access rows).");
 		}
 	}
 

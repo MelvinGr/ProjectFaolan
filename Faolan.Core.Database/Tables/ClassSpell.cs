@@ -26,6 +26,16 @@ namespace Faolan.Core.Database.Tables
 		// and the grant is stated outright. (Melvin: the RDB leads on level data, including over captures.)
 		public bool IsStarter { get; set; }
 
+		// The level at which a capture SHOWS this class actually being granted this spell: a NewLevelIIR (0x6D314743)
+		// ding followed by the 0x200A grant (#376). Null = no capture has caught this spell being granted.
+		//
+		// This is the real unlock gate and it is NOT `Spells.Level`. Retail grants at or BELOW that field, never above
+		// - Desecrating Essence R1 is granted at 3 but Spells.Level says 5; Contract of Protection R1 at 5 vs 10; Ice
+		// Strike R1 in the create kit at 1 vs 7. So the RDB field (which the ellatha scrape agrees with) is a trainer /
+		// full-power level, a DIFFERENT fact, not a worse measurement of this one. Where a capture has spoken, this
+		// wins; everywhere else `Spells.Level` is still the only gate we have.
+		public byte? GrantLevel { get; set; }
+
 		// FK into the Spell catalog. The importer ensures a catalog row exists for every harvested spell, so this
 		// navigation always resolves (load it with .Include(s => s.Spell) when the spell's params/level are needed).
 		// virtual so the lazy-loading-proxy DbContext used in tests can build its model.
