@@ -60,6 +60,71 @@ namespace Faolan.Importer.Captures
 			[269272] = "Rest"
 		};
 
+		// Derives the class<->ability ACCESS (ClassAbility) straight from the CREATE CAPTURES: DetectClass reads the
+		// create-editor callback, and the 0x2052 grants that follow are that class's universal level-1 kit. Every one
+		// of the 12 classes has a create dump and all 12 resolve, so this covers the whole roster (#296).
+		//
+		// This exists because DeriveClassAbilitiesAsync below can only see classes we imported a CHARACTER for, and we
+		// have exactly four (Assassin/Necro/HoX/Demo). That left the map in a state that was both wrong and
+		// unreproducible: DarkTemplar had ZERO abilities despite its create dump carrying 14 grants, while seven other
+		// classes held 7-8 rows apiece derived from characters that no longer exist - a from-scratch rebuild would
+		// simply have lost them, since that pass only ever inserts/updates. Sourcing from the captures makes the whole
+		// table reproducible and is the same trick starter-spells uses for spells: take the class from the capture,
+		// not from a character that may never have been imported.
+		//
+		// Level 1: a create grant IS the level-1 kit by definition. DeriveClassAbilitiesAsync still runs afterwards and
+		// contributes the gameplay-only abilities of the classes we do have characters for, at their real levels.
+		public static async Task<(int Inserted, int Classes)> DeriveClassAbilitiesFromCreatesAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
+		{
+			var byClass = new Dictionary<uint, HashSet<uint>>();
+			foreach (var capture in createCaptures)
+			{
+				if (DetectClass(capture) is not { } cls || !Enum.IsDefined((Class)cls))
+					continue;
+
+				var grants = new Dictionary<uint, (uint, uint, uint, uint, uint, uint)>();
+				foreach (var packet in capture)
+					TryReadAddSpecialAbility(packet, grants);
+
+				if (grants.Count == 0)
+					continue; // capture never reached the grant burst
+
+				if (!byClass.TryGetValue(cls, out var set))
+					byClass[cls] = set = [];
+				set.UnionWith(grants.Keys);
+			}
+
+			if (byClass.Count == 0)
+				return (0, 0);
+
+			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
+			var inserted = 0;
+
+			foreach (var (cls, ids) in byClass)
+				foreach (var abilityId in ids)
+				{
+					if (!abilityIds.Contains(abilityId))
+						continue; // grant for an ability we never cataloged - a catalog gap, not a fake id
+
+					if (existing.ContainsKey(((Class)cls, abilityId)))
+						continue; // already known; DeriveClassAbilitiesAsync owns the level for those
+
+					db.ClassAbilities.Add(new ClassAbility
+					{
+						Class = (Class)cls,
+						AbilityId = abilityId,
+						Level = 1 // a create grant is the level-1 kit by definition
+					});
+					existing[((Class)cls, abilityId)] = null!;
+					inserted++;
+				}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("CaptureAbilityImporter: {Inserted} class-ability access rows from {Classes} create captures.", inserted, byClass.Count);
+			return (inserted, byClass.Count);
+		}
+
 		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
 		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
 		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only

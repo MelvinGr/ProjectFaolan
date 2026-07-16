@@ -331,9 +331,15 @@ namespace Faolan.Importer.Modules
 		{
 			var (aChars, aRows) = await CaptureAbilityImporter.ImportCharacterAbilitiesAsync(ctx.Db, ctx.RawPackets);
 			var (cChars, cRows) = await CaptureAbilityImporter.ImportCharacterCombosAsync(ctx.Db, ctx.RawPackets);
-			// Derive the class<->ability access (ClassAbility) from the per-character grants just imported (the data-driven
-			// replacement for IsStartingAbility - the ability RDB template has no class/level requirement).
+			// The class<->ability access map (ClassAbility), from two sources. FIRST the CREATE captures: all 12 classes
+			// have a create dump and all 12 resolve, so this covers the whole roster with each class's level-1 kit.
+			// THEN the per-character grants, which can only see the four classes we imported a character for but do
+			// carry their real gameplay levels. Creates-first because the character pass only inserts what it can see:
+			// on its own it left DarkTemplar with ZERO abilities (its create dump has 14) and seven other classes
+			// holding rows derived from characters that no longer exist - unreproducible from a clean rebuild (#296).
+			var (createInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesFromCreatesAsync(ctx.Db, ctx.CreateCaptures);
 			var (caInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesAsync(ctx.Db);
+			caInserted += createInserted;
 			// Combos have no per-character grant to derive from, so ClassCombo comes from the catalog's capture-validated
 			// name prefixes (e.g. Herald_ = HoX, confirmed by Hakotep's 0x2076 combo book) - see DeriveClassCombosAsync.
 			var (ccInserted, _) = await CaptureAbilityImporter.DeriveClassCombosAsync(ctx.Db);
