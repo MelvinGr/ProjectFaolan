@@ -116,10 +116,14 @@ namespace Faolan.GameServer
 			const uint secondBarBase = 100; // page 2 / "bar 1" (slot = bar position, page 2 = +100; see ShortcutBarBuilder)
 
 			// Seed the class's spells ONLY for a character whose spellbook is EMPTY (a freshly-created one). An
-			// imported character already carries its REAL spellbook (the snapshot known-list = its actual highest-rank
-			// spells), so padding it with the full all-rank class set would bloat it far past what retail shows. The
-			// abilities below are still granted every login (they're never in the snapshot known-list, and the client
-			// keeps no persistent kit), and the bar's own spells are ensured resolvable further down.
+			// imported character already carries its REAL spellbook from the capture's snapshot known-list, so
+			// re-seeding it would only duplicate work and could reintroduce ids that character never had.
+			//
+			// NB the known-list is NOT a "highest rank only" set - it carries EVERY rank (NecroL80's imported book has
+			// Pestilential Blast R1-R6, Ice Strike R1-R6, ...), which is correct: all ranks are learned and visible,
+			// and showing only the top rank is a CLIENT-side UI option. Never filter a grant to a highest-rank set.
+			// The abilities below are still granted every login (they're never in the snapshot known-list, and the
+			// client keeps no persistent kit), and the bar's own spells are ensured resolvable further down.
 			var spells = (await Database.GetCharacterSpells(character.Id)).Length == 0
 				? await Database.GetStartingSpells(character.Level, character.Class)
 				: [];

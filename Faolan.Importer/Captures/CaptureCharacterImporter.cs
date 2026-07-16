@@ -350,9 +350,10 @@ namespace Faolan.Importer.Captures
 					Console.WriteLine($"Character '{name}': carried-inventory import failed ({e.GetType().Name}: {e.Message}); worn equipment only.");
 				}
 
-				// The character's SPELLBOOK is the snapshot's known-spell list (its actual highest-rank spells), NOT
-				// the incremental DispatchLearnSpell grants (which only carry a session's re-learns). Scanned straight
-				// out of the raw snapshot bytes so it survives a tails-parse failure on a large caster snapshot.
+				// The character's SPELLBOOK is the snapshot's known-spell list (its actual learned set - EVERY rank,
+				// not just the highest; see ImportKnownSpells), NOT the incremental DispatchLearnSpell grants (which
+				// only carry a session's re-learns). Scanned straight out of the raw snapshot bytes so it survives a
+				// tails-parse failure on a large caster snapshot.
 				try
 				{
 					knownSpells = await ImportKnownSpells(db, character.Id, snapshots);
@@ -537,7 +538,10 @@ namespace Faolan.Importer.Captures
 		}
 
 		// The character's SPELLBOOK from its FullChar snapshot's known-spell list (KnownSpellList): each type-2 record
-		// is a learned spell (the char's actual highest-rank set). Scanned from the raw snapshot bytes (no tails
+		// is a learned spell. This is the char's full learned set carrying EVERY RANK - not a "highest rank only"
+		// set: NecroL80's imported book holds Pestilential Blast R1-R6, Ice Strike R1-R6, and so on. That is correct
+		// and retail-accurate; collapsing a family to its top rank is a CLIENT-side UI option, so never filter the
+		// import (or any grant) down to one rank per family. Scanned from the raw snapshot bytes (no tails
 		// deserialize). The largest snapshot that yields a list wins; idempotent (skips already-recorded spells).
 		private static async Task<int> ImportKnownSpells(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
 		{
