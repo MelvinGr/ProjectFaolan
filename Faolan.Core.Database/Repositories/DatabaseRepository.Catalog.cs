@@ -220,16 +220,30 @@ namespace Faolan.Core.Database.Repositories
 			}
 		}
 
+		// The spells a character of this class/level should already know: the create-granted STARTER KIT, plus (above
+		// level 1) everything its class has access to whose level requirement it meets.
+		//
+		// LEVEL 1 IS THE KIT'S EXCLUSIVE DOMAIN, and that is capture-proven rather than a tidy-up: a create capture
+		// shows retail granting the necro EXACTLY Ice Strike (Rank 1) + Frozen Hatred. A plain "Level <= 1" query
+		// returns six - the class also has access to four other spells the RDB rates level 1 (Vile Insight,
+		// Pestilential Blast R1, ...) that retail demonstrably does NOT grant at create. So the create kit is a fixed
+		// LIST, not "every level-1 spell", and the level query starts at 2.
+		//
+		// Conversely the kit ignores the requirement entirely - retail grants Ice Strike (Rank 1) at creation though
+		// the RDB rates it level 7 (Hellfire Breath R1: level 25). Level never reaches the client (DispatchLearnSpell
+		// 0x200A carries the spell id alone), so it is purely this gate; the client's own view comes from its RDB.
+		// This used to be faked by PINNING the kit to Level 1 and pushing the four others to 2, which overwrote real
+		// levels with sentinels. See ClassSpell.IsStarter.
 		public async Task<uint[]> GetStartingSpells(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
-				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
-				.Where(s => s.Level > 0 && s.Level <= level)
-				.OrderBy(s => s.Level)
-				.ThenBy(s => s.Id)
-				.Select(s => s.Id)
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new { cs, s })
+				.Where(x => x.cs.IsStarter || (level > 1 && x.s.Level > 1 && x.s.Level <= level))
+				.OrderBy(x => x.s.Level)
+				.ThenBy(x => x.s.Id)
+				.Select(x => x.s.Id)
 				.Distinct()
 				.ToArrayAsync();
 		}

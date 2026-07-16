@@ -31,14 +31,19 @@ namespace Faolan.Importer.Captures
 		// conversations (CharacterSearch etc.); the receiver-instance == character-id is the s2c-direction filter.
 		private const ushort LearnSpellOpcode = 0x200A;
 
-		// Corrects each captured class's spell unlock LEVELS from the create grants (the level-1 truth). The ellatha
-		// scrape (EllathaSpellLevelImporter) tags many ranks with wrong levels - e.g. Ice Strike (Rank 1) at 7, or
-		// several non-granted ranks at 1 - so a naive "Level <= charLevel" starter query over-/under-grants a fresh
-		// caster. Rule: every spell a create capture GRANTS (0x200A) is level 1; every OTHER access row of that same
-		// captured class currently at level 1 is pushed above it. So a level-1 create yields EXACTLY the capture's
-		// grant (necro = Ice Strike R1 + Frozen Hatred). Must run AFTER the ellatha/wiki level modules (it overrides
-		// them). Idempotent; only classes whose create capture actually reached a grant are touched.
-		public static async Task<(int Pinned, int Bumped)> CorrectStarterLevelsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
+		// Marks each captured class's create-granted spells as its STARTER KIT (ClassSpell.IsStarter), from the 0x200A
+		// grants a create capture actually shows. So a level-1 create yields EXACTLY the capture's grant
+		// (necro = Ice Strike R1 + Frozen Hatred).
+		//
+		// This used to write LEVELS instead: it pinned every granted spell to Level 1 and pushed every other level-1
+		// access row of that class to 2, so that the level-gated "Level <= charLevel" starter query happened to return
+		// the captured set. That conflated two independent facts and corrupted a correct one - retail grants the necro
+		// Ice Strike (Rank 1) at create even though its requirement really is level 7 (the RDB and ellatha AGREE on 7;
+		// the old comment here blamed an ellatha mis-tag, but the client says the same). The starter kit is a fixed
+		// LIST, not a level query, so it is now stated outright and Spells.Level is left to the RDB, which leads on
+		// level data (Melvin, 2026-07-16). Idempotent; only classes whose create capture actually reached a grant are
+		// touched, and it no longer has to run after the level modules.
+		public static async Task<(int Starters, int Cleared)> MarkStarterSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{
 			var startersByClass = new Dictionary<uint, HashSet<uint>>();
 			foreach (var capture in createCaptures)
@@ -63,35 +68,33 @@ namespace Faolan.Importer.Captures
 				set.UnionWith(ids);
 			}
 
-			var allStarters = startersByClass.Values.SelectMany(s => s).ToHashSet();
-			if (allStarters.Count == 0)
+			if (startersByClass.Count == 0)
 				return (0, 0);
 
-			// 1. Create-granted spells are the level-1 truth.
-			var starterRows = await db.Spells.Where(s => allStarters.Contains(s.Id)).ToListAsync();
-			foreach (var s in starterRows)
-				s.Level = 1;
-
-			// 2. Every OTHER level-1 access row of a captured class is not actually a level-1 spell - push it above 1
-			//    (the ellatha scrape mis-tags non-granted ranks). A level-1 create then yields exactly the grant.
-			var bumped = 0;
-			foreach (var (cls, starters) in startersByClass)
+			// Replace-all per captured class: a spell this class's create capture granted IS a starter, anything else
+			// on that class is not (so a re-import after a better capture can retract a stale flag).
+			var starters = 0;
+			var cleared = 0;
+			foreach (var (cls, ids) in startersByClass)
 			{
-				var classSpellIds = await db.ClassSpells.Where(cs => (uint)cs.Class == cls).Select(cs => cs.SpellId).ToListAsync();
-				var l1 = await db.Spells.Where(sp => classSpellIds.Contains(sp.Id) && sp.Level == 1).ToListAsync();
-				foreach (var sp in l1)
+				var rows = await db.ClassSpells.Where(cs => (uint)cs.Class == cls).ToListAsync();
+				foreach (var row in rows)
 				{
-					if (starters.Contains(sp.Id))
+					var isStarter = ids.Contains(row.SpellId);
+					if (row.IsStarter == isStarter)
 						continue;
 
-					sp.Level = 2;
-					bumped++;
+					row.IsStarter = isStarter;
+					if (isStarter)
+						starters++;
+					else
+						cleared++;
 				}
 			}
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("CaptureSpellImporter: pinned {Pinned} starter spells to level 1, bumped {Bumped} non-starter level-1 rows above it.", starterRows.Count, bumped);
-			return (starterRows.Count, bumped);
+			logger?.LogInformation("CaptureSpellImporter: marked {Starters} create-granted starter spells ({Cleared} stale flags cleared) across {Classes} captured classes.", starters, cleared, startersByClass.Count);
+			return (starters, cleared);
 		}
 
 		public static async Task<(int Seen, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)

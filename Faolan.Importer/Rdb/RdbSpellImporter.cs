@@ -43,20 +43,17 @@ namespace Faolan.Importer.Rdb
 		// Pestilential Blast R7 at Level 0, the RDB says 80. 19,239 of 20,822 rows had no level at all, so this is
 		// nearly all upside (coverage 1,583 -> 8,202). (#367)
 		//
-		// PRECEDENCE: captures > RDB > scrapes (Melvin, 2026-07-16: "rdb is leading, so if a wiki import says
-		// something else, take rdb"). So this OVERWRITES a level from ellatha-levels / wiki-spell-levels, and the two
-		// disagree for 224 of the 7,645 spells the RDB knows (they agree on the other 7,135 - 93%).
+		// PRECEDENCE: the RDB LEADS on level data - over the ellatha/wiki scrapes AND over captures (Melvin,
+		// 2026-07-16: "rdb is leading, so if a wiki import says something else, take rdb" / "rdb is also leading over
+		// captures"). So this OVERWRITES whatever is there. The RDB and the scrapes agree on 7,135 of the 7,645 spells
+		// it knows (93%), so the 185 rows it changes are a small correction to a cross-validated field.
 		//
-		// ⚠️ LEVEL 1 IS CAPTURE-OWNED, IN BOTH DIRECTIONS - this module must neither overwrite a 1 nor mint one.
-		// `starter-spell-levels` (which runs immediately BEFORE this one) makes `Level == 1` mean exactly
-		// "create-granted starter, proven by a create capture", and pushes every other class level-1 row to 2 so a
-		// level-1 create yields exactly the captured grant. Both halves of that invariant are load-bearing:
-		//   - overwriting a 1 would push real starters to as much as 80 (the RDB calls the level-1 starters Ice Strike
-		//     and Healing Lotus 80) -> a NEW CHARACTER WITH NO SPELLS;
-		//   - minting a 1 would resurrect the 2s that module deliberately bumped -> the RDB calls 534 spells level 1,
-		//     so a class would be granted a pile of spells its create capture proves it never gets.
-		// Captures outrank the client RDB - the project's whole premise. A guard is needed rather than plan order
-		// because this module is opt-in: `--only rdb-spells` after a default run would otherwise clobber the pin.
+		// Nothing needs protecting from this any more. `starter-spells` used to encode the create-granted kit by
+		// PINNING those spells to Level 1 (and pushing every other class level-1 row to 2), so an overwrite here would
+		// have silently un-granted a new character's starters. That was always a conflation: retail grants the necro
+		// Ice Strike (Rank 1) at create even though its requirement really is level 7 - and the RDB and ellatha AGREE
+		// on 7, so the pin was overwriting a CORRECT level with a sentinel. The starter kit is now a capture-proven
+		// list on ClassSpell.IsStarter, independent of level, and Spells.Level means only "the level requirement".
 		private const uint LevelField = 0x07D;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
@@ -110,9 +107,7 @@ namespace Faolan.Importer.Rdb
 				var durationMs = fields.TryGetValue(DurationField, out var du)
 					? du * 10
 					: 0u; // centiseconds -> ms
-				// > 1 only: level 1 is the captures' to assign, never the RDB's (see LevelField). A record the RDB
-				// calls level 1 is recorded as "no level" rather than minted as a starter.
-				var level = fields.TryGetValue(LevelField, out var lv) && lv > 1 && lv <= byte.MaxValue
+				var level = fields.TryGetValue(LevelField, out var lv) && lv <= byte.MaxValue
 					? (byte)lv
 					: (byte)0;
 
@@ -155,9 +150,8 @@ namespace Faolan.Importer.Rdb
 				spell.DamageRating = damageRating;
 				spell.DurationMs = durationMs;
 
-				// RDB beats the scrapes; level 1 belongs to the captures in both directions (see LevelField). `level`
-				// is already 0 when the RDB said 1, so this only has to protect an EXISTING pin.
-				if (level != 0 && spell.Level != 1 && spell.Level != level)
+				// The RDB leads on level, over both the scrapes and the captures (see LevelField).
+				if (level != 0 && spell.Level != level)
 				{
 					spell.Level = level;
 					levelsSet++;

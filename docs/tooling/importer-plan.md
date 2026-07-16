@@ -91,7 +91,7 @@ RDB-sourced (require `--rdb`, **not** in the default group — opt-in via `--onl
 `rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt).
 
 TSV-sourced (default group; each self-skips if its `.tsv` is absent): `ellatha-levels`, `ellatha-combos`,
-`wiki-class-spells`, `wiki-spell-levels`. Plus `starter-spell-levels` — capture-sourced but registered late
+`wiki-class-spells`, `wiki-spell-levels`. Plus `starter-spells` — capture-sourced but registered late
 so it overrides the scraped spell levels with the level-1 create truth.
 
 ### Seed data has an explicit home

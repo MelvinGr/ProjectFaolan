@@ -228,13 +228,13 @@ namespace Faolan.Importer.Modules
 			WriteMode.Overwrite
 		};
 
-		public string Description => "Pin create-granted spells to level 1, push other class level-1 rows above it.";
-		public string Name => "starter-spell-levels";
+		public string Description => "Mark create-granted spells as each captured class's starter kit (ClassSpell.IsStarter).";
+		public string Name => "starter-spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var (pinned, bumped) = await CaptureSpellImporter.CorrectStarterLevelsAsync(ctx.Db, ctx.CreateCaptures);
-			return new ImportResult($"{pinned} starter spells pinned to L1, {bumped} non-starter L1 rows bumped.");
+			var (starters, cleared) = await CaptureSpellImporter.MarkStarterSpellsAsync(ctx.Db, ctx.CreateCaptures);
+			return new ImportResult($"{starters} create-granted starters marked, {cleared} stale flags cleared.");
 		}
 	}
 
