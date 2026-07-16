@@ -39,6 +39,12 @@ namespace Faolan.GameServer.World
 
 		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry).
 		private const double LootBagExpirySeconds = 120.0;
+
+		// How far a loot bag may be ground-snapped from the NPC's death Y. The snap fixes death-moment Y drift (tall /
+		// flying creatures, MoveTask Z-drift #190) - a few metres. Beyond that the heightmap is describing the OUTDOOR
+		// SURFACE above an interior/cave kill, not the floor the creature stood on, so the snap is refused and the
+		// death Y wins. Outdoor kills sit ~1m off; the cave kill that exposed this was 28m.
+		private const float MaxLootGroundSnap = 5f;
 		private const double PatrolDwellSeconds = 2.0;
 
 		// #266 patrol cycle: estimated client WALK speed (world units/sec) used to time how long a patrol route takes to
@@ -635,14 +641,18 @@ namespace Faolan.GameServer.World
 				// Bag at the NPC's death spot HORIZONTALLY (X/Z - where the player expects it, not at the killer's feet
 				// on a ranged/AoE kill), snapped to the terrain GROUND Y so a static bag mesh sits on the floor instead
 				// of at the creature's death-moment Y (which varies by creature: tall / flying / MoveTask Z-drift #190 ->
-				// bags float or sink). #284: the ground height is the RDB heightmap sample at the death X/Z. When terrain
-				// is unavailable (no client RDB), fall back to the KILLER's Y (they're on valid ground nearby), then to
-				// the NPC's own Y.
+				// bags float or sink). #284: the ground height is the RDB heightmap sample at the death X/Z.
+				//
+				// The snap only applies when the heightmap AGREES the NPC was standing on the outdoor surface. The
+				// heightmap is that surface and nothing else: an NPC killed in a cave, indoors, or on an upper floor
+				// sits far below (or above) it, and snapping there flings the bag to the open air - Kier-Dheed died at
+				// Y=153 under a surface of Y=181 and his bag spawned 28m overhead, unreachable. Outdoors the delta is
+				// ~1m, which is why this only ever showed up on interior kills. Past the tolerance the death Y is the
+				// better answer: the creature was demonstrably standing there.
 				var dropPos = deadNpc.Position;
-				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY)
+				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY
+					&& MathF.Abs(groundY - deadNpc.Position.Y) <= MaxLootGroundSnap)
 					dropPos = new Vector3(deadNpc.Position.X, groundY, deadNpc.Position.Z);
-				else if (deadNpc.LastAttackerHandle != 0 && _sim.World.ZoneForEntity(deadNpc).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
-					dropPos = new Vector3(deadNpc.Position.X, killer.Position.Y, deadNpc.Position.Z);
 
 				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name, deadNpc.LootContainer);
 				_logger.LogInformation(
