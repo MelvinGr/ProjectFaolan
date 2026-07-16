@@ -19,11 +19,13 @@ namespace Faolan.Importer.Captures
 	// the ability's Slot (template word) + Data0..4 identity quad; names are client-side (resolved by id).
 	//
 	// CLASS-AWARE: each create-flow capture is attributed to its character's class via the ChangeClass editor command
-	// it contains (numericValue/2 = class id; same convention as HandleCommandPacket). An ability granted under two
-	// or more distinct classes is GENERIC (Class=0, the universal kit - Normal Attack L/R/F + toggle-combat /
-	// switch-weapon / utility); one granted under a single class is class-specific (Class=that id). GrantCharacterAbilities
-	// then grants the generic set plus the character's own class set. Coverage is necessarily incomplete (only the
-	// classes/levels present in the captures) - that is expected.
+	// it contains (numericValue/2 = class id; same convention as HandleCommandPacket).
+	//
+	// NB there is no Class=0 "generic" row, whatever this comment used to claim: BOTH the CK_ClassAbility_Class CHECK
+	// and GetClassAbilities' `ca.Class == @class` filter reject it, so a class-0 row would be unwritable AND unread.
+	// The universal kit is MATERIALISED per class instead - all 12 rows - by DeriveClassAbilitiesFromCreatesAsync.
+	// (The same stale "Class 0 = generic" claim is on ClassSpell; GetStartingSpells does honour `cs.Class == 0` there,
+	// but the CHECK still forbids writing one, so it is equally dead.)
 	public static class CaptureAbilityImporter
 	{
 		private const uint ChangeClassSubOpcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR; // client->server character-editor script callback
@@ -60,14 +62,23 @@ namespace Faolan.Importer.Captures
 			[269272] = "Rest"
 		};
 
-		// Derives the class<->ability ACCESS (ClassAbility) straight from the CREATE CAPTURES: DetectClass reads the
-		// create-editor callback, and the 0x2052 grants that follow are that class's universal level-1 kit. Every one
-		// of the 12 classes has a create dump and all 12 resolve, so this covers the whole roster (#296).
+		// Seeds the UNIVERSAL level-1 ability kit onto every class (ClassAbility), from the create captures: the
+		// 0x2052 grants that follow a create. Melvin: "Rest needs to be granted to all classes, same with the
+		// directional attacks etc" - these are basic combat/movement/UI abilities, not class kit (#296).
 		//
-		// A create dump carries ~14 0x2052 PACKETS but only ~7 DISTINCT ability ids - the grants repeat - so count ids,
-		// not packets. The whole create kit across all 12 classes is just 8 distinct abilities (Rest, Upper Left /
-		// Upper Right / Overhead Attack, Toggle Combat, Switch Weapons, Crouch, Dash) and every one is already in the
-		// catalog; the grants dictionary is id-keyed, which collapses the duplicates for free.
+		// The kit is the UNION across all 12 create dumps, granted to all 12 classes - NOT each dump's own subset.
+		// That is what the data says: all 12 dumps together yield only **8 distinct** ability ids (Rest, Upper Left /
+		// Upper Right / Overhead Attack, Toggle Combat, Switch Weapons, Crouch, Dash). If any were class-specific the
+		// union would be bigger, so every class grants a subset of ONE shared kit and the per-class differences are
+		// capture noise - a dump that missed a packet - not design. Taking each dump's own subset left Conqueror
+		// without Rest (its dump never shows the grant) while Guardian and the necro had it: an artefact, and exactly
+		// the kind of hole that then reads as intentional.
+		//
+		// A dump carries ~14 0x2052 PACKETS but only ~7 DISTINCT ids - the grants repeat - so count ids, not packets;
+		// the id-keyed dictionary collapses the duplicates for free. All 8 are already in the Abilities catalog.
+		//
+		// DetectClass resolves all 12 classes, but only to prove a dump IS a class create (a dump we can't attribute
+		// might be some other capture) - the kit itself is class-independent.
 		//
 		// This exists because DeriveClassAbilitiesAsync below can only see classes we imported a CHARACTER for, and we
 		// have exactly four (Assassin/Necro/HoX/Demo). That left the map in a state that was both wrong and
@@ -81,11 +92,12 @@ namespace Faolan.Importer.Captures
 		// contributes the gameplay-only abilities of the classes we do have characters for, at their real levels.
 		public static async Task<(int Inserted, int Classes)> DeriveClassAbilitiesFromCreatesAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{
-			var byClass = new Dictionary<uint, HashSet<uint>>();
+			var kit = new HashSet<uint>();
+			var dumps = 0;
 			foreach (var capture in createCaptures)
 			{
 				if (DetectClass(capture) is not { } cls || !Enum.IsDefined((Class)cls))
-					continue;
+					continue; // can't confirm this is a class create
 
 				var grants = new Dictionary<uint, (uint, uint, uint, uint, uint, uint)>();
 				foreach (var packet in capture)
@@ -94,40 +106,39 @@ namespace Faolan.Importer.Captures
 				if (grants.Count == 0)
 					continue; // capture never reached the grant burst
 
-				if (!byClass.TryGetValue(cls, out var set))
-					byClass[cls] = set = [];
-				set.UnionWith(grants.Keys);
+				dumps++;
+				kit.UnionWith(grants.Keys);
 			}
 
-			if (byClass.Count == 0)
+			if (kit.Count == 0)
 				return (0, 0);
 
 			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 			var inserted = 0;
 
-			foreach (var (cls, ids) in byClass)
-				foreach (var abilityId in ids)
+			foreach (var cls in Enum.GetValues<Class>())
+				foreach (var abilityId in kit)
 				{
 					if (!abilityIds.Contains(abilityId))
-						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the create kit is 8 distinct ids and all 8 are cataloged.
+						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
 
-					if (existing.ContainsKey(((Class)cls, abilityId)))
+					if (existing.ContainsKey((cls, abilityId)))
 						continue; // already known; DeriveClassAbilitiesAsync owns the level for those
 
 					db.ClassAbilities.Add(new ClassAbility
 					{
-						Class = (Class)cls,
+						Class = cls,
 						AbilityId = abilityId,
-						Level = 1 // a create grant is the level-1 kit by definition
+						Level = 1 // the universal kit is level 1 by definition
 					});
-					existing[((Class)cls, abilityId)] = null!;
+					existing[(cls, abilityId)] = null!;
 					inserted++;
 				}
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("CaptureAbilityImporter: {Inserted} class-ability access rows from {Classes} create captures.", inserted, byClass.Count);
-			return (inserted, byClass.Count);
+			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} abilities (from {Dumps} create dumps) -> {Inserted} new class-ability rows across {Classes} classes.", kit.Count, dumps, inserted, Enum.GetValues<Class>().Length);
+			return (inserted, kit.Count);
 		}
 
 		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
