@@ -566,13 +566,20 @@ namespace Faolan.GameServer
 										return;
 									}
 
+									// applyTo = the spell's SUBJECT (the target, or the caster for a targetless self-cast),
+									// applyFrom = the CASTER. Passing these the other way round applied every hostile cast
+									// to the CASTER "from" the NPC: the debuff landed on the player's own buff bar, and
+									// because applyTo != applyFrom SendMagicBuffIir never registered it, so it never
+									// expired - a permanent 0s icon per cast. Invisible on a self-cast, where both
+									// arguments are casterHandle. (#370)
+									//
 									// ApplySpell takes the WIRE buff id ((base<<8)|rank), but the cast trailer carries the
 									// bare BASE id (the Spells key) - shift it to rank 0. Unshifted, the client resolved
 									// base=spellId>>8 / rank=spellId's low byte, neither of which is a real spell, and
 									// silently rendered no icon while the server-side lifecycle looked correct (#274).
-									await ApplySpell(client, casterHandle, targetHandle == 0
+									await ApplySpell(client, targetHandle == 0
 										? casterHandle
-										: targetHandle, spellId << 8);
+										: targetHandle, casterHandle, spellId << 8);
 									await _combat.SpendCasterMana(client, spellId);
 									if (targetHandle != 0 && targetHandle != casterHandle)
 										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
