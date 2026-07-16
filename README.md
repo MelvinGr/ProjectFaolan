@@ -109,8 +109,11 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 Buff stat effects — buffs are icon + timer only; nothing applies a stat delta. Damage-over-time is the one live
   effect (`Spells.DotDelta`, 34 spells); the other ~11,600 duration-bearing spells render an icon and do nothing.
   `Spells` has no stat-delta columns, so this needs an RDB decode + schema + apply/revert engine (#367)
-- 🟡 Spell cooldowns — client-side semantics fully RE'd and `SpellRecastActionBuilder` is byte-exact, but nothing
-  calls it: no cooldown is emitted on cast, and `Spell.Cooldown` (408 populated rows) is never read at runtime (#271)
+- 🟡 Spell cooldowns — fully RE'd (68-type GameAction catalog recovered from a live client). **Base cooldowns are
+  client-side**: retail sends nothing on a normal cast, the client reads the recast from its own RDB when the spell
+  is granted — so we deliberately emit nothing either. `SpellRecastActionBuilder` is byte-exact and construct-only,
+  for the server-OVERRIDE case (cooldown resets / AA reductions). Awaits an in-client check that the client runs the
+  sweep unaided (#271)
 - 🟡 Spellweaving (necromancer) — byte-exact builders; energy-bar drop still open (#141)
 - 🟡 Combat shields — server-side broadcast exists; the client guard-arc render is not yet decoded (#20)
 - ✅ NPC death animations — the death-pose MoveTask + death-behavior BCC play on kill (no more disappear /
