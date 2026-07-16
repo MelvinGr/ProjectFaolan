@@ -22,9 +22,7 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-
-**Imported content** (the DB is the server's source of truth): 242 maps · 526 NPC types / 978 placements · 2,463 items · 20,822 spells · 27 abilities · 211 conversation nodes · 20 shops · 26 quests · 1,056 world objects · 136 patrol routes
-
+**Imported content** (the DB is the server's source of truth): 520 maps · 586 NPC types / 1,086 placements · 3,188 items · 20,822 spells · 27 abilities · 242 conversation nodes · 29 shops · 28 quests · 1,053 world objects · 139 patrol routes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -33,10 +31,9 @@ we've seen_, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
 
 <!-- coverage:start -->
-
-- **NPC conversations** — 32/35 greeted dialogue NPCs imported (91.4%)
-- **Vendor shops** — 20/20 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 2,455/77,631 decrypted, **3.2% of the total encrypted**. Keys held per category: 2,428 items, 27 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **NPC conversations** — 34/37 greeted dialogue NPCs imported (91.9%)
+- **Vendor shops** — 21/21 captured vendors imported (100.0%)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,178/77,631 decrypted, **4.1% of the total encrypted**. Keys held per category: 3,151 items, 27 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -72,15 +69,20 @@ we've seen_, and names the gaps). Regenerate with
   anchor so they stop stacking); disabled by default until a group's creature type is confirmed (#332 done, #363)
 - 🟡 NPC line-of-sight — NPCs don't aggro over a hill / across a drop / through a building wall, and loot bags +
   corpses snap to the ground, driven by a baked per-map terrain file (heightmap + PhysX collision mesh; the game
-  server never touches the client RDB at runtime); awaits in-client confirm (#284)
+  server never touches the client RDB at runtime). The ground-snap is tolerance-gated: the heightmap is the OUTDOOR
+  surface only, so an interior/cave kill keeps its death Y instead of flinging the bag up to open sky (#369). Aggro
+  gating awaits in-client confirm (#284)
 - ✅ Interactive world objects — doors/gates open on use; interacting with a prop with no behavior floats a
   "nothing to interact with here yet" bubble instead of a silent no-op
 - ✅ Zone-line / teleport doors — using a door that changes location teleports the player (same-playfield and
   cross-playfield, in-client verified), destinations auto-imported from captured UseObject→teleport sequences;
   the ~52 un-harvested zone-lines still fall through to the open animation (#341) and the GameAction type ids are
   placeholders (#338)
-- 🟡 Area-name banners — entering a named area/region floats the on-screen area title (`GenericDisplayAreaName`
-  via `FormatFeedbackIIR`), harvested per map from captures into `Map.AreaNameId`; awaits in-client confirm (#348)
+- 🟡 Area-name banners — entering a map floats the on-screen area title (`GenericDisplayAreaName` via
+  `FormatFeedbackIIR`), harvested from captures into `Map.AreaNameId` (4 maps); awaits in-client confirm. Interim
+  shape: retail fires a banner per **sub-region** crossing and a playfield has many, so the single per-map column
+  can't represent it (Old Tarantia alone has a cluster of 4 captured ids) — the real model is RDB region trigger
+  volumes, still un-extracted (#348)
 - 🟡 Sit on benches — the sit/stand/hold-state animations are decoded + built byte-exact, but the pose reverts
   to standing after the animation (does not yet hold in-client) (#355)
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
@@ -99,23 +101,29 @@ we've seen_, and names the gaps). Regenerate with
   which drops the cast bar + plays the "Interrupted" text (#347)
 - ✅ Death window + resurrect/respawn
 - ✅ Buff application, damage-over-time, buff-expiry lifecycle (timers clear the icon at 0), and right-click cancel
-  (server-driven icon removal)
+  (server-driven icon removal). Self-buffs and hostile debuffs both verified in-client (#274, #370)
 - ✅ Shield of the Risen — the top-of-screen protection buff, re-applied on login and every map change; dispels on
   the first aggressive action with the `LostGraceEffect` toast (#361)
 - 🟡 Ground-targeted AoE (Deathly Blizzard) — ticks damage over its channel with floating numbers; the per-spell
   blast radius + tick cadence are still interim constants (not in the RDB spell record) (#349)
-- 🟡 Non-health debuff effect application — awaits in-client confirm (#274)
-- 🟡 Spell cooldowns — client-side semantics fully RE'd; the server-authored builder is capture-blocked (#271)
+- 🟡 Buff stat effects — buffs are icon + timer only; nothing applies a stat delta. Damage-over-time is the one live
+  effect (`Spells.DotDelta`, 34 spells); the other ~11,600 duration-bearing spells render an icon and do nothing.
+  `Spells` has no stat-delta columns, so this needs an RDB decode + schema + apply/revert engine (#367)
+- 🟡 Spell cooldowns — client-side semantics fully RE'd and `SpellRecastActionBuilder` is byte-exact, but nothing
+  calls it: no cooldown is emitted on cast, and `Spell.Cooldown` (408 populated rows) is never read at runtime (#271)
 - 🟡 Spellweaving (necromancer) — byte-exact builders; energy-bar drop still open (#141)
 - 🟡 Combat shields — server-side broadcast exists; the client guard-arc render is not yet decoded (#20)
 - ✅ NPC death animations — the death-pose MoveTask + death-behavior BCC play on kill (no more disappear /
-  teleport-to-spawn / attack-while-dead for patrolling NPCs); per-creature death anim (humanoid/demon/beast)
-  harvested per NPC, awaits in-client confirm (#362)
+  teleport-to-spawn / attack-while-dead for patrolling NPCs). The per-creature death anim is carried on
+  `NpcTemplate.DeathBehaviorId` and verified in-client for humanoid (41877) and beast (215333); 43 types harvested,
+  the remaining 543 fall back to the humanoid anim until harvested (#362)
 - ⬜ Directional combat + defensive shield arcs ("real combat", #20) · Fatalities (#140)
 
 ### Character progression
 
-- ✅ Learned-spell grant on login; level-up spell / ability / combo grants; starting abilities & combos
+- ✅ Learned-spell grant on login; level-up spell / ability / combo grants; starting abilities & combos. Every rank
+  is learned and visible (retail's snapshot known-list carries R1..Rn); collapsing a family to its top rank is a
+  client-side UI option, not something the server does
 - ✅ Combos persist across relog — re-emitted on every world entry, not just on level-up (#299)
 - 🟡 XP curve — provisional ramp; real thresholds only partially harvested (#297)
 - 🟡 Class spell/combo catalog data — sparse (#296) · abilities panel completeness — mount/travel/class-inherent
@@ -133,6 +141,9 @@ we've seen_, and names the gaps). Regenerate with
 
 - ✅ Inventory (DB containers, equip, move, starting gear)
 - ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
+  (taking an attachment now clears it: `Mail`'s primary key is the wire `MailId` itself, so the attachment FK can no
+  longer mismatch the id every caller passes — the old surrogate row key silently deleted nothing and duplicated the
+  item on relog, #368)
 - ✅ Item claims / Redeem window (`CoreClaimIIR`) — the per-account claim list + redeem (Claim / Claim All),
   infinite vs. multi-charge (Double XP) claims, delivered to the backpack; item keys harvested from the claim
   list, rendered by key on relog (#359)
