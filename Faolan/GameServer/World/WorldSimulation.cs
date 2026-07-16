@@ -396,7 +396,7 @@ namespace Faolan.GameServer.World
 				if (now == 0)
 					continue; // left an area into unnamed ground - retail shows nothing
 
-                    await _output.SendAreaNameBanner(client, now);
+				await _output.SendAreaNameBanner(client, now);
 				// Logged by id, not name: MapArea has no name (the client renders the text; decoding one needs a
 				// per-page LDB pin, #291). 3373519 is "Bridge of Vilerus I" if you need to read one by hand.
 				_logger.LogInformation("World: {Player} entered area {Id} on map {Map} ({Samples} captured sighting(s) back it).", client.Session.Character.Name, now, entity.MapId, best!.SampleCount);
@@ -437,6 +437,7 @@ namespace Faolan.GameServer.World
 					continue;
 
 				var discovered = await GetDiscoveredRespawnCached(character.Id);
+				var newlyFound = false;
 				foreach (var point in points)
 				{
 					if (point.AlwaysKnown || discovered.Contains(point.Id))
@@ -446,9 +447,32 @@ namespace Faolan.GameServer.World
 
 					await _database.DiscoverRespawnPoint(character.Id, point.Id);
 					discovered.Add(point.Id);
-					await _agents.SendSystemMessage(character.Id, $"Resurrection point discovered: {point.Name}");
-					_logger.LogInformation("World: {Player} discovered resurrection point '{Point}'.", character.Name, point.Name);
+					newlyFound = true;
+					_logger.LogInformation("World: {Player} discovered resurrection point {Point} ('{Name}').", character.Name, point.Id, point.Name);
 				}
+
+				if (!newlyFound)
+					continue;
+
+				// #372: retail ANNOUNCES a discovery by re-sending the resurrection-spots list with the new point in
+				// it - the client diffs it against what it had and draws its own "discovered" toast. There is no
+				// server-sent toast to reproduce: no capture carries a discovery token (13 distinct FormatFeedback
+				// tokens across 104 captures, none of them this), because the text is CLIENT-side, exactly like the
+				// "Congratulations, you reached level N" banner that NewLevelIIR gates.
+				//
+				// Proven by Hoxxling_mage-heraldofxotli_login_gameplay: frame 138 carries ONE spot (0x0bf76c =
+				// 784236, the AlwaysKnown one); frame 7862 carries TWO (784237 then 784236) at the moment the player
+				// walked near the discoverable second - ALIVE and mid-walk, so this does not open the release screen
+				// (the client only shows that on the dead bcc_state). Both spots' positions match our imported
+				// RespawnPoints byte-for-byte.
+				//
+				// This replaces a `SendSystemMessage($"Resurrection point discovered: {point.Name}")` chat line that
+				// was never capture-derived - and which printed the RDB's designer label ("ResurrectionAIPoint2")
+				// because a resurrection point has no display name in the client (its real name lives in the LDB,
+				// page 211698 / category 270: "Water's Edge", "Secluded Cove", ...). Letting the client name it side-
+				// steps that entirely.
+				var known = points.Where(p => p.AlwaysKnown || discovered.Contains(p.Id)).ToList();
+				await _output.SendResurrectionSpots(client, entity.Position, known);
 			}
 		}
 
@@ -822,7 +846,7 @@ namespace Faolan.GameServer.World
 			var killer = ResolveKiller(playerEntity, deathPosition, character.MapId, handle);
 			await _output.SendDeathPose(client, handle, deathPosition);
 			await _output.SendDeathTrigger(client, handle, killer);
-			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
+			await _output.SendResurrectionSpots(client, deathPosition, [spot]);
 			// The BccIIR that transitions the live SimpleChar into the dead state (bcc_state 29) - retail sends it after
 			// the release screen. This is what shows the release window for an IN-SESSION death (the login spawn's
 			// bcc_state=29 only covers login-while-dead).

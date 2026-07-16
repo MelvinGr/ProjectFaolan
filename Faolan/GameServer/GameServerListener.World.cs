@@ -1,4 +1,7 @@
+using System.Collections.Generic;
+using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
@@ -11,6 +14,14 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
 			return SendAreaNameBanner(client, areaNameId);
+		}
+
+		// The player's resurrection spots. Lives here rather than in the Combat partial because the list is not a
+		// combat concern: the world tick sends it to a LIVE player to announce a newly-discovered point (#372), and
+		// the death path is only its other caller.
+		Task IWorldOutbound.SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots)
+		{
+			return SendValidResurrectionSpots(client, referencePosition, spots);
 		}
 
 		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)

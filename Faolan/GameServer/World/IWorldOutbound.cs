@@ -82,7 +82,7 @@ namespace Faolan.GameServer.World
 		Task SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition);
 
 		// The explicit death trigger (SimpleCharKilledByUpdateIIR 0xB066AFC2) the client needs to enter the dead
-		// (release-screen) state - a health=0 StatUpdate alone doesn't (#214). Sent before SendResurrectionScreen.
+		// (release-screen) state - a health=0 StatUpdate alone doesn't (#214). Sent before the resurrection-spots list.
 		Task SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint);
 
 		// Send the NPC's attack-animation ack to the player it hit (the decoded "second BccAck" - BehaviorControlCenterIIR
@@ -94,9 +94,17 @@ namespace Faolan.GameServer.World
 		// damage/effect is the captured payload; visual + the HP move rides the caller's PushVitals (like the swing).
 		Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell);
 
-		// Push the death/release screen: DispatchValidResurrectionSpots with the death position + the spots the
-		// player may resurrect at. The client replies with RespawnMe(spawnPointId) (handled inbound).
-		Task SendResurrectionScreen(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots);
+		// The player's resurrection spots: DispatchValidResurrectionSpots (0x2024) with a reference position + every
+		// spot they may resurrect at. Serves BOTH of retail's uses, which is why it is named for the list it carries
+		// and not for the release screen:
+		//   - ON DEATH, with the death position - the client draws the release screen and replies RespawnMe(spotId)
+		//     (handled inbound). It is SimpleCharKilledByUpdateIIR that puts the client in the dead state, not this.
+		//   - ON DISCOVERY, with the LIVE position - re-sending the list with a newly-found spot in it is the whole
+		//     discovery notification (#372): the client diffs it against what it held and toasts itself. There is no
+		//     server-sent toast; the text is client-side, like NewLevelIIR's level banner.
+		// Proven in Hoxxling_mage-heraldofxotli_login_gameplay: frame 138 = one spot, frame 7862 = two, the second
+		// arriving while the player was ALIVE and mid-walk - so this alone never opens the release screen.
+		Task SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots);
 
 		// The revive action (BccIIR 0x642CD3D6) retail sends on RespawnMe to transition the player out of the Dead
 		// substate (bcc_state 29→1) - closes the release window + revives IN PLACE, NOT a world re-entry (#214).

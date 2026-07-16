@@ -66,11 +66,6 @@ namespace Faolan.GameServer
 			return CombatService.SendNpcSpellCast(client, npcHandle, spell);
 		}
 
-		Task IWorldOutbound.SendResurrectionScreen(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
-		{
-			return SendValidResurrectionSpots(client, deathPosition, spots);
-		}
-
 		Task IWorldOutbound.SendRevive(INetworkClient client, uint handle, uint respawnPointId)
 		{
 			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).

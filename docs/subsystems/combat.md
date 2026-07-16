@@ -94,6 +94,42 @@ commit 763aeb0). Trail: agent memory `protocol_death_resurrect`.
 (The corpse object `TombStoneFullUpdateIIR_c` 0x0D80E7C9 is decoded but not used — the corpse lingers as the dying
 creature, then a separate loot bag spawns, #246.)
 
+**Resurrection spots (`DispatchValidResurrectionSpots`, s2c 0x2024) — body fully decoded, #372.** The body is a
+reference position + a **list** of the points a player may revive at, built by `ResurrectionSpotsBody`:
+
+```
+[refPos X,Y,Z][u32 (count+1) * 0x3F1]  then count × 41-byte records:
+  [spotPos X,Y,Z][u32 spotType][u32 mapId][u32 0][u32 0][u32 0][u32 spotId][u32 restorationLevel][u8 0x00]
+```
+
+Three fields once carried as "undecoded constants" are real, and all three were invisible while we only ever sent
+the **one** spot of the death case — at count 1 the hardcoded `0x7E2` *is* the correct prefix and a single
+end-of-body `0x00` lands exactly where the per-record one goes
+[V3: DispatchValidResurrectionSpotsTests.ValidResurrectionSpotsBody_CountPrefixIsListFramed]:
+
+- `0x7E2` is the **list count**, `(count+1) * 0x3F1` — the same list framing the guild lists use. The four values
+  across the captures are exactly 2/3/4/8 × 0x3F1 for the 1/2/3/7-spot frames.
+- the trailing `0x00` is **per-record** (stride 41), not one byte at the end of the body.
+- the `0x0A` tail is **`RestorationLevel`** — the percent of max the point revives you at (#375). Observed
+  0x0A/0x32/0x64 = 10/50/100, and for all 21 spot ids in the captures the wire value equals the RDB
+  `RestorationLevel` we import for that point, along with its map and position, to the byte
+  [V3: DispatchValidResurrectionSpotsTests.ValidResurrectionSpotsBody_EmitsThePointsRestorationLevel].
+
+The list is ordered **nearest-first** from the reference position (the client renders it in wire order). Proven
+rather than guessed: the three 7-spot frames carry the *same seven points in three different orders*, each
+ascending by distance from that frame's own reference position; ascending distance holds in 23/23 multi-spot
+frames where ordering by id holds in only 16/23
+[V3: DispatchValidResurrectionSpotsTests.ValidResurrectionSpotsBody_TwoSpots_MatchCapture_OrderedNearestFirstWhateverTheInputOrder]. `spotType` (0xC7A0 login / 0xC79E create-flow / 0xC79C once)
+stays undecoded and is **not** a property of the point — point 790836 appears under both 0xC79C and 0xC7A0.
+
+**Discovery is a re-send, not a toast (#372).** Walking near an undiscovered point makes the server re-send this
+same packet with the new spot in it; the client diffs it against what it held and draws its own "discovered"
+banner, exactly like `NewLevelIIR`'s level banner. There is no server-sent toast to reproduce and no name on the
+wire — the client names the point itself. Sent with the **live** position to a **living** player, and it does not
+open the release screen (that is `SimpleCharKilledByUpdateIIR`'s job) [V2:
+`Captures/Hoxxling_mage-heraldofxotli_login_gameplay.tshark.json`]. `WorldSimulation.DiscoverNearbyRespawnPoints`
+sends it via `IWorldOutbound.SendResurrectionSpots`.
+
 ## Melee cleave (#18)
 
 A swing damages an ARC in retail, not just the selected target. `CombatService.ApplyMeleeCleave` (called
