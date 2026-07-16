@@ -19,6 +19,12 @@ namespace Faolan.GameServer
 			return _broadcaster.ConvertCorpseToLoot(npc);
 		}
 
+		// #348: the tick's sub-area crossing banner - forwards to the Outbound partial's sender.
+		Task IWorldOutbound.SendAreaNameBanner(INetworkClient client, uint areaNameId)
+		{
+			return SendAreaNameBanner(client, areaNameId);
+		}
+
 		Task IWorldOutbound.SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
 		{
 			return CombatService.SendDamageNumber(client, targetHandle, attackerHandle, damage);

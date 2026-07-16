@@ -15,6 +15,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Map[]> GetMaps();
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
+		Task<MapArea[]> GetMapAreas(uint mapId);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<WorldObject?> GetWorldObject(uint mapId, uint captureId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
@@ -26,6 +27,13 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.CapturedHandle == capturedHandle).ExecuteDeleteAsync();
+		}
+
+		// The named sub-areas of a playfield - the regions that float the area banner when a player walks in (#348).
+		public async Task<MapArea[]> GetMapAreas(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.MapAreas.Where(a => a.MapId == mapId).ToArrayAsync();
 		}
 
 		public async Task<RespawnPoint?> GetDefaultSpawn(uint mapId)

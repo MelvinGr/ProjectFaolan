@@ -76,11 +76,6 @@ namespace Faolan.Core.Database.Tables
 		// Tarantia = 0x00507927). 0 = unknown → the world-entry falls back to WorldState.DefaultPlayfieldToken (beach).
 		public uint PlayfieldToken { get; set; }
 
-		// The client localized-string id for this map's primary AREA NAME (#348) - the top-of-screen FIFO banner the
-		// server sends on entry (FormatFeedbackIIR GenericDisplayAreaName). Harvested from captures (the first area
-		// banner after entering the playfield); NULL = no captured area name, so no banner is sent. Sub-region
-		// crossings within a playfield (multiple area names per map) need trigger geometry - a follow-up.
-		public uint? AreaNameId { get; set; }
 	}
 
 	// How the live world creates copies (instances) of a map (#268). Retail's playfield-instance token is the

@@ -50,6 +50,10 @@ namespace Faolan.GameServer.World
 
 		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
 		public uint MapId { get; set; }
+
+		// The MapArea.AreaNameId the player is currently standing in, or 0 for none (#348). Live world state, never
+		// persisted: it exists so the tick can tell a CROSSING (banner) from merely still being inside the area.
+		public uint CurrentAreaNameId { get; set; }
 		public bool Following => FollowTargetHandle != 0;
 
 		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.

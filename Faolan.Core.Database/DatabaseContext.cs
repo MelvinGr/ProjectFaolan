@@ -52,6 +52,7 @@ namespace Faolan.Core.Database
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
 		DbSet<Map> Maps { get; }
+		DbSet<MapArea> MapAreas { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcTemplate> NpcTemplates { get; }
@@ -125,6 +126,7 @@ namespace Faolan.Core.Database
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }
 		public DbSet<Map> Maps { get; set; }
+		public DbSet<MapArea> MapAreas { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcTemplate> NpcTemplates { get; set; }

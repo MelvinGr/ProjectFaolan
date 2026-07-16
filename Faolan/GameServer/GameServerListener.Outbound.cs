@@ -423,16 +423,16 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 		}
 
-		// #348: the top-of-screen FIFO banner with the playfield's area name, shown on entry (retail does this on
-		// playfield entry + sub-region crossings; we do entry, from the harvested Map.AreaNameId). No-op for a map with
-		// no captured area name.
-		private async Task SendAreaNameBanner(INetworkClient client, uint mapId)
+		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on
+		// every sub-area crossing, not once per playfield - Old Tarantia alone has six (Bridge of Vilerus I, The East
+		// Gate, The West Gate, ...) - so the world tick drives this off MapArea, and the entry banner is simply the
+		// first crossing. `areaNameId` is the client's localized-string id; the client renders the text itself.
+		//
+		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
+		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
+		private Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
-			var map = await Database.GetMap(mapId);
-			if (map?.AreaNameId is not { } areaId)
-				return;
-
-			await SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaId)));
+			return SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).

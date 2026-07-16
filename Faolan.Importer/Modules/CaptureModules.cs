@@ -603,37 +603,40 @@ namespace Faolan.Importer.Modules
 			WriteMode.Overwrite
 		};
 
-		public string Description => "Per-map area name (FIFO banner shown on playfield entry).";
+		public string Description => "Named sub-areas per map + the positions their banner fires at (MapArea).";
 		public string Name => "area-names";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var harvested = AreaNameExtractor.Merge(ctx.Captures.SelectMany(c => AreaNameExtractor.Extract(c.Packets)));
-			var byMap = harvested.ToDictionary(a => a.MapId, a => a.AreaNameId);
+			// Every banner sighting, with the position it fired at - a map has MANY areas (Old Tarantia fires six),
+			// so this is one row per (map, areaNameId), not the old one-scalar-per-map vote.
+			var areas = AreaNameExtractor.MergeAreas(ctx.Captures.SelectMany(c => AreaNameExtractor.Extract(c.Packets)));
+			if (areas.Count == 0)
+				return new ImportResult("no area banners in the captures.");
 
-			var cleared = 0;
-			if (ctx.ModeFor(Name) == WriteMode.Overwrite)
-			{
-				foreach (var m in await ctx.Db.Maps.Where(m => m.AreaNameId != null).ToListAsync())
-				{
-					m.AreaNameId = null;
-					cleared++;
-				}
-			}
+			// Replace-all: the hull is derived wholly from the current capture set, so a stale row from a previous
+			// run would keep bounds no capture supports any more.
+			ctx.Db.MapAreas.RemoveRange(ctx.Db.MapAreas);
+			await ctx.Db.SaveChangesAsync();
 
-			var updated = 0;
-			foreach (var map in await ctx.Db.Maps.ToListAsync())
+			var maps = (await ctx.Db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			var added = 0;
+			var skipped = 0;
+			foreach (var area in areas)
 			{
-				if (byMap.TryGetValue(map.Id, out var areaId) && map.AreaNameId != areaId)
+				if (!maps.Contains(area.MapId))
 				{
-					map.AreaNameId = areaId;
-					updated++;
+					skipped++; // a banner on a playfield we never imported - would FK-fault
+					continue;
 				}
+
+				ctx.Db.MapAreas.Add(area);
+				added++;
 			}
 
 			await ctx.Db.SaveChangesAsync();
-			var prefix = cleared > 0 ? $"cleared {cleared}; " : "";
-			return new ImportResult($"{prefix}{byMap.Count} map area name(s) harvested, {updated} maps set.");
+			var multi = areas.GroupBy(a => a.MapId).Count(g => g.Count() > 1);
+			return new ImportResult($"{added} named sub-areas across {areas.Select(a => a.MapId).Distinct().Count()} maps ({multi} with more than one){(skipped > 0 ? $", {skipped} on unknown maps" : "")}.");
 		}
 	}
 

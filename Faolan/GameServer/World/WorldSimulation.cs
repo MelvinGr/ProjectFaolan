@@ -59,11 +59,20 @@ namespace Faolan.GameServer.World
 		// How close a player must get to discover a resurrection point.
 		private const float RespawnDiscoveryRange = 15f;
 
+		// #348: how far OUTSIDE a captured area hull still counts as inside. The hull is built from the positions
+		// retail was seen firing the banner at, so it can only cover ground a captured player walked - it is always
+		// an under-estimate of the real region. The slack buys back some of that; the vertical one is looser because
+		// a hull from a handful of samples barely captures an area's height range at all (Bridge of Vilerus I spans
+		// 1 unit of Y across six sightings, which is the bridge deck, not the trigger's true band).
+		private const float AreaBannerSlack = 8f;
+		private const float AreaBannerVerticalSlack = 20f;
+
 		// Local-say range in world units. Built-NPC tests showed a +4-unit offset renders "beside" the player, so
 		// units are ~metres; ~50 is a generous "nearby" for /say. Tunable; same-map is the hard filter either way.
 		private const float SayRangeUnits = 50f;
 
 		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
+		private readonly ConcurrentDictionary<uint, MapArea[]> _mapAreas = new(); // #348: per-map sub-areas, read every tick
 		private readonly ConcurrentDictionary<INetworkClient, double> _playerRespawnRemaining = new ConcurrentDictionary<INetworkClient, double>();
 
 		// Cached DoT effect per base spell id (Spell.DotDelta/DotType): looked up once per spell, then reused so the
@@ -337,6 +346,76 @@ namespace Faolan.GameServer.World
 
 			if (vitals.IsDead)
 				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}'s spell.", character.Name, npc.Name);
+		}
+
+		// #348: floats the area banner when a player CROSSES into a named sub-area. A map has many - Old Tarantia
+		// fires six - so this is a per-tick position test against MapArea, not a per-playfield event; entering a
+		// playfield lands you in an area and that is simply the first crossing.
+		//
+		// The regions are CAPTURE-DERIVED (the boundary triggers are server-side - no client record references a
+		// banner id), so the bounds are a hull over the positions retail was seen firing each banner at, widened by
+		// AreaBannerSlack because a hull can only cover ground a captured player actually walked. That makes them
+		// approximate: expect a banner slightly early/late at the edges, and expect areas we have no sighting of to
+		// stay silent. It tightens as more marked dumps land.
+		//
+		// The SMALLEST containing area wins: the captured hulls overlap (Old Tarantia's "The West Gate" box sits
+		// inside "The East Gate" box), and the tighter hull is the more specific claim.
+		private async Task TickAreaBanners()
+		{
+			foreach (var pair in Players)
+			{
+				var client = pair.Key;
+				var entity = pair.Value;
+				if (client.Session?.Character == null)
+					continue;
+
+				var areas = await GetMapAreasCached(entity.MapId);
+				if (areas.Length == 0)
+					continue;
+
+				MapArea? best = null;
+				var bestVolume = double.MaxValue;
+				foreach (var area in areas)
+				{
+					if (!Contains(area, entity.Position))
+						continue;
+
+					var volume = (double)(area.MaxX - area.MinX + 1) * (area.MaxZ - area.MinZ + 1);
+					if (volume >= bestVolume)
+						continue;
+
+					bestVolume = volume;
+					best = area;
+				}
+
+				var now = best?.AreaNameId ?? 0;
+				if (now == entity.CurrentAreaNameId)
+					continue; // still in the same area (or still in none) - a banner per tick would spam
+
+				entity.CurrentAreaNameId = now;
+				if (now == 0)
+					continue; // left an area into unnamed ground - retail shows nothing
+
+                    await _output.SendAreaNameBanner(client, now);
+				_logger.LogInformation("World: {Player} entered area '{Area}' (id {Id}) on map {Map}.", client.Session.Character.Name, best!.Name, now, entity.MapId);
+			}
+		}
+
+		private static bool Contains(MapArea area, Vector3 p)
+		{
+			return p.X >= area.MinX - AreaBannerSlack && p.X <= area.MaxX + AreaBannerSlack &&
+				p.Z >= area.MinZ - AreaBannerSlack && p.Z <= area.MaxZ + AreaBannerSlack &&
+				p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
+		}
+
+		private async Task<MapArea[]> GetMapAreasCached(uint mapId)
+		{
+			if (_mapAreas.TryGetValue(mapId, out var cached))
+				return cached;
+
+			var areas = await _database.GetMapAreas(mapId);
+			_mapAreas[mapId] = areas;
+			return areas;
 		}
 
 		// Discovers any resurrection point a living player has walked near (so they can respawn there later). Run at the
@@ -698,6 +777,7 @@ namespace Faolan.GameServer.World
 					{
 						await RegenerateConnectedPlayers(regenElapsed);
 						await DiscoverNearbyRespawnPoints();
+						await TickAreaBanners();
 					}
 
 					// #363: keep the ambient spawn-group pools at strength (respawn killed members). No-op when disabled.

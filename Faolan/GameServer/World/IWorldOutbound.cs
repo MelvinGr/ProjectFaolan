@@ -100,6 +100,9 @@ namespace Faolan.GameServer.World
 
 		// The revive action (BccIIR 0x642CD3D6) retail sends on RespawnMe to transition the player out of the Dead
 		// substate (bcc_state 29→1) - closes the release window + revives IN PLACE, NOT a world re-entry (#214).
+		// #348: the sub-area name banner, fired by the tick when a player crosses into a MapArea.
+		Task SendAreaNameBanner(INetworkClient client, uint areaNameId);
+
 		Task SendRevive(INetworkClient client, uint handle, uint respawnPointId);
 
 		// The actual position move to the res point: the revive n3Teleport (0x5A32F0D7) carrying the destination
