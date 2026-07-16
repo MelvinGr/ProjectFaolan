@@ -7,6 +7,12 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		// #348: the sub-area crossing banner the world tick fires - forwards to the Outbound partial's sender.
+		Task IWorldOutbound.SendAreaNameBanner(INetworkClient client, uint areaNameId)
+		{
+			return SendAreaNameBanner(client, areaNameId);
+		}
+
 		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
 		{
 			return _broadcaster.BroadcastEntityFade(entity);

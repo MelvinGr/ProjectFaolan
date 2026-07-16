@@ -78,11 +78,13 @@ we've seen_, and names the gaps). Regenerate with
   cross-playfield, in-client verified), destinations auto-imported from captured UseObject→teleport sequences;
   the ~52 un-harvested zone-lines still fall through to the open animation (#341) and the GameAction type ids are
   placeholders (#338)
-- 🟡 Area-name banners — entering a map floats the on-screen area title (`GenericDisplayAreaName` via
-  `FormatFeedbackIIR`), harvested from captures into `Map.AreaNameId` (4 maps); awaits in-client confirm. Interim
-  shape: retail fires a banner per **sub-region** crossing and a playfield has many, so the single per-map column
-  can't represent it (Old Tarantia alone has a cluster of 4 captured ids) — the real model is RDB region trigger
-  volumes, still un-extracted (#348)
+- ✅ Area-name banners — crossing into a named **sub-area** floats the on-screen area title (`GenericDisplayAreaName`
+  via `FormatFeedbackIIR`), verified in-client. A playfield has many (Old Tarantia fires six: Bridge of Vilerus I,
+  The East Gate, The West Gate, …), so the world tick drives it off the `MapArea` child table. The boundary triggers
+  are **server-side** — no client record references a banner id — so the regions are reconstructed from captures:
+  each banner is paired with the player position it fired at, and the hull over those sightings is the region. Names
+  decode from the LDB (`textId = pageBase + index`, #291). Coverage is capture-bound (10 areas, 4 maps of 520) and
+  the hulls under-cover by construction; both improve with more dumps (#377)
 - 🟡 Sit on benches — the sit/stand/hold-state animations are decoded + built byte-exact, but the pose reverts
   to standing after the animation (does not yet hold in-client) (#355)
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
