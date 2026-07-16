@@ -40,9 +40,17 @@ namespace Faolan.Importer.Rdb
 
 		// 125 - the level requirement. Verified against the independent wiki scrape: identical for every rank >= 2
 		// (Runed Flesh 25/40/55/70, Pestilential Blast 20/35/50/65/80) and MORE COMPLETE than it - the wiki has
-		// Pestilential Blast R7 at Level 0, the RDB says 80. Written ADDITIVELY (only where the row has no level yet)
-		// so a scraped value always wins: the two disagree slightly at rank 1 (Runed Flesh R1 RDB 10 vs wiki 12) and
-		// which is right is unproven. 19,239 of 20,822 rows have no level at all, so this is nearly all upside. (#367)
+		// Pestilential Blast R7 at Level 0, the RDB says 80. 19,239 of 20,822 rows had no level at all, so this is
+		// nearly all upside (coverage 1,583 -> 8,202). (#367)
+		//
+		// Written ADDITIVELY - only where the row has no level yet. The two sources disagree at RANK 1 (Runed Flesh R1:
+		// RDB 10 vs wiki 12; Pestilential R1: RDB 1 vs wiki 2) and which is right is unproven, so neither gets to
+		// overrule the other on the strength of that.
+		// ⚠️ ORDERING: "additive" makes whoever runs FIRST win, it does not make the scrape authoritative.
+		// wiki-spell-levels only fills rows at Level == 0 too, so on a DB where this module runs first the RDB value
+		// sticks and the wiki silently skips it. Today's faolan.db was scraped first (R1s are 12/2, the wiki values),
+		// but a from-scratch rebuild that runs `--only rdb-spells` before the default plan would land 10/1 instead.
+		// Harmless while the disagreement is +-2 levels at rank 1; revisit if either source is ever proven right.
 		private const uint LevelField = 0x07D;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
