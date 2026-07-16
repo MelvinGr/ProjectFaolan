@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// skeleton - so the sheet is authored as (statId, value) pairs from the character, not carried verbatim.
 	public sealed class StatList : ICodec<StatList>
 	{
-		public const uint Frame = 0x3F1;
+		public const uint Frame = ListFrame.Unit;
 
 		public List<(uint Id, uint Value)> Pairs { get; init; } = [];
 

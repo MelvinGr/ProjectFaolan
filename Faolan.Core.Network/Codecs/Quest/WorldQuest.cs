@@ -109,6 +109,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(0);
 			w.WriteUInt32(0);
 			w.WriteUInt32(0);
+			// ⚠️ 0x7E2 is exactly ListFrame.ForCount(1), and this template only ever carries ONE goal - so this may be
+			// a count-framed goal list rather than the constant it is written as. Left VERBATIM: the whole run is a
+			// capture-derived template and a replacement must be proven byte-for-byte first (three "constants" of this
+			// shape have already turned out to be list counts - see ListFrame). Suspect, not established.
 			w.WriteUInt32(0x7E2);
 			w.WriteUInt32(1);
 			w.WriteUInt32(0x0C);

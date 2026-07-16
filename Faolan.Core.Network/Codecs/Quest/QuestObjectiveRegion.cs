@@ -26,9 +26,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The region's lead word is the goal-list FRAMING count = (goals + 1) * 0x3F1 (the same 0x3F1 list-framing
 		// multiplier as QuestcRegion/QuestIndexRegion). The beach quest's 2 goals make it 0xBD3, which was previously
 		// hardcoded as "ChapterTag"; a 1-goal quest (e.g. Casilda 13479) is 0x7E2. #255.
-		public const uint Frame = 0x000003F1;
+		public const uint Frame = ListFrame.Unit;
 		public const uint GoalLead = 1; // every goal record opens with this word
-		public const uint IndexTag = 0x000003F1; // opens the quest index that terminates this region
+		public const uint IndexTag = ListFrame.Unit; // opens the quest index that terminates this region
 
 		public List<QuestObjectiveGoal> Goals { get; init; } = [];
 

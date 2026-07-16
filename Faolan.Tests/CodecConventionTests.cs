@@ -31,6 +31,26 @@ namespace Faolan.Tests
 		// 8-hex-digit literals; IIR opcodes are 32-bit BKDR-31 hashes so they always appear in this form.
 		private static readonly Regex HexLiteral = new(@"0x[0-9A-Fa-f]{8}\b");
 		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
+
+		// The count-framing word in any spelling it has been written in: 0x3F1 (the unit), 0x7E2 (a 1-element list -
+		// the value that keeps passing for a constant), and decimal 1009, which two snapshot codecs used.
+		private static readonly Regex ListWordLiteral = new(@"\b(0x0*3F1|0x0*7E2|1009)\b", RegexOptions.IgnoreCase);
+
+		// String literals are prose (exception messages naming the word) - stripped like comments before scanning.
+		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
+
+		// Files where the word is deliberately still a literal, with the reason. NOT a place to silence the test: each
+		// entry is a capture-derived payload the project rule forbids refactoring until a replacement is proven
+		// byte-for-byte, and each is flagged in-source as a SUSPECT count.
+		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal)
+		{
+			// 0x7E2 mid-template, single-goal only; whole run is a verbatim capture template.
+			["WorldQuest.cs"] = "verbatim capture template; suspect count flagged in-source",
+			// Head = 0x7E2, "constant across 570 captures" - but possibly all single-action. Needs a multi-action capture.
+			["GameActionListCodec.cs"] = "unproven: needs a multi-action capture to tell a constant from ForCount(1)",
+			// The search REQUEST's category field; every captured query carries 0x7E2 and its meaning is untested.
+			["TradepostResponses.cs"] = "request category field, meaning untested (the response head IS ListFrame)"
+		};
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 
 		private static IEnumerable<Type> CodecTypes =>
@@ -128,6 +148,43 @@ namespace Faolan.Tests
 
 			Assert.True(offenders.Count == 0,
 				"IIR opcodes must come from GameServer0X2000Opcodes, not a hex literal:\n  " + string.Join("\n  ", offenders));
+		}
+
+		// (4) The count-framed LIST word comes from ListFrame, never a hand-rolled 0x3F1. This word had ELEVEN local
+		// names and a pile of raw literals, and that scattering is exactly why it kept getting re-mistaken for a magic
+		// constant: 0x7E2 is just ListFrame.ForCount(1), and single-element lists are the common case in captures.
+		// Three subsystems shipped it as a "constant" before anyone noticed (resurrection spots #372, the AH search
+		// head, and SendMail #378 - still open). One name, one place, one test.
+		//
+		// Allowed: ListFrame.cs itself, and VERBATIM capture-derived byte templates (NpcSpawnScaffold's blobs), which
+		// the project rule says not to refactor without proving the replacement byte-for-byte.
+		[Fact]
+		public void CountFramedListWordComesFromListFrame_NotAHandRolled0x3F1()
+		{
+			var codecDir = TestPaths.Repo("Faolan.Core.Network", "Codecs");
+			var offenders = new List<string>();
+
+			foreach (var file in Directory.EnumerateFiles(codecDir, "*.cs", SearchOption.AllDirectories))
+			{
+				var name = Path.GetFileName(file);
+				if (name is "ListFrame.cs" or "NpcSpawnScaffold.cs" || ListWordLiteralAllowlist.ContainsKey(name))
+					continue;
+
+				var lines = File.ReadAllLines(file);
+				for (var i = 0; i < lines.Length; i++)
+				{
+					var code = StringLiteral.Replace(LineComment.Replace(BlockComment.Replace(lines[i], ""), ""), "");
+					if (code.Contains("ListFrame", StringComparison.Ordinal))
+						continue; // it comes from ListFrame on this line - that IS the convention
+
+					if (ListWordLiteral.IsMatch(code))
+						offenders.Add($"{name}:{i + 1}  {code.Trim()}");
+				}
+			}
+
+			Assert.True(offenders.Count == 0,
+				"the count-framed list word must come from ListFrame (0x3F1 = ListFrame.Unit, 0x7E2 = ListFrame.ForCount(1)):\n  "
+				+ string.Join("\n  ", offenders));
 		}
 	}
 }

@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 		public const byte StateAck = 0x05;
 
 		private const uint AckConstant = 0xC350;
-		private const uint ListMarker = 0x3F1;
+		private const uint ListMarker = ListFrame.Unit;
 		private const int FeatsOffset = 22; // [sub 4][c350 4][handle 4][00 1][state 1][zero 4][marker 4]
 
 		// Build the wire body (from the sub-opcode; the u32 length prefix is added by the framing WriteArrayUInt32Length).

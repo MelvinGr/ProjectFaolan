@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
@@ -440,7 +441,9 @@ namespace Faolan.GameServer
 				listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
 		}
 
-		// SendMail (0x2002) [u16+recipient][u16+body][money:u64][0x7E2:u32][bankItemSlot:u32]: a player-composed mail, 		// optionally with a bank item attached (capture F499 = to "DemoL80", "Hello this is a test", slot 5, no COD).
+		// SendMail (0x2002) [u16+recipient][u16+body][money:u64][attachments: ListFrame word + u32 slot each]: a
+		// player-composed mail, optionally with a bank item attached (capture F499 = to "DemoL80", "Hello this is a
+		// test", slot 5, no COD - its word is 0x7E2 = one attachment; see #378 on why that is read as a count).
 		// Creates a Mail to the recipient with the sender's bank item escrowed, removes it from the sender's bank, and
 		// replies DispatchSendMailResult. Rejects (success=0) an unknown recipient so the client shows "couldn't send".
 		private async Task HandleTradepostSendMail(INetworkClient client, ConanPacket packet)
@@ -452,13 +455,36 @@ namespace Faolan.GameServer
 			var recipientName = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
 			var bodyText = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
 			var money = packet.Body.ReadUInt64();
-			// 0x7E2: called a "category constant" because the ONE captured SendMail carries it - but 0x7E2 is also
-			// exactly 2 * 0x3F1, i.e. this protocol's list framing for a 1-element list, and that mail has exactly 1
-			// attachment. If it is the attachment-list count, a no-attachment mail sends 0x3F1 with NO slot word and
-			// the ReadUInt32 below reads off the end. Unresolved on one sample - the same degenerate-case trap that
-			// hid the resurrection-spots count (#372). See the follow-up issue.
-			packet.Body.ReadUInt32();
-			var bankSlot = (int)packet.Body.ReadUInt32();
+			// The word before the attachment slot is 0x7E2 in the ONE captured SendMail, and was read as a "category
+			// constant" on that basis. But 0x7E2 is exactly ListFrame.ForCount(1), and that mail has exactly ONE
+			// attachment - so a single sample cannot tell a constant from a 1-element list count (#378, and the same
+			// degenerate-case trap that hid the resurrection-spots count, #372).
+			//
+			// Read it as a COUNT, which is right EITHER WAY: if it is the attachment count, we now parse a
+			// no-attachment mail (word 0x3F1, no slot) instead of reading a slot off the end of the body; if it is
+			// really a constant, it is always 0x7E2 => count 1 => one slot, exactly as before. A word that is not
+			// count-framed at all would mean it is a category id after all, so fall back to the old shape rather than
+			// throw a real mail away, and say so loudly.
+			var attachmentWord = packet.Body.ReadUInt32();
+			var bankSlot = -1;
+			if (ListFrame.TryCountOf(attachmentWord, out var attachmentCount))
+			{
+				// Only ever 1 in the captures; read them all so a multi-attach mail can't desync the body.
+				for (var i = 0; i < attachmentCount; i++)
+				{
+					var slot = (int)packet.Body.ReadUInt32();
+					if (i == 0)
+						bankSlot = slot; // one escrowed item is all Mail.SenderBankSlot models today
+				}
+
+				if (attachmentCount > 1)
+					Logger.LogWarning("Tradepost mail: {Char} sent {Count} attachments; only the first is escrowed (#378).", character.Name, attachmentCount);
+			}
+			else
+			{
+				Logger.LogWarning("Tradepost mail: attachment word 0x{Word:X} is not count-framed - treating it as a category id + one slot (#378).", attachmentWord);
+				bankSlot = (int)packet.Body.ReadUInt32();
+			}
 
 			var recipient = await Database.GetCharacterByName(recipientName, character.RealmId);
 			if (recipient == null)

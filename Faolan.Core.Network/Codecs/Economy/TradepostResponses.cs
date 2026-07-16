@@ -135,7 +135,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// straight off the stored listing rows, which already carry the retail-shaped shared ItemHandle + seller Handle.)
 		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound, IReadOnlyCollection<TradepostListing> listings)
 		{
-			var head = (uint)(listings.Count + 1) * 0x3F1;
+			var head = ListFrame.ForCount(listings.Count); // the LIST COUNT, not a category echo - see TradepostListingCodec
 			return Build(TradepostInterfaceOpcodes.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance).SendAsync(client);
 		}
 

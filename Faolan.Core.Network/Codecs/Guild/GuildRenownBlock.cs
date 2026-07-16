@@ -24,7 +24,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 		public const int Length = 277;
 
 		// 0x3F1 list-framing invariant: the first word of a count-framed u32 list is (count+1)*0x3F1.
-		private const uint ListMultiplier = 0x3F1;
+		private const uint ListMultiplier = ListFrame.Unit;
 
 		// The 13 guild stat-slot ids (the first 0x3F1 list). Constant across guilds - the structural scaffold a
 		// fresh-guild block reproduces (ascending, the classic AoC stat-id stepping).

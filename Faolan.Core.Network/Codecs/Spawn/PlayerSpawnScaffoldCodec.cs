@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 
-		public const uint Marker = 0x3F1;
+		public const uint Marker = ListFrame.Unit;
 		private const int BuffRecordSize = 60;
 
 		public static byte[] Generate(PlayerSpawnScaffold s)

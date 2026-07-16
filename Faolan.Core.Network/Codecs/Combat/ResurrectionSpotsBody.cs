@@ -16,8 +16,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Decoded from all 141 s2c 0x2024 frames in the captures (1/2/3/7 spots), every one of which parses under this
 	// layout with nothing left over. Three fields that were carried as "undecoded constants" are real:
 	//
-	//   - The 0x7E2 "header" is the LIST COUNT: (count+1) * 0x3F1 - the same list framing the guild lists use. The
-	//     four observed values are exactly 2/3/4/8 * 0x3F1 for the 1/2/3/7-spot frames.
+	//   - The 0x7E2 "header" is the LIST COUNT: (count+1) * 0x3F1 - the protocol-wide framing (ListFrame). The four
+	//     observed values are exactly 2/3/4/8 * 0x3F1 for the 1/2/3/7-spot frames.
 	//   - The trailing 0x00 is PER-RECORD (stride 41), not one byte at the end of the body.
 	//   - The 0x0A tail is RESTORATIONLEVEL, the percent of max the point revives you at (#375). Observed 0x0A/0x32/
 	//     0x64 = 10/50/100, and for all 21 spot ids in the captures the wire value equals the RDB's RestorationLevel
@@ -33,9 +33,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// not reproduce; what selects the third value is unknown.
 		public const uint SpotTypeLogin = 0x0000C7A0;
 		public const uint SpotTypeCreateFlow = 0x0000C79E;
-
-		// Element unit of the count prefix - lists on this protocol are framed as [u32 (count+1) * 0x3F1].
-		private const uint ListCountUnit = 0x3F1;
 
 		// The create-flow variant: one spot at the fresh character's spawn point, spawnPointId 0 (no anchor chosen
 		// yet), restoration 100 (a new character revives at full). Byte-identical in SHAPE to the login body - only
@@ -65,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		private static void WriteBodyHeader(FaolanStream s, Vector3 referencePosition, int spotCount)
 		{
 			s.WriteVector3(referencePosition);
-			s.WriteUInt32((uint)(spotCount + 1) * ListCountUnit);
+			s.WriteUInt32(ListFrame.ForCount(spotCount));
 		}
 
 		private static void WriteSpot(FaolanStream s, Vector3 position, uint spotType, uint mapId, uint spotId, uint restorationLevel)

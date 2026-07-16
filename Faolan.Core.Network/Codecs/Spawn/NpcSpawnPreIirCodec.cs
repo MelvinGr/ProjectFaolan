@@ -59,7 +59,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			{
 				if (isSublist)
 				{
-					if (o + 4 > coreCharOffset || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(o, 4)) != 0x3F1u)
+					if (o + 4 > coreCharOffset || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(o, 4)) != ListFrame.Unit)
 						return false; // count>0 sublist - variable-width, out of scope
 
 					result.Sublist = body[o..(o + 4)];

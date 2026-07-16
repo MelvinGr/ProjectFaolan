@@ -31,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 		public const CSPlayerInterfaceOpcodes Opcode = CSPlayerInterfaceOpcodes.DispatchGuildRankingsUpdate;
 
 		public const uint GuildClass = 0x0000DEB7; // the guild ID32 type word (Guild.WireType)
-		public const uint ListMultiplier = 0x3F1; // count-framed-list word == (count + 1) * 0x3F1
+		public const uint ListMultiplier = ListFrame.Unit; // count-framed-list word == (count + 1) * 0x3F1
 		public const int CategoryCount = 4; // Total(0), Valor(1), Glory(2), Artistry(3)
 		public const int MaxRanked = 20; // retail lists the top 20 guilds per tab
 
@@ -157,17 +157,13 @@ namespace Faolan.Core.Network.Codecs.Guild
 			return rankings;
 		}
 
-		// The count-framed-list word for a given element count.
-		public static uint ListWord(int count) => (uint)((count + 1) * ListMultiplier);
+		// The count-framed-list word for a given element count. The framing is protocol-wide, not a guild thing -
+		// these stay as the guild codec's local spelling but delegate, so there is ONE implementation (ListFrame).
+		public static uint ListWord(int count) => ListFrame.ForCount(count);
 
 		// The element count encoded in a count-framed-list word (throws if the word isn't a 0x3F1 multiple - the same
 		// check the client's readers make before aborting the dispatch).
-		public static int ListCount(uint word)
-		{
-			if (word % ListMultiplier != 0 || word == 0)
-				throw new InvalidOperationException($"list word {word:X8} is not a positive multiple of 0x{ListMultiplier:X}");
-			return (int)(word / ListMultiplier) - 1;
-		}
+		public static int ListCount(uint word) => ListFrame.CountOf(word);
 
 		private static void RequireGuildClass(uint word)
 		{

@@ -20,13 +20,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// QuestDefinitions (their IndexMagic/IndexTableField/IndexGoalSteps/AreaId/IndexTrailerWord seeds).
 	public sealed class QuestIndexRegion : ICodec<QuestIndexRegion>
 	{
-		public const uint IndexTag = 0x000003F1;
+		public const uint IndexTag = ListFrame.Unit;
 		public const uint Sentinel = 0x000000F1;
 		private const uint MinQuestId = 0x1000;
 		public List<Block> Blocks { get; init; } = [];
 		public List<uint> QuestIds { get; init; } = [];
 
-		public uint Marker { get; init; } = 0x7E2;
+		// The goal-list count framing, (QuestIds.Count + 1) * 0x3F1 - Build derives it. The default is the 1-quest
+		// word; it is NOT a constant (0x7E2 just IS ListFrame.ForCount(1), which is what makes it look like one).
+		public uint Marker { get; init; } = ListFrame.ForCount(1);
 
 		public static QuestIndexRegion Read(FaolanStream r)
 		{
@@ -160,7 +162,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 			return new QuestIndexRegion
 			{
-				Marker = IndexTag * (uint)(ordered.Count + 1),
+				Marker = ListFrame.ForCount(ordered.Count), // NB IndexTag is 0x3F1 too, but this is the FRAMING, not the tag
 				QuestIds = ordered.Select(q => q.QuestId).ToList(),
 				Blocks = blocks
 			};

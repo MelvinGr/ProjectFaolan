@@ -17,13 +17,18 @@ namespace Faolan.Core.Network.Codecs.World
 	//   [u8 0][u32 0x000007E2][u32 dynelHandle][u32 field3][u32 4][u64 1][actionTail...]
 	// frameHandle = the receiving player's instance; dynelHandle = the entity the action list is about; field3 is
 	// usually 0 (a small id in some captures, undecoded); the 0x7E2 / 4 / 1 words are constant across all 570 captures.
+	//
+	// ⚠️ SUSPECT: 0x7E2 is exactly ListFrame.ForCount(1). "Constant across 570 captures" is NOT evidence it is a
+	// constant if all 570 carry a single action - that is the same reasoning that made the resurrection-spots count
+	// look constant for months (#372), and every capture there had exactly one spot. Left VERBATIM because no capture
+	// disproves it either and the project rule is not to refactor an unproven payload; needs a multi-action capture.
 	public static class GameActionListCodec
 	{
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
 
 		public const uint ConstFour = 4;
-		public const uint Head = 0x000007E2;
+		public const uint Head = 0x000007E2; // see the SUSPECT note above - possibly ListFrame.ForCount(1)
 		public const ulong ConstOne = 1;
 
 		// Builds the GameActionList body for `dynelHandle`, delivered to `frameHandle`, carrying `actionTail` verbatim.

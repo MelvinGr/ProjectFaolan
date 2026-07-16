@@ -218,7 +218,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			// Feat list: [u32 (count+1)*0x3F1] then count x u32 feat id (train order). Empty (count 0) writes the bare
 			// 0x3F1 marker and no ids - byte-identical to the old constant-239 fresh frame.
-			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(FeatMarkerOffset, 4), 0x3F1 * ((uint)featCount + 1));
+			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(FeatMarkerOffset, 4), ListFrame.ForCount(featCount));
 			for (var k = 0; k < featCount; k++)
 				BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(PreFrameHead + 4 * k, 4), feats[k]);
 
@@ -239,10 +239,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return feats;
 
 			var marker = BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(FeatMarkerOffset, 4));
-			if (marker == 0 || marker % 0x3F1 != 0)
+			if (!ListFrame.TryCountOf(marker, out var signedCount))
 				return feats;
 
-			var count = marker / 0x3F1 - 1;
+			var count = (uint)signedCount;
 			if (PreFrameHead + 4 * (long)count > preFrame.Length)
 				return feats;
 
@@ -335,7 +335,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			{
 				scaffold.Entries[^1] = scaffold.Entries[^1] with
 				{
-					Tag = (ushort)((scaffold.IdList.Count + 2) * 0x3F1)
+					Tag = (ushort)ListFrame.ForCount(scaffold.IdList.Count + 1) // frames ONE MORE than the id list holds; truncated to u16
 				};
 			}
 
@@ -391,7 +391,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				_                                                             => 400u // Mage
 			};
 
-			var tag = (ushort)((FreshSkillIdsFor(@class).Length + 2) * 0x3F1);
+			var tag = (ushort)ListFrame.ForCount(FreshSkillIdsFor(@class).Length + 1); // as above: one more than the ids
 			return (tag, value);
 		}
 

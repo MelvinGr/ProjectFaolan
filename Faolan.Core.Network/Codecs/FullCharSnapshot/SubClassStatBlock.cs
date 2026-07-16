@@ -18,7 +18,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public const int RepeatedRunLength = 148;
 		public const int RepeatedRunStart = 35; // the 35..182 sub-block is copied to 183..330 (Length 148)
 		public const uint BlockType = 0x46F2;
-		public const uint Marker = 1009; // 0x3F1, twice
+		public const uint Marker = ListFrame.Unit; // an EMPTY count-framed list, twice
 
 		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
 		// 0xBF..0x40B (see WorldDespawn). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
@@ -92,7 +92,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			}
 
 			var records = known?.Records ?? [];
-			values.Add(((uint)records.Count + 1) * StatList.Frame); // known-spell list count (0x3F1 when empty)
+			values.Add(ListFrame.ForCount(records.Count)); // known-spell list count (0x3F1 when empty)
 			foreach (var record in records)
 			{
 				values.Add(record.Id);

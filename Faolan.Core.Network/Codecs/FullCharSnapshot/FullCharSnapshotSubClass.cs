@@ -800,7 +800,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// Observed post-access block starts with:
 			// 0x000003F1, 0x000003F1, 0x000046F2
-			if (marker0 != 1009 || marker1 != 1009)
+			if (marker0 != ListFrame.Empty || marker1 != ListFrame.Empty) // 0x3F1 = an EMPTY count-framed list
 				return null;
 
 			var payloadLength = data.Length - 12;

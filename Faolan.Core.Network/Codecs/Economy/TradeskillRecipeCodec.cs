@@ -50,7 +50,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		public const byte RoleIngredient = 0;
 		public const byte RoleResult = 1;
-		public const uint ListFrame = 0x3F1;
+		public const uint ListFrame = Codecs.ListFrame.Unit;
 		public const uint Version = 1;
 
 		// Fixed record/element constants (invariant across all 603 captured records; validated on parse so a capture

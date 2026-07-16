@@ -151,6 +151,13 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
   is what `docs/protocol/gen/coverage.md` reads to attribute each type to its builder.
 - Codecs with no opcode (sub-record helpers: `CharacterStatBlock`, `StatList`, `SnapshotItemBuilder`) declare
   nothing — that's fine and expected.
+- **Count-framed lists come from `ListFrame`, never a hand-rolled `0x3F1`.** A list is prefixed by a u32
+  `(count + 1) * 0x3F1` (guilds, AH, quests, spell book, shortcut bar, stat lists, spawn scaffold, resurrection
+  spots). ⚠️ A ONE-element list frames as `0x7E2`, and single-element lists are the common case in captures — so
+  `0x7E2` reads as magic and has been written down as a constant **three times** (resurrection spots #372, the AH
+  search `head`, `SendMail` #378). **When a "constant" equals `n * 0x3F1`, suspect a list count**, and distrust any
+  grammar pinned only by single-element captures. Enforced by `CodecConventionTests` (allowlist w/ reasons for
+  unproven verbatim payloads).
 - Files are one-type-per-file named after that type (a tightly cohesive group may share one file, e.g.
   `FullCharSnapshot/FullCharSnapshotSubClass.cs`), filed under their domain folder.
 

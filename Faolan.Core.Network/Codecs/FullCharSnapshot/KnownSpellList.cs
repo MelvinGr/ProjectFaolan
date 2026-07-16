@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public const byte FeatType = 5;
 		public const byte SpellType = 2;
 		public const int RecordSize = 12; // [u32 id][u32 0xFFFFFFFF][u32 type]
-		public const uint Frame = 1009; // 0x3F1
+		public const uint Frame = ListFrame.Unit;
 		public const uint Unbound = 0xFFFFFFFF; // the "no bound bar slot" word
 
 		public List<KnownSpellRecord> Records { get; init; } = [];

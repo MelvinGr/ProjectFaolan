@@ -32,7 +32,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// journals once the WTHD fields are pinned (needs a server spec or a progressed-capture corpus).
 	public sealed class QuestcRegion : ICodec<QuestcRegion>
 	{
-		public const uint Frame = 0x3F1; // 1009 - the list-count framing multiplier
+		public const uint Frame = ListFrame.Unit; // 1009 - the list-count framing multiplier
 		public const uint Marker = 0x412;
 		public const uint RecordVersion = 1;
 		public const uint Version = 0x18;

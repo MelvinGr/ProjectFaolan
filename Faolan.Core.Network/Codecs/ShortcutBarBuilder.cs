@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs
 	// CharacterShortcut; this rebuilds the bar from those rows so it survives relog.
 	public static class ShortcutBarBuilder
 	{
-		private const uint ListFraming = 0x3F1;
+		private const uint ListFraming = ListFrame.Unit;
 
 		public static byte[] BuildBody(IReadOnlyList<CharacterShortcut> shortcuts)
 		{

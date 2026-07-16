@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public record AreaFormulaCodec(uint Handle, byte Env, (uint Class, uint Instance)[] Refs, uint FieldA, Vector3[] Positions, uint FieldB) : ICodec<AreaFormulaCodec>
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.AreaFormulaIIR;
-		private const uint ListStride = 0x3F1;
+		private const uint ListStride = ListFrame.Unit;
 
 		public static AreaFormulaCodec Read(FaolanStream s)
 		{

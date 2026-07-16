@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(ListMarker));
 		}
 
-		public static byte[] Build(uint handle, uint listMarker = 0x3F1, byte env = 0x00)
+		public static byte[] Build(uint handle, uint listMarker = ListFrame.Empty, byte env = 0x00)
 		{
 			return new SpellBookCodec(handle, env, listMarker).ToArray();
 		}
