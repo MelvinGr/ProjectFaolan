@@ -792,6 +792,10 @@ namespace Faolan.Tests
 				await repo.RemoveMailAttachment(0x20d82b631c0c578f, 0x20d82b62d02b198b);
 				var afterTake = await repo.GetMailByWireId(0x20d82b631c0c578f);
 				Assert.True(afterTake!.IsRead);
+				// The attachment must be GONE FROM THE DB, not just from a nav the caller already mutated: the row
+				// surviving means the item can be taken again after a relog (a dupe) and the mail can never be
+				// deleted. RemoveMailAttachment takes the WIRE id but the FK is to the ROW key, and the uint/ulong
+				// widening made the mismatch compile and silently delete nothing. (#368)
 				Assert.Empty(afterTake.Attachments);
 
 				// Delete the mail.

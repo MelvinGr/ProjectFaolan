@@ -15,7 +15,9 @@ namespace Faolan.Core.Database.Tables
 		// longer name is the clearer one.
 		public ulong ItemInstanceId { get; set; }
 
-		public uint MailId { get; set; } // FK -> Mail.Id (the row key, not the wire MailId)
+		// FK -> Mail.MailId, the wire id, which IS Mail's primary key. Same name, same number, same type as the
+		// mail's own id - deliberately, see the Mail class comment (#368).
+		public ulong MailId { get; set; }
 
 		[ForeignKey(nameof(MailId))]
 		public virtual Mail Mail { get; set; } = null!;

@@ -60,7 +60,16 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).OrderByDescending(m => m.Id).ToListAsync();
+			// Newest first by SEND TIME. This used to lean on the surrogate Id's autoincrement as an insertion-order
+			// proxy; with MailId as the PK (#368) that proxy is gone and MailId itself is useless for it (AllocateMailId
+			// is Random.Shared, not monotonic). Timestamp1 is the send time our own mail builders stamp. Tie-break on
+			// MailId so same-second mails still order deterministically.
+			//
+			// Ordered in MEMORY, like GetTradepostListingsForItem above: SQLite cannot ORDER BY a ulong (its INTEGER is
+			// signed 64-bit) and throws NotSupportedException on the MailId tie-break. An inbox is small, so the sort
+			// is free; the WHERE still runs in SQL.
+			var rows = await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).ToListAsync();
+			return rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).ToList();
 		}
 
 		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId)
@@ -82,6 +91,10 @@ namespace Faolan.Core.Database.Repositories
 			return rows.OrderBy(l => l.Price).ToList();
 		}
 
+		// MailAttachment.MailId is the WIRE id (FK -> Mail.MailId, Mail's PK), so this compares like for like. It did
+		// NOT before #368: the FK was a uint pointing at a surrogate Mail.Id row key while callers passed the ulong
+		// wire id, which widened and silently matched nothing - the delete was a no-op, the taken item's attachment
+		// survived, and it came back on relog as a dupe (masked in-session by TakeMailItem's Attachments.Remove).
 		public async Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

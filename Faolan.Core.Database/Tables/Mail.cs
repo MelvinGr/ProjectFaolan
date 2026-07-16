@@ -9,19 +9,31 @@ namespace Faolan.Core.Database.Tables
 	// necrol80 buy_from_autionhouse_get_mail capture (docs/subsystems/tradepost-protocol.md "Buy -> mail delivery"); the on-wire
 	// DispatchMailMessage (S->C 0x2002) is built byte-exact by MailMessageCodec. An auction-house delivery is a
 	// SYSTEM mail: the recipient is the buyer, the sender NAME is empty. The bought item rides as an attachment
-	// (MailAttachment) fetched on demand. Keyed by MailId (the wire id the client's GetMailByID/GetMailItem target).
-	[Index(nameof(MailId), IsUnique = true), Index(nameof(RecipientName))]
-	public class Mail : BaseEntity
+	// (MailAttachment) fetched on demand.
+	//
+	// PRIMARY KEY = MailId, the wire id itself. Deliberately NOT a BaseEntity: carrying a surrogate uint Id
+	// ALONGSIDE the ulong wire MailId meant two different numbers lived in two same-named properties (Mail.MailId =
+	// the wire id, MailAttachment.MailId = the FK to Mail.Id), and comparing one to the other silently widened the
+	// uint and matched nothing. That shipped an item dupe (#368). One id, one meaning: the FK is the wire id.
+	[Index(nameof(RecipientName))]
+	public class Mail
 	{
+		// The unique wire mail id (the client's GetMailByID / GetMailItem target) AND this row's primary key.
+		// Allocated by AllocateMailId - RANDOM, not monotonic, so it is not an ordering proxy (see
+		// GetMailsForRecipient, which orders by Timestamp1).
+		//
+		// DatabaseGeneratedOption.None is REQUIRED: EF's convention makes an integer key store-generated, which on
+		// SQLite scaffolds the key as AUTOINCREMENT and lets the store overwrite the id we allocated. The wire id is
+		// assigned in code and the client addresses mail by it, so the DB must never mint one.
+		[Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
+		public ulong MailId { get; set; }
+
 		// The realm this mail belongs to (#324) - the recipient's realm; no cross-realm mail, so a realm process only
 		// reads its own inbox rows. Backfilled from the recipient character on migration.
 		public uint RealmId { get; set; }
 
 		[ForeignKey(nameof(RealmId))]
 		public virtual Realm Realm { get; set; } = null!;
-
-		// The unique wire mail id (the client's GetMailByID / GetMailItem target).
-		public ulong MailId { get; set; } // TODO: Make PK? - composite with RealmId?
 
 		public virtual ICollection<MailAttachment> Attachments { get; set; } = new List<MailAttachment>();
 
