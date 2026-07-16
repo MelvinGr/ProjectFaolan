@@ -64,6 +64,11 @@ namespace Faolan.Importer.Captures
 		// create-editor callback, and the 0x2052 grants that follow are that class's universal level-1 kit. Every one
 		// of the 12 classes has a create dump and all 12 resolve, so this covers the whole roster (#296).
 		//
+		// A create dump carries ~14 0x2052 PACKETS but only ~7 DISTINCT ability ids - the grants repeat - so count ids,
+		// not packets. The whole create kit across all 12 classes is just 8 distinct abilities (Rest, Upper Left /
+		// Upper Right / Overhead Attack, Toggle Combat, Switch Weapons, Crouch, Dash) and every one is already in the
+		// catalog; the grants dictionary is id-keyed, which collapses the duplicates for free.
+		//
 		// This exists because DeriveClassAbilitiesAsync below can only see classes we imported a CHARACTER for, and we
 		// have exactly four (Assassin/Necro/HoX/Demo). That left the map in a state that was both wrong and
 		// unreproducible: DarkTemplar had ZERO abilities despite its create dump carrying 14 grants, while seven other
@@ -105,7 +110,7 @@ namespace Faolan.Importer.Captures
 				foreach (var abilityId in ids)
 				{
 					if (!abilityIds.Contains(abilityId))
-						continue; // grant for an ability we never cataloged - a catalog gap, not a fake id
+						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the create kit is 8 distinct ids and all 8 are cataloged.
 
 					if (existing.ContainsKey(((Class)cls, abilityId)))
 						continue; // already known; DeriveClassAbilitiesAsync owns the level for those
