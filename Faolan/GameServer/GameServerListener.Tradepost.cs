@@ -455,22 +455,26 @@ namespace Faolan.GameServer
 			var recipientName = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
 			var bodyText = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
 			var money = packet.Body.ReadUInt64();
-			// The word before the attachment slot is 0x7E2 in the ONE captured SendMail, and was read as a "category
-			// constant" on that basis. But 0x7E2 is exactly ListFrame.ForCount(1), and that mail has exactly ONE
-			// attachment - so a single sample cannot tell a constant from a 1-element list count (#378, and the same
-			// degenerate-case trap that hid the resurrection-spots count, #372).
+			// The attachment list (#378). The word before the slot is 0x7E2 in the one captured SendMail, and was long
+			// read as a "category constant" on that basis - but 0x7E2 is exactly ListFrame.ForCount(1) and that mail
+			// has exactly ONE attachment, so a single sample could never tell a constant from a 1-element count.
 			//
-			// Read it as a COUNT, which is right EITHER WAY: if it is the attachment count, we now parse a
-			// no-attachment mail (word 0x3F1, no slot) instead of reading a slot off the end of the body; if it is
-			// really a constant, it is always 0x7E2 => count 1 => one slot, exactly as before. A word that is not
-			// count-framed at all would mean it is a category id after all, so fall back to the old shape rather than
-			// throw a real mail away, and say so loudly.
-			var attachmentWord = packet.Body.ReadUInt32();
+			// It IS a count: a mail sent with no attachment crashed the old parser with EndOfStreamException here (it
+			// read the slot unconditionally), which is the failure a count predicts and a constant does not. So parse
+			// the whole thing DEFENSIVELY - every read is guarded, because this body is client-controlled and an
+			// EndOfStream out of a packet handler drops the player's connection (that is exactly how it was found).
 			var bankSlot = -1;
-			if (ListFrame.TryCountOf(attachmentWord, out var attachmentCount))
+			if (packet.Body.Position + 4 <= packet.Body.Length)
 			{
-				// Only ever 1 in the captures; read them all so a multi-attach mail can't desync the body.
-				for (var i = 0; i < attachmentCount; i++)
+				var attachmentWord = packet.Body.ReadUInt32();
+				if (!ListFrame.TryCountOf(attachmentWord, out var attachmentCount))
+				{
+					// Not count-framed => not the shape we think. Say so with the bytes rather than guessing.
+					Logger.LogWarning("Tradepost mail: attachment word 0x{Word:X} is not count-framed; ignoring attachments (#378).", attachmentWord);
+					attachmentCount = 0;
+				}
+
+				for (var i = 0; i < attachmentCount && packet.Body.Position + 4 <= packet.Body.Length; i++)
 				{
 					var slot = (int)packet.Body.ReadUInt32();
 					if (i == 0)
@@ -479,11 +483,6 @@ namespace Faolan.GameServer
 
 				if (attachmentCount > 1)
 					Logger.LogWarning("Tradepost mail: {Char} sent {Count} attachments; only the first is escrowed (#378).", character.Name, attachmentCount);
-			}
-			else
-			{
-				Logger.LogWarning("Tradepost mail: attachment word 0x{Word:X} is not count-framed - treating it as a category id + one slot (#378).", attachmentWord);
-				bankSlot = (int)packet.Body.ReadUInt32();
 			}
 
 			var recipient = await Database.GetCharacterByName(recipientName, character.RealmId);

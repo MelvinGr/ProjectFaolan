@@ -413,9 +413,8 @@ namespace Faolan.GameServer.World
 
 		private static bool Contains(MapArea area, Vector3 p)
 		{
-			return p.X >= area.MinX - AreaBannerSlack && p.X <= area.MaxX + AreaBannerSlack &&
-				p.Z >= area.MinZ - AreaBannerSlack && p.Z <= area.MaxZ + AreaBannerSlack &&
-				p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
+			return p.X >= area.MinX - AreaBannerSlack && p.X <= area.MaxX + AreaBannerSlack && p.Z >= area.MinZ - AreaBannerSlack && p.Z <= area.MaxZ + AreaBannerSlack &&
+			       p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
 		}
 
 		private async Task<MapArea[]> GetMapAreasCached(uint mapId)
@@ -467,8 +466,7 @@ namespace Faolan.GameServer.World
 					// which fits the LDB strings being plaintext and the area-name banner's nested <localized>
 					// carrying no key either. The codec still takes one so the goldens can reproduce retail exactly.
 					await _output.SendRespawnPointDiscoveredBanner(client, point.Id, null);
-					_logger.LogInformation("World: {Player} discovered resurrection point {Point} ('{Name}').",
-						character.Name, point.Id, point.Name);
+					_logger.LogInformation("World: {Player} discovered resurrection point {Point} ('{Name}').", character.Name, point.Id, point.Name);
 				}
 
 				if (!newlyFound)
@@ -679,6 +677,7 @@ namespace Faolan.GameServer.World
 			var regen = new TickAccumulator(RegenIntervalSeconds);
 			var ambientMaintain = new TickAccumulator(AmbientMaintainIntervalSeconds);
 			var lastTimestamp = Stopwatch.GetTimestamp();
+			var consecutiveFailures = 0;
 			try
 			{
 				while (await timer.WaitForNextTickAsync(cancellationToken))
@@ -687,149 +686,172 @@ namespace Faolan.GameServer.World
 					var dt = Stopwatch.GetElapsedTime(lastTimestamp, now).TotalSeconds;
 					lastTimestamp = now;
 
-					// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the
-					// wire-visible effects (NPC respawns, loot expiry, NPC attacks) for us to broadcast.
-					foreach (var effect in World.Tick(dt))
+					// ONE BAD TICK MUST NOT KILL THE WORLD. This try used to sit outside the while, so any exception
+					// from any tick ended the loop for the process lifetime - and silently: the listeners keep
+					// accepting clients while nothing moves, regenerates, respawns, aggroes or discovers anything. A
+					// transient SQLite "database is locked" from DiscoverRespawnPoint was enough to do it (a stray
+					// concurrent reader is enough to produce one), and the only trace was a single log line.
+					try
 					{
-						// A dead NPC must emit NO live broadcast (move / patrol / follow / heartbeat / chatter / attack /
-						// combat-mode). A move effect generated the tick it died - or one processed across an await after
-						// the player's kill ran OnNpcKilled and sent the death-pose - would otherwise override that
-						// death-pose and walk / re-animate the corpse, so a patrolling NPC appears to walk off and vanish
-						// instead of dying in place. Only the corpse-lifecycle effects (linger->loot, respawn, fade) apply
-						// once dead.
-						if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootable
-							or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
-							continue;
-
-						switch (effect.Type)
+						// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the
+						// wire-visible effects (NPC respawns, loot expiry, NPC attacks) for us to broadcast.
+						foreach (var effect in World.Tick(dt))
 						{
-							case WorldTickEffectType.NpcRespawned:
-							{
-								await _output.BroadcastNpcRespawn(effect.Entity);
-								break;
-							}
+							// A dead NPC must emit NO live broadcast (move / patrol / follow / heartbeat / chatter / attack /
+							// combat-mode). A move effect generated the tick it died - or one processed across an await after
+							// the player's kill ran OnNpcKilled and sent the death-pose - would otherwise override that
+							// death-pose and walk / re-animate the corpse, so a patrolling NPC appears to walk off and vanish
+							// instead of dying in place. Only the corpse-lifecycle effects (linger->loot, respawn, fade) apply
+							// once dead.
+							if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootable or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
+								continue;
 
-							case WorldTickEffectType.NpcCorpseLootable:
+							switch (effect.Type)
 							{
-								await _output.ConvertCorpseToLoot(effect.Entity);
-								break;
-							}
-
-							case WorldTickEffectType.LootExpired:
-							{
-								await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
-								World.Remove(effect.Entity);
-								break;
-							}
-
-							case WorldTickEffectType.NpcAttack:
-							{
-								// Gated by NpcAutoAttackEnabled (the once-feared respawn/world-re-entry death-loop on a
-								// dense zone); the swing now plays the decoded attack-animation ack (see ApplyNpcAttack).
-								if (NpcAutoAttackEnabled)
-									await ApplyNpcAttack(effect.Entity, effect.Target);
-								break;
-							}
-
-							case WorldTickEffectType.NpcCast:
-							{
-								if (NpcAutoAttackEnabled)
-									await ApplyNpcCast(effect.Entity, effect.Target);
-								break;
-							}
-
-							case WorldTickEffectType.NpcPatrol:
-							{
-								await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat sim
-								break;
-							}
-
-							case WorldTickEffectType.NpcFollow:
-							{
-								await _output.BroadcastNpcMove(effect.Entity); // companion-follow step - ungated (not combat), #262
-								break;
-							}
-
-							case WorldTickEffectType.NpcMove:
-							{
-								if (NpcAutoAttackEnabled)
-									await _output.BroadcastNpcMove(effect.Entity);
-								break;
-							}
-
-							case WorldTickEffectType.NpcEnterCombat:
-							case WorldTickEffectType.NpcExitCombat:
-							{
-								// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers - #218. Gated with the
-								// rest of the combat sim since combat mode only has meaning alongside the auto-attack swing.
-								if (NpcAutoAttackEnabled)
+								case WorldTickEffectType.NpcRespawned:
 								{
-									await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
-									// On engage, also push the aggro so the threat/hate is visible (#216).
-									if (effect is { Type: WorldTickEffectType.NpcEnterCombat, Target: not null })
-										await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
+									await _output.BroadcastNpcRespawn(effect.Entity);
+									break;
 								}
 
-								break;
-							}
-
-							case WorldTickEffectType.NpcStopped:
-							{
-								// The NPC arrived home and stopped; close its move with a StopIIR (#190).
-								if (NpcAutoAttackEnabled)
-									await _output.BroadcastNpcStop(effect.Entity);
-								break;
-							}
-
-							case WorldTickEffectType.NpcHeartbeat:
-							{
-								// The idle-behavior pulse - ungated (fidelity, not combat), like NpcPatrol/NpcFollow; the
-								// Confirmed gate in the broadcaster keeps it off a still-loading client (#225).
-								if (NpcHeartbeatEnabled)
-									await _output.BroadcastNpcHeartbeat(effect.Entity);
-								break;
-							}
-
-							case WorldTickEffectType.NpcChatter:
-							{
-								// Ambient bystander bark: the NPC local-says a random RenownBystanderLovers line (chat
-								// server CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the
-								// NPC handle so the client shows the bubble over it.
-								var npc = effect.Entity;
-								if (npc.ChatterLines is not { Length: > 0 } lines)
+								case WorldTickEffectType.NpcCorpseLootable:
+								{
+									await _output.ConvertCorpseToLoot(effect.Entity);
 									break;
-								var recipients = new HashSet<uint>();
-								foreach (var near in World.ZoneForEntity(npc).PlayersInRange(npc.Position, SayRangeUnits, npc.Handle))
-									recipients.Add(near.Handle);
-								if (recipients.Count > 0)
-									await _agents.CharacterSay(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
-								break;
+								}
+
+								case WorldTickEffectType.LootExpired:
+								{
+									await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
+									World.Remove(effect.Entity);
+									break;
+								}
+
+								case WorldTickEffectType.NpcAttack:
+								{
+									// Gated by NpcAutoAttackEnabled (the once-feared respawn/world-re-entry death-loop on a
+									// dense zone); the swing now plays the decoded attack-animation ack (see ApplyNpcAttack).
+									if (NpcAutoAttackEnabled)
+										await ApplyNpcAttack(effect.Entity, effect.Target);
+									break;
+								}
+
+								case WorldTickEffectType.NpcCast:
+								{
+									if (NpcAutoAttackEnabled)
+										await ApplyNpcCast(effect.Entity, effect.Target);
+									break;
+								}
+
+								case WorldTickEffectType.NpcPatrol:
+								{
+									await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat sim
+									break;
+								}
+
+								case WorldTickEffectType.NpcFollow:
+								{
+									await _output.BroadcastNpcMove(effect.Entity); // companion-follow step - ungated (not combat), #262
+									break;
+								}
+
+								case WorldTickEffectType.NpcMove:
+								{
+									if (NpcAutoAttackEnabled)
+										await _output.BroadcastNpcMove(effect.Entity);
+									break;
+								}
+
+								case WorldTickEffectType.NpcEnterCombat:
+								case WorldTickEffectType.NpcExitCombat:
+								{
+									// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers - #218. Gated with the
+									// rest of the combat sim since combat mode only has meaning alongside the auto-attack swing.
+									if (NpcAutoAttackEnabled)
+									{
+										await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
+										// On engage, also push the aggro so the threat/hate is visible (#216).
+										if (effect is { Type: WorldTickEffectType.NpcEnterCombat, Target: not null })
+											await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
+									}
+
+									break;
+								}
+
+								case WorldTickEffectType.NpcStopped:
+								{
+									// The NPC arrived home and stopped; close its move with a StopIIR (#190).
+									if (NpcAutoAttackEnabled)
+										await _output.BroadcastNpcStop(effect.Entity);
+									break;
+								}
+
+								case WorldTickEffectType.NpcHeartbeat:
+								{
+									// The idle-behavior pulse - ungated (fidelity, not combat), like NpcPatrol/NpcFollow; the
+									// Confirmed gate in the broadcaster keeps it off a still-loading client (#225).
+									if (NpcHeartbeatEnabled)
+										await _output.BroadcastNpcHeartbeat(effect.Entity);
+									break;
+								}
+
+								case WorldTickEffectType.NpcChatter:
+								{
+									// Ambient bystander bark: the NPC local-says a random RenownBystanderLovers line (chat
+									// server CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the
+									// NPC handle so the client shows the bubble over it.
+									var npc = effect.Entity;
+									if (npc.ChatterLines is not { Length: > 0 } lines)
+										break;
+
+									var recipients = new HashSet<uint>();
+									foreach (var near in World.ZoneForEntity(npc).PlayersInRange(npc.Position, SayRangeUnits, npc.Handle))
+										recipients.Add(near.Handle);
+									if (recipients.Count > 0)
+										await _agents.CharacterSay(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
+									break;
+								}
 							}
 						}
+
+						// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
+						await TickPlayerDeaths();
+						await TickBuffExpiry();
+						await TickDots();
+
+						// Boundary CROSSING tests: every base tick (10 Hz). Both used to hang off the regen accumulator
+						// below, which has nothing to do with either and sampled them at 1 Hz - a walking player covers
+						// several units between samples, so both fired late, well inside the boundary. In-client that read
+						// as having to stand on top of a resurrection point before it registered; the radius was never the
+						// problem. Cheap enough to run hot: the points/areas and the per-player discovered set are all
+						// cached, so a tick is a handful of distance checks per player, and only an actual discovery
+						// touches the DB.
+						await DiscoverNearbyRespawnPoints();
+						await TickAreaBanners();
+
+						// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
+						if (regen.Advance(dt, out var regenElapsed))
+							await RegenerateConnectedPlayers(regenElapsed);
+
+						// #363: keep the ambient spawn-group pools at strength (respawn killed members). No-op when disabled.
+						if (ambientMaintain.Advance(dt, out _))
+							await _output.MaintainAmbientPools();
+
+						consecutiveFailures = 0;
 					}
-
-					// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
-					await TickPlayerDeaths();
-					await TickBuffExpiry();
-					await TickDots();
-
-					// Boundary CROSSING tests: every base tick (10 Hz). Both used to hang off the regen accumulator
-					// below, which has nothing to do with either and sampled them at 1 Hz - a walking player covers
-					// several units between samples, so both fired late, well inside the boundary. In-client that read
-					// as having to stand on top of a resurrection point before it registered; the radius was never the
-					// problem. Cheap enough to run hot: the points/areas and the per-player discovered set are all
-					// cached, so a tick is a handful of distance checks per player, and only an actual discovery
-					// touches the DB.
-					await DiscoverNearbyRespawnPoints();
-					await TickAreaBanners();
-
-					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
-					if (regen.Advance(dt, out var regenElapsed))
-						await RegenerateConnectedPlayers(regenElapsed);
-
-					// #363: keep the ambient spawn-group pools at strength (respawn killed members). No-op when disabled.
-					if (ambientMaintain.Advance(dt, out _))
-						await _output.MaintainAmbientPools();
+					catch (OperationCanceledException)
+					{
+						throw; // shutdown - let the outer handler end the loop
+					}
+					catch (Exception ex)
+					{
+						// Log the first failure and then back off geometrically: a systemic fault (a broken query, a
+						// permanently locked DB) would otherwise write a stack trace 10x a second, and the flood is
+						// what buries the first one - the only line that says what actually broke.
+						consecutiveFailures++;
+						if (consecutiveFailures == 1 || consecutiveFailures % 100 == 0)
+							_logger.LogError(ex, "Game tick failed ({Count} consecutive); the world keeps ticking.", consecutiveFailures);
+					}
 				}
 			}
 			catch (OperationCanceledException)
@@ -838,7 +860,8 @@ namespace Faolan.GameServer.World
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "Game tick loop failed.");
+				// Only a failure of the TIMER itself reaches here now - a per-tick fault is caught above.
+				_logger.LogError(ex, "Game tick loop terminated.");
 			}
 		}
 
