@@ -262,7 +262,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			static QuestcRecord Record(QuestDefinition q)
 			{
-				return QuestcRecord.BuildSingle(q, q.SnapshotState, q.SnapshotN, q.SnapshotFieldEc, q.SnapshotFieldF0, q.SnapshotFieldF8, q.SnapshotField28);
+				return QuestcRecord.BuildSingle(q, q.Level, q.SnapshotUnknown118, q.SnapshotUnknownEc, q.SnapshotUnknownF0, q.SnapshotUnknownF8, q.SnapshotUnknown28);
 			}
 		}
 
@@ -272,7 +272,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
-			var record = QuestcRecord.BuildSingle(def, state, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8);
+			var record = QuestcRecord.BuildSingle(def, state, def.SnapshotUnknown118, def.SnapshotUnknownEc, def.SnapshotUnknownF0, def.SnapshotUnknownF8);
 			record.Objectives = QuestObjectiveRegion.Build(def, instance);
 			var quests = new QuestcRegion
 			{
@@ -365,11 +365,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		}
 
 		// A quest can ride the snapshot journal region (BuildQuestPortion) only if its Quest_c scalars are seeded
-		// (SnapshotState != 0) AND all 5 header text refs are present - else BuildSingle throws. Quests failing this
+		// (Level != 0) AND all 5 header text refs are present - else BuildSingle throws. Quests failing this
 		// fall to the live RestorePlayerQuests path instead, so the two never deliver the same quest twice (#255).
 		public static bool IsSnapshotEligible(QuestDefinition def)
 		{
-			if (def is not { SnapshotState: not 0 })
+			if (def is not { HasSnapshotRecord: true })
 				return false;
 
 			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();

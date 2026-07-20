@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Codecs.Quest;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -648,12 +649,14 @@ namespace Faolan.Importer.Captures
 			if (quest == null)
 				return;
 
-			quest.SnapshotN = 4;
-			quest.SnapshotFieldEc = 1;
-			quest.SnapshotFieldF0 = 0x96;
-			quest.SnapshotFieldF8 = 15;
-			quest.SnapshotState = 1;
-			quest.SnapshotField28 = 0;
+			quest.SnapshotUnknown118 = 4;
+			quest.SnapshotGoalCount = QuestcRegion.BeachN; // the beach record's `n` (@+0x14)
+			quest.SnapshotUnknownEc = 1;
+			quest.SnapshotUnknownF0 = 0x96;
+			quest.SnapshotUnknownF8 = 15;
+			quest.Level = 1;
+			quest.HasSnapshotRecord = true;
+			quest.SnapshotUnknown28 = 0;
 			quest.IndexMagic = 0x57365154;
 			quest.IndexMarker = 0x7E2;
 			quest.IndexTableField1 = 1;
@@ -733,12 +736,14 @@ namespace Faolan.Importer.Captures
 			if (quest == null)
 				return;
 
-			quest.SnapshotState = 3;
-			quest.SnapshotN = 3;
-			quest.SnapshotFieldEc = 1;
-			quest.SnapshotFieldF0 = 80;
-			quest.SnapshotFieldF8 = 7;
-			quest.SnapshotField28 = 80;
+			quest.Level = 3;
+			quest.HasSnapshotRecord = true;
+			quest.SnapshotUnknown118 = 3;
+			quest.SnapshotGoalCount = QuestcRegion.BeachN;
+			quest.SnapshotUnknownEc = 1;
+			quest.SnapshotUnknownF0 = 80;
+			quest.SnapshotUnknownF8 = 7;
+			quest.SnapshotUnknown28 = 80;
 			quest.IndexMagic = 0x52524C33;
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 3;

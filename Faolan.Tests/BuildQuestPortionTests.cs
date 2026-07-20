@@ -83,7 +83,7 @@ namespace Faolan.Tests
 
 			var casilda = await LoadDefinition(13479);
 			Assert.NotNull(casilda);
-			var rec = QuestcRecord.BuildSingle(casilda, casilda.SnapshotState, casilda.SnapshotN, casilda.SnapshotFieldEc, casilda.SnapshotFieldF0, casilda.SnapshotFieldF8, casilda.SnapshotField28);
+			var rec = QuestcRecord.BuildSingle(casilda, casilda.Level, casilda.SnapshotUnknown118, casilda.SnapshotUnknownEc, casilda.SnapshotUnknownF0, casilda.SnapshotUnknownF8, casilda.SnapshotUnknown28);
 			using var w = new FaolanStream();
 			rec.Write(w);
 			var built = w.ToArray();
@@ -109,7 +109,7 @@ namespace Faolan.Tests
 		{
 			var beach = await LoadDefinition(10238);
 			var built = FullCharSnapshotSubClass.BuildQuestPortion([beach], beach, CaptureInstance);
-			var single = FullCharSnapshotSubClass.BuildSingleQuestPortion(beach, beach.SnapshotState, CaptureInstance);
+			var single = FullCharSnapshotSubClass.BuildSingleQuestPortion(beach, beach.Level, CaptureInstance);
 			Assert.True(single.SequenceEqual(built), "single-quest portion must equal the multi-quest form");
 		}
 

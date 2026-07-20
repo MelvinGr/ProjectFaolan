@@ -50,8 +50,8 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			// All scalars sourced from the DB (SnapshotN/FieldEc/FieldF0/FieldF8) - no literals but the per-char state.
-			var record = QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8);
+			// All scalars sourced from the DB (SnapshotUnknown118/FieldEc/FieldF0/FieldF8) - no literals but the per-char state.
+			var record = QuestcRecord.BuildSingle(def, BeachState, def.SnapshotUnknown118, def.SnapshotUnknownEc, def.SnapshotUnknownF0, def.SnapshotUnknownF8);
 			var region = new QuestcRegion
 			{
 				Records =
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			{
 				Records =
 				{
-					QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8)
+					QuestcRecord.BuildSingle(def, BeachState, def.SnapshotUnknown118, def.SnapshotUnknownEc, def.SnapshotUnknownF0, def.SnapshotUnknownF8)
 				}
 			};
 			var objectives = QuestObjectiveRegion.Build(def, instance);

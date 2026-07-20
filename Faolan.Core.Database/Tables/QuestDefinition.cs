@@ -24,9 +24,16 @@ namespace Faolan.Core.Database.Tables
 		// PROPERTY, constant across its lifecycle. (Earlier read as a "state/category" enum; the harvest across faolan.db
 		// disproved that - the values track level, not state: Tortage starter quests 1/3/4/5, open-world zones 23/24,
 		// endgame 80, and two quests in the SAME zone can be 23 and 80. It is never the QuestIIR StateActive value 2.)
-		// Harvested from the wire by QuestDefinitionExtractor (#352); 0 means "not seen in a captured full-update" and the
-		// sender falls back to WorldQuest.DefaultQuestLevel. The client silently DROPS a full-update whose level word is
-		// wrong (e.g. the QuestIIR state 2), leaving the journal empty - the bug that first surfaced this field.
+		// Working interpretation: the quest's OPTIMAL level - what the J-panel colours the title against (red when the
+		// character is under it, green at it, grey when over-levelled). The captured journals fit: Strie L1 -> 1,
+		// AssassinL23 L23 -> 21/22/23/30, Hakotep L24 -> 22/23/24/30, DemoL80 L80 -> 70..80, NecroL80 L80 -> 80 across all 27
+		// (her active set is all endgame). Note both L23 and L24 hold a quest at 30 - above them, so red. Not proven
+		// from captures (the colour mapping is client-side), but nothing contradicts it.
+		//
+		// Harvested from TWO packets for the same quantity: the QuestFullUpdate's level word (QuestDefinitionExtractor,
+		// #352) and the Quest_c journal record's word @+0x10. The latter used to live in a separate SnapshotState
+		// column; they agree exactly where both were present (10238 -> 1/1, 13479 -> 3/3), so they were collapsed here.
+		// 0 = never seen; the sender falls back to WorldQuest.DefaultQuestLevel.
 		public uint Level { get; set; }
 
 		// The objective's world-marker (map id + x/y) shown on the map; 0 when the quest has no map marker.
@@ -67,22 +74,33 @@ namespace Faolan.Core.Database.Tables
 		public uint IndexTrailerWord { get; set; }
 		public uint MarkerX { get; set; } // TODO: Vector2?
 		public uint MarkerY { get; set; }
-		public uint SnapshotField28 { get; set; }
-		public uint SnapshotFieldEc { get; set; }
-		public uint SnapshotFieldF0 { get; set; }
+		public uint SnapshotUnknown28 { get; set; }
+		public uint SnapshotUnknownEc { get; set; }
+		public uint SnapshotUnknownF0 { get; set; }
 
 		// --- Snapshot-tails GENERATION data (#186): values that live ONLY in the FullChar snapshot's quest region
 		// (BeachTailsTemplate.bin), not the QuestFullUpdate/Journal packets, so they are seeded (not harvested). They
 		// let the snapshot's Quest_c record + quest index generate from the DB with no literals.
 
-		// Quest_c (journal) record scalars (still semantically undecoded; carried per quest). Beach 10238 = 4/1/0x96/15.
-		public uint SnapshotN { get; set; }
+		// A level-ADJACENT value: across the captured journals it runs level..level+5 (NecroL80 L80 -> 80-83,
+		// Hakotep L24 -> 19-30). Its exact meaning is undecoded, hence the name. Was called SnapshotN, which was
+		// doubly wrong - it is not `n` (that is SnapshotGoalCount, a different word at a different offset).
+		public uint SnapshotUnknown118 { get; set; }
 
-		// The Quest_c record's State word (@20) and Field28 (@28) - per-quest CONSTANTS (verified byte-identical across
-		// a quest's active + completed login captures, #255). Beach 10238 = state 1 / field28 0; Casilda 13479 = state 3
-		// / field28 80. Drive the multi-quest journal region (BuildQuestPortion) so every held quest's record generates.
-		public uint SnapshotState { get; set; }
-		public ulong SnapshotFieldF8 { get; set; }
+		// The Quest_c record's `n` word (@+0x14) - the per-quest goal count. NOT the 0x412 the beach template happens
+		// to carry: captured journals vary (NecroL80's records run 2, 10, ...). QuestcRecord.BuildSingle used to emit the
+		// beach constant for every quest, which is fine while the only generated journal IS the beach one, and wrong
+		// the moment a real character's journal is regenerated - so it is stored per quest. Beach 10238 keeps 0x412,
+		// so its golden stays byte-exact.
+		public uint SnapshotGoalCount { get; set; }
+
+		public ulong SnapshotUnknownF8 { get; set; }
+
+		// True once this quest's Quest_c record scalars are known (seeded, or harvested from a captured journal), i.e.
+		// the record can be GENERATED. Previously inferred from `SnapshotState != 0` - but that word turned out to be
+		// the quest LEVEL (it collapsed into Level), and plenty of definitions carry a level with no record scalars at
+		// all, so the inference would have made them falsely eligible. An explicit flag says what was actually meant.
+		public bool HasSnapshotRecord { get; set; }
 	}
 
 	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.

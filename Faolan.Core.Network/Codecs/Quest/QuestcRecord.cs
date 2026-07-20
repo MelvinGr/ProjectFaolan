@@ -156,10 +156,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 				QuestId = def.QuestId,
 				State = state,
 				Field114 = 0,
-				// `n` is the QuestDefinition.SnapshotN column, which despite its name feeds field118, not the goal
+				// `n` is the QuestDefinition.SnapshotUnknown118 column, which despite its name feeds field118, not the goal
 				// count - the DB column keeps the old (mislabeled) name to avoid a rename migration.
 				Field118 = n,
-				N = QuestcRegion.BeachN,
+				// The per-quest goal count, stored from the capture (QuestDefinition.SnapshotGoalCount). This used to
+				// emit QuestcRegion.BeachN for EVERY quest, which is only right for the beach journal - captured
+				// records vary (NecroL80's run 2, 10, ...). Substituting a constant here is the same mistake as
+				// defaulting the vanity mask: the wire must carry what retail carried.
+				N = def.SnapshotGoalCount,
 				Title = Slot(QuestTextSlot.Title),
 				Summary = Slot(QuestTextSlot.Summary),
 				Area = Slot(QuestTextSlot.AreaTitle),

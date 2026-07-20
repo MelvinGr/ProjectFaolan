@@ -127,7 +127,7 @@ namespace Faolan.Importer.Extractors
 
 			// The per-quest LEVEL word sits after the second questId: with the [u32 len] prefix InnerBody keeps, that is
 			// body[33..37] (subop 4, ack 4, player 4, [len 4] all counted). Harvested straight off the wire, see
-			// QuestDefinition.Level (the values track quest level, not the seeded SnapshotState).
+			// QuestDefinition.Level (the values track quest level, not the seeded Level).
 			if (body.Length >= 37)
 				def.Level = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(33, 4));
 
