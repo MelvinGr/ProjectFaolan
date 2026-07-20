@@ -13,8 +13,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//   per AREA group:
 	//     [u32 areaId]
 	//     [string areaTitle]                         <remoteformat category=50300 id=areaId>
-	//     [string regionName]                        <remoteformat category=52000>
-	//     [string mapName]                           <remoteformat category=52000>
+	//     [string mapName]                           <remoteformat category=52000> the PLAYFIELD (4010 Tortage Island)
+	//     [string regionName]                        <remoteformat category=52000> the CONTINENT (1,2,3,4,8, ...)
 	//     [u32 magic]                                the area's goal-table NAME word ('RRL3', 'W6QT', ...)
 	//     [u32 tf1]                                  0 in every captured group
 	//     [u32 questsInArea]
@@ -141,8 +141,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			public uint AreaId { get; init; }
 			public string AreaTitle { get; init; } = "";
-			public string RegionName { get; init; } = "";
+
+			// ⚠️ MAP comes FIRST on the wire, then REGION - the larger 52000 id is the playfield (4010 "Tortage
+			// Island", 4020 "City of Tortage"), the smaller one the continent. Labelling them in wire order gets it
+			// backwards; the corpus settles it: 917 distinct areas resolve to only 8 distinct region ids, each area
+			// to exactly one. An AREA is NOT a map - it is the finer, leaf grouping the journal tree renders.
 			public string MapName { get; init; } = "";
+			public string RegionName { get; init; } = "";
 			public uint Magic { get; init; } // the AREA's goal-table name word ('RRL3', 'W6QT', ...)
 			public uint TableField1 { get; init; }
 			public List<QuestEntry> Quests { get; init; } = [];

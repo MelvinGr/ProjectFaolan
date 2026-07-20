@@ -67,6 +67,7 @@ namespace Faolan.Core.Database
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<PatrolNode> PatrolNodes { get; }
 		DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; }
+		DbSet<QuestArea> QuestAreas { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
@@ -141,6 +142,7 @@ namespace Faolan.Core.Database
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolNode> PatrolNodes { get; set; }
 		public DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; set; }
+		public DbSet<QuestArea> QuestAreas { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }

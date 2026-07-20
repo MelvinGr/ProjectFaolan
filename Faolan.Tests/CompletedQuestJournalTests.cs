@@ -24,6 +24,7 @@ namespace Faolan.Tests
 		public void EveryCapturedRegion_RoundTripsByteExact()
 		{
 			int examined = 0, withRegion = 0, quests = 0, areas = 0;
+			var allAreas = new List<CompletedQuestJournalRegion.AreaGroup>();
 
 			foreach (var (source, subClass, tails) in SubClasses())
 			{
@@ -58,6 +59,7 @@ namespace Faolan.Tests
 				withRegion++;
 				quests += region.QuestCount;
 				areas += region.Areas.Count;
+				allAreas.AddRange(region.Areas);
 
 				// The region ends where its own frame count runs out - well before the access-window table, with other
 				// regions in between - so the round-trip is measured against exactly what Parse consumed.
@@ -67,6 +69,27 @@ namespace Faolan.Tests
 			}
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");
+
+			// Is an "area" the same thing as a map?
+			var pairs = new HashSet<(uint Area, string Region, string Map)>();
+			var areaToMap = new Dictionary<uint, HashSet<string>>();
+			var mapToArea = new Dictionary<string, HashSet<uint>>();
+			foreach (var g in allAreas)
+			{
+				var reg = Id(g.RegionName);
+				var map = Id(g.RegionName);
+				pairs.Add((g.AreaId, reg, map));
+				(areaToMap.TryGetValue(g.AreaId, out var m) ? m : areaToMap[g.AreaId] = []).Add(map);
+				(mapToArea.TryGetValue(map, out var a) ? a : mapToArea[map] = []).Add(g.AreaId);
+			}
+
+			o.WriteLine($"distinct areaIds={areaToMap.Count} distinct 2nd-52000 ids={mapToArea.Count}");
+			o.WriteLine($"areas whose 2nd-52000 id is NOT unique: {areaToMap.Count(kv => kv.Value.Count > 1)}");
+			o.WriteLine($"2nd-52000 ids shared by >1 area: {mapToArea.Count(kv => kv.Value.Count > 1)}");
+			foreach (var kv in mapToArea.OrderByDescending(k => k.Value.Count).Take(5))
+				o.WriteLine($"   id {kv.Key} <- {kv.Value.Count} areas: {string.Join(",", kv.Value.Take(8))}");
+			foreach (var g in allAreas.Take(4))
+				o.WriteLine($"   sample area={g.AreaId} map={Id(g.MapName)} region={Id(g.RegionName)} title={Id(g.AreaTitle)}");
 			Assert.True(withRegion > 0, "no snapshot in the corpus carried a completed-quest journal");
 		}
 
@@ -114,6 +137,12 @@ namespace Faolan.Tests
 			{
 				return $"areas={areas} quests={quests} THREW at {r.Position}: {ex.Message}";
 			}
+		}
+
+		private static string Id(string xml)
+		{
+			var m = System.Text.RegularExpressions.Regex.Match(xml, "id=\"([0-9]+)\"");
+			return m.Success ? m.Groups[1].Value : "?";
 		}
 
 		// The access-window table starts 15 bytes before the first PFAccessWindow_ name (mirrors
