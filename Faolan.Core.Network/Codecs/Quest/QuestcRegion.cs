@@ -91,5 +91,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			return $"<remoteformat id=\"{id}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
 		}
+
+		// The token-addressed form: `token="Noname"` instead of `id="0"`. See QuestObjectiveRegion.LocalizedToken.
+		public static string RemoteFormatToken(string token, uint category, string key)
+		{
+			return $"<remoteformat token=\"{token}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
+		}
 	}
 }

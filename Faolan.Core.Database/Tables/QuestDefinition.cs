@@ -116,6 +116,15 @@ namespace Faolan.Core.Database.Tables
 		// the quest LEVEL (it collapsed into Level), and plenty of definitions carry a level with no record scalars at
 		// all, so the inference would have made them falsely eligible. An explicit flag says what was actually meant.
 		public bool HasSnapshotRecord { get; set; }
+
+		// True when the quest's @609 objective region, REBUILT from these rows, reproduces the captured bytes exactly.
+		// Set by the importer, which does that comparison per quest at harvest time (ImportOps.VerifyObjectiveRegions).
+		//
+		// This is what gates a quest into the login snapshot. Shipping an objective region we cannot reproduce desyncs
+		// the client and asserts it on statlist.cpp:134, and the region still has undecoded fields - so "we harvested
+		// some goals" is not good enough, only "the bytes come out identical" is. The flag flips itself on as decoding
+		// improves; no code change is needed to widen coverage.
+		public bool ObjectiveRegionVerified { get; set; }
 	}
 
 	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.

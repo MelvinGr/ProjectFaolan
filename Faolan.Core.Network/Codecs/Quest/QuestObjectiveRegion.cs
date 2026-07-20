@@ -92,16 +92,22 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			ArgumentNullException.ThrowIfNull(def);
 			var region = new QuestObjectiveRegion();
-			foreach (var g in def.Goals.OrderBy(g => g.Sequence))
+			foreach (var g in def.Goals.OrderBy(g => g.RegionOrder).ThenBy(g => g.Sequence))
 			{
-				var objective = QuestcRegion.RemoteFormat(g.ObjectiveRefId, g.ObjectiveCategory, g.ObjectiveKey);
+				var objective = g.ObjectiveToken is { Length: > 0 } ot
+					? QuestcRegion.RemoteFormatToken(ot, g.ObjectiveCategory, g.ObjectiveKey)
+					: QuestcRegion.RemoteFormat(g.ObjectiveRefId, g.ObjectiveCategory, g.ObjectiveKey);
 				var trailing = g.TrailingLocalized
-					? Localized(g.TrailingRefId, g.TrailingCategory, g.TrailingFlags ?? "", g.TrailingKey)
-					: QuestcRegion.RemoteFormat(g.TrailingRefId, g.TrailingCategory, g.TrailingKey);
+					? g.TrailingToken is { Length: > 0 } tt
+						? LocalizedToken(tt, g.TrailingCategory, g.TrailingFlags ?? "", g.TrailingKey)
+						: Localized(g.TrailingRefId, g.TrailingCategory, g.TrailingFlags ?? "", g.TrailingKey)
+					: g.TrailingToken is { Length: > 0 } rt
+						? QuestcRegion.RemoteFormatToken(rt, g.TrailingCategory, g.TrailingKey)
+						: QuestcRegion.RemoteFormat(g.TrailingRefId, g.TrailingCategory, g.TrailingKey);
 				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator, g.SubId, g.MapId ?? 0, g.MarkerX ?? 0, g.MarkerY ?? 0, Encoding.Latin1.GetBytes(objective),
 					Encoding.Latin1.GetBytes(trailing), g.Extra5, g.Extra6, g.RequiredCount == 0
 						? 1
-						: g.RequiredCount));
+						: g.RequiredCount, g.Extra1, g.Extra2, g.Unknown1));
 			}
 
 			return region;
@@ -112,6 +118,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public static string Localized(uint id, uint category, string flags, string key)
 		{
 			return $"<localized id=\"{id}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >";
+		}
+
+		// A text record addresses its string EITHER by numeric id OR by a name token - `token="Noname"` rather than
+		// `id="0"`. Modelling only the id form emitted `id="0"` where the wire carries a token, which is 8 bytes short
+		// and desynced everything after it. Same split as the feedback records in #372.
+		public static string LocalizedToken(string token, uint category, string flags, string key)
+		{
+			return $"<localized token=\"{token}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >";
 		}
 
 		public static QuestObjectiveRegion Parse(byte[] data, int offset)

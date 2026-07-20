@@ -15,16 +15,46 @@ namespace Faolan.Importer.Extractors
 			uint QuestId,
 			uint GoalId,
 			uint Sequence,
+			uint RegionOrder,
 			uint Separator,
 			uint SubId,
 			uint MapId,
 			uint MarkerX,
 			uint MarkerY,
+			uint Unknown1,
+			uint Extra1,
+			uint Extra2,
 			uint Extra5,
 			uint Extra6,
 			uint RequiredCount,
 			CompletedQuestExtractor.TextRef Objective,
 			CompletedQuestExtractor.TextRef? Trailing);
+
+		// The captured objective goals per quest, exactly as the wire carried them - the oracle the importer compares
+		// a rebuilt region against (ImportOps.VerifyObjectiveRegions). First capture of a quest wins, matching how
+		// Extract harvests the rows themselves.
+		public static Dictionary<uint, List<List<Faolan.Core.Network.Codecs.Quest.QuestObjectiveGoal>>> CapturedRegions(IReadOnlyList<CapturedPacket> packets)
+		{
+			var byQuest = new Dictionary<uint, List<List<Faolan.Core.Network.Codecs.Quest.QuestObjectiveGoal>>>();
+			if (packets == null)
+				return byQuest;
+
+			foreach (var p in packets)
+			{
+				if (!SnapshotJournalReader.TryRead(p.Bytes, out _, out var journal))
+					continue;
+
+				foreach (var record in journal)
+				{
+					// EVERY capture of the quest, not just the first: a region that reproduces one capture but not
+					// another is not safe to ship (goal 1448's trailing record is spelled differently across captures).
+					if (record.Objectives is { Goals.Count: > 0 } objectives)
+						(byQuest.TryGetValue(record.QuestId, out var all) ? all : byQuest[record.QuestId] = []).Add(objectives.Goals);
+				}
+			}
+
+			return byQuest;
+		}
 
 		public static List<Goal> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -42,8 +72,9 @@ namespace Faolan.Importer.Extractors
 					if (record.Objectives is not { Goals.Count: > 0 } objectives)
 						continue;
 
-					foreach (var g in objectives.Goals)
+					for (var gi = 0; gi < objectives.Goals.Count; gi++)
 					{
+						var g = objectives.Goals[gi];
 						// GoalId is the table's PK and is globally unique across the corpus (verified: 158 distinct
 						// ids, zero used by more than one quest), so first writer wins.
 						if (byGoal.ContainsKey(g.GoalId))
@@ -57,11 +88,15 @@ namespace Faolan.Importer.Extractors
 							record.QuestId,
 							g.GoalId,
 							g.N,
+							(uint)gi,
 							g.K,
 							g.SubId,
 							g.MapId,
 							g.MarkerX,
 							g.MarkerY,
+							g.Unknown1,
+							g.Reserved.Length > 1 ? g.Reserved[1] : 0,
+							g.Reserved.Length > 2 ? g.Reserved[2] : 0,
 							g.Reserved.Length > 5 ? g.Reserved[5] : 0,
 							g.Reserved.Length > 6 ? g.Reserved[6] : 0,
 							g.RequiredCount,

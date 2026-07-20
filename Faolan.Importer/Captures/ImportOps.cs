@@ -462,6 +462,33 @@ namespace Faolan.Importer.Captures
 			return added;
 		}
 
+		// Marks every quest whose @609 objective region, rebuilt from the rows just imported, reproduces the captured
+		// bytes exactly. Only those may ride the login snapshot - the region still has undecoded fields, and shipping
+		// one we cannot reproduce asserts the client (statlist.cpp:134).
+		public static async Task<(int Verified, int Total)> VerifyObjectiveRegions(DatabaseContext db,
+			IReadOnlyDictionary<uint, List<List<QuestObjectiveGoal>>> capturedByQuest)
+		{
+			var defs = await db.QuestDefinitions.Include(q => q.Goals).ToDictionaryAsync(q => q.QuestId);
+			int verified = 0, total = 0;
+
+			foreach (var (questId, captures) in capturedByQuest)
+			{
+				if (!defs.TryGetValue(questId, out var def) || def.Goals.Count == 0)
+					continue;
+
+				total++;
+				def.ObjectiveRegionVerified = captures.All(goals =>
+					QuestObjectiveRegion.Build(def, goals[0].Instance).ToArray()
+						.SequenceEqual(new QuestObjectiveRegion { Goals = goals }.ToArray()));
+
+				if (def.ObjectiveRegionVerified)
+					verified++;
+			}
+
+			await db.SaveChangesAsync();
+			return (verified, total);
+		}
+
 		// Quest definitions harvested from the COMPLETED-quest journal (#390). ADDITIVE by design: these rows carry
 		// only a title + journal sub-line, so they fill the catalog out for quests no capture session ever touched
 		// without disturbing the far richer definitions the QuestFullUpdate path builds.
@@ -575,17 +602,23 @@ namespace Faolan.Importer.Captures
 					GoalId = g.GoalId,
 					QuestDefinitionId = g.QuestId,
 					Sequence = g.Sequence,
+					RegionOrder = g.RegionOrder,
 					Separator = g.Separator,
 					SubId = g.SubId,
 					MapId = mapId,
 					MarkerX = mapId == null ? null : g.MarkerX,
 					MarkerY = mapId == null ? null : g.MarkerY,
+					Unknown1 = g.Unknown1,
+					Extra1 = g.Extra1,
+					Extra2 = g.Extra2,
 					Extra5 = g.Extra5,
 					Extra6 = g.Extra6,
 					RequiredCount = g.RequiredCount,
 					ObjectiveRefId = g.Objective.RefId,
 					ObjectiveCategory = g.Objective.Category,
 					ObjectiveKey = g.Objective.Key,
+					ObjectiveToken = g.Objective.Token,
+					TrailingToken = g.Trailing?.Token,
 					TrailingRefId = g.Trailing?.RefId ?? 0,
 					TrailingCategory = g.Trailing?.Category ?? 0,
 					TrailingKey = g.Trailing?.Key,

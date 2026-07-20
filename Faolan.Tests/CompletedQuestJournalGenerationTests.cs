@@ -46,6 +46,153 @@ namespace Faolan.Tests
 		// was missing: the index was generated from QuestDefinition columns that are 0 for every harvested quest
 		// (tf1/tf2/trailer), so the server shipped a malformed index and the client died in StatList_t - while every
 		// existing test stayed green, because none of them regenerated an index.
+		// The @609 OBJECTIVE region, rebuilt from DB rows and compared byte-for-byte with the capture. The last
+		// generated region without such a gate - and every region that lacked one has shipped malformed at least once
+		// today while the suite stayed green.
+		[Fact]
+		public async Task CapturedObjectiveRegions_RebuildFromTheDatabase_ByteExact()
+		{
+			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
+			var defs = await db.QuestDefinitions.Include(q => q.Goals).ToDictionaryAsync(q => q.QuestId);
+
+			int compared = 0, exact = 0, skipped = 0, lenDiff = 0, sameLenDiff = 0;
+			_ = lenDiff;
+			var failByQuest = new Dictionary<uint, int>();
+			var seenQuest = new HashSet<uint>();
+			var shown = 0;
+			var okByQuest = new HashSet<uint>();
+			var first = "";
+
+			foreach (var (source, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			foreach (var rec in sub.Quests.Records)
+			{
+				if (rec.Objectives is not { Goals.Count: > 0 } captured)
+					continue;
+
+				if (!defs.TryGetValue(rec.QuestId, out var def) || def.Goals.Count == 0)
+				{
+					skipped++;
+					continue;
+				}
+
+				// Goals carry the live player's instance; take it from the capture so only CONTENT is compared.
+				var instance = captured.Goals[0].Instance;
+				var built = QuestObjectiveRegion.Build(def, instance).ToArray();
+				var want = captured.ToArray();
+				compared++;
+				if (built.SequenceEqual(want))
+				{
+					exact++;
+					okByQuest.Add(rec.QuestId);
+					continue;
+				}
+
+				failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
+				if (built.Length != want.Length)
+					lenDiff++;
+				else
+					sameLenDiff++;
+
+				if (shown < 4 && seenQuest.Add(rec.QuestId))
+				{
+					shown++;
+					first = "see log";
+					o.WriteLine($"  MISMATCH {source[..Math.Min(30, source.Length)]} quest {rec.QuestId}: built {built.Length} B vs captured {want.Length} B; " +
+						$"goals db={def.Goals.Count} cap={captured.Goals.Count}; builtGoalIds=[{string.Join(",", QuestObjectiveRegion.Parse(built, 0).Goals.Select(x => x.GoalId))}] capGoalIds=[{string.Join(",", captured.Goals.Select(x => x.GoalId))}]");
+					var rebuilt = QuestObjectiveRegion.Parse(built, 0);
+					for (var gi = 0; gi < captured.Goals.Count; gi++)
+					{
+						var cg = captured.Goals[gi];
+						var bg = rebuilt.Goals[gi];
+						o.WriteLine($"    goal{gi} id cap={cg.GoalId} got={bg.GoalId} | n cap={cg.N} got={bg.N} | k cap={cg.K} got={bg.K} | " +
+							$"sub cap={cg.SubId} got={bg.SubId} | map cap={cg.MapId} got={bg.MapId} | req cap={cg.RequiredCount} got={bg.RequiredCount} | " +
+							$"marker cap=({cg.MarkerX},{cg.MarkerY}) got=({bg.MarkerX},{bg.MarkerY})");
+						o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} z2={cg.Zero2} res=[{string.Join(",", cg.Reserved)}]");
+						o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} z2={bg.Zero2} res=[{string.Join(",", bg.Reserved)}]");
+						if (!cg.Objective.SequenceEqual(bg.Objective))
+							o.WriteLine($"      OBJ cap={System.Text.Encoding.Latin1.GetString(cg.Objective)}\n      OBJ got={System.Text.Encoding.Latin1.GetString(bg.Objective)}");
+						if (!cg.TextRecord.SequenceEqual(bg.TextRecord))
+							o.WriteLine($"      TXT cap={System.Text.Encoding.Latin1.GetString(cg.TextRecord)}\n      TXT got={System.Text.Encoding.Latin1.GetString(bg.TextRecord)}");
+					}
+				}
+			}
+
+			// For each goal id, how do the captures spell its trailing record?
+			var spell = new Dictionary<uint, (int Localized, int Remote)>();
+			foreach (var (_, sub2, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			foreach (var rec2 in sub2.Quests.Records)
+			{
+				if (rec2.Objectives is not { Goals.Count: > 0 } o2)
+					continue;
+
+				foreach (var g2 in o2.Goals)
+				{
+					var txt = System.Text.Encoding.Latin1.GetString(g2.TextRecord);
+					var cur = spell.GetValueOrDefault(g2.GoalId);
+					spell[g2.GoalId] = txt.Contains("<localized")
+						? (cur.Localized + 1, cur.Remote)
+						: (cur.Localized, cur.Remote + 1);
+				}
+			}
+
+			o.WriteLine($"goals seen={spell.Count}  always-localized={spell.Count(k => k.Value.Remote == 0)}  " +
+				$"always-remoteformat={spell.Count(k => k.Value.Localized == 0)}  MIXED={spell.Count(k => k.Value.Localized > 0 && k.Value.Remote > 0)}");
+			foreach (var k in spell.Where(x => x.Key is 1448 or 3490))
+				o.WriteLine($"  goal {k.Key}: localized={k.Value.Localized} remoteformat={k.Value.Remote}");
+
+			// Do two captures of the SAME goal agree on the reserved tags and the text spelling? If not, byte-exact
+			// against every capture is impossible by construction and the gate must target the harvested source.
+			var tagVals = new Dictionary<uint, HashSet<string>>();
+			foreach (var (_, sub3, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			foreach (var rec3 in sub3.Quests.Records)
+			{
+				if (rec3.Objectives is not { Goals.Count: > 0 } o3)
+					continue;
+
+				foreach (var g3 in o3.Goals)
+				{
+					var sig = $"{g3.Unknown1}|{g3.Zero2}|{string.Join(",", g3.Reserved)}|{System.Text.Encoding.Latin1.GetString(g3.TextRecord)}";
+					(tagVals.TryGetValue(g3.GoalId, out var set) ? set : tagVals[g3.GoalId] = []).Add(sig);
+				}
+			}
+
+			o.WriteLine($"goals seen across captures={tagVals.Count}; goals whose zero1/zero2/reserved/text VARY: {tagVals.Count(k => k.Value.Count > 1)}");
+			var z1 = new Dictionary<uint, HashSet<uint>>();
+			foreach (var (_, sub4, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			foreach (var rec4 in sub4.Quests.Records)
+			{
+				if (rec4.Objectives is not { Goals.Count: > 0 } o4)
+					continue;
+
+				foreach (var g4 in o4.Goals)
+					(z1.TryGetValue(g4.GoalId, out var st) ? st : z1[g4.GoalId] = []).Add(g4.Unknown1);
+			}
+
+			o.WriteLine($"  Zero1: nonzero on {z1.Count(k => k.Value.Any(v => v != 0))} of {z1.Count} goals; VARIES across captures on {z1.Count(k => k.Value.Count > 1)}");
+
+			// NecroL80's snapshot-eligible quests specifically - these are what the server would actually ship.
+			uint[] necrol80 = [17624, 16324, 13784, 17171, 16341, 17238, 17236, 17168, 19365];
+			foreach (var q in necrol80)
+				o.WriteLine($"  NECROL80 quest {q}: {(okByQuest.Contains(q) ? "OK" : failByQuest.ContainsKey(q) ? "FAILS" : "not in corpus")}");
+
+			o.WriteLine($"objective regions compared={compared} byteExact={exact} skipped={skipped}");
+			o.WriteLine($"  failing: {failByQuest.Count} distinct quests; ok: {okByQuest.Count} distinct quests");
+			o.WriteLine($"  length differs={lenDiff} sameLengthButDiffers={sameLenDiff}");
+			if (first.Length > 0)
+				o.WriteLine($"  {first}");
+
+			// The hard gate is on what we SHIP: a quest flagged ObjectiveRegionVerified must rebuild byte-exact in
+			// every capture it appears in. Overall coverage is reported, not asserted - the region still has undecoded
+			// fields, and the flag is what keeps the unreproducible ones out of the login snapshot.
+			var shipped = defs.Values.Where(d => d.ObjectiveRegionVerified).Select(d => d.QuestId).ToHashSet();
+			var shippedButFailing = failByQuest.Keys.Where(shipped.Contains).ToList();
+			o.WriteLine($"  quests flagged verified={shipped.Count}; of those FAILING here={shippedButFailing.Count}");
+
+			Assert.True(compared > 0, "no captured objective region could be rebuilt");
+			Assert.True(shippedButFailing.Count == 0,
+				$"quests flagged ObjectiveRegionVerified must rebuild byte-exact, but these do not: {string.Join(",", shippedButFailing.Take(10))}");
+		}
+
 		[Fact]
 		public async Task CapturedQuestIndexes_RebuildFromTheDatabase_ByteExact()
 		{

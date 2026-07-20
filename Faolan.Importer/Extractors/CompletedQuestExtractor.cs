@@ -20,7 +20,7 @@ namespace Faolan.Importer.Extractors
 	{
 		public sealed record CompletedQuest(uint QuestId, uint AreaId, uint MapId, uint Sequence, TextRef Title, TextRef SubLine);
 
-		public sealed record TextRef(uint RefId, uint Category, string Key, string? Flags, bool IsLocalized);
+		public sealed record TextRef(uint RefId, uint Category, string Key, string? Flags, bool IsLocalized, string? Token);
 
 		public sealed record Harvest(List<CompletedQuest> Quests, Dictionary<uint, AreaHeader> Areas);
 
@@ -81,8 +81,9 @@ namespace Faolan.Importer.Extractors
 			if (key == null)
 				return null;
 
+			// Either id= or token= addresses the string; token wins when present.
 			return new TextRef(AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags"),
-				xml.Contains("<localized", System.StringComparison.Ordinal));
+				xml.Contains("<localized", System.StringComparison.Ordinal), Attr(xml, "token"));
 		}
 
 		private static string? Attr(string xml, string name)

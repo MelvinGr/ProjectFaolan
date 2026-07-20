@@ -19,7 +19,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint MarkerY { get; init; }
 		public uint N { get; init; }
 		public uint RequiredCount { get; init; } // the goal's required amount (kills/collects/etc.); 1/3/4/8/12/64 seen on the wire (decode 2026-06-19, #47)
-		public uint Zero1 { get; init; }
+		// NOT always zero, despite the name it carried until 2026-07-20: nonzero on 24 of the 158 goals in the corpus
+		// (quest 12411 goal 3555 holds 60). Stable per goal across every capture, so it is quest data to be stored,
+		// not progress. Meaning still unknown - named for its position.
+		public uint Unknown1 { get; init; }
 		public uint Zero2 { get; init; }
 		public uint[] Reserved { get; init; } = new uint[ReservedWords]; // 7 words, all 0 in the template
 
@@ -67,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				MapId = mapId,
 				MarkerX = markerX,
 				MarkerY = markerY,
-				Zero1 = zero1,
+				Unknown1 = zero1,
 				Zero2 = zero2,
 				Objective = objective,
 				TextRecord = text
@@ -90,7 +93,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(MapId);
 			w.WriteUInt32(MarkerX);
 			w.WriteUInt32(MarkerY);
-			w.WriteUInt32(Zero1);
+			w.WriteUInt32(Unknown1);
 			w.WriteUInt32(Zero2);
 			w.WriteArrayUInt32Length(Objective);
 			w.WriteArrayUInt16Length(TextRecord); // u16-framed - see Read (#388)
@@ -102,11 +105,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// generator for the objective region (#186), mirroring QuestcRecord.BuildSingle for the journal region. The
 		// objective/trailing text come from the quest's per-goal text refs (the same RemoteFormat/Localized records the
 		// journal uses); `instance` is re-addressed to the live player like the rest of the tails.
-		// extra5/extra6 are the last two of the 7 "reserved" words: 0 for the first goal, but the second goal carries
-		// a number + a 4-char tag there (70099 / 0x36314C56 = "61LV"; still undecoded - carried per goal like
-		// QuestcRecord's undecoded scalars). The first five reserved words are always 0.
+		// The 7 "reserved" words hold TWO (marker, token) pairs - at [1..2] and [5..6] - each a constant 70099 next to
+		// a RANDOM 4-character tag (0x36314C56 "61LV", 0x30474454 "0GDT", ...). Not always zero-except-the-last-two,
+		// which is what the earlier note here claimed: quest 14615 carries [0,70099,810042964,0,0,70099,1415075403].
+		// Carried per goal like QuestcRecord's undecoded scalars; the tags being random is why they must be stored
+		// rather than derived (see the WTHD note in questc-region-decode).
 		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, byte[] objective, byte[] textRecord,
-			uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1)
+			uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1, uint extra1 = 0, uint extra2 = 0, uint unknown1 = 0)
 		{
 			ArgumentNullException.ThrowIfNull(objective);
 			ArgumentNullException.ThrowIfNull(textRecord);
@@ -120,12 +125,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 				N = n,
 				GoalIdRepeat = goalId,
 				RequiredCount = requiredCount,
-				Reserved = [0, 0, 0, 0, 0, extra5, extra6],
+				Reserved = [0, extra1, extra2, 0, 0, extra5, extra6],
 				SubId = subId,
 				MapId = mapId,
 				MarkerX = markerX,
 				MarkerY = markerY,
-				Zero1 = 0,
+				Unknown1 = unknown1,
 				Zero2 = 0,
 				Objective = objective,
 				TextRecord = textRecord

@@ -824,6 +824,10 @@ namespace Faolan.Importer.Modules
 			var goals = ObjectiveGoalExtractor.Extract(packets);
 			var addedGoals = await ImportOps.ImportObjectiveGoals(ctx.Db, goals);
 
+			// Only quests whose objective region provably rebuilds may ride the login snapshot.
+			var (verified, verifiable) = await ImportOps.VerifyObjectiveRegions(ctx.Db, ObjectiveGoalExtractor.CapturedRegions(packets));
+			Console.WriteLine($"  objective regions verified byte-exact: {verified} of {verifiable} quests.");
+
 			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {addedGoals} objective goals, {areaCount} quest areas " +
 				$"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");
 		}

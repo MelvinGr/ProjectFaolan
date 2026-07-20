@@ -417,8 +417,21 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (def is not { HasSnapshotRecord: true })
 				return false;
 
-			if (def.Goals.Count == 0 || area is not { Magic: not 0 })
+			// Only quests whose objective region provably reproduces the wire (see
+			// QuestDefinition.ObjectiveRegionVerified). The region has undecoded fields left, and an unreproducible
+			// one takes the whole login down with it.
+			if (def.Goals.Count == 0 || !def.ObjectiveRegionVerified || area is not { Magic: not 0 })
 				return false;
+
+			// ⚠️ TEMPORARILY OFF (#389). Everything above is satisfied by 9 of NecroL80's quests, but the @609 OBJECTIVE
+			// region we would generate for them is not trustworthy yet: regenerating the corpus reproduces only 5 of
+			// 99 quests byte-exact (CapturedObjectiveRegions_RebuildFromTheDatabase_ByteExact - 570 differ in length,
+			// 1030 differ at equal length). Shipping it asserts the client on statlist.cpp:134.
+			//
+			// The quest index and the completed journal DO regenerate byte-exact (23/23 and 81/81), so this is the one
+			// region left. Remove this line when the objective gate is green - not before: a snapshot the client
+			// rejects takes the whole login with it, and the completed journal rides along with the active one.
+			return false;
 
 			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
 			return HeaderSlots.All(slots.Contains);

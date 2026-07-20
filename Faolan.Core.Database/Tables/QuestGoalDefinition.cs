@@ -66,6 +66,15 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? ObjectiveKey { get; set; }
 
+		// A text record addresses its string by numeric id OR by a name TOKEN (`token="Noname"`). Non-null selects the
+		// token form; the RefId is then unused. Modelling only the id form rendered `id="0"` where the wire had a
+		// token - 8 bytes short, and everything after it desynced.
+		[MaxLength(128)]
+		public string? ObjectiveToken { get; set; }
+
+		[MaxLength(128)]
+		public string? TrailingToken { get; set; }
+
 		// The NPC this goal is ABOUT, interpreted per GoalType: the NPC to kill (Kill), whose corpse bag to loot
 		// (LootFromNpc), or to talk to (TalkToNpc / Escort). SERVER-SIDE ONLY - NOT on the wire: the goal record carries
 		// the count but not the target (it's in the RDB-resolved objective text). Sourced per quest by capture
@@ -83,6 +92,14 @@ namespace Faolan.Core.Database.Tables
 
 		// Two of the "reserved" header words: 0 for most goals; the beach goal 2 carries a number + a 4-char tag
 		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.
+		// The reserved words' two (70099, random-4CC-token) pairs, at Reserved[1..2] and Reserved[5..6]. Stored, not
+		// derived: the tags are random per entry.
+		// The word after the marker block - "Zero1" in the codec until it turned out to be nonzero on 24 of the 158
+		// captured goals. Stable per goal across every capture, so it is quest data.
+		public uint Unknown1 { get; set; }
+
+		public uint Extra1 { get; set; }
+		public uint Extra2 { get; set; }
 		public uint Extra5 { get; set; }
 		public uint Extra6 { get; set; }
 		// The marker coordinates, null exactly when MapId is - the three travel as one block on the wire.
@@ -97,6 +114,11 @@ namespace Faolan.Core.Database.Tables
 
 		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
+
+		// The goal's position in the @609 objective region. NOT derivable from Sequence: several quests carry two
+		// goals both with N=1 (12068, 12057), so ordering by Sequence is ambiguous and produced the goals in the
+		// wrong order - quest 12057's wire order is [3542,2949] while Sequence gives [2949,3542].
+		public uint RegionOrder { get; set; }
 		public uint TrailingCategory { get; set; }
 	}
 }
