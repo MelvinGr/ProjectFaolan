@@ -128,7 +128,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				{
 					var saleId = s.ReadUInt64();
 					var handle = s.ReadUInt32();
-					var seller = Encoding.ASCII.GetString(s.ReadArrayUInt16Length());
+					var seller = s.ReadString();
 					var price = s.ReadUInt64();
 					var qty = s.ReadUInt32();
 					var itemId = s.ReadUInt32();
@@ -159,7 +159,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 					s
 						.WriteUInt64(row.SaleId)
 						.WriteUInt32(row.Handle)
-						.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(row.Seller ?? ""))
+						.WriteString(row.Seller ?? "")
 						.WriteUInt64(row.Price)
 						.WriteUInt32(row.Quantity)
 						.WriteUInt32(row.ItemId)

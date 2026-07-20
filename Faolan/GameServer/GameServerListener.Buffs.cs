@@ -197,7 +197,7 @@ namespace Faolan.GameServer
 			// Retail shows the "lost the grace" on-screen line the instant the shield is LOST to an aggressive action,
 			// sent right BEFORE the buff-removal twin (conans-castle-exit rec#508). Without it the icon vanishes with no
 			// notification. Only fired here (the aggression loss), not on a playfield swap (SendShieldOfTheRisen).
-			await SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildLostGraceEffectXml()),
+			await SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildLostGraceEffectXml()),
 				FormatFeedbackCodec.EffectLineTypeFlags);
 			await SendBuffRemoval(client, self, self, appliedId);
 

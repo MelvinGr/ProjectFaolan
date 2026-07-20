@@ -111,7 +111,7 @@ namespace Faolan.Core.Network.Codecs.World
 				var template = stream.ReadUInt32();
 				stream.ReadUInt32(); // template (dup)
 				var level = stream.ReadUInt64();
-				var code = System.Text.Encoding.ASCII.GetString(stream.ReadArray(ClaimEntry.CodeLength)).TrimEnd('\0');
+				var code = System.Text.Encoding.Latin1.GetString(stream.ReadArray(ClaimEntry.CodeLength)).TrimEnd('\0');
 				var key = stream.ReadArray(ClaimEntry.KeyLength);
 				stream.ReadArray(ClaimEntry.KeyLength); // key (dup)
 				var guid = stream.ReadArray(ClaimEntry.BatchGuidLength);

@@ -71,7 +71,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 			try
 			{
-				var lang = Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
+				var lang = body.ReadString();
 				var cat = body.ReadUInt32(); // category root; 0x7E2 in every captured query, meaning untested
 				var page = body.ReadUInt32();
 				body.ReadUInt32(); // cat2 (mirror of cat)
@@ -103,7 +103,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		{
 			var s = new FaolanStream();
 			s.WriteByte(Convert.ToByte(success));
-			s.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(SendMailResultXml));
+			s.WriteString(SendMailResultXml);
 			return Build(TradepostInterfaceOpcodes.DispatchSendMailResult, s.ToArray(), interfaceInstance).SendAsync(client);
 		}
 

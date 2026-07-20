@@ -40,7 +40,7 @@ namespace Faolan.Core.Network.Codecs.World
 		public byte[] CodeBytes()
 		{
 			var bytes = new byte[CodeLength];
-			var src = System.Text.Encoding.ASCII.GetBytes(Code ?? "");
+			var src = System.Text.Encoding.Latin1.GetBytes(Code ?? "");
 			Array.Copy(src, bytes, Math.Min(src.Length, CodeLength));
 			return bytes;
 		}

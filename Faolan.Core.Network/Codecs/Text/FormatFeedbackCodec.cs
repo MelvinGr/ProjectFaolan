@@ -43,7 +43,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// as BuildAreaNameXml's fixed key).
 		public static byte[] BuildLostGraceEffectXml()
 		{
-			return System.Text.Encoding.ASCII.GetBytes(
+			return System.Text.Encoding.Latin1.GetBytes(
 				"<remoteformat token=\"LostGraceEffect\" category=\"100\" key=\"RO5SQlZn.h/DvvaH&#36;WGu\" knubot=\"0\"  ></remoteformat>");
 		}
 
@@ -58,7 +58,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// the result via Build(instance, FifoBannerTypeFlags, 1, xml).
 		public static byte[] BuildAreaNameXml(uint textId)
 		{
-			return System.Text.Encoding.ASCII.GetBytes(
+			return System.Text.Encoding.Latin1.GetBytes(
 				"<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
 				"key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
 				$"token=&#39;DisplayedText(3)|GenericDisplayAreaName|{textId}&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>");
@@ -82,7 +82,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		public static byte[] BuildRespawnPointDiscoveredXml(uint pointId, string? nameKey)
 		{
 			var key = nameKey == null ? "" : $"key=&quot;{nameKey}&quot; ";
-			return System.Text.Encoding.ASCII.GetBytes(
+			return System.Text.Encoding.Latin1.GetBytes(
 				"<remoteformat id=\"218327236\" category=\"100\" key=\"KsATGOK`H%9l@@z[1mo,\" knubot=\"0\"  >" +
 				$"<parameter value=\"7;&lt;localized id=&quot;{pointId}&quot; category=&quot;270&quot; " +
 				$"flags=&quot;&quot; {key}&gt;\" /></remoteformat>");

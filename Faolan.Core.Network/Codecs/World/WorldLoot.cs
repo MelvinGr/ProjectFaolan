@@ -112,7 +112,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// [subop][typetag][handle][00000000][0x00][u16 strLen][ascii]. The bag stays in the world; this just opens its UI.
 		public static byte[] BuildOpenWindowBody(uint typeTag, uint handle, string state = "Open")
 		{
-			var text = Encoding.ASCII.GetBytes(state);
+			var text = Encoding.Latin1.GetBytes(state);
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR)
 				.WriteUInt32(typeTag)

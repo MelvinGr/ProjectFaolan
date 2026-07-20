@@ -32,11 +32,11 @@ namespace Faolan.Core.Network.Codecs.Economy
 			s.WriteUInt64(mail.MailId);
 
 			s.WriteUInt32(mail.RecipientClass);
-			s.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(mail.RecipientName ?? ""));
+			s.WriteString(mail.RecipientName ?? "");
 			s.WriteUInt32(mail.SenderClass);
-			s.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(mail.SenderName ?? ""));
+			s.WriteString(mail.SenderName ?? "");
 
-			s.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(mail.BodyXml ?? ""));
+			s.WriteString(mail.BodyXml ?? "");
 
 			s.WriteUInt32(mail.FooterWord);
 			s.WriteUInt64(mail.Money);
@@ -112,10 +112,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 			{
 				MailId = s.ReadUInt64(),
 				RecipientClass = s.ReadUInt32(),
-				RecipientName = Encoding.ASCII.GetString(s.ReadArrayUInt16Length()),
+				RecipientName = s.ReadString(),
 				SenderClass = s.ReadUInt32(),
-				SenderName = Encoding.ASCII.GetString(s.ReadArrayUInt16Length()),
-				BodyXml = Encoding.ASCII.GetString(s.ReadArrayUInt16Length()),
+				SenderName = s.ReadString(),
+				BodyXml = s.ReadString(),
 				FooterWord = s.ReadUInt32(),
 				Money = s.ReadUInt64(),
 				Timestamp1 = s.ReadUInt32(),

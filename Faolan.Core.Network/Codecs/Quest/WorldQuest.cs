@@ -187,7 +187,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(areaId);
 			foreach (var rec in areaHeader)
 				w.WriteArray(rec);
-			w.WriteArray(Encoding.ASCII.GetBytes(RrlMagic));
+			w.WriteArray(Encoding.Latin1.GetBytes(RrlMagic));
 			w.WriteUInt32(0);
 			w.WriteUInt32(entries.Count);
 			for (var i = 0; i < entries.Count; i++)

@@ -452,8 +452,8 @@ namespace Faolan.GameServer
 			if (character == null)
 				return;
 
-			var recipientName = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
-			var bodyText = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
+			var recipientName = packet.Body.ReadString();
+			var bodyText = packet.Body.ReadString();
 			var money = packet.Body.ReadUInt64();
 			// The attachment list (#378). The word before the slot is 0x7E2 in the one captured SendMail, and was long
 			// read as a "category constant" on that basis - but 0x7E2 is exactly ListFrame.ForCount(1) and that mail

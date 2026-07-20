@@ -137,12 +137,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var args = message.ToProtobuf();
 			var tail = new FaolanStream()
 				.WriteUInt32(tailA)
-				.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(animName))
+				.WriteString(animName)
 				.WriteUInt32(tailB)
 				.WriteFloat(blend)
 				.WriteArray(new byte[5])
 				.WriteByte(flag)
-				.WriteArray(Encoding.ASCII.GetBytes(remoteformat))
+				.WriteArray(Encoding.Latin1.GetBytes(remoteformat))
 				.WriteUInt32(trailer)
 				.ToArray();
 

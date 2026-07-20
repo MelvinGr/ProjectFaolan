@@ -87,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static byte[] BuildBehaviorControlCenterIirLong(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag,
 			byte[] transform, uint type = EntityClass.Character, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
 		{
-			var tagBytes = Encoding.ASCII.GetBytes(tag);
+			var tagBytes = Encoding.Latin1.GetBytes(tag);
 			if (tagBytes.Length != 4)
 				throw new ArgumentException("behavior entity tag must be 4 ASCII chars", nameof(tag));
 			if (transform.Length != 16)
@@ -263,7 +263,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// only re-reads the custom name on that refresh. So 3/1/1 is what makes an already-spawned NPC show the name.
 		public static byte[] BuildWorldSetNameIir(uint handle, string name, uint type = EntityClass.Character)
 		{
-			var bytes = Encoding.ASCII.GetBytes(name ?? "");
+			var bytes = Encoding.Latin1.GetBytes(name ?? "");
 			if (bytes.Length > 31)
 				bytes = bytes[..31];
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(0x00).WriteUInt32(3u).WriteByte(0x01).WriteByte(0x01).WriteUInt32((uint)bytes.Length).WriteArray(bytes).ToArray();

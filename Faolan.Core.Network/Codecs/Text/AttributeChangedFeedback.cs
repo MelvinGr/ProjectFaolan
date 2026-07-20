@@ -33,7 +33,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// GameInterface instance, reusing the captured key nonces.
 		public static byte[] Build(uint instance, uint attributeId, uint amount)
 		{
-			return FormatFeedbackCodec.Build(instance, TypeFlags, Footer, Encoding.ASCII.GetBytes(BuildXml(attributeId, amount)));
+			return FormatFeedbackCodec.Build(instance, TypeFlags, Footer, Encoding.Latin1.GetBytes(BuildXml(attributeId, amount)));
 		}
 
 		// Assembles the AttributeChanged remoteformat XML for one attribute. The key arguments are passed through

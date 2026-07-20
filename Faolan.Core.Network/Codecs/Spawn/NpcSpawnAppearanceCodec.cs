@@ -36,7 +36,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var stream = new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Record1).WriteUInt32(morphs.Count);
 
 			foreach (var morph in morphs)
-				stream.WriteUInt32(morph.MorphId).WriteFloat(morph.Value).WriteUInt32(0).WriteByte(0).WriteArrayByteLength(Encoding.ASCII.GetBytes(morph.Text ?? ""));
+				stream.WriteUInt32(morph.MorphId).WriteFloat(morph.Value).WriteUInt32(0).WriteByte(0).WriteArrayByteLength(Encoding.Latin1.GetBytes(morph.Text ?? ""));
 
 			return stream.WriteArray(Terminator).ToArray();
 		}
@@ -117,7 +117,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 				var text = strLen == 0
 					? ""
-					: Encoding.ASCII.GetString(post.Slice(o, strLen));
+					: Encoding.Latin1.GetString(post.Slice(o, strLen));
 				o += strLen;
 				result.Add(new NpcAppearanceMorph
 				{

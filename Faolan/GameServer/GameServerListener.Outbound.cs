@@ -370,7 +370,7 @@ namespace Faolan.GameServer
 		private static async Task SendFeedback(INetworkClient client, string xml, uint typeFlags = FormatFeedbackCodec.FifoBannerTypeFlags, uint footer = 1)
 		{
 			var instance = client.Session.Account.ClientInstance;
-			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.ASCII.GetBytes(xml));
+			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.Latin1.GetBytes(xml));
 
 			var ps = new PacketStream();
 			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob);
@@ -387,7 +387,7 @@ namespace Faolan.GameServer
 		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
 		private Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
-			return SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
+			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
 		}
 
 		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
@@ -395,7 +395,7 @@ namespace Faolan.GameServer
 		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
 		private Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
 		{
-			return SendFeedback(client, Encoding.ASCII.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
+			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
@@ -451,7 +451,7 @@ namespace Faolan.GameServer
 		private static async Task SendWorldChat(INetworkClient client, string xml)
 		{
 			var instance = client.Session.Account.ClientInstance;
-			var body = ChatTextCodec.Build(instance, Encoding.ASCII.GetBytes(xml));
+			var body = ChatTextCodec.Build(instance, Encoding.Latin1.GetBytes(xml));
 
 			var ps = new PacketStream();
 			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob);

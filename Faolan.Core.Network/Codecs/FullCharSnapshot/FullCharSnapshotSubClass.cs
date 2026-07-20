@@ -438,7 +438,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		private static int IndexOfAscii(byte[] data, string text, int startOffset = 0)
 		{
-			var pattern = Encoding.ASCII.GetBytes(text);
+			var pattern = Encoding.Latin1.GetBytes(text);
 
 			for (var i = startOffset; i <= data.Length - pattern.Length; i++)
 			{
