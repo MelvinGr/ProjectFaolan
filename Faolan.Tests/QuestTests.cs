@@ -15,6 +15,12 @@ namespace Faolan.Tests
 {
 	// Quest state packets (docs/re/quests-and-combat.md), byte-verified against the hoxxling-login-gameplay capture
 	// (quest 0x34A7 = 13479, player 0x01316E71).
+	// ⚠️ The ONLY tests still needing the capture repo (Captures/, a symlink to ProjectFaolan-Data). Everything else
+	// reads the committed corpus extract - see CorpusExtract - so 1043 of 1046 tests run from a plain clone.
+	//
+	// These three are the awkward ones: they feed FULL packets to QuestDefinitionExtractor and look bodies up by
+	// tshark FRAME number, neither of which the extract was shaped for. Migrating them is worth doing (Gitea #392);
+	// it just is not worth blocking the split on.
 	public class QuestTests
 	{
 		private static readonly string CapturesDir = FindCaptures();

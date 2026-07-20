@@ -8,6 +8,7 @@ using Faolan.Core;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Abstractions;
@@ -191,44 +192,32 @@ namespace Faolan.Tests
 
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClasses()
 		{
-			foreach (var json in Directory.EnumerateFiles(TestPaths.CapturesDir, "*.tshark.json").OrderBy(f => f))
+			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
+			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
 			{
-				using var doc = JsonDocument.Parse(File.ReadAllBytes(json));
-				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
-					continue;
+				var declared = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
+				if (declared + 4 > body.Length)
+					continue; // truncated capture - the TCP-reassembly gap on compressed downloads
 
-				var index = 0;
-				foreach (var p in packets.EnumerateArray())
+				FullCharSnapshotCodec.InventoryPacketParts parts;
+				try
 				{
-					if (!p.TryGetProperty("BodyHex", out var hexEl))
-						continue;
-
-					var hex = hexEl.GetString() ?? "";
-					if (hex.Length < 40 || !hex.AsSpan(8, 8).Equals("737a6df9", StringComparison.OrdinalIgnoreCase))
-						continue;
-
-					var raw = Convert.FromHexString(hex);
-					var declared = BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(0, 4));
-					if (declared + 4 > raw.Length)
-						continue;
-
-					FullCharSnapshotCodec.InventoryPacketParts parts;
-					try
-					{
-						var stream = new FaolanStream(raw[4..]);
-						stream.ReadUInt32();
-						stream.ReadUInt32();
-						stream.ReadUInt32();
-						parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
-					}
-					catch
-					{
-						continue;
-					}
-
-					yield return ($"{Path.GetFileName(json)}#{index++}", parts.SubClass, parts.SubClass.ToArray());
+					var stream = new FaolanStream(body[4..]);
+					stream.ReadUInt32();
+					stream.ReadUInt32();
+					stream.ReadUInt32();
+					parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
 				}
+				catch
+				{
+					// A snapshot shape this codec cannot split - the caller's gates report coverage, so a silent
+					// skip here would understate it rather than hide a wrong model.
+					continue;
+				}
+
+				yield return (source, parts.SubClass, parts.SubClass.ToArray());
 			}
 		}
+
 	}
 }

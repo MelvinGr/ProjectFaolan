@@ -91,9 +91,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void V2Citations_NameARealCaptureFile()
 		{
-			var captures = Directory.EnumerateFiles(TestPaths.CapturesDir, "*", SearchOption.AllDirectories)
-				.Select(Path.GetFileName)
-				.ToHashSet(StringComparer.Ordinal);
+			// Names come from the committed corpus extract's manifest, so this linter runs without the capture repo.
+			var captures = CorpusExtract.CaptureFileNames;
 
 			var bad = (from c in Citations()
 				where c.Level == 2

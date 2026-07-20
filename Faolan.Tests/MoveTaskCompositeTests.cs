@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -54,42 +55,25 @@ namespace Faolan.Tests
 		// MoveTaskCodec builders emit, minus the 4-byte length the burst framing adds).
 		private static IEnumerable<byte[]> AllMoveTaskRecords()
 		{
-			foreach (var path in Directory.EnumerateFiles(CapturesDir, "*.tshark.json"))
+			// From the committed corpus extract, so this runs without the capture repo. Verified equivalent: all
+			// 10241 MoveTask records in the corpus are TOP-LEVEL packets - none is nested inside another packet's
+			// body - so filtering by IIR loses nothing versus scanning every body.
+			foreach (var (_, raw) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.MoveTaskIIR))
 			{
-				JsonDocument doc;
-				try
+				var o = 0;
+				while (true)
 				{
-					doc = JsonDocument.Parse(File.ReadAllText(path));
-				}
-				catch
-				{
-					continue;
-				}
+					var j = IndexOf(raw, Sub, o);
+					if (j < 0)
+						break;
 
-				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
-					continue;
-
-				foreach (var pk in packets.EnumerateArray())
-				{
-					if (!pk.TryGetProperty("BodyHex", out var bh) || bh.ValueKind != JsonValueKind.String)
+					o = j + 1;
+					if (j < 4)
 						continue;
 
-					var raw = Convert.FromHexString(bh.GetString()!);
-					var o = 0;
-					while (true)
-					{
-						var j = IndexOf(raw, Sub, o);
-						if (j < 0)
-							break;
-
-						o = j + 1;
-						if (j < 4)
-							continue;
-
-						var len = (int)BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(j - 4, 4));
-						if (len is >= 8 and <= 512 && j + len <= raw.Length)
-							yield return raw[j..(j + len)];
-					}
+					var len = (int)BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(j - 4, 4));
+					if (len is >= 8 and <= 512 && j + len <= raw.Length)
+						yield return raw[j..(j + len)];
 				}
 			}
 		}

@@ -158,9 +158,9 @@ namespace Faolan.GameServer.Dialogue
 		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath, uint clickedTemplateId)
 		{
 			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath, clickedTemplateId);
-			if (variants.Count == 0)
+			if (variants.Length == 0)
 				return null;
-			if (variants.Count == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
+			if (variants.Length == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
 				return variants[0]; // GetConversationScreens orders the unconditional fallback last
 
 			var player = await BuildLuaPlayer(client.Session.Character);

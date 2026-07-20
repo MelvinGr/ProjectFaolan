@@ -53,6 +53,24 @@ Terrain: baked terrain files from '...' (ground-snap + line-of-sight on).
 check for that line rather than assuming terrain is loaded. The key was previously absent from
 `faolan.json` entirely, falling back to a bare `Terrain` — which is why it is spelled out now.
 
+## Do you actually need the captures?
+
+**Mostly no.** 1043 of 1046 tests read a committed 12 MB extract of the corpus
+(`Faolan.Tests/Assets/corpus-extract.bin`) rather than the captures themselves — the six IIR types the
+whole-corpus gates walk, pulled out of the 349 MB and deflated. Regenerate it with the capture repo
+present:
+
+```sh
+dotnet run --project Faolan.Importer -- --report corpus-extract
+```
+
+Only `QuestTests` (3 tests) still needs `Captures/`; it feeds FULL packets to the extractor and looks
+bodies up by tshark frame number. The importer and the `--report` tools need the real corpus too.
+
+⚠️ The extract is DERIVED, so a regeneration against a partial corpus would quietly WEAKEN every gate
+while they all still pass. Its manifest pins per-IIR counts and the reader asserts them — a short
+extract throws rather than narrowing coverage.
+
 ## ⚠️ Without the captures, the suite FAILS
 
 That is deliberate. Nine corpus gates assert they saw data — `"no snapshot bodies found in the capture

@@ -224,13 +224,13 @@ namespace Faolan.GameServer
 			if (parts.Length >= 1 && parts[0].Equals("list", StringComparison.OrdinalIgnoreCase))
 			{
 				var rows = await Database.GetAccountClaims(accountId);
-				if (rows.Count == 0)
+				if (rows.Length == 0)
 				{
 					await _agentServerDispatcher.SendSystemMessage(characterId, "No pending claims.");
 					return;
 				}
 
-				for (var i = 0; i < rows.Count; i++)
+				for (var i = 0; i < rows.Length; i++)
 				{
 					var item = await Database.GetItem(rows[i].ItemTemplateId);
 					var qty = rows[i].Quantity?.ToString() ?? "∞"; // null = infinite charges

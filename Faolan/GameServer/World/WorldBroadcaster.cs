@@ -1762,7 +1762,7 @@ namespace Faolan.GameServer.World
 			// Log the contents by display Pos so an in-client single-drag test can confirm the client's source-Pos maps
 			// to the item the player actually clicked (TryLootItem 0x2046 is not in any capture - the Pos mapping is
 			// verified live, not from a golden).
-			if (loot.Count > 0)
+			if (loot.Length > 0)
 				_logger.LogInformation("Loot: bag 0x{Handle:X8} contents by Pos: {Items}", handle, string.Join(", ", loot.Select((l, i) => $"#{i}=0x{l.Id:X}({l.Name})")));
 
 			foreach (var viewer in _sim.World.ZoneFor(mapId, instanceId).PlayersInRange(position, WorldSimulation.PlayerInterestRange))

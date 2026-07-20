@@ -81,7 +81,16 @@ namespace Faolan.Tests
 					foreach (Match m in pathRe.Matches(lines[i]))
 					{
 						var path = m.Groups[1].Value;
-						if (!File.Exists(Path.Combine(repo, path)) && !Allowlist.Contains(path))
+						if (Allowlist.Contains(path))
+							continue;
+
+						// Captures/ is a symlink to the (private) capture repo and may not be present. Its file NAMES
+						// are recorded in the committed corpus extract, so citations still get verified either way.
+						var exists = path.StartsWith("Captures/", StringComparison.Ordinal)
+							? CorpusExtract.CaptureFileNames.Contains(Path.GetFileName(path))
+							: File.Exists(Path.Combine(repo, path));
+
+						if (!exists)
 							failures.Add($"{rel}:{i + 1}  {path} - path does not exist");
 					}
 				}

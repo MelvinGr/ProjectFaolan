@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -91,24 +92,13 @@ namespace Faolan.Tests
 			return -1;
 		}
 
-		private static byte[]? SnapshotBody(string path)
+		// The FIRST snapshot body from one capture, taken from the committed corpus extract (provenance is
+		// "<file>#<index>", so the capture name still selects it) - no capture repo needed.
+		private static byte[]? SnapshotBody(string captureFileName)
 		{
-			if (!File.Exists(path))
-				return null;
-
-			using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-			if (!doc.RootElement.TryGetProperty("Packets", out var packets))
-				return null;
-
-			foreach (var p in packets.EnumerateArray())
-			{
-				if (!p.TryGetProperty("BodyHex", out var bh))
-					continue;
-
-				var hex = bh.GetString() ?? "";
-				if (hex.Length >= 16 && hex.Substring(8, 8).Equals("737a6df9", StringComparison.OrdinalIgnoreCase))
-					return Convert.FromHexString(hex);
-			}
+			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
+				if (source.StartsWith(captureFileName + "#", StringComparison.Ordinal))
+					return body;
 
 			return null;
 		}
@@ -117,7 +107,7 @@ namespace Faolan.Tests
 
 		private static Dictionary<uint, uint> StatBlockPairs(string captureFileName)
 		{
-			var body = SnapshotBody(Path.Combine(CapturesDir, captureFileName));
+			var body = SnapshotBody(captureFileName);
 			Assert.NotNull(body);
 
 			// Stat-block frame: two empty 0x3F1 StatList counts then the 0x46F2 block-type word.

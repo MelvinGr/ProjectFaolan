@@ -35,6 +35,15 @@ namespace Faolan.Importer.Cli
 
 			switch (report)
 			{
+				case "corpus-extract":
+				{
+					// The test suite's slice of the corpus, so a plain clone can run the whole-corpus gates without
+					// the 349 MB capture repo. See CorpusExtractWriter.
+					var target = arg ?? Path.Combine(RepoRoot, "Faolan.Tests", "Assets", "corpus-extract.bin");
+					CorpusExtractWriter.Write(capturesDir, target);
+					return 0;
+				}
+
 				case "conversation-states":
 				{
 					ConversationStates(LoadCaptures(capturesDir));
@@ -247,7 +256,7 @@ namespace Faolan.Importer.Cli
 		{
 			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
-			foreach (var a in db.Abilities.OrderBy(x => x.Slot).ToList())
+			foreach (var a in db.Abilities.OrderBy(x => x.Slot).Include(ability => ability.Key).ToList())
 			{
 				var key = new[] { a.Key.Key1, a.Key.Key2, a.Key.Key3, a.Key.Key4 };
 				if (!rdb.TryGet(1000020, a.Id, out var e) || e.Size == 0 || !rdb.CanRead(e))

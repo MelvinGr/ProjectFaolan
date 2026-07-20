@@ -238,7 +238,7 @@ namespace Faolan.GameServer
 					foreach (var m in mails)
 						await TradepostResponses.SendMailMessage(client, m, false, inst);
 					await TradepostResponses.SendRetrieveMailResult(client, inst);
-					Logger.LogInformation("Tradepost mail: {Char} polled the mailbox -> {Count} mail(s).", character.Name, mails.Count);
+					Logger.LogInformation("Tradepost mail: {Char} polled the mailbox -> {Count} mail(s).", character.Name, mails.Length);
 					break;
 				}
 
@@ -306,7 +306,7 @@ namespace Faolan.GameServer
 					var query = TradepostResponses.ParseSearch(packet.Body);
 					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character?.RealmId ?? 0); // #324: realm-local market
 					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", client.Session?.Character.Name, query.Lang, query.ItemId,
-						query.Page, listings.Count);
+						query.Page, listings.Length);
 
 					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no rows).
 					await TradepostResponses.SendSearchResults(client, packet, listings);

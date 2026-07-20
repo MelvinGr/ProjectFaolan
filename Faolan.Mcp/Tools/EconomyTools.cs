@@ -83,7 +83,7 @@ namespace Faolan.Mcp.Tools
 			return JsonSerializer.Serialize(new
 			{
 				Owner = character.Name,
-				mails.Count,
+				mails.Length,
 				Mails = mails.Select(m => new
 				{
 					MailId = "0x" + m.MailId.ToString("X16"),

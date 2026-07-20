@@ -410,7 +410,7 @@ namespace Faolan.Tests
 
 				var listings = await repo.GetTradepostListings(0x7530, 1);
 
-				Assert.Equal(2, listings.Count); // only the matching item
+				Assert.Equal(2, listings.Length); // only the matching item
 				Assert.Equal(25ul, listings[0].Price); // cheapest first
 				Assert.Equal(5000ul, listings[1].Price);
 			}

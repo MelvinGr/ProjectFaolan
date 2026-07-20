@@ -137,32 +137,18 @@ namespace Faolan.Tests
 		// `iirType`, across the tshark corpus.
 		private static IEnumerable<(string Source, byte[] Body)> CapturedBodies(uint iirType)
 		{
-			var wanted = iirType.ToString("x8");
-
-			foreach (var json in Directory.EnumerateFiles(TestPaths.CapturesDir, "*.tshark.json").OrderBy(f => f))
+			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
+			// Bodies are byte-identical to the corpus' BodyHex and keep their "<file>#<index>" provenance.
+			foreach (var (source, body) in CorpusExtract.OfType(iirType))
 			{
-				using var doc = JsonDocument.Parse(File.ReadAllBytes(json));
-				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
-					continue;
+				// BodyHex is the body WITH its leading u32 length; callers want everything after it.
+				var declared = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
+				if (declared + 4 > body.Length)
+					continue; // truncated capture - the TCP-reassembly gap on compressed downloads
 
-				var index = 0;
-				foreach (var p in packets.EnumerateArray())
-				{
-					if (!p.TryGetProperty("BodyHex", out var hexEl))
-						continue;
-
-					var hex = hexEl.GetString() ?? "";
-					if (hex.Length < 40 || !hex.AsSpan(8, 8).Equals(wanted, StringComparison.OrdinalIgnoreCase))
-						continue;
-
-					var raw = Convert.FromHexString(hex);
-					var declared = BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(0, 4));
-					if (declared + 4 > raw.Length)
-						continue; // truncated capture (the TCP-reassembly gap on compressed downloads)
-
-					yield return ($"{Path.GetFileName(json)}#{index++}", raw[4..]);
-				}
+				yield return (source, body[4..]);
 			}
 		}
+
 	}
 }

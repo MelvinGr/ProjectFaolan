@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -11,6 +12,7 @@ namespace Faolan.Tests.Support
 	{
 		// Captures/ - the packet-trace corpus. The *.tshark.json files are read at TEST time (the whole-corpus
 		// round-trip gates), so they are fixtures, not regenerable build artifacts.
+		[Obsolete]
 		public static string CapturesDir => Path.Combine(RepoRoot(), "Captures");
 
 		// The committed game database at the repo root.
