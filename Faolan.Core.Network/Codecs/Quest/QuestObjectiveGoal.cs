@@ -21,10 +21,19 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint RequiredCount { get; init; } // the goal's required amount (kills/collects/etc.); 1/3/4/8/12/64 seen on the wire (decode 2026-06-19, #47)
 		// NOT always zero, despite the name it carried until 2026-07-20: nonzero on 24 of the 158 goals in the corpus
 		// (quest 12411 goal 3555 holds 60). Stable per goal across every capture, so it is quest data to be stored,
-		// not progress. Meaning still unknown - named for its position.
+		// not progress.
+		//
+		// BYTE-RANGED: max 170 over the whole corpus, never above 255, and only 15 distinct values
+		// (0,3,10,20,25,40,50,60,80,90,...). The round numbers suggest a percentage or threshold; the client writes a
+		// single byte here in QuestGoal_c::WriteToStream. Meaning still unknown - named for its position.
 		public uint Unknown1 { get; init; }
-		// NOT always zero: nonzero on 318 of the 2850 captured goals. Stable per goal, so stored rather than derived.
+		// A BOOLEAN, not a number. It takes exactly two values across all 2850 captured goals: 0 and 0x01000000 -
+		// which is the client's own `local_c[0] = 1` byte-swapped to `0x1000000` in QuestGoal_c::WriteToStream, i.e.
+		// the flag byte lands FIRST and the remaining three are padding. Set on 318 goals. Meaning still unknown.
 		public uint Unknown2 { get; init; }
+
+		// The wire word for the flag above; the client writes the byte 0x01 followed by three zero bytes.
+		public const uint FlagSet = 0x01000000;
 		public uint[] Reserved { get; init; } = new uint[ReservedWords]; // 7 words, all 0 in the template
 
 		public static QuestObjectiveGoal Read(FaolanStream r)

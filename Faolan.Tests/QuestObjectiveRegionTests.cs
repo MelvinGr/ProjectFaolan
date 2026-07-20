@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Text;
 using Faolan.Core.Network.Codecs.Quest;
@@ -16,6 +18,35 @@ namespace Faolan.Tests
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		private static byte[] Region => File.ReadAllBytes(TemplatePath)[RegionStart..IndexTag];
+
+		// Corpus invariants for the two byte-shaped goal words, recovered from QuestGoal_c::WriteToStream plus the
+		// captures. Pinned so a future "these look like u32s" refactor has to argue with the data.
+		[Fact]
+		public void ByteShapedGoalWords_HoldTheirCorpusInvariants()
+		{
+			var goals = CapturedGoals().ToList();
+			Assert.NotEmpty(goals);
+
+			// Unknown1: the client writes ONE byte, so the word never exceeds 255.
+			Assert.All(goals, g => Assert.InRange(g.Unknown1, 0u, 255u));
+
+			// Unknown2: a flag, never an arbitrary number - 0 or the byte 0x01 followed by three zero bytes.
+			Assert.All(goals, g => Assert.True(g.Unknown2 is 0 or QuestObjectiveGoal.FlagSet,
+				$"Unknown2 should be a flag but goal {g.GoalId} carries 0x{g.Unknown2:X8}"));
+		}
+
+		private static IEnumerable<QuestObjectiveGoal> CapturedGoals()
+		{
+			foreach (var (_, subClass, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			foreach (var record in subClass.Quests.Records)
+			{
+				if (record.Objectives is not { Goals.Count: > 0 } objectives)
+					continue;
+
+				foreach (var goal in objectives.Goals)
+					yield return goal;
+			}
+		}
 
 		[Fact]
 		public void BuildSingle_RegeneratesTheRegion_ByteExact()
