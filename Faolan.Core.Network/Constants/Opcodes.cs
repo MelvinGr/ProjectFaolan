@@ -625,7 +625,7 @@ namespace Faolan.Core.Network.Constants
 		CoreClaimIIR = 0x06EC1255, // CoreClaimIIR  (x8) - "InventoryClaimsButton"
 		CrimeIIR = 0xC7954504, // CrimeIIR_c  (x3)
 		DamageResultIIR = 0xFEC4158A, // DamageResultIIR_c  (x1134) - combat damage result
-		DeleteItemIIR = 0x72491DE9, // DeleteItemIIR_t - "DropItem"
+		DeleteItemIIR = 0x72491DE9, // DeleteItemIIR_t - "DropItem"; body = ProtoDeleteItemIIR (NOT the sibling move message - they alias on the wire; see InventoryDeleteCodec)
 		DestructibleFullUpdateIIR = 0x6BD56736, // DestructibleFullUpdateIIR_c  (x189)
 		DoorFullUpdateIIR = 0x33A56FB0, // DoorFullUpdateIIR_c  (x89) - world door/object full update
 		EnergyIIR = 0x40749B8A, // EnergyIIR  (x1039)
@@ -753,7 +753,8 @@ namespace Faolan.Core.Network.Constants
 		//   GameCodeDynelFullUpdateIIR   0x16294E79  [auth: GameCodeDynelFullUpdateIIR]
 		//   GameCodeDynelIIR             bare 0xB9287491  _c 0x10DDA035  [unverified]
 		//   ProtoCoreCharacterIIR        bare 0xB00B3E90  _c 0xDA35E674  [unverified]
-		//   ProtoDeleteItemIIR           bare 0x6F9E4A2C  _c 0x01347B10  [unverified]
+		//   ProtoDeleteItemIIR           bare 0x6F9E4A2C  _c 0x01347B10  [unverified]  (the MESSAGE is confirmed as
+		//       DeleteItemIIR_t's payload via the client ctor's vftable - it is these NAME HASHES that stay unverified)
 		//   ProtoFullCharacterIIR        bare 0xAA47C980  _c 0x377B7564  [unverified]
 		//   ProtoGameCodeDynelIIR        bare 0x07A8BE59  _c 0xC07297FD  [unverified]
 		//   ProtoLootBagIIR              bare 0x6862F2DA  _c 0xDB71B03E  [unverified]

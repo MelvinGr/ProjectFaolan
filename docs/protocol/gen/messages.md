@@ -91,7 +91,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryMoveCodec` |  |
+| V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryDeleteCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
 | V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
 | V1 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | — |  |

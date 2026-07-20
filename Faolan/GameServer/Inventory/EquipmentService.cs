@@ -31,14 +31,14 @@ namespace Faolan.GameServer.Inventory
 		// Persists an item drop (DropItem - the client sends only the source side of ProtoMoveInventoryItemIIR) by
 		// clearing the source cell, so the dropped item does not reappear in the bag on relog. (Whether a ground
 		// loot bag spawns is a separate world-sim concern; this only removes it from the player's persisted bag.)
-		public async Task PersistDropItem(INetworkClient client, ProtoMoveInventoryItemIIR move)
+		public async Task PersistDropItem(INetworkClient client, ProtoDeleteItemIIR drop)
 		{
 			var character = client.Session.Character;
-			if (character == null || move?.SourceContainerId == null)
+			if (character == null || drop?.ContainerId == null)
 				return;
 
-			var kind = (int)move.SourceContainerId.Type;
-			var pos = move.SourceItemPos;
+			var kind = (int)drop.ContainerId.Type;
+			var pos = drop.ItemPos;
 			if (kind == (int)FullPlayerCharacterBuilder.EquippedKind)
 				return; // equipped items are unequipped, not dropped, through this path
 

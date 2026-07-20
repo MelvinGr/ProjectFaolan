@@ -891,18 +891,21 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.DeleteItemIIR:
 				{
-					var (_, move) = InventoryMoveCodec.Parse(packet.Body);
+					// ProtoDeleteItemIIR, NOT the sibling move message: { container_id, item_pos, template_id }. The
+					// two alias on the wire for fields 1-3, so this parsed as a move for a long time and quietly read
+					// the item TEMPLATE id as a destination container - see InventoryDeleteCodec.
+					var (_, drop) = InventoryDeleteCodec.Parse(packet.Body);
 
-					Logger.LogInformation($"DropItem: {move}");
+					Logger.LogInformation($"DropItem: {drop}");
 
 					// Remove the dropped item from the persisted bag so it doesn't reappear on relog.
-					await _equipment.PersistDropItem(client, move);
+					await _equipment.PersistDropItem(client, drop);
 
 					// Push the LIVE remove so the open bag updates without a relog (#230): the DropItem opcode has no
 					// implicit client-side removal, so without this the dropped item stays visible until next login.
 					// Same DispatchRemoveItem (0x201F) the .removeitem GM path / RemoveItemFromBackpack use.
-					if (move?.SourceContainerId?.Type == (uint)ContainerKind.Bag)
-						await SendRemoveItem(client, (ContainerKind)move.SourceContainerId.Type, (uint)move.SourceItemPos);
+					if (drop?.ContainerId?.Type == (uint)ContainerKind.Bag)
+						await SendRemoveItem(client, (ContainerKind)drop.ContainerId.Type, (uint)drop.ItemPos);
 
 					break;
 				}
