@@ -55,7 +55,7 @@ check for that line rather than assuming terrain is loaded. The key was previous
 
 ## Do you actually need the captures?
 
-**Mostly no.** 1043 of 1046 tests read a committed 12 MB extract of the corpus
+**No.** All 1046 tests read a committed 12 MB extract of the corpus
 (`Faolan.Tests/Assets/corpus-extract.bin`) rather than the captures themselves — the six IIR types the
 whole-corpus gates walk, pulled out of the 349 MB and deflated. Regenerate it with the capture repo
 present:
@@ -64,8 +64,8 @@ present:
 dotnet run --project Faolan.Importer -- --report corpus-extract
 ```
 
-Only `QuestTests` (3 tests) still needs `Captures/`; it feeds FULL packets to the extractor and looks
-bodies up by tshark frame number. The importer and the `--report` tools need the real corpus too.
+**The whole suite runs without `Captures/`** — 1046 of 1046. The symlink is only needed to regenerate
+the extract, and to run the importer and the `--report` tools against real captures.
 
 ⚠️ The extract is DERIVED, so a regeneration against a partial corpus would quietly WEAKEN every gate
 while they all still pass. Its manifest pins per-IIR counts and the reader asserts them — a short

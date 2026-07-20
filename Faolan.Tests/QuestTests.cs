@@ -6,8 +6,12 @@ using System.Text.Json;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Constants;
 using Faolan.Importer.Captures;
+using Faolan.Core.Network.Constants;
+using Faolan.Tests.Support;
 using Faolan.Importer.Extractors;
+using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Sdk;
 
@@ -15,12 +19,6 @@ namespace Faolan.Tests
 {
 	// Quest state packets (docs/re/quests-and-combat.md), byte-verified against the hoxxling-login-gameplay capture
 	// (quest 0x34A7 = 13479, player 0x01316E71).
-	// ⚠️ The ONLY tests still needing the capture repo (Captures/, a symlink to ProjectFaolan-Data). Everything else
-	// reads the committed corpus extract - see CorpusExtract - so 1043 of 1046 tests run from a plain clone.
-	//
-	// These three are the awkward ones: they feed FULL packets to QuestDefinitionExtractor and look bodies up by
-	// tshark FRAME number, neither of which the extract was shaped for. Migrating them is worth doing (Gitea #392);
-	// it just is not worth blocking the split on.
 	public class QuestTests
 	{
 		private static readonly string CapturesDir = FindCaptures();
@@ -153,7 +151,13 @@ namespace Faolan.Tests
 		[Fact]
 		public void QuestDefinitionExtractor_RoundTripsCasilda()
 		{
-			var packets = TsharkCaptureReader.Read(Path.Combine(CapturesDir, "Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json"));
+			// Full packets from the committed corpus extract: QuestDefinitionExtractor takes CapturedPacket and strips
+			// the framing itself, so bodies alone would not do.
+			const string casildaCapture = "Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json#";
+			var packets = CorpusExtract.All()
+				.Where(e => e.Source.StartsWith(casildaCapture, StringComparison.Ordinal))
+				.Select(e => new CapturedPacket(0, true, e.Opcode, e.Iir, e.Full))
+				.ToList();
 			var def = QuestDefinitionExtractor.Extract(packets).Single(d => d.QuestId == 0x34A7);
 
 			Assert.Equal(1054u, def.AreaId);
@@ -256,12 +260,13 @@ namespace Faolan.Tests
 				("Ranochar_mage-necromancer_login_get-casilda-quest.tshark.json", 687), ("Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json", 9947)
 			})
 			{
-				var path = Path.Combine(CapturesDir, file);
-				using var doc = JsonDocument.Parse(File.ReadAllText(path));
-				foreach (var p in doc.RootElement.GetProperty("Packets").EnumerateArray())
+				foreach (var e in CorpusExtract.All())
 				{
-					var bh = p.GetProperty("BodyHex").GetString();
-					if (bh is { Length: >= 16 } && bh.Substring(8, 8) == subOpHex && p.GetProperty("Frame").GetInt32() == frame)
+					if (e.Frame != frame || !e.Source.StartsWith(file + "#", StringComparison.Ordinal))
+						continue;
+
+					var bh = Convert.ToHexString(e.Body).ToLowerInvariant();
+					if (bh.Length >= 16 && bh.Substring(8, 8) == subOpHex)
 						return bh.Substring(8); // drop the 4-byte (8 hex) length prefix
 				}
 			}
@@ -304,16 +309,12 @@ namespace Faolan.Tests
 		// The per-quest detail block (questId onward, 879 B) for `questId` from xxx-login's 0x737A6DF9 login snapshot.
 		private static byte[] SnapshotQuestBlock(uint questId)
 		{
-			var path = Path.Combine(CapturesDir, "Stihetfv_soldier-conqueror_login.tshark.json");
-			using var doc = JsonDocument.Parse(File.ReadAllText(path));
 			Span<byte> needle = stackalloc byte[12];
-			foreach (var p in doc.RootElement.GetProperty("Packets").EnumerateArray())
+			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
 			{
-				var bh = p.GetProperty("BodyHex").GetString();
-				if (bh == null || bh.Length < 16 || bh.Substring(8, 8) != "737a6df9")
+				if (!source.StartsWith("Stihetfv_soldier-conqueror_login.tshark.json#", StringComparison.Ordinal))
 					continue;
 
-				var body = Convert.FromHexString(bh);
 				// block header = [questId][1][questId]; find it and take 879 bytes.
 				BinaryPrimitives.WriteUInt32BigEndian(needle[..4], questId);
 				BinaryPrimitives.WriteUInt32BigEndian(needle.Slice(4, 4), 1);
