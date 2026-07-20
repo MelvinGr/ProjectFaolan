@@ -729,7 +729,7 @@ namespace Faolan.Core.Protobuf
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
-        [global::ProtoBuf.ProtoMember(1, Name = @"character_tag")]
+        [global::ProtoBuf.ProtoMember(1, Name = @"character_tag", IsPacked = true)]
         public uint[] CharacterTags { get; set; }
 
         [global::ProtoBuf.ProtoMember(2, Name = @"free_feat_respecs")]
