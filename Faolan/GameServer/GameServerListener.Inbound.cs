@@ -990,6 +990,26 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServer0X2000Opcodes.UpdateInventoryIIR:
+				{
+					// c2s UpdateInventoryIIR is a PROBE, not a request that wants an answer: as an entity streams in
+					// the client fires a pair asking for that entity's Equipped(101) then Bag(104) container -
+					//   [handle][env 00][u32 pbLen][ProtoInventoryGame { 1: { 1: kind, 2: handle } }]
+					// where the protobuf's inner id is the carrier handle again. It rides the same streaming burst as
+					// UpdateQuestMarkerNPC + RequestAggroStatus on that handle.
+					// Retail NEVER answers it: across all 104 captures there are 34 c2s and 2 s2c, and the 2 s2c are an
+					// UNSOLICITED push of the player's OWN containers after an equip change (a RemoveItem, in
+					// Hoxxling_mage-heraldofxotli_login_gameplay2 frame 5118) - zero of the 34 requests draw a reply.
+					// Visible gear already arrives with the spawn snapshot, so drop it quietly like the teleport acks
+					// below; answering would diverge from capture. The s2c push itself is unimplemented (see
+					// UpdateInventoryCodec, currently emitted nowhere).
+					//var probe = packet.Body.ReadRemainingArray();
+
+					Logger.LogDebug("GameServer 0x2000 inventory probe"); //" {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), probe.Length);
+
+					break;
+				}
+
 				default:
 				{
 					var data = packet.Body.ReadRemainingArray();
