@@ -275,8 +275,8 @@ namespace Faolan.GameServer
 
 		// The 5-byte IIR blob prefix the client (n3InfoItemRemote::Construct) reads before the FullCharacterIIR root:
 		// [u8 flag=0][u32 BE blobLen], where blobLen == rootLength (the client reads EXACTLY blobLen bytes as the
-		// protobuf root, then expects the 0x18 tails version). Identical BE32 model to SetSnapshotBlobLength, but
-		// built from scratch rather than patched onto a captured prefix.
+		// protobuf root, then expects the 0x18 tails version). Built from scratch - there is no captured prefix to
+		// patch, which is what retired the old SetSnapshotBlobLength.
 		//
 		// This used to append a captured 3-byte "field5" (28 81 06) after the length. Those bytes are not a frame at
 		// all - they are the ROOT's own `subscription_flags` (field 5) varint, which BuildRoot already emits typed
@@ -373,22 +373,6 @@ namespace Faolan.GameServer
 			return ps.WriteLengthHash().ToArray();
 		}
 
-		// Sets the snapshot's protobuf-blob length to match a regenerated root. The 5-byte prefix the client reads
-		// is [u8 flag][u32 BE blobLen], where the client (n3InfoItemRemote::Construct -> FUN_00cbfb80 in
-		// AgeOfConan.exe) reads EXACTLY blobLen bytes as the FullCharacterIIR root, then expects the 0x18 version.
-		// So blobLen = rootLength, written as a 4-byte big-endian int at prefix offset 1. (This SUPERSEDES
-		// AdjustSnapshotPrefixRootLength, which adjusted a byte-misaligned protobuf-varint model and corrupted the
-		// real length on resize — see [[protocol_containeradditem]].) Any bytes past offset 5 are extra prefix the
-		// caller owns and are preserved unchanged.
-		internal static byte[] SetSnapshotBlobLength(byte[] prefix, int rootLength)
-		{
-			if (prefix.Length < 5 || rootLength < 0)
-				return prefix;
-
-			var result = (byte[])prefix.Clone();
-			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(1, 4), (uint)(prefix.Length - 5 + rootLength));
-			return result;
-		}
 
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
 		// updates (0x2005) ride.

@@ -78,7 +78,9 @@ namespace Faolan.Tests
 			var genRoot = typed.ToProtobuf();
 			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
 
-			var newPrefix = GameServerListener.SetSnapshotBlobLength(prefix, genRoot.Length);
+			// BuildSnapshotPrefix is the production path (the old SetSnapshotBlobLength patched a CAPTURED prefix and
+			// was retired when the prefix started being built from scratch).
+			var newPrefix = GameServerListener.BuildSnapshotPrefix(genRoot.Length);
 			Assert.Equal((uint)genRoot.Length, BinaryPrimitives.ReadUInt32BigEndian(newPrefix.AsSpan(1, 4)));
 
 			// Reassemble [subop][c350][instance][newPrefix][genRoot][tails] and re-split.
@@ -110,22 +112,21 @@ namespace Faolan.Tests
 			}
 		}
 
-		// SetSnapshotBlobLength writes the correct BE32 length for ANY regenerated root length, keeping the flag
-		// byte; a round-trip back through the captured length reproduces the original prefix.
+		// BuildSnapshotPrefix writes the correct BE32 length for ANY root length, keeping the flag byte, and at the
+		// captured root's own length reproduces the captured prefix byte-for-byte.
 		[Fact]
-		public void SetSnapshotBlobLength_WritesBe32_PreservesFlag()
+		public void BuildSnapshotPrefix_WritesBe32_ForAnyRootLength()
 		{
 			var (prefix, rootLen, _) = Split("strie-login-inventory.bin");
 
 			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
 			{
-				var p = GameServerListener.SetSnapshotBlobLength(prefix, newRoot);
+				var p = GameServerListener.BuildSnapshotPrefix(newRoot);
 				Assert.Equal((uint)newRoot, BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));
-				Assert.Equal(prefix[0], p[0]); // flag preserved
+				Assert.Equal(prefix[0], p[0]); // flag
 			}
 
-			// Writing the original root length reproduces the captured prefix byte-for-byte.
-			Assert.Equal(prefix, GameServerListener.SetSnapshotBlobLength(prefix, rootLen));
+			Assert.Equal(prefix, GameServerListener.BuildSnapshotPrefix(rootLen));
 		}
 
 		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)
