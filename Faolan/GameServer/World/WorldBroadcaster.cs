@@ -922,7 +922,7 @@ namespace Faolan.GameServer.World
 		// POOL owns its respawn. Returns the entity, or null if the type won't build.
 		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
 		{
-			var handle = (uint)NextRuntimeHandle();
+			var handle = NextRuntimeHandle();
 			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
 				return null;
 

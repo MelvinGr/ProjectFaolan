@@ -477,7 +477,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = new ConanPacket(packetBytes);
-				instance = (uint)packet.Receiver.Instance;
+				instance = packet.Receiver.Instance;
 				return instance != 0;
 			}
 			catch

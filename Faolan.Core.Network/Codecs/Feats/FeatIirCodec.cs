@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 				.WriteUInt32(Opcode)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(charHandle)
-				.WriteByte((byte)0x00)
+				.WriteByte(0x00)
 				.WriteByte(state)
 				.WriteUInt32(0u)
 				.WriteUInt32(ListFrame.ForCount(featIds.Count));

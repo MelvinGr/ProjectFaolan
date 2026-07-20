@@ -258,7 +258,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return feats;
 
 			for (var k = 0; k < count; k++)
-				feats.Add(BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(PreFrameHead + 4 * (int)k, 4)));
+				feats.Add(BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(PreFrameHead + 4 * k, 4)));
 
 			return feats;
 		}

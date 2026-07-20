@@ -452,9 +452,9 @@ namespace Faolan.GameServer
 								// 0x125D9B / 0x42CA77 are real learned-spell ids. args.Target.Instance is the target. (#236)
 								var spellId = target != 0
 									? target
-									: (uint)(args.Target?.Type ?? args.BccActionId);
+									: args.Target?.Type ?? args.BccActionId;
 								var casterHandle = client.Session.Account.ClientInstance;
-								var targetHandle = (uint)(args.Target?.Instance ?? 0);
+								var targetHandle = args.Target?.Instance ?? 0;
 
 								// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
 								// trailer instead of a locked entity: it has NO SpellTarget and the trailer's kind byte is 0.
@@ -594,7 +594,7 @@ namespace Faolan.GameServer
 								// The melee swing / auto-attack: ack the behavior + resolve the hit (see
 								// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
 								await BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
-								await _combat.SendNormalAttackResponse(client, rawPayload, (uint)(args.Target?.Instance ?? 0), args.CommandqueueClientId);
+								await _combat.SendNormalAttackResponse(client, rawPayload, args.Target?.Instance ?? 0, args.CommandqueueClientId);
 
 								break;
 							}
@@ -606,7 +606,7 @@ namespace Faolan.GameServer
 								// 2026-06-12); targeted damage reuses the armed path (the capture's unarmed swings
 								// hit air, so the damage part is an extension pending in-client validation).
 								await BreakShieldOnAggression(client); // an unarmed swing is aggressive - drops the shield (#361)
-								await _combat.SendUnarmedAttackResponse(client, rawPayload, args.CommandqueueClientId, (uint)(args.Target?.Instance ?? 0));
+								await _combat.SendUnarmedAttackResponse(client, rawPayload, args.CommandqueueClientId, args.Target?.Instance ?? 0);
 
 								break;
 							}
@@ -685,7 +685,7 @@ namespace Faolan.GameServer
 							{
 								// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);
 								// (TypeId, Mode, Field3) select the conversation node the client is requesting.
-								var npcHandle = (uint)(args.Target?.Instance ?? 0);
+								var npcHandle = args.Target?.Instance ?? 0;
 								Logger.LogInformation("TalkToNpc: from=0x{From:X}, target=0x{Target:X}, npcHandle=0x{NpcHandle:X}, args={Args}", from, target, npcHandle, args);
 
 								// Vendor trade-open (#134): when the clicked NPC is a shop vendor (matched by NAME - the
@@ -722,7 +722,7 @@ namespace Faolan.GameServer
 
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 								// the client asked for, re-addressed to the clicked NPC.
-								if (await _conversation.TryReplayConversation(client, args.BccActionId, (uint)args.CommandqueueServerId, npcHandle))
+								if (await _conversation.TryReplayConversation(client, args.BccActionId, args.CommandqueueServerId, npcHandle))
 									break;
 
 								// Only a GREETING click (Field3 == 0) may OPEN a dialogue. The client fires a second
