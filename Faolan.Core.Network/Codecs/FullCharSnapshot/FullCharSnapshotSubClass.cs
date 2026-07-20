@@ -71,6 +71,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
 		public QuestIndexRegion? QuestIndex { get; init; }
 
+		// The COMPLETED-quest journal, grouped by area - the Completed tab's data, sitting directly after the active
+		// journal (#390). Null for tails without one: the beach template holds no completed quests, which is exactly
+		// why the region went unmodelled and every real journal's bytes fell into UnknownBefore.
+		public CompletedQuestJournalRegion? CompletedQuests { get; init; }
+
 
 		public SubClassPostAccessBlock? PostAccessBlock { get; init; }
 
@@ -102,6 +107,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			writer.WriteArray(Quests.ToArray());
 
+			if (CompletedQuests != null)
+				writer.WriteArray(CompletedQuests.ToArray());
 
 			if (QuestIndex != null)
 				writer.WriteArray(QuestIndex.ToArray());
@@ -305,12 +312,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			if (accessWindowNameOffset < 0)
 			{
-				var questIndexNoAw = TryParseQuestIndex(data, afterObjectives, data.Length, out var afterIndexNoAw);
+				var completedNoAw = TryParseCompletedJournal(data, afterObjectives, data.Length, out var afterCompletedNoAw);
+				var questIndexNoAw = TryParseQuestIndex(data, afterCompletedNoAw, data.Length, out var afterIndexNoAw);
 				var unknownBeforeAccessWindowTable = data[afterIndexNoAw..];
 
 				return new FullCharSnapshotSubClass
 				{
 					Quests = quests,
+					CompletedQuests = completedNoAw,
 					QuestIndex = questIndexNoAw,
 					KnownHeaderLength = knownHeaderLength,
 					UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable,
@@ -335,7 +344,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// The quest index sits between the @609 region and the access-window table; model it typed (its trailer
 			// runs to the table start). On anything unexpected it stays in the opaque UnknownBefore blob.
-			var questIndex = TryParseQuestIndex(data, afterObjectives, accessWindowTableStart, out var afterIndex);
+			var completedQuests = TryParseCompletedJournal(data, afterObjectives, accessWindowTableStart, out var afterCompleted);
+			var questIndex = TryParseQuestIndex(data, afterCompleted, accessWindowTableStart, out var afterIndex);
 			var unknownBeforeAccessWindowTable0 = data[afterIndex..accessWindowTableStart];
 
 			using var accessReader = new FaolanStream(data, false)
@@ -354,6 +364,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return new FullCharSnapshotSubClass
 			{
 				Quests = quests,
+				CompletedQuests = completedQuests,
 				QuestIndex = questIndex,
 				KnownHeaderLength = knownHeaderLength,
 				UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable0,
@@ -682,6 +693,32 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				RepeatCount = repeatedRun.RepeatCount,
 				FooterValues = footer
 			};
+		}
+
+		// Parses the COMPLETED-quest journal when the boundary opens with an area-count ListFrame word rather than the
+		// 0x3F1 index tag (#390). Returns null - leaving the bytes in the opaque blob, as before - for tails without
+		// one or on anything unexpected.
+		private static CompletedQuestJournalRegion? TryParseCompletedJournal(byte[] data, int offset, int endOffset, out int afterRegion)
+		{
+			afterRegion = offset;
+			if (offset + 4 > data.Length || endOffset < offset)
+				return null;
+
+			var lead = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4));
+			if (lead == QuestIndexRegion.IndexTag || lead == 0 || lead % ListFrame.Unit != 0)
+				return null;
+
+			try
+			{
+				var region = CompletedQuestJournalRegion.Parse(data, offset, endOffset, out var after);
+				afterRegion = after;
+				return region;
+			}
+			catch (Exception)
+			{
+				afterRegion = offset;
+				return null;
+			}
 		}
 
 		// Parses the quest index region when the boundary opens with the 0x3F1 index tag; its trailer runs to
