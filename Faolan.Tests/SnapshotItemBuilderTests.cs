@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
 			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Equipped);
-			var captured = FullCharSnapshotReader.GetEntryBySlot(equipped, Slot);
+			var captured = SnapshotEntryAccessors.EntryBySlot(equipped, Slot);
 			Assert.NotNull(captured);
 			var expected = captured!.ToProtobuf();
 
@@ -120,10 +120,10 @@ namespace Faolan.Tests
 				var bag = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Bag);
 				var before = FullCharSnapshotReader.GetContainerEntries(bag).ToList();
 				var original = before[0];
-				var slot = FullCharSnapshotReader.GetEntrySlot(original);
-				var itemId = FullCharSnapshotReader.GetEntryItemId(original) ?? 0;
-				var recordId = FullCharSnapshotReader.GetEntryRecordId(original) ?? 0;
-				var count = FullCharSnapshotReader.GetEntryCount(original) ?? 1;
+				var slot = SnapshotEntryAccessors.EntrySlot(original);
+				var itemId = SnapshotEntryAccessors.EntryItemId(original) ?? 0;
+				var recordId = SnapshotEntryAccessors.EntryRecordId(original) ?? 0;
+				var count = SnapshotEntryAccessors.EntryCount(original) ?? 1;
 
 				var built = SnapshotItemBuilder.BuildListEntry(slot, itemId, recordId, count, item, hash);
 				bag.Items[bag.Items.IndexOf(original)] = built;
@@ -135,11 +135,11 @@ namespace Faolan.Tests
 				var after = FullCharSnapshotReader.GetContainerEntries(bag2).ToList();
 
 				Assert.Equal(before.Count, after.Count); // entry count unchanged (in-place replace)
-				var first = FullCharSnapshotReader.GetEntryBySlot(bag2, slot);
+				var first = SnapshotEntryAccessors.EntryBySlot(bag2, slot);
 				Assert.NotNull(first);
 				Assert.Equal(SlaveManaclesId, FullCharSnapshotReader.GetEntryTemplateId(first!));
-				Assert.Equal(itemId, FullCharSnapshotReader.GetEntryItemId(first!));
-				Assert.Equal(recordId, FullCharSnapshotReader.GetEntryRecordId(first!));
+				Assert.Equal(itemId, SnapshotEntryAccessors.EntryItemId(first!));
+				Assert.Equal(recordId, SnapshotEntryAccessors.EntryRecordId(first!));
 			}
 			finally
 			{

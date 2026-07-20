@@ -13,7 +13,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// [u8 flag][u32 BE blobLen] (RetailLoginReplay.SetSnapshotBlobLength / n3InfoItemRemote::Construct): the
 	// client reads exactly blobLen bytes, and those bytes are the WHOLE ProtoFullCharacterIIR root. A pure
 	// structural read - no byte scanning, and robust to a resized/re-lengthed prefix.
-	// Test/RE tooling only: production BUILDS snapshots typed via FullPlayerCharacterBuilder.
+	// MIXED audience, so do not assume either half is dead:
+	//   - ParseInventoryRoot + the container/entry getters are PRODUCTION (the importer's ItemHashHarvester and
+	//     CaptureCharacterImporter read every captured snapshot through them).
+	//   - ParseInventoryPacketBody (the full prefix/root/tails split) has no production caller - production BUILDS
+	//     snapshots typed via FullPlayerCharacterBuilder - but it stays here deliberately: it encodes the server's
+	//     own prefix model, so moving it into the tests would leave the byte-exact round-trip gates asserting their
+	//     own copy of that model instead of the server's.
+	// Five one-line entry accessors that only the tests used moved out to
+	// Faolan.Tests/Support/SnapshotEntryAccessors.cs.
 	//
 	// ⚠ The prefix used to be modelled as [flag][blobLen][field5 = 3 bytes] with root = blobLen - 3. That "field5"
 	// was not a frame at all: it was the root's OWN first field (`subscription_flags` = 5), which happens to encode
@@ -51,16 +59,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return entry.Item?.ItemData?.Hash;
 		}
 
-		public static ProtoInventoryGame.InventoryListEntry GetEntryBySlot(ProtoInventoryGame container, ulong slot)
-		{
-			return GetContainerEntries(container).FirstOrDefault(e => e.Pos == slot);
-		}
-
-		public static uint? GetEntryCount(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			return Stat(entry, 26);
-		}
-
 		public static (uint Data1, uint Data2, uint Data3, uint Data4)? GetEntryIdentityQuad(ProtoInventoryGame.InventoryListEntry entry)
 		{
 			var key = entry.Item?.ItemData?.Key1;
@@ -69,29 +67,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				: (key.Key1, key.Key2, key.Key3, key.Key4);
 		}
 
-		public static ulong? GetEntryItemId(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			return entry.Item?.ItemId;
-		}
-
-		// Stat 23 = the item's local inventory record id; stat 26 = the stack count (both in ProtoInventoryGameEntry.stat_list).
-		public static uint? GetEntryRecordId(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			return Stat(entry, 23);
-		}
-
-		public static ulong GetEntrySlot(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			return entry.Pos;
-		}
-
 		public static uint? GetEntryTemplateId(ProtoInventoryGame.InventoryListEntry entry)
 		{
 			return entry.Item?.ItemData?.Template1;
 		}
 
 		// `bodyStream` must be positioned right after the [subOpcode][c350][instance] header. The prefix's BE32
-		// blob length delimits the root (blobLen = field5Len + rootLength), so this is a pure structural split.
+		// blob length delimits the root (blobLen == rootLength), so this is a pure structural split.
 		public static InventoryPacketParts ParseInventoryPacketBody(FaolanStream bodyStream)
 		{
 			var prefixStart = bodyStream.Position;
@@ -124,11 +106,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			bodyStream.ReadArray(PrefixFlagBytes); // flag
 			return bodyStream.ReadUInt32(); // BE32 blobLen == the root's length
-		}
-
-		private static uint? Stat(ProtoInventoryGame.InventoryListEntry entry, uint stat)
-		{
-			return entry.Item?.StatLists.FirstOrDefault(s => s.Stat == stat)?.Value;
 		}
 
 		// The three regions of a snapshot body: the exact prefix bytes, the typed inventory root, and the sub-class

@@ -41,7 +41,7 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
 			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Equipped);
-			var captured = FullCharSnapshotReader.GetEntryBySlot(equipped, Slot);
+			var captured = SnapshotEntryAccessors.EntryBySlot(equipped, Slot);
 			Assert.NotNull(captured);
 
 			// 2) Decode those bytes with the generated, schema-accurate types.
@@ -99,7 +99,7 @@ namespace Faolan.Tests
 
 			// One inventory entry round-trips exactly.
 			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Equipped);
-			var entryBytes = FullCharSnapshotReader.GetEntryBySlot(equipped, Slot)!.ToProtobuf();
+			var entryBytes = SnapshotEntryAccessors.EntryBySlot(equipped, Slot)!.ToProtobuf();
 			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(new MemoryStream(entryBytes));
 			using var em = new MemoryStream();
 			Serializer.Serialize(em, entry);
