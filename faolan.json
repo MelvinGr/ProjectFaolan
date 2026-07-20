@@ -1,5 +1,6 @@
 {
 	"DatabasePath": "faolan.db",
+	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
 	"ServerIpAddress": "127.0.0.1",
 	"UniverseAgentPort": 7010,
@@ -12,3 +13,4 @@
 
 	"AmbientSpawnsEnabled": true
 }
+

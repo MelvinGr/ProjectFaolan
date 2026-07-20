@@ -34,9 +34,24 @@ The **tooling** that reads the captures stays here, because the test suite depen
 
 ## Terrain
 
-`Terrain/` is in the data repo too, but it needs **no symlink** — it is a config path. Point
-`TerrainDir` in `faolan.json` at the clone, or leave it unset to run without ground-snap and
-line-of-sight (`TerrainService` logs that it is disabled and carries on).
+`Terrain/` is in the data repo too, but it needs **no symlink** — it is a config path, and
+`faolan.json` now carries it explicitly:
+
+```json
+"TerrainDir": "../../ProjectFaolan-Data/Terrain"
+```
+
+Relative to the repo root, which is the server's required CWD. Adjust it if your clone sits
+elsewhere. On startup the server says which it took:
+
+```
+Terrain: baked terrain files from '...' (ground-snap + line-of-sight on).
+```
+
+⚠️ If the directory is missing, `TerrainService` logs that ground-snap and line-of-sight are
+**disabled** and carries on. That is a real behaviour change that only shows up in one log line, so
+check for that line rather than assuming terrain is loaded. The key was previously absent from
+`faolan.json` entirely, falling back to a bare `Terrain` — which is why it is spelled out now.
 
 ## ⚠️ Without the captures, the suite FAILS
 
