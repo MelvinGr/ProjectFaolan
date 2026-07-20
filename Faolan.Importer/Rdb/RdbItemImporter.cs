@@ -156,10 +156,15 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// The item QUALITY/rarity tier = property field 499 (the client's own ItemQuality id; White Gown 1,
-				// raid gear 4, Mythical Band 5). Same strictly-decreasing property-table parse as field 74. Only accept
-				// the known 1..Legendary range; an out-of-range/absent 499 leaves Quality NULL.
-				if (TryReadPropertyField(template.AsSpan(12), 499, out var quality) && quality is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary
-				    && item.Quality != (ItemQuality)quality)
+				// raid gear 4, Mythical Band/max = 5 - retail field 499 tops out at 5, there is no 6). The strict-
+				// decreasing property-table parse reaches it for most gear, but on some templates 499 sits OUTSIDE the
+				// main decreasing run (e.g. the max-capacity bags 5061819/5061820 carry 499=5 at a position the strict
+				// parser can't reach - the same blind spot bag slots hit, #397), leaving Quality wrongly NULL. Fall back
+				// to a direct field scan (validated to the 1..6 range) so those items get their tier too.
+				uint quality = 0;
+				if (!(TryReadPropertyField(template.AsSpan(12), 499, out quality) && quality is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary))
+					TryReadQualityAnywhere(template.AsSpan(12), out quality);
+				if (quality is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary && item.Quality != (ItemQuality)quality)
 				{
 					item.Quality = (ItemQuality)quality;
 					qualitiesAdded++;
@@ -275,6 +280,28 @@ namespace Faolan.Importer.Rdb
 		// Veteran's Bag 35 / Max Inventory 216) via 104, and the Max Resource Bag (102) via 1331. Non-bag templates
 		// virtually never carry these fields, and the value is only ever used for an item in the matching bag slot, so
 		// a stray match is inert.
+		// Direct scan for field 499 (item quality) at any 4-byte-aligned position, taking the following word as the
+		// value and accepting only the 1..Legendary ItemQuality range. Mirrors TryReadBagSlots: the fallback for
+		// templates whose 499 is outside the strict-decreasing property run (#397).
+		private static bool TryReadQualityAnywhere(ReadOnlySpan<byte> body, out uint value)
+		{
+			value = 0;
+			for (var i = 0; i + 8 <= body.Length; i += 4)
+			{
+				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) != 499)
+					continue;
+
+				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
+				if (v is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary)
+				{
+					value = v;
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		private static bool TryReadBagSlots(ReadOnlySpan<byte> body, uint fieldId, out uint slots)
 		{
 			slots = 0;
