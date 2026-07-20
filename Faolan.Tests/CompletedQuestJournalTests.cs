@@ -70,26 +70,28 @@ namespace Faolan.Tests
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");
 
-			// Is an "area" the same thing as a map?
-			var pairs = new HashSet<(uint Area, string Region, string Map)>();
-			var areaToMap = new Dictionary<uint, HashSet<string>>();
-			var mapToArea = new Dictionary<string, HashSet<uint>>();
+			var rec1 = new Dictionary<string, HashSet<string>>();   // first 52000 id -> second 52000 ids
+			var rec2 = new Dictionary<string, HashSet<string>>();   // second 52000 id -> first 52000 ids
+			var areaToRec1 = new Dictionary<uint, HashSet<string>>();
+			var rec1ToArea = new Dictionary<string, HashSet<uint>>();
 			foreach (var g in allAreas)
 			{
-				var reg = Id(g.RegionName);
-				var map = Id(g.RegionName);
-				pairs.Add((g.AreaId, reg, map));
-				(areaToMap.TryGetValue(g.AreaId, out var m) ? m : areaToMap[g.AreaId] = []).Add(map);
-				(mapToArea.TryGetValue(map, out var a) ? a : mapToArea[map] = []).Add(g.AreaId);
+				var mapId = Id(g.MapName);      // first 52000 record on the wire
+				var regId = Id(g.RegionName);   // second 52000 record on the wire
+				(rec1.TryGetValue(mapId, out var a) ? a : rec1[mapId] = []).Add(regId);
+				(rec2.TryGetValue(regId, out var b) ? b : rec2[regId] = []).Add(mapId);
+				(areaToRec1.TryGetValue(g.AreaId, out var c) ? c : areaToRec1[g.AreaId] = []).Add(mapId);
+				(rec1ToArea.TryGetValue(mapId, out var d) ? d : rec1ToArea[mapId] = []).Add(g.AreaId);
 			}
 
-			o.WriteLine($"distinct areaIds={areaToMap.Count} distinct 2nd-52000 ids={mapToArea.Count}");
-			o.WriteLine($"areas whose 2nd-52000 id is NOT unique: {areaToMap.Count(kv => kv.Value.Count > 1)}");
-			o.WriteLine($"2nd-52000 ids shared by >1 area: {mapToArea.Count(kv => kv.Value.Count > 1)}");
-			foreach (var kv in mapToArea.OrderByDescending(k => k.Value.Count).Take(5))
-				o.WriteLine($"   id {kv.Key} <- {kv.Value.Count} areas: {string.Join(",", kv.Value.Take(8))}");
-			foreach (var g in allAreas.Take(4))
-				o.WriteLine($"   sample area={g.AreaId} map={Id(g.MapName)} region={Id(g.RegionName)} title={Id(g.AreaTitle)}");
+			o.WriteLine($"distinct areaIds={areaToRec1.Count}  distinct 1st-52000={rec1.Count}  distinct 2nd-52000={rec2.Count}");
+			o.WriteLine($"1st-52000 values each mapping to >1 of the 2nd: {rec1.Count(kv => kv.Value.Count > 1)}");
+			o.WriteLine($"2nd-52000 values each mapping to >1 of the 1st: {rec2.Count(kv => kv.Value.Count > 1)}");
+			o.WriteLine($"areas spanning >1 of the 1st-52000: {areaToRec1.Count(kv => kv.Value.Count > 1)}");
+			o.WriteLine("1st-52000 -> how many areas:");
+			foreach (var kv in rec1ToArea.OrderByDescending(k => k.Value.Count).Take(10))
+				o.WriteLine($"   id {kv.Key,8} : {kv.Value.Count,4} areas, 2nd-52000 = {string.Join(",", rec1[kv.Key])}");
+
 			Assert.True(withRegion > 0, "no snapshot in the corpus carried a completed-quest journal");
 		}
 
