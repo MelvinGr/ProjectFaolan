@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,50 @@ namespace Faolan.Tests
 	// re-sorts for display anyway, so the test feeds each capture's own order and checks the CONTENT.
 	public class CompletedQuestJournalGenerationTests(ITestOutputHelper o)
 	{
+		// REGRESSION: the whole suite stayed green while both journal tabs rendered EMPTY in-client, because every
+		// test built a portion for a character that HAD active snapshot quests. BuildQuestPortion returned the empty
+		// region early when there were none, silently dropping the completed journal with it - and a character with 0
+		// eligible active quests and 1500 completed ones is the normal case right now.
+		[Fact]
+		public void CompletedJournal_IsEmitted_EvenWithNoActiveQuests()
+		{
+			var area = new QuestArea
+			{
+				AreaId = 241,
+				Magic = 0x57365154,
+				AreaTitleRefId = 241,
+				AreaTitleCategory = 50300,
+				AreaTitleKey = "k-area",
+				MapRefId = 4010,
+				MapCategory = 52000,
+				MapKey = "k-map",
+				RegionRefId = 4,
+				RegionCategory = 52000,
+				RegionKey = "k-region"
+			};
+
+			var quest = new QuestDefinition { QuestId = 10238, AreaId = 241, JournalSequence = 1 };
+			quest.TextRefs.Add(new QuestTextRef { QuestId = 10238, Slot = QuestTextSlot.Title, RefId = 10238, Category = 50301, KeyText = "k-title" });
+			quest.TextRefs.Add(new QuestTextRef { QuestId = 10238, Slot = QuestTextSlot.ListSubLine, RefId = 10238, Category = 50303, KeyText = "k-sub" });
+
+			var groups = new List<(QuestArea, IReadOnlyList<QuestDefinition>)> { (area, [quest]) };
+
+			var withCompleted = FullCharSnapshotSubClass.BuildQuestPortion([], null, 1, groups);
+			var withoutAnything = FullCharSnapshotSubClass.BuildQuestPortion([], null, 1);
+
+			Assert.True(withCompleted.Length > withoutAnything.Length,
+				"a character with no active quests but completed ones must still carry the completed journal");
+
+			// And it must be the real region: parse it back out of the portion.
+			var region = CompletedQuestJournalRegion.Parse(withCompleted, 8, withCompleted.Length, out _);
+			var group = Assert.Single(region.Areas);
+			Assert.Equal(241u, group.AreaId);
+			Assert.Equal(10238u, Assert.Single(group.Quests).QuestId);
+
+			// The no-quests-at-all case stays byte-identical to the capture-proven empty region.
+			Assert.Equal(FullCharSnapshotSubClass.BuildEmptyQuestPortion(), withoutAnything);
+		}
+
 		[Fact]
 		public async Task CapturedRegions_RebuildFromTheDatabase_ByteExact()
 		{
