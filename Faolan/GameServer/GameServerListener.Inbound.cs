@@ -72,7 +72,7 @@ namespace Faolan.GameServer
 				{
 					// Create-editor (unnamed) avatar stat stream: retail sends no response, we just observe it.
 					if (client.Session.IsUnnamedCreatePhase)
-						Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}.", client.Session.HasPendingPost205FFollowUp);
+						Logger.LogInformation("Observed retail create-editor (uint)GameServer0X2000Opcodes.StatIIR while pendingPost205F={PendingPost205F}.", client.Session.HasPendingPost205FFollowUp);
 
 					break;
 				}

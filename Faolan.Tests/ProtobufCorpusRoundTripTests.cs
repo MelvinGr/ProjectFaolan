@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -79,7 +80,7 @@ namespace Faolan.Tests
 			var withCharacterTags = 0;
 			var singleTagUnpacked = 0;
 
-			foreach (var (source, body) in CapturedBodies(0x737A6DF9u))
+			foreach (var (source, body) in CapturedBodies((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
 			{
 				var stream = new FaolanStream(body);
 				stream.ReadUInt32(); // subOpcode

@@ -118,11 +118,25 @@ namespace Faolan.Tests
 		[Fact]
 		public void NoCodecSourceContainsAMagicIirOpcodeLiteral()
 		{
-			var codecDir = TestPaths.Repo("Faolan.Core.Network", "Codecs");
+			// Scans the CODEC layer AND its consumers. It used to cover Codecs/ only, and the gap showed: the
+			// snapshot opcode 0x737A6DF9 has had an enum member (FullPlayerCharacterIIR) all along, and Codecs/ was
+			// clean, but 12 bare literals had accumulated in the server, the importer and the tests - exactly the
+			// emitters `grep GameServer0X2000Opcodes.<Type>` needs to find. Mirrors the ListFrame rule below, which
+			// already spanned both trees.
+			string[] roots =
+			[
+				TestPaths.Repo("Faolan.Core.Network", "Codecs"),
+				TestPaths.Repo("Faolan"),
+				TestPaths.Repo("Faolan.Importer")
+			];
 			var defined = Enum.GetValues<GameServer0X2000Opcodes>().ToHashSet();
 			var offenders = new List<string>();
 
-			foreach (var file in Directory.EnumerateFiles(codecDir, "*.cs", SearchOption.AllDirectories))
+			foreach (var file in roots.Where(Directory.Exists)
+				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
+				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+				                     && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
+				                     && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")))
 			{
 				var lines = File.ReadAllLines(file);
 				for (var i = 0; i < lines.Length; i++)

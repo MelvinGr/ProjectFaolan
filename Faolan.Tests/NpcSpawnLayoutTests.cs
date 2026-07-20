@@ -44,13 +44,13 @@ namespace Faolan.Tests
 			return b.ToArray();
 		}
 
-		private static void U32(List<byte> b, uint v) => b.AddRange(System.BitConverter.GetBytes(v));
-		private static void F32(List<byte> b, float v) => b.AddRange(System.BitConverter.GetBytes(v));
+		private static void U32(List<byte> b, uint v) => b.AddRange(BitConverter.GetBytes(v));
+		private static void F32(List<byte> b, float v) => b.AddRange(BitConverter.GetBytes(v));
 
 		private static void Str(List<byte> b, string s)
 		{
 			var bytes = Encoding.Latin1.GetBytes(s);
-			b.AddRange(System.BitConverter.GetBytes((ushort)bytes.Length));
+			b.AddRange(BitConverter.GetBytes((ushort)bytes.Length));
 			b.AddRange(bytes);
 		}
 

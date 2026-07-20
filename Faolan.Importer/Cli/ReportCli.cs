@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -24,7 +25,7 @@ namespace Faolan.Importer.Cli
 	// These inspect captures or the DB and print; they never write, so they bypass the import runner entirely.
 	public static class ReportCli
 	{
-		private static readonly string RepoRoot = Faolan.Core.RepoPaths.Root;
+		private static readonly string RepoRoot = RepoPaths.Root;
 
 		public static async Task<int> RunAsync(string[] args, string report)
 		{
@@ -627,7 +628,7 @@ namespace Faolan.Importer.Cli
 			foreach (var c in captures)
 			foreach (var p in c.Packets)
 			{
-				if (p.Opcode != 0x2000u || p.SubOpcode != 0x5D85BFC7u || p.Bytes.Length < 16)
+				if (p.Opcode != 0x2000u || p.SubOpcode != (uint)GameServer0X2000Opcodes.PlayfieldFIIR || p.Bytes.Length < 16)
 					continue;
 
 				var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
@@ -1044,7 +1045,7 @@ namespace Faolan.Importer.Cli
 			foreach (var c in captures)
 			foreach (var p in c.Packets)
 			{
-				if (!p.IsDownload || p.SubOpcode != 0x737A6DF9u)
+				if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
 					continue;
 
 				var body = p.Bytes.Length >= 16
@@ -1064,7 +1065,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				var instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-				Console.WriteLine($"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x737A6DF9@[{string.Join(",", positions)}]");
+				Console.WriteLine($"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x{(uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR:X8}@[{string.Join(",", positions)}]");
 				Console.WriteLine($"    first48: {Convert.ToHexString(body.AsSpan(0, Math.Min(48, body.Length)))}");
 
 				try

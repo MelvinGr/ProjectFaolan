@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,7 +22,7 @@ namespace Faolan.Importer.Captures
 	// derived and not in the pcaps (see docs/tooling/importer-plan.md). Takes raw on-wire packet bytes.
 	public static class CaptureSpellImporter
 	{
-		private const uint ApplySpellSubOpcode = 0x6B87E316;
+		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
 		private const uint GameCharAgentType = 0xA9ECB95D;
 		private const uint GameCharInterfaceType = 0x8B87F791;
 

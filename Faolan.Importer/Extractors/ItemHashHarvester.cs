@@ -33,7 +33,7 @@ namespace Faolan.Importer.Extractors
 		// folds into Normal, keeping the catalog to the three real item classes (the routing hint that keeps quest/
 		// resource items out of random loot).
 		private const uint EquippedContainerKind = 101;
-		private const uint InventorySubOpcode = 0x737A6DF9;
+		private const uint InventorySubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
 
 		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
 		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the

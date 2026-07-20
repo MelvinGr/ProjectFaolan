@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -112,7 +113,7 @@ namespace Faolan.Importer.Captures
 			return (charactersSeeded, questsWritten);
 		}
 
-		private const uint SnapshotSubOpcode = 0x737A6DF9;
+		private const uint SnapshotSubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
 
 		private static void TryRead(byte[] packetBytes, Dictionary<uint, Dictionary<uint, uint>> stateByChar, Dictionary<uint, Dictionary<uint, uint>> progressByChar, Dictionary<uint, HashSet<uint>> logListByChar, Dictionary<uint, HashSet<uint>> completedByChar)
 		{

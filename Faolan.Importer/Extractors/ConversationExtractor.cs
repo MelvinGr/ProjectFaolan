@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,22 +45,22 @@ namespace Faolan.Importer.Extractors
 	// `packets` must be one capture's GameServer packets in chronological order.
 	public static class ConversationExtractor
 	{
-		private const uint InteractSubOpcode = 0x642CD3D6;
-		private const uint KnubotAnswerSubOpcode = 0x4D7D9123;
+		private const uint InteractSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
+		private const uint KnubotAnswerSubOpcode = (uint)GameServer0X2000Opcodes.KnubotAnswerIIR;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2015 = 0x2015; // GameCharInterfaceOpcodes.DispatchSetDialogueCamera
 
 		// A quest GRANT signal seen mid-conversation: the full journal record (0x63268258) the retail server sends when
 		// the player accepts a quest. (QuestIIR-add 0x97E02314 also adds the quest but the full-update is the
 		// unambiguous "here is the new quest" marker; the runtime guards against re-granting, so this is safe.)
-		private const uint QuestFullUpdateSubOpcode = 0x63268258;
+		private const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR;
 
-		private const uint SpawnSubOpcode = 0xFA015807;
+		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 		private const uint TalkToNpcActionType = 0x16;
 
 		// The Knubot conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack):
 		// OpenChatWindow (045B0B0F), AppendText (4A3D899A), AnswerList (F164A4A5), CloseChatWindow (C4AF39EB).
-		private static readonly HashSet<uint> ResponseSubOpcodes = [0x4A3D899A, 0xF164A4A5, 0x045B0B0F, 0xC4AF39EB];
+		private static readonly HashSet<uint> ResponseSubOpcodes = [(uint)GameServer0X2000Opcodes.KnubotAppendTextIIR, (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR, (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR, (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR];
 
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{

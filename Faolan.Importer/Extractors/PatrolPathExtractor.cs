@@ -22,7 +22,7 @@ namespace Faolan.Importer.Extractors
 	{
 		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles (a player isn't a patrol)
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
-		private const uint MoveTaskSubOpcode = 0x96C46740;
+		private const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
 		private const uint Opcode2000 = 0x2000;
 
 		// One patrol route per NPC HANDLE in a capture (#266 patrol). The real route is the mode-1 PathMoveTask

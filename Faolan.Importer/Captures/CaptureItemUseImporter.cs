@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,8 +19,8 @@ namespace Faolan.Importer.Captures
 	// Moonspill->Mana Potion Effect, etc. See docs/subsystems/item-claims.md (item-use) / GameServerListener.UseInventoryItem.
 	public static class CaptureItemUseImporter
 	{
-		private const uint ApplySpellSubOpcode = 0x6B87E316;
-		private const uint TemplateActionSubOpcode = 0x6C300937;
+		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
+		private const uint TemplateActionSubOpcode = (uint)GameServer0X2000Opcodes.TemplateActionIIR;
 
 		// (template -> on-use spell BASE) for one capture, in frame order (state resets per capture so a use in one
 		// capture can't pair with a template in the next).

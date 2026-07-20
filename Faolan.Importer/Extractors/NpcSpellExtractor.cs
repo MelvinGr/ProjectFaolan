@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,7 +22,7 @@ namespace Faolan.Importer.Extractors
 		private const int ApplyToOffset = 12;
 		private const int PayloadOffset = 30;
 		private const int SpellIdOffset = 18;
-		private const uint ApplySpellSubOpcode = 0x6B87E316;
+		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
 		private const uint Opcode2000 = 0x2000;
 
 		public static List<NpcSpellEntry> Extract(IReadOnlyList<CapturedPacket> packets)

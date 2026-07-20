@@ -17,7 +17,7 @@ namespace Faolan.Importer.Extractors
 	// Sibling of WorldObjectExtractor (which keeps the bag as a world object); this one lifts only the contents.
 	public static class MapLootExtractor
 	{
-		private const uint LootBagSubOpcode = 0xF096251E;
+		private const uint LootBagSubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR;
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2000 = 0x2000;
 

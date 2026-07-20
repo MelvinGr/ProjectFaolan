@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -739,10 +740,10 @@ namespace Faolan.Importer.Modules
 
 		// The stored zone-line row for a harvested link: same map + name, nearest to the captured source position
 		// (a name can repeat across maps; within a map the position disambiguates). Null when none is within tolerance.
-		private static Faolan.Core.Database.Tables.WorldObject NearestZoneLine(
-			IReadOnlyList<Faolan.Core.Database.Tables.WorldObject> zoneLines, TeleportLink link)
+		private static Core.Database.Tables.WorldObject NearestZoneLine(
+			IReadOnlyList<Core.Database.Tables.WorldObject> zoneLines, TeleportLink link)
 		{
-			Faolan.Core.Database.Tables.WorldObject best = null;
+			Core.Database.Tables.WorldObject best = null;
 			var bestSq = PositionTolerance * PositionTolerance;
 			foreach (var o in zoneLines)
 			{
@@ -854,7 +855,7 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert
 		};
 
-		public string Description => "Crafting recipes book (TradeskillReplyIIR 0x9062D559, opt-in).";
+		public string Description => "Crafting recipes book (TradeskillReplyIIR (uint)GameServer0X2000Opcodes.TradeskillReplyIIR, opt-in).";
 		public string Name => "recipes";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
@@ -890,14 +891,12 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
-	// Account CLAIMS (CoreClaimIIR 0x06EC1255) -> AccountClaim rows, attached to the shared "captured" account. Opt-in
+	// Account CLAIMS (CoreClaimIIR 0x06EC1255) -> AccountClaim rows, attached to the import account. Opt-in
 	// like the other account-state seeds. The item TEA keys the claims reference are harvested into Items by the items
 	// module (ItemHashHarvester's claim-list source), so this depends on `items` for the FK + the key the server
 	// re-sends on the wire. Overwrite = rebuild the account's claim set cleanly. See docs/subsystems/item-claims.md.
 	public sealed class ClaimsModule : IImportModule
 	{
-		private const string CapturedAccountName = "captured"; // CaptureCharacterImporter.ImportAccountName
-
 		public bool InDefaultSet => false;
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
@@ -912,12 +911,12 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var account = await ctx.Db.Accounts.FirstOrDefaultAsync(a => a.UserName == CapturedAccountName);
+			var account = await ctx.Db.Accounts.FirstOrDefaultAsync(a => a.UserName == CaptureCharacterImporter.ImportAccountName);
 			if (account == null)
-				return new ImportResult($"no '{CapturedAccountName}' account - run the characters module first; skipped.");
+				return new ImportResult($"no '{CaptureCharacterImporter.ImportAccountName}' account - run the characters module first; skipped.");
 
 			var (parsed, written) = await CaptureClaimImporter.ImportAsync(ctx.Db, ctx.RawPackets, account.Id);
-			return new ImportResult($"{parsed} claims parsed, {written} written to account '{CapturedAccountName}'.");
+			return new ImportResult($"{parsed} claims parsed, {written} written to account '{CaptureCharacterImporter.ImportAccountName}'.");
 		}
 	}
 

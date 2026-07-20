@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -161,7 +162,7 @@ namespace Faolan.Tests
 						continue;
 
 					var bodyStart = 12 + (int)headerLen;
-					if (bodyStart + 8 > raw.Length || BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(bodyStart + 4, 4)) != 0x737A6DF9u)
+					if (bodyStart + 8 > raw.Length || BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(bodyStart + 4, 4)) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
 						continue;
 
 					yield return ($"{Path.GetFileName(json)}#{index++}", raw[(bodyStart + 4)..]);

@@ -328,7 +328,7 @@ namespace Faolan.GameServer
 					.WriteUInt32(0x00000013)
 					.WriteUInt32(0x00000000))
 				.SendAsync(client);
-			Logger.LogInformation("Sent deferred 0xF98E10B3 prompt.");
+			Logger.LogInformation("Sent deferred (uint)GameServer0X2000Opcodes.StatIIR prompt.");
 
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)

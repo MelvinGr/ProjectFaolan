@@ -13,7 +13,7 @@ namespace Faolan.Importer.Cli
 	// migrates, and hands a resolved plan to ImportRunner. See docs/tooling/importer-plan.md for the CLI spec.
 	public static class ImportCli
 	{
-		private static readonly string RepoRoot = Faolan.Core.RepoPaths.Root;
+		private static readonly string RepoRoot = Core.RepoPaths.Root;
 
 		public static async Task<int> RunAsync(string[] args)
 		{

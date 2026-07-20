@@ -112,7 +112,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			// of the 136 functions that touch this word, 77 DIVIDE it by 0x3F1 to get a count and 59 multiply to build
 			// one - NONE compares it to a constant. (Which list it frames here is not decoded; the surrounding run is
 			// still a verbatim single-goal template, so this stays ForCount(1) = the captured 0x7E2, byte-identical.)
-			w.WriteUInt32(Codecs.ListFrame.ForCount(1));
+			w.WriteUInt32(ListFrame.ForCount(1));
 			w.WriteUInt32(1);
 			w.WriteUInt32(0x0C);
 			w.WriteUInt32(playerHandle);
@@ -243,9 +243,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			var w = new FaolanStream();
 			w.WriteUInt32(trackedQuestId);
-			w.WriteUInt32(Codecs.ListFrame.Empty); // an EMPTY count-framed list
+			w.WriteUInt32(ListFrame.Empty); // an EMPTY count-framed list
 			w.WriteUInt32(0); // list A (empty)
-			w.WriteUInt32(Codecs.ListFrame.Empty); // an EMPTY count-framed list
+			w.WriteUInt32(ListFrame.Empty); // an EMPTY count-framed list
 			w.WriteUInt32(0); // list B (empty)
 			return w.ToArray();
 		}

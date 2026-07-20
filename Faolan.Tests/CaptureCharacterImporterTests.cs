@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
@@ -53,7 +54,7 @@ namespace Faolan.Tests
 				var capture = new[]
 				{
 					new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)), new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Golden.Bytes("SpawnDikketestLogin"))),
-					new CapturedPacket(2, true, 0x2000, 0x737A6DF9, SnapshotPacket(dikketestHandle))
+					new CapturedPacket(2, true, 0x2000, (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, SnapshotPacket(dikketestHandle))
 				};
 
 				CaptureCharacterImporter.AccountId = 7;
@@ -118,7 +119,7 @@ namespace Faolan.Tests
 		{
 			var body = new byte[40];
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length - 4);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x737A6DF9);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), instance);
 			return WrapBody(body);
 		}

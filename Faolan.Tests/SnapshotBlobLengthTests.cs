@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -85,7 +86,7 @@ namespace Faolan.Tests
 
 			// Reassemble [subop][c350][instance][newPrefix][genRoot][tails] and re-split.
 			using var content = new FaolanStream();
-			content.WriteUInt32(0x737A6DF9);
+			content.WriteUInt32(GameServer0X2000Opcodes.FullPlayerCharacterIIR);
 			content.WriteUInt32(0x0000C350);
 			content.WriteUInt32(instance);
 			content.WriteArray(newPrefix);

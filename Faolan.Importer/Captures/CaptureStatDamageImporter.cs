@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,7 +19,7 @@ namespace Faolan.Importer.Captures
 	// Spell table are updated (the base ids are RDB-cataloged). Idempotent.
 	public static class CaptureStatDamageImporter
 	{
-		private const uint StatDamageSubOpcode = 0xE9F24184;
+		private const uint StatDamageSubOpcode = (uint)GameServer0X2000Opcodes.StatDamageIIR;
 
 		public static async Task<(int Spells, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{

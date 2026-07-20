@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,8 +17,8 @@ namespace Faolan.Importer.Extractors
 	// sub-line (category 50303) - so we merge them by quest id.
 	public static class QuestDefinitionExtractor
 	{
-		private const uint FullUpdateSubOpcode = 0x63268258;
-		private const uint JournalSubOpcode = 0x79F8C7A1;
+		private const uint FullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR;
+		private const uint JournalSubOpcode = (uint)GameServer0X2000Opcodes.QuestJournalIIR;
 
 		public static List<QuestDefinition> Extract(IReadOnlyList<CapturedPacket> packets)
 		{

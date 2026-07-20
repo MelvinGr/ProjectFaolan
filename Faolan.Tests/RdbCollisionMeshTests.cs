@@ -82,7 +82,7 @@ namespace Faolan.Tests
 			if (!System.IO.File.Exists(System.IO.Path.Combine(rdbDir, "le.idx")))
 				return; // client RDB unavailable (CI) - skip
 
-			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+			using var rdb = new Core.Rdb.RdbReader(rdbDir);
 			Assert.True(rdb.TryGet(RdbCollisionMesh.ResourceType, 4010, out var e));
 			var body = rdb.ReadDecompressed(e);
 			Assert.True(RdbCollisionMesh.TryParse(body, out var mesh));

@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,7 +24,7 @@ namespace Faolan.Importer.Captures
 	public static class CaptureBankImporter
 	{
 		private const int BlobOffset = 17; // subop(4) + 0xC350(4) + charInstance(4) + flag(1) + blobLen(4)
-		private const uint BankIirSubOpcode = 0x0BA1C1CB;
+		private const uint BankIirSubOpcode = (uint)GameServer0X2000Opcodes.BankIIR;
 		private const ushort IirCarrierOpcode = 0x2000;
 
 		public static async Task<(int Characters, int Items)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)

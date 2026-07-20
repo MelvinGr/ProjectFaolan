@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Network.Constants;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Extensions;
@@ -62,7 +63,7 @@ namespace Faolan.Tests
 			var prefix = FullCharSnapshotCodec.BuildPrefix(root.Length);
 
 			using var content = new FaolanStream();
-			content.WriteUInt32(0x737A6DF9);
+			content.WriteUInt32(GameServer0X2000Opcodes.FullPlayerCharacterIIR);
 			content.WriteUInt32(0x0000C350);
 			content.WriteUInt32(0x02165EFF);
 			content.WriteArray(prefix);

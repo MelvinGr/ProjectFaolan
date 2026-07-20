@@ -32,7 +32,7 @@ namespace Faolan.Importer.Extractors
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2000 = 0x2000;
 
-		private static readonly HashSet<uint> ObjectSubOpcodes = [0x66AEDD50, 0xF096251E, 0x33A56FB0, 0x6BD56736, 0x1FD6412B];
+		private static readonly HashSet<uint> ObjectSubOpcodes = [(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR, (uint)GameServer0X2000Opcodes.DoorFullUpdateIIR, (uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR, (uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR];
 
 		public static List<WorldObjectEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{

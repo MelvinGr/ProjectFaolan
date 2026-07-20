@@ -25,17 +25,23 @@ namespace Faolan.Importer.Captures
 	// overwrites; the biggest captured spawn per name wins (geared late-game spawns carry the most data).
 	public static class CaptureCharacterImporter
 	{
-		private const string ImportAccountName = "captured";
+		// The account imported characters (and the claims module's AccountClaim rows) attach to. ONE definition -
+		// ClaimsModule used to keep a hand-copied duplicate with a comment pointing here, which is exactly how the
+		// two drift.
+		internal const string ImportAccountName = "faolan";
 		private const uint CharacterListOpcode = 0x20EF; // PlayerAgent SendCharacterList
-		private const uint InventorySnapshotSubOpcode = 0x737A6DF9;
+		private const uint InventorySnapshotSubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 
 		private const uint Opcode2000 = 0x2000;
 
-		// The account imported characters are attached to. 0 = find-or-create the dedicated "captured"
-		// account (login validation is stubbed, so logging in as captured/captured works). Imported
-		// characters deliberately do NOT join an existing play account: a 20+ entry character list breaks
-		// the client's auto-enter flow (observed with the smoke account).
+		// The account imported characters are attached to. 0 = find-or-create ImportAccountName, which is the normal
+		// PLAY account ("faolan"), so the reference characters are reachable from the same login as everything else.
+		// Login validation is stubbed, so any password works.
+		//
+		// This used to import to a dedicated "captured" account, justified in a comment by "a 20+ entry character
+		// list breaks the client's auto-enter flow". That is NOT true (Melvin, 2026-07-20), so the split bought
+		// nothing and only made the reference characters awkward to reach.
 		public static uint AccountId = 0;
 
 		// minLevel (0 = no filter): captured characters at or below this level are skipped as fresh/tutorial chars

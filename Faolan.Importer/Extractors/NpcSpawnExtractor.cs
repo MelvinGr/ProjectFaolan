@@ -50,7 +50,7 @@ namespace Faolan.Importer.Extractors
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll login burst window
-		private const uint SpawnSubOpcode = 0xFA015807;
+		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 
 		// Every FA015807 spawn in the capture (login burst AND mid-session interest/respawn spawns), all maps. This
 		// accretes the cross-session UNION - the same physical NPC at slightly different spots across sessions - so

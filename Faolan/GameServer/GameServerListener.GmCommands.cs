@@ -584,7 +584,7 @@ namespace Faolan.GameServer
 		// account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR][DispOpenTradepost].
 		// Sending the open FIRST landed the BankIIR before the window existed and the first open rendered empty. So:
 		// bank first, open last. Returns the bank item count for the caller's feedback.
-		private async Task<int> SendAuctionHouseOpen(INetworkClient client, System.Numerics.Vector3 accessPosition)
+		private async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
 		{
 			var characterId = client.Session.Character.Id;
 			var rows = await Database.GetCharacterInventory(characterId);
@@ -721,7 +721,7 @@ namespace Faolan.GameServer
 		private async Task SysChatCommand(INetworkClient client)
 		{
 			// await SendWorldChat(client, CriteriaSystemLineXml);
-			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent a world/system chat line (ChatTextIIR 0xE0B51102).");
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent a world/system chat line (ChatTextIIR (uint)GameServer0X2000Opcodes.ChatTextIIR).");
 		}
 
 		// .teleport <mapId>  - move the character to another playfield via the retail HANDOFF + RECONNECT.
