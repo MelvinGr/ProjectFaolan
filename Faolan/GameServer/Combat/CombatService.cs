@@ -110,7 +110,7 @@ namespace Faolan.GameServer.Combat
 		// ApplySpell VFX is broadcast by the caller.
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
-			var casterLevel = client.Session.Character?.Level ?? 1;
+			var casterLevel = client.Session.Character.Level;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
 			await SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId);
@@ -154,7 +154,7 @@ namespace Faolan.GameServer.Combat
 		// retail. Channeled AoEs (a cast time) go through ChannelGroundAoe instead so they tick.
 		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
 		{
-			var casterLevel = client.Session.Character?.Level ?? 1;
+			var casterLevel = client.Session.Character.Level;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
 			var count = await ApplyAoeTick(client, casterHandle, target, spellId, damage);
 			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, count, damage);
@@ -168,7 +168,7 @@ namespace Faolan.GameServer.Combat
 		// Fire-and-forget from cast begin. The tick CADENCE is interim; each tick's DamageResult packet is byte-exact.
 		public async Task ChannelGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int channelMs, uint castToken)
 		{
-			var casterLevel = client.Session.Character?.Level ?? 1;
+			var casterLevel = client.Session.Character.Level;
 			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
 			var tickCount = Math.Max(1, channelMs / GroundAoeTickIntervalMs);
 			var perTick = Math.Max(1, total / tickCount);
@@ -246,7 +246,7 @@ namespace Faolan.GameServer.Combat
 			}
 
 			var echoedArgs = BehaviorAckBody.InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
-			var level = client.Session.Character?.Level ?? 1;
+			var level = client.Session.Character.Level;
 			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, level);
 			var next = (ushort)(seq + 1);
 
@@ -321,7 +321,7 @@ namespace Faolan.GameServer.Combat
 			var abilityId = reqTail.Length >= 4
 				? BinaryPrimitives.ReadUInt32BigEndian(reqTail.AsSpan(reqTail.Length - 4, 4))
 				: 0u;
-			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, client.Session.Character?.Level ?? 1);
+			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, client.Session.Character.Level);
 			await SendSwingDamage(client, instance, targetHandle, damage);
 		}
 
@@ -335,7 +335,7 @@ namespace Faolan.GameServer.Combat
 			if (player.MaxMana == 0)
 				return;
 
-			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character?.Level ?? 1);
+			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character.Level);
 			player.ApplyManaDelta(-(int)cost);
 			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
 		}

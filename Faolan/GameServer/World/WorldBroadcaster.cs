@@ -204,7 +204,7 @@ namespace Faolan.GameServer.World
 
 			npc.FollowTargetHandle = follow
 				? playerHandle
-				: 0;
+				: null;
 			_logger.LogInformation("Follow: {Name} {State} player 0x{Player:X8} (by name).", npcName, follow
 				? "now follows"
 				: "stopped following", playerHandle);
@@ -600,8 +600,8 @@ namespace Faolan.GameServer.World
 
 			// A quest mob the killer needs to LOOT (an active LootFromNpc goal targeting this NPC, #261) ALWAYS leaves a
 			// bag - the "key" must be lootable, not a 50/50 roll. The goal may also name a specific key ITEM (QuestItemId).
-			var lootGoalItem = deadNpc.LastAttackerHandle != 0
-				? await ActiveLootGoalItemFor(deadNpc.LastAttackerHandle, deadNpc.Name)
+			var lootGoalItem = deadNpc.LastAttackerHandle is { } looterHandle
+				? await ActiveLootGoalItemFor(looterHandle, deadNpc.Name)
 				: null;
 			var questDrop = lootGoalItem.HasValue;
 
@@ -654,7 +654,7 @@ namespace Faolan.GameServer.World
 					&& MathF.Abs(groundY - deadNpc.Position.Y) <= MaxLootGroundSnap)
 					dropPos = new Vector3(deadNpc.Position.X, groundY, deadNpc.Position.Z);
 
-				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name, deadNpc.LootContainer);
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle ?? 0, deadNpc.Name, deadNpc.LootContainer);
 				_logger.LogInformation(
 					"Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).", deadNpc.Name,
 					deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
@@ -1273,7 +1273,7 @@ namespace Faolan.GameServer.World
 
 			npc.FollowTargetHandle = follow
 				? player.Handle
-				: 0;
+				: null;
 			_logger.LogInformation("Follow: {Name} 0x{Handle:X8} {State} {Player}.", npc.Name, npcHandle, follow
 				? "now follows"
 				: "stopped following", player.Name);

@@ -223,11 +223,11 @@ namespace Faolan.GameServer.World
 					// step toward them and broadcast a MoveTask each step (UNGATED; not combat), the server-driven
 					// incremental follow retail uses. Takes priority over patrol/aggro/leash. Clears when the leader
 					// leaves the zone or logs out.
-					if (entity.Following)
+					if (entity.FollowTargetHandle is { } followTargetHandle)
 					{
-						if (!zone.TryGet(entity.FollowTargetHandle, out var leader) || !leader.IsPlayer)
+						if (!zone.TryGet(followTargetHandle, out var leader) || !leader.IsPlayer)
 						{
-							entity.FollowTargetHandle = 0;
+							entity.FollowTargetHandle = null;
 							EndMove(entity, true, WorldTickEffectType.NpcFollow);
 							continue;
 						}
@@ -236,7 +236,7 @@ namespace Faolan.GameServer.World
 						// exact spot, so multiple pets fan out instead of stacking (#307). The slot is deterministic
 						// from the handle (stable, no per-tick jitter) and settles at a tighter stop so it holds its
 						// place. Escort/quest followers (Casilda, OwnerHandle == 0) keep the exact-follow path (#262).
-						var isPet = entity.OwnerHandle != 0;
+						var isPet = entity.OwnerHandle != null;
 						var (ox, oz) = isPet
 							? FollowFormationOffset(entity.Handle)
 							: (0f, 0f);

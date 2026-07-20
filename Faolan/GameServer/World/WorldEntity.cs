@@ -54,7 +54,7 @@ namespace Faolan.GameServer.World
 		// The MapArea.AreaNameId the player is currently standing in, or 0 for none (#348). Live world state, never
 		// persisted: it exists so the tick can tell a CROSSING (banner) from merely still being inside the area.
 		public uint CurrentAreaNameId { get; set; }
-		public bool Following => FollowTargetHandle != 0;
+		public bool Following => FollowTargetHandle != null;
 
 		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.
 		// Invisible: hostile NPCs don't aggro the player (skipped in target selection). Default off; cleared on relog
@@ -250,7 +250,7 @@ namespace Faolan.GameServer.World
 		// Hoxxling gameplay capture: a stream of 0x96C46740 from->to ~6-7u steps tracking the player). Cleared when the
 		// leader leaves the zone / logs out. The shared Moving flag tracks whether she stepped so a single Stop closes
 		// the move when she catches up (avoids spamming a stop every idle tick).
-		public uint FollowTargetHandle { get; set; }
+		public uint? FollowTargetHandle { get; set; }
 
 		// The wire handle other entities address this one by (the player's client instance / an NPC's spawn handle).
 		public uint Handle { get; }
@@ -258,14 +258,14 @@ namespace Faolan.GameServer.World
 		// For a PLAYER: the handle of the NPC that last damaged them - used as the killer in the death's
 		// SimpleCharKilledBy record. The resurrect window goes WAVE iff the killer resolves to the LOCAL player; a
 		// real mob killer makes it INSTANT like retail (#214). Set by ApplyNpcAttack/ApplyNpcCast when a hit lands.
-		public uint LastAttackerHandle { get; set; }
+		public uint? LastAttackerHandle { get; set; }
 
 		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
 		public uint Level { get; set; }
 
-		// If this entity is a PET, the handle of the owner (the summoner's client instance); 0 = not a pet (#307).
+		// If this entity is a PET, the handle of the owner (the summoner's client instance); null = not a pet (#307).
 		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.
-		public uint OwnerHandle { get; set; }
+		public uint? OwnerHandle { get; set; }
 
 		// #272: the FROM point of the segment the broadcaster actually sends (MoveFrom -> Position), captured when a move
 		// effect is queued. Distinct from MoveOrigin (which re-anchors to Position at that moment to start the next

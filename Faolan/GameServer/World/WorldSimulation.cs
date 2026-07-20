@@ -611,8 +611,8 @@ namespace Faolan.GameServer.World
 		{
 			// The last thing that hit them wins - alive or not. A stale/dead handle is fine: it just isn't the local
 			// player, so the client takes the instant path. This is what keeps a DoT-kill (caster long dead) instant.
-			if (player != null && player.LastAttackerHandle != 0 && player.LastAttackerHandle != selfHandle)
-				return player.LastAttackerHandle;
+			if (player?.LastAttackerHandle is { } lastAttacker && lastAttacker != selfHandle)
+				return lastAttacker;
 
 			if (World.TryGetZone(mapId, out var zone))
 			{
