@@ -41,13 +41,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // fieldA
+				// The 0x2C transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
+				// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order, and every
+				// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
+				// already 4 bytes, so SpawnPlayfieldRewriter's splice-free in-place re-address still holds.
 				.WriteByte(0x2C)
-				.WriteByte(0x0A)
-				.WriteArrayByteLength(EncodeVec3(position))
-				.WriteByte(0x12)
-				.WriteArrayByteLength(EncodeQuat(rotation))
-				.WriteByte(0x18)
-				.WritePlayfieldToken(playfieldToken)
+				.WriteArray(new ProtoGameCodeDynelIIR { Position = position, Rotation = rotation, PlayfieldInstance = playfieldToken }.ToProtobuf())
 				.WriteArray(preIir)
 				.WriteByte(0x41)
 				.WriteUInt32(iirHeader)
@@ -227,25 +226,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				msg.MovementMode = core.MovementMode.Value;
 		}
 
-		// The transform quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
-		private static byte[] EncodeQuat(Quaternion q)
-		{
-			return new FaolanStream()
-				.WriteByte(0x0D)
-				.WriteFloatLittleEndian(q.X)
-				.WriteByte(0x15)
-				.WriteFloatLittleEndian(q.Y)
-				.WriteByte(0x1D)
-				.WriteFloatLittleEndian(q.Z)
-				.WriteByte(0x25)
-				.WriteFloatLittleEndian(q.W)
-				.ToArray();
-		}
 
-		// The transform vec3 = [0D x][15 y][1D z], each a little-endian fixed32 (15 bytes).
-		private static byte[] EncodeVec3(Vector3 v)
-		{
-			return new FaolanStream().WriteByte(0x0D).WriteFloatLittleEndian(v.X).WriteByte(0x15).WriteFloatLittleEndian(v.Y).WriteByte(0x1D).WriteFloatLittleEndian(v.Z).ToArray();
-		}
 	}
 }

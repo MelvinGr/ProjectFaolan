@@ -23,11 +23,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteUInt32(s.Ack)
 				.WriteUInt32(s.Handle)
 				.WriteUInt32(s.FieldA)
+				// NOT built through ProtoGameCodeDynelIIR, unlike NpcSpawnBuilder/WorldObjectBuilder/SpawnPacketBuilder:
+				// this codec ROUND-TRIPS a captured body, and Vec3/Quat/Scale are carried as the raw field payloads it
+				// parsed. Re-serializing them through the typed classes would re-encode someone else's bytes, which is
+				// how a verbatim pass-through stops being verbatim. Construction from columns is what gets typed; a
+				// pass-through stays byte-for-byte. (#352 says the same about columnizing these.)
 				.WriteByte(0x2C)
 				.WriteByte(0x0A)
 				.WriteArrayByteLength(s.Vec3)
 				.WriteByte(0x12)
 				.WriteArrayByteLength(s.Quat);
+			// Field 4 as a fixed32. Never observed: all 15787 captured FA015807/66AEDD50 transform groups are exactly
+			// {0x0A vec3, 0x12 quat, 0x18 playfield}, and nothing in the codebase ever SETS Scale - it is only ever
+			// parsed out of a body and written back. Kept as defensive pass-through, not as a modelled field. (Note
+			// ProtoGameCodeDynelIIR declares field 4 as `repeated RunningEffects` - length-delimited, not fixed32 -
+			// so if a 0x25 ever does turn up, one of the two models is wrong and it needs decoding, not typing.)
 			if (s.Scale != null)
 				payload.WriteByte(0x25).WriteArray(s.Scale);
 

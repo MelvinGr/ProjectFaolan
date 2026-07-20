@@ -34,13 +34,12 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteUInt32(typeTag)
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // fieldA
+				// The 0x2C transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
+				// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order, and every
+				// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
+				// already 4 bytes, so SpawnPlayfieldRewriter's splice-free in-place re-address still holds.
 				.WriteByte(0x2C)
-				.WriteByte(0x0A)
-				.WriteArrayByteLength(position.ToProtobuf())
-				.WriteByte(0x12)
-				.WriteArrayByteLength(rotation.ToProtobuf())
-				.WriteByte(0x18)
-				.WritePlayfieldToken(playfieldToken)
+				.WriteArray(new ProtoGameCodeDynelIIR { Position = position, Rotation = rotation, PlayfieldInstance = playfieldToken }.ToProtobuf())
 				.ToArray();
 
 			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row)); // [u32 len][record]
