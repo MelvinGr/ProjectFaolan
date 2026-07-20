@@ -404,7 +404,10 @@ namespace Faolan.Importer.Extractors
 			body.ReadUInt32(); // c350
 			body.ReadUInt32(); // instance
 
-			root = FullCharSnapshotReader.ParseInventoryPacketBody(body).Root;
+			// ParseInventoryRoot, NOT ParseInventoryPacketBody: we only want the containers, and the full split also
+			// deserializes the SUB-CLASS, whose Quest_c decode still fails on a level-80 journal ("marker 0x2 != 0x412").
+			// That threw away a perfectly good root and cost us every item only ever seen in an L80 bag (#383).
+			root = FullCharSnapshotReader.ParseInventoryRoot(body);
 			return true;
 		}
 

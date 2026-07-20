@@ -135,11 +135,17 @@ namespace Faolan.Core.Database.Tables
 		public virtual Item? VanityChest { get; set; }
 
 		// Vanity ("costume") slots - override the worn item's APPEARANCE only. Retail exposes them at slot ids 1000 +
-		// the base slot (VanityHead 1002, VanityChest 1005, VanityBelt 1007, VanityCape 1011, VanityBoots 1014, VanityWrist 1018).
+		// the base slot (VanityHead 1002, VanityChest 1005, VanityBelt 1007, VanityCape 1011, VanityBoots 1014,
+		// VanityLegs 1016, VanityWrist 1018).
 		public uint? VanityHeadId { get; set; }
 
 		[ForeignKey(nameof(VanityHeadId))]
 		public virtual Item? VanityHead { get; set; }
+
+		public uint? VanityLegsId { get; set; }
+
+		[ForeignKey(nameof(VanityLegsId))]
+		public virtual Item? VanityLegs { get; set; }
 
 		public uint? VanityWristId { get; set; }
 
@@ -183,6 +189,7 @@ namespace Faolan.Core.Database.Tables
 					CharacterEquipmentSlot.VanityBelt    => VanityBelt,
 					CharacterEquipmentSlot.VanityCape    => VanityCape,
 					CharacterEquipmentSlot.VanityBoots   => VanityBoots,
+					CharacterEquipmentSlot.VanityLegs    => VanityLegs,
 					CharacterEquipmentSlot.VanityWrist   => VanityWrist,
 					_                                    => throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot")
 				};
@@ -325,6 +332,12 @@ namespace Faolan.Core.Database.Tables
 					case CharacterEquipmentSlot.VanityBoots:
 					{
 						VanityBoots = value;
+						break;
+					}
+
+					case CharacterEquipmentSlot.VanityLegs:
+					{
+						VanityLegs = value;
 						break;
 					}
 
