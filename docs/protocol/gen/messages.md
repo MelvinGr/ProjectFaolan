@@ -28,7 +28,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
 | V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `CombatReactiveIIR` | `0x54C02089` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
-| V3 | `CombatShieldIIR` | `0xCFFD0519` | `CombatShieldBuilder`, `CombatShieldCodec` | [V3: CombatShieldBuilderTests.Build_IsByteIdenticalToCapturedInstance] |
+| V3 | `CombatShieldIIR` | `0xCFFD0519` | `CombatShieldCodec` | [V3: CombatRecordCodecTests.CombatShield_BuildsByteExact] |
 | V3 | `ComboBookIIR` | `0xA8BBEB7F` | `ComboBookIirCodec` | [V3: ComboBookIirCodecTests.Build_MatchesCapturedLevelUpCombo] |
 | V3 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimCodec`, `CoreClaimListCodec` | [V3: CoreClaimCodecTests.Build_MatchesCapturedClaim] |
 | V3 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` | [V3: V1IirCodecTests.Crime_RoundTripsCapturedBody] |
