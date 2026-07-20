@@ -45,7 +45,7 @@ Written 2026-06-11. Grounds: the GameServer/ChatServer code as it stands; see al
 >   (20u) and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled
 >   damage (`ResolveNpcAttackDamage`) + pushes `0x96B8DC59`. A damaged NPC with no player in range **leashes** — heals
 >   back to full (no kiting from out of range / across pulls). NPC *movement* has since shipped: the tick chases/leashes
->   and patrols via the decoded MoveTask grammar (`BroadcastNpcMove`/`BroadcastNpcPatrol` + `MoveTaskBuilder`,
+>   and patrols via the decoded MoveTask grammar (`BroadcastNpcMove`/`BroadcastNpcPatrol` + `MoveTaskCodec`,
 >   `PatrolPath` table). Both HP and hostility now come from columns the
 >   **importer lifts**: **`NpcSpawn.Health`** (real per-NPC max HP, was a level-scaled guess) and the type-level
 >   **`NpcStatCore.Community`** (faction; moved off `NpcSpawn` to the Npc-type side table in #244): `Community > 0` = a faction mob (poachers 59, scavengers 60, picts 317,
@@ -97,7 +97,7 @@ Written 2026-06-11. Grounds: the GameServer/ChatServer code as it stands; see al
   `Abilities`, `Characters`/inventory/equipment/scaffold. Populated by `Faolan.Importer` (captures + client RDB).
 - **World rendering** — per-map world-burst replay renders a world with NPCs + objects; the player's own spawn is
   fully **DB-generated** (identity, race/sex/level, vitals, equipment, scaffold frame).
-- **Construct-don't-replay machinery** — `NpcSpawnBuilder` / `WorldObjectBuilder` / `MoveTaskBuilder` build packets
+- **Construct-don't-replay machinery** — `NpcSpawnBuilder` / `WorldObjectBuilder` / `MoveTaskCodec` build packets
   byte-exact; a coverage gate (`Faolan.Importer --report burst-coverage`, ~29%) tracks how much of each map is rebuildable
   from tables vs still replayed.
 - **Combat scaffolding** — `CombatState` (in-memory vitals per handle), `CombatResolver` (provisional damage), NPC

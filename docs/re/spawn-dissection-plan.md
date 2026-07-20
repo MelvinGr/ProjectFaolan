@@ -25,7 +25,7 @@
 >   DB-generated; NPC identity lifted to `NpcSpawn` columns; `NpcSpawnBuilder` rebuilds byte-exact. The 227B
 >   pre-IIR block is characterized as a sparse `0x3F1` scaffold (not encrypted; decodable like the post-IIR one).
 > - **`96C46740` MoveTask** — grammar CRACKED; `dissect_movetask.py coverage` round-trips **4267/4267 (100%)**,
->   82.8% fully field-grammared; `MoveTaskBuilder.Build{Stationary,Patrol}` build byte-exact.
+>   82.8% fully field-grammared; `MoveTaskCodec.Build{Stationary,Patrol}` build byte-exact.
 > - **`66AEDD50`/`F096251E`/`33A56FB0` world objects** — message + tail DISSECTED; tail round-trips **1854/1854**;
 >   `WorldObjectBuilder` rebuilds byte-exact.
 > - **`737A6DF9` inventory snapshot** — containers + tails parse→reserialize byte-identical (`InventorySnapshotTests`).

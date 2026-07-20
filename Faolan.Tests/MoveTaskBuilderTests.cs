@@ -29,7 +29,7 @@ namespace Faolan.Tests
 				waypoints.Add(ReadVec3(captured, 41 + 12 * k));
 			var speed = BinaryPrimitives.ReadSingleBigEndian(captured.AsSpan(41 + 12 * count + 1, 4));
 
-			var built = MoveTaskBuilder.BuildPatrol(handle, curPos, waypoints, speed);
+			var built = MoveTaskCodec.BuildPatrol(handle, curPos, waypoints, speed);
 
 			Assert.Equal(captured, built);
 		}
@@ -38,7 +38,7 @@ namespace Faolan.Tests
 		public void BuildPatrol_PairsWithSpawnHandleAndIsBigEndian()
 		{
 			var waypoints = new[] { new Vector3(100f, 10f, 200f), new Vector3(110f, 11f, 210f), new Vector3(120f, 12f, 220f) };
-			var built = MoveTaskBuilder.BuildPatrol(0x000900A1u, new Vector3(100f, 10f, 200f), waypoints, 4.5f);
+			var built = MoveTaskCodec.BuildPatrol(0x000900A1u, new Vector3(100f, 10f, 200f), waypoints, 4.5f);
 
 			Assert.Equal((uint)GameServer0X2000Opcodes.MoveTaskIIR, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4, 4)));
 			Assert.Equal(0x000900A1u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(12, 4)));
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			var position = new Vector3(BinaryPrimitives.ReadSingleBigEndian(captured.AsSpan(18, 4)), BinaryPrimitives.ReadSingleBigEndian(captured.AsSpan(22, 4)),
 				BinaryPrimitives.ReadSingleBigEndian(captured.AsSpan(26, 4)));
 
-			var built = MoveTaskBuilder.BuildStationary(handle, position);
+			var built = MoveTaskCodec.BuildStationary(handle, position);
 
 			Assert.Equal(captured, built);
 		}
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildStationary_WritesHandleAndPositionBigEndian()
 		{
-			var built = MoveTaskBuilder.BuildStationary(0x000818D9u, new Vector3(461.22f, 162.71f, 664.95f));
+			var built = MoveTaskCodec.BuildStationary(0x000818D9u, new Vector3(461.22f, 162.71f, 664.95f));
 
 			Assert.Equal(31, built.Length);
 			Assert.Equal((uint)GameServer0X2000Opcodes.MoveTaskIIR, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4, 4)));

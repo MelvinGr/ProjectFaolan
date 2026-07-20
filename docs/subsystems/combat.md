@@ -215,7 +215,7 @@ interpolation (a small teleport/snap) and a **walk** gait. Findings from the Mov
 - `0x08` follow (the chasing mobs send it with id = the player handle) is **target/facing metadata, NOT a
   mover** - wiring it as the chase driver made NPCs face+attack in place without moving. The actual
   locomotion rides the position-transform packets sent alongside it.
-- ⚠️ `MoveTaskBuilder` bodies (`BuildStationary`/`BuildPatrol`/...) carry their **own** 4-byte length prefix,
+- ⚠️ `MoveTaskCodec` bodies (`BuildStationary`/`BuildPatrol`/...) carry their **own** 4-byte length prefix,
   so they must be framed RAW after the RPC header - wrapping them in a `WriteArrayUInt32Length` length prefix
   double-prefixes and the client drops the packet.
 - **Next candidate** for run gait + no snap: the `0x05` "pace" form (len 69) `[05][const 12][f32][vec3][vec3]`

@@ -791,11 +791,11 @@ namespace Faolan.GameServer.World
 				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
 				if (npc.PatrolPath is { Nodes.Count: > 0 } patrol)
 				{
-					var waypoints = MoveTaskBuilder.PatrolWaypoints(patrol);
+					var waypoints = MoveTaskCodec.PatrolWaypoints(patrol);
 					if (waypoints.Count > 0)
 					{
 						entity.PatrolWaypoints = waypoints;
-						entity.PatrolBody = MoveTaskBuilder.BuildPatrol(handle, entity.Position, patrol);
+						entity.PatrolBody = MoveTaskCodec.BuildPatrol(handle, entity.Position, patrol);
 						entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
 						entity.ArmPatrolCycle();
 					}

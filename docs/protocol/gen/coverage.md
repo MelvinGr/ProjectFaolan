@@ -9,7 +9,7 @@
 
 - **821** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
 - **77** IIR carrier types: **73 V3** (byte-exact builder), **3 V2** (built, no golden), **1 V1** (no builder found).
-- **62** codec classes, **59** with a byte-exact test.
+- **61** codec classes, **58** with a byte-exact test.
 - **44** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -74,7 +74,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `LootBagFullUpdateIIR` | `LootBagMessageCodec`, `LootContainerTemplate` |
 | V3 | `LootRemoveItemsIIR` | `WorldLoot` |
 | V3 | `MagicBuffIIR` | `NpcSpellCastBuilder`, `WorldDeath` |
-| V3 | `MoveTaskIIR` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` |
+| V3 | `MoveTaskIIR` | `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` |
 | V3 | `N3TeleportIIR` | `TeleportCodec` |
 | V3 | `N3ToClientFadeIIR` | `WorldLoot` |
 | V3 | `N3ToClientQuitIIR` | `WorldDespawn` |

@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using Faolan.Core.Database.Tables;
+using System.Linq;
+using System;
 using System.Numerics;
 using Faolan.Core.Network.Constants;
 
@@ -163,6 +166,115 @@ namespace Faolan.Core.Network.Codecs.World
 			for (var i = 1; i < waypoints.Count; i++)
 				length += Vector3.Distance(waypoints[i - 1], waypoints[i]);
 			return length;
+		}
+
+		// ---- patrol forms (merged from the former MoveTaskBuilder) ---------------------------------------------
+		// Both classes were static builder modules for the SAME opcode, each declaring `Opcode = MoveTaskIIR`, with
+		// overlapping forms (BuildBarePositionBody vs BuildStationary are both the minimal position record). One
+		// opcode, one builder module - and the coverage matrix no longer double-attributes MoveTaskIIR.
+
+		// The MINIMAL stationary record (BuildStationary), distinct from BodyLength=57 above (the
+		// at-position-facing form). The two classes this codec was merged from each had a private `BodyLength`
+		// with a DIFFERENT value - a fair illustration of why one opcode wants one builder module.
+		private const int StationaryBodyLength = 31;
+
+		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is
+		// what a moving NPC needs: a current position plus a list of waypoints it walks between at `speed`. The
+		// grammar (docs/re/spawn-dissection-plan.md, dissect_movetask.py) for this dominant form is:
+		//   [00 00][curPos vec3 BE]
+		//   04 01 00 02 01 01 00 00 00 00          segment-list + move-block header (flag bytes constant here)
+		//   [count u8][count x waypoint vec3 BE]    the patrol path
+		//   00 [speed f32 BE][12x 00]              block trailer (flag 00 + speed + pad)
+		//   [anchor vec3 BE = curPos]              the return/anchor point
+		//   00 01                                  terminator
+		// All floats are BIG-ENDIAN (unlike the spawn transform's little-endian). Reproduces the captured patrol
+		// body byte-for-byte (MoveTaskBuilderTests). The multi-segment and parametric ("approach/face") forms are
+		// the documented remainder - see the workbench coverage report.
+		public static byte[] BuildPatrol(uint handle, Vector3 currentPosition, IReadOnlyList<Vector3> waypoints, float speed)
+		{
+			if (waypoints == null || waypoints.Count == 0)
+				throw new ArgumentException("a patrol needs at least one waypoint", nameof(waypoints));
+			if (waypoints.Count > byte.MaxValue)
+				throw new ArgumentOutOfRangeException(nameof(waypoints), "waypoint count exceeds one byte");
+
+			var total = 16 + 2 + 12 + 10 + 1 + 12 * waypoints.Count + 17 + 12 + 2;
+			var stream = new FaolanStream()
+				.WriteUInt32(total - 4)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteUInt16(0) // prefix 00 00
+				.WriteVector3(currentPosition)
+				// segment-list + move-block header (04 01 00 02 01 01 00 00 00 00)
+				.WriteArray(0x04, 0x01, 0x00, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00)
+				.WriteByte(waypoints.Count);
+			foreach (var wp in waypoints)
+				stream.WriteVector3(wp);
+
+			return stream
+				// block trailer: flag 00, speed, 12 pad bytes
+				.WriteByte(0x00)
+				.WriteFloat(speed)
+				.WriteArray(new byte[12])
+				.WriteVector3(currentPosition) // anchor
+				.WriteByte(0x00)
+				.WriteByte(0x01) // terminator
+				.ToArray();
+		}
+
+		// Builds the patrol MoveTask for a live spawn from its columnarized PatrolNode tree (#316): the stored task
+		// tree (any of the captured forms - single- or multi-segment) re-addressed to the live `handle` and the
+		// spawn's current position `from`, re-emitted byte-exact via MoveTaskComposite. Replaces the captured-Body
+		// re-address (the retired WorldBroadcastBodies.ReaddressPatrol).
+		public static byte[] BuildPatrol(uint handle, Vector3 from, PatrolPath path)
+		{
+			ArgumentNullException.ThrowIfNull(path);
+			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null)
+				?? throw new InvalidOperationException($"patrol {path.Id} has no root node");
+
+			return new MoveTaskComposite
+			{
+				Handle = handle,
+				FromX = BitConverter.SingleToUInt32Bits(from.X),
+				FromY = BitConverter.SingleToUInt32Bits(from.Y),
+				FromZ = BitConverter.SingleToUInt32Bits(from.Z),
+				Task = PatrolNodeMapper.ToTask(root)
+			}.Encode();
+		}
+
+		// The patrol's ordered waypoints (every PathMoveTask's waypoint list, walked in tree order) - the world
+		// simulation's route + cycle-length source, from the columnarized tree.
+		public static IReadOnlyList<Vector3> PatrolWaypoints(PatrolPath path)
+		{
+			ArgumentNullException.ThrowIfNull(path);
+			var waypoints = new List<Vector3>();
+			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null);
+			if (root != null)
+				CollectWaypoints(root, waypoints);
+			return waypoints;
+		}
+
+		private static void CollectWaypoints(PatrolNode node, List<Vector3> waypoints)
+		{
+			if (node.Mode == 1)
+				foreach (var w in node.Waypoints.OrderBy(w => w.Ordinal))
+					waypoints.Add(new Vector3(w.PositionX, w.PositionY, w.PositionZ));
+
+			foreach (var child in node.Children.OrderBy(c => c.Ordinal))
+				CollectWaypoints(child, waypoints);
+		}
+
+		public static byte[] BuildStationary(uint handle, Vector3 position)
+		{
+			return new FaolanStream()
+				.WriteUInt32(StationaryBodyLength - 4)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteUInt16(0) // prefix 00 00
+				.WriteVector3(position)
+				.WriteByte(0x06) // stationary terminator (vs 0x04 = a movement segment follows)
+				.ToArray();
 		}
 	}
 }

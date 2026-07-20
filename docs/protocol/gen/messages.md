@@ -57,7 +57,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootContainerTemplate` | [V3: LootBagMessageTests.BuildContents_RoundTripsByteExact] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_EmptyPayload_IsTheBuffRemovalEndTwin] |
-| V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskBuilder`, `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskBuilderTests.BuildPatrol_FromCapturedWaypoints_IsByteIdentical] |
+| V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskCompositeTests.Parse_ThenEncode_RoundTripsEveryCapturedRecord] |
 | V3 | `N3TeleportIIR` | `0x5A32F0D7` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
 | V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `N3ToClientQuitIIR` | `0x04B82B2D` | `WorldDespawn` | [V3: WorldDespawnTests.BuildBody_MatchesRetailLayout] |
