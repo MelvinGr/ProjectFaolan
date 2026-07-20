@@ -5,7 +5,7 @@
 > `[ProtoContract]`/`[ProtoMember]` attributes (the actual wire contract).
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-60 message types, 348 fields. These are the protobuf messages recovered from
+58 message types, 340 fields. These are the protobuf messages recovered from
 `AgeOfConan.exe`; the human-readable schema is `Faolan.Core/Protobuf/aoc-client-protos.proto`,
 and `AocProtocol.g.cs` is protobuf-net-generated from it (the reflected source here).
 
@@ -222,13 +222,6 @@ The **Wire** column is the on-the-wire encoding of each field. The two that bite
 | 7 | `level` | `uint` | `varint` |  |
 | 8 | `hash` | `uint` | `fixed32` (LE) |  |
 
-## ProtoCastSpellTarget
-
-| Tag | Name | Type | Wire | Required |
-|-----|------|------|------|----------|
-| 1 | `spell_id` | `ulong` | `varint` |  |
-| 2 | `target_handle` | `ulong` | `varint` |  |
-
 ## ProtoCoreCharacterIIR
 
 | Tag | Name | Type | Wire | Required |
@@ -426,17 +419,6 @@ The **Wire** column is the on-the-wire encoding of each field. The two that bite
 |-----|------|------|------|----------|
 | 1 | `type` | `uint` | `varint` |  |
 | 2 | `instance` | `uint` | `varint` |  |
-
-## ProtoInteractIIR
-
-| Tag | Name | Type | Wire | Required |
-|-----|------|------|------|----------|
-| 1 | `type_id` | `ulong` | `varint` |  |
-| 2 | `mode` | `ulong` | `varint` |  |
-| 3 | `field3` | `ulong` | `varint` |  |
-| 5 | `category` | `ulong` | `varint` |  |
-| 6 | `field6` | `ulong` | `varint` |  |
-| 10 | `spell_target` | `ProtoCastSpellTarget` | `length-delimited` (message) |  |
 
 ## ProtoInventoryGame
 

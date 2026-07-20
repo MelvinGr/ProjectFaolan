@@ -3,6 +3,8 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Extensions;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Importer.Extractors
 {
@@ -267,53 +269,18 @@ namespace Faolan.Importer.Extractors
 				: [];
 		}
 
-		// Walks the ProtoInteractIIR protobuf -> (typeId f1, mode f2, field3 f3, npc handle = field10.SpellTarget.f2).
-		private static (uint TypeId, uint Mode, uint Field3, uint NpcTemplate) ParseArgs(ReadOnlySpan<byte> a)
+		// The TalkToNpc action's args message. This is a CommandMessage (the client-recovered BCC payload), NOT the
+		// old hand-reconstructed "ProtoInteractIIR" - see Gitea #387. It used to be walked by a hand-written
+		// tag/varint parser here, duplicating what the generated class does; the call sites already guarantee the
+		// span is the args protobuf (they check the actionType and that the declared length fits), so a decode
+		// failure is a real surprise and is left to throw rather than silently returning zeros.
+		private static (uint BccActionId, uint CommandqueueClientId, uint CommandqueueServerId, uint NpcTemplate) ParseArgs(ReadOnlySpan<byte> a)
 		{
-			uint typeId = 0, mode = 0, field3 = 0, npc = 0;
-			var i = 0;
-			while (i < a.Length)
-			{
-				var tag = a[i++];
-				int fn = tag >> 3, wt = tag & 7;
-				if (wt == 0)
-				{
-					var v = ReadVarint(a, ref i);
-					if (fn == 1)
-						typeId = (uint)v;
-					else if (fn == 2)
-						mode = (uint)v;
-					else if (fn == 3)
-						field3 = (uint)v;
-				}
-				else if (wt == 2)
-				{
-					var len = (int)ReadVarint(a, ref i);
-					var sub = a.Slice(i, len);
-					i += len;
-					if (fn == 10) // SpellTarget { f1, f2 = npc handle }
-					{
-						var j = 0;
-						while (j < sub.Length)
-						{
-							var t2 = sub[j++];
-							int f2 = t2 >> 3, w2 = t2 & 7;
-							if (w2 == 0)
-							{
-								var v2 = ReadVarint(sub, ref j);
-								if (f2 == 2)
-									npc = (uint)v2;
-							}
-							else
-								break;
-						}
-					}
-				}
-				else
-					break;
-			}
+			var args = a.FromProtobuf<CommandMessage>();
 
-			return (typeId, mode, field3, npc);
+			// target is a ProtoID32 { type, instance }; the NPC handle is its instance. (The old model called this
+			// field a "SpellTarget" and its first word a spell_id - it is an ENTITY CLASS, e.g. 0xC350.)
+			return (args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId, args.Target?.Instance ?? 0);
 		}
 
 		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
@@ -344,21 +311,6 @@ namespace Faolan.Importer.Extractors
 			}
 
 			return null;
-		}
-
-		private static ulong ReadVarint(ReadOnlySpan<byte> b, ref int i)
-		{
-			ulong r = 0;
-			var shift = 0;
-			while (true)
-			{
-				var x = b[i++];
-				r |= (ulong)(x & 0x7f) << shift;
-				if ((x & 0x80) == 0)
-					return r;
-
-				shift += 7;
-			}
 		}
 
 		private static int VarintLength(uint value)

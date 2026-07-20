@@ -288,7 +288,7 @@ namespace Faolan.GameServer
 					}
 
 					var actionType = packet.Body.ReadUInt32<ActionType>();
-					var args = packet.Body.ReadProtobufUInt32Length<ProtoInteractIIR>();
+					var args = packet.Body.ReadProtobufUInt32Length<CommandMessage>();
 
 					if (actionType == ActionType.SwitchWeaponsButton)
 					{
@@ -296,7 +296,7 @@ namespace Faolan.GameServer
 						// the player's combat stance, pushing the CombatMode stat so the client draws/sheathes the weapon -
 						// the player analogue of the NPC weapon-draw (#218). NEEDS in-client verification of the exact
 						// mechanism (stat push vs behavior-only) against a capture.
-						await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 						var drawn = _broadcaster.TogglePlayerCombatStance(client);
 						await _broadcaster.BroadcastPlayerCombatMode(client, drawn);
 						Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}", drawn
@@ -306,7 +306,7 @@ namespace Faolan.GameServer
 					else
 					{
 						// Not every action carries from/target after the args (e.g. TalkToNpc only has a short
-						// trailer - the NPC handle lives in args.SpellTarget). Read defensively to avoid overrunning.
+						// trailer - the NPC handle lives in args.Target.Instance). Read defensively to avoid overrunning.
 						var from = packet.Body.Length - packet.Body.Position >= sizeof(uint)
 							? packet.Body.ReadUInt32()
 							: 0; // fromid or slotid depending on actionType, see below
@@ -342,7 +342,7 @@ namespace Faolan.GameServer
 									: "mount", args);
 
 								var self = client.Session.Account.ClientInstance;
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode); // cast begin: bar + animation
+								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId); // cast begin: bar + animation
 
 								if (dismounting)
 								{
@@ -411,7 +411,7 @@ namespace Faolan.GameServer
 								// container (0x68 = backpack), target = slot - decoded from the use_totem_of_origin
 								// capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
 								// is the capture's "long loading screen").
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 								await UseInventoryItem(client, (ContainerKind)from, (int)target);
 
 								break;
@@ -438,25 +438,28 @@ namespace Faolan.GameServer
 									if (beginArgs != null)
 										await CombatService.SendCastInterruptAbort(client, beginArgs, rawPayload, client.Session.PendingCastMode);
 									else
-										await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+										await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 									Logger.LogInformation("CastSpell CANCEL (interrupted/moved) - abort ack sent, cast bar cleared.");
 									break;
 								}
 
 								// The real spell id rides the action TRAILER (`target`, the uint32 read after the protobuf
-								// args), NOT args.SpellTarget.SpellId - that protobuf field is the constant 0xC350 type-word, 								// so casts logged as "spell 50000" and ApplySpell carried a non-existent id (no effect shown).
+								// args), NOT the args message. The old model called field 10 a "SpellTarget" whose field 1 was
+								// a spell_id, so casts logged as "spell 50000" and ApplySpell carried a non-existent id (no
+								// effect shown) - 50000 is 0xC350, an ENTITY CLASS. Field 10 is a ProtoID32 {type, instance}
+								// (CommandMessage.target); the fallback below reads .Type only to preserve the old behaviour.
 								// Decoded from the ice-strike capture (c2s 0x642CD3D6 cast): trailer = [u32 from=1][u32 spellId];
-								// 0x125D9B / 0x42CA77 are real learned-spell ids. args.SpellTarget.TargetHandle is the target. (#236)
+								// 0x125D9B / 0x42CA77 are real learned-spell ids. args.Target.Instance is the target. (#236)
 								var spellId = target != 0
 									? target
-									: (uint)(args.SpellTarget?.SpellId ?? args.TypeId);
+									: (uint)(args.Target?.Type ?? args.BccActionId);
 								var casterHandle = client.Session.Account.ClientInstance;
-								var targetHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
+								var targetHandle = (uint)(args.Target?.Instance ?? 0);
 
 								// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
 								// trailer instead of a locked entity: it has NO SpellTarget and the trailer's kind byte is 0.
 								// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
-								var isGroundCast = CastGroundTarget.TryParse(unk2, out var groundTarget) && args.SpellTarget == null;
+								var isGroundCast = CastGroundTarget.TryParse(unk2, out var groundTarget) && args.Target == null;
 
 								// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
 								// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
@@ -469,7 +472,7 @@ namespace Faolan.GameServer
 								// client never channels - it sent only Mode 1, no progress ticks - and the cast looks
 								// instant). Ack every cast packet (begin + channel ticks); the effect itself is resolved
 								// once, below, after the cast time.
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 
 								// Shield of the Risen breaks the moment an AGGRESSIVE cast is COMMITTED (cast begin), not when
 								// the cast time elapses (#361) - a ground AoE (Deathly Blizzard) or an offensive cast at another
@@ -495,7 +498,7 @@ namespace Faolan.GameServer
 									// Cleared on resolve/cancel.
 									var castArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4)); // TODO: just read the packet with FaolanStream instead of rawPayload
 									client.Session.PendingCastArgs = rawPayload[26..(26 + castArgsLen)];
-									client.Session.PendingCastMode = (uint)args.Mode;
+									client.Session.PendingCastMode = args.CommandqueueClientId;
 
 									// A channeled ground AoE (Deathly Blizzard) ticks damage DURING the channel, not one hit at
 									// the end (#349) - kick the tick loop now; it stops itself if the cast is interrupted (the
@@ -591,7 +594,7 @@ namespace Faolan.GameServer
 								// The melee swing / auto-attack: ack the behavior + resolve the hit (see
 								// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
 								await BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
-								await _combat.SendNormalAttackResponse(client, rawPayload, (uint)(args.SpellTarget?.TargetHandle ?? 0), (uint)args.Mode);
+								await _combat.SendNormalAttackResponse(client, rawPayload, (uint)(args.Target?.Instance ?? 0), args.CommandqueueClientId);
 
 								break;
 							}
@@ -603,7 +606,7 @@ namespace Faolan.GameServer
 								// 2026-06-12); targeted damage reuses the armed path (the capture's unarmed swings
 								// hit air, so the damage part is an extension pending in-client validation).
 								await BreakShieldOnAggression(client); // an unarmed swing is aggressive - drops the shield (#361)
-								await _combat.SendUnarmedAttackResponse(client, rawPayload, (uint)args.Mode, (uint)(args.SpellTarget?.TargetHandle ?? 0));
+								await _combat.SendUnarmedAttackResponse(client, rawPayload, args.CommandqueueClientId, (uint)(args.Target?.Instance ?? 0));
 
 								break;
 							}
@@ -682,7 +685,7 @@ namespace Faolan.GameServer
 							{
 								// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);
 								// (TypeId, Mode, Field3) select the conversation node the client is requesting.
-								var npcHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
+								var npcHandle = (uint)(args.Target?.Instance ?? 0);
 								Logger.LogInformation("TalkToNpc: from=0x{From:X}, target=0x{Target:X}, npcHandle=0x{NpcHandle:X}, args={Args}", from, target, npcHandle, args);
 
 								// Vendor trade-open (#134): when the clicked NPC is a shop vendor (matched by NAME - the
@@ -696,10 +699,10 @@ namespace Faolan.GameServer
 								// (template 12236) does NOT, so his click falls through to dialogue below. A non-vendor (Casilda,
 								// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
 								// the greeting is swallowed and dialogue never opens.
-								if (npcHandle != 0 && args.Field3 == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
+								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
 									await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
 								{
-									await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
+									await _shop.HandleVendorTradeOpen(client, rawPayload, args.CommandqueueClientId, vendorShop, npcHandle);
 									break;
 								}
 
@@ -708,7 +711,7 @@ namespace Faolan.GameServer
 								// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"). The NPC NAME
 								// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
 								// click it, so their own position trivially satisfies the 15-unit client proximity check.
-								if (npcHandle != 0 && args.Field3 == 0 &&
+								if (npcHandle != 0 && args.CommandqueueServerId == 0 &&
 									client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
 									talkedNpcName == AuctioneerNpcName &&
 									PlayerWorldEntity(client) is { } auctioneerPlayer)
@@ -719,7 +722,7 @@ namespace Faolan.GameServer
 
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 								// the client asked for, re-addressed to the clicked NPC.
-								if (await _conversation.TryReplayConversation(client, (uint)args.TypeId, (uint)args.Field3, npcHandle))
+								if (await _conversation.TryReplayConversation(client, args.BccActionId, (uint)args.CommandqueueServerId, npcHandle))
 									break;
 
 								// Only a GREETING click (Field3 == 0) may OPEN a dialogue. The client fires a second
@@ -727,7 +730,7 @@ namespace Faolan.GameServer
 								// ack); if that duplicate isn't absorbed above (no active conversation - e.g. right after a
 								// close) it must NOT re-open the intro/greeting, or the dialogue "triggers a second time"
 								// (#217). A non-greeting click with nothing to absorb is a no-op.
-								if (args.Field3 != 0)
+								if (args.CommandqueueServerId != 0)
 									break;
 
 								// Beach login with no captured node for this (Mode, Field3): close the chat window so the
@@ -739,7 +742,7 @@ namespace Faolan.GameServer
 										? rn
 										: "<unmapped handle>";
 									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{NpcTemplate:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.",
-										npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
+										npcHandle, routedName, args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId);
 
 									// Surface the gap instead of silently closing (Melvin: have them say so). A greeting click
 									// that reaches here has NEITHER an imported shop (the vendor branch above didn't match)
@@ -761,7 +764,7 @@ namespace Faolan.GameServer
 							{
 								// bag slot starts top left, continue counting on next page
 
-								var direction = (MoveItemInInventoryDirection)args.TypeId;
+								var direction = (MoveItemInInventoryDirection)args.BccActionId;
 								switch (direction)
 								{
 									// Into-slot moves: tail = [srcBagCell][destEquipSlot][item][item][0][flags].
@@ -786,7 +789,7 @@ namespace Faolan.GameServer
 
 										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
-										await CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, movedItem);
+										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem);
 										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
@@ -807,7 +810,7 @@ namespace Faolan.GameServer
 
 										// Retail's reply: the behavior ack with null identity + a 0x201C entry
 										// (prefix 0x68, state 0). Capture frames 320-321.
-										await CombatService.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, null);
+										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null);
 										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
@@ -834,7 +837,7 @@ namespace Faolan.GameServer
 								// stuck in the action's start state forever (cast bar never finishes / dodge never lands
 								// back to idle) and the player soft-locks until relog. Acking with the request's Mode
 								// returns control even when we don't yet model the action's effect.
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 
 								break;
 							}
@@ -846,7 +849,7 @@ namespace Faolan.GameServer
 						// differs - other-players-visible capture). Limited to the world-visible combat behaviors.
 						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell)
 						{
-							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account.ClientInstance, rawPayload, (uint)args.Mode);
+							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account.ClientInstance, rawPayload, args.CommandqueueClientId);
 							if (behaviorRelay != null)
 								await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
 						}

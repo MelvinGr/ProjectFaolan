@@ -537,20 +537,3 @@ message GameTriggerBuf {
   repeated GameTriggerBuf.Trigger trigger = 2;
   optional uint32 max_trigger_id = 3;
 }
-
-// ===== CUSTOM (NOT recovered from the descriptor blobs) =====
-// The client's Interact (0x09) command message. Not present in the embedded FileDescriptorProto blobs, so
-// reconstructed from the wire (RE'd field numbers/types); field3/field6 are still-undecoded placeholders.
-// Fields are optional because an Interact's payload varies by action (spell_target is only sent for casts).
-message ProtoInteractIIR {
-  optional uint64 type_id = 1;
-  optional uint64 mode = 2;
-  optional uint64 field3 = 3;
-  optional uint64 category = 5;
-  optional uint64 field6 = 6;
-  optional ProtoCastSpellTarget spell_target = 10;
-}
-message ProtoCastSpellTarget {
-  optional uint64 spell_id = 1;
-  optional uint64 target_handle = 2;
-}
