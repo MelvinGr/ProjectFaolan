@@ -9,6 +9,16 @@
 # Dumps the STAGED BLOB, not the working file, for two reasons: the working copy may hold newer session writes
 # than you are committing, and under WAL it can LAG its -wal sidecar - so dumping the file could silently mirror
 # something that is not what lands in the commit. `git show :faolan.db` is exactly what is being committed.
+#
+# CHARACTERS ARE EXCLUDED - their schema is dumped, their rows are not. They are per-developer play state, not
+# reference content: position, vitals, quest progress and inventory move every session, and the imported reference
+# characters are reproducible at any time (`--only characters,character-state,learned-spells,character-abilities,
+# character-quests,character-bank`). Keeping them out is what makes faolan.sql a reviewable diff of game DATA
+# rather than a log of whoever last logged in.
+#
+# The excluded set is DERIVED from the schema, never listed here: `Characters` plus every table with a foreign key
+# to it. Excluding only `Characters` would orphan its children and the dump would not restore under FK
+# enforcement; a hardcoded list would go stale the first time a CharacterX table is added.
 set -e
 
 git diff --cached --name-only | grep -qx 'faolan.db' || exit 0
@@ -23,6 +33,30 @@ tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 git show :faolan.db > "$tmp"
 
+# Character-scoped tables = Characters + everything that FKs to it (PRAGMA foreign_key_list field 3 is the
+# referenced table). Emptying Characters with foreign_keys=ON cascades into all of them; the check below fails
+# loudly rather than shipping a half-emptied dump if one of those FKs ever stops being ON DELETE CASCADE.
+char_tables="Characters"
+for t in $(sqlite3 "$tmp" "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"); do
+	if sqlite3 "$tmp" "PRAGMA foreign_key_list(\"$t\");" | cut -d'|' -f3 | grep -qx 'Characters'; then
+		char_tables="$char_tables $t"
+	fi
+done
+
+sqlite3 "$tmp" "PRAGMA foreign_keys=ON; DELETE FROM Characters;"
+
+for t in $char_tables; do
+	n=$(sqlite3 "$tmp" "SELECT COUNT(*) FROM \"$t\";")
+	if [ "$n" != "0" ]; then
+		echo "pre-commit: $t still holds $n row(s) after emptying Characters - its FK is not ON DELETE CASCADE," >&2
+		echo "            so the dump would carry character data. Fix the cascade and retry." >&2
+		exit 1
+	fi
+	# The AUTOINCREMENT counter tracks how many rows have ever existed, so leaving it in would reintroduce exactly
+	# the per-session churn this exclusion removes.
+	sqlite3 "$tmp" "DELETE FROM sqlite_sequence WHERE name = '$t';"
+done
+
 # Drop `CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq)`: SQLite REJECTS it on restore ("object name reserved
 # for internal use") because it owns that table - it materialises automatically with the first AUTOINCREMENT table.
 # Everything else about it survives (the DELETE/INSERTs that follow restore all 33 counters identically), so this
@@ -31,4 +65,4 @@ git show :faolan.db > "$tmp"
 sqlite3 "$tmp" .dump | sed '/^CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);$/d' > faolan.sql
 
 git add faolan.sql
-echo "pre-commit: regenerated faolan.sql from the staged faolan.db ($(wc -l < faolan.sql) lines)"
+echo "pre-commit: regenerated faolan.sql from the staged faolan.db, characters excluded ($(wc -l < faolan.sql) lines)"
