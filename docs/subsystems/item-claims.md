@@ -83,7 +83,7 @@ not exist to harvest. Tracked as a follow-up.
 
 ### The 0x0009 "new claims" glow
 
-`CoreClaimCodec.Build` (proven by `CoreClaimCodecTests`) is the short 14-byte push that lights the claims
+`CoreClaimListCodec.BuildNewClaimsGlow` (proven by `CoreClaimListCodecTests`) is the short 14-byte push that lights the claims
 button. Retail sends it at world entry **only when the account has unseen claims** — present in the Faolanx
 login capture (new claims), absent in the NecroL80 capture (claims already viewed). The server gates it on a
 single per-account flag `Account.ClaimsAvailable` (`GameServerListener.SendNewClaimsGlowIfAny`) — set true

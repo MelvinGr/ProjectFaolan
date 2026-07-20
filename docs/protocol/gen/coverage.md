@@ -9,7 +9,7 @@
 
 - **821** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
 - **77** IIR carrier types: **73 V3** (byte-exact builder), **3 V2** (built, no golden), **1 V1** (no builder found).
-- **60** codec classes, **57** with a byte-exact test.
+- **59** codec classes, **56** with a byte-exact test.
 - **44** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -47,7 +47,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `CombatReactiveIIR` | `SpellweaveCodec` |
 | V3 | `CombatShieldIIR` | `CombatShieldCodec` |
 | V3 | `ComboBookIIR` | `ComboBookIirCodec` |
-| V3 | `CoreClaimIIR` | `CoreClaimCodec`, `CoreClaimListCodec` |
+| V3 | `CoreClaimIIR` | `CoreClaimListCodec` |
 | V3 | `CrimeIIR` | `CrimeCodec` |
 | V3 | `DamageResultIIR` | `CombatEffectBuilder`, `CombatPacketCodec` |
 | V3 | `DestructibleFullUpdateIIR` | `DynelFullUpdateCodec` |

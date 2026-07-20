@@ -26,6 +26,22 @@ namespace Faolan.Core.Network.Codecs.World
 
 		private const int EntrySize = 106;
 
+		// CoreClaimIIR sub 0x0009 - the "new claims available" GLOW push that lights the client's Claims/Redeem
+		// button. Body = [opcode][Character][handle][u16 sub], no payload. Retail sends it at world entry ONLY when
+		// the account has unseen claims: present in the Faolanx login capture (new claims), absent in the NecroL80
+		// login_redeem-claim capture (already seen), so it is gated on an IsNew flag rather than pushed
+		// unconditionally. (Was a separate one-method CoreClaimCodec that already borrowed SubNewClaims from here -
+		// one opcode, one codec.) See docs/subsystems/item-claims.md.
+		public static byte[] BuildNewClaimsGlow(uint handle)
+		{
+			return new FaolanStream()
+				.WriteUInt32(Opcode)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteUInt16(SubNewClaims)
+				.ToArray();
+		}
+
 		public static byte[] Build(uint handle, IReadOnlyList<ClaimEntry> claims)
 		{
 			var stream = new FaolanStream()

@@ -16,7 +16,7 @@ namespace Faolan.GameServer
 {
 	// Item claims / "Redeem" window (CoreClaimIIR 0x06EC1255). The client requests its claims (sub 0x0007), the
 	// server answers with the list (sub 0x0001, CoreClaimListCodec); redeeming (sub 0x0003 + 1-based index) grants
-	// the item to the backpack and drops the claim. The "new claims available" glow (sub 0x0009, CoreClaimCodec) is
+	// the item to the backpack and drops the claim. The "new claims available" glow (sub 0x0009, CoreClaimListCodec.BuildNewClaimsGlow) is
 	// pushed at world entry only when the account has unseen claims. Claims are account-scoped (AccountClaim), seeded
 	// by the .claim GM command for now. See docs/subsystems/item-claims.md.
 	public partial class GameServerListener
@@ -149,7 +149,7 @@ namespace Faolan.GameServer
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(CoreClaimCodec.Build(client.Session.Account.ClientInstance))
+				.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Account.ClientInstance))
 				.SendAsync(client);
 		}
 
