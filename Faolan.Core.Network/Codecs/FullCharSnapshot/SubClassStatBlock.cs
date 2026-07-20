@@ -51,7 +51,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// KillingBlows) are the tail the known-spell list is built right after (CreateBlock).
 		private static readonly (CharacterStatId Id, uint Value)[] StatList2Half =
 		[
-			(CharacterStatId.Unknown12, 0x0), (CharacterStatId.Unknown13, 0x0), (CharacterStatId.Unknown14, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC), (CharacterStatId.Unknown16, 0x0), (CharacterStatId.Unknown17, 0x6F),
+			(CharacterStatId.Unknown12, 0x0), (CharacterStatId.Unknown13, 0x0), (CharacterStatId.Timestamp, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC), (CharacterStatId.Unknown16, 0x0), (CharacterStatId.Unknown17, 0x6F),
 			(CharacterStatId.Unknown18, 0x0), (CharacterStatId.Unknown19, 0x8), (CharacterStatId.HealthCurrent, 0x2648), (CharacterStatId.HealthMax, 0x2328), (CharacterStatId.Intelligence, 0xA), (CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.ManaMax, 0x0),
 			(CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.StaminaMax, 0x59D8), (CharacterStatId.StaminaCurrent, 0x5C30), (CharacterStatId.Strength, 0xA), (CharacterStatId.Unknown20, 0x0), (CharacterStatId.Unknown21, 0x0), (CharacterStatId.Unknown22, 0x0),
 			(CharacterStatId.Unknown23, 0x3), (CharacterStatId.MaxExp, 0x64), (CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.Level, 0x1), (CharacterStatId.PvpLevel, 0x0), (CharacterStatId.PvpExp, 0x0), (CharacterStatId.Exp, 0x0), (CharacterStatId.Unknown24, 0x3E8),

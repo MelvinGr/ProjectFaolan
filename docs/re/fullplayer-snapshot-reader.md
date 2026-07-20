@@ -109,9 +109,14 @@ across **29 distinct archetype characters** (L1 fresh through L80, every class) 
   XP bar fills `(Exp - base) / (MaxExp - base)`. Airtight: `base <= Exp <= MaxExp` everywhere, `base == Exp` for a
   freshly-dinged char, and **level 24's base (263640) is exactly level 23's `MaxExp` (263640)** — each level's
   base is the previous level's cap.
-- **Characterised but not scalar stats** (documented on the enum, left `Unknown`): `0x044A` is a unix epoch
-  timestamp (2010-era, veterans only); `0x025F` is a per-character 32-bit hash constant; `0x0398/9A/9B/9D` are a
-  co-varying signed quad (base -300).
+- **Non-scalar slots** (characterised across each character's many captures, #393):
+  - `0x044A` → **`Timestamp`** — a unix epoch (values decode to real 2010 dates; the same value recurs across
+    different characters, one character varies across captures) — a shared session/server time, not a scalar stat.
+  - `0x025F` — a per-character CONSTANT (byte-identical across NecroL80's 42 captures), only 3 distinct values
+    corpus-wide. NOT race: two Stygian-only necros (Faolanx, Stickienecro) differ. An appearance/creation bucket or
+    identity hash; left `Unknown`.
+  - `0x0398/9A/9B/9D` — four SIGNED values, all four equal per char, base -300, scaling WITH LEVEL (Hoxxling's quad
+    tracks her `ExpCurrentLevelBase` across captures). A level-scaled rating quad; left `Unknown` (needs probing).
 
 The remaining per-character unknowns cannot be named from captures (the values track level/class but map to no
 independently-observable quantity). Naming them needs **in-client `.setstat <id> <value>` probing** — the method

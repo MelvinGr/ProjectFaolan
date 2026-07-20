@@ -64,6 +64,13 @@ namespace Faolan.Core.Enums
 		// each level's base is the previous level's cap. See docs/re/fullplayer-snapshot-reader.md.
 		ExpCurrentLevelBase = 0x0039,
 
+		// A UNIX EPOCH timestamp slot (#393). Every non-zero value in the corpus decodes to a valid 2010 date
+		// (1263095211 = 2010-01-10, 1280838357 = 2010-08-03), the SAME value recurs across DIFFERENT characters, and
+		// one character carries different values in different captures - so it is a shared session/server time, not a
+		// per-character property (0 in most snapshots). Which event it stamps (save/login/server clock) is not pinned;
+		// the epoch decode is the grounded part.
+		Timestamp = 0x044A,
+
 		// Undecoded slots of the 0x737A6DF9 tails stat sheet, numbered Unknown{i} so the whole block is enumerable.
 		// Values are the raw wire stat ids; rename to a real name as each is decoded.
 		//
@@ -73,12 +80,15 @@ namespace Faolan.Core.Enums
 		// counters, PlayfieldToken and a handful below actually vary per character - the real leveled stats arrive via
 		// the live StatIIR (0xF98E10B3) / vitals (0x96B8DC59) updates, not here. So the remaining Unknown## are mostly
 		// not worth chasing from captures; the few that vary need in-client .setstat probing (the method that pinned
-		// HP/mana/stamina) to name. Notable ones already characterised by value:
-		//   0x044A (Unknown14) - a UNIX EPOCH timestamp (values decode to 2010 dates; only veteran/L80 chars carry a
-		//                        non-zero one), NOT a scalar stat.
-		//   0x025F (Unknown30) - a per-character 32-bit HASH/checksum constant (3 distinct values corpus-wide), not a scalar.
-		//   0x0398/0x039A/0x039B/0x039D (Unknown42/43/41/40) - a co-varying group of four SIGNED values, base -300
-		//                        (0xFFFFFED4) on a fresh char, equal to each other per char (likely a resist/rating quad).
+		// HP/mana/stamina) to name. Two more are characterised across a character's MANY captures - TYPE pinned, meaning
+		// not (still Unknown):
+		//   0x025F (Unknown30) - a per-character CONSTANT (byte-identical across NecroL80's 42 captures), only 3 distinct
+		//                        values corpus-wide. NOT a scalar, and NOT race: two Stygian-only necros (Faolanx,
+		//                        Stickienecro) carry different values. An appearance/creation bucket or identity hash.
+		//   0x0398/0x039A/0x039B/0x039D (Unknown42/43/41/40) - four SIGNED values, base -300 (0xFFFFFED4) fresh, all four
+		//                        EQUAL per char, and they scale WITH LEVEL (Hoxxling's quad tracks her ExpCurrentLevelBase
+		//                        across captures, 100->9300 as base 0->263640). A level-scaled rating quad; exact stat
+		//                        needs .setstat probing.
 		Unknown0 = 0x252,
 		Unknown1 = 0x253,
 		Unknown2 = 0x254,
@@ -91,7 +101,6 @@ namespace Faolan.Core.Enums
 		Unknown11 = 0x0A9,
 		Unknown12 = 0x534,
 		Unknown13 = 0x16B,
-		Unknown14 = 0x44A,
 		Unknown15 = 0x163,
 		Unknown16 = 0x449,
 		Unknown17 = 0x0A5,
