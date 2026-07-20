@@ -415,3 +415,50 @@ FullPlayerCharacterIIR (0x737A6DF9) carve-out - the player inventory/bag seriali
 - no server->client inventory packet follows later MoveItemInInventory requests, so the client
   appears to learn the initial bag state here rather than via a small incremental sync packet
 ```
+
+## The client-side reader (Ghidra, 2026-07-20)
+
+`CoreFullPlayerCharacterIIR::vftable` is at `0x01fc90bc` (loaded by the ctor `FUN_00796500`, which
+passes the class name `"FullPlayerCharacterIIR"` to the IIR registrar). Slot **8** is `ReadSubClass`
+= **`FUN_00797440`** — the reader for the tails this document describes. It was identified from the
+`statlist.cpp` crash stack: frame `0x007975A6` falls inside it.
+
+⚠️ The IIR ids are BKDR-31 hashes computed at runtime, so `0x737A6DF9` never appears as a constant -
+searching for it finds nothing. Anchor on the class-name string's xrefs instead.
+
+```c
+version = ReadU32();                 // FUN_0048f900
+if (version == 0x18) {               // == QuestcRegion.Version
+    FUN_0091f5c0(stream);            // three sub-readers before the quest list
+    FUN_00798c70(stream, this+0x20);
+    FUN_004d4c70(stream, *(this+0x40));
+    count = ReadU32();
+    while (count--) {                // one MainQuest_c (0x54 bytes) per quest
+        ...
+        FUN_00922210(quest);         // the per-quest reader
+    }
+    FUN_0077d220(this+0x44);
+    FUN_0077d5b0(this+0x54);
+    FUN_004d5900(stream);
+    FUN_0139d450(stream, *(this+0x74));   // StatList_t::read
+    FUN_0139d450(stream, *(this+0x78));   // StatList_t::read
+    ...
+}
+```
+
+**Two stat lists sit directly after the quest loop.** That is why every quest-region desync in this
+codebase surfaces as `statlist.cpp (134) (nSize%1009)==0 && nSize>0` — the stat list is the first
+strict length check downstream, not the thing that is wrong.
+
+The per-quest reader `FUN_00922210` reads five u32s into the quest object, then a **count followed by
+u32 pairs** — the (questId, sequence) pairs our `QuestIndexRegion.Block.AreaQuestIds` models.
+
+### The area 4CC is SERVER-authored
+
+`FUN_00922210` **reads the 4CC off the stream and stores it**; nothing in the client looks one up by
+area id. So there is no client-side area catalog, and the value cannot be recovered from the client
+at all - not from the RDB, not from a table. Only captures carry it. (The RDB search was doomed for
+this reason, not merely because records are compressed.)
+
+Practical consequence: an area's 4CC becomes available only once a capture shows that area in a
+completed-quest journal. See `QuestArea.Magic` and Gitea #389/#390.
