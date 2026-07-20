@@ -490,7 +490,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return bestRun;
 		}
 
-		private static int IndexOfAscii(byte[] data, string text, int startOffset = 0)
+		private static int IndexOfAscii(byte[] data, string text, int startOffset = 0) // TODO: Convert to extension on byte[]
 		{
 			var pattern = Encoding.Latin1.GetBytes(text);
 

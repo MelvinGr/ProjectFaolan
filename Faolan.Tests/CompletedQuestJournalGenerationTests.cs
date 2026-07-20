@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
@@ -41,73 +42,59 @@ namespace Faolan.Tests
 				FullCharSnapshotSubClass.BuildQuestPortion([], null, 1, groups));
 		}
 
-		// Can the quest INDEX block be DERIVED, instead of harvested? It is the last thing blocking an active quest
-		// from riding the snapshot (#389). Two candidates: its Magic is the quest's AREA 4CC, and its GoalSteps are
-		// the quest's own @609 objective goal ids.
+		// The quest INDEX, rebuilt from DB rows and compared byte-for-byte with the capture. This is the gate that
+		// was missing: the index was generated from QuestDefinition columns that are 0 for every harvested quest
+		// (tf1/tf2/trailer), so the server shipped a malformed index and the client died in StatList_t - while every
+		// existing test stayed green, because none of them regenerated an index.
 		[Fact]
-		public async Task QuestIndexBlocks_AreDerivableFromAreaAndGoals()
+		public async Task CapturedQuestIndexes_RebuildFromTheDatabase_ByteExact()
 		{
 			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
 			var defs = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId);
-			var areas = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId);
+			var areaRows = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId);
+			var catalogs = (await db.QuestDefinitions.Where(q => q.AreaId != 0).ToListAsync())
+				.GroupBy(q => q.AreaId)
+				.ToDictionary(g => g.Key, g => (IReadOnlyList<QuestDefinition>)[.. g.OrderBy(q => q.JournalSequence)]);
 
-			int blocks = 0, magicMatchesArea = 0, magicKnown = 0, stepsMatchGoals = 0, stepsKnown = 0;
-			var samples = new List<string>();
-			var dumped = 6;
+			int compared = 0, exact = 0;
+			var first = "";
 
 			foreach (var (source, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				if (sub.QuestIndex is not { } idx)
+				if (sub.QuestIndex is not { } captured || captured.QuestIds.Count == 0)
 					continue;
 
-				foreach (var b in idx.Blocks)
+				// Rebuild from the SAME quests, in the capture's order.
+				var ordered = captured.QuestIds.Select(defs.GetValueOrDefault).ToList();
+				if (ordered.Any(d => d == null))
+					continue; // catalog gap, not a builder failure
+
+				var built = QuestIndexRegion.Build([.. ordered!], ordered[0]!, areaRows, catalogs).ToArray();
+				var want = captured.ToArray();
+				compared++;
+				if (built.SequenceEqual(want))
 				{
-					blocks++;
-					if (!defs.TryGetValue(b.TrailerQuestId, out var def))
-						continue;
+					exact++;
+					continue;
+				}
 
-					if (areas.TryGetValue(def.AreaId, out var area) && area.Magic != 0)
-					{
-						magicKnown++;
-						if (area.Magic == b.Magic)
-							magicMatchesArea++;
-						else if (samples.Count < 5)
-							samples.Add($"quest {b.TrailerQuestId} area {def.AreaId}: block magic 0x{b.Magic:X8} vs area 0x{area.Magic:X8}");
-					}
-
-					// The quest's @609 goal ids, from the SAME snapshot's journal record.
-					var rec = sub.Quests.Records.FirstOrDefault(r => r.QuestId == b.TrailerQuestId);
-					if (rec?.Objectives is { Goals.Count: > 0 } obj)
-					{
-						stepsKnown++;
-						if (obj.Goals.Select(g => g.GoalId).SequenceEqual(b.AreaQuestIds))
-							stepsMatchGoals++;
-						else if (samples.Count < 8)
-							samples.Add($"quest {b.TrailerQuestId}: steps [{string.Join(",", b.AreaQuestIds)}] vs goals [{string.Join(",", obj.Goals.Select(g => g.GoalId))}]");
-					}
+				if (first.Length == 0)
+				{
+					var b = QuestIndexRegion.Parse(built, 0, built.Length);
+					first = $"{source}: {built.Length} B built vs {want.Length} B captured; " +
+						$"block0 tf1={b.Blocks[0].TableField1}/{captured.Blocks[0].TableField1} " +
+						$"tf2={b.Blocks[0].TableField2}/{captured.Blocks[0].TableField2} " +
+						$"chain=0x{b.Blocks[0].ChainWord:X}/0x{captured.Blocks[0].ChainWord:X} " +
+						$"areaQuests={b.Blocks[0].AreaQuestIds.Count}/{captured.Blocks[0].AreaQuestIds.Count}";
 				}
 			}
 
-			// Structure: what do the blocks and the top-level id list correspond to?
-			foreach (var (source, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			{
-				if (sub.QuestIndex is not { } ix || sub.Quests.Records.Count == 0)
-					continue;
+			o.WriteLine($"quest indexes compared={compared} byteExact={exact}");
+			if (first.Length > 0)
+				o.WriteLine($"  {first}");
 
-				var activeIds = sub.Quests.Records.Select(r => r.QuestId).ToList();
-				var activeAreas = activeIds.Select(q => defs.TryGetValue(q, out var d) ? d.AreaId : 0).Distinct().ToList();
-				o.WriteLine($"  {source[..Math.Min(40, source.Length)]}: active={activeIds.Count} activeAreas={activeAreas.Count} " +
-					$"blocks={ix.Blocks.Count} indexIds=[{string.Join(",", ix.QuestIds)}] trailers=[{string.Join(",", ix.Blocks.Select(b => b.TrailerQuestId))}] " +
-					$"activeIds=[{string.Join(",", activeIds)}]");
-				if (--dumped <= 0)
-					break;
-			}
-
-			o.WriteLine($"index blocks={blocks}");
-			o.WriteLine($"  Magic == area 4CC:      {magicMatchesArea} of {magicKnown} comparable");
-			o.WriteLine($"  GoalSteps == goal ids:  {stepsMatchGoals} of {stepsKnown} comparable");
-			foreach (var x in samples)
-				o.WriteLine($"    {x}");
+			Assert.True(compared > 0, "no captured quest index could be rebuilt");
+			Assert.Equal(compared, exact);
 		}
 
 		[Fact]

@@ -22,6 +22,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 	{
 		public const uint IndexTag = ListFrame.Unit;
 		public const uint Sentinel = 0x000000F1;
+
+		// The word the LAST block's trailer carries, terminating the chain. Constant across every captured index and
+		// identical to the terminal of the empty quest portion.
+		public const uint IndexTerminalWord = 0x000156E7;
 		private const uint MinQuestId = 0x1000;
 		public List<Block> Blocks { get; init; } = [];
 		public List<uint> QuestIds { get; init; } = [];
@@ -152,19 +156,27 @@ namespace Faolan.Core.Network.Codecs.Quest
 				var magic = areas != null && areas.TryGetValue(q.AreaId, out var a) ? a.Magic : q.IndexMagic;
 				var catalog = areaCatalog != null && areaCatalog.TryGetValue(q.AreaId, out var c) ? c : null;
 
+				// tf1 is the quest's position in its area and tf2 the number of area quests AFTER it, so the pair is
+				// (sequence, remaining). Captured: quest 10238 seq 1 of 8 -> (1, 7); quest 13479 seq 1 of 4 -> (1, 3).
+				// tf3 is 0 in every captured block.
+				var areaCount = catalog?.Count ?? 0;
+				var sequence = q.JournalSequence;
+
 				blocks.Add(new Block
 				{
 					Magic = magic,
-					TableField1 = q.IndexTableField1,
-					TableField2 = q.IndexTableField2,
-					TableField3 = q.IndexTableField3,
+					TableField1 = catalog != null ? sequence : q.IndexTableField1,
+					TableField2 = catalog != null ? (areaCount > sequence ? (uint)areaCount - sequence : 0) : q.IndexTableField2,
+					TableField3 = catalog != null ? 0 : q.IndexTableField3,
 					AreaQuestIds = catalog != null
 						? [.. catalog.Select(d => d.QuestId)]
 						: ParseGoalSteps(q.IndexGoalSteps),
 					TrailerQuestId = q.QuestId,
+					// The trailers CHAIN: each carries the NEXT held quest's AreaId, and the LAST carries the terminal
+					// word - a constant 0x156E7 in every capture, the same word BuildEmptyQuestPortion ends on.
 					ChainWord = i + 1 < ordered.Count
 						? ordered[i + 1].AreaId
-						: primary.IndexTrailerWord
+						: IndexTerminalWord
 				});
 			}
 
