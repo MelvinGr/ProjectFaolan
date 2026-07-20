@@ -1261,40 +1261,6 @@ namespace Faolan.GameServer.World
 				: WorldState.DefaultPlayfieldToken;
 		}
 
-		// On world entry: re-send the player's persisted active quests so their journal is restored.
-		public async Task RestorePlayerQuests(INetworkClient client)
-		{
-			var character = client.Session?.Character;
-			if (character == null)
-				return;
-
-			// Restore the LIVE journal only for active quests NOT carried by the world-entry snapshot. A
-			// snapshot-eligible quest (Quest_c scalars + header text refs seeded - beach starter, Casilda 13479, ...)
-			// already rides the snapshot's multi-quest region (#255), so re-sending it live would double-deliver.
-			var active = (await _database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).ToList();
-			var definitions = new List<(CharacterQuest Quest, QuestDefinition Def)>();
-			foreach (var quest in active)
-			{
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				if (FullCharSnapshotSubClass.IsSnapshotEligible(def))
-					continue; // delivered in the snapshot's quest region
-
-				await SendQuestIir(client, quest.QuestId, WorldQuest.StateActive);
-				if (quest.GoalRequired > 0)
-					await SendQuestGoal(client, quest.QuestId, 0, quest.GoalProgress);
-
-				if (def != null)
-				{
-					await SendQuestFullUpdate(client, def);
-					definitions.Add((quest, def));
-				}
-			}
-
-			// One journal-list packet covers every quest that has a seeded definition (the J-panel title lines).
-			if (definitions.Count > 0)
-				await SendQuestJournal(client, definitions.Select(d => d.Def).ToList());
-		}
-
 		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
 		// world tick (WorldState) then steps it toward the player and broadcasts a MoveTask each step. Returns the NPC,
 		// or null if the handle isn't a non-player entity in the caller's zone. Used by the .npcfollow GM command and by
@@ -1823,6 +1789,13 @@ namespace Faolan.GameServer.World
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
 		// from the first definition. The trailing "tracked quest" pointer is the captured no-track block; pinning the
 		// multi-quest tracked variant needs more decode.
+		// ⚠️ CURRENTLY UNCALLED, and deliberately kept. Retail bundles a QuestJournal with QuestIIR x2 +
+		// QuestFullUpdate in a SINGLE frame when a quest is accepted in-session; our accept path does not emit it yet.
+		// Its former caller (RestorePlayerQuests) was a fabricated login burst and is gone (#389/#390).
+		//
+		// ⚠️ Before reusing it: it takes the area header from `definitions[0]` and files EVERY entry under that one
+		// area. That is only correct for a single-area call - it is what rendered ~28 quests from 20 areas as one
+		// collapsed group in the Completed tab.
 		public static Task SendQuestJournal(INetworkClient client, IReadOnlyList<QuestDefinition> definitions)
 		{
 			var first = definitions[0];

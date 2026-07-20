@@ -760,7 +760,11 @@ namespace Faolan.GameServer
 				? mapToken
 				: BeachPlayfieldId;
 			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken);
+			// The Completed tab rides the snapshot too (#390); a create-world entry has none.
+			var completedJournal = isCreateEntry
+				? []
+				: await LoadCompletedJournal(character);
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken, completedJournal);
 
 			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
 			{
@@ -787,14 +791,17 @@ namespace Faolan.GameServer
 
 			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets (no burst).", mapId, character?.Name, toSend.Count);
 
-			// Interest spawns the NPCs + this player to nearby players; restore the quest journal.
+			// Interest spawns the NPCs + this player to nearby players. The quest journal is NOT re-sent here: retail
+			// ships both tabs in the login snapshot and sends no quest packet at all until the first in-session
+			// accept (#389/#390), so a live "restore" burst is a fabrication - and the one that used to live here
+			// delivered every quest under a single area header, which is what filled the Completed tab with one
+			// bogus group and left Active empty.
 			await _broadcaster.BroadcastPlayerEntry(client);
-			await _broadcaster.RestorePlayerQuests(client);
 
 			// On a CREATE-world entry the snapshot carried no quests (empty region above), so deliver the starter quest
 			// LIVE exactly as retail does: QuestLogList (J-panel) then QuestFullUpdate (detail). It was persisted at
-			// character creation, so it rides the snapshot on every later login. RestorePlayerQuests skips it (it's
-			// snapshot-eligible), so this is the only live delivery and there is no double-send.
+			// character creation, so it rides the snapshot on every later login - and nothing re-sends it live there
+			// (#390), so there is no double-send.
 			if (isCreateEntry && character != null)
 			{
 				await WorldBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
@@ -973,11 +980,12 @@ namespace Faolan.GameServer
 
 		private static byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags,
 			IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet,
-			uint? playfieldToken)
+			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet);
+			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet,
+				completedJournal);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 

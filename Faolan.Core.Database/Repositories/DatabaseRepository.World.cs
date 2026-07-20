@@ -14,6 +14,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
+		Task<QuestArea[]> GetQuestAreas();
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<MapArea[]> GetMapAreas(uint mapId);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
@@ -74,6 +75,12 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
+		}
+
+		public async Task<QuestArea[]> GetQuestAreas()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.QuestAreas.OrderBy(a => a.AreaId).ToArrayAsync();
 		}
 
 		public async Task<RespawnPoint?> GetRespawnPoint(uint id)

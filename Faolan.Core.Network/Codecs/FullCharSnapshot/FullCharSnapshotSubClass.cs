@@ -164,13 +164,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// character's learned spells - built INTO the stat block's known-list so they persist across relog + place on
 		// the action bar (#74/#71); null/empty leaves the list empty (byte-identical to the captured beach tails).
 		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null,
-			IReadOnlyList<uint> knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null)
+			IReadOnlyList<uint> knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null,
+			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 			// `primary` may be null IFF the character holds no snapshot quests (the empty-region create case); when
 			// quests are present BuildQuestPortion enforces a non-null primary.
 
-			var quest = BuildQuestPortion(quests, primary, instance);
+			var quest = BuildQuestPortion(quests, primary, instance, completedQuests);
 
 			// #74/#71: the character's learned spells are built INTO the stat block's known-list (no-op when empty).
 			var knownList = KnownSpellList.FromSpellIds(knownSpellIds);
@@ -234,7 +235,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return [.. quest, .. AccessWindowTable, .. statBytes];
 		}
 
-		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance)
+		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance,
+			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completed = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 			if (quests.Count == 0)
@@ -260,6 +262,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				record.Objectives = QuestObjectiveRegion.Build(q, instance);
 				record.Write(w);
 			}
+
+			// The COMPLETED-quest journal sits between the active journal and the index (#390). Absent for a
+			// character with no completed quests, which is why the beach template - and every from-scratch test
+			// built on it - stays byte-identical when `completed` is null or empty.
+			if (completed is { Count: > 0 })
+				w.WriteArray(CompletedQuestJournalRegion.Build(completed).ToArray());
 
 			// The quest index: all held questIds + one chained goal-id block per quest, owned by the primary
 			// (its trailer carries the terminal IndexTrailerWord). Modeled by the typed QuestIndexRegion codec.

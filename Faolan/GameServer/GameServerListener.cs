@@ -422,8 +422,9 @@ namespace Faolan.GameServer
 		// The complete burst-less 0x737A6DF9 snapshot packet (DB containers + from-scratch tails).
 		// #255: the player's snapshot-eligible held quests + the primary (tracked) quest. The beach starter is the
 		// primary (always held + seeded). A held quest joins only if its definition is snapshot-eligible (Quest_c
-		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw; those fall to the live
-		// RestorePlayerQuests path.
+		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw. An ineligible held quest is
+		// simply ABSENT from the journal: there is no live restore path any more (#389/#390), so widening
+		// IsSnapshotEligible is what makes such a quest appear.
 		private async Task<(List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character)
 		{
 			var quests = new List<QuestDefinition>();
@@ -443,6 +444,41 @@ namespace Faolan.GameServer
 			// held, else the first held quest (null only when the character holds none -> empty region).
 			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
 			return (quests, primary);
+		}
+
+		// The character's COMPLETED-quest journal, grouped by area (#390) - the Completed tab's contents. Retail ships
+		// this in the login snapshot and sends no quest packets at all before the first in-session accept, so this is
+		// the ONLY path that populates that tab.
+		//
+		// The order is ours to choose: the wire order is per-character in the captures, but the client re-sorts for
+		// display (retail renders alphabetically while the wire does not), so a stable areaId/questId ordering is
+		// enough. A quest whose area has no row, or that has no definition, is skipped rather than guessed at.
+		private async Task<List<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>> LoadCompletedJournal(Character character)
+		{
+			var groups = new List<(QuestArea, IReadOnlyList<QuestDefinition>)>();
+			if (character == null)
+				return groups;
+
+			var completed = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Completed).ToList();
+			if (completed.Count == 0)
+				return groups;
+
+			var areas = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
+			var byArea = new SortedDictionary<uint, List<QuestDefinition>>();
+
+			foreach (var cq in completed)
+			{
+				var def = await Database.GetQuestDefinition(cq.QuestId);
+				if (def == null || def.AreaId == 0 || !areas.ContainsKey(def.AreaId))
+					continue;
+
+				(byArea.TryGetValue(def.AreaId, out var list) ? list : byArea[def.AreaId] = []).Add(def);
+			}
+
+			foreach (var (areaId, defs) in byArea)
+				groups.Add((areas[areaId], defs.OrderBy(d => d.QuestId).ToList()));
+
+			return groups;
 		}
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
