@@ -788,25 +788,43 @@ namespace Faolan.Importer.Captures
 				Console.WriteLine($"World objects: purged {stale.Count} transient loot-bag row(s) (live-only entities).");
 			}
 
+			// The DB UNIQUE index is (MapId, PositionX/Y/Z, DisplayName). Two Adds sharing that key collide at
+			// SaveChanges - and the existing-row query below does NOT see un-saved Adds, so two duplicate entries in
+			// THIS batch both fell through to Add and crashed a full import (#394). Track the rows queued this batch by
+			// the exact constraint key and update the pending/existing one instead of adding a second. SQLite treats a
+			// NULL DisplayName as distinct (never collides), so those skip the dedup and always add, as before.
+			var pending = new Dictionary<(uint MapId, float X, float Y, float Z, string Name), WorldObject>();
 			foreach (var e in objects)
 			{
 				if (e.DisplayName == "Bag of loot")
 					continue;
 
-				var candidates = await db.WorldObjects.Where(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z).ToListAsync();
-				var existing = candidates.FirstOrDefault(o => WorldObjectBuilder.ReadIdentity(o) == e.DisplayName);
-				if (existing == null)
+				// Populate FIRST: the DisplayName column is DERIVED by TryLiftColumns (from the object message body) and
+				// can differ from e.DisplayName, so the dedup must key on the actual stored value the UNIQUE index sees.
+				var built = PopulateObject(new WorldObject { MapId = e.MapId, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z }, e);
+
+				if (built.DisplayName is { } name)
 				{
-					db.WorldObjects.Add(PopulateObject(new WorldObject
+					var key = (e.MapId, e.X, e.Y, e.Z, name);
+					if (pending.TryGetValue(key, out var queued))
 					{
-						MapId = e.MapId,
-						PositionX = e.X,
-						PositionY = e.Y,
-						PositionZ = e.Z
-					}, e));
+						PopulateObject(queued, e); // a duplicate within this batch: fold it into the row already queued
+						continue;
+					}
+
+					var existing = await db.WorldObjects
+						.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z && o.DisplayName == name);
+					if (existing != null)
+					{
+						PopulateObject(existing, e);
+						pending[key] = existing;
+						continue;
+					}
+
+					pending[key] = built;
 				}
-				else
-					PopulateObject(existing, e);
+
+				db.WorldObjects.Add(built);
 			}
 
 			Console.WriteLine("World objects: identity columns + geometry tail lifted from the dump at import (#187).");
