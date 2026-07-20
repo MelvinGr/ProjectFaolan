@@ -177,7 +177,17 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// #74/#71: the character's learned spells are built INTO the stat block's known-list (no-op when empty).
 			var knownList = KnownSpellList.FromSpellIds(knownSpellIds);
-			var imported = statSheet is { Count: > 0 } && statSheet.Count == SubClassStatBlock.SheetSize;
+			// A character with NO stored sheet is the create path - it legitimately gets the baseline skeleton. But a
+			// sheet of the WRONG SIZE is corruption, and silently falling back to baseline stats there would ship a
+			// level-80 character with skeleton vitals and no visible error. Fail loudly instead.
+			if (statSheet is { Count: > 0 } && statSheet.Count != SubClassStatBlock.SheetSize)
+				throw new InvalidOperationException(
+					$"Stat sheet has {statSheet.Count} pairs, expected exactly {SubClassStatBlock.SheetSize} " +
+					$"(StatList#1 {SubClassStatBlock.StatList1Size} + StatList#2 {SubClassStatBlock.StatList2Size}). " +
+					"The snapshot carries TWO 0x3F1-framed StatList_t and both are built from this sheet, so a partial " +
+					"one cannot be written - fix the character's CharacterStats rows rather than padding here.");
+
+			var imported = statSheet is { Count: > 0 };
 
 			// Build the full stat SHEET and apply every BY-ID override to IT, THEN construct the block (with the known-
 			// list) in one pass. The overrides MUST NOT be post-hoc SetStat calls on the built block: SetStat scans ALL
@@ -753,17 +763,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (lead == QuestIndexRegion.IndexTag || lead == 0 || lead % ListFrame.Unit != 0)
 				return null;
 
-			try
-			{
-				var region = CompletedQuestJournalRegion.Parse(data, offset, endOffset, out var after);
-				afterRegion = after;
-				return region;
-			}
-			catch (Exception)
-			{
-				afterRegion = offset;
-				return null;
-			}
+			// The lead word already says a region STARTS here, so a parse failure means our model is wrong - not that
+			// the region is absent. Swallowing it drops the bytes into the opaque blob, which is exactly how the
+			// completed-quest journal stayed unmodelled while every snapshot still round-tripped (#390).
+			var region = CompletedQuestJournalRegion.Parse(data, offset, endOffset, out var after);
+			afterRegion = after;
+			return region;
 		}
 
 		// Parses the quest index region when the boundary opens with the 0x3F1 index tag; its trailer runs to
@@ -775,17 +780,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (offset + 4 > data.Length || endOffset < offset || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4)) != QuestIndexRegion.IndexTag)
 				return null;
 
-			try
-			{
-				var region = QuestIndexRegion.Parse(data, offset, endOffset);
-				afterIndex = endOffset; // the region consumes to the boundary (its trailer is the remainder)
-				return region;
-			}
-			catch (Exception)
-			{
-				afterIndex = offset;
-				return null;
-			}
+			// As above: the 0x3F1 tag says an index starts here, so failing to parse it is a MODEL error, not an
+			// absent region.
+			var region = QuestIndexRegion.Parse(data, offset, endOffset);
+			afterIndex = endOffset; // the region consumes to the boundary (its trailer is the remainder)
+			return region;
 		}
 
 		private static bool TryReadAccessWindowEntry(FaolanStream reader, byte[] data, out PfAccessWindowEntry entry)

@@ -78,9 +78,12 @@ namespace Faolan.Core.Network.Codecs.Economy
 				var itemId = body.ReadUInt32();
 				return new SearchQuery(lang, cat, page, itemId);
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
-				return new SearchQuery("", ListFrame.ForCount(1), 0, 0);
+				// A malformed query used to become an EMPTY search with a fabricated category, so the player silently
+				// got wrong results and nothing anywhere recorded that we failed to read their request.
+				throw new InvalidOperationException(
+					$"Auction-house search query is malformed ({body.Length} bytes): {ex.Message}", ex);
 			}
 		}
 

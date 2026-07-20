@@ -7,16 +7,13 @@ namespace Faolan.Core.Extensions
 	public static class StringHexExtensions
 	{
 		// https://stackoverflow.com/questions/321370/how-can-i-convert-a-hex-string-to-a-byte-array
+		//
+		// Throws on malformed input rather than returning null: a silent null here surfaces later as an NRE or an
+		// empty payload with nothing pointing back at the bad hex.
 		public static byte[] HexToByteArray(this string hex)
 		{
-			try
-			{
-				return Enumerable.Range(0, hex.Length).Where(x => x % 2 == 0).Select(x => Convert.ToByte(hex.Substring(x, 2), 16)).ToArray();
-			}
-			catch
-			{
-				return null;
-			}
+			ArgumentNullException.ThrowIfNull(hex);
+			return Enumerable.Range(0, hex.Length).Where(x => x % 2 == 0).Select(x => Convert.ToByte(hex.Substring(x, 2), 16)).ToArray();
 		}
 
 		public static string ToHex(this IEnumerable<byte> value, bool asArray = false)

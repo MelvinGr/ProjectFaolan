@@ -49,7 +49,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 			if (count != questIds.Count)
 				throw new InvalidOperationException($"Quest index: count {count} != ids {questIds.Count}");
 
+			// An EMPTY index terminates on IndexTerminalWord instead of the sentinel - the shape
+			// BuildEmptyQuestPortion writes, and what a character with no snapshot-eligible quests carries. Modelling
+			// only the non-empty form meant every such snapshot threw and got swallowed into the opaque blob.
 			var sentinel = r.ReadUInt32();
+			if (count == 0)
+			{
+				if (sentinel != IndexTerminalWord)
+					throw new InvalidOperationException($"Empty quest index: terminator 0x{sentinel:X} != 0x{IndexTerminalWord:X}");
+
+				return new QuestIndexRegion { Marker = marker };
+			}
+
 			if (sentinel != Sentinel)
 				throw new InvalidOperationException($"Quest index: sentinel 0x{sentinel:X} != 0x{Sentinel:X}");
 
@@ -103,7 +114,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			foreach (var id in QuestIds)
 				w.WriteUInt32(id);
 			w.WriteUInt32(QuestIds.Count);
-			w.WriteUInt32(Sentinel);
+			w.WriteUInt32(QuestIds.Count == 0
+				? IndexTerminalWord
+				: Sentinel);
 
 			foreach (var b in Blocks)
 			{

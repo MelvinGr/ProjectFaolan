@@ -30,6 +30,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
 		public static int SheetSize => StatList1.Length + StatList2Half.Length;
 
+		// The two lists' sizes, exposed so a size mismatch can say WHICH half is short.
+		public static int StatList1Size => StatList1.Length;
+		public static int StatList2Size => StatList2Half.Length;
+
 		// The block is TWO 0x3F1-framed StatList_t (StatPair_t = [statId, value]; docs/re/fullplayer-snapshot-reader.md
 		// regions 9-10). StatList#1 = the 17 DISPLAYED stats (its count word IS the BlockType field, (17+1)*0x3F1 =
 		// 0x46F2). StatList#2 = the full sheet: 74 UNIQUE pairs written TWICE (base + current copy = 148 pairs, the old
