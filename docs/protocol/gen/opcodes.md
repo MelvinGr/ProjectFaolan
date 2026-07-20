@@ -158,8 +158,8 @@ RPC class **CSPlayerAgent** (id `0x6DD55614`) · C2S (client→server call)
 | `0x2084` | `GetWorldStat` |  |
 | `0x2085` | `RequestItemSalesBalance` |  |
 | `0x2086` | `RequestItemSalesCoupons` |  |
-| `0x20C5` | `Ox20C5` | GroupFinder remoteformat echo |
-| `0x20D0` | `Ox20D0` |  |
+| `0x20C5` | `EchoGroupFinderRemoved` | s2c DispatchGroupFinderRemoved (args: reason, silent) |
+| `0x20D0` | `EchoGroupFinderUpdateFeaturedActivities` | s2c DispatchGroupFinderUpdateFeaturedActivities (args: activities list) |
 
 ## CSPlayerInterfaceOpcodes
 

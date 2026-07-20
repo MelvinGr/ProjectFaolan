@@ -164,10 +164,11 @@ namespace Faolan.Core.Network.Constants
 		RequestItemSalesBalance = 0x2085,
 		RequestItemSalesCoupons = 0x2086,
 
-		// Beyond the recovered table (the live build has more methods): the client ECHOES these
-		// server->client GroupFinder values back on the upload path.
-		Ox20C5 = 0x20C5, // GroupFinder remoteformat echo
-		Ox20D0 = 0x20D0
+		// Beyond the recovered c2s table: these are the CSPlayerInterface server->client GroupFinder DISPATCH
+		// opcodes that the client ECHOES back on the upload path (names recovered from the client dispatch table +
+		// verbatim binary strings, #365). Consume-only; the real s2c pushes are the CSPlayerInterface entries.
+		EchoGroupFinderRemoved = 0x20C5, // s2c DispatchGroupFinderRemoved (args: reason, silent)
+		EchoGroupFinderUpdateFeaturedActivities = 0x20D0 // s2c DispatchGroupFinderUpdateFeaturedActivities (args: activities list)
 	}
 
 	// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.

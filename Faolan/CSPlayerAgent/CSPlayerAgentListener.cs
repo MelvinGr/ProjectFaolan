@@ -262,7 +262,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.Ox20C5:
+				case CSPlayerAgentOpcodes.EchoGroupFinderRemoved:
 				{
 					// The client echoes a GroupFinder remoteformat back to us (e.g.
 					// token="GroupFinderCharacterLeftPlayfield") - a notification the server consumes; no response
@@ -271,7 +271,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.Ox20D0:
+				case CSPlayerAgentOpcodes.EchoGroupFinderUpdateFeaturedActivities:
 				{
 					var unk0 = packet.Body.ReadUInt32();
 					// { 0x00, 0x00, 0x03, 0xF1 } // Same data that we send in Authenticate
