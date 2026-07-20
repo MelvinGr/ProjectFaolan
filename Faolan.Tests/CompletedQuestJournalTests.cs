@@ -25,6 +25,7 @@ namespace Faolan.Tests
 		{
 			int examined = 0, withRegion = 0, quests = 0, areas = 0;
 			var allAreas = new List<CompletedQuestJournalRegion.AreaGroup>();
+			var perSnapshot = new List<(string Source, CompletedQuestJournalRegion Region)>();
 
 			foreach (var (source, subClass, tails) in SubClasses())
 			{
@@ -60,6 +61,7 @@ namespace Faolan.Tests
 				quests += region.QuestCount;
 				areas += region.Areas.Count;
 				allAreas.AddRange(region.Areas);
+				perSnapshot.Add((source, region));
 
 				// The region ends where its own frame count runs out - well before the access-window table, with other
 				// regions in between - so the round-trip is measured against exactly what Parse consumed.
@@ -70,19 +72,28 @@ namespace Faolan.Tests
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");
 
-			var distinctQuests = new HashSet<uint>();
-			var withBothRecords = 0;
-			foreach (var g in allAreas)
-			foreach (var q in g.Quests)
+			// Is the wire order alphabetical? Alphabetical is a FIXED TOTAL ORDER, so any two characters must agree
+			// on the relative order of areas they share. Print the raw sequences for the smallest journals.
+			foreach (var (src, reg) in perSnapshot.GroupBy(x => string.Join(",", x.Region.Areas.Select(a => a.AreaId)))
+						.Select(g => g.First()).OrderBy(x => x.Region.Areas.Count).Take(6))
+				o.WriteLine($"  {src[..Math.Min(46, src.Length)]}: [{string.Join(",", reg.Areas.Select(a => a.AreaId))}]");
+
+			var byChar = perSnapshot.GroupBy(x => string.Join(",", x.Region.Areas.Select(a => a.AreaId))).Select(g => g.First().Region).ToList();
+			var contradictions = 0;
+			for (var a = 0; a < byChar.Count; a++)
+			for (var b = a + 1; b < byChar.Count; b++)
 			{
-				distinctQuests.Add(q.QuestId);
-				if (q.Records.Count == 2)
-					withBothRecords++;
+				var xa = byChar[a].Areas.Select(x => x.AreaId).ToList();
+				var xb = byChar[b].Areas.Select(x => x.AreaId).ToList();
+				var shared = xa.Intersect(xb).ToHashSet();
+				if (shared.Count < 2)
+					continue;
+
+				if (!xa.Where(shared.Contains).SequenceEqual(xb.Where(shared.Contains)))
+					contradictions++;
 			}
 
-			o.WriteLine($"distinct COMPLETED quest ids across the corpus: {distinctQuests.Count}");
-			o.WriteLine($"entries carrying exactly 2 records (title + sub-line): {withBothRecords} of {quests}");
-			o.WriteLine($"distinct areas: {allAreas.Select(a => a.AreaId).Distinct().Count()}");
+			o.WriteLine($"PAIRS OF JOURNALS THAT CONTRADICT A FIXED ORDER: {contradictions}");
 
 			Assert.True(withRegion > 0, "no snapshot in the corpus carried a completed-quest journal");
 		}
