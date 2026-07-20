@@ -1,5 +1,7 @@
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -50,7 +52,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] SpellweaveComponentAdd(uint caster, uint elementBaseId, bool complete)
 		{
-			var args = ArgsPrefix(SpellweaveAddAction, 5, 0).WriteByte(0x52).WriteArrayByteLength(Target(EntityClass.Character, caster)).ToArray();
+			var message = ArgsPrefix(SpellweaveAddAction, 5, 0);
+			message.Target = Target(EntityClass.Character, caster);
+			var args = message.ToProtobuf();
 			var trailer = new FaolanStream().WriteUInt32(1).WriteUInt32(elementBaseId).WriteByte(0x01).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).WriteByte(complete).ToArray();
 
 			return Build(caster, complete
@@ -60,7 +64,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] SpellweaveTrance(uint caster)
 		{
-			var args = ArgsPrefix(SpellweaveTranceAction, 4, 0).WriteByte(0x58).WriteVarint(1199).ToArray();
+			var message = ArgsPrefix(SpellweaveTranceAction, 4, 0);
+			message.RechargeTime = 1199;
+			var args = message.ToProtobuf();
 			var trailer = new FaolanStream().WriteUInt32(0x27).WriteUInt32(1).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).ToArray();
 
 			return Build(caster, SeqBegin, 1, args, trailer);
@@ -68,7 +74,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] SpellweaveTranceExit(uint caster)
 		{
-			var args = ArgsPrefix(SpellweaveExitAction, 6, 0).WriteByte(0x58).WriteVarint(79).ToArray();
+			var message = ArgsPrefix(SpellweaveExitAction, 6, 0);
+			message.RechargeTime = 79;
+			var args = message.ToProtobuf();
 			var trailer = new FaolanStream().WriteUInt32(4).WriteUInt32(0x27).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).ToArray();
 
 			return Build(caster, SeqBegin, 1, args, trailer);
@@ -93,14 +101,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// [action]. Byte-exact vs F2793 / F2801.
 		public static byte[] BenchSitState(uint actor, ushort seq, uint benchHandle)
 		{
-			var args = new FaolanStream()
-				.WriteByte(0x08).WriteVarint(StandAnimAction)
-				.WriteByte(0x10).WriteVarint(7)
-				.WriteByte(0x18).WriteVarint(9)
-				.WriteByte(0x28).WriteVarint(10)
-				.WriteByte(0x30).WriteVarint(0)
-				.WriteByte(0x52).WriteArrayByteLength(Target(EntityClass.Character, actor))
-				.ToArray();
+			var args = new CommandMessage
+			{
+				BccActionId = StandAnimAction,
+				CommandqueueClientId = 7,
+				CommandqueueServerId = 9,
+				Flags = 10,
+				ExecutionStatus = 0,
+				Target = Target(EntityClass.Character, actor)
+			}.ToProtobuf();
 			var tail = new FaolanStream().WriteUInt32(EntityClass.SimpleDynel).WriteUInt32(benchHandle).WriteUInt32(BenchSitAction).ToArray();
 			return Build(actor, seq, ObjectStateBehaviorId, args, tail);
 		}
@@ -123,7 +132,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		private static byte[] ObjectActionAnimation(uint actor, uint animActionId, uint p3, uint p6, uint targetClass,
 			uint targetHandle, string animName, uint tailA, uint tailB, float blend, byte flag, string remoteformat, uint trailer)
 		{
-			var args = ArgsPrefix(animActionId, p3, p6).WriteByte(0x52).WriteArrayByteLength(Target(targetClass, targetHandle)).ToArray();
+			var message = ArgsPrefix(animActionId, p3, p6);
+			message.Target = Target(targetClass, targetHandle);
+			var args = message.ToProtobuf();
 			var tail = new FaolanStream()
 				.WriteUInt32(tailA)
 				.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(animName))
@@ -138,18 +149,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return Build(actor, SeqBegin, ObjectActionBehaviorId, args, tail);
 		}
 
-		// The args protobuf every animation shares: {f1=animActionId, f3=p3, f5=8, f6=p6}. Callers append their f10
-		// target sub-message or f11 scalar.
-		private static FaolanStream ArgsPrefix(uint animActionId, uint p3, uint p6) =>
-			new FaolanStream()
-				.WriteByte(0x08).WriteVarint(animActionId)
-				.WriteByte(0x18).WriteVarint(p3)
-				.WriteByte(0x28).WriteVarint(8)
-				.WriteByte(0x30).WriteVarint(p6);
+		// The args every animation shares: a CommandMessage {bcc_action_id, commandqueue_server_id, flags=8,
+		// execution_status}. Callers set Target (field 10) or RechargeTime (field 11) before serializing.
+		private static CommandMessage ArgsPrefix(uint animActionId, uint p3, uint p6) =>
+			new()
+			{
+				BccActionId = animActionId,
+				CommandqueueServerId = p3,
+				Flags = 8,
+				ExecutionStatus = p6
+			};
 
-		// The f10/f52 target sub-message {f1=class, f2=instance} - who/what the animation is aimed at.
-		private static byte[] Target(uint entityClass, uint instance) =>
-			new FaolanStream().WriteByte(0x08).WriteVarint(entityClass).WriteByte(0x10).WriteVarint(instance).ToArray();
+		// Field 10 - who/what the animation is aimed at. A ProtoID32 { type, instance }; the old model called it a
+		// "spell target" with a spell_id first word, which it never was (Gitea #387).
+		private static ProtoID32 Target(uint entityClass, uint instance) =>
+			new() { Type = entityClass, Instance = instance };
 
 		// The shared BCC framing primitive: header + behaviorId + length-prefixed args + the behavior-specific trailer.
 		private static byte[] Build(uint actor, ushort seq, uint behaviorId, byte[] args, byte[] trailer)

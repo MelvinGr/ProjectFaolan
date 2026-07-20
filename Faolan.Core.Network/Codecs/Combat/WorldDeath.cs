@@ -1,5 +1,7 @@
 using System.Numerics;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -73,18 +75,28 @@ namespace Faolan.Core.Network.Codecs.Combat
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x14, 0xEF, 0x17, 0x7D
 		];
 
-		private static readonly byte[] ReviveBccProtobuf = [0x08, 0x98, 0xC3, 0x02, 0x18, 0x04, 0x28, 0x08, 0x30, 0x00, 0x60, 0x64];
+		// The revive BCC's args (was the literal [0x08,0x98,0xC3,0x02, 0x18,0x04, 0x28,0x08, 0x30,0x00, 0x60,0x64]).
+		private static readonly byte[] ReviveBccProtobuf = new CommandMessage
+		{
+			BccActionId = 41368, // 0x98 0xC3 0x02
+			CommandqueueServerId = 4,
+			Flags = 8,
+			ExecutionStatus = 0,
+			ActivationTime = 100
+		}.ToProtobuf();
 
 		public static byte[] BuildDeathBcc(uint handle, uint deathBehaviorId = HumanoidDeathBehaviorId, byte deathVariant = PlayerDeathVariant)
 		{
 			// protobuf: field1(0x08) = behaviorId varint (the creature's death animation), field3(0x18) = variant,
 			// field5(0x28)=8, field6(0x30)=0, field12(0x60) = 240 varint (0xF0 0x01).
-			var protobuf = new FaolanStream().WriteByte(0x08).WriteVarint(deathBehaviorId)
-				.WriteByte(0x18).WriteByte(deathVariant)
-				.WriteByte(0x28).WriteByte(0x08)
-				.WriteByte(0x30).WriteByte(0x00)
-				.WriteByte(0x60).WriteByte(0xF0).WriteByte(0x01)
-				.ToArray();
+			var protobuf = new CommandMessage
+			{
+				BccActionId = deathBehaviorId, // the creature's death animation
+				CommandqueueServerId = deathVariant,
+				Flags = 8,
+				ExecutionStatus = 0,
+				ActivationTime = 240
+			}.ToProtobuf();
 			return new FaolanStream()
 				.WriteUInt32(BccIirOpcode)
 				.WriteUInt32(0x0000C350)

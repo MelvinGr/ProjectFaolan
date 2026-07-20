@@ -1,6 +1,8 @@
 using System;
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -56,19 +58,25 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint type = EntityClass.Character, uint? field2 = null,
 			uint? field4 = null, uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = 0x0004)
 		{
-			var pb = new FaolanStream().WriteByte(0x08).WriteVarint(behaviorId);
+			// protobuf-net omits an unset optional and emits fields in ascending order, so the optional f2/f4/f11/f12
+			// land exactly where the hand-written writer put them.
+			var message = new CommandMessage
+			{
+				BccActionId = behaviorId,
+				CommandqueueServerId = phase,
+				Flags = field5,
+				ExecutionStatus = field6
+			};
 			if (field2 is { } f2)
-				pb.WriteByte(0x10).WriteVarint(f2);
-			pb.WriteByte(0x18).WriteVarint(phase);
+				message.CommandqueueClientId = f2;
 			if (field4 is { } f4)
-				pb.WriteByte(0x20).WriteVarint(f4);
-			pb.WriteByte(0x28).WriteVarint(field5).WriteByte(0x30).WriteVarint(field6);
+				message.AnimRandom = f4;
 			if (field11 is { } f11)
-				pb.WriteByte(0x58).WriteVarint(f11);
+				message.RechargeTime = f11;
 			if (field12 is { } f12)
-				pb.WriteByte(0x60).WriteVarint(f12);
+				message.ActivationTime = f12;
 
-			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(form).WriteUInt32(slot).WriteArrayUInt32Length(pb.ToArray());
+			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(form).WriteUInt32(slot).WriteArrayUInt32Length(message.ToProtobuf());
 			if (boundA is { } a)
 				s.WriteUInt32(a).WriteUInt32(boundB ?? 0u).WriteArray(new byte[12]);
 			return s.ToArray();

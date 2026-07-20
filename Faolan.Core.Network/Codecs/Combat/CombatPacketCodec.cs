@@ -1,6 +1,8 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -71,24 +73,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			// args protobuf: {f1=TypeId, f3=swingCounter, f5, f6=0, f10=SpellTarget{f1=0xC350, f2=player}, f11, f12}.
 			// NO f2/Mode - that field is present only on player-initiated actions and is the NPC-vs-player tell.
-			var spellTarget = new FaolanStream().WriteByte(0x08).WriteVarint(SpellTargetTypeWord).WriteByte(0x10).WriteVarint(playerHandle).ToArray();
-			var args = new FaolanStream()
-				.WriteByte(0x08)
-				.WriteVarint(typeId)
-				.WriteByte(0x18)
-				.WriteVarint(swingCounter)
-				.WriteByte(0x28)
-				.WriteVarint(f5)
-				.WriteByte(0x30)
-				.WriteVarint(0)
-				.WriteByte(0x52)
-				.WriteVarint((ulong)spellTarget.Length)
-				.WriteArray(spellTarget)
-				.WriteByte(0x58)
-				.WriteVarint(f11)
-				.WriteByte(0x60)
-				.WriteVarint(f12)
-				.ToArray();
+			// CommandMessage. field 10 is the TARGET - a ProtoID32 { type, instance }, not the "spell target" the old
+			// hand-reconstructed schema called it: its first word is an entity class (Gitea #387).
+			var args = new CommandMessage
+			{
+				BccActionId = typeId,
+				CommandqueueServerId = swingCounter,
+				Flags = f5,
+				ExecutionStatus = 0,
+				Target = new ProtoID32 { Type = SpellTargetTypeWord, Instance = playerHandle },
+				RechargeTime = f11,
+				ActivationTime = f12
+			}.ToProtobuf();
 
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)

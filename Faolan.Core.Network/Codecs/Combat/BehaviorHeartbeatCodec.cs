@@ -1,4 +1,6 @@
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -16,14 +18,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
 		private const uint IdleBehaviorId = 7;
 
+		// The idle-behavior constant in args field 1 (the capture's `08 c5 c3 02` varint).
+		private const uint IdleBehaviorAction = 41413;
+
 		public static byte[] Build(uint actor, uint tick)
 		{
-			var payload = new FaolanStream()
-				.WriteArray(0x08, 0xC5, 0xC3, 0x02) // field 1: idle-behavior constant
-				.WriteArray(0x18)
-				.WriteVarint(tick) // field 3: monotonic tick
-				.WriteArray(0x28, 0x18, 0x30, 0x00) // field 5 = 0x18, field 6 = 0
-				.ToArray();
+			var payload = new CommandMessage
+			{
+				BccActionId = IdleBehaviorAction,
+				CommandqueueServerId = tick, // the monotonic per-stream tick
+				Flags = 0x18,
+				ExecutionStatus = 0
+			}.ToProtobuf();
 
 			return new FaolanStream()
 				.WriteUInt32(Opcode)

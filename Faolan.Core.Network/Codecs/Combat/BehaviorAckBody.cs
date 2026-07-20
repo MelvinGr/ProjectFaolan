@@ -1,7 +1,9 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -114,63 +116,22 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return BuildBehaviorEchoAckBody(rawPayload, instance, phase, tail.ToArray());
 		}
 
-		// Splices field3 (the behaviour "phase", tag 0x18 varint) into the request args right after field2, matching
-		// retail's BccAck echo. If field2 is absent/malformed the phase is appended at the end.
+		// Sets field 3 (the behaviour "phase") on the request args, matching retail's BccAck echo, which returns the
+		// request args with the phase added.
+		//
+		// The args are a CommandMessage, so this is a deserialize / set / re-serialize. It used to be a byte SPLICE:
+		// hand-encode `18 <varint>` and memcpy it in right after field 2, located by OffsetAfterField - a hand-written
+		// partial protobuf parser that walked tags and varints and gave up on wiretypes 1 and 5 (`return msg.Length;
+		// // unsupported wiretype`). protobuf-net emits fields in ascending number order, so the phase lands exactly
+		// where the splice put it, for every input, with no parser to maintain (Gitea #386). The captured
+		// swing-1 request/ack pair pins it - see BehaviorPhaseFieldTests.
+		//
+		// CommandMessage is IExtensible, so any field the schema does not model survives the round-trip.
 		public static byte[] InsertBehaviorPhaseField(byte[] args, uint phase)
 		{
-			var phaseField = EncodeBehaviorPhase(phase);
-			var insertAt = Math.Min(OffsetAfterField(args, 2), args.Length);
-			var result = new byte[args.Length + phaseField.Length];
-			Array.Copy(args, 0, result, 0, insertAt);
-			phaseField.CopyTo(result, insertAt);
-			Array.Copy(args, insertAt, result, insertAt + phaseField.Length, args.Length - insertAt);
-			return result;
-		}
-
-		// field3 as protobuf: tag 0x18 (field 3, varint) + the base-128 varint of `value`.
-		private static byte[] EncodeBehaviorPhase(uint value)
-		{
-			return new FaolanStream().WriteByte(0x18).WriteVarint(value).ToArray();
-		}
-
-		// Byte offset just after `fieldNumber`'s value in a protobuf message (the message end if absent/malformed).
-		private static int OffsetAfterField(byte[] msg, int fieldNumber)
-		{
-			var i = 0;
-			while (i < msg.Length)
-			{
-				var tag = msg[i++];
-				var fn = tag >> 3;
-				var wt = tag & 7;
-				if (wt == 0)
-				{
-					while (i < msg.Length && (msg[i] & 0x80) != 0)
-						i++;
-					i++;
-				}
-				else if (wt == 2)
-				{
-					int len = 0, shift = 0;
-					while (i < msg.Length)
-					{
-						var b = msg[i++];
-						len |= (b & 0x7f) << shift;
-						if ((b & 0x80) == 0)
-							break;
-
-						shift += 7;
-					}
-
-					i += len;
-				}
-				else
-					return msg.Length; // unsupported wiretype -> append at end
-
-				if (fn == fieldNumber)
-					return i;
-			}
-
-			return msg.Length;
+			var message = ((ReadOnlySpan<byte>)args).FromProtobuf<CommandMessage>();
+			message.CommandqueueServerId = phase;
+			return message.ToProtobuf();
 		}
 	}
 }
