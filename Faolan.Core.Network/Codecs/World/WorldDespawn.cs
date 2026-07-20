@@ -47,21 +47,27 @@ namespace Faolan.Core.Network.Codecs.World
 		// The inverse of BuildBody: parses a 17-byte n3ToClientQuit body into its (handle, token). Returns false when
 		// the length, sub-opcode, ack TypeTag, or record marker don't match the decoded grammar (so a mis-routed body
 		// is rejected rather than yielding garbage). Proven against the captured records by WorldDespawnTests round-trip.
-		public static bool TryParseBody(ReadOnlySpan<byte> body, out uint handle, out uint token)
+		// Read sequentially: the old offsets ran 0 -> 4 -> 8 -> 13, and that 8 -> 13 step was the only trace of the
+		// single-byte record marker between the handle and the token.
+		public static bool TryParseBody(byte[] body, out uint handle, out uint token)
 		{
 			handle = 0;
 			token = 0;
-			if (body.Length != BodyLength)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
-				return false;
-			if (body[12] != RecordMarker)
+			if (body is not { Length: BodyLength })
 				return false;
 
-			handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
-			token = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4));
+			var r = new FaolanStream(body);
+			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR)
+				return false;
+			if (r.ReadUInt32() != EntityClass.Character)
+				return false;
+
+			var parsedHandle = r.ReadUInt32();
+			if (r.ReadByte() != RecordMarker)
+				return false;
+
+			handle = parsedHandle;
+			token = r.ReadUInt32();
 			return true;
 		}
 
