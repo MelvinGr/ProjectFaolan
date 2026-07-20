@@ -34,8 +34,18 @@ namespace Faolan.Importer.Extractors
 		// packet that is not a parseable player snapshot.
 		public static bool TryRead(byte[] packet, out uint characterId, out IReadOnlyList<QuestcRecord> records)
 		{
+			return TryRead(packet, out characterId, out records, out _);
+		}
+
+		// As above, but also surfaces the quest INDEX region that follows the journal. The index carries the per-quest
+		// goal-table word and goal-step ids, which the Quest_c record itself does not - both are needed before a quest
+		// can ride the login snapshot (#389).
+		public static bool TryRead(byte[] packet, out uint characterId, out IReadOnlyList<QuestcRecord> records,
+			out QuestIndexRegion? index)
+		{
 			characterId = 0;
 			records = [];
+			index = null;
 			if (packet == null || packet.Length < 32)
 				return false;
 
