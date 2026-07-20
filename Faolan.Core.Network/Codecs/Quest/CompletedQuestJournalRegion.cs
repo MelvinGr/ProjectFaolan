@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
@@ -13,8 +14,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//   per AREA group:
 	//     [u32 areaId]
 	//     [string areaTitle]                         <remoteformat category=50300 id=areaId>
-	//     [string regionName]                        <remoteformat category=52000> the CONTINENT (8 distinct)
-	//     [string mapName]                           <remoteformat category=52000> the PLAYFIELD (4010 Tortage Island)
+	//     [string mapName]                           <remoteformat category=52000> the PLAYFIELD (4010 "Tortage Island")
+	//     [string regionName]                        <remoteformat category=52000> the COARSER grouping (8 distinct)
 	//     [u32 magic]                                the area's goal-table NAME word ('RRL3', 'W6QT', ...)
 	//     [u32 tf1]                                  0 in every captured group
 	//     [u32 questsInArea]
@@ -71,8 +72,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 				{
 					AreaId = r.ReadUInt32(),
 					AreaTitle = r.ReadString(),
-					RegionName = r.ReadString(),
 					MapName = r.ReadString(),
+					RegionName = r.ReadString(),
 					Magic = r.ReadUInt32(),
 					TableField1 = r.ReadUInt32()
 				};
@@ -109,8 +110,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				w.WriteUInt32(area.AreaId);
 				w.WriteString(area.AreaTitle);
-				w.WriteString(area.RegionName);
 				w.WriteString(area.MapName);
+				w.WriteString(area.RegionName);
 				w.WriteUInt32(area.Magic);
 				w.WriteUInt32(area.TableField1);
 				w.WriteUInt32(area.Quests.Count);
@@ -126,6 +127,53 @@ namespace Faolan.Core.Network.Codecs.Quest
 			}
 		}
 
+		// Builds the region from DB rows. `groups` is ORDERED - both the area sequence and each area's quest sequence -
+		// because the wire order is per-character and not derivable: two characters carry the same two areas in
+		// opposite order (#390). It is not stored either, since the client demonstrably re-sorts for display (retail
+		// renders alphabetically while the wire does not), so callers pass whatever deterministic order they like and
+		// the tests pass a capture's own order to compare byte-for-byte.
+		public static CompletedQuestJournalRegion Build(IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> groups)
+		{
+			ArgumentNullException.ThrowIfNull(groups);
+
+			var region = new CompletedQuestJournalRegion();
+			foreach (var (area, quests) in groups)
+			{
+				var group = new AreaGroup
+				{
+					AreaId = area.AreaId,
+					AreaTitle = QuestcRegion.RemoteFormat(area.AreaTitleRefId, area.AreaTitleCategory, area.AreaTitleKey ?? ""),
+					MapName = QuestcRegion.RemoteFormat(area.MapRefId, area.MapCategory, area.MapKey ?? ""),
+					RegionName = QuestcRegion.RemoteFormat(area.RegionRefId, area.RegionCategory, area.RegionKey ?? ""),
+					Magic = area.Magic,
+					TableField1 = area.TableField1
+				};
+
+				for (var i = 0; i < quests.Count; i++)
+					group.Quests.Add(new QuestEntry
+					{
+						Sequence = quests[i].JournalSequence,
+						QuestId = quests[i].QuestId,
+						Records = [Text(quests[i], QuestTextSlot.Title), Text(quests[i], QuestTextSlot.ListSubLine)]
+					});
+
+				region.Areas.Add(group);
+			}
+
+			return region;
+		}
+
+		private static string Text(QuestDefinition? def, QuestTextSlot slot)
+		{
+			var r = def?.TextRefs.FirstOrDefault(t => t.Slot == slot);
+			if (r == null)
+				return QuestcRegion.RemoteFormat(0, 0, "");
+
+			return r.IsLocalized
+				? QuestObjectiveRegion.Localized(r.RefId, r.Category, r.Flags ?? "", r.KeyText ?? "")
+				: QuestcRegion.RemoteFormat(r.RefId, r.Category, r.KeyText ?? "");
+		}
+
 		public byte[] ToArray()
 		{
 			using var w = new FaolanStream();
@@ -139,16 +187,20 @@ namespace Faolan.Core.Network.Codecs.Quest
 			public uint AreaId { get; init; }
 			public string AreaTitle { get; init; } = "";
 
-			// The three tiers, coarse to fine, measured over the corpus rather than assumed:
-			//   RegionName  8 distinct   the continent (ids 1,2,3,4,5,8,5000,1000000)
-			//   MapName    68 distinct   the playfield (4010 "Tortage Island", 4020 "City of Tortage", ...)
+			// MAP comes first on the wire, then REGION. The three tiers, fine to coarse:
 			//   AreaId    917 distinct   the leaf grouping the journal tree renders
-			// Containment is strict: every map belongs to exactly ONE region and every area to exactly one map, while
-			// 7 of the 8 regions hold several maps. So a MAP HAS MANY AREAS - an area is not a map.
-			// ⚠️ Do not sanity-check a region id against the Maps table: ids 1/2/4/8 exist there as "QA Test
-			// Playfield" / "Mariannek_test_playfield" and will CONFIRM the wrong reading.
-			public string RegionName { get; init; } = "";
+			//   MapName    68 distinct   the playfield - 4010 "Tortage Island", 4020 "City of Tortage"
+			//   RegionName  8 distinct   the coarser grouping above it (ids 1,2,3,4,5,8,5000,1000000)
+			// So a MAP HAS MANY AREAS, and the region above it holds several maps.
+			//
+			// ⚠️ This pair got labelled backwards once, on the strength of a miscounted probe, and reverting it broke
+			// generation while leaving the parse round-trip green - a round-trip cannot see a swap of two fields it
+			// both reads and writes. What caught it was rebuilding a captured region from DB rows, where the map/
+			// region split is derived independently ("region = smaller id, map = larger" in QuestDefinitionExtractor).
+			// ⚠️ Do not sanity-check a region id against the Maps table: 1/2/4/8 exist there as "QA Test Playfield" /
+			// "Mariannek_test_playfield" and will CONFIRM the wrong reading.
 			public string MapName { get; init; } = "";
+			public string RegionName { get; init; } = "";
 			public uint Magic { get; init; } // the AREA's goal-table name word ('RRL3', 'W6QT', ...)
 			public uint TableField1 { get; init; }
 			public List<QuestEntry> Quests { get; init; } = [];

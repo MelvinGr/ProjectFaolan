@@ -18,7 +18,7 @@ namespace Faolan.Importer.Extractors
 	// wholesale and would strip the richer rows the full-update path built.
 	public static class CompletedQuestExtractor
 	{
-		public sealed record CompletedQuest(uint QuestId, uint AreaId, uint MapId, TextRef Title, TextRef SubLine);
+		public sealed record CompletedQuest(uint QuestId, uint AreaId, uint MapId, uint Sequence, TextRef Title, TextRef SubLine);
 
 		public sealed record TextRef(uint RefId, uint Category, string Key, string? Flags, bool IsLocalized);
 
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Extractors
 						if (title == null || subLine == null)
 							continue;
 
-						quests[q.QuestId] = new CompletedQuest(q.QuestId, area.AreaId, map.RefId, title, subLine);
+						quests[q.QuestId] = new CompletedQuest(q.QuestId, area.AreaId, map.RefId, q.Sequence, title, subLine);
 					}
 				}
 			}
@@ -67,6 +67,11 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// A <remoteformat .../> or <localized .../> record as the region carries it.
+		public static TextRef? ParseRecord(string xml)
+		{
+			return Parse(xml);
+		}
+
 		private static TextRef? Parse(string xml)
 		{
 			if (string.IsNullOrEmpty(xml))

@@ -72,28 +72,21 @@ namespace Faolan.Tests
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");
 
-			// Is the wire order alphabetical? Alphabetical is a FIXED TOTAL ORDER, so any two characters must agree
-			// on the relative order of areas they share. Print the raw sequences for the smallest journals.
-			foreach (var (src, reg) in perSnapshot.GroupBy(x => string.Join(",", x.Region.Areas.Select(a => a.AreaId)))
-						.Select(g => g.First()).OrderBy(x => x.Region.Areas.Count).Take(6))
-				o.WriteLine($"  {src[..Math.Min(46, src.Length)]}: [{string.Join(",", reg.Areas.Select(a => a.AreaId))}]");
-
-			var byChar = perSnapshot.GroupBy(x => string.Join(",", x.Region.Areas.Select(a => a.AreaId))).Select(g => g.First().Region).ToList();
-			var contradictions = 0;
-			for (var a = 0; a < byChar.Count; a++)
-			for (var b = a + 1; b < byChar.Count; b++)
+			// Is Sequence a property of the QUEST (stable everywhere it appears) or of its position?
+			var seqByQuest = new Dictionary<uint, HashSet<uint>>();
+			var ordByQuest = new Dictionary<uint, HashSet<int>>();
+			foreach (var g in allAreas)
+			for (var k = 0; k < g.Quests.Count; k++)
 			{
-				var xa = byChar[a].Areas.Select(x => x.AreaId).ToList();
-				var xb = byChar[b].Areas.Select(x => x.AreaId).ToList();
-				var shared = xa.Intersect(xb).ToHashSet();
-				if (shared.Count < 2)
-					continue;
-
-				if (!xa.Where(shared.Contains).SequenceEqual(xb.Where(shared.Contains)))
-					contradictions++;
+				var q = g.Quests[k];
+				(seqByQuest.TryGetValue(q.QuestId, out var a) ? a : seqByQuest[q.QuestId] = []).Add(q.Sequence);
+				(ordByQuest.TryGetValue(q.QuestId, out var b) ? b : ordByQuest[q.QuestId] = []).Add(k + 1);
 			}
 
-			o.WriteLine($"PAIRS OF JOURNALS THAT CONTRADICT A FIXED ORDER: {contradictions}");
+			o.WriteLine($"quests with a STABLE Sequence everywhere: {seqByQuest.Count(kv => kv.Value.Count == 1)} of {seqByQuest.Count}");
+			o.WriteLine($"quests with a stable ORDINAL everywhere:  {ordByQuest.Count(kv => kv.Value.Count == 1)} of {ordByQuest.Count}");
+			foreach (var kv in seqByQuest.Where(k => k.Value.Count > 1).Take(5))
+				o.WriteLine($"   quest {kv.Key} varies: seq {string.Join(",", kv.Value.OrderBy(v => v))}");
 
 			Assert.True(withRegion > 0, "no snapshot in the corpus carried a completed-quest journal");
 		}
@@ -166,6 +159,16 @@ namespace Faolan.Tests
 			}
 
 			return -1;
+		}
+
+		// The parsed completed-quest journal of every capture that carries one - shared with the generation gate.
+		public static IEnumerable<(string Source, CompletedQuestJournalRegion Region)> CapturedRegions()
+		{
+			foreach (var (source, subClass, tails) in SubClasses())
+			{
+				if (subClass.CompletedQuests is { Areas.Count: > 0 } region)
+					yield return (source, region);
+			}
 		}
 
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClasses()

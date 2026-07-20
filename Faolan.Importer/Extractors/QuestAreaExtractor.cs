@@ -11,6 +11,12 @@ namespace Faolan.Importer.Extractors
 	// per-quest - only ever had two rows filled from the beach/Casilda seeds (#389).
 	public static class QuestAreaExtractor
 	{
+		private static CompletedQuestExtractor.TextRef? Parse(string xml)
+		{
+			return CompletedQuestExtractor.ParseRecord(xml);
+		}
+
+
 		public static List<QuestArea> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var byArea = new Dictionary<uint, QuestArea>();
@@ -29,11 +35,26 @@ namespace Faolan.Importer.Extractors
 					if (byArea.ContainsKey(area.AreaId))
 						continue;
 
+					var title = Parse(area.AreaTitle);
+					var map = Parse(area.MapName);
+					var region = Parse(area.RegionName);
+					if (title == null || map == null || region == null)
+						continue;
+
 					byArea[area.AreaId] = new QuestArea
 					{
 						AreaId = area.AreaId,
 						Magic = area.Magic,
-						TableField1 = area.TableField1
+						TableField1 = area.TableField1,
+						AreaTitleRefId = title.RefId,
+						AreaTitleCategory = title.Category,
+						AreaTitleKey = title.Key,
+						MapRefId = map.RefId,
+						MapCategory = map.Category,
+						MapKey = map.Key,
+						RegionRefId = region.RefId,
+						RegionCategory = region.Category,
+						RegionKey = region.Key
 					};
 				}
 			}

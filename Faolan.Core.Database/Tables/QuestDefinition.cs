@@ -17,6 +17,16 @@ namespace Faolan.Core.Database.Tables
 		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
 		public uint AreaId { get; set; }
 
+		// The quest's sequence word in the completed journal (#390). A property of the QUEST, not of its position:
+		// measured over the corpus, all 1975 completed quests carry the SAME value everywhere they appear, across
+		// characters and areas. It usually equals the 1-based ordinal within the area (73346 of 74392 entries), which
+		// is why generating an ordinal reproduced 33 of 81 regions and failed the rest - 182 areas list every quest
+		// with 0, and 260 more are mixed.
+		//
+		// Probably a chapter index within a quest series ("Letter to the King I / II"), but that is unverified, so the
+		// name says what it is rather than what it likely means.
+		public uint JournalSequence { get; set; }
+
 		// The area this quest is grouped under. Every referenced area has a row: the importer inserts a placeholder
 		// (Magic 0) for any area the captures never showed a completed quest in, the same way it does for Maps.
 		[ForeignKey(nameof(AreaId))]

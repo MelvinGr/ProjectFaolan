@@ -428,6 +428,15 @@ namespace Faolan.Importer.Captures
 
 					row.Magic = wire.Magic;
 					row.TableField1 = wire.TableField1;
+					row.AreaTitleRefId = wire.AreaTitleRefId;
+					row.AreaTitleCategory = wire.AreaTitleCategory;
+					row.AreaTitleKey = wire.AreaTitleKey;
+					row.MapRefId = wire.MapRefId;
+					row.MapCategory = wire.MapCategory;
+					row.MapKey = wire.MapKey;
+					row.RegionRefId = wire.RegionRefId;
+					row.RegionCategory = wire.RegionCategory;
+					row.RegionKey = wire.RegionKey;
 					continue;
 				}
 
@@ -435,7 +444,16 @@ namespace Faolan.Importer.Captures
 				{
 					AreaId = areaId,
 					Magic = wire?.Magic ?? 0,
-					TableField1 = wire?.TableField1 ?? 0
+					TableField1 = wire?.TableField1 ?? 0,
+					AreaTitleRefId = wire?.AreaTitleRefId ?? 0,
+					AreaTitleCategory = wire?.AreaTitleCategory ?? 0,
+					AreaTitleKey = wire?.AreaTitleKey,
+					MapRefId = wire?.MapRefId ?? 0,
+					MapCategory = wire?.MapCategory ?? 0,
+					MapKey = wire?.MapKey,
+					RegionRefId = wire?.RegionRefId ?? 0,
+					RegionCategory = wire?.RegionCategory ?? 0,
+					RegionKey = wire?.RegionKey
 				});
 				added++;
 			}
@@ -471,13 +489,15 @@ namespace Faolan.Importer.Captures
 
 				if (!existing.TryGetValue(q.QuestId, out var def))
 				{
-					def = new QuestDefinition { QuestId = q.QuestId, AreaId = q.AreaId, MapId = q.MapId };
+					def = new QuestDefinition { QuestId = q.QuestId, AreaId = q.AreaId, MapId = q.MapId, JournalSequence = q.Sequence };
 					db.QuestDefinitions.Add(def);
 					existing[q.QuestId] = def;
 					added++;
 				}
 				else
 				{
+					// Stable per quest across the whole corpus, so refreshing it is safe and fills older rows.
+					def.JournalSequence = q.Sequence;
 					filled++;
 				}
 
