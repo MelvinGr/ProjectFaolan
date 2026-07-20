@@ -403,6 +403,47 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Quest journal-content definitions, refreshed per harvested quest; un-harvested quests untouched.
+		// Quest AREAS - the grouping tier of the journal tree. `harvested` carries the wire words (the 4CC), which only
+		// the completed-quest journal exposes (#390); `referenced` is every AreaId a quest definition points at.
+		//
+		// QuestDefinition.AreaId is a real FK, so a row must exist for EVERY referenced area before definitions are
+		// saved - the captures only show areas a character actually completed a quest in, which is far short of the
+		// areas quests live in. Anything unharvested gets a placeholder (Magic 0), exactly as Maps do; a missing row
+		// would otherwise fail the FK check on rebuild.
+		public static async Task<int> ImportQuestAreas(DatabaseContext db, IReadOnlyList<QuestArea> harvested, IReadOnlyCollection<uint> referenced)
+		{
+			var existing = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId);
+			var byArea = harvested.ToDictionary(a => a.AreaId);
+			var added = 0;
+
+			foreach (var areaId in byArea.Keys.Concat(referenced).Distinct())
+			{
+				byArea.TryGetValue(areaId, out var wire);
+
+				if (existing.TryGetValue(areaId, out var row))
+				{
+					// Only ever fill IN - never clobber a harvested 4CC with a placeholder's 0.
+					if (wire == null)
+						continue;
+
+					row.Magic = wire.Magic;
+					row.TableField1 = wire.TableField1;
+					continue;
+				}
+
+				db.QuestAreas.Add(new QuestArea
+				{
+					AreaId = areaId,
+					Magic = wire?.Magic ?? 0,
+					TableField1 = wire?.TableField1 ?? 0
+				});
+				added++;
+			}
+
+			await db.SaveChangesAsync();
+			return added;
+		}
+
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
 		{
 			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a

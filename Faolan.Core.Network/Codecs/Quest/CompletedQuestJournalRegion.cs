@@ -40,10 +40,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	{
 		public List<AreaGroup> Areas { get; init; } = [];
 
-		public int QuestCount
-		{
-			get { return Areas.Sum(a => a.Quests.Count); }
-		}
+		public int QuestCount => Areas.Sum(a => a.Quests.Count);
 
 		// Parses the region starting at `offset`. The leading frame counts AREA GROUPS - it is an ordinary ListFrame
 		// word, (areas + 1) * 0x3F1 - and that count is the only terminator; the region ends well before the

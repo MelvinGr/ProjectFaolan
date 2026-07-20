@@ -17,6 +17,11 @@ namespace Faolan.Core.Database.Tables
 		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
 		public uint AreaId { get; set; }
 
+		// The area this quest is grouped under. Every referenced area has a row: the importer inserts a placeholder
+		// (Magic 0) for any area the captures never showed a completed quest in, the same way it does for Maps.
+		[ForeignKey(nameof(AreaId))]
+		public virtual QuestArea Area { get; set; } = null!;
+
 		// The primary objective's goal id (e.g. 0x1670 = 5744), echoed in QuestGoal and the full-update.
 		public uint GoalId { get; set; }
 

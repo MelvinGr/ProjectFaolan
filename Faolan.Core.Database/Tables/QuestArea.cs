@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -24,5 +25,8 @@ namespace Faolan.Core.Database.Tables
 		// The word after Magic. 0 in every captured area group; kept rather than asserted, because "constant across
 		// the corpus" has repeatedly turned out to mean "the corpus only covers one case" in this protocol.
 		public uint TableField1 { get; set; }
+
+		// The quests grouped under this area - the middle tier of the client's Region > Area > quest journal tree.
+		public virtual ICollection<QuestDefinition> Quests { get; set; } = [];
 	}
 }

@@ -805,9 +805,16 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var defs = QuestDefinitionExtractor.Extract(ctx.Captures.SelectMany(c => c.Packets).ToList());
+			var packets = ctx.Captures.SelectMany(c => c.Packets).ToList();
+			var defs = QuestDefinitionExtractor.Extract(packets);
+
+			// Areas FIRST: QuestDefinition.AreaId is an FK, so every area a definition points at must already have a
+			// row. The 4CCs come from the completed-quest journal (#390); the rest are placeholders.
+			var areas = QuestAreaExtractor.Extract(packets);
+			var areaCount = await ImportOps.ImportQuestAreas(ctx.Db, areas, defs.Select(d => d.AreaId).Where(id => id != 0).Distinct().ToList());
+
 			await ImportOps.ImportQuestDefinitions(ctx.Db, defs);
-			return new ImportResult($"{defs.Count} quest definitions (+ seeds).");
+			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {areaCount} quest areas ({areas.Count} with wire data).");
 		}
 	}
 

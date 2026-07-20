@@ -74,6 +74,36 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
+		// The COMPLETED-quest journal a snapshot packet carries (#390) - the area-grouped region after the active
+		// journal. Returns false for any packet that is not a parseable player snapshot, or that carries no
+		// completed quests (a fresh character has none, which is why the region is absent from the beach template).
+		public static bool TryReadCompleted(byte[] packet, out CompletedQuestJournalRegion? completed)
+		{
+			completed = null;
+			if (packet == null || packet.Length < 32)
+				return false;
+
+			var body = Body(packet);
+			if (body.Length < 20 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+				return false;
+
+			try
+			{
+				var stream = new FaolanStream(body);
+				stream.ReadUInt32(); // body length
+				stream.ReadUInt32(); // sub-opcode
+				stream.ReadUInt32(); // type tag
+				stream.ReadUInt32(); // instance
+
+				completed = FullCharSnapshotCodec.ParseInventoryPacketBody(stream).SubClass.CompletedQuests;
+				return completed is { Areas.Count: > 0 };
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
 		// The 0x2000 body within a full on-wire packet: [len4][crc4][headerLen4][header][body].
 		private static byte[] Body(byte[] full)
 		{
