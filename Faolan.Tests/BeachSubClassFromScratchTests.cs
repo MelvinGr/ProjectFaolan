@@ -187,7 +187,9 @@ namespace Faolan.Tests
 		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
 		private static int QuestRegionTrailerLength(FullCharSnapshotSubClass tails)
 		{
-			return (tails.QuestObjectives?.ByteLength ?? 0) + (tails.QuestIndex?.ByteLength ?? 0);
+			// The @609 objective region is INSIDE the journal records now (KnownHeaderLength covers it), so only
+			// the quest index trails it (#384).
+			return tails.QuestIndex?.ByteLength ?? 0;
 		}
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>

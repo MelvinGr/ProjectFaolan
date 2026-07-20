@@ -10,7 +10,7 @@
 - **821** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
 - **77** IIR carrier types: **73 V3** (byte-exact builder), **3 V2** (built, no golden), **1 V1** (no builder found).
 - **61** codec classes, **59** with a byte-exact test.
-- **43** Python dissectors (`Captures/scripts/decode_*.py`).
+- **44** Python dissectors (`Captures/scripts/decode_*.py`).
 
 ### The distinction this table exists to make
 

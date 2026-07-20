@@ -17,18 +17,28 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public List<uint[]> Obj2 { get; init; } = [];
 		public List<uint[]> Obj3 { get; init; } = [];
 		public List<uint[]> Obj4 { get; init; } = [];
+
+		// The quest's @609 OBJECTIVE region, which on the wire follows this record's obj4 - the journal record and
+		// its objective region are INTERLEAVED per quest, not two separate top-level regions. The writer already
+		// emitted them that way (FullCharSnapshotSubClass); the reader did not consume it, so QuestcRegion.Read
+		// desynced on the SECOND record of any multi-quest journal and blew up with "marker 0x2 != 0x412" (#384).
+		// Null only for a record read/built without one. See Captures/scripts/decode_questc_progress.py, which
+		// validates the interleaved grammar across all 141 captured snapshots.
+		public QuestObjectiveRegion? Objectives { get; set; }
 		public string Area { get; init; } = ""; // <remoteformat category=50300>
 		public string Region1 { get; init; } = ""; // <remoteformat category=52000>
 		public string Region2 { get; init; } = ""; // <remoteformat category=52000>
 		public string Summary { get; init; } = ""; // <remoteformat category=50302>
 		public string Title { get; init; } = ""; // <remoteformat category=50301>
+		public uint Field114 { get; init; } // @+0x114 (=0 on the beach template)
+		public uint Field118 { get; init; } // @+0x118
 		public uint Field11c { get; init; } // @+0x11c (=0)
 		public uint Field28 { get; init; } // @+0x28 (=0)
+		public uint Field2c { get; init; } // @+0x2c - equals questId on the beach template, but NOT in general
 		public uint FieldEc { get; init; } // @+0xec (=1 in template)
 		public uint FieldF0 { get; init; } // @+0xf0 (=0x96)
-		public uint N { get; init; }
+		public uint N { get; init; } // @+0x14 - the record's GOAL COUNT (0x412 on the beach template)
 		public uint State { get; set; } // settable: world entry historically patches the lead quest's @20 word
-		public uint Zero { get; init; }
 		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
 		public ulong FieldF8 { get; init; } // @+0xf8 u64 (=15)
 
@@ -44,11 +54,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				throw new InvalidOperationException($"Quest_c record: listKey {listKey} != questId {questId}");
 
 			var state = r.ReadUInt32();
-			var zero = r.ReadUInt32();
+			var field114 = r.ReadUInt32();
+			var field118 = r.ReadUInt32();
 			var n = r.ReadUInt32();
-			var marker = r.ReadUInt32();
-			if (marker != QuestcRegion.Marker)
-				throw new InvalidOperationException($"Quest_c record: marker 0x{marker:X} != 0x{QuestcRegion.Marker:X}");
 
 			var title = r.ReadString();
 			var summary = r.ReadString();
@@ -58,9 +66,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 			var fieldEc = r.ReadUInt32();
 			var areaId = r.ReadUInt32();
-			var questId2 = r.ReadUInt32();
-			if (questId2 != questId)
-				throw new InvalidOperationException($"Quest_c record: trailing questId {questId2} != {questId}");
+			var field2c = r.ReadUInt32();
 
 			var field11c = r.ReadUInt32();
 			var accept = r.ReadUInt64();
@@ -73,11 +79,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var obj3 = ReadObjList(r);
 			var obj4 = ReadObjList(r);
 
+			var objectives = QuestObjectiveRegion.Read(r);
+
 			return new QuestcRecord
 			{
 				QuestId = questId,
 				State = state,
-				Zero = zero,
+				Field114 = field114,
+				Field118 = field118,
 				N = n,
 				Title = title,
 				Summary = summary,
@@ -86,6 +95,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Region2 = region2,
 				FieldEc = fieldEc,
 				AreaId = areaId,
+				Field2c = field2c,
 				Field11c = field11c,
 				Accept = accept,
 				Field28 = field28,
@@ -94,7 +104,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Obj1 = obj1,
 				Obj2 = obj2,
 				Obj3 = obj3,
-				Obj4 = obj4
+				Obj4 = obj4,
+				Objectives = objectives
 			};
 		}
 
@@ -104,9 +115,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(QuestcRegion.RecordVersion);
 			w.WriteUInt32(QuestId);
 			w.WriteUInt32(State);
-			w.WriteUInt32(Zero);
+			w.WriteUInt32(Field114);
+			w.WriteUInt32(Field118);
 			w.WriteUInt32(N);
-			w.WriteUInt32(QuestcRegion.Marker);
 
 			w.WriteString(Title);
 			w.WriteString(Summary);
@@ -116,7 +127,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 			w.WriteUInt32(FieldEc);
 			w.WriteUInt32(AreaId);
-			w.WriteUInt32(QuestId);
+			w.WriteUInt32(Field2c);
 			w.WriteUInt32(Field11c);
 			w.WriteUInt64(Accept);
 			w.WriteUInt32(Field28);
@@ -127,6 +138,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt64(FieldF8);
 			WriteObjList(w, Obj3);
 			WriteObjList(w, Obj4);
+			Objectives?.Write(w);
 		}
 
 		// Build a single quest-journal record from a QuestDefinition (its 5 header text refs + areaId) plus the
@@ -143,8 +155,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				QuestId = def.QuestId,
 				State = state,
-				Zero = 0,
-				N = n,
+				Field114 = 0,
+				// `n` is the QuestDefinition.SnapshotN column, which despite its name feeds field118, not the goal
+				// count - the DB column keeps the old (mislabeled) name to avoid a rename migration.
+				Field118 = n,
+				N = QuestcRegion.BeachN,
 				Title = Slot(QuestTextSlot.Title),
 				Summary = Slot(QuestTextSlot.Summary),
 				Area = Slot(QuestTextSlot.AreaTitle),
@@ -152,6 +167,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Region2 = Slot(QuestTextSlot.MapName),
 				FieldEc = fieldEc,
 				AreaId = def.AreaId,
+				Field2c = def.QuestId,
 				Field11c = 0,
 				Accept = 0,
 				Field28 = field28,

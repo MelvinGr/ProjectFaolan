@@ -12,7 +12,10 @@ namespace Faolan.Tests
 	// Grammar: docs/re/fullplayer-snapshot-reader.md (recovered from FullPlayerCharacterIIR::ReadSubClass).
 	public class QuestcRegionTests
 	{
-		private const int RegionEnd = 609; // where Quest_c ends in the beach template (decode_questc.py)
+		// Where Quest_c ends in the beach template. 1168, not the old 609: the journal record's own @609 objective
+		// region is part of the record (interleaved per quest), so the region does not end until past it (#384).
+		// Cross-checked by Captures/scripts/decode_questc_progress.py, which reports the same boundary.
+		private const int RegionEnd = 1168;
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private readonly ITestOutputHelper _o;
 
@@ -31,7 +34,12 @@ namespace Faolan.Tests
 			Assert.Equal(10238u, q.QuestId); // "Shipwrecked"
 			Assert.Equal(1u, q.State); // active
 			Assert.Equal(241u, q.AreaId); // matches the 50300 area string id
-			Assert.Equal(4u, q.N);
+			Assert.Equal(4u, q.Field118);
+			// +0x14 - the beach template's value. NOT a 0x412 "marker": a progressed journal carries a real count
+			// here (NecroL80 rec0 = 2), which is why asserting it rejected every level-80 snapshot (#384).
+			Assert.Equal(QuestcRegion.BeachN, q.N);
+			// The record owns its objective region.
+			Assert.NotNull(q.Objectives);
 			Assert.Contains("category=\"50301\"", q.Title);
 			Assert.Contains("category=\"50302\"", q.Summary);
 			Assert.Contains("category=\"50300\"", q.Area);

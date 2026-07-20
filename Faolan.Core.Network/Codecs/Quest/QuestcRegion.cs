@@ -33,7 +33,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 	public sealed class QuestcRegion : ICodec<QuestcRegion>
 	{
 		public const uint Frame = ListFrame.Unit; // 1009 - the list-count framing multiplier
-		public const uint Marker = 0x412;
+		// The value the BEACH template carries in the record's `n` (goal-count) slot. It is NOT a marker and NOT a
+		// constant on the wire - a progressed journal carries a real goal count here. Kept only so the fresh-char
+		// generator reproduces the beach bytes exactly; never assert against it. See docs/re/questc-region-decode.md.
+		public const uint BeachN = 0x412;
 		public const uint RecordVersion = 1;
 		public const uint Version = 0x18;
 

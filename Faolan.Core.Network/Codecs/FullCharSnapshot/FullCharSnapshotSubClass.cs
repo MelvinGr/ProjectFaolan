@@ -71,10 +71,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
 		public QuestIndexRegion? QuestIndex { get; init; }
 
-		// The @609 per-goal objective-detail region (chapterTag + per-goal records), modeled from the recovered
-		// grammar (QuestObjectiveRegion, docs/re/fullplayer-snapshot-reader.md) instead of riding in the opaque blob.
-		// Null when the tails carry no such region (no chapterTag at the boundary) - then it stays in UnknownBefore.
-		public QuestObjectiveRegion? QuestObjectives { get; init; }
 
 		public SubClassPostAccessBlock? PostAccessBlock { get; init; }
 
@@ -106,8 +102,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			writer.WriteArray(Quests.ToArray());
 
-			if (QuestObjectives != null)
-				writer.WriteArray(QuestObjectives.ToArray());
 
 			if (QuestIndex != null)
 				writer.WriteArray(QuestIndex.ToArray());
@@ -253,8 +247,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			w.WriteUInt32((ordered.Count + 1) * QuestcRegion.Frame);
 			foreach (var q in ordered)
 			{
-				Record(q).Write(w);
-				w.WriteArray(QuestObjectiveRegion.Build(q, instance).ToArray());
+				// The objective region is part of the RECORD (interleaved per quest), so it rides on the record and
+				// QuestcRecord.Write emits it - keeping the writer symmetric with QuestcRegion.Read (#384).
+				var record = Record(q);
+				record.Objectives = QuestObjectiveRegion.Build(q, instance);
+				record.Write(w);
 			}
 
 			// The quest index: all held questIds + one chained goal-id block per quest, owned by the primary
@@ -275,17 +272,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
+			var record = QuestcRecord.BuildSingle(def, state, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8);
+			record.Objectives = QuestObjectiveRegion.Build(def, instance);
 			var quests = new QuestcRegion
 			{
-				Records =
-				{
-					QuestcRecord.BuildSingle(def, state, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8)
-				}
+				Records = { record }
 			};
-			var objectives = QuestObjectiveRegion.Build(def, instance);
 			var index = QuestIndexRegion.Build([def], def);
 
-			byte[] portion = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
+			byte[] portion = [.. quests.ToArray(), .. index.ToArray()];
 			if (portion.Length != QuestPortionLength)
 				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {QuestPortionLength}");
 
@@ -300,10 +295,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// typed region and take the boundary where it ends as the start of the remaining opaque blob.
 			var quests = QuestcRegion.Parse(data, out var knownHeaderLength);
 
-			// Then the @609 per-goal objective-detail region (when present - it opens with the 0x0BD3 chapterTag).
-			// Modeled typed; on anything unexpected fall back to leaving it in the opaque UnknownBefore blob so a
-			// tails shape we don't fully recognise is never corrupted.
-			var questObjectives = TryParseQuestObjectives(data, knownHeaderLength, out var afterObjectives);
+			// The @609 per-goal objective region is NOT a separate top-level region: it is interleaved per quest and
+			// QuestcRegion already consumed each record's own (QuestcRecord.Objectives, #384). Parsing it again here
+			// only worked because the beach journal holds exactly ONE quest, where "after the record" and "after the
+			// last record" are the same offset. So the boundary past the journal is the journal's own end.
+			var afterObjectives = knownHeaderLength;
 
 			var accessWindowNameOffset = IndexOfAscii(data, "PFAccessWindow_");
 
@@ -315,7 +311,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				return new FullCharSnapshotSubClass
 				{
 					Quests = quests,
-					QuestObjectives = questObjectives,
 					QuestIndex = questIndexNoAw,
 					KnownHeaderLength = knownHeaderLength,
 					UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable,
@@ -359,7 +354,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return new FullCharSnapshotSubClass
 			{
 				Quests = quests,
-				QuestObjectives = questObjectives,
 				QuestIndex = questIndex,
 				KnownHeaderLength = knownHeaderLength,
 				UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable0,
@@ -697,33 +691,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			catch (Exception)
 			{
 				afterIndex = offset;
-				return null;
-			}
-		}
-
-		// Parses the @609 per-goal objective-detail region when the boundary opens with the 0x0BD3 chapterTag;
-		// reports the offset just past it (= the start of the quest index / remaining opaque blob). Returns null and
-		// leaves `afterObjectives == boundary` for any tails without that region or that fail to parse cleanly.
-		private static QuestObjectiveRegion? TryParseQuestObjectives(byte[] data, int boundary, out int afterObjectives)
-		{
-			afterObjectives = boundary;
-			if (boundary + 4 > data.Length)
-				return null;
-
-			// The objective region opens with the goal-list framing word (goals+1)*0x3F1 (#255); the beach's is 0xBD3.
-			var lead = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(boundary, 4));
-			if (lead == 0 || lead % QuestObjectiveRegion.Frame != 0)
-				return null;
-
-			try
-			{
-				var region = QuestObjectiveRegion.Parse(data, boundary, out var consumed);
-				afterObjectives = boundary + consumed;
-				return region;
-			}
-			catch (Exception)
-			{
-				afterObjectives = boundary;
 				return null;
 			}
 		}

@@ -1,0 +1,128 @@
+using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using Faolan.Core;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Tests.Support;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Faolan.Tests
+{
+	// The whole-corpus gate for the FULL snapshot split (prefix + root + tails) on PROGRESSED journals - Gitea #384.
+	//
+	// Every other snapshot golden in this suite is pinned on the two level-1 Strie beach assets, and the beach
+	// journal is the degenerate case: exactly ONE held quest. With one quest, "the objective region follows the
+	// record" and "the objective region follows the list" are the same offset, so a reader that treats the @609
+	// objective region as a separate TOP-LEVEL region parses the beach fine and desyncs on the second record of
+	// any real journal - which is what happened ("Quest_c record: marker 0x2 != 0x412" on every level-80 capture).
+	//
+	// This reads the tshark corpus directly (as ProtocolCitationTests/QuestTests do) so it covers the L23/L24/L80
+	// journals without committing a 600 KB binary asset. Same lesson as [[list_frame_0x3f1_count_word]]: a grammar
+	// pinned only by the single-element case is not pinned.
+	public class ProgressedJournalSnapshotTests
+	{
+		private readonly ITestOutputHelper _output;
+
+		public ProgressedJournalSnapshotTests(ITestOutputHelper output)
+		{
+			_output = output;
+		}
+
+		// The TAILS must survive the typed model byte-for-byte on every captured snapshot - the #384 regression
+		// surface. (The protobuf ROOT does not yet re-encode byte-exactly on characters that carry character_tag:
+		// protobuf-net writes that repeated field UNPACKED while retail packs it. Separate defect, tracked on its
+		// own issue; it is why this asserts on SubClass rather than the whole body.)
+		[Fact]
+		public void EveryCapturedSnapshot_TailsRoundTrip_ByteExact()
+		{
+			var checkedBodies = 0;
+			var progressed = 0;
+
+			foreach (var (source, body) in SnapshotBodies())
+			{
+				var stream = new FaolanStream(body);
+				_ = stream.ReadUInt32();
+				_ = stream.ReadUInt32();
+				_ = stream.ReadUInt32();
+
+				var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
+
+				// The tails as they arrived: everything after [subop][typeTag][instance][prefix][root].
+				Assert.True(parts.SubClass.OriginalData.SequenceEqual(parts.SubClass.ToArray()),
+					$"{source}: tails must survive the typed model byte-identically");
+
+				checkedBodies++;
+				if (parts.SubClass.Quests.Records.Count > 1)
+					progressed++;
+			}
+
+			_output.WriteLine($"{checkedBodies} snapshot bodies round-tripped ({progressed} multi-quest journals)");
+			Assert.True(checkedBodies > 0, "no snapshot bodies found in the capture corpus");
+			// Guard the actual regression: without multi-quest journals in the set this test proves nothing beyond
+			// what the beach goldens already cover.
+			Assert.True(progressed > 0, "corpus has no multi-quest journal - this gate would be vacuous");
+		}
+
+		// Each journal record owns its own @609 objective region, rather than one region trailing the whole list.
+		[Fact]
+		public void MultiQuestJournal_InterleavesAnObjectiveRegionPerRecord()
+		{
+			var multi = SnapshotBodies()
+				.Select(x =>
+				{
+					var stream = new FaolanStream(x.Body);
+					stream.ReadUInt32();
+					stream.ReadUInt32();
+					stream.ReadUInt32();
+					return (x.Source, Parts: FullCharSnapshotReader.ParseInventoryPacketBody(stream));
+				})
+				.FirstOrDefault(x => x.Parts.SubClass.Quests.Records.Count > 1);
+
+			Assert.NotNull(multi.Source);
+			var records = multi.Parts.SubClass.Quests.Records;
+			_output.WriteLine($"{multi.Source}: {records.Count} quest records");
+
+			Assert.All(records, r => Assert.NotNull(r.Objectives));
+			// The record's quest id must match the goals its objective region carries - i.e. the regions really are
+			// per-quest and not one region sliced at arbitrary boundaries.
+			foreach (var record in records.Where(r => r.Objectives!.Goals.Count > 0))
+				Assert.All(record.Objectives!.Goals, g => Assert.Equal(record.QuestId, g.QuestId));
+		}
+
+		// Yields the `[subop][typeTag][instance][prefix][root][tails]` body of every 0x737A6DF9 snapshot in the
+		// tshark corpus.
+		private static IEnumerable<(string Source, byte[] Body)> SnapshotBodies()
+		{
+			foreach (var json in Directory.EnumerateFiles(TestPaths.CapturesDir, "*.tshark.json").OrderBy(f => f))
+			{
+				using var doc = JsonDocument.Parse(File.ReadAllBytes(json));
+				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
+					continue;
+
+				var index = 0;
+				foreach (var p in packets.EnumerateArray())
+				{
+					if (!p.TryGetProperty("BodyHex", out var hexEl))
+						continue;
+
+					var hex = hexEl.GetString() ?? "";
+					if (hex.Length < 40 || !hex.AsSpan(8, 8).Equals("737a6df9", StringComparison.OrdinalIgnoreCase))
+						continue;
+
+					var raw = Convert.FromHexString(hex);
+					// BodyHex is the body WITH its leading u32 length; the split path wants everything after it.
+					var declared = BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(0, 4));
+					if (declared + 4 > raw.Length)
+						continue; // truncated capture - the TCP-reassembly gap on compressed downloads
+
+					yield return ($"{Path.GetFileName(json)}#{index++}", raw[4..]);
+				}
+			}
+		}
+	}
+}

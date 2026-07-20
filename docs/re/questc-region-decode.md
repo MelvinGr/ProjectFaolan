@@ -42,7 +42,31 @@ progress-sublist                       # <-- the piece the beach template never 
 2 words, `Read4×U32`, 2 words). Reading them as 16 raw u32 in wire order (what `QuestcRegion.cs` does) IS
 byte-exact.
 
-## progress-sublist (per record, after obj4) — the real blocker
+## ~~progress-sublist (per record, after obj4) — the real blocker~~ — RESOLVED 2026-07-20 (#384)
+
+> **This section's conclusion was wrong.** What follows below is kept for the record; read this first.
+>
+> There is no "progress sub-list" and no opaque server block. The thing after `obj4` is the quest's own **@609
+> objective region** — `QuestObjectiveRegion`, a codec this repo already had — and it is **interleaved per
+> quest record**, not appended once after the whole list. `FullCharSnapshotSubClass` had always *written* it
+> that way; only the reader was wrong, treating it as a separate top-level region.
+>
+> That parses the beach template fine because the beach journal holds exactly **one** quest, where "after the
+> record" and "after the last record" are the same offset — the same single-element blind spot as the
+> [`0x7E2` list-frame trap](../protocol/README.md). On any real journal the reader desynced at record 2 and
+> threw `Quest_c record: marker 0x2 != 0x412`.
+>
+> The `WTHD` "magic" was a **mis-segmentation**: those bytes are `QuestObjectiveGoal.Reserved[5..6]`, the pair
+> this repo already documented as "70099 / a 4-char tag". It has zero xrefs in `AgeOfConan.exe` not because it
+> is opaque server data, but because **it is not a constant at all** — it is a random 4-character token,
+> distinct in every entry (NecroL80's journal: 39 anchors, 39 distinct tokens — `WTHD`, `1LJL`, `UFWN`, `HIB4`,
+> `C9PY`, …), the same flavour of random key the `<remoteformat key="...">` attributes carry.
+>
+> Verified by `Captures/scripts/decode_questc_progress.py` across **all 141 captured snapshots** (beach L1,
+> L23, L24, and both L80 journals), and gated in the suite by `ProgressedJournalSnapshotTests` — 141 bodies,
+> 85 of them multi-quest, tails byte-exact.
+
+## progress-sublist (per record, after obj4) — the original (incorrect) reading
 
 `[u32 frame = 0x3F1*(k+1)][k × progress-entry]`. rec0 (quest 13907): `frame=0x7E2 ⇒ k=1`. Full byte map of the
 one entry (offsets from NecroL80's snapshot):
@@ -74,13 +98,20 @@ Records are also VARIABLE (rec1 quest 6451 has empty header strings + is itself 
 faithful arbitrary-journal generator needs either a retail server-side spec or a large corpus of progressed
 captures to infer the WTHD/progress fields empirically.
 
-## Status / what to change in `QuestcRegion.cs`
+## Status — DONE (#384, 2026-07-20)
 
-- **Safe now** (preserves the beach round-trip): rename the mislabeled fields (`Zero→Field114`, `N→Field118`,
-  `Marker→N`, `QuestId2→Field2c`) and DROP the two beach-only asserts (`!=0x412`, `questId2!=questId`) — the
-  read/write order is unchanged so the golden stays byte-exact, and the field semantics become correct.
-- **Blocked** (needs the above corpus/spec): reading/generating the progress-sublist for progressed chars.
-  Production is unaffected — fresh chars (the only journals we generate) have `k=0` empty progress lists.
+Both items below shipped; nothing here is blocked any more.
 
-Fresh-char / beach journal generation already works. This decode de-risks the eventual progressed-journal work
-and corrects the field model; the opaque WTHD block is the hard limit of client-only RE here.
+- The mislabeled fields were renamed (`Zero→Field114`, `N→Field118`, `Marker→N`, `QuestId2→Field2c`) and the
+  two beach-only asserts (`!=0x412`, `questId2!=questId`) dropped. Read/write order is unchanged, so every
+  beach golden stayed byte-exact. `QuestcRegion.Marker` is now `QuestcRegion.BeachN` — the value the beach
+  template happens to carry in the goal-count slot, never something to assert against.
+- The per-record objective region is modelled as `QuestcRecord.Objectives` and read/written with the record,
+  so `QuestcRegion` round-trips a progressed journal. `FullCharSnapshotSubClass` lost its now-redundant
+  top-level `QuestObjectives` property (the records own it) and no longer re-parses that region at the
+  boundary.
+
+Reading a progressed journal was never blocked by a spec or a corpus — the structure was already fully
+decoded, just attributed to the wrong owner. The lesson is the recurring one: **a grammar pinned only by the
+single-element/degenerate capture is not pinned**, and a "constant" that appears once per record is worth
+checking against a second capture before calling it a magic.
