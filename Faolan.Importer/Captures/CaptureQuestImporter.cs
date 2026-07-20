@@ -1,3 +1,4 @@
+using Faolan.Importer.Extractors;
 using System;
 using Faolan.Core.Network.Constants;
 using System.Collections.Generic;
@@ -23,6 +24,9 @@ namespace Faolan.Importer.Captures
 	//   - QuestIIR (0x97E02314): per-quest STATE events; the last state per (char, quest) WINS over the log-list Active
 	//     entry - retail sends a completed quest as Active then Completed, so this is what marks a quest Completed.
 	//   - QuestGoal (0x0774C8C1): goal progress count for the matching quest.
+	//   - the FullChar SNAPSHOT's Quest_c JOURNAL region (SnapshotJournalReader): the character's J-panel at login, one
+	//     record per HELD quest. Authoritative for what a character actually holds - it overrides the completed sweep
+	//     below, whose regex cannot tell a journal title record from a completed-archive one.
 	//   - the FullChar SNAPSHOT (0x737A6DF9, DispatchPassBlob): the login snapshot embeds the character's COMPLETED-quest
 	//     log - hundreds of quests for a high-level char, one <remoteformat category=50301> title record each (the
 	//     lvl-80 necro's is a 625 KB snapshot with ~1540 of them). These are entered Completed; the snapshot is addressed
@@ -42,16 +46,32 @@ namespace Faolan.Importer.Captures
 			var progressByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> goal count
 			var logListByChar = new Dictionary<uint, HashSet<uint>>(); // char -> quest ids from the QuestLogList (the J-panel log)
 			var completedByChar = new Dictionary<uint, HashSet<uint>>(); // char -> completed quest ids from the snapshot log
+			var journalByChar = new Dictionary<uint, HashSet<uint>>(); // char -> HELD quest ids from the snapshot's Quest_c region
 			foreach (var packet in rawPackets)
+			{
 				TryRead(packet, stateByChar, progressByChar, logListByChar, completedByChar);
 
-			if (stateByChar.Count == 0 && logListByChar.Count == 0 && completedByChar.Count == 0)
+				// The snapshot's Quest_c region IS the character's J-panel at login - one record per HELD quest. Without
+				// it the completed-title regex below swept those same quests into the COMPLETED archive (their title
+				// records are byte-identical in form), so a character's real journal was stored inside-out: NecroL80's 27
+				// held quests all Completed, and 17 unrelated session-touched quests marked Active.
+				if (SnapshotJournalReader.TryRead(packet, out var journalChar, out var journal))
+				{
+					if (!journalByChar.TryGetValue(journalChar, out var held))
+						journalByChar[journalChar] = held = [];
+					foreach (var record in journal)
+						held.Add(record.QuestId);
+				}
+			}
+
+			if (stateByChar.Count == 0 && logListByChar.Count == 0 && completedByChar.Count == 0 && journalByChar.Count == 0)
 				return (0, 0);
 
 			// The full set of characters we saw ANY quest data for (completed log, active log list, and/or state events).
 			var allChars = new HashSet<uint>(stateByChar.Keys);
 			allChars.UnionWith(logListByChar.Keys);
 			allChars.UnionWith(completedByChar.Keys);
+			allChars.UnionWith(journalByChar.Keys);
 
 			var charactersSeeded = 0;
 			var questsWritten = 0;
@@ -67,6 +87,11 @@ namespace Faolan.Importer.Captures
 				if (completedByChar.TryGetValue(characterId, out var completedIds))
 					foreach (var id in completedIds)
 						merged[id] = QuestState.Completed;
+				// The snapshot journal overrides the completed sweep: a quest with a Quest_c record was HELD at login,
+				// and its title record is what the regex above just mis-filed as completed.
+				if (journalByChar.TryGetValue(characterId, out var heldIds))
+					foreach (var id in heldIds)
+						merged[id] = QuestState.Active;
 				if (logListByChar.TryGetValue(characterId, out var logIds))
 					foreach (var id in logIds)
 						merged[id] = QuestState.Active;

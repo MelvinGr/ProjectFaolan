@@ -1,0 +1,83 @@
+using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
+using Faolan.Core;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Constants;
+
+namespace Faolan.Importer.Extractors
+{
+	// Reads the Quest_c JOURNAL region out of a captured FullChar snapshot (0x737A6DF9) - the character's live
+	// J-panel at login, one record per HELD quest, each carrying the quest's title/summary/area/region text refs and
+	// its record scalars.
+	//
+	// This is the authoritative source for two things nothing else in the corpus provides:
+	//   - which quests a character actually HOLDS (the incremental QuestLogList/QuestIIR packets only show quests
+	//     touched during that capture session);
+	//   - the journal CONTENT for those quests, so their definitions can be generated rather than replayed.
+	//
+	// Both were previously lost. CaptureQuestImporter regex-scanned the whole snapshot for
+	// `<remoteformat id="N" category="50301">` title records and entered every hit as COMPLETED - but the Quest_c
+	// records carry title records in exactly that form, so a character's ACTIVE journal was swept into the completed
+	// archive wholesale (NecroL80: all 27 of her held quests stored as Completed, while the 17 marked Active were
+	// incidental session packets). QuestDefinitionExtractor, meanwhile, only read the QuestFullUpdate/QuestJournal
+	// packets, which covered 2 of her 27.
+	//
+	// Reading this region only became possible on 2026-07-20: QuestcRegion threw on any progressed journal until the
+	// per-record objective interleaving was fixed (Gitea #384).
+	public static class SnapshotJournalReader
+	{
+		private const uint CarrierOpcode = 0x2000;
+
+		// The journal records a snapshot packet carries, with the character they belong to. Returns false for any
+		// packet that is not a parseable player snapshot.
+		public static bool TryRead(byte[] packet, out uint characterId, out IReadOnlyList<QuestcRecord> records)
+		{
+			characterId = 0;
+			records = [];
+			if (packet == null || packet.Length < 32)
+				return false;
+
+			var body = Body(packet);
+			if (body.Length < 20 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+				return false;
+
+			try
+			{
+				var stream = new FaolanStream(body);
+				stream.ReadUInt32(); // body length
+				stream.ReadUInt32(); // sub-opcode
+				stream.ReadUInt32(); // type tag
+				var instance = stream.ReadUInt32(); // the snapshot is addressed to its own player
+
+				// The full split: the journal lives in the SUB-CLASS (tails), so the root-only reader will not do.
+				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
+				characterId = instance;
+				records = parts.SubClass.Quests.Records;
+				return records.Count > 0;
+			}
+			catch
+			{
+				// truncated capture, or a snapshot shape we cannot split - the caller falls back to its other sources
+				return false;
+			}
+		}
+
+		// The 0x2000 body within a full on-wire packet: [len4][crc4][headerLen4][header][body].
+		private static byte[] Body(byte[] full)
+		{
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
+			var start = 12 + headerLen;
+			return start > 0 && start < full.Length
+				? full[start..]
+				: [];
+		}
+
+		// True when the packet is a 0x2000 carrier at all - a cheap pre-filter for callers scanning every packet.
+		public static bool IsCarrier(uint opcode)
+		{
+			return opcode == CarrierOpcode;
+		}
+	}
+}

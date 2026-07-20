@@ -406,10 +406,25 @@ namespace Faolan.Importer.Captures
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
 		{
 			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a
-			// playfield that isn't in the Maps catalog (e.g. a marker for a map the rdb-maps module didn't pull). Those
-			// would fail the FK, so skip them with a clear line rather than silently — they'll re-import once/if their
-			// map is added to the catalog.
+			// playfield the Maps catalog doesn't have - the catalog is built from captured MapChange packets, so a map
+			// nobody visited in a capture is simply absent (e.g. 1000004, referenced by four Quest_c journal records).
+			// These used to be SKIPPED, which threw away real journal content to satisfy an FK. A placeholder Map row
+			// carries the id and nothing else; the maps module fills in the name if that playfield is ever captured.
 			var knownMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			var placeholderMaps = 0;
+			foreach (var mapId in definitions.Select(d => d.MapId).Distinct().Where(id => id != 0 && !knownMaps.Contains(id)))
+			{
+				db.Maps.Add(new Map { Id = mapId, Name = string.Empty });
+				knownMaps.Add(mapId);
+				placeholderMaps++;
+			}
+
+			if (placeholderMaps > 0)
+			{
+				await db.SaveChangesAsync();
+				Console.WriteLine($"Quest definitions: added {placeholderMaps} placeholder Map row(s) for playfields not in the catalog.");
+			}
+
 			var skipped = 0;
 
 			var added = 0;
@@ -418,7 +433,7 @@ namespace Faolan.Importer.Captures
 			{
 				if (!knownMaps.Contains(def.MapId))
 				{
-					Console.WriteLine($"Quest {def.QuestId}: skipped - map {def.MapId} not in the (pruned) Maps catalog.");
+					Console.WriteLine($"Quest {def.QuestId}: skipped - map {def.MapId} not in the Maps catalog (id 0 = the record carried no map ref).");
 					skipped++;
 					continue;
 				}
