@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Importer.Captures;
 
@@ -56,6 +57,28 @@ namespace Faolan.Importer.Extractors
 						RegionCategory = region.Category,
 						RegionKey = region.Key
 					};
+				}
+			}
+
+			// SECOND source: the quest INDEX blocks carry the same area 4CC (29 of 29 captured blocks match the
+			// completed journal's). An area only reachable through a character's ACTIVE quests never appears in a
+			// completed journal, so this covers areas the first pass cannot.
+			foreach (var p2 in packets)
+			{
+				if (!SnapshotJournalReader.TryRead(p2.Bytes, out _, out var journal, out var index) || index == null)
+					continue;
+
+				foreach (var block in index.Blocks)
+				{
+					if (block.Magic == 0)
+						continue;
+
+					var quest = journal.FirstOrDefault(r => r.QuestId == block.TrailerQuestId);
+					if (quest == null || quest.AreaId == 0 || byArea.ContainsKey(quest.AreaId))
+						continue;
+
+					// Only the 4CC is available here - the area's header records are not part of the index.
+					byArea[quest.AreaId] = new QuestArea { AreaId = quest.AreaId, Magic = block.Magic };
 				}
 			}
 
