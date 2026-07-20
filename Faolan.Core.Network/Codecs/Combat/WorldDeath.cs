@@ -99,7 +99,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			}.ToProtobuf();
 			return new FaolanStream()
 				.WriteUInt32(BccIirOpcode)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0004) // form
 				.WriteUInt32(0x0000001F) // slot
@@ -112,11 +112,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			return new FaolanStream()
 				.WriteUInt32(DeathEffectOpcode)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(dyingHandle) // applyTo = the dying player
 				.WriteUInt16(0x0000)
 				.WriteUInt32(DeathEffectSpellId)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(dyingHandle) // applyFrom = self
 				.WriteArray(DeathEffectPayload)
 				.ToArray();
@@ -124,18 +124,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] BuildDeathPose(uint dyingHandle, Vector3 position)
 		{
-			return new FaolanStream().WriteUInt32(MoveTaskOpcode).WriteUInt32(0x0000C350).WriteUInt32(dyingHandle).WriteUInt16(0x0000).WriteVector3(position).WriteByte(DeadMovementType).ToArray();
+			return new FaolanStream().WriteUInt32(MoveTaskOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(dyingHandle).WriteUInt16(0x0000).WriteVector3(position).WriteByte(DeadMovementType).ToArray();
 		}
 
 		public static byte[] BuildKilledBy(uint dyingHandle, uint killerEndpoint)
 		{
 			return new FaolanStream()
 				.WriteUInt32(SimpleCharKilledByOpcode)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(dyingHandle)
 				.WriteByte(0x00)
 				.WriteByte(0x01)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(killerEndpoint)
 				.ToArray();
 		}
@@ -144,7 +144,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			return new FaolanStream()
 				.WriteUInt32(BccIirOpcode)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0004) // form
 				.WriteUInt32(0x00000025) // slot

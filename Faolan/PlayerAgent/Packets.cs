@@ -12,8 +12,8 @@ namespace Faolan.PlayerAgent
 {
 	partial class PlayerAgentListener
 	{
-		private static readonly byte[] Sender = [0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02];
-		private static readonly byte[] ServiceConnectionSender = [0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x08];
+		private static readonly byte[] Sender = Endpoints.EndpointBytes(Endpoints.PlayerAgentType, 0x02);
+		private static readonly byte[] ServiceConnectionSender = Endpoints.EndpointBytes(Endpoints.PlayerAgentServiceConnectionType, 0x08);
 
 		// The active character's realm - the routing target for the world/chat/guild handoffs (#324). Every service
 		// the client is about to connect to lives IN that realm's process, so all three handoffs advertise this realm's
@@ -129,7 +129,7 @@ namespace Faolan.PlayerAgent
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D])
 				.WriteString($"{realm.IpAddress}:{realm.Port}")
 				.WriteUInt32(account.Id)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(account.ClientInstance)
 				.WriteArray((byte[])[0x62, 0x00, 0x00, 0xC7, 0x9C, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00])
 				.WriteUInt32(account.ClientInstance)
@@ -191,7 +191,7 @@ namespace Faolan.PlayerAgent
 		{
 			return new PacketStream()
 				.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox20B9)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteUInt32(0)
 				.SendAsync(client);

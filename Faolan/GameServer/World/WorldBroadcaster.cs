@@ -1895,7 +1895,7 @@ namespace Faolan.GameServer.World
 		{
 			return new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(npcHandle)
 				.WriteByte(state)
 				.SendAsync(client);

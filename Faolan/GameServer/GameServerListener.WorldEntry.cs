@@ -901,7 +901,7 @@ namespace Faolan.GameServer
 
 			await new PacketStream()
 				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(handle)
 				.WriteByte(status)
 				.SendAsync(client);

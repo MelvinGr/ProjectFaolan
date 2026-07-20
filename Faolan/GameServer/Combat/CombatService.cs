@@ -255,7 +255,7 @@ namespace Faolan.GameServer.Combat
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
-					.WriteUInt32(0x0000C350u)
+					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(instance)
 					.WriteUInt16(next)
 					.WriteUInt32(0x0000000Fu)
@@ -271,7 +271,7 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(0)
 					.WriteUInt32(0) // entry (6 u32)
 					.WriteUInt32(1)
-					.WriteUInt32(0x0000C350u)
+					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(targetHandle)
 					.WriteUInt32(0) // result: count, c350, VICTIM=target, 0 - the entity that plays the hit-react/blood.
 									// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);

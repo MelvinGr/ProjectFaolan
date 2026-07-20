@@ -252,14 +252,16 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		public static byte[] Localized(int id, int category, string flags, string key)
 		{
-			return TextRecord($"<localized id=\"{id}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >");
+			var xml = $"<localized id=\"{id}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >";
+			return new FaolanStream().WriteString(xml).ToArray();
 		}
 
 		// One <remoteformat>/<localized> text slot:  00 <u8 length> <ascii bytes>.  `key` is passed
 		// pre-escaped (it already contains entities like &#36; in the capture).
 		public static byte[] RemoteFormat(int id, int category, string key)
 		{
-			return TextRecord($"<remoteformat id=\"{id}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>");
+			var xml = $"<remoteformat id=\"{id}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
+			return new FaolanStream().WriteString(xml).ToArray();
 		}
 
 		// The inverse of BuildQuestGoal: recovers (playerHandle, questId, goalId, count) from a 33-byte QuestGoal body.
@@ -382,21 +384,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// QuestLogList: the fixed head before the entries, and one [u32 ordinal][u32 questId] entry.
 		private const int HeaderLength = 29;
 		private const int EntrySize = 8;
-
-		// A quest text record: the <remoteformat>/<localized> XML, u16-length-prefixed.
-		//
-		// This was hand-rolled as [0x00][u8 len][ascii] with a >255 guard. Both were wrong, and invisibly so: the
-		// bytes are identical below 256 (the "lead 0x00" is the u16 length's high byte) and the longest of 2850
-		// captured records is 119 B, so no capture could discriminate. The client decides it - BinaryStream::
-		// ReadString (FUN_00cbf840) reads a u16 in its default mode, escaping to a u32 form only at >= 0x8000, so
-		// the real ceiling is 0x7FFF and the old 0xFF guard was an artificial limit (#388).
-		//
-		// Latin1, not ASCII: the client memcpy's these bytes into a std::string without transcoding, so ASCII's
-		// lossy '?' substitution would corrupt any accented text. See FaolanStream.ReadString.
-		private static byte[] TextRecord(string xml)
-		{
-			return new FaolanStream().WriteString(xml).ToArray();
-		}
 
 		private static void WriteHeader(FaolanStream w, uint subOpcode, uint playerHandle)
 		{

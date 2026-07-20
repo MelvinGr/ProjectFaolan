@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		{
 			return new FaolanStream()
 				.WriteUInt32(Opcode)
-				.WriteUInt32(0x0000C350u)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(charInstance)
 				.WriteByte(0x01)
 				.WriteArrayUInt32Length(containerBlob.ToProtobuf())

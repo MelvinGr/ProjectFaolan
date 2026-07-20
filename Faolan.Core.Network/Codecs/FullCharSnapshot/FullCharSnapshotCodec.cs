@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
 
@@ -40,9 +41,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// accessors that only the tests used live in Faolan.Tests/Support/SnapshotEntryAccessors.cs.
 	public static class FullCharSnapshotCodec
 	{
-		// The IIR entity-class tag that follows the sub-opcode (shared with the 0x201C handshake bodies).
-		public const uint TypeTag = 0x0000C350;
-
 		// Prefix = [u8 flag][u32 BE blobLen]; blobLen counts the root exactly, so the prefix carries no payload.
 		public const int PrefixLength = 5;
 
@@ -61,7 +59,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			body.WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(FullPlayerCharacterBuilder.Opcode);
-				s.WriteUInt32(TypeTag);
+				s.WriteUInt32(EntityClass.Character);
 				s.WriteUInt32(instance);
 				s.WriteArray(BuildPrefix(rootBytes.Length));
 				s.WriteArray(rootBytes);

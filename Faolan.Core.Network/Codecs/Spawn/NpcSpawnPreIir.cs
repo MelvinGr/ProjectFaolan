@@ -76,6 +76,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public byte[] Flags { get; set; } = new byte[ByteCount];
 
 		// The per-spawn sublist, raw. count==0 (the only observed form) is the bare 0x3F1 framing word.
+		// ListFrame.Empty (the (0+1)*0x3F1 word) as bytes - an empty count-framed list, not a magic constant.
 		public byte[] Sublist { get; set; } = [0x00, 0x00, 0x03, 0xF1];
 
 		// The 53 u32 fields, in wire order, each held as the big-endian value read off the wire (the value the

@@ -9,7 +9,7 @@ namespace Faolan.UniverseAgent
 {
 	partial class UniverseAgentListener
 	{
-		private static readonly byte[] Sender = [0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01];
+		private static readonly byte[] Sender = Endpoints.EndpointBytes(Endpoints.UniverseAgentType, 0x01);
 
 		private Task SendPlayerAgentRealm(INetworkClient client)
 		{

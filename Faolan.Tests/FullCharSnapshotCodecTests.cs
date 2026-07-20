@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Constants;
 using System;
 using System.IO;
 using System.Linq;
@@ -34,7 +35,7 @@ namespace Faolan.Tests
 			var stream = new FaolanStream(body);
 			stream.ReadUInt32(); // record length
 			Assert.Equal(FullPlayerCharacterBuilder.Opcode, stream.ReadUInt32());
-			Assert.Equal(FullCharSnapshotCodec.TypeTag, stream.ReadUInt32());
+			Assert.Equal(EntityClass.Character, stream.ReadUInt32());
 			Assert.Equal(Instance, stream.ReadUInt32());
 
 			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);

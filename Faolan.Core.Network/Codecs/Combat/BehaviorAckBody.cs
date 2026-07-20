@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			using var s = new FaolanStream();
 			s
 				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
-				.WriteUInt32(0x0000C350u)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(instance)
 				.WriteUInt16(seq + 1)
 				.WriteUInt32(behaviorId)
@@ -68,7 +68,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			using var s = new FaolanStream();
 			s
 				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
-				.WriteUInt32(0x0000C350u)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(instance)
 				.WriteUInt16(0x0007)
 				.WriteUInt32(behaviorId)

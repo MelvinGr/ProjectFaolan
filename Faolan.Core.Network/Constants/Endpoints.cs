@@ -21,6 +21,13 @@ namespace Faolan.Core.Network.Constants
 		public const uint CSPlayerAgentType = 0x6DD55614; // = hash("CSPlayerAgent")     (CsPlayerAgent reply endpoint)
 		public const uint CSPlayerInterfaceType = 0xBBD560C8; // = hash("CSPlayerInterface") (CsPlayerAgent reply caller)
 		public const uint GameAgentType = 0xB171CE13; // = hash("GameAgent")
+
+		// The login-tier endpoint classes. These were hand-encoded as raw ProtoEndpoint bytes in the agents'
+		// Packets.cs (e.g. [0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01] = {type, instance}); named here so the senders
+		// go through EndpointBytes like every other endpoint.
+		public const uint PlayerAgentType = 0x82F20484;
+		public const uint PlayerAgentServiceConnectionType = 0x1D359116;
+		public const uint UniverseAgentType = 0x604DDBA0;
 		public const uint GameCharAgentProjectType = 0x5B9756FC; // = hash("GameCharAgentProject")     (post-ready family)
 		public const uint GameCharAgentType = 0xA9ECB95D; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
 		public const uint GameCharInterfaceProjectType = 0x28377648; // = hash("GameCharInterfaceProject")  (report-server-id family)

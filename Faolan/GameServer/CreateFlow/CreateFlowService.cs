@@ -602,7 +602,7 @@ namespace Faolan.GameServer.CreateFlow
 		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository database = null)
 		{
 			var id = client.Session.Account.ClientInstance;
-			var sender = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x59 };
+			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
 
 			// The galley scene props are WorldObjects rows on the editor map (4000), loaded here keyed by captured
@@ -841,7 +841,7 @@ namespace Faolan.GameServer.CreateFlow
 		internal static async Task SendRetailCreateEditorCreationScriptBurst(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
-			var sender = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x59 };
+			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
 
 			const uint W = EntityClass.Character; // EntityClass.Character (0xC350)
@@ -915,7 +915,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			return new PacketStream()
 				.WriteHeader(RetailCreateEditorPostReadyAckSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(requestId)
 				.WriteUInt32(requestId == 0x0009FF95
 					? 0x00000000u
