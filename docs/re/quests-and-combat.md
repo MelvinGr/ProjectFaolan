@@ -172,7 +172,9 @@ Quest state is driven by four IIR records (decoded from `hoxxling-login-gameplay
 
 **Built:** `WorldQuest` (byte-exact `QuestIIR`/`QuestGoal` builders) + a `CharacterQuest` table (per-character
 quest id + state + goal progress; schema since squashed into the `InitialCreate` migration) + repo upsert/remove +
-restore-on-login (`RestorePlayerQuests`). This is the quest STATE foundation. **Objective auto-tracking on kill is
+restore-on-login. ⚠️ That live restore path (`RestorePlayerQuests`) was DELETED on 2026-07-20: retail sends no
+quest packet at all before the first in-session accept, and both journal tabs ride the login snapshot instead
+(#389/#390). This is the quest STATE foundation. **Objective auto-tracking on kill is
 wired**: `CharacterQuest.GoalTargetName` (+ `GoalProgress`/`GoalRequired`) holds a kill objective; the NPC-death
 path calls `QuestProgressionService.AdvanceKillGoals`, which (via `QuestProgress.Advances`) bumps any active quest
 whose target matches the slain NPC, pushes `QuestGoal`, persists, and completes at the required count (state +

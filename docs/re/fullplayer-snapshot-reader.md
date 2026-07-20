@@ -43,9 +43,11 @@ NEXT held quest's `AreaId`, the LAST block = the primary's `IndexTrailerWord`. *
 PER-QUEST CONSTANTS** (byte-identical across a quest's active AND completed login captures — NOT progress-bearing; the
 beach record is the same fresh 601 B early or late). Builder: `FullCharSnapshotSubClass.BuildQuestPortion(quests, primary,
 instance)` + a `BuildFromScratch(quests, primary, ...)` overload (beach-only delegates → byte-identical). New
-`QuestDefinition` cols: `SnapshotState`, `SnapshotField28`, `IndexMagic` (+migrations). A held quest joins the snapshot
-only if `FullCharSnapshotSubClass.IsSnapshotEligible` (scalars + 5 header text refs seeded); others fall to the live
-`RestorePlayerQuests` path (no double-delivery). Golden: `BuildQuestPortionTests` reproduces the 2-quest region
+`QuestDefinition` cols: `Level`, `SnapshotUnknown28`, `IndexMagic` (+migrations; `SnapshotState` was collapsed into
+`Level` and the `SnapshotField*` scalars renamed `SnapshotUnknown*` on 2026-07-20). A held quest joins the snapshot
+only if `FullCharSnapshotSubClass.IsSnapshotEligible` — record scalars + the 5 header text refs + @609 goals +
+`ObjectiveRegionVerified` + its area's 4CC. ⚠️ There is NO live fallback any more: `RestorePlayerQuests` was deleted
+(#389/#390), so an ineligible quest is simply ABSENT from the journal. Golden: `BuildQuestPortionTests` reproduces the 2-quest region
 byte-for-byte. NB the 3 earlier in-client crashes were WRONG ASSEMBLY ORDER (records-then-objective + single-block
 index), NOT a progress/obj-list issue — the obj-lists are empty and the records are constants.
 
@@ -58,7 +60,8 @@ DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Quest INDEX (`@1168`)** — codec `QuestIndexRegion` (the `0x3F1` index + the `0x57365154` "W6QT" goal-id
   table), wired into `FullCharSnapshotSubClass`, with a `Build` generator.
 - **Per-goal `QuestDefinition` model** — `QuestGoalDefinition` table + the snapshot-generation columns
-  (`SnapshotN/FieldEc/FieldF0/FieldF8`, `IndexMarker/TableField*/TrailerWord/GoalSteps`) + migration; seeded
+  (`SnapshotUnknown118/UnknownEc/UnknownF0/UnknownF8`, `IndexMarker/TableField*/TrailerWord/IndexGoalSteps`) +
+  migration; seeded
   for the beach starter (importer `SeedBeachQuestGoals`). `BuildWholeQuestPortion_ReproducesBeachTails`
   proves `@0..1292` regenerates byte-exact with NO literals (only the per-character quest state).
 - **Production wiring (live, in-client verified 2026-06-16 — INTERIM, since SUPERSEDED by #210)** — the (now
@@ -123,8 +126,9 @@ REMAINING to author multi-quest (the gating work, decode-first):
    `FUN_00798c70`/`FUN_004d4c70`/`FUN_00922210` (Lists B/C/MainQuest) on the 2-quest tails to see which reader
    consumes @1065..1624. Then model the quest region as the real per-quest (record [+ objregion]) sequence in
    `FullCharSnapshotSubClass`/`QuestcRegion` and regenerate from `CharacterQuests`.
-2. **Harvest 13479's snapshot scalars + goals** (`SnapshotN`/`FieldEc`/`FieldF0`/`FieldF8`, per-goal markers,
-   `GoalSteps`, trailer word) into `QuestDefinition`/`QuestGoalDefinition` (seeded only for 10238 today).
+2. ~~**Harvest 13479's snapshot scalars + goals**~~ DONE 2026-07-20: harvested for every captured quest, not just
+   the seeds (`ObjectiveGoalExtractor`, `QuestAreaExtractor`, `CompletedQuestExtractor`). ⚠️ The index block's
+   `GoalSteps` are NOT goal ids - they are the AREA's quest catalog, renamed `Block.AreaQuestIds`.
 3. **Extend `FullCharSnapshotSubClass.BuildQuestPortion` → `BuildQuestPortion(IReadOnlyList<(def,state)>)`** — emit N
    `Quest_c` records + the N-quest objective region + the N-id index; validate byte-exact against `xxx-login`'s
    2-quest region (golden test) before wiring.
