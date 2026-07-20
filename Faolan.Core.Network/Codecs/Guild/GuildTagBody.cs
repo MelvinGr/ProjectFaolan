@@ -34,26 +34,32 @@ namespace Faolan.Core.Network.Codecs.Guild
 			s.WriteString(GuildName);
 		}
 
-		// Zero-copy inverse over a raw body: recovers (characterId, guildName), validating the sub-opcode + C350 wire
-		// type and the string length prefix. False on any mismatch. Proven by the GuildPacketTests round-trip.
+		// Validating inverse over a raw body: recovers (characterId, guildName), rejecting a mis-routed body.
+		//
+		// Implemented ON Read rather than re-parsing by fixed offsets. It used to hand-roll the same layout with
+		// BinaryPrimitives at 0/4/8/14 - the 8 -> 14 jump silently stepping over the constant u16 - and decoded the
+		// name with Encoding.UTF8 while Read used the stream helper, so the two halves of one codec disagreed about
+		// the string encoding (wire strings are Latin1; see FaolanStream.ReadString).
 		public static bool TryParse(ReadOnlySpan<byte> body, out uint characterId, out string guildName)
 		{
 			characterId = 0;
 			guildName = string.Empty;
 			if (body.Length < 16) // subop(4) + type(4) + char(4) + u16 0(2) + u16 str-len(2)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.GuildUpdateIIR)
+
+			var s = new FaolanStream(body.ToArray());
+			if (s.ReadUInt32() != (uint)GameServer0X2000Opcodes.GuildUpdateIIR)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
+			if (s.ReadUInt32() != EntityClass.Character)
 				return false;
 
-			characterId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
-			// body[12..14] is the constant u16 0; the WriteString length prefix follows at [14..16], then the name.
-			int len = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(14, 2));
-			if (body.Length != 16 + len)
+			s.Position = 0;
+			var parsed = Read(s);
+			if (s.Position != body.Length) // trailing bytes - not a well-formed tag body
 				return false;
 
-			guildName = Encoding.UTF8.GetString(body.Slice(16, len));
+			characterId = parsed.CharacterId;
+			guildName = parsed.GuildName;
 			return true;
 		}
 	}

@@ -226,7 +226,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// capture and the small p/q trailing pair carries morph flags/index. Raw-body float = big-endian.
 		public static byte[] BuildSetMorphValueIir(uint handle, string name, float weight, byte p, uint q, uint type = EntityClass.Character)
 		{
-			var nameBytes = Encoding.UTF8.GetBytes(name);
+			var nameBytes = Encoding.Latin1.GetBytes(name); // wire strings are raw bytes - see FaolanStream.ReadString
 			return new FaolanStream()
 				.WriteUInt32(type)
 				.WriteUInt32(handle)

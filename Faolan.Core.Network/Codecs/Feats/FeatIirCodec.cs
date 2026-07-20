@@ -18,21 +18,20 @@ namespace Faolan.Core.Network.Codecs.Feats
 		public const byte StateTrainRequest = 0x04;
 		public const byte StateAck = 0x05;
 
-		private const uint AckConstant = 0xC350;
-		private const uint ListMarker = ListFrame.Unit;
-		private const int FeatsOffset = 22; // [sub 4][c350 4][handle 4][00 1][state 1][zero 4][marker 4]
+		// [sub 4][C350 4][handle 4][00 1][state 1][zero 4][marker 4]
+		private const int FeatsOffset = 22;
 
 		// Build the wire body (from the sub-opcode; the u32 length prefix is added by the framing WriteArrayUInt32Length).
 		public static byte[] Build(uint charHandle, byte state, IReadOnlyList<uint> featIds)
 		{
 			var s = new FaolanStream()
 				.WriteUInt32(Opcode)
-				.WriteUInt32(AckConstant)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(charHandle)
 				.WriteByte((byte)0x00)
 				.WriteByte(state)
 				.WriteUInt32(0u)
-				.WriteUInt32(ListMarker * ((uint)featIds.Count + 1));
+				.WriteUInt32(ListFrame.ForCount(featIds.Count));
 			foreach (var id in featIds)
 				s.WriteUInt32(id);
 
@@ -40,30 +39,43 @@ namespace Faolan.Core.Network.Codecs.Feats
 		}
 
 		// Parse a FeatIIR body (from the sub-opcode). Returns false on a shape mismatch (wrong sub / bad list marker).
+		//
+		// Read SEQUENTIALLY: the old fixed offsets ran 0 -> 8 -> 13 -> 18, stepping silently over the 0xC350 type
+		// word, the 0x00 byte before `state`, and the zero word before the list marker. Every field the record
+		// carries is now named.
 		public static bool TryParse(byte[] body, out uint charHandle, out byte state, out List<uint> featIds)
 		{
 			charHandle = 0;
 			state = 0;
 			featIds = null;
-			if (body == null || body.Length < FeatsOffset)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4)) != Opcode)
+			if (body is not { Length: >= FeatsOffset })
 				return false;
 
-			charHandle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4));
-			state = body[13];
-			var marker = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4));
-			if (marker == 0 || marker % ListMarker != 0)
+			var r = new FaolanStream(body);
+			if (r.ReadUInt32() != Opcode)
 				return false;
 
-			var count = marker / ListMarker - 1;
+			r.ReadUInt32(); // 0xC350 type word
+			var handle = r.ReadUInt32();
+			r.ReadByte(); // constant 0x00
+			var parsedState = r.ReadByte();
+			r.ReadUInt32(); // zero word
+
+			var marker = r.ReadUInt32();
+			if (marker == 0 || marker % ListFrame.Unit != 0)
+				return false;
+
+			var count = ListFrame.CountOf(marker);
 			if (FeatsOffset + 4L * count > body.Length)
 				return false;
 
-			featIds = new List<uint>((int)count);
+			var ids = new List<uint>(count);
 			for (var k = 0; k < count; k++)
-				featIds.Add(BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(FeatsOffset + 4 * k, 4)));
+				ids.Add(r.ReadUInt32());
 
+			charHandle = handle;
+			state = parsedState;
+			featIds = ids;
 			return true;
 		}
 	}
