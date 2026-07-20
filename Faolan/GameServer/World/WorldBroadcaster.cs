@@ -701,10 +701,13 @@ namespace Faolan.GameServer.World
 
 			// World objects aren't tracked in Known, so we can't use that #245 gate; instead only despawn for viewers
 			// that have ENTERED the world (they received the world-object burst, so the handle is safe to quit for them).
+			// A world object is removed by its OWN class (SimpleDynel / LootBag / ZoneLabel / ...), not Character - a
+			// Character-classed despawn silently misses it (#366). Derive the class from its spawn IIR.
+			var classWord = WorldObjectBuilder.TypeTagForClass(obj.SubOpcode);
 			var zone = _sim.World.ZoneForEntity(player);
 			foreach (var viewer in zone.PlayersInRange(obj.Position, WorldSimulation.PlayerInterestRange))
 				if (viewer.Client?.Session?.WorldEntered == true)
-					await SendWorldDespawn(viewer.Client, zone.PlayfieldToken, handle);
+					await SendWorldDespawn(viewer.Client, zone.PlayfieldToken, handle, classWord);
 
 			var deleted = await _database.DeleteWorldObject(player.MapId, handle);
 			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", obj.DisplayName ?? obj.Name, handle, deleted, player.Name);
@@ -1640,7 +1643,7 @@ namespace Faolan.GameServer.World
 		// recipient's INSTANCE playfield token (#268; ZoneForEntity(recipient).PlayfieldToken at the call site): the
 		// burst's value for a replayed playfield (what the client learned at entry), else WorldState's minted fallback.
 		// The token-is-0 guard is just defensive (ZoneFor always mints one).
-		private Task SendWorldDespawn(INetworkClient recipient, uint playfieldToken, uint subjectHandle)
+		private Task SendWorldDespawn(INetworkClient recipient, uint playfieldToken, uint subjectHandle, uint classWord = EntityClass.Character)
 		{
 			var token = playfieldToken;
 			if (token == 0)
@@ -1651,7 +1654,7 @@ namespace Faolan.GameServer.World
 
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(subjectHandle, token)))
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(subjectHandle, token, classWord)))
 				.SendAsync(recipient);
 		}
 

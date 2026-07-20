@@ -6,7 +6,11 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	// The despawn / "entity left your view" packet - n3ToClientQuit (0x04B82B2D). DECODED 2026-06-11 from all 3271
 	// retail records (server->client only); see protocol_despawn_n3toclientquit. The 0x2000 IIR body is:
-	//   [subop=04B82B2D][typeTag/ack=0000C350][handle = entity to remove][0x01 marker][u32 playfield-instance token]
+	//   [subop=04B82B2D][class][handle = entity to remove][0x01 marker][u32 playfield-instance token]
+	// ⚠️ The second word is the removed object's CLASS (EntityClass), NOT a constant ack. The client indexes the
+	// removal by (class, handle), so a despawn sent with the wrong class silently misses the object (#366): a static
+	// world object is a SimpleDynel 0xC878 / a loot bag 0xC87A / a door 0xC748, not Character 0xC350. Players/NPCs are
+	// Character. (The 3271-record decode only ever looked at Character despawns, which is why it read as a constant.)
 	// The marker is always 0x01. The token is NOT a handle - it's the per-playfield id the server announces at
 	// world-entry (woven into the 0x737A6DF9 snapshot tails, between markers 000000BF and 0000040B) and stamps into
 	// every despawn so the client scopes the removal to that playfield instance. We extract it from the snapshot we
@@ -24,12 +28,14 @@ namespace Faolan.Core.Network.Codecs.World
 		private static readonly byte[] TokenPrefixMarker = [0x00, 0x00, 0x00, 0xBF];
 		private static readonly byte[] TokenSuffixMarker = [0x00, 0x00, 0x04, 0x0B];
 
-		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` in playfield `token`.
-		public static byte[] BuildBody(uint handle, uint token)
+		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` (of class
+		// `classWord`) in playfield `token`. classWord defaults to Character (players/NPCs); a static world object must
+		// pass its own class (WorldObjectBuilder.TypeTagForClass) or the client won't remove it (#366).
+		public static byte[] BuildBody(uint handle, uint token, uint classWord = EntityClass.Character)
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.N3ToClientQuitIIR)
-				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(classWord)
 				.WriteUInt32(handle)
 				.WriteByte(RecordMarker)
 				.WriteUInt32(token)
@@ -59,8 +65,7 @@ namespace Faolan.Core.Network.Codecs.World
 			var r = new FaolanStream(body);
 			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR)
 				return false;
-			if (r.ReadUInt32() != EntityClass.Character)
-				return false;
+			r.ReadUInt32(); // class - a field (Character / SimpleDynel / LootBag / ...), NOT a constant (#366)
 
 			var parsedHandle = r.ReadUInt32();
 			if (r.ReadByte() != RecordMarker)
