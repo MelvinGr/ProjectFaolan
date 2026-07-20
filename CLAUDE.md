@@ -205,14 +205,15 @@ The 349 MB of retail traces, the Ghidra project and the baked terrain live in a 
 (and can go public). Clone it as a sibling of this one.
 
 **The test suite does NOT need it.** All 1046 tests read `Faolan.Tests/Assets/corpus-extract.bin` (12 MB,
-committed): the six IIR types the whole-corpus gates walk, pulled out of the corpus and deflated, with each
+committed): the eight IIR types the gates need, pulled out of the corpus and deflated, with each
 packet's source file, index and tshark frame preserved so a byte-exact failure still names one packet in one
 capture. Regenerate it with the data repo present:
 
 ```zsh
-ln -s ../../ProjectFaolan-Data/Captures Captures   # only needed for the tools below; gitignored
-dotnet run --project Faolan.Importer -- --report corpus-extract
+dotnet run --project Faolan.Importer -- --report corpus-extract --captures <data-repo>/Captures
 ```
+
+`--captures` is how every importer command takes it (`--db`, `--rdb` likewise)
 
 ⚠️ The extract is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
 gate while they all still pass - the exact failure mode those gates exist to catch. Its manifest pins the

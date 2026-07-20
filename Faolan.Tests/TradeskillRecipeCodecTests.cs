@@ -6,6 +6,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
+using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -18,7 +19,13 @@ namespace Faolan.Tests
 	public class TradeskillRecipeCodecTests
 	{
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59];
-		private static readonly string Capture = TestPaths.Capture("NecroL80_mage-necromancer_shops_open-crrafting-receipies.tshark.json");
+		// The one captured recipe catalog, from the committed corpus extract. Both tests below used to `return`
+		// silently when the capture was absent, so they asserted NOTHING on a checkout without the capture repo.
+		private static CapturedPacket Reply()
+		{
+			var entry = CorpusExtract.PacketsOfType((uint)GameServer0X2000Opcodes.TradeskillReplyIIR).Single();
+			return new CapturedPacket(0, true, entry.Opcode, entry.Iir, entry.Full);
+		}
 
 		[Fact]
 		public void BuildReplyBody_EmptyCatalog_IsAValidEmptyList()
@@ -31,11 +38,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ParseReplyBody_DecodesRecipeFieldsAndElements()
 		{
-			if (!File.Exists(Capture))
-				return;
-
-			var packets = TsharkCaptureReader.Read(Capture);
-			var reply = packets.First(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000Opcodes.TradeskillReplyIIR);
+			var reply = Reply();
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
 			var records = TradeskillRecipeCodec.ParseReplyBody(reply.Bytes.AsSpan(sub + 12).ToArray());
 
@@ -59,12 +62,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ParseThenBuild_ReproducesTheCapturedRecipeBook_ByteExact()
 		{
-			if (!File.Exists(Capture))
-				return; // capture not present in this checkout - nothing to assert
-
-			var packets = TsharkCaptureReader.Read(Capture);
-			var reply = packets.FirstOrDefault(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000Opcodes.TradeskillReplyIIR);
-			Assert.NotEqual(default, reply);
+			var reply = Reply();
 
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
 			Assert.True(sub >= 0);
@@ -84,11 +82,7 @@ namespace Faolan.Tests
 			// The end-to-end DB-path guard: project each decoded record into its Recipe row + RecipeItem children (as
 			// the importer does) with each element's key+hash on the referenced Items row, then ToRecord it back (as
 			// the live server does) and rebuild. Proves the column schema loses nothing through the DB representation.
-			if (!File.Exists(Capture))
-				return;
-
-			var packets = TsharkCaptureReader.Read(Capture);
-			var reply = packets.First(p => p.IsDownload && p.SubOpcode == (uint)GameServer0X2000Opcodes.TradeskillReplyIIR);
+			var reply = Reply();
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
 			var capturedBody = reply.Bytes.AsSpan(sub + 12).ToArray();
 			var records = TradeskillRecipeCodec.ParseReplyBody(capturedBody);

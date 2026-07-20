@@ -26,8 +26,6 @@ namespace Faolan.Tests
 	{
 		private const uint HealthCurrentStatId = 0x001B;
 		private const uint HealthMaxStatId = 0x0001;
-		private static readonly string CapturesDir = TestPaths.CapturesDir;
-
 		[Fact]
 		public void AliveLoginSnapshots_AllHaveNonZeroHealthCurrent()
 		{

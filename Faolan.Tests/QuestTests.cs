@@ -21,8 +21,6 @@ namespace Faolan.Tests
 	// (quest 0x34A7 = 13479, player 0x01316E71).
 	public class QuestTests
 	{
-		private static readonly string CapturesDir = FindCaptures();
-
 		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------
 
 		[Fact]
@@ -274,17 +272,7 @@ namespace Faolan.Tests
 			throw new XunitException($"no captured packet for sub-op {subOpHex}");
 		}
 
-		private static string FindCaptures()
-		{
-			for (var dir = AppContext.BaseDirectory; dir != null; dir = Directory.GetParent(dir)?.FullName)
-			{
-				var c = Path.Combine(dir, "Captures");
-				if (Directory.Exists(c))
-					return c;
-			}
 
-			throw new DirectoryNotFoundException("Captures/ not found above " + AppContext.BaseDirectory);
-		}
 
 		private static QuestGoalDefinition GoalSeq(uint sequence, uint goalId, QuestGoalType type, string target)
 		{

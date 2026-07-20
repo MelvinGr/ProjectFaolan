@@ -18,7 +18,7 @@ namespace Faolan.Importer.Cli
 		public static async Task<int> RunAsync(string[] args)
 		{
 			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
-			var capturesDir = GetOption(args, "--captures") ?? Path.Combine(RepoRoot, "Captures");
+			var capturesDir = GetOption(args, "--captures");
 			var rdbDir = GetOption(args, "--rdb");
 
 			// --report <name>: read-only diagnostics (no import, bypasses the runner).
@@ -54,6 +54,9 @@ namespace Faolan.Importer.Cli
 			if (!Directory.Exists(capturesDir))
 			{
 				await Console.Error.WriteLineAsync($"Captures directory not found: {capturesDir}");
+				await Console.Error.WriteLineAsync("  The corpus lives in the private ProjectFaolan-Data repo, not here. Point at it with");
+				await Console.Error.WriteLineAsync("  The corpus is NOT in this repo - it lives in the private ProjectFaolan-Data repo");
+				await Console.Error.WriteLineAsync("  (see CLAUDE.md \"Capture data\"). Pass --captures <dir> pointing at its Captures/ folder.");
 				return 1;
 			}
 

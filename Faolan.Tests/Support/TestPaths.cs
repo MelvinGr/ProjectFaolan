@@ -30,10 +30,7 @@ namespace Faolan.Tests.Support
 			return File.ReadAllBytes(Asset(fileName));
 		}
 
-		public static string Capture(string fileName)
-		{
-			return Path.Combine(CapturesDir, fileName);
-		}
+
 
 		// Any repo-relative path, e.g. Repo("docs", "protocol", "gen", "opcodes.md").
 		public static string Repo(params string[] parts)

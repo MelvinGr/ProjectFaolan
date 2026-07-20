@@ -32,7 +32,9 @@ namespace Faolan.Tests.Support
 			((uint)GameServer0X2000Opcodes.MoveTaskIIR, 10241),
 			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, 60),
 			((uint)GameServer0X2000Opcodes.QuestJournalIIR, 26),
-			((uint)GameServer0X2000Opcodes.QuestLogListIIR, 40)
+			((uint)GameServer0X2000Opcodes.QuestLogListIIR, 40),
+			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 141),
+			((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1)
 		];
 
 		private static readonly Lazy<List<Entry>> Entries = new(Load);

@@ -23,8 +23,6 @@ namespace Faolan.Tests
 	// drops parts of compressed downloads) are skipped; a body that splits but does not round-trip fails.
 	public class FullCharIirRoundTripTests
 	{
-		private static readonly string CapturesDir = TestPaths.CapturesDir;
-
 		private readonly ITestOutputHelper _output;
 
 		public FullCharIirRoundTripTests(ITestOutputHelper output)
@@ -133,41 +131,9 @@ namespace Faolan.Tests
 				yield return (bin, packet.Body.ReadArrayUInt32Length());
 			}
 
-			if (!Directory.Exists(CapturesDir))
-				yield break;
-
-			foreach (var json in Directory.EnumerateFiles(CapturesDir, "*.json").OrderBy(f => f))
-			{
-				if (json.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
-					continue; // tshark dumps use a different schema (BodyHex, not RawBytesBase64) - not this test's input
-
-				using var doc = JsonDocument.Parse(File.ReadAllBytes(json));
-				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
-					continue;
-
-				var index = 0;
-				foreach (var p in packets.EnumerateArray())
-				{
-					if (!p.TryGetProperty("RawBytesBase64", out var rawEl))
-						continue;
-
-					var raw = Convert.FromBase64String(rawEl.GetString() ?? "");
-					if (raw.Length < 32)
-						continue;
-
-					// [len4][crc4][headerLen4][header][body]; body = [len4][subop4]... Non-GameServer packets
-					// (other protocols / framings) yield nonsense header lengths - skip them.
-					var headerLen = BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(8, 4));
-					if (headerLen > (uint)raw.Length)
-						continue;
-
-					var bodyStart = 12 + (int)headerLen;
-					if (bodyStart + 8 > raw.Length || BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(bodyStart + 4, 4)) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
-						continue;
-
-					yield return ($"{Path.GetFileName(json)}#{index++}", raw[(bodyStart + 4)..]);
-				}
-			}
+			// NOTE: there is deliberately no capture-corpus loop here. It used to enumerate Captures/*.json while
+			// SKIPPING *.tshark.json - and the corpus contains nothing else, so it never yielded a single packet even
+			// when the captures were present. Dead code that also silently skipped when they were absent.
 		}
 	}
 }
