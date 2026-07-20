@@ -155,25 +155,18 @@ namespace Faolan.Importer.Rdb
 					valuesAdded++;
 				}
 
-				// The item QUALITY/rarity tier = property field 499. It is 0-INDEXED into the client's 6-tier tooltip
-				// scale (AgeOfConan.exe font colours, low->high: mundane superior enchanted rare epic legendary), so
-				// the tier = field499 + 1 (field499 tops out at 5 = Legendary; there is no field499 6). ItemQuality is
-				// 1-based, hence the +1 - the previous code stored field499 directly, which was one tier too LOW (a
-				// legendary bag read as Epic). #397. The strict-decreasing property parse reaches 499 for most gear,
-				// but on some templates it sits OUTSIDE the main decreasing run (e.g. the max-capacity bags carry 499=5
-				// at a position the strict parser can't reach - the same blind spot bag slots hit), so fall back to a
-				// direct field scan.
+				// The item QUALITY/rarity tier = property field 499 - the client's 0-indexed tooltip tier (0=Mundane ..
+				// 5=Legendary), stored directly as ItemQuality (whose values ARE those ids). The strict-decreasing
+				// property parse reaches 499 for most gear, but on some templates it sits OUTSIDE the main decreasing
+				// run (e.g. the max-capacity bags carry 499=5 at a position the strict parser can't reach - the same
+				// blind spot bag slots hit, #397), so fall back to a direct field scan.
 				var found = TryReadPropertyField(template.AsSpan(12), 499, out var qualityRaw) && qualityRaw <= MaxQualityFieldValue;
 				if (!found)
 					found = TryReadQualityAnywhere(template.AsSpan(12), out qualityRaw);
-				if (found)
+				if (found && item.Quality != (ItemQuality)qualityRaw)
 				{
-					var quality = (ItemQuality)(qualityRaw + 1);
-					if (item.Quality != quality)
-					{
-						item.Quality = quality;
-						qualitiesAdded++;
-					}
+					item.Quality = (ItemQuality)qualityRaw;
+					qualitiesAdded++;
 				}
 
 				// The VALIDATED primary-attribute modifier (docs/rdb/item-template-stats.md, #3): field 972 = the wire
