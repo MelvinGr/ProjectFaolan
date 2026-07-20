@@ -3,8 +3,10 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +26,6 @@ namespace Faolan.Importer.Captures
 	{
 		private const int ShortcutEntrySize = 24; // [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]
 		private const uint GameCharInterfaceType = 0x8B87F791;
-		private const uint ListFrame = 0x3F1; // (count + 1) * 0x3F1 list framing (matches ShortcutBarBuilder)
 
 		public static CaptureState Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -57,26 +58,24 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				// DispatchShortcutBarReply (0x2076): the whole saved bar. Body = [u32 (count+1)*0x3F1][entry * count],
-				// entry = [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]. Latest in the capture wins.
+				// DispatchShortcutBarReply (0x2076): the whole saved bar - the SAME body ShortcutBarBuilder builds, so
+				// parse it with ShortcutBar.Read instead of a hand-rolled 0x3F1 loop. Latest in the capture wins.
 				var body = packet.Body.ReadRemainingArray();
 				if (body.Length < 4)
 					continue;
 
 				var framing = BinaryPrimitives.ReadUInt32BigEndian(body);
-				if (framing < ListFrame || framing % ListFrame != 0)
+				if (framing < ListFrame.Unit || framing % ListFrame.Unit != 0)
 					continue; // not a shortcut-bar reply (0x2076 collides across classes; the framing disambiguates)
 
-				var count = (int)(framing / ListFrame) - 1;
-				var bar = new Dictionary<uint, (uint, uint)>();
-				for (var i = 0; i < count && 4 + (i + 1) * ShortcutEntrySize <= body.Length; i++)
-				{
-					var off = 4 + i * ShortcutEntrySize;
-					var slot = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off, 4));
-					var type = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off + 4, 4));
-					var target = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off + 8, 4));
-					bar[slot] = (type, target);
-				}
+				// The codec reads all `count` records unconditionally, so only hand it a body that carries them (a
+				// truncated reply is skipped rather than seeding a partial bar over a good one).
+				var count = (int)ListFrame.CountOf(framing);
+				if (4 + count * ShortcutEntrySize > body.Length)
+					continue;
+
+				var bar = ShortcutBarBuilder.ShortcutBar.Read(new FaolanStream(body))
+					.Entries.ToDictionary(e => e.Slot, e => (e.Type, e.Id));
 
 				shortcuts[character] = bar; // the full saved bar is authoritative (replaces any earlier one)
 			}

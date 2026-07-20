@@ -7,6 +7,7 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.EntityFrameworkCore;
@@ -428,20 +429,13 @@ namespace Faolan.Importer.Captures
 					return;
 
 				var body = packet.Body.ReadRemainingArray();
-				if (body.Length < 40)
+
+				// The 0x2052 grant is exactly what AbilityGrantBody builds/parses (slot, id, data0, key1..4) - use its
+				// parser (which validates the full 81-byte shape) instead of re-reading the words by hand.
+				if (!AbilityGrantBody.TryParseAddSpecialAbilityBody(body, out var ability, out _) || ability.Id == 0)
 					return;
 
-				uint U(int i)
-				{
-					return BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i * 4, 4));
-				}
-
-				var slot = U(0);
-				var id = U(1);
-				if (id == 0 || id != U(2))
-					return; // id appears twice; guard against mis-parses
-
-				grants[id] = (slot, U(5), U(6), U(7), U(8), U(9));
+				grants[ability.Id] = (ability.Slot, ability.Data0, ability.Key.Key1, ability.Key.Key2, ability.Key.Key3, ability.Key.Key4);
 			}
 			catch
 			{
@@ -527,16 +521,15 @@ namespace Faolan.Importer.Captures
 					if (packet.Opcode != IirCarrierOpcode || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
 						return;
 
-					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4));
+					id = ComboBookIirCodec.Message.Read(new FaolanStream(body)).ComboId;
 				}
 				else
 				{
-					if (packet.Opcode != AddSpecialAbilityOpcode || body.Length < 12)
+					// The same 0x2052 grant AbilityGrantBody parses; take its validated id.
+					if (packet.Opcode != AddSpecialAbilityOpcode || !AbilityGrantBody.TryParseAddSpecialAbilityBody(body, out var ability, out _))
 						return;
 
-					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)); // ability id (word 1)
-					if (id != BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)))
-						return; // id appears twice; guard against mis-parses
+					id = ability.Id;
 				}
 
 				if (id == 0)

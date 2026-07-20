@@ -1,4 +1,6 @@
 using System;
+using Faolan.Core;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -15,13 +17,10 @@ namespace Faolan.Importer.Extractors
 
 	public static class NpcSpellExtractor
 	{
-		private const int ApplyFromOffset = 26;
-
 		// Body offsets (inside the 0x2000 IIR carrier): [u32 len][u32 subop][u32 c350][u32 applyTo][u16 0]
-		// [u32 spellId][u32 c350][u32 applyFrom][payload...].
-		private const int ApplyToOffset = 12;
+		// [u32 spellId][u32 c350][u32 applyFrom][payload...]. The header fields are read by NpcSpellCastBuilder;
+		// PayloadOffset (30) is the fixed header length used as the minimum-body guard.
 		private const int PayloadOffset = 30;
-		private const int SpellIdOffset = 18;
 		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
 		private const uint Opcode2000 = 0x2000;
 
@@ -47,24 +46,23 @@ namespace Faolan.Importer.Extractors
 				if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ApplySpellSubOpcode)
 					continue;
 
-				var applyTo = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(ApplyToOffset, 4));
-				var spellId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpellIdOffset, 4));
-				var applyFrom = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(ApplyFromOffset, 4));
-
-				if (applyFrom == applyTo) // a self-buff, not an offensive cast
-					continue;
-				if (!nameByHandle.TryGetValue(applyFrom, out var name)) // not a known NPC caster (e.g. the player's own cast)
-					continue;
-
+				// The ApplySpell content is [subop][c350][applyTo][u16 0][spellId][c350][applyFrom][payload] - the same
+				// shape NpcSpellCastBuilder builds, so parse it with that codec (applyTo@12 / spellId@18 / applyFrom@26
+				// as before). Bound the stream to the declared IIR length so Payload matches the old len-bounded slice.
 				var len = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
 				var end = Math.Min(body.Length, 4 + len);
-				var payload = end > PayloadOffset
-					? body[PayloadOffset..end]
-					: [];
-				if (payload.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)
+				if (end < PayloadOffset) // a length shorter than the fixed header: the old code yielded an empty payload -> skip
+					continue;
+				var cast = NpcSpellCastBuilder.NpcSpellCast.Read(new FaolanStream(body[4..end]));
+
+				if (cast.ApplyFrom == cast.ApplyTo) // a self-buff, not an offensive cast
+					continue;
+				if (!nameByHandle.TryGetValue(cast.ApplyFrom, out var name)) // not a known NPC caster (e.g. the player's own cast)
+					continue;
+				if (cast.Payload.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)
 					continue;
 
-				entries.Add(new NpcSpellEntry(name, spellId, payload));
+				entries.Add(new NpcSpellEntry(name, cast.SpellId, cast.Payload));
 			}
 
 			return entries;

@@ -9,6 +9,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
@@ -79,7 +80,9 @@ namespace Faolan.Importer.Captures
 					var subop = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4));
 					if (subop == MapChangeSubOpcode)
 					{
-						currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+						// body is [u32 len][subop][PlayfieldFiir]; MapChangeCodec parses [subop][body], so skip the length.
+						if (MapChangeCodec.TryParse(body.AsSpan(4), out var mc))
+							currentMap = mc.MapId;
 						continue;
 					}
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -72,9 +73,9 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 30)
 					continue; // a CharDCMove body is shorter than the 38 a MapChange needs; each check re-validates its own length
 
-				if (p.SubOpcode == MapChangeSubOpcode && p.IsDownload && body.Length >= 38)
+				if (p.SubOpcode == MapChangeSubOpcode && p.IsDownload && body.Length >= 38 && MapChangeCodec.TryParse(body.AsSpan(4), out var mc))
 				{
-					var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					var map = mc.MapId;
 					if (map != currentMap)
 					{
 						currentMap = map;

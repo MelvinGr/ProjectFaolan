@@ -3,8 +3,6 @@ using System;
 using Faolan.Core.Network.Constants;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -37,9 +35,6 @@ namespace Faolan.Importer.Captures
 	// Idempotent: updates an existing row, else inserts. Only characters already in the DB are touched.
 	public static class CaptureQuestImporter
 	{
-		// The completed-quest title records in the snapshot log: <remoteformat id="<questId>" category="50301" ...>.
-		private static readonly Regex CompletedTitleRx = new(@"<remoteformat id=""(\d+)"" category=""50301""", RegexOptions.Compiled);
-
 		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> wire state
@@ -150,20 +145,25 @@ namespace Faolan.Importer.Captures
 
 				var inner = packet.Body.ReadArrayUInt32Length();
 
-				// The FullChar snapshot embeds the completed-quest log (one category-50301 title record per completed
-				// quest). It's addressed to the player, so Receiver.Instance is the character id.
+				// The FullChar snapshot embeds the COMPLETED-quest journal (#390). Read it TYPED via
+				// SnapshotJournalReader.TryReadCompleted (as CompletedQuestExtractor does) instead of regex-scanning the
+				// whole packet for category-50301 titles: the regex also swept up the ACTIVE journal's titles (the reason
+				// journalByChar had to override them back), whereas the typed region returns ONLY the completed archive.
 				if (inner.Length >= 4 && System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) == SnapshotSubOpcode)
 				{
 					var charId = packet.Receiver.Instance;
 					if (charId == 0)
 						return;
 
-					var text = Encoding.Latin1.GetString(inner);
-					if (!completedByChar.TryGetValue(charId, out var set))
-						completedByChar[charId] = set = new HashSet<uint>();
-					foreach (Match mm in CompletedTitleRx.Matches(text))
-						if (uint.TryParse(mm.Groups[1].Value, out var qid) && qid != 0)
-							set.Add(qid);
+					if (SnapshotJournalReader.TryReadCompleted(packetBytes, out var completed) && completed != null)
+					{
+						if (!completedByChar.TryGetValue(charId, out var set))
+							completedByChar[charId] = set = new HashSet<uint>();
+						foreach (var area in completed.Areas)
+							foreach (var q in area.Quests)
+								if (q.QuestId != 0)
+									set.Add(q.QuestId);
+					}
 					return;
 				}
 

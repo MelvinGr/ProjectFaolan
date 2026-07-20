@@ -83,8 +83,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 				return false;
 			if (f[14] != AddSpecialAbilityConstantA || f[15] != AddSpecialAbilityConstantB || f[16] != AddSpecialAbilityConstantA || f[17] != AddSpecialAbilityConstantB)
 				return false;
-			if (f[18] != 0x00000001 || f[19] != 0x00000000)
-				return false;
+			// f[18]/f[19] are a VARIABLE per-grant trailer (kind + value), NOT constants: the server's own grants carry
+			// (1, 0) so Build writes that, but captured retail grants also carry (1, 0x0B) and (2, 0x37F412)/(2, 0x37F298)
+			// - the f[19] value looks like a linked ability id. Requiring (1, 0) wrongly rejected 3 of 27 valid 81-byte
+			// grants when the importer switched to this parser; the repeated B290805C/29E627CA pair + duplicated Id/Data
+			// above are the real discriminator, so the trailer is not validated. (Modelling it as a field is #393-adjacent
+			// follow-up; the importer harvests only Slot/Id/Data.)
 
 			var announceByte = body[80];
 			if (announceByte > 1)

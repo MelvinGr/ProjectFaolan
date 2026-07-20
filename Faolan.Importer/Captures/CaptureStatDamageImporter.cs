@@ -1,4 +1,6 @@
 using System;
+using Faolan.Core;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -74,16 +76,16 @@ namespace Faolan.Importer.Captures
 
 				seen++;
 
-				var delta = BinaryPrimitives.ReadInt32BigEndian(inner.AsSpan(37, 4));
-				var type = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(41, 4));
-				var spellId = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(61, 4));
-				if (spellId == 0 || delta == 0)
+				// The StatDamageIIR content is exactly what CombatEffectBuilder.StatDamage models (delta@37 / statId@41
+				// / spellBaseId@61) - parse it typed (StatDamage) instead of re-reading those three offsets by hand.
+				var dmg = StatDamage.Read(new FaolanStream(inner));
+				if (dmg.SpellBaseId == 0 || dmg.Delta == 0)
 					return;
 
-				deltas.TryAdd(spellId, new Dictionary<int, int>());
-				deltas[spellId][delta] = deltas[spellId].GetValueOrDefault(delta) + 1;
-				types.TryAdd(spellId, new Dictionary<uint, int>());
-				types[spellId][type] = types[spellId].GetValueOrDefault(type) + 1;
+				deltas.TryAdd(dmg.SpellBaseId, new Dictionary<int, int>());
+				deltas[dmg.SpellBaseId][dmg.Delta] = deltas[dmg.SpellBaseId].GetValueOrDefault(dmg.Delta) + 1;
+				types.TryAdd(dmg.SpellBaseId, new Dictionary<uint, int>());
+				types[dmg.SpellBaseId][dmg.StatId] = types[dmg.SpellBaseId].GetValueOrDefault(dmg.StatId) + 1;
 			}
 			catch
 			{

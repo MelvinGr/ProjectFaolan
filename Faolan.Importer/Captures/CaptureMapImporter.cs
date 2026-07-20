@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.EntityFrameworkCore;
@@ -80,17 +81,12 @@ namespace Faolan.Importer.Captures
 					return;
 
 				var inner = packet.Body.ReadArrayUInt32Length();
-				if (inner.Length < 34 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != MapChangeSubOpcode)
+				if (!MapChangeCodec.TryParse(inner, out var mc))
 					return;
 
-				var mapId = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(30, 4));
-				var flags = inner.Length >= 107
-					? BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(103, 4))
-					: (uint?)null;
-
 				// Prefer a packet that actually carried the flags; don't let a later short packet blank a known value.
-				if (flags is not null || !into.ContainsKey(mapId))
-					into[mapId] = flags;
+				if (mc.Flags is not null || !into.ContainsKey(mc.MapId))
+					into[mc.MapId] = mc.Flags;
 			}
 			catch
 			{

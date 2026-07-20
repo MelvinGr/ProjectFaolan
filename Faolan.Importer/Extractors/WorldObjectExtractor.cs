@@ -62,7 +62,14 @@ namespace Faolan.Importer.Extractors
 					continue; // too short to hold the transform
 
 				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-				var (objectId, name) = ReadMessage(body);
+				// For a SimpleDynel the identity message is a ProtoSimpleDynelIIR that SimpleDynelMessageCodec parses -
+				// the SAME message ReadIdentity below reads for DisplayName - so take the id (kdtree) + name from it
+				// instead of the hand-rolled protobuf walker. LootBag and the Door/Destructible/Climbing trio keep
+				// ReadMessage (LootBag's name and the trio's geometry-tail name are not exposed by that codec).
+				var (objectId, name) = subop == SimpleDynelMessageCodec.Opcode
+					&& SimpleDynelMessageCodec.TryParse(body.AsSpan(8), out var dynel, out _, out _)
+					? (dynel.Kdtree, dynel.Name ?? string.Empty)
+					: ReadMessage(body);
 				var displayName = WorldObjectBuilder.ReadIdentity(body);
 
 				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-container DROPS and static
