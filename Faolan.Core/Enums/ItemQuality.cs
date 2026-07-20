@@ -1,10 +1,10 @@
 namespace Faolan.Core.Enums
 {
-	// An item's quality/rarity tier. The backing values are the CLIENT ids carried in the RDB item-template property
-	// table at field 499 (validated against decrypted templates: basic starter clothing e.g. White Gown / Slave Sarong
-	// = 1; high-end raid/vendor gear e.g. Helm of the Black Dragon / Cloak of the Silent Legion = 4; the top vet reward
-	// Mythical Band of Advancement = 5). Ordinal 1-based, low tier -> high tier. Imported by RdbItemImporter; NULL on an
-	// Item means the template carried no field 499 (or the item was never RDB-imported).
+	// An item's quality/rarity tier. These are the client's 6 tooltip tiers (AgeOfConan.exe font colours, low->high:
+	// mundane superior enchanted rare epic legendary). The RDB item-template property field 499 carries the tier
+	// 0-INDEXED (0=Mundane .. 5=Legendary), so RdbItemImporter maps ItemQuality = field499 + 1 (#397 - storing field499
+	// directly was one tier too low; e.g. a legendary max-bag carries 499=5 = Legendary, not Epic). Ordinal 1-based,
+	// low tier -> high tier. NULL on an Item means the template carried no field 499 (or the item was never RDB-imported).
 	public enum ItemQuality
 	{
 		Mundane = 1,

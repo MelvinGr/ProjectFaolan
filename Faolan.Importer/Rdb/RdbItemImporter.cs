@@ -155,19 +155,25 @@ namespace Faolan.Importer.Rdb
 					valuesAdded++;
 				}
 
-				// The item QUALITY/rarity tier = property field 499 (the client's own ItemQuality id; White Gown 1,
-				// raid gear 4, Mythical Band/max = 5 - retail field 499 tops out at 5, there is no 6). The strict-
-				// decreasing property-table parse reaches it for most gear, but on some templates 499 sits OUTSIDE the
-				// main decreasing run (e.g. the max-capacity bags 5061819/5061820 carry 499=5 at a position the strict
-				// parser can't reach - the same blind spot bag slots hit, #397), leaving Quality wrongly NULL. Fall back
-				// to a direct field scan (validated to the 1..6 range) so those items get their tier too.
-				uint quality = 0;
-				if (!(TryReadPropertyField(template.AsSpan(12), 499, out quality) && quality is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary))
-					TryReadQualityAnywhere(template.AsSpan(12), out quality);
-				if (quality is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary && item.Quality != (ItemQuality)quality)
+				// The item QUALITY/rarity tier = property field 499. It is 0-INDEXED into the client's 6-tier tooltip
+				// scale (AgeOfConan.exe font colours, low->high: mundane superior enchanted rare epic legendary), so
+				// the tier = field499 + 1 (field499 tops out at 5 = Legendary; there is no field499 6). ItemQuality is
+				// 1-based, hence the +1 - the previous code stored field499 directly, which was one tier too LOW (a
+				// legendary bag read as Epic). #397. The strict-decreasing property parse reaches 499 for most gear,
+				// but on some templates it sits OUTSIDE the main decreasing run (e.g. the max-capacity bags carry 499=5
+				// at a position the strict parser can't reach - the same blind spot bag slots hit), so fall back to a
+				// direct field scan.
+				var found = TryReadPropertyField(template.AsSpan(12), 499, out var qualityRaw) && qualityRaw <= MaxQualityFieldValue;
+				if (!found)
+					found = TryReadQualityAnywhere(template.AsSpan(12), out qualityRaw);
+				if (found)
 				{
-					item.Quality = (ItemQuality)quality;
-					qualitiesAdded++;
+					var quality = (ItemQuality)(qualityRaw + 1);
+					if (item.Quality != quality)
+					{
+						item.Quality = quality;
+						qualitiesAdded++;
+					}
 				}
 
 				// The VALIDATED primary-attribute modifier (docs/rdb/item-template-stats.md, #3): field 972 = the wire
@@ -280,9 +286,13 @@ namespace Faolan.Importer.Rdb
 		// Veteran's Bag 35 / Max Inventory 216) via 104, and the Max Resource Bag (102) via 1331. Non-bag templates
 		// virtually never carry these fields, and the value is only ever used for an item in the matching bag slot, so
 		// a stray match is inert.
-		// Direct scan for field 499 (item quality) at any 4-byte-aligned position, taking the following word as the
-		// value and accepting only the 1..Legendary ItemQuality range. Mirrors TryReadBagSlots: the fallback for
-		// templates whose 499 is outside the strict-decreasing property run (#397).
+		// The highest field-499 value: it is 0-indexed (0=Mundane .. 5=Legendary), so the max is the number of tiers
+		// above Mundane = Legendary - Mundane = 5.
+		private const uint MaxQualityFieldValue = (uint)ItemQuality.Legendary - (uint)ItemQuality.Mundane;
+
+		// Direct scan for field 499 (item quality, 0-indexed) at any 4-byte-aligned position, taking the following word
+		// as the value and accepting only the 0..5 field range. Mirrors TryReadBagSlots: the fallback for templates
+		// whose 499 is outside the strict-decreasing property run (#397).
 		private static bool TryReadQualityAnywhere(ReadOnlySpan<byte> body, out uint value)
 		{
 			value = 0;
@@ -292,7 +302,7 @@ namespace Faolan.Importer.Rdb
 					continue;
 
 				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
-				if (v is >= (uint)ItemQuality.Mundane and <= (uint)ItemQuality.Legendary)
+				if (v <= MaxQualityFieldValue)
 				{
 					value = v;
 					return true;
