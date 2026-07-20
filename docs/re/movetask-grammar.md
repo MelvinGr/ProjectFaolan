@@ -86,7 +86,7 @@ validates the spline and reads nothing), so both PathMoveTask branches end with 
 
 ## Status (#53)
 
-- **Decode COMPLETE (2026-06-17)**: the full recursive grammar is pinned — `tools/capture/decode_movetask.py`
+- **Decode COMPLETE (2026-06-17)**: the full recursive grammar is pinned — `MoveTaskCodecTests`
   round-trips **9468/9468 captured MoveTask records (100%)** byte-exact. Scripts: `DumpMoveTaskList.java`,
   `DumpMoveTaskLeafReaders.java`, `DumpPathHelpers.java`, `DumpMoveTaskTail.java`.
 - **Built byte-exact** (`MoveTaskCodec`, golden tests): mode 0 bare-position, mode 1 PathMoveTask

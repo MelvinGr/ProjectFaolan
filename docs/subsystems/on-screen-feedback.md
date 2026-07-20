@@ -30,7 +30,7 @@ Plain tokens (no `showfifomessagefromserver` wrapper) render the smaller feedbac
 banner in any capture — when a character dings (or a quest awards attribute points) retail sends one
 `AttributeChanged` message **per primary attribute that rose** (the 5 category-615 ids 804/806/808/810/814), then
 a `0x96B8DC59` vitals push with the new maxima. Built by `AttributeChangedFeedback` (`Faolan.Core.Network`, reuses
-`FormatFeedbackCodec`), decoded in `tools/capture/decode_levelup_feedback.py`, byte-exact in
+`FormatFeedbackCodec`), decoded in `AttributeChangedFeedbackTests`, byte-exact in
 `AttributeChangedFeedbackTests`. typeFlags = `0x40000006`, footer = `0` (invariant across all 33 captured
 messages). The three `key="..."` are per-burst nonces the client does not validate (reuse is in-client proven).
 Wired into both ding paths: GM `.level` and the XP-driven `CombatService.PushLevelUp`. The growth amounts are

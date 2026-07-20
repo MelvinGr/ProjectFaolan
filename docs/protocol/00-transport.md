@@ -71,7 +71,7 @@ Two consequences that have each caused a real bug:
 The four bytes between the tag and the flag are the standard **CRC32 header field** — `crc32(body)`, in the exact
 position every packet carries its crc — not a compression parameter. Confirmed across 1310 control frames in the
 raw pcaps (`crc32(0x00)=0xd202ef8d`, `crc32(0x01)=0xa505df1b`, `crc32(0x02)=0x3c0c8ea1`, all matching).
-[V1: tools/capture/decode_compression_frame.py]
+[V1: Faolan.Tests/ListFrameTests.cs]
 
 ## Reading captures
 

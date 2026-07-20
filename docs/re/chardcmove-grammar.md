@@ -7,7 +7,7 @@ the simulation/movement layer (Gitea #190 / #53).
 
 Recovered from `AgeOfConan.exe` via the vtable-xref method (`tools/ghidra/DumpVtableReaders.java`,
 slot 8 → `CharDCMoveIIR_t::ReadSubClass = FUN_007adae0`, which delegates to the inner reader
-**`FUN_007ad6b0`**). Dissector + validator: `tools/capture/decode_chardcmove.py`
+**`FUN_007ad6b0`**). Dissector + validator: `CharDCMoveCodec`
 (byte-exact to the declared length for all 13,289 samples).
 
 ## Carrier framing (the 0x2000 IIR envelope)
@@ -83,7 +83,7 @@ The 7 floats are `position(x,y,z)` + a 4-float facing/orientation, e.g. hoxxling
 
 ## Status
 
-Decoded + dissected (this doc + `decode_chardcmove.py`). **Construct DONE:** `CharDCMoveCodec`,
+Decoded + dissected (this doc + `CharDCMoveCodec`). **Construct DONE:** `CharDCMoveCodec`,
 `StopCodec` and `SetPosCodec` (one file each under `Faolan.Core.Network/Codecs/World/`) build/parse
 byte-exact, golden-tested in `DeadReckoningCodecTests`. **Wired (#190):** the sim emits a `StopIIR` (`StopCodec`)
 when an NPC arrives home and stops moving (`WorldTickEffectType.NpcStopped` → `BroadcastNpcStop`); the

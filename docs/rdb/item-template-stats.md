@@ -11,7 +11,7 @@ Data quad). They live in the **encrypted RDB item-template**, which we already T
 dotnet run --project Faolan.Importer -- --only rdb-items --rdb <RDB dir> --dump-templates <dir>
 ```
 
-Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `tools/capture/decode_item_template.py`.
+Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `DispatchAddItemTests`.
 
 ## Body grammar
 

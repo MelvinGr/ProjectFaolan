@@ -131,7 +131,7 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 - `tools/capture/decode_skill_scaffold.py` — reads the **ability/skill scaffold** (id + tag) from the spawn's *post-IIR*
   region; self-IDs class from the profession id (`featId // 100 == Class` enum value). Modes: per-class / `discover` /
   `dump` / `json`. NB it reads skills, not feats (documented in its header).
-- `tools/capture/find_missing_opcodes.py` — sweeps captures for IIR hashes/opcodes missing from `Opcodes.cs` and
+- `OpcodesSource` — sweeps captures for IIR hashes/opcodes missing from `Opcodes.cs` and
   enumerates client IIR classes we've never named/seen. This is how `FeatIIR` was found.
 - `tools/ghidra/DumpVtableReaders.java` — recovers any IIR's `ReadSubClass` reader (vtable slot 8) → authoritative
   hash + grammar. Run headless via the `#`-free symlink (see the `ghidra_hash_path_symlink` memory).

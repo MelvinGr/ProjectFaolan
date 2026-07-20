@@ -2,7 +2,7 @@
 
 Wire grammars for the Knubot conversation records plus a batch of misc combat/world IIR records,
 recovered from `AgeOfConan.exe` via vtable-xref (`tools/ghidra/DumpVtableReaders.java`, slot 8)
-and the shared helpers. Validator: `tools/capture/decode_iir_conversation_misc.py` — every reader below
+and the shared helpers. Validator: `ConversationConstructTests` — every reader below
 consumes **exactly to the declared packet length** for every captured instance.
 
 Stream primitives + the dynel-style framing `[len][sub][0xC350][handle][u8 env][reader]` are as in
@@ -84,5 +84,5 @@ them (trade UI / spellbook), since capture coverage is thin.
 
 ## Status
 
-Decoded + dissected (this doc + `decode_iir_conversation_misc.py`). The Knubot readers feed the
+Decoded + dissected (this doc + `ConversationConstructTests`). The Knubot readers feed the
 dialogue VM (#188); the combat/teleport ones feed combat (#216/#218) and the simulation layer (#190).

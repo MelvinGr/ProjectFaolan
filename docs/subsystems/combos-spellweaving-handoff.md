@@ -10,7 +10,7 @@ Tracked as **Gitea #141** (`needs-testing`). Full session write-up is in the #14
 | Piece                                                                   | State                                           |
 | ----------------------------------------------------------------------- | ----------------------------------------------- |
 | `ClassCombo` table/grant/superseding + `ComboActionParser`/`ComboService` | ✅ committed (melee data side)                 |
-| **Spellweave wire decode** (activate/adds/fire/energy/DoT/cancel)       | ✅ DECODED (`tools/capture/decode_spellweave.py`)    |
+| **Spellweave wire decode** (activate/adds/fire/energy/DoT/cancel)       | ✅ DECODED (`SpellweaveCodecTests`)    |
 | Activate response: 3 trance buffs + reactive element LIST + trance-pose BCC | ✅ built, byte-exact, works in-client        |
 | Component picker (pick→hide→reappear ~8s) + per-add buff + add gesture BCC | ✅ built, works in-client                     |
 | Stacking Spellweaving(1) buff (37E5A8→A9→AA) each picker reappear        | ✅ built, works in-client (x2 overlap)          |
@@ -183,7 +183,7 @@ LEFT (in rough priority):
 - `Faolan.Core.Network/Constants/SpellweaveCatalog.cs` — per-class `SpellweaveProfile` + `EnergyMaxForClass` (Necro only)
 - `Faolan/GameServer/GameServerListener.Buffs.cs` — `SendSprintBar` (0x200E) + the persistent energy loop
 - `Faolan/GameServer/GameServerListener.Buffs.cs` — `ApplySpellweaveBuff` (54-byte blob) + `SendBuffRemoval`
-- `Faolan.Tests/SpellweaveCodecTests.cs` + `BehaviorAnimationCodecTests.cs` — 12 golden tests · `tools/capture/decode_spellweave.py`
+- `Faolan.Tests/SpellweaveCodecTests.cs` + `BehaviorAnimationCodecTests.cs` — 12 golden tests · `SpellweaveCodecTests`
 - `Faolan/GameServer/GameServerListener.cs` — `_spellweave` ctor seams
 - `Faolan/GameServer/GameServerListener.Inbound.cs` — `CombatReactiveIIR` add case + `PerformSpecialAction` (0x205A) handler
 - `Faolan.Core.Network/NetworkClientSession.cs` — weave + energy session state

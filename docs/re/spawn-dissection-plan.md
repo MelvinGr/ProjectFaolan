@@ -51,7 +51,7 @@
 
 ## Status (updated 2026-06-07)
 
-- **Phase 0 DONE** — workbench (`dissect_spawn.py`), `SpawnPacketBuilder`, `SpawnHandleTable`, tests 5/5 pass.
+- **Phase 0 DONE** — workbench (`NpcSpawnAppearanceTests`), `SpawnPacketBuilder`, `SpawnHandleTable`, tests 5/5 pass.
 - **Phase 1 DONE** — player spawn **position** rebuilt from DB in the Strie replay; confirmed in-client (loads +
   spawns at the edited DB position). Rotation kept verbatim (DB rotation unreliable + stalled loading).
 - **Phase 2 DONE** — any beach character (`Character.MapId == 0xFAA`) uses the replay; the capture's instance is
@@ -139,7 +139,7 @@ the existing `ProtoMessage` parser; the rest is differential.
 
 ## Tooling to build (Phase 0) — DONE
 
-Implemented: `tools/capture/dissect_spawn.py` (workbench: decodes handle/position/rotation/name per spawn, plus a
+Implemented: `NpcSpawnAppearanceTests` (workbench: decodes handle/position/rotation/name per spawn, plus a
 `diff` mode); `Faolan.Core.Network/Codecs/Spawn/SpawnPacketBuilder.cs` (then template-based; the embedded
 `spawn-player-template.bin` has since been retired — spawns are generated, see the top banner);
 `Faolan.Core.Network/Codecs/Spawn/SpawnHandleTable.cs` (per-session unique/stable handle allocator, base 0x00090000);
@@ -153,7 +153,7 @@ Original outline:
 
 
 
-1. **`tools/capture/dissect_spawn.py`** — for a given sub-opcode (default `FA015807`), extract every matching
+1. **`NpcSpawnAppearanceTests`** — for a given sub-opcode (default `FA015807`), extract every matching
    `0x2000` body from one or more capture JSONs, parse into a tag/length/value field tree (reuse the
    `ProtoMessage`-style walk), and print them **side-by-side** with a per-field "constant / varies" flag and
    the known character attribute next to each varying field. This is the dissection workbench.
@@ -261,7 +261,7 @@ Reuse `SpawnPacketBuilder` for NPCs sourced from `Npcs` / `NpcBodies` / `NpcEqui
 `SpawnTortageBeach`'s verbatim dikketest blobs with built spawns; allocate NPC handles from the table; add to
 the `0x2076` manifest. Verify a beach NPC built from a seeded `Npcs` row matches its captured `FA015807`.
 
-DISSECTION DONE (2026-06-10) — workbench `tools/capture/dissect_npc_spawn.py` (`one <handle-hex>` = full field
+DISSECTION DONE (2026-06-10) — workbench `NpcSpawnAppearanceTests` (`one <handle-hex>` = full field
 dump, no-arg = table of every NPC in the Strie login burst). **An NPC spawn is the exact same FA015807 grammar
 as the player spawn** — only the field VALUES differ; the byte layout is identical:
 ```
@@ -313,7 +313,7 @@ scaffold key. So the lift is: model the fixed field sequence as a struct (most f
 spatial), emit the empty 0x3F1 scaffold word, and the block regenerates from columns — no raw `Data` blob, no
 cross-session stale refs. (Caveat: cross-session humanoid render still has a separate unknown — minimal
 post-IIR breaks humanoids, `memory npc_spawn_minimal_postiir_breaks_humanoids` — so prove the regenerated
-pre-IIR in-client.) Next: correlate the 53-u32 order with a captured NPC body (`tools/capture/dissect_npc_spawn.py`)
+pre-IIR in-client.) Next: correlate the 53-u32 order with a captured NPC body (`NpcSpawnAppearanceTests`)
 to label the spatial fields, then a `NpcSpawnPreIirCodec` (Parse/Build) golden-tested like `PlayerSpawnScaffoldCodec`.
 
 PREMISE CORRECTION 2026-06-14 (#185): the long-standing claim that cross-session NPC rows fail to render
@@ -581,7 +581,7 @@ into the DB from that blob, byte-identical). The burst is still the captured RAW
 still the remaining work, but logins no longer need an embedded blob and any map with a capture works. KNOWN: a
 couple of maps whose captured player instance is out of the 4-byte-varint range don't re-address cleanly yet.
 
-STATIC-WORLD DISSECTION DONE (2026-06-10) — workbench `tools/capture/dissect_world_object.py` (`one <handle-hex>` =
+STATIC-WORLD DISSECTION DONE (2026-06-10) — workbench `QuestObjectiveRegionTests` (`one <handle-hex>` =
 full decode, no-arg = table). The three world-object sub-opcodes share the FA015807 header + 0x2C transform
 group but are SIMPLER than entity spawns - there is NO 228-byte pre-IIR float block; the object message's u32
 length prefix immediately follows the transform:
@@ -622,7 +622,7 @@ CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC sp
   a normalized stateHandle is what fully retires the burst objects.
 
 96C46740 MoveTask (per-entity movement registration) — GRAMMAR CRACKED 2026-06-11 (workbench
-`tools/capture/dissect_movetask.py`, `coverage` mode). Each FA015807 spawn is paired with a 96C46740 MoveTask that
+`MoveTaskCodecTests`, `coverage` mode). Each FA015807 spawn is paired with a 96C46740 MoveTask that
 registers the entity's movement. It does NOT use the 0x2C transform framing; its floats are BIG-ENDIAN (unlike
 the spawn transform's LE). Body = `[u32 bodyLen][96C46740][ack=0xC350][u32 handle][00 00][curPos vec3 BE][TASK
 TYPE byte @30][payload]`. The byte @30 is a TASK-TYPE discriminator; **all types but 0x04 are FIXED-LENGTH** and

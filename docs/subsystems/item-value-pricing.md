@@ -38,7 +38,7 @@ Slot 9 (count 7, total 392 → 56/item) is the proof that price scales with coun
 
 The earlier "no multiplier matches" search failed because it scanned **raw offsets**. The body is an RDB
 **property table** — a run of `[fieldId u32][value u32]` LE pairs with strictly-decreasing fieldId after the
-header (same grammar as `tools/capture/decode_item_template.py`). The value is **field 74**, and the
+header (same grammar as `DispatchAddItemTests`). The value is **field 74**, and the
 **vendor sell-per-unit = round(value / 10)** (integer `(value+5)/10`):
 
 | template | field 74 | sell/item |

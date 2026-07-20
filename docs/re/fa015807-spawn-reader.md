@@ -6,7 +6,7 @@ token; it is now the SOLE NPC-spawn path (every FA015807 is dropped from the log
 there is no verbatim-burst fallback anymore — #185).
 
 > **RESOLVED (2026-06-17): the scaffolds are RUNTIME state, not config — generate the minimal form from scratch.**
-> A cross-capture sweep (`tools/capture/classify_fa015807_fields.py` for the pre-IIR, `classify_fa015807_postiir.py` for
+> A cross-capture sweep (`tools/capture/classify_fa015807_fields.py` for the pre-IIR, `NpcSpawnAppearanceTests` for
 > the post-IIR; **5026 / 5151 scaffolds across all 45 captures**) overturned the "per-NPC RDB-config" theory below.
 > The scaffolds carry **no per-NPC config and no session-volatile reference**; **every** non-zero word is
 > per-instance runtime state (target/owner handles, timers, action counters) that is **0 on an idle fresh spawn**.
@@ -19,7 +19,7 @@ there is no verbatim-burst fallback anymore — #185).
 
 Decompiled from `AgeOfConan.exe` (Ghidra) — reproduce with `tools/ghidra/DumpSpawnIir.java` +
 `DumpFns.java` (both committed). Grammar **validated against 4558 captured FA015807 records** (zero
-framing failures) by `tools/capture/decode_fa015807_reader.py`.
+framing failures) by `PlayerSpawnReader`.
 
 ## Reader primitives (`DumpFns.java`)
 
@@ -61,7 +61,7 @@ the embedded CoreCharacter.
 
 ## Validation
 
-`python3 tools/capture/decode_fa015807_reader.py` walks the fixed scaffold for every captured FA015807 record and
+`python3 `PlayerSpawnReader`` walks the fixed scaffold for every captured FA015807 record and
 checks three predictions: leading version `0x05`, the sub-list's first word is a multiple of `0x3F1`, and the
 embedded CoreCharacter version `0x41` lands at the exact predicted offset. Across all login + create captures:
 
@@ -88,7 +88,7 @@ So the block is genuinely **fixed-width: 222 bytes** (version+1 → CoreChar), w
 lands on `0x41` at +223 across all 4094 records. The ASCII that shows up in the capture
 (`fifomessagefromserver`, `<font color=…>` markup, event names) is **the value of u32 slots**, not a special
 read: the C++ struct has fixed-width inline **char buffer(s)** over the region `0x184–0x264` that the IIR
-reads 4 bytes at a time. `analyze_fa015807_scaffold.py` carries the exact wire-order→struct-offset map and
+reads 4 bytes at a time. `NpcSpawnScaffoldTests` carries the exact wire-order→struct-offset map and
 classifies each word over a beach burst: the great majority are `ascii/charbuf` (text in some NPCs, zero in
 others — 36/36 blocks distinct because the per-NPC text differs), with only a few genuine scalars
 (`w21`@0x1fc, the const-zero `w22`@0x200 / `w45`@0x224, the numeric `w50`@0x23c).
@@ -115,7 +115,7 @@ evidently keeps for script/debug, not geometry). Source: the RDB script layer (`
 ## The POST-IIR is runtime state, NOT appearance — "missing hair" was the playfield token (corrected 2026-06-17)
 
 An earlier offline pass guessed the larger humanoid post-IIR was a **float-stat / appearance table** and that the
-minimal form "drops hair". **The cross-capture sweep (`classify_fa015807_postiir.py`, 5151 records) disproves it:**
+minimal form "drops hair". **The cross-capture sweep (`NpcSpawnAppearanceTests`, 5151 records) disproves it:**
 - **Appearance lives in the IIR** (`CharacterStats.head_mesh` / `looks_package`), which the DB build already
   sources — NOT in the post-IIR.
 - **19 humanoid NPC types** (Kalanthes, Guard, Nobleman, Black Dragon Guard, Poacher, Bat Pict Mauler, …) emit

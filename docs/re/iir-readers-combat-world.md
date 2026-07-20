@@ -2,7 +2,7 @@
 
 Wire grammars for a batch of combat / world-entity / movement-adjacent `IIR` records, recovered
 from `AgeOfConan.exe` via the vtable-xref method (`tools/ghidra/DumpVtableReaders.java`, slot 8 →
-each class's `ReadSubClass`). Validator: `tools/capture/decode_combat_world_iir.py` — every reader below
+each class's `ReadSubClass`). Validator: `CombatPacketCodec` — every reader below
 consumes **exactly to the declared packet length** for every captured instance.
 
 ## Shared framing + primitives
@@ -89,7 +89,7 @@ the kd-tree region is the same shared reader already decoded for SimpleDynel.
 
 ## Status
 
-Decoded + dissected (this doc + `decode_combat_world_iir.py`). Construct/implement (C# codecs +
+Decoded + dissected (this doc + `CombatPacketCodec`). Construct/implement (C# codecs +
 golden tests) belongs to the relevant subsystems: combat (#216/#218/`../subsystems/combat.md`) for
 StatDamage/CombatShield/ChainKill/CombatReactive/ThreatLevel/HateList, and the simulation/world
 layer (#190/#187) for SetPos/CharInPlay + the dynel full-updates.

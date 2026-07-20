@@ -70,7 +70,7 @@ never showed). **NPC death and player death use DIFFERENT triggers** — decoded
 - **NPC death** (#204/#349) = a **death-pose `MoveTaskIIR`** (0x96C46740, movement-type 0x06 — freezes the
   corpse where it fell) followed by a **death-behavior `BehaviorControlCenterIIR`** (0x642CD3D6) on the dying
   handle. In `NecroL80_..._casting-combat` **every** NPC kill carries exactly this pair and **NO
-  `SimpleCharKilledBy`** (validated by `tools/capture/decode_npc_death.py`). The death is identified by the
+  `SimpleCharKilledBy`** (validated by `WorldDeathTests`). The death is identified by the
   BccIIR **envelope** — form **0x0004**, slot **0x0000001F**, a 13-byte protobuf `08 <behaviorId> 18 <variant>
   28 08 30 00 60 <f12>`; the **behaviorId is creature-specific** (that creature's own death animation — 41877
   for the common humanoid mobs, 17036 for the F023 creature) and the field-3 `<variant>` byte varies per kill
@@ -183,7 +183,7 @@ clean NPC-vs-player tell). `seq` is the constant `0x0004` (server-initiated, not
 Sending it plays the NPC's swing + the player's hit-react; the authoritative HP move still rides the
 world-tick `StatUpdate` (the ack's damage is just the floating number, so the two don't double-apply).
 
-Decode: `tools/capture/decode_combat_npc_ack.py` (98/98 frames of the strickenbla capture). Builder
+Decode: `CombatEffectBuilderTests` (98/98 frames of the strickenbla capture). Builder
 `CombatPacketCodec.BuildNpcAttackAnimationAckBody`, byte-exact against frame 6472 in
 `CombatPacketCodecTests`. Wired into `WorldSimulation.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
@@ -249,7 +249,7 @@ on-screen feedback lines — **one per primary attribute that rose** (the 5 cate
 then a `0x96B8DC59` vitals push with the new Health/Stamina/Mana maxima. There is **no** "You reached level N"
 banner in any capture, and the Level number is never pushed as a standalone `0x36` stat (the client tracks it from
 the snapshot/quest stream). The attribute lines are `FormatFeedbackIIR` payloads — see `docs/subsystems/on-screen-feedback.md`
-and `AttributeChangedFeedback` (decode `tools/capture/decode_levelup_feedback.py`, golden `AttributeChangedFeedbackTests`).
+and `AttributeChangedFeedback` (decode `AttributeChangedFeedbackTests`, golden `AttributeChangedFeedbackTests`).
 Wired into both paths: GM `.level` (`SetLevelCommand`) and `CombatService.PushLevelUp`. Which attributes rise / by
 how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-class growth tables exist in captures.
 
@@ -261,7 +261,7 @@ byte-exact:
   `GrantCharacterAbilities` (post-0x2024, from `FlushPendingPost205FFollowUp`).
 - **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
   invariant across all 68 captured packets. `SendLearnSpell`/`AbilityGrantBody.BuildLearnSpellBody` (decode
-  `tools/capture/decode_learn_spell.py`, golden `LearnSpellTests`).
+  `CaptureSpellImporterTests`, golden `LearnSpellTests`).
 
 (The GM test commands `.grantability`/`.abilitylist`/`.learnspell` were removed in the "remove 25 GM test commands"
 cleanup — 2026-07-05; the underlying wire builders above are still live.)

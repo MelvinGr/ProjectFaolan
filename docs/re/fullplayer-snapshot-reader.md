@@ -71,7 +71,7 @@ DONE 2026-06-16 (the single-quest beach region authors from server state):
   world-burst tails for everything OUTSIDE the quest portion. **That interim is retired: #210 landed, so
   `FullCharSnapshotSubClass.BuildFromScratch` now builds the WHOLE tails and is the sole production path
   (`GameServerListener.WorldEntry.cs`); there is no captured-burst splice anymore.**
-- **Stat block decoded** — `decode_statblock.py`: only 25 of 338 values vary across fresh chars (class/map/XP
+- **Stat block decoded** — `CharacterStatBlockTests`: only 25 of 338 values vary across fresh chars (class/map/XP
   + one session slot); the other 313 are a fixed skeleton, relocated to `SubClassStatBlock`.
 
 DONE (2026-06-17): the **access-window table** (`[1292,7917)`, 86 `PFAccessWindow_` entries / 172 name strings)
@@ -273,7 +273,7 @@ Each populated **`ObjRec`** (0x48-byte heap node; not exercised by the beach sta
 In the template, `Quest_c` ends at byte `@609` (its 4 numeric objective lists are **empty** for quest 10238 —
 counts at `@581/@585/@601/@605` are all 0). The bytes from `@609` up to the quest index (`@1168`) are a
 **per-GOAL objective-detail block** — its OWN grammar, fully decoded + validated by
-`tools/capture/decode_snapshot_609.py` (parses to the index boundary exactly) and locked by
+`QuestObjectiveRegionTests` (parses to the index boundary exactly) and locked by
 `Faolan.Tests/Snapshot609AnalysisTests`:
 
 ```
@@ -310,7 +310,7 @@ fits none — likely List B/C / MainQuest are empty here and consume only a few 
 start; pinning the exact reader needs a **dynamic trace**. NOT blocking the *generator* now that the wire
 grammar above is decoded — the blocker is the per-goal `QuestDefinition` model, not the byte layout.
 
-Validated by the dissector `tools/capture/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
+Validated by the dissector `QuestcGenerationTests` (parses version + List A + each `Quest_c` and asserts
 it consumes exactly to the objective-block boundary `@609`; `listKey == questId`). A C# codec
 `QuestcRegion`/`QuestcRecord` (Parse/ToArray + typed fields) round-trips the template's `@0–609` **byte-exact**
 (`QuestcRegionTests`) and is **wired into `FullCharSnapshotSubClass`** — it now models the tails' front region instead of
@@ -374,7 +374,7 @@ Class-derived VITALS/mana are now authored from-scratch (see `ApplyClassVitals` 
 retail Necro captures):
 - HP **is** in the tails stat block (`[23]/[54]` ×100; retail Necro HP 89 = 8900).
 - **Mana IS** in the stat block after all (the earlier "mana not in the block" note was a search error, corrected
-  in `decode_statblock.py`): the DISPLAYED max mana lives at `[60]` = `[64]` (×100; verified across four
+  in `CharacterStatBlockTests`): the DISPLAYED max mana lives at `[60]` = `[64]` (×100; verified across four
   archetypes' retail LOGIN snapshots — Necro `[64]=24600`), with a ~6-lower secondary at `[62]`. The vitals are
   now authored: `SubClassPostAccessBlock.ApplyClassVitals` writes HP/mana/stamina (displayed + base/secondary
   slots, ×100, keeping the `+148` repeated copies in sync) from `CharacterMaxStats.SnapshotVitals()` (#4/#186).
@@ -382,7 +382,7 @@ retail Necro captures):
   REAL captured stat sheet is available `BuildFromScratch` ships that sheet (imported), otherwise the fresh
   skeleton with per-class vitals patched. The distinct class *identity* in the root is still the open part (#239).
 - (The earlier standalone tails-stat-block patch was reverted; the correct approach is the sheet-level authoring
-  above. `decode_statblock.py`'s WRONG label was `[78]=archetype` — every archetype has `[78]=3`; `[64]=mana` is
+  above. `CharacterStatBlockTests`'s WRONG label was `[78]=archetype` — every archetype has `[78]=3`; `[64]=mana` is
   CONFIRMED.)
 
 ## Inventory/bag carve-out (moved from Opcodes.cs 2026-07-06)

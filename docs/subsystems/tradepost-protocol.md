@@ -6,7 +6,7 @@
 > test with the `.ah` GM command (sends `DispatchOpenTradepost` at the player's position). Once it renders,
 > proceed to Step 3 (DB-backed listings + the `Mail`/`MailAttachment` model + buy→mail). Tracked as Gitea issues under `area:economy`.
 
-Decoded 2026-06-12 from two captures via `tools/capture/decode_tradepost.py`:
+Decoded 2026-06-12 from two captures via `TradepostListingCodecTests`:
 - `account-faolan-character-necrol80-...-sell_items_to_trader-intract-with-auctionhouse` (browse/search)
 - `account-faolan-character-assassinl23-...-buy_from_autionhouse_get_mail-...` (buy + mail delivery)
 

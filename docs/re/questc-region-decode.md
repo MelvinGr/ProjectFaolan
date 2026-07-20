@@ -62,7 +62,7 @@ byte-exact.
 > distinct in every entry (NecroL80's journal: 39 anchors, 39 distinct tokens — `WTHD`, `1LJL`, `UFWN`, `HIB4`,
 > `C9PY`, …), the same flavour of random key the `<remoteformat key="...">` attributes carry.
 >
-> Verified by `tools/capture/decode_questc_progress.py` across **all 141 captured snapshots** (beach L1,
+> Verified by `ProgressedJournalSnapshotTests` across **all 141 captured snapshots** (beach L1,
 > L23, L24, and both L80 journals), and gated in the suite by `ProgressedJournalSnapshotTests` — 141 bodies,
 > 85 of them multi-quest, tails byte-exact.
 

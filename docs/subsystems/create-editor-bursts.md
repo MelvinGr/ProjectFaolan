@@ -24,7 +24,7 @@ choreography remain, gated on #185/#190). The former verbatim beach NPC intro co
 through the live constructed `ConversationService` (#188, `d208fc82`). This doc is the decode that makes the
 construction possible.
 
-Dissector: `tools/capture/decode_create_editor.py` (default-globs and validates across every `*create*.tshark.json` capture).
+Dissector: `CreateEditorRecordTests` (default-globs and validates across every `*create*.tshark.json` capture).
 
 ## 1. `0x2000` is multiplexed — split by endpoint-class pair first
 
