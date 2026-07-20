@@ -121,47 +121,61 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// The inverse of BuildDamageResultBody. Validates the sub-opcode, both C350 type words, the 0x00 marker and the
 		// trailing [02][00][00] constants so a mis-routed body is rejected. Proven by the CombatPacketCodecTests round-trip.
-		public static bool TryParseDamageResultBody(ReadOnlySpan<byte> body, out uint attackerInstance, out uint targetHandle, out uint damage)
+		//
+		// Read SEQUENTIALLY through FaolanStream rather than by fixed offsets: the old offsets stepped 8 -> 12 -> 13
+		// -> 17 -> 21 -> 25, and those irregular gaps were the only trace of the single-byte marker. Reading in order
+		// states the record; it does not leave the layout implicit in arithmetic.
+		public static bool TryParseDamageResultBody(byte[] body, out uint attackerInstance, out uint targetHandle, out uint damage)
 		{
 			attackerInstance = 0;
 			targetHandle = 0;
 			damage = 0;
-			if (body.Length != DamageResultBodyLength)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.DamageResultIIR)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
-				return false;
-			if (body[12] != 0x00)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4)) != EntityClass.Character)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4)) != 2 || BinaryPrimitives.ReadUInt32BigEndian(body.Slice(29, 4)) != 0 ||
-			    BinaryPrimitives.ReadUInt32BigEndian(body.Slice(33, 4)) != 0)
+			if (body is not { Length: DamageResultBodyLength })
 				return false;
 
-			attackerInstance = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
-			targetHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(17, 4));
-			damage = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(21, 4));
+			var r = new FaolanStream(body);
+			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.DamageResultIIR)
+				return false;
+			if (r.ReadUInt32() != EntityClass.Character)
+				return false;
+
+			var attacker = r.ReadUInt32();
+			if (r.ReadByte() != 0x00) // marker
+				return false;
+			if (r.ReadUInt32() != EntityClass.Character) // the TARGET's type word
+				return false;
+
+			var target = r.ReadUInt32();
+			var amount = r.ReadUInt32();
+			if (r.ReadUInt32() != 2 || r.ReadUInt32() != 0 || r.ReadUInt32() != 0) // trailing [02][00][00]
+				return false;
+
+			attackerInstance = attacker;
+			targetHandle = target;
+			damage = amount;
 			return true;
 		}
 
 		// The inverse of BuildEnergyBody. Validates the sub-opcode, the C350 type word and the 0x01 marker.
-		public static bool TryParseEnergyBody(ReadOnlySpan<byte> body, out uint actorInstance, out uint stamina)
+		public static bool TryParseEnergyBody(byte[] body, out uint actorInstance, out uint stamina)
 		{
 			actorInstance = 0;
 			stamina = 0;
-			if (body.Length != EnergyBodyLength)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.EnergyIIR)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
-				return false;
-			if (body[12] != 0x01)
+			if (body is not { Length: EnergyBodyLength })
 				return false;
 
-			actorInstance = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
-			stamina = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4));
+			var r = new FaolanStream(body);
+			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.EnergyIIR)
+				return false;
+			if (r.ReadUInt32() != EntityClass.Character)
+				return false;
+
+			var actor = r.ReadUInt32();
+			if (r.ReadByte() != 0x01) // marker
+				return false;
+
+			actorInstance = actor;
+			stamina = r.ReadUInt32();
 			return true;
 		}
 	}

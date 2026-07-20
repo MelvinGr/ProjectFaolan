@@ -265,101 +265,145 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The inverse of BuildQuestGoal: recovers (playerHandle, questId, goalId, count) from a 33-byte QuestGoal body.
 		// Validates the sub-opcode, ack TypeTag, the 0x01 marker and the trailing zero words. Proven by the QuestTests
 		// round-trip (#87 quest-packets codec consolidation).
-		public static bool TryParseQuestGoal(ReadOnlySpan<byte> body, out uint playerHandle, out uint questId, out uint goalId, out uint count)
+		//
+		// Read SEQUENTIALLY through FaolanStream rather than by fixed offsets: the offsets ran 8 -> 13 -> 17 -> 21,
+		// and that non-uniform step was the only trace of the single-byte marker sitting between them. Reading in
+		// order states the layout instead of encoding it in arithmetic the reader has to diff.
+		public static bool TryParseQuestGoal(byte[] body, out uint playerHandle, out uint questId, out uint goalId, out uint count)
 		{
 			playerHandle = 0;
 			questId = 0;
 			goalId = 0;
 			count = 0;
-			if (body.Length != 33)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestGoalIIR)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
-				return false;
-			if (body[12] != 0x01)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4)) != 0 || BinaryPrimitives.ReadUInt32BigEndian(body.Slice(29, 4)) != 0)
+			if (body is not { Length: 33 })
 				return false;
 
-			playerHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
-			questId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4));
-			goalId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(17, 4));
-			count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(21, 4));
+			var r = new FaolanStream(body);
+			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.QuestGoalIIR)
+				return false;
+			if (r.ReadUInt32() != EntityClass.Character)
+				return false;
+
+			var handle = r.ReadUInt32();
+			if (r.ReadByte() != 0x01) // marker
+				return false;
+
+			var quest = r.ReadUInt32();
+			var goal = r.ReadUInt32();
+			var amount = r.ReadUInt32();
+			if (r.ReadUInt32() != 0 || r.ReadUInt32() != 0) // trailing zero words
+				return false;
+
+			playerHandle = handle;
+			questId = quest;
+			goalId = goal;
+			count = amount;
 			return true;
 		}
 
 		// The inverse of BuildQuestIir: recovers (playerHandle, state, questId) from a 29-byte QuestIIR body. Validates
-		// the sub-opcode, ack TypeTag, the zeroed word at [12..16], the 0x01 marker and the trailing zero word.
-		public static bool TryParseQuestIir(ReadOnlySpan<byte> body, out uint playerHandle, out uint questId, out uint state)
+		// the sub-opcode, ack TypeTag, the zeroed word before the 0x01 marker, and the trailing zero word.
+		public static bool TryParseQuestIir(byte[] body, out uint playerHandle, out uint questId, out uint state)
 		{
 			playerHandle = 0;
 			questId = 0;
 			state = 0;
-			if (body.Length != 29)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestIIR)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4)) != 0)
-				return false;
-			if (body[16] != 0x01)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4)) != 0)
+			if (body is not { Length: 29 })
 				return false;
 
-			playerHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
-			state = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(17, 4));
-			questId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(21, 4));
+			var r = new FaolanStream(body);
+			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.QuestIIR)
+				return false;
+			if (r.ReadUInt32() != EntityClass.Character)
+				return false;
+
+			var handle = r.ReadUInt32();
+			if (r.ReadUInt32() != 0) // zero word
+				return false;
+			if (r.ReadByte() != 0x01) // marker
+				return false;
+
+			var questState = r.ReadUInt32();
+			var quest = r.ReadUInt32();
+			if (r.ReadUInt32() != 0) // trailing zero word
+				return false;
+
+			playerHandle = handle;
+			state = questState;
+			questId = quest;
 			return true;
 		}
 
 		// The inverse of BuildQuestLogList: recovers (playerHandle, trackedQuestId, questIds) from a QuestLogList body.
 		// The list populates the J-panel - the character's full quest log as the retail server sent it on login - so it
 		// is the bulk per-character quest set (many ids in ONE packet), unlike the one-quest QuestIIR/QuestGoal packets.
-		public static bool TryParseQuestLogList(ReadOnlySpan<byte> body, out uint playerHandle, out uint trackedQuestId, out List<uint> questIds)
+		//
+		// Reading sequentially surfaced two regions the fixed-offset version stepped straight over: the [u32 one=1]
+		// [u32 areaId] pair after the marker (offsets 13..21 - areaId is real data this parser DISCARDS; see
+		// BuildQuestLogList, which writes it), and the per-entry 1-based ordinal that precedes each quest id.
+		public static bool TryParseQuestLogList(byte[] body, out uint playerHandle, out uint trackedQuestId, out List<uint> questIds)
 		{
 			playerHandle = 0;
 			trackedQuestId = 0;
 			questIds = null;
-			if (body.Length < 29)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.QuestLogListIIR)
-				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
-				return false;
-			if (body[12] != 0x01)
+			if (body is not { Length: >= 29 })
 				return false;
 
-			playerHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
-			trackedQuestId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(21, 4));
-			var count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4));
-			if (count > 4096 || 29 + count * 8 > body.Length)
+			var r = new FaolanStream(body);
+			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.QuestLogListIIR)
+				return false;
+			if (r.ReadUInt32() != EntityClass.Character)
+				return false;
+
+			var handle = r.ReadUInt32();
+			if (r.ReadByte() != 0x01) // marker
+				return false;
+
+			r.ReadUInt32(); // constant 1
+			r.ReadUInt32(); // areaId - written by the builder, not surfaced here
+			var tracked = r.ReadUInt32();
+			var count = r.ReadUInt32();
+			if (count > 4096 || HeaderLength + count * EntrySize > body.Length)
 				return false; // implausible count / truncated - not a well-formed log list
 
-			questIds = new List<uint>((int)count);
-			var off = 29;
+			var ids = new List<uint>((int)count);
 			for (uint i = 0; i < count; i++)
 			{
-				questIds.Add(BinaryPrimitives.ReadUInt32BigEndian(body.Slice(off + 4, 4)));
-				off += 8;
+				r.ReadUInt32(); // 1-based ordinal
+				ids.Add(r.ReadUInt32());
 			}
 
+			playerHandle = handle;
+			trackedQuestId = tracked;
+			questIds = ids;
 			return true;
 		}
 
+		// QuestLogList: the fixed head before the entries, and one [u32 ordinal][u32 questId] entry.
+		private const int HeaderLength = 29;
+		private const int EntrySize = 8;
+
+		// A quest text record: the <remoteformat>/<localized> XML with its length prefix.
+		//
+		// This was hand-rolled (allocate, poke b[0]=0, poke b[1]=len, CopyTo). It is WriteByte(0) +
+		// WriteStringByteLength - the same shape QuestObjectiveGoal.Read parses back (ReadByte()==0 then
+		// ReadArrayByteLength), so the write side now mirrors the read side through the helpers.
+		//
+		// ⚠️ NOT written as FaolanStream.WriteString, even though [0x00][u8 len] and a [u16 BE len] are the SAME
+		// BYTES for any record under 256: which of the two the client actually reads is UNDECIDED, and using
+		// WriteString here would quietly assert the u16 answer. The captures cannot decide it - across 2850 captured
+		// goal text records the longest is 119 bytes, so every observed record sits in the range where the two
+		// models coincide. Note the same <remoteformat> content IS read u16-framed elsewhere in this subsystem
+		// (QuestcRecord.Read -> ReadString) while QuestObjectiveGoal reads it as [0x00][u8] - one content type,
+		// two models, neither disprovable from the corpus. Until a client read or a >255 record settles it, this
+		// keeps the modelled framing and the guard that goes with it.
 		private static byte[] TextRecord(string xml)
 		{
 			var ascii = Encoding.ASCII.GetBytes(xml);
 			if (ascii.Length > 0xFF)
 				throw new ArgumentException($"text record too long ({ascii.Length} B): {xml}");
 
-			var b = new byte[2 + ascii.Length];
-			b[0] = 0x00;
-			b[1] = (byte)ascii.Length;
-			ascii.CopyTo(b, 2);
-			return b;
+			return new FaolanStream().WriteByte(0).WriteArrayByteLength(ascii).ToArray();
 		}
 
 		private static void WriteHeader(FaolanStream w, uint subOpcode, uint playerHandle)
