@@ -814,7 +814,14 @@ namespace Faolan.Importer.Modules
 			var areaCount = await ImportOps.ImportQuestAreas(ctx.Db, areas, defs.Select(d => d.AreaId).Where(id => id != 0).Distinct().ToList());
 
 			await ImportOps.ImportQuestDefinitions(ctx.Db, defs);
-			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {areaCount} quest areas ({areas.Count} with wire data).");
+
+			// The completed journal carries a title + sub-line for every quest the character ever finished - far more
+			// quests than any capture session touches. Additive: never disturbs the richer full-update definitions.
+			var harvest = CompletedQuestExtractor.Extract(packets);
+			var (addedCompleted, filledCompleted) = await ImportOps.ImportCompletedQuestDefinitions(ctx.Db, harvest);
+
+			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {areaCount} quest areas " +
+				$"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");
 		}
 	}
 

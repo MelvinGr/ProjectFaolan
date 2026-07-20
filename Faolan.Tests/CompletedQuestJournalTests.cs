@@ -70,27 +70,19 @@ namespace Faolan.Tests
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");
 
-			var rec1 = new Dictionary<string, HashSet<string>>();   // first 52000 id -> second 52000 ids
-			var rec2 = new Dictionary<string, HashSet<string>>();   // second 52000 id -> first 52000 ids
-			var areaToRec1 = new Dictionary<uint, HashSet<string>>();
-			var rec1ToArea = new Dictionary<string, HashSet<uint>>();
+			var distinctQuests = new HashSet<uint>();
+			var withBothRecords = 0;
 			foreach (var g in allAreas)
+			foreach (var q in g.Quests)
 			{
-				var mapId = Id(g.MapName);      // first 52000 record on the wire
-				var regId = Id(g.RegionName);   // second 52000 record on the wire
-				(rec1.TryGetValue(mapId, out var a) ? a : rec1[mapId] = []).Add(regId);
-				(rec2.TryGetValue(regId, out var b) ? b : rec2[regId] = []).Add(mapId);
-				(areaToRec1.TryGetValue(g.AreaId, out var c) ? c : areaToRec1[g.AreaId] = []).Add(mapId);
-				(rec1ToArea.TryGetValue(mapId, out var d) ? d : rec1ToArea[mapId] = []).Add(g.AreaId);
+				distinctQuests.Add(q.QuestId);
+				if (q.Records.Count == 2)
+					withBothRecords++;
 			}
 
-			o.WriteLine($"distinct areaIds={areaToRec1.Count}  distinct 1st-52000={rec1.Count}  distinct 2nd-52000={rec2.Count}");
-			o.WriteLine($"1st-52000 values each mapping to >1 of the 2nd: {rec1.Count(kv => kv.Value.Count > 1)}");
-			o.WriteLine($"2nd-52000 values each mapping to >1 of the 1st: {rec2.Count(kv => kv.Value.Count > 1)}");
-			o.WriteLine($"areas spanning >1 of the 1st-52000: {areaToRec1.Count(kv => kv.Value.Count > 1)}");
-			o.WriteLine("1st-52000 -> how many areas:");
-			foreach (var kv in rec1ToArea.OrderByDescending(k => k.Value.Count).Take(10))
-				o.WriteLine($"   id {kv.Key,8} : {kv.Value.Count,4} areas, 2nd-52000 = {string.Join(",", rec1[kv.Key])}");
+			o.WriteLine($"distinct COMPLETED quest ids across the corpus: {distinctQuests.Count}");
+			o.WriteLine($"entries carrying exactly 2 records (title + sub-line): {withBothRecords} of {quests}");
+			o.WriteLine($"distinct areas: {allAreas.Select(a => a.AreaId).Distinct().Count()}");
 
 			Assert.True(withRegion > 0, "no snapshot in the corpus carried a completed-quest journal");
 		}

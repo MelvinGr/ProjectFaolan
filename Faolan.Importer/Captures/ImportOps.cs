@@ -444,6 +444,76 @@ namespace Faolan.Importer.Captures
 			return added;
 		}
 
+		// Quest definitions harvested from the COMPLETED-quest journal (#390). ADDITIVE by design: these rows carry
+		// only a title + journal sub-line, so they fill the catalog out for quests no capture session ever touched
+		// without disturbing the far richer definitions the QuestFullUpdate path builds.
+		//
+		// ⚠️ Deliberately NOT routed through ImportQuestDefinitions, which does
+		// `RemoveRange(existing.TextRefs); existing.TextRefs = def.TextRefs` - that would strip a complete quest's
+		// summary/objective refs down to the two the completed journal happens to carry.
+		public static async Task<(int Added, int Filled)> ImportCompletedQuestDefinitions(DatabaseContext db,
+			CompletedQuestExtractor.Harvest harvest)
+		{
+			var existing = await db.QuestDefinitions.Include(q => q.TextRefs).ToDictionaryAsync(q => q.QuestId);
+			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
+			var areas = await db.QuestAreas.Select(a => a.AreaId).ToHashSetAsync();
+			int added = 0, filled = 0;
+
+			foreach (var q in harvest.Quests)
+			{
+				// Maps and areas are FK targets - a placeholder beats dropping the quest (Melvin: "its okay to insert
+				// maps wihtout name").
+				if (q.MapId != 0 && maps.Add(q.MapId))
+					db.Maps.Add(new Map { Id = q.MapId, Name = "" });
+
+				if (q.AreaId != 0 && areas.Add(q.AreaId))
+					db.QuestAreas.Add(new QuestArea { AreaId = q.AreaId });
+
+				if (!existing.TryGetValue(q.QuestId, out var def))
+				{
+					def = new QuestDefinition { QuestId = q.QuestId, AreaId = q.AreaId, MapId = q.MapId };
+					db.QuestDefinitions.Add(def);
+					existing[q.QuestId] = def;
+					added++;
+				}
+				else
+				{
+					filled++;
+				}
+
+				AddRefIfMissing(def, QuestTextSlot.Title, q.Title);
+				AddRefIfMissing(def, QuestTextSlot.ListSubLine, q.SubLine);
+
+				if (harvest.Areas.TryGetValue(q.AreaId, out var header))
+				{
+					AddRefIfMissing(def, QuestTextSlot.AreaTitle, header.Title);
+					AddRefIfMissing(def, QuestTextSlot.RegionName, header.Region);
+					AddRefIfMissing(def, QuestTextSlot.MapName, header.Map);
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return (added, filled);
+		}
+
+		// Only ever ADDS a slot that is absent - an existing ref is authoritative, having come from a full-update.
+		private static void AddRefIfMissing(QuestDefinition def, QuestTextSlot slot, CompletedQuestExtractor.TextRef text)
+		{
+			if (def.TextRefs.Any(r => r.Slot == slot))
+				return;
+
+			def.TextRefs.Add(new QuestTextRef
+			{
+				QuestId = def.QuestId,
+				Slot = slot,
+				RefId = text.RefId,
+				Category = text.Category,
+				KeyText = text.Key,
+				Flags = text.Flags,
+				IsLocalized = text.IsLocalized
+			});
+		}
+
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
 		{
 			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a
