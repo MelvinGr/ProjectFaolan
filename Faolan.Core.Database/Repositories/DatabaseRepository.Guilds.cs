@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -13,7 +12,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Guild?> CreateGuild(string name, uint leaderCharacterId);
 		Task<Guild?> GetGuild(uint id);
 		Task<Guild?> GetGuildByName(string name, uint realmId);
-		Task<List<Guild>> GetGuilds(uint realmId);
+		Task<Guild[]> GetGuilds(uint realmId);
 		Task SaveGuild(Guild guild);
 	}
 
@@ -57,10 +56,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Guilds.Include(g => g.Members).Where(g => g.RealmId == realmId && g.Name == name).FirstOrDefaultAsync();
 		}
 
-		public async Task<List<Guild>> GetGuilds(uint realmId)
+		public async Task<Guild[]> GetGuilds(uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Guilds.Include(g => g.Members).Where(g => g.RealmId == realmId).ToListAsync();
+			return await ctx.Guilds.Include(g => g.Members).Where(g => g.RealmId == realmId).ToArrayAsync();
 		}
 
 		public async Task SaveGuild(Guild guild)

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -16,7 +15,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Account?> GetAccount(uint id);
 		Task<Account?> GetAccount(string userName);
 		Task<AccountClaim?> GetAccountClaim(uint claimId);
-		Task<List<AccountClaim>> GetAccountClaims(uint accountId);
+		Task<AccountClaim[]> GetAccountClaims(uint accountId);
 		Task SaveAccount(Account account);
 		Task SetAccountClaimQuantity(uint claimId, uint? quantity);
 		Task SetAccountClaimsAvailable(uint accountId, bool available);
@@ -65,10 +64,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.AccountClaims.Include(c => c.Item).FirstOrDefaultAsync(c => c.Id == claimId);
 		}
 
-		public async Task<List<AccountClaim>> GetAccountClaims(uint accountId)
+		public async Task<AccountClaim[]> GetAccountClaims(uint accountId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.AccountClaims.Include(c => c.Item).Where(c => c.AccountId == accountId).OrderBy(c => c.Id).ToListAsync();
+			return await ctx.AccountClaims.Include(c => c.Item).Where(c => c.AccountId == accountId).OrderBy(c => c.Id).ToArrayAsync();
 		}
 
 		public async Task SaveAccount(Account account)

@@ -18,7 +18,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<Item?> GetItem(uint id);
-		Task<List<Item>> GetItems(params IReadOnlyList<uint> ids);
+		Task<Item[]> GetItems(params IReadOnlyList<uint> ids);
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<Item[]> GetRandomBuildableItems(int count);
@@ -35,24 +35,6 @@ namespace Faolan.Core.Database.Repositories
 
 	public partial class DatabaseRepository
 	{
-		// Interior lowercase words allowed inside a combo DISPLAY name (e.g. "Burn to Death", "Body and Spirit Wrack").
-		private static readonly HashSet<string> ComboNameConnectors = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-		{
-			"to",
-			"of",
-			"and",
-			"the",
-			"for",
-			"a",
-			"in",
-			"on",
-			"from",
-			"with",
-			"your",
-			"our",
-			"my"
-		};
-
 		public async Task<Ability[]> GetAbilities()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -86,20 +68,13 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Combo[]> GetClassCombos(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var candidates = await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level <= level).Include(cc => cc.Combo).Select(cc => cc.Combo).ToListAsync();
-			return HighestRankPerFamily(candidates);
+			return await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level <= level).Include(cc => cc.Combo).Select(cc => cc.Combo).ToArrayAsync();
 		}
 
 		public async Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var candidates = await ctx
-				.ClassCombos.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive)
-				.Include(cc => cc.Combo)
-				.Select(cc => cc.Combo)
-				.ToListAsync();
-
-			return HighestRankPerFamily(candidates);
+			return await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive).Include(cc => cc.Combo).Select(cc => cc.Combo).ToArrayAsync();
 		}
 
 		public async Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
@@ -122,10 +97,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
 		}
 
-		public async Task<List<Item>> GetItems(params IReadOnlyList<uint> ids)
+		public async Task<Item[]> GetItems(params IReadOnlyList<uint> ids)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Items.Where(i => ids.Contains(i.Id)).ToListAsync();
+			return await ctx.Items.Where(i => ids.Contains(i.Id)).ToArrayAsync();
 		}
 
 		public async Task<uint?> GetItemSearchCategory(uint template)
@@ -246,11 +221,14 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
-				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new { cs, s })
-				.Where(x => x.cs.IsStarter
-					|| (level > 1 && (x.cs.GrantLevel != null
-						? x.cs.GrantLevel <= level
-						: x.s.Level > 1 && x.s.Level <= level)))
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new
+				{
+					cs,
+					s
+				})
+				.Where(x => x.cs.IsStarter || (level > 1 && (x.cs.GrantLevel != null
+					? x.cs.GrantLevel <= level
+					: x.s.Level > 1 && x.s.Level <= level)))
 				.OrderBy(x => x.s.Level)
 				.ThenBy(x => x.s.Id)
 				.Select(x => x.s.Id)
@@ -275,66 +253,6 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Items.Where(i => i.Id == itemId).ExecuteUpdateAsync(s => s.SetProperty(i => i.ExcludeFromRandomLoot, excluded)) == 1;
-		}
-
-		// Collapses a combo set to one entry per family - the highest rank (by Level, then Id) - ordered low->high by
-		// first-acquired level. The combo twin of the spell-bar family collapse in GetStartingBarSpells.
-		private static Combo[] HighestRankPerFamily(IEnumerable<Combo> combos)
-		{
-			return combos.GroupBy(c => ComboFamilyKey(c.Name)).Select(g => g.OrderByDescending(c => c.Level).ThenByDescending(c => c.Id).First()).OrderBy(c => c.Level).ThenBy(c => c.Id).ToArray();
-
-			// The combo-family key: groups the ranks of one combo LINE (Hell Strikes I/II/III...) so the grant can pick
-			// just the highest rank the character qualifies for - the combo analogue of StripRankSuffix for spells. Combo
-			// catalog names are ENGINE names ({Class}_{level}_{tags}_{Display Name}_{RankRoman}, e.g.
-			// Herald_05_multihit_Hell_Strikes_I), so the family is the trailing DISPLAY-name run (Capitalized words +
-			// interior connectors like "to"/"and"), normalised (lowercased, separators stripped) after dropping the class
-			// prefix and a trailing roman-numeral rank. This groups I..V of a line regardless of the differing level/tag
-			// prefix, and merges the "80b" / space-in-name / "khitai" variants that share a display name (validated in
-			// Python against the Herald catalog: a lvl-24 HoX collapses to the 5 the retail 0x2076 book shows).
-			static string ComboFamilyKey(string name)
-			{
-				if (string.IsNullOrEmpty(name))
-					return name ?? "";
-
-				var tokens = name.Split('_', StringSplitOptions.RemoveEmptyEntries);
-				if (tokens.Length <= 1)
-					return name.ToLowerInvariant();
-
-				var end = tokens.Length;
-				if (IsRomanNumeral(tokens[end - 1]))
-					end--;
-
-				// Walk back over the trailing display run (stop before the class prefix at index 0).
-				var start = end;
-				for (var i = end - 1; i >= 1; i--)
-				{
-					var t = tokens[i];
-					if (t.Length > 0 && (char.IsUpper(t[0]) || ComboNameConnectors.Contains(t)))
-						start = i;
-					else
-						break;
-				}
-
-				if (start >= end)
-					return name.ToLowerInvariant().Replace("_", "").Replace(" ", "");
-
-				return string.Concat(tokens[start..end]).ToLowerInvariant().Replace(" ", "");
-			}
-
-			// True for a combo rank token (I, II, III, IV, V, VI, VII, ...): uppercase roman numeral characters only.
-			static bool IsRomanNumeral(string s)
-			{
-				if (string.IsNullOrEmpty(s) || s.Length > 5)
-					return false;
-
-				foreach (var c in s)
-				{
-					if (c is not ('I' or 'V' or 'X'))
-						return false;
-				}
-
-				return true;
-			}
 		}
 	}
 }

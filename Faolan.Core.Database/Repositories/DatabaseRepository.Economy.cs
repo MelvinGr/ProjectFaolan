@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -13,10 +12,10 @@ namespace Faolan.Core.Database.Repositories
 		Task DeleteMail(ulong mailId);
 		Task DeleteTradepostListing(ulong saleId);
 		Task<Mail?> GetMailByWireId(ulong mailId);
-		Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId);
+		Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId);
 		Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId);
 		Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
-		Task<List<TradepostListing>> GetTradepostListings(uint itemId, uint realmId);
+		Task<TradepostListing[]> GetTradepostListings(uint itemId, uint realmId);
 		Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId);
 		Task SetMailMoney(ulong mailId, ulong money);
 		Task SetMailRead(ulong mailId, bool read);
@@ -57,7 +56,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).FirstOrDefaultAsync(m => m.MailId == mailId);
 		}
 
-		public async Task<List<Mail>> GetMailsForRecipient(string recipientName, uint realmId)
+		public async Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			// Newest first by SEND TIME. This used to lean on the surrogate Id's autoincrement as an insertion-order
@@ -69,7 +68,7 @@ namespace Faolan.Core.Database.Repositories
 			// signed 64-bit) and throws NotSupportedException on the MailId tie-break. An inbox is small, so the sort
 			// is free; the WHERE still runs in SQL.
 			var rows = await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).ToListAsync();
-			return rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).ToList();
+			return rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).ToArray();
 		}
 
 		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId)
@@ -84,11 +83,11 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.RealmId == realmId && l.SellerName == sellerName && l.BankSlot == bankSlot);
 		}
 
-		public async Task<List<TradepostListing>> GetTradepostListings(uint itemId, uint realmId)
+		public async Task<TradepostListing[]> GetTradepostListings(uint itemId, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var rows = await ctx.TradepostListings.Include(l => l.TemplateItem).Where(l => l.RealmId == realmId && l.ItemId == itemId).ToListAsync();
-			return rows.OrderBy(l => l.Price).ToList();
+			return rows.OrderBy(l => l.Price).ToArray();
 		}
 
 		// MailAttachment.MailId is the WIRE id (FK -> Mail.MailId, Mail's PK), so this compares like for like. It did

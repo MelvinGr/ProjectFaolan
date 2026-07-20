@@ -11,12 +11,12 @@ namespace Faolan.Core.Database.Repositories
 	{
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
-		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
+		Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
-		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
+		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
 		Task<Dictionary<string, uint>> GetQuestGiverMap();
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
@@ -54,7 +54,7 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId));
 		}
 
-		public async Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
+		public async Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var nodes = await ctx
@@ -64,7 +64,7 @@ namespace Faolan.Core.Database.Repositories
 				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId))
 				.ToListAsync();
 
-			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToList();
+			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToArray();
 		}
 
 		public async Task<NpcTemplate?> GetNpcByName(string name)
@@ -124,11 +124,11 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		public async Task<List<NpcSpell>> GetNpcSpellsByName(string name)
+		public async Task<NpcSpell[]> GetNpcSpellsByName(string name)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
-			return await ctx.NpcSpells.Where(s => s.NpcTemplate.Name.ToLower() == lowered).ToListAsync();
+			return await ctx.NpcSpells.Where(s => s.NpcTemplate.Name.ToLower() == lowered).ToArrayAsync();
 		}
 
 		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
