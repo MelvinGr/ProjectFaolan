@@ -30,6 +30,9 @@ Coverage: 9468/9468 captured MoveTask records (100%) round-trip byte-exact - the
 """
 import json, struct, glob, sys
 from collections import Counter
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 
 class Reader:
@@ -136,5 +139,5 @@ def main(paths):
 
 
 if __name__ == '__main__':
-    args = sys.argv[1:] or sorted(glob.glob('Captures/*.tshark.json'))
+    args = sys.argv[1:] or capture_files("*.tshark.json")
     main(args)

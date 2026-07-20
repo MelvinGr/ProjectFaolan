@@ -1,3 +1,6 @@
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 #!/usr/bin/env python3
 """Decode the guild RPC traffic on the CsPlayerAgent connection (port 7012) from a capture JSON.
 
@@ -174,4 +177,4 @@ def main(path):
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else
-         'Captures/Hoxxling_mage-heraldofxotli_login_guild_invite_accepted-random-gameplay-other_playersvisible.tshark.json')
+         capture("Hoxxling_mage-heraldofxotli_login_guild_invite_accepted-random-gameplay-other_playersvisible.tshark.json"))

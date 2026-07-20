@@ -38,8 +38,11 @@ prefix, on the world conversation GameAgent 0xB171CE13/0x58 -> GameInterface 0x6
 """
 import json
 import sys
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
-CAP = "Captures/NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving.tshark.json"
+CAP = capture("NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving.tshark.json")
 CASTER = 0x0802E5D4
 
 

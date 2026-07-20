@@ -21,13 +21,16 @@ import importlib.util
 import struct
 import sys
 from pathlib import Path
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # repo root (this file is at tools/capture/)
 spec = importlib.util.spec_from_file_location('c', ROOT / 'tools/capture/compare_log_to_dump.py')
 cdt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cdt)
 
-CAP = 'Captures/Strie_rogue-assassin_login.tshark.json'
+CAP = capture("Strie_rogue-assassin_login.tshark.json")
 SUBOPS = ('66aedd50', 'f096251e', '33a56fb0')
 
 
@@ -198,7 +201,7 @@ def cmd_coverage():
     import glob
     total = ok = 0
     states = {}
-    for cap in sorted(glob.glob(str(ROOT / 'Captures/*.tshark.json'))):
+    for cap in sorted(capture_files("*.tshark.json")):
         try:
             rows = [p[4] for p in cdt.from_dump(cap)
                     if p[2] == 0x2000 and len(p[4]) >= 20 and p[4][4:8].hex() in SUBOPS]

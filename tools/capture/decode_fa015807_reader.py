@@ -20,6 +20,9 @@ predicts. If all three hold across every record, the read sequence is correct.
 Run:  python3 tools/capture/decode_fa015807_reader.py [capture.tshark.json ...]
 """
 import json, struct, sys, glob
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 FA = 0xFA015807
 CARRIER_SENDER_PREFIXES = None  # FA015807 records appear on multiple class pairs (world-entry + editor); key on iirType
@@ -111,7 +114,7 @@ def run(path):
 
 
 if __name__ == '__main__':
-    paths = sys.argv[1:] or sorted(glob.glob('Captures/*login*.tshark.json'))[:6]
+    paths = sys.argv[1:] or capture_files("*login*.tshark.json")[:6]
     for p in paths:
         try:
             run(p)

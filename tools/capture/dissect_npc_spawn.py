@@ -32,6 +32,9 @@ import importlib.util
 import struct
 import sys
 from pathlib import Path
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # repo root (this file is at tools/capture/)
 spec = importlib.util.spec_from_file_location('c', ROOT / 'tools/capture/compare_log_to_dump.py')
@@ -41,7 +44,7 @@ ss = importlib.util.spec_from_file_location('s', ROOT / 'tools/capture/parse_spa
 ps = importlib.util.module_from_spec(ss)
 ss.loader.exec_module(ps)
 
-DEFAULT_CAP = 'Captures/Strie_rogue-assassin_login.tshark.json'
+DEFAULT_CAP = capture("Strie_rogue-assassin_login.tshark.json")
 INSTANCE_RANGE_START = 0x02000000  # >= this handle is the player's own spawn, not an NPC
 
 # CharacterStats (IIR f4) field names, from ProtoCoreCharacterIIR.CharacterStats in AocProtocol.g.cs.

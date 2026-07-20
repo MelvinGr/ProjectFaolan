@@ -35,6 +35,9 @@ result block (the 81-byte tail of the common 132-byte frame):
   [u32 resultConst][u32 0][u32 k][u32 damage][u32 k][u32 0][u32 0]   (k = 1 or 3; resultConst 0xC9..0xCD = hit type)
 """
 import json, struct, sys, glob
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 CAP = "Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json"
 NORMAL_ATTACK = 0x0F
@@ -62,8 +65,9 @@ def parse_args(a):
 
 
 def main():
+    # CAP may be an absolute path (from capture()) or a bare name/glob given on the CLI.
     path = CAP
-    matches = glob.glob(path) or glob.glob("Captures/" + path)
+    matches = glob.glob(str(path)) or [str(c) for c in capture_files(str(path))]
     if matches:
         path = matches[0]
     pkts = json.load(open(path))["Packets"]

@@ -15,6 +15,9 @@ then the kd-tree/bounds struct (FUN_0080c620). On the wire, after the record hea
 Run:  python3 tools/capture/decode_iir_subclass_readers.py [capture.tshark.json ...]
 """
 import json, struct, sys, glob
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 DYNEL = 0x66AEDD50
 
@@ -60,7 +63,7 @@ def run(path):
 
 
 if __name__ == '__main__':
-    paths = sys.argv[1:] or sorted(glob.glob('Captures/*login*.tshark.json'))[:8]
+    paths = sys.argv[1:] or capture_files("*login*.tshark.json")[:8]
     for p in paths:
         try:
             run(p)

@@ -1,3 +1,6 @@
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 #!/usr/bin/env python3
 """96C46740 (per-entity MoveTask) dissection workbench — GRAMMAR CRACKED.
 
@@ -58,7 +61,7 @@ spec = importlib.util.spec_from_file_location('c', ROOT / 'tools/capture/compare
 cdt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cdt)
 
-DEFAULT_CAP = 'Captures/Strie_rogue-assassin_login.tshark.json'
+DEFAULT_CAP = capture("Strie_rogue-assassin_login.tshark.json")
 SUBOP = '96c46740'
 FIXED = {0x06: 1, 0x00: 2, 0x02: 31, 0x05: 39, 0x07: 25, 0x08: 19, 0x01: 60}
 
@@ -252,7 +255,7 @@ def cmd_one(cap, handle_hex):
 
 def cmd_coverage():
     uniq = {}
-    for cap in sorted(glob.glob(str(ROOT / 'Captures/*.tshark.json'))):
+    for cap in sorted(capture_files("*.tshark.json")):
         try:
             rows = move_tasks(cap)
         except Exception:

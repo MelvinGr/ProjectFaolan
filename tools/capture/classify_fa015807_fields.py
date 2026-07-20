@@ -14,6 +14,9 @@ Run:  python3 tools/capture/classify_fa015807_fields.py
 """
 import json, struct, sys, glob, re
 from collections import defaultdict
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 FA = 0xFA015807
 
@@ -96,7 +99,7 @@ def npc_name(rec, corechar_off):
 
 
 def main():
-    paths = sorted(glob.glob('Captures/*.tshark.json'))
+    paths = capture_files("*.tshark.json")
     # records[name] = list of (flags, words, capture)
     records = defaultdict(list)
     total = 0

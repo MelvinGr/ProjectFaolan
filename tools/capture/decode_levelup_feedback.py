@@ -28,6 +28,9 @@ Grammar of one AttributeChanged packet (FormatFeedbackCodec wrapper + this XML p
 Run: python3 tools/capture/decode_levelup_feedback.py
 """
 import json, glob, re, struct
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 ATTR_IDS = {804, 806, 808, 810, 814}  # the 5 primary-attribute category-615 string ids
 TOKEN = re.compile(rb'token="AttributeChanged"')
@@ -58,7 +61,7 @@ def main():
     total = 0
     bursts = 0
     seen_ids = set()
-    for f in sorted(glob.glob("Captures/*.tshark.json")):
+    for f in capture_files("*.tshark.json"):
         try:
             packets = json.load(open(f))["Packets"]
         except Exception:

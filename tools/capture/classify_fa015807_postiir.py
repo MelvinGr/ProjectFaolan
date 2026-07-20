@@ -11,6 +11,9 @@ Run:  python3 tools/capture/classify_fa015807_postiir.py
 """
 import json, struct, glob, re
 from collections import defaultdict, Counter
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 FA = 0xFA015807
 
@@ -89,7 +92,7 @@ def main():
     # rec: name -> list of (is_humanoid, post_bytes, capture)
     recs = defaultdict(list)
     total = 0
-    for path in sorted(glob.glob('Captures/*.tshark.json')):
+    for path in capture_files("*.tshark.json"):
         try:
             d = json.load(open(path))
         except Exception:

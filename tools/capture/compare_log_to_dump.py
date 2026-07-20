@@ -13,9 +13,12 @@ Defaults: logs.txt in repo root, the Strie login capture.
 """
 import sys, re, json, struct
 from collections import Counter
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 DEFAULT_LOG = 'logs.txt'
-DEFAULT_DUMP = 'Captures/Strie_rogue-assassin_login.tshark.json'
+DEFAULT_DUMP = capture("Strie_rogue-assassin_login.tshark.json")
 
 # GameServer RPC endpoint class ids (ConanEndpoints.cs). The .tshark.json dump tags every Conan packet
 # Protocol="Conan", so the GameServer conversation is selected by these classes, not the old ProtocolName.

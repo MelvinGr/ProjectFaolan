@@ -17,9 +17,11 @@ create-world cutscene registers behaviors on scene entities with this fixed-shap
 Usage: decode_behaviorcc.py [capture.tshark.json]   (defaults to the hoxxling create-world capture)
 """
 import json, struct, sys, os, collections
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
-CAP = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
+CAP = sys.argv[1] if len(sys.argv) > 1 else capture(
     "Hoxxling_mage-heraldofxotli_create_modified_all_sliders-very_long_loading_screen-chat_message_before_exit.tshark.json")
 
 

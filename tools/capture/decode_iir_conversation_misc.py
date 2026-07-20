@@ -17,6 +17,9 @@ Run: python3 tools/capture/decode_iir_conversation_misc.py
 """
 import json, struct, glob
 from collections import Counter
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 U = 4
 KNUBOT_HDR_END = 27           # env(1) @16 + u16 ver(2) + u32 c350(4) + u32 npcHandle(4) -> ends @27
@@ -32,7 +35,7 @@ def u16(b, o):
 
 def load():
     caps = {}
-    for path in sorted(glob.glob('Captures/*.tshark.json')):
+    for path in capture_files("*.tshark.json"):
         try:
             d = json.load(open(path))
         except Exception:

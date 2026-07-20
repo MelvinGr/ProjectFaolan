@@ -18,8 +18,11 @@ Usage:
   python3 tools/capture/dissect_spawn.py diff A B         # byte-diff spawn index A vs B (Strie login capture)
 """
 import sys, struct, importlib.util
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
-CAP = 'Captures/Strie_rogue-assassin_login.tshark.json'
+CAP = capture("Strie_rogue-assassin_login.tshark.json")
 spec = importlib.util.spec_from_file_location('c', 'tools/capture/compare_log_to_dump.py')
 cdt = importlib.util.module_from_spec(spec); spec.loader.exec_module(cdt)
 

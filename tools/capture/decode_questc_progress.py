@@ -17,6 +17,9 @@ import glob
 import json
 import struct
 import sys
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 FRAME = 1009  # ListFrame.Unit (0x3F1)
 SNAPSHOT_SUBOP = "737a6df9"
@@ -155,7 +158,7 @@ def snapshots(path):
 
 
 def main(argv):
-    paths = argv[1:] or sorted(glob.glob("Captures/*.tshark.json"))
+    paths = argv[1:] or capture_files("*.tshark.json")
     ok = bad = 0
     for path in paths:
         for tails in snapshots(path):

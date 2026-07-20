@@ -23,6 +23,9 @@ Run:  python3 tools/capture/analyze_fa015807_scaffold.py [capture.tshark.json]
 """
 import json, struct, sys, glob
 from collections import defaultdict
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 FA = 0xFA015807
 
@@ -152,7 +155,7 @@ def main(path):
 if __name__ == '__main__':
     args = sys.argv[1:]
     text_mode = '--text' in args
-    paths = [a for a in args if a != '--text'] or [sorted(glob.glob('Captures/*hoxxling-login.tshark.json'))[0]]
+    paths = [a for a in args if a != '--text'] or [capture_files("*hoxxling-login.tshark.json")[0]]
     for p in paths:
         if text_mode:
             print(f'== {p.split("/")[-1]} — struct-order char-buffer text ==')

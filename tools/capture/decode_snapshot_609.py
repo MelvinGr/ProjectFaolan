@@ -41,7 +41,7 @@ Run:  python3 tools/capture/decode_snapshot_609.py   # defaults to the beach tai
 """
 import struct, sys
 
-TEMPLATE = "Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin"
+TEMPLATE = "Faolan.Tests/Assets/BeachTailsTemplate.bin"
 CHAPTER_TAG = 0x00000BD3
 INDEX_TAG = 0x000003F1
 

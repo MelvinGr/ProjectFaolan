@@ -27,6 +27,9 @@ Run: python3 tools/capture/decode_applyspell.py
 """
 import json, struct, glob
 from collections import defaultdict
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 SUB = 0x6B87E316
 MAGNITUDE_OFFSET = 8
@@ -34,7 +37,7 @@ MAGNITUDE_OFFSET = 8
 
 def npc_casts():
     out = defaultdict(list)
-    for path in sorted(glob.glob('Captures/*.tshark.json')):
+    for path in capture_files("*.tshark.json"):
         try:
             d = json.load(open(path))
         except Exception:

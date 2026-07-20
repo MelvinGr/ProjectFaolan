@@ -28,8 +28,11 @@ Run: python3 tools/capture/decode_npc_death.py
 import json
 import struct
 import sys
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
-CAP = "Captures/NecroL80_mage-necromancer_login_casting-combat.tshark.json"
+CAP = capture("NecroL80_mage-necromancer_login_casting-combat.tshark.json")
 
 STATDAMAGE = "e9f24184"
 MOVETASK = "96c46740"

@@ -23,6 +23,9 @@ Anything else printed under "UNEXPECTED" is a parser artifact, not a new grammar
 Usage:  tools/capture/decode_rpc_headerdata.py [Captures/*.tshark.json ...]
 """
 import json, glob, sys, collections
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 KNOWN = {1, 3, 4, 13}  # the four real case lengths
 
@@ -86,7 +89,7 @@ def scan(node, out):
 
 
 def main(argv):
-    files = argv or glob.glob('Captures/*.tshark.json')
+    files = argv or capture_files("*.tshark.json")
     recs = []
     for f in files:
         try:

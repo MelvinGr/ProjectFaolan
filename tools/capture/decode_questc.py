@@ -31,7 +31,7 @@ Run:  python3 tools/capture/decode_questc.py [tails.bin ...]   (default: the bea
 """
 import struct, sys
 
-TEMPLATE = "Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin"
+TEMPLATE = "Faolan.Tests/Assets/BeachTailsTemplate.bin"
 VERSION = 0x18
 FRAME = 0x3F1          # 1009
 MARKER_412 = 0x412

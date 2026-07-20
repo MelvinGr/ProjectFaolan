@@ -1,3 +1,6 @@
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 #!/usr/bin/env python3
 """Decode the 0x737A6DF9 tails' STAT block (the SnapshotTails PostAccessBlock) for from-scratch generation (#186).
 
@@ -71,7 +74,7 @@ def stat_block(b):
 
 def fresh_blocks():
     out = {}
-    for f in sorted(glob.glob("Captures/*.tshark.json")):
+    for f in capture_files("*.tshark.json"):
         try:
             d = json.load(open(f))["Packets"]
         except Exception:
@@ -97,8 +100,8 @@ def necro_vs_strie():
         while o + 4 <= len(b):
             vals.append(u32(b, o)); o += 4
         return vals
-    necro = block("Captures/Stickienecro_mage-necromancer_create.tshark.json", 528)
-    strie = block("Captures/Strie_rogue-assassin_login.tshark.json", 52)
+    necro = block(capture("Stickienecro_mage-necromancer_create.tshark.json"), 528)
+    strie = block(capture("Strie_rogue-assassin_login.tshark.json"), 52)
     print(f"necro(Mage) len={len(necro)}  strie(Rogue) len={len(strie)}")
     for i in range(min(len(necro), len(strie))):
         if necro[i] != strie[i]:

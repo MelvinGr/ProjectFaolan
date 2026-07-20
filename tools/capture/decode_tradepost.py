@@ -9,6 +9,9 @@ each endpoint = ProtoEndpoint { 0x0d fixed32 classId (LITTLE-endian on wire), 0x
 Tradepost classes: TradepostAgent 0x3D744981 (client->server), TradepostInterface 0xF2C2D5B5 (server->client).
 """
 import json, sys, struct
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture
 
 AGENT = 0x3D744981   # TradepostAgent  (client -> server)
 IFACE = 0xF2C2D5B5   # TradepostInterface (server -> client)
@@ -143,6 +146,5 @@ def main(path):
 
 if __name__ == '__main__':
     import os
-    default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           'NecroL80_mage-necromancer_login_sell_items_to_trader-intract-with-auctionhouse.tshark.json')
+    default = capture('NecroL80_mage-necromancer_login_sell_items_to_trader-intract-with-auctionhouse.tshark.json')
     main(sys.argv[1] if len(sys.argv) > 1 else default)

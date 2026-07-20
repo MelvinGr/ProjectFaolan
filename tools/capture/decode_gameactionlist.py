@@ -22,6 +22,9 @@ This script validates the fixed HEADER across every captured instance (the decod
 action-tail shapes (the remaining part). Run: python3 tools/capture/decode_gameactionlist.py
 """
 import json, glob, binascii, struct, collections, sys
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 SUBOP = "f508f4c1"
 
@@ -32,7 +35,7 @@ def u64(b, o): return struct.unpack_from(">Q", b, o)[0]
 
 
 def instances():
-    for f in sorted(glob.glob("Captures/*.tshark.json")):
+    for f in capture_files("*.tshark.json"):
         try:
             d = json.load(open(f))["Packets"]
         except Exception:

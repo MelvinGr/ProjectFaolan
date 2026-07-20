@@ -20,12 +20,15 @@ inside compressed/other payload, not a real frame — this script reports those 
 Usage:  tools/capture/decode_compression_frame.py [Captures/*.pcapng ...]
 """
 import glob, sys, zlib, collections, os
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 TAG = bytes.fromhex("80000005")
 
 
 def main(argv):
-    files = argv or glob.glob('Captures/*.pcapng')
+    files = argv or capture_files("*.pcapng")
     real = collections.Counter()   # flag -> count (crc verified)
     bogus = 0
     for f in files:

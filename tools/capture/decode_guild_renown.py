@@ -57,6 +57,9 @@ RenownCounters[1] (param_1[0x40], block offset 133) is the live renown total; ev
 across the two snapshots.
 """
 import json, struct, sys
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 # The captured "Sepulchra Invictus" renown block (== GuildRenownBlockTemplate in GuildService.cs).
 TEMPLATE_HEX = (
@@ -177,5 +180,5 @@ def main(path):
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if a != '--walk']
     path = args[0] if args else \
-        'Hoxxling_mage-heraldofxotli_login_guild_invite_accepted-random-gameplay-other_playersvisible.tshark.json'
+        capture('Hoxxling_mage-heraldofxotli_login_guild_invite_accepted-random-gameplay-other_playersvisible.tshark.json')
     (walk if '--walk' in sys.argv else main)(path)

@@ -17,6 +17,9 @@ import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 EXE = sys.argv[1] if len(sys.argv) > 1 else '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe'
@@ -36,7 +39,7 @@ def main():
 
     # 2) sweep captures for IIR hashes + unnamed methods
     iir, unnamed = Counter(), Counter()
-    for cap in glob.glob(str(ROOT / 'Captures/*.tshark.json')):
+    for cap in capture_files("*.tshark.json"):
         try:
             d = json.load(open(cap))
         except Exception:

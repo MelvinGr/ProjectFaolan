@@ -127,7 +127,8 @@ create-specific to decode, only builder wiring to do:
 4. **Remaining** — every record in `RetailCreateEditorInitialBurst` is now constructed except the live
    `Character…` preview (`IirId`, intentionally verbatim — see item 1). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
-   + wired** (dissectors `tools/capture/decode_character_action.py` + `decode_create_iir_records.py`, builders in
+   + wired** (the two dissectors were retired with the burst - they read `Faolan.Tests/Golden/WorldPrepBurst.bin`,
+   deleted in `0683e84d`; builders in
    `CreateEditorRecordBuilder`, locked by `CreateEditorRecordTests` + the burst goldens):
    - `CharacterActionIIR` (0x6B6FD368) — action/ability grant (26 records).
    - `ComboBookIIR` (0xA8BBEB7F) — combo-book grant (12 records).
@@ -140,13 +141,13 @@ create-specific to decode, only builder wiring to do:
      entity tag (`OPC1`/`M9W9`/`CUP5`) and the 16-byte transform (the item's pose as four big-endian u32) all
      match the paired `DispatchAddItem` equipment piece earlier in the same burst; `ownerStamp`
      (`B290805C 29E627CA`) is the fixed creator/timestamp pair that recurs burst-wide. Decoded by
-     `decode_create_iir_records.py`, built by `CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong`.
+     the retired `decode_create_iir_records.py` (see above), built by `CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong`.
    - `RegenIIR` (0x28D0AC99, #223) — `[u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]` (21 bytes). The
      grammar was pinned by harvesting **590 records across all `*.tshark.json`** captures (it's ×1 in the create
      burst but recurs throughout login/gameplay) and confirmed in the client: `RegenIIR_c::ReadSubClass`
      (Ghidra `FUN_0079dea0`, vtable slot 8) reads exactly three big-endian u32 into +0x2c/+0x30/+0x34 — the three
      resource/regen pools; the lone `flag` byte is the base IIR's (0 in every capture). Decoded by
-     `decode_create_iir_records.py` + `tools/ghidra/DumpRegenReader.java`, built by
+     the retired `decode_create_iir_records.py` + `tools/ghidra/DumpRegenReader.java`, built by
      `CreateEditorRecordBuilder.BuildRegenIir`.
    - `StatIIR` (0xF98E10B3) / `EnergyIIR` (0x40749B8A) / `StatUpdateIIR` (0x96B8DC59) — had builders, and as of
      c2611b23 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /

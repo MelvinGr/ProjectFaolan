@@ -1,3 +1,6 @@
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 #!/usr/bin/env python3
 """Decode CharDCMoveIIR_t (0x4517AA81) - the per-tick dead-reckoning movement update.
 
@@ -76,7 +79,7 @@ def f(b, o):
 
 def main():
     samples = []
-    for path in sorted(glob.glob('Captures/*.tshark.json')):
+    for path in capture_files("*.tshark.json"):
         try:
             d = json.load(open(path))
         except Exception:

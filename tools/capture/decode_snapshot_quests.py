@@ -27,6 +27,9 @@ Run:  python3 tools/capture/decode_snapshot_quests.py [capture.tshark.json ...]
 Default captures: the beach template source + the in-progress (two-quest) login.
 """
 import json, re, struct, sys
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 CHAPTER_TAG = 0x00000BD3
 MARKER_412 = 0x00000412
@@ -91,8 +94,8 @@ def decode(path):
 
 if __name__ == "__main__":
     args = sys.argv[1:] or [
-        "Captures/Strie_rogue-assassin_login.tshark.json",        # beach template source (1 quest)
-        "Captures/Stihetfv_soldier-conqueror_login.tshark.json",          # in-progress (2 quests: 10238 + 13479)
+        capture("Strie_rogue-assassin_login.tshark.json"),        # beach template source (1 quest)
+        capture("Stihetfv_soldier-conqueror_login.tshark.json"),          # in-progress (2 quests: 10238 + 13479)
     ]
     for a in args:
         decode(a)

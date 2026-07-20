@@ -18,6 +18,9 @@ Run:  python3 tools/capture/decode_create_editor.py [capture.tshark.json ...]
 """
 import json, struct, sys, glob
 from collections import Counter, defaultdict
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 IIR_NAMES = {
     0x5D85BFC7: 'PlayfieldFIIR', 0x4F57DC08: 'GameTimeIIR', 0x40749B8A: 'EnergyIIR',
@@ -143,7 +146,7 @@ def decode(path):
 
 
 if __name__ == '__main__':
-    paths = sys.argv[1:] or sorted(glob.glob('Captures/*create*.tshark.json'))
+    paths = sys.argv[1:] or capture_files("*create*.tshark.json")
     for p in paths:
         try:
             decode(p)

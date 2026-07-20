@@ -17,12 +17,15 @@ class in any capture, so they have no byte-exact oracle and are deferred (decode
 Run: python3 tools/capture/decode_learn_spell.py
 """
 import json, glob, struct
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 GAMECHARAGENT_TYPE = "0xa9ecb95d"  # sender class of the s2c GameCharInterface grants
 
 
 def learn_spell_packets():
-    for f in sorted(glob.glob("Captures/*.tshark.json")):
+    for f in capture_files("*.tshark.json"):
         try:
             packets = json.load(open(f))["Packets"]
         except Exception:

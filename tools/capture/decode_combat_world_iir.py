@@ -17,6 +17,9 @@ captured instance. Run: python3 tools/capture/decode_combat_world_iir.py
 """
 import json, struct, glob
 from collections import Counter
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+from captures import capture_files, capture  # corpus lives in the ProjectFaolan-Data repo
 
 U = 4
 
@@ -27,7 +30,7 @@ def u32(b, o):
 
 def load():
     caps = {}
-    for path in sorted(glob.glob('Captures/*.tshark.json')):
+    for path in capture_files("*.tshark.json"):
         try:
             d = json.load(open(path))
         except Exception:
