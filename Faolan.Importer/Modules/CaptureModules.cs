@@ -820,7 +820,11 @@ namespace Faolan.Importer.Modules
 			var harvest = CompletedQuestExtractor.Extract(packets);
 			var (addedCompleted, filledCompleted) = await ImportOps.ImportCompletedQuestDefinitions(ctx.Db, harvest);
 
-			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {areaCount} quest areas " +
+			// The @609 objective goals - required before a quest can ride the login snapshot (#389).
+			var goals = ObjectiveGoalExtractor.Extract(packets);
+			var addedGoals = await ImportOps.ImportObjectiveGoals(ctx.Db, goals);
+
+			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {addedGoals} objective goals, {areaCount} quest areas " +
 				$"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");
 		}
 	}

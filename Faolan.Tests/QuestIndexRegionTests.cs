@@ -21,8 +21,8 @@ namespace Faolan.Tests
 			Assert.Equal(0x7E2u, region.Marker);
 			Assert.Equal(new[] { 10238u }, region.QuestIds);
 			Assert.Single(region.Blocks);
-			Assert.Equal(8, region.Blocks[0].GoalSteps.Count); // the eight goal-step ids (index 1..8)
-			Assert.Equal(10238u, region.Blocks[0].GoalSteps[0]);
+			Assert.Equal(8, region.Blocks[0].AreaQuestIds.Count); // the eight goal-step ids (index 1..8)
+			Assert.Equal(10238u, region.Blocks[0].AreaQuestIds[0]);
 		}
 
 		[Fact]

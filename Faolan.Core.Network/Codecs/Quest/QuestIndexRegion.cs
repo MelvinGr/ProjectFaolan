@@ -63,7 +63,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 					goalSteps.Add(r.ReadUInt32());
 					var idx = r.ReadUInt32();
 					if (idx != i + 1)
-						throw new InvalidOperationException($"Quest index: goal idx {idx} != {i + 1}");
+						throw new InvalidOperationException($"Quest index: area-quest idx {idx} != {i + 1}");
 				}
 
 				var trailerQuestId = r.ReadUInt32();
@@ -78,7 +78,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 					TableField1 = f1,
 					TableField2 = f2,
 					TableField3 = f3,
-					GoalSteps = goalSteps,
+					AreaQuestIds = goalSteps,
 					TrailerQuestId = trailerQuestId,
 					ChainWord = chainWord
 				});
@@ -107,10 +107,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 				w.WriteUInt32(b.TableField1);
 				w.WriteUInt32(b.TableField2);
 				w.WriteUInt32(b.TableField3);
-				w.WriteUInt32(b.GoalSteps.Count);
-				for (var i = 0; i < b.GoalSteps.Count; i++)
+				w.WriteUInt32(b.AreaQuestIds.Count);
+				for (var i = 0; i < b.AreaQuestIds.Count; i++)
 				{
-					w.WriteUInt32(b.GoalSteps[i]);
+					w.WriteUInt32(b.AreaQuestIds[i]);
 					w.WriteUInt32(i + 1);
 				}
 
@@ -137,7 +137,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// Generates the index region for the held quests (already ordered - primary first). Each quest contributes a
 		// goal-id block from its seeded index fields; the block trailers chain to the next quest's AreaId, terminating
 		// on the primary's IndexTrailerWord. The marker/count/sentinel follow from the quest count. #186/#255/#304.
-		public static QuestIndexRegion Build(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary)
+		// `areas` maps areaId -> that area's QuestArea row; `areaCatalog` maps areaId -> every quest in the area,
+		// ordered by JournalSequence. Both are needed because a block is NOT self-contained (see Block.AreaQuestIds).
+		public static QuestIndexRegion Build(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary,
+			IReadOnlyDictionary<uint, QuestArea>? areas = null, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
 			ArgumentNullException.ThrowIfNull(ordered);
 			ArgumentNullException.ThrowIfNull(primary);
@@ -146,13 +149,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 			for (var i = 0; i < ordered.Count; i++)
 			{
 				var q = ordered[i];
+				var magic = areas != null && areas.TryGetValue(q.AreaId, out var a) ? a.Magic : q.IndexMagic;
+				var catalog = areaCatalog != null && areaCatalog.TryGetValue(q.AreaId, out var c) ? c : null;
+
 				blocks.Add(new Block
 				{
-					Magic = q.IndexMagic,
+					Magic = magic,
 					TableField1 = q.IndexTableField1,
 					TableField2 = q.IndexTableField2,
 					TableField3 = q.IndexTableField3,
-					GoalSteps = ParseGoalSteps(q.IndexGoalSteps),
+					AreaQuestIds = catalog != null
+						? [.. catalog.Select(d => d.QuestId)]
+						: ParseGoalSteps(q.IndexGoalSteps),
 					TrailerQuestId = q.QuestId,
 					ChainWord = i + 1 < ordered.Count
 						? ordered[i + 1].AreaId
@@ -202,7 +210,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public sealed class Block
 		{
 			public uint TrailerQuestId { get; init; }
-			public List<uint> GoalSteps { get; init; } = [];
+			// The AREA's full quest catalog, ordered by each quest's JournalSequence - NOT this quest's goal ids, which
+			// is what "GoalSteps" claimed until 2026-07-20. Proven: quest 10238's list is
+			// [10238,12369,12373,10320,12371,10286,10287,10915], exactly area 241's 8 quests, while its own goals are
+			// [1448,3490]. A FRESH character with no completed quests carries the whole list, so it is static area
+			// data rather than anything journal-derived.
+			//
+			// On the wire each entry is a (questId, sequence) pair; the sequence is the quest's position in the area.
+			public List<uint> AreaQuestIds { get; init; } = [];
 			public uint ChainWord { get; init; } // next held quest's AreaId, or the primary's IndexTrailerWord (last)
 			public uint Magic { get; init; } // the quest's goal-table name word (W6QT / Casilda / ...)
 			public uint TableField1 { get; init; }

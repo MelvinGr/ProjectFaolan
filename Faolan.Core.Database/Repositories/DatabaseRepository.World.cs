@@ -15,6 +15,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Map[]> GetMaps();
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<QuestArea[]> GetQuestAreas();
+		Task<QuestDefinition[]> GetQuestDefinitionsByArea(uint areaId);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<MapArea[]> GetMapAreas(uint mapId);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
@@ -81,6 +82,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.QuestAreas.OrderBy(a => a.AreaId).ToArrayAsync();
+		}
+
+		// Every quest of an area, ordered by its position within that area (JournalSequence) - the quest index's
+		// per-area id list.
+		public async Task<QuestDefinition[]> GetQuestDefinitionsByArea(uint areaId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.QuestDefinitions.Where(q => q.AreaId == areaId).OrderBy(q => q.JournalSequence).ToArrayAsync();
 		}
 
 		public async Task<RespawnPoint?> GetRespawnPoint(uint id)

@@ -11,14 +11,23 @@ namespace Faolan.Core.Database.Tables
 	{
 		// The goal's wire objective id - globally unique, so it is the PK (no synthetic Id / BaseEntity dropped). It is
 		// what CharacterQuestGoal.GoalId FKs, and what QuestGoal echoes on the wire.
+		// ⚠️ DatabaseGenerated(None) is load-bearing. Without it EF's convention treats an integer [Key] as
+		// store-generated, so adding a goal that already carries its wire id is taken to be an EXISTING row: EF marks
+		// it Modified and emits an UPDATE, which affects 0 rows and throws DbUpdateConcurrencyException mid-import.
+		// The id comes from the wire and is never generated here.
 		[Key]
+		[DatabaseGenerated(DatabaseGeneratedOption.None)]
 		public uint GoalId { get; set; }
 
 		// The map the goal's objective/marker sits on (all goal maps are in the Maps catalog).
-		public uint MapId { get; set; }
+		// NULL when the goal has no world marker. 449 of the 2850 captured @609 goals are like this, and mapId==0
+		// coincides with markerX==markerY==0 in EVERY one of them (zero counter-examples), so it is the wire's way of
+		// saying "no marker" rather than a missing value. Modelled nullable rather than 0 because the column is an FK:
+		// a 0 points at no Maps row and fails the constraint outright.
+		public uint? MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; } = null!;
+		public virtual Map? Map { get; set; }
 
 		// The objective text (always a <remoteformat category=50304>).
 		public uint ObjectiveRefId { get; set; }
@@ -76,8 +85,9 @@ namespace Faolan.Core.Database.Tables
 		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.
 		public uint Extra5 { get; set; }
 		public uint Extra6 { get; set; }
-		public uint MarkerX { get; set; }
-		public uint MarkerY { get; set; }
+		// The marker coordinates, null exactly when MapId is - the three travel as one block on the wire.
+		public uint? MarkerX { get; set; }
+		public uint? MarkerY { get; set; }
 		public uint ObjectiveCategory { get; set; }
 
 		// The goal's required amount - how many kills/collects/etc. complete it. Decoded from the QuestFullUpdate /

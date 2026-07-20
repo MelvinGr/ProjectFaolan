@@ -764,7 +764,11 @@ namespace Faolan.GameServer
 			var completedJournal = isCreateEntry
 				? []
 				: await LoadCompletedJournal(character);
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken, completedJournal);
+			// The quest INDEX needs, per active quest, its AREA's 4CC and that area's full quest catalog ordered by
+			// JournalSequence (#390) - neither is per-quest data.
+			var (indexAreas, areaCatalog) = await LoadAreaCatalog(snapshotQuests);
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken,
+				completedJournal, indexAreas, areaCatalog);
 
 			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
 			{
@@ -980,12 +984,13 @@ namespace Faolan.GameServer
 
 		private static byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags,
 			IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet,
-			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal)
+			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal,
+			IReadOnlyDictionary<uint, QuestArea> indexAreas, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>> areaCatalog)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
 			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet,
-				completedJournal);
+				completedJournal, indexAreas, areaCatalog);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 

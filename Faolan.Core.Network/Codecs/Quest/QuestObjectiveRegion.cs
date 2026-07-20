@@ -98,7 +98,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				var trailing = g.TrailingLocalized
 					? Localized(g.TrailingRefId, g.TrailingCategory, g.TrailingFlags ?? "", g.TrailingKey)
 					: QuestcRegion.RemoteFormat(g.TrailingRefId, g.TrailingCategory, g.TrailingKey);
-				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator, g.SubId, g.MapId, g.MarkerX, g.MarkerY, Encoding.Latin1.GetBytes(objective),
+				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator, g.SubId, g.MapId ?? 0, g.MarkerX ?? 0, g.MarkerY ?? 0, Encoding.Latin1.GetBytes(objective),
 					Encoding.Latin1.GetBytes(trailing), g.Extra5, g.Extra6, g.RequiredCount == 0
 						? 1
 						: g.RequiredCount));

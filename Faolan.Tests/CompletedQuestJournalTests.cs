@@ -72,21 +72,34 @@ namespace Faolan.Tests
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");
 
-			// Is Sequence a property of the QUEST (stable everywhere it appears) or of its position?
-			var seqByQuest = new Dictionary<uint, HashSet<uint>>();
-			var ordByQuest = new Dictionary<uint, HashSet<int>>();
-			foreach (var g in allAreas)
-			for (var k = 0; k < g.Quests.Count; k++)
+			// Why would an @609 goal have MapId 0?
+			int goals = 0, zeroMap = 0;
+			var zeroSamples = new List<string>();
+			var mapVals = new Dictionary<uint, int>();
+			foreach (var (src, sub, _) in SubClasses())
+			foreach (var rec in sub.Quests.Records)
 			{
-				var q = g.Quests[k];
-				(seqByQuest.TryGetValue(q.QuestId, out var a) ? a : seqByQuest[q.QuestId] = []).Add(q.Sequence);
-				(ordByQuest.TryGetValue(q.QuestId, out var b) ? b : ordByQuest[q.QuestId] = []).Add(k + 1);
+				if (rec.Objectives is not { Goals.Count: > 0 } obj)
+					continue;
+
+				foreach (var g in obj.Goals)
+				{
+					goals++;
+					mapVals[g.MapId] = mapVals.GetValueOrDefault(g.MapId) + 1;
+					if (g.MapId != 0)
+						continue;
+
+					zeroMap++;
+					if (g.MarkerX != 0 || g.MarkerY != 0)
+						zeroSamples.Add($"COUNTER-EXAMPLE quest {rec.QuestId} goal {g.GoalId}: mapId=0 but marker=({g.MarkerX},{g.MarkerY})");
+				}
 			}
 
-			o.WriteLine($"quests with a STABLE Sequence everywhere: {seqByQuest.Count(kv => kv.Value.Count == 1)} of {seqByQuest.Count}");
-			o.WriteLine($"quests with a stable ORDINAL everywhere:  {ordByQuest.Count(kv => kv.Value.Count == 1)} of {ordByQuest.Count}");
-			foreach (var kv in seqByQuest.Where(k => k.Value.Count > 1).Take(5))
-				o.WriteLine($"   quest {kv.Key} varies: seq {string.Join(",", kv.Value.OrderBy(v => v))}");
+			o.WriteLine($"@609 goals={goals} withMapId0={zeroMap} distinctMapIds={mapVals.Count}");
+			o.WriteLine($"  mapId==0 goals that still carry a marker: {zeroSamples.Count}");
+			o.WriteLine("  top mapIds: " + string.Join(" ", mapVals.OrderByDescending(k => k.Value).Take(8).Select(k => $"{k.Key}:{k.Value}")));
+			foreach (var x in zeroSamples)
+				o.WriteLine($"    {x}");
 
 			Assert.True(withRegion > 0, "no snapshot in the corpus carried a completed-quest journal");
 		}
@@ -169,6 +182,11 @@ namespace Faolan.Tests
 				if (subClass.CompletedQuests is { Areas.Count: > 0 } region)
 					yield return (source, region);
 			}
+		}
+
+		public static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClassesForProbe()
+		{
+			return SubClasses();
 		}
 
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClasses()

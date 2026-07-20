@@ -433,10 +433,11 @@ namespace Faolan.GameServer
 
 			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
 			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
+			var areaRows = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
 			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
 			{
 				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (FullCharSnapshotSubClass.IsSnapshotEligible(def))
+				if (def != null && areaRows.TryGetValue(def.AreaId, out var area) && FullCharSnapshotSubClass.IsSnapshotEligible(def, area))
 					quests.Add(def);
 			}
 
@@ -479,6 +480,29 @@ namespace Faolan.GameServer
 				groups.Add((areas[areaId], defs.OrderBy(d => d.QuestId).ToList()));
 
 			return groups;
+		}
+
+		// The area rows + area quest catalogs the quest INDEX needs for a set of active quests. The catalog is every
+		// quest of the area ordered by JournalSequence - static area data, not the character's journal: a freshly
+		// created character carries its area's whole list in the captures (#390).
+		private async Task<(Dictionary<uint, QuestArea> Areas, Dictionary<uint, IReadOnlyList<QuestDefinition>> Catalog)> LoadAreaCatalog(
+			IReadOnlyList<QuestDefinition> quests)
+		{
+			var areas = new Dictionary<uint, QuestArea>();
+			var catalog = new Dictionary<uint, IReadOnlyList<QuestDefinition>>();
+			if (quests.Count == 0)
+				return (areas, catalog);
+
+			var allAreas = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
+			foreach (var areaId in quests.Select(q => q.AreaId).Distinct())
+			{
+				if (allAreas.TryGetValue(areaId, out var area))
+					areas[areaId] = area;
+
+				catalog[areaId] = await Database.GetQuestDefinitionsByArea(areaId);
+			}
+
+			return (areas, catalog);
 		}
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is

@@ -534,6 +534,75 @@ namespace Faolan.Importer.Captures
 			});
 		}
 
+		// @609 objective goals harvested from captured journals. ADDITIVE, and deliberately NOT routed through
+		// ImportQuestDefinitions - that path rebuilds a quest's goal set and would fight the Seed* overlays.
+		//
+		// ⚠️ QuestGoalDefinition.GoalId is a GLOBAL primary key. A goal id already owned by a different quest is
+		// SKIPPED rather than moved: attaching one to a second quest is what made an earlier attempt at this die with
+		// a DbUpdateConcurrencyException mid-import.
+		public static async Task<int> ImportObjectiveGoals(DatabaseContext db, IReadOnlyList<ObjectiveGoalExtractor.Goal> goals)
+		{
+			var owner = await db.QuestGoalDefinitions.ToDictionaryAsync(g => g.GoalId, g => g.QuestDefinitionId);
+			var quests = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId, q => q.MapId);
+			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
+			int added = 0, noMap = 0;
+
+			foreach (var g in goals)
+			{
+				if (!quests.TryGetValue(g.QuestId, out var questMapId))
+					continue; // no definition to hang it on
+
+				// 0 means the goal has no world marker - stored as NULL, not skipped.
+				uint? mapId = g.MapId != 0
+					? g.MapId
+					: null;
+				if (mapId == null)
+					noMap++;
+
+				if (owner.TryGetValue(g.GoalId, out var existingQuest))
+				{
+					if (existingQuest != g.QuestId)
+						Console.WriteLine($"  goal {g.GoalId} already belongs to quest {existingQuest}, not {g.QuestId} - skipped.");
+
+					continue; // already present; a Seed* overlay may have completed it
+				}
+
+				if (mapId is { } m && maps.Add(m))
+					db.Maps.Add(new Map { Id = m, Name = "" });
+
+				db.QuestGoalDefinitions.Add(new QuestGoalDefinition
+				{
+					GoalId = g.GoalId,
+					QuestDefinitionId = g.QuestId,
+					Sequence = g.Sequence,
+					Separator = g.Separator,
+					SubId = g.SubId,
+					MapId = mapId,
+					MarkerX = mapId == null ? null : g.MarkerX,
+					MarkerY = mapId == null ? null : g.MarkerY,
+					Extra5 = g.Extra5,
+					Extra6 = g.Extra6,
+					RequiredCount = g.RequiredCount,
+					ObjectiveRefId = g.Objective.RefId,
+					ObjectiveCategory = g.Objective.Category,
+					ObjectiveKey = g.Objective.Key,
+					TrailingRefId = g.Trailing?.RefId ?? 0,
+					TrailingCategory = g.Trailing?.Category ?? 0,
+					TrailingKey = g.Trailing?.Key,
+					TrailingFlags = g.Trailing?.Flags,
+					TrailingLocalized = g.Trailing?.IsLocalized ?? false
+				});
+				owner[g.GoalId] = g.QuestId;
+				added++;
+			}
+
+			await db.SaveChangesAsync();
+			if (noMap > 0)
+				Console.WriteLine($"  {noMap} objective goals carry no world marker (MapId/MarkerX/MarkerY null).");
+
+			return added;
+		}
+
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
 		{
 			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a
@@ -605,7 +674,19 @@ namespace Faolan.Importer.Captures
 				updated++;
 			}
 
-			await db.SaveChangesAsync();
+			try
+			{
+				await db.SaveChangesAsync();
+			}
+			catch (DbUpdateConcurrencyException ex)
+			{
+				foreach (var e in ex.Entries)
+					Console.WriteLine($"  CONFLICT entity={e.Entity.GetType().Name} state={e.State} keys=" +
+						string.Join(",", e.Properties.Where(pr => pr.Metadata.IsPrimaryKey()).Select(pr => $"{pr.Metadata.Name}={pr.CurrentValue}")));
+
+				throw;
+			}
+
 			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated, {skipped} skipped (map not in catalog).");
 
 			await SeedBeachQuestGoals(db);
