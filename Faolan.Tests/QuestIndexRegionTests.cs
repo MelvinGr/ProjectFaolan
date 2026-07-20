@@ -6,11 +6,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact round-trip of the quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the
-	// @609 objective region and the access-window table. docs/re/fullplayer-snapshot-reader.md, #186.
+	// Byte-exact round-trip of the quest INDEX region (the marker + the "W6QT" area-catalog table) between the
+	// COMPLETED-quest journal and the access-window table. docs/re/fullplayer-snapshot-reader.md, #186/#391.
 	public class QuestIndexRegionTests
 	{
-		private const int RegionStart = 1168, RegionEnd = 1292; // index region / access-window table boundaries
+		// The index opens at its MARKER, not the 0x3F1 at 1168 - that word is the empty completed-journal frame (the
+		// beach char has no completed quests), decoded as a phantom "IndexTag" until #391. The index is 1172..1292.
+		private const int RegionStart = 1172, RegionEnd = 1292;
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
@@ -20,8 +22,9 @@ namespace Faolan.Tests
 
 			Assert.Equal(0x7E2u, region.Marker);
 			Assert.Equal(new[] { 10238u }, region.QuestIds);
+			Assert.Equal(241u, region.LeadAreaId); // the beach area id (== 0xF1, the old "sentinel")
 			Assert.Single(region.Blocks);
-			Assert.Equal(8, region.Blocks[0].AreaQuestIds.Count); // the eight goal-step ids (index 1..8)
+			Assert.Equal(8, region.Blocks[0].AreaQuestIds.Count); // the eight area-catalog ids (sequence 1..8)
 			Assert.Equal(10238u, region.Blocks[0].AreaQuestIds[0]);
 		}
 

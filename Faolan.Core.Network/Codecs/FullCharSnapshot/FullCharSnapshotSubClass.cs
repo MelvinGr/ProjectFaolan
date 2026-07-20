@@ -136,7 +136,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			using var w = new FaolanStream();
 			w.WriteUInt32(QuestcRegion.Version); // 0x18
 			w.WriteUInt32(QuestcRegion.Frame); // 0x3F1 - empty Quest_c list ((0+1)*0x3F1)
-			w.WriteUInt32(QuestIndexRegion.IndexTag); // 0x3F1
+			w.WriteUInt32(ListFrame.Empty); // 0x3F1 - empty completed-journal frame (0 areas); NOT an "index tag" (#391)
 			w.WriteUInt32(QuestcRegion.Frame); // 0x3F1 - empty index marker ((0+1)*0x3F1)
 			w.WriteUInt32(0); // index count = 0
 			w.WriteUInt32(EmptyQuestTerminal); // 0x000156E7
@@ -288,13 +288,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				record.Write(w);
 			}
 
-			// The COMPLETED-quest journal sits between the active journal and the index (#390). Absent for a
-			// character with no completed quests, which is why the beach template - and every from-scratch test
-			// built on it - stays byte-identical when `completed` is null or empty.
-			if (completed is { Count: > 0 })
-				w.WriteArray(CompletedQuestJournalRegion.Build(completed).ToArray());
+			// The COMPLETED-quest journal sits between the active journal and the index (#390) and is ALWAYS present -
+			// as its own frame word even when empty (ListFrame.ForCount(0) == 0x3F1). That empty frame is exactly the
+			// 0x3F1 the index USED to swallow as a phantom "IndexTag" (#391); emitting it here (and dropping the tag
+			// from QuestIndexRegion) keeps the beach/2-quest goldens byte-identical while making the model correct.
+			w.WriteArray(CompletedQuestJournalRegion.Build(completed ?? []).ToArray());
 
-			// The quest index: all held questIds + one chained goal-id block per quest, owned by the primary
+			// The quest index: all held questIds + one chained area-catalog block per quest, owned by the primary
 			// (its trailer carries the terminal IndexTrailerWord). Modeled by the typed QuestIndexRegion codec.
 			w.WriteArray(QuestIndexRegion.Build(ordered, primary, areas, areaCatalog).ToArray());
 
@@ -320,7 +320,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			};
 			var index = QuestIndexRegion.Build([def], def);
 
-			byte[] portion = [.. quests.ToArray(), .. index.ToArray()];
+			// The empty completed-journal frame (0x3F1) always sits between the active journal and the index (#391).
+			byte[] portion = [.. quests.ToArray(), .. CompletedQuestJournalRegion.Build([]).ToArray(), .. index.ToArray()];
 			if (portion.Length != QuestPortionLength)
 				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {QuestPortionLength}");
 
@@ -750,9 +751,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			};
 		}
 
-		// Parses the COMPLETED-quest journal when the boundary opens with an area-count ListFrame word rather than the
-		// 0x3F1 index tag (#390). Returns null - leaving the bytes in the opaque blob, as before - for tails without
-		// one or on anything unexpected.
+		// Parses the COMPLETED-quest journal, which ALWAYS precedes the quest index (#390/#391). Its frame word is
+		// (areas + 1) * 0x3F1, so a character with no completed quests still carries the empty frame 0x3F1 - the word
+		// that used to be mis-read as the index's "IndexTag". Returns null - leaving the bytes opaque - only when the
+		// boundary word is not a ListFrame word at all.
 		private static CompletedQuestJournalRegion? TryParseCompletedJournal(byte[] data, int offset, int endOffset, out int afterRegion)
 		{
 			afterRegion = offset;
@@ -760,28 +762,33 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				return null;
 
 			var lead = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4));
-			if (lead == QuestIndexRegion.IndexTag || lead == 0 || lead % ListFrame.Unit != 0)
+			if (lead == 0 || lead % ListFrame.Unit != 0)
 				return null;
 
-			// The lead word already says a region STARTS here, so a parse failure means our model is wrong - not that
-			// the region is absent. Swallowing it drops the bytes into the opaque blob, which is exactly how the
-			// completed-quest journal stayed unmodelled while every snapshot still round-tripped (#390).
+			// The lead word already says a region STARTS here (an area-count frame, 0x3F1 when empty), so a parse
+			// failure means our model is wrong - not that the region is absent. Swallowing it drops the bytes into
+			// the opaque blob, which is exactly how the completed-quest journal stayed unmodelled while every snapshot
+			// still round-tripped (#390).
 			var region = CompletedQuestJournalRegion.Parse(data, offset, endOffset, out var after);
 			afterRegion = after;
 			return region;
 		}
 
-		// Parses the quest index region when the boundary opens with the 0x3F1 index tag; its trailer runs to
-		// `endOffset` (the access-window table start). Returns null (and leaves `afterIndex == offset`) for tails
-		// without it or that fail to parse cleanly, so an unrecognised shape stays in the opaque blob.
+		// Parses the quest index, which follows the completed-journal frame and opens with its id-list marker
+		// (count + 1) * 0x3F1 - NOT a 0x3F1 "IndexTag" (that phantom tag was the empty completed-journal frame, #391).
+		// Its trailer runs to `endOffset` (the access-window table start). Returns null (and leaves `afterIndex ==
+		// offset`) when the boundary is not a marker word, so an unrecognised shape stays in the opaque blob.
 		private static QuestIndexRegion? TryParseQuestIndex(byte[] data, int offset, int endOffset, out int afterIndex)
 		{
 			afterIndex = offset;
-			if (offset + 4 > data.Length || endOffset < offset || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4)) != QuestIndexRegion.IndexTag)
+			if (offset + 4 > data.Length || endOffset < offset)
 				return null;
 
-			// As above: the 0x3F1 tag says an index starts here, so failing to parse it is a MODEL error, not an
-			// absent region.
+			var marker = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4));
+			if (marker == 0 || marker % ListFrame.Unit != 0)
+				return null;
+
+			// The marker says an index starts here, so failing to parse it is a MODEL error, not an absent region.
 			var region = QuestIndexRegion.Parse(data, offset, endOffset);
 			afterIndex = endOffset; // the region consumes to the boundary (its trailer is the remainder)
 			return region;

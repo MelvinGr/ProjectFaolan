@@ -51,6 +51,46 @@ only if `FullCharSnapshotSubClass.IsSnapshotEligible` — record scalars + the 5
 byte-for-byte. NB the 3 earlier in-client crashes were WRONG ASSEMBLY ORDER (records-then-objective + single-block
 index), NOT a progress/obj-list issue — the obj-lists are empty and the records are constants.
 
+## UPDATE 2026-07-20 (#391) — the quest INDEX is fully decoded across the corpus; NO phantom "IndexTag"
+
+The measurement in #391 ("81 of 141 snapshots have no quest index we can identify") was the last big
+degenerate-corpus trap. The index was modelled from beach/2-quest goldens only, so two beach-only accidents
+were baked into the grammar. Both are now corrected and `FullCharSnapshotSubClass.Deserialize` identifies the
+index in **all 141** snapshots (`UnknownBeforeAccessWindowTable` 105,744 B → **0**, guarded by
+`SnapshotOpaqueSurfaceTests`):
+
+1. **There is NO leading `0x3F1` "IndexTag".** That word is the **empty completed-journal frame**
+   (`ListFrame.ForCount(0) == 0x3F1`), which ALWAYS precedes the index. When a character HAS completed quests
+   the frame is `(areas+1)*0x3F1` and the index follows with no `0x3F1` in front — which is exactly why the
+   index parser (demanding a `0x3F1`) failed on all 81 snapshots that carry a completed journal. The wire is
+   always `[active journal][completed-journal frame][quest index]`.
+2. **The "`0xF1` sentinel" is the first block's quest AreaId** (beach area 241 == `0xF1`), and the block
+   trailer `[1][0][0]` fields VARY per quest (a up to 8, c 0 or 1) — constant-looking only because every golden
+   is a beach char. The `(questId, idx)` catalog pairs' second field is a 1-based **sequence that is NOT
+   strictly monotonic** (branch/chapter quests repeat one), so the old `idx == i+1` assertion was also a
+   beach-only accident.
+
+Corrected grammar (no leading tag), `QuestIndexRegion`:
+```
+[u32 marker=(count+1)*0x3F1] [u32 questId × count] [u32 count]
+count==0 -> [u32 terminal 0x000156E7]
+count>0  -> [u32 leadAreaId]                                  # the first block's quest AreaId (head of the chain)
+            per held quest (count blocks, id order):
+              [u32 magic] [u32 tf1] [u32 tf2=count-1] [u32 tf3=0]
+              [u32 n] [ (questId, sequence) × n ]             # the AREA's full quest catalog
+              [u32 trailerQuestId] [u32 a] [u32 b] [u32 c] [u32 chainWord]
+```
+- `trailerQuestId` is the **area's ANCHOR quest** (catalog sequence 1), NOT the held quest — they coincide only
+  when the held quest is the area's first. Beach: held 12371 (seq 5) but the block trailer is 10238 (seq 1).
+  (`QuestIndexRegion.Build` had this wrong; fixed — it exposed a real generation bug the beach goldens hid.)
+- `chainWord` = the NEXT block's `leadAreaId`, or the terminal `0x156E7` for the last block (a linked list of
+  area ids). `leadAreaId` + the block chainWords form that chain.
+
+Round-trip (`QuestIndexRegion` carries `LeadAreaId`, per-block `AreaQuestSequences` and `TrailerA/B/C`) is
+byte-exact for all 141. GENERATION from the DB is byte-exact only for the single-block beach shape today; the
+multi-area per-quest sequences/trailers are not modelled in the DB yet (generation follow-up, #389), and
+`IsSnapshotEligible` remains gated off, so nothing ships that path.
+
 DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Quest_c (`@0..609`)** — `QuestcRegion`/`QuestcRecord` codec (byte-exact round-trip), wired into
   `FullCharSnapshotSubClass`, and `QuestcRecord.BuildSingle` GENERATES it from `faolan.db` (`QuestcGenerationTests`).

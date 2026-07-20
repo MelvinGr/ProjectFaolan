@@ -65,6 +65,10 @@ namespace Faolan.Importer.Extractors
 				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
 				characterId = instance;
 				records = parts.SubClass.Quests.Records;
+				// The quest index follows the journal; since #391 it parses for every held-quest snapshot, so surface
+				// it (QuestAreaExtractor reads the per-block area 4CCs from it - areas an ACTIVE quest reaches but no
+				// completed journal shows).
+				index = parts.SubClass.QuestIndex;
 				return records.Count > 0;
 			}
 			catch
