@@ -46,6 +46,11 @@ namespace Faolan.Tests
 		// was missing: the index was generated from QuestDefinition columns that are 0 for every harvested quest
 		// (tf1/tf2/trailer), so the server shipped a malformed index and the client died in StatList_t - while every
 		// existing test stayed green, because none of them regenerated an index.
+		private static void Bump(Dictionary<string, int> d, string k)
+		{
+			d[k] = d.GetValueOrDefault(k) + 1;
+		}
+
 		// The @609 OBJECTIVE region, rebuilt from DB rows and compared byte-for-byte with the capture. The last
 		// generated region without such a gate - and every region that lacked one has shipped malformed at least once
 		// today while the suite stayed green.
@@ -58,6 +63,7 @@ namespace Faolan.Tests
 			int compared = 0, exact = 0, skipped = 0, lenDiff = 0, sameLenDiff = 0;
 			_ = lenDiff;
 			var failByQuest = new Dictionary<uint, int>();
+			var fieldDiffs = new Dictionary<string, int>();
 			var seenQuest = new HashSet<uint>();
 			var shown = 0;
 			var okByQuest = new HashSet<uint>();
@@ -88,6 +94,36 @@ namespace Faolan.Tests
 				}
 
 				failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
+
+				// Aggregate WHICH field differs, so the tail can be worked in priority order.
+				var rebuiltGoals = QuestObjectiveRegion.Parse(built, 0).Goals;
+				if (rebuiltGoals.Count != captured.Goals.Count)
+				{
+					Bump(fieldDiffs, "GOAL COUNT");
+				}
+				else
+				{
+					for (var gi = 0; gi < captured.Goals.Count; gi++)
+					{
+						var c = captured.Goals[gi];
+						var b = rebuiltGoals[gi];
+						if (c.GoalId != b.GoalId) Bump(fieldDiffs, "GoalId/order");
+						if (c.N != b.N) Bump(fieldDiffs, "N");
+						if (c.K != b.K) Bump(fieldDiffs, "K/separator");
+						if (c.SubId != b.SubId) Bump(fieldDiffs, "SubId");
+						if (c.MapId != b.MapId) Bump(fieldDiffs, "MapId");
+						if (c.MarkerX != b.MarkerX || c.MarkerY != b.MarkerY) Bump(fieldDiffs, "Marker");
+						if (c.RequiredCount != b.RequiredCount) Bump(fieldDiffs, "RequiredCount");
+						if (c.Unknown1 != b.Unknown1) Bump(fieldDiffs, "Unknown1");
+						if (c.Unknown2 != b.Unknown2) Bump(fieldDiffs, "Zero2");
+						if (c.Lead != b.Lead) Bump(fieldDiffs, "Lead");
+						if (c.GoalIdRepeat != b.GoalIdRepeat) Bump(fieldDiffs, "GoalIdRepeat");
+						if (!c.Reserved.SequenceEqual(b.Reserved)) Bump(fieldDiffs, "Reserved");
+						if (!c.Objective.SequenceEqual(b.Objective)) Bump(fieldDiffs, "Objective text");
+						if (!c.TextRecord.SequenceEqual(b.TextRecord)) Bump(fieldDiffs, "Trailing text");
+					}
+				}
+
 				if (built.Length != want.Length)
 					lenDiff++;
 				else
@@ -107,8 +143,8 @@ namespace Faolan.Tests
 						o.WriteLine($"    goal{gi} id cap={cg.GoalId} got={bg.GoalId} | n cap={cg.N} got={bg.N} | k cap={cg.K} got={bg.K} | " +
 							$"sub cap={cg.SubId} got={bg.SubId} | map cap={cg.MapId} got={bg.MapId} | req cap={cg.RequiredCount} got={bg.RequiredCount} | " +
 							$"marker cap=({cg.MarkerX},{cg.MarkerY}) got=({bg.MarkerX},{bg.MarkerY})");
-						o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} z2={cg.Zero2} res=[{string.Join(",", cg.Reserved)}]");
-						o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} z2={bg.Zero2} res=[{string.Join(",", bg.Reserved)}]");
+						o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} z2={cg.Unknown2} res=[{string.Join(",", cg.Reserved)}]");
+						o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} z2={bg.Unknown2} res=[{string.Join(",", bg.Reserved)}]");
 						if (!cg.Objective.SequenceEqual(bg.Objective))
 							o.WriteLine($"      OBJ cap={System.Text.Encoding.Latin1.GetString(cg.Objective)}\n      OBJ got={System.Text.Encoding.Latin1.GetString(bg.Objective)}");
 						if (!cg.TextRecord.SequenceEqual(bg.TextRecord))
@@ -151,7 +187,7 @@ namespace Faolan.Tests
 
 				foreach (var g3 in o3.Goals)
 				{
-					var sig = $"{g3.Unknown1}|{g3.Zero2}|{string.Join(",", g3.Reserved)}|{System.Text.Encoding.Latin1.GetString(g3.TextRecord)}";
+					var sig = $"{g3.Unknown1}|{g3.Unknown2}|{string.Join(",", g3.Reserved)}|{System.Text.Encoding.Latin1.GetString(g3.TextRecord)}";
 					(tagVals.TryGetValue(g3.GoalId, out var set) ? set : tagVals[g3.GoalId] = []).Add(sig);
 				}
 			}
@@ -174,6 +210,41 @@ namespace Faolan.Tests
 			uint[] necrol80 = [17624, 16324, 13784, 17171, 16341, 17238, 17236, 17168, 19365];
 			foreach (var q in necrol80)
 				o.WriteLine($"  NECROL80 quest {q}: {(okByQuest.Contains(q) ? "OK" : failByQuest.ContainsKey(q) ? "FAILS" : "not in corpus")}");
+
+			// What IS GoalIdRepeat / Zero2 / Reserved, when they are not what we assume?
+			int rptEqualsGoal = 0, rptEqualsQuest = 0, rptOther = 0, z2NonZero = 0, allGoals = 0;
+			var rptSamples = new List<string>();
+			var stableRpt = new Dictionary<uint, HashSet<uint>>();
+			foreach (var (_, sub5, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			foreach (var rec5 in sub5.Quests.Records)
+			{
+				if (rec5.Objectives is not { Goals.Count: > 0 } o5)
+					continue;
+
+				foreach (var g5 in o5.Goals)
+				{
+					allGoals++;
+					if (g5.GoalIdRepeat == g5.GoalId) rptEqualsGoal++;
+					else if (g5.GoalIdRepeat == rec5.QuestId) rptEqualsQuest++;
+					else
+					{
+						rptOther++;
+						if (rptSamples.Count < 6)
+							rptSamples.Add($"quest {rec5.QuestId} goal {g5.GoalId}: repeat={g5.GoalIdRepeat} n={g5.N} k={g5.K} req={g5.RequiredCount} z2={g5.Unknown2}");
+					}
+
+					if (g5.Unknown2 != 0) z2NonZero++;
+					(stableRpt.TryGetValue(g5.GoalId, out var st5) ? st5 : stableRpt[g5.GoalId] = []).Add(g5.GoalIdRepeat);
+				}
+			}
+
+			o.WriteLine($"GoalIdRepeat: ==GoalId {rptEqualsGoal}, ==QuestId {rptEqualsQuest}, other {rptOther} (of {allGoals}); VARIES per goal on {stableRpt.Count(k => k.Value.Count > 1)} of {stableRpt.Count}");
+			o.WriteLine($"Zero2 nonzero on {z2NonZero} goals");
+			foreach (var x in rptSamples)
+				o.WriteLine($"    {x}");
+
+			foreach (var kv in fieldDiffs.OrderByDescending(k => k.Value))
+				o.WriteLine($"    DIFF {kv.Key,-18} {kv.Value}");
 
 			o.WriteLine($"objective regions compared={compared} byteExact={exact} skipped={skipped}");
 			o.WriteLine($"  failing: {failByQuest.Count} distinct quests; ok: {okByQuest.Count} distinct quests");

@@ -107,7 +107,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator, g.SubId, g.MapId ?? 0, g.MarkerX ?? 0, g.MarkerY ?? 0, Encoding.Latin1.GetBytes(objective),
 					Encoding.Latin1.GetBytes(trailing), g.Extra5, g.Extra6, g.RequiredCount == 0
 						? 1
-						: g.RequiredCount, g.Extra1, g.Extra2, g.Unknown1));
+						: g.RequiredCount, g.Extra1, g.Extra2, g.Unknown1, g.Extra0, g.Extra3, g.Extra4, g.GoalIdEcho, g.Unknown2));
 			}
 
 			return region;

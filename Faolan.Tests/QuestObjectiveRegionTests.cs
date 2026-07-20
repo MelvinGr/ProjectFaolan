@@ -27,8 +27,12 @@ namespace Faolan.Tests
 			var parsed = QuestObjectiveRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart);
 			const uint instance = 0x02165EFF; // the template's baked-in instance (re-addressed live)
 
-			var g1 = QuestObjectiveGoal.BuildSingle(instance, 10238, 1448, 1, 9, 180, 4010, 416, 701, parsed.Goals[0].Objective, parsed.Goals[0].TextRecord);
-			var g2 = QuestObjectiveGoal.BuildSingle(instance, 10238, 3490, 2, 12, 0, 4010, 521, 757, parsed.Goals[1].Objective, parsed.Goals[1].TextRecord, 70099, 0x36314C56);
+			// goalIdEcho is explicit now: it is EITHER the goal id or 0 depending on the goal (1567 of 2850 captured
+			// goals carry 0), so it cannot default to the id.
+			var g1 = QuestObjectiveGoal.BuildSingle(instance, 10238, 1448, 1, 9, 180, 4010, 416, 701, parsed.Goals[0].Objective, parsed.Goals[0].TextRecord,
+				goalIdEcho: 1448);
+			var g2 = QuestObjectiveGoal.BuildSingle(instance, 10238, 3490, 2, 12, 0, 4010, 521, 757, parsed.Goals[1].Objective, parsed.Goals[1].TextRecord, 70099, 0x36314C56,
+				goalIdEcho: 3490);
 
 			var region = new QuestObjectiveRegion
 			{

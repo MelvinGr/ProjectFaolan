@@ -98,10 +98,20 @@ namespace Faolan.Core.Database.Tables
 		// captured goals. Stable per goal across every capture, so it is quest data.
 		public uint Unknown1 { get; set; }
 
+		public uint Extra0 { get; set; }
 		public uint Extra1 { get; set; }
 		public uint Extra2 { get; set; }
+		public uint Extra3 { get; set; }
+		public uint Extra4 { get; set; }
 		public uint Extra5 { get; set; }
 		public uint Extra6 { get; set; }
+
+		// The word echoing the goal id - EITHER the goal id or 0, stable per goal but not derivable from it (1567 of
+		// the 2850 captured goals carry 0, 1283 carry the id).
+		public uint GoalIdEcho { get; set; }
+
+		// The second word after the marker block; "Zero2" in the codec, but nonzero on 318 captured goals.
+		public uint Unknown2 { get; set; }
 		// The marker coordinates, null exactly when MapId is - the three travel as one block on the wire.
 		public uint? MarkerX { get; set; }
 		public uint? MarkerY { get; set; }

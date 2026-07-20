@@ -23,7 +23,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// (quest 12411 goal 3555 holds 60). Stable per goal across every capture, so it is quest data to be stored,
 		// not progress. Meaning still unknown - named for its position.
 		public uint Unknown1 { get; init; }
-		public uint Zero2 { get; init; }
+		// NOT always zero: nonzero on 318 of the 2850 captured goals. Stable per goal, so stored rather than derived.
+		public uint Unknown2 { get; init; }
 		public uint[] Reserved { get; init; } = new uint[ReservedWords]; // 7 words, all 0 in the template
 
 		public static QuestObjectiveGoal Read(FaolanStream r)
@@ -71,7 +72,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				MarkerX = markerX,
 				MarkerY = markerY,
 				Unknown1 = zero1,
-				Zero2 = zero2,
+				Unknown2 = zero2,
 				Objective = objective,
 				TextRecord = text
 			};
@@ -94,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(MarkerX);
 			w.WriteUInt32(MarkerY);
 			w.WriteUInt32(Unknown1);
-			w.WriteUInt32(Zero2);
+			w.WriteUInt32(Unknown2);
 			w.WriteArrayUInt32Length(Objective);
 			w.WriteArrayUInt16Length(TextRecord); // u16-framed - see Read (#388)
 		}
@@ -111,7 +112,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// Carried per goal like QuestcRecord's undecoded scalars; the tags being random is why they must be stored
 		// rather than derived (see the WTHD note in questc-region-decode).
 		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, byte[] objective, byte[] textRecord,
-			uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1, uint extra1 = 0, uint extra2 = 0, uint unknown1 = 0)
+			uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1, uint extra1 = 0, uint extra2 = 0, uint unknown1 = 0,
+			uint extra0 = 0, uint extra3 = 0, uint extra4 = 0, uint goalIdEcho = 0, uint unknown2 = 0)
 		{
 			ArgumentNullException.ThrowIfNull(objective);
 			ArgumentNullException.ThrowIfNull(textRecord);
@@ -123,15 +125,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 				QuestId = questId,
 				GoalId = goalId,
 				N = n,
-				GoalIdRepeat = goalId,
+				GoalIdRepeat = goalIdEcho,
 				RequiredCount = requiredCount,
-				Reserved = [0, extra1, extra2, 0, 0, extra5, extra6],
+				Reserved = [extra0, extra1, extra2, extra3, extra4, extra5, extra6],
 				SubId = subId,
 				MapId = mapId,
 				MarkerX = markerX,
 				MarkerY = markerY,
 				Unknown1 = unknown1,
-				Zero2 = 0,
+				Unknown2 = unknown2,
 				Objective = objective,
 				TextRecord = textRecord
 			};

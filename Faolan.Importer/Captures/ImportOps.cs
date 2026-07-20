@@ -569,10 +569,11 @@ namespace Faolan.Importer.Captures
 		// a DbUpdateConcurrencyException mid-import.
 		public static async Task<int> ImportObjectiveGoals(DatabaseContext db, IReadOnlyList<ObjectiveGoalExtractor.Goal> goals)
 		{
-			var owner = await db.QuestGoalDefinitions.ToDictionaryAsync(g => g.GoalId, g => g.QuestDefinitionId);
+			var tracked = await db.QuestGoalDefinitions.ToDictionaryAsync(g => g.GoalId);
+			var owner = tracked.ToDictionary(k => k.Key, k => k.Value.QuestDefinitionId);
 			var quests = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId, q => q.MapId);
 			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
-			int added = 0, noMap = 0;
+			int added = 0, noMap = 0, refreshed = 0;
 
 			foreach (var g in goals)
 			{
@@ -589,9 +590,46 @@ namespace Faolan.Importer.Captures
 				if (owner.TryGetValue(g.GoalId, out var existingQuest))
 				{
 					if (existingQuest != g.QuestId)
+					{
 						Console.WriteLine($"  goal {g.GoalId} already belongs to quest {existingQuest}, not {g.QuestId} - skipped.");
+						continue;
+					}
 
-					continue; // already present; a Seed* overlay may have completed it
+					// Present already - typically from a Seed* overlay. The CAPTURE is the truth source for every wire
+					// field, so refresh them; the server-side-only fields (TargetName/GoalType/QuestItemId) are left
+					// alone. Skipping instead kept hand-written seed values that no capture agrees with, which is what
+					// left the last ~116 regions unreproducible.
+					var row = tracked[g.GoalId];
+					row.Sequence = g.Sequence;
+					row.RegionOrder = g.RegionOrder;
+					row.Separator = g.Separator;
+					row.SubId = g.SubId;
+					row.MapId = mapId;
+					row.MarkerX = mapId == null ? null : g.MarkerX;
+					row.MarkerY = mapId == null ? null : g.MarkerY;
+					row.RequiredCount = g.RequiredCount;
+					row.Unknown1 = g.Unknown1;
+					row.Unknown2 = g.Unknown2;
+					row.GoalIdEcho = g.GoalIdEcho;
+					row.Extra0 = g.Extra0;
+					row.Extra1 = g.Extra1;
+					row.Extra2 = g.Extra2;
+					row.Extra3 = g.Extra3;
+					row.Extra4 = g.Extra4;
+					row.Extra5 = g.Extra5;
+					row.Extra6 = g.Extra6;
+					row.ObjectiveRefId = g.Objective.RefId;
+					row.ObjectiveCategory = g.Objective.Category;
+					row.ObjectiveKey = g.Objective.Key;
+					row.ObjectiveToken = g.Objective.Token;
+					row.TrailingRefId = g.Trailing?.RefId ?? 0;
+					row.TrailingCategory = g.Trailing?.Category ?? 0;
+					row.TrailingKey = g.Trailing?.Key;
+					row.TrailingFlags = g.Trailing?.Flags;
+					row.TrailingToken = g.Trailing?.Token;
+					row.TrailingLocalized = g.Trailing?.IsLocalized ?? false;
+					refreshed++;
+					continue;
 				}
 
 				if (mapId is { } m && maps.Add(m))
@@ -609,8 +647,13 @@ namespace Faolan.Importer.Captures
 					MarkerX = mapId == null ? null : g.MarkerX,
 					MarkerY = mapId == null ? null : g.MarkerY,
 					Unknown1 = g.Unknown1,
+					Unknown2 = g.Unknown2,
+					GoalIdEcho = g.GoalIdEcho,
+					Extra0 = g.Extra0,
 					Extra1 = g.Extra1,
 					Extra2 = g.Extra2,
+					Extra3 = g.Extra3,
+					Extra4 = g.Extra4,
 					Extra5 = g.Extra5,
 					Extra6 = g.Extra6,
 					RequiredCount = g.RequiredCount,
@@ -632,6 +675,9 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 			if (noMap > 0)
 				Console.WriteLine($"  {noMap} objective goals carry no world marker (MapId/MarkerX/MarkerY null).");
+
+			if (refreshed > 0)
+				Console.WriteLine($"  {refreshed} existing objective goals refreshed from the captures.");
 
 			return added;
 		}
