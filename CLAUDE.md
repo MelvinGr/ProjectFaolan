@@ -80,7 +80,7 @@ networking + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World
 GM-command tools) · `Faolan.Web/` + `Faolan.Web.Content/` Blazor armory/3D-viewer + GM tools + CDN proxy ·
 `Faolan.Tests/` the test suite · `Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib +
 RpcHeader endpoints + named opcodes/IIR types (generated from `Opcodes.cs`) + handoff auto-follow (ground truth, TCP-reassembled; use
-`-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces (a SYMLINK to the ProjectFaolan-Data repo - see `Captures-README.md`) ·
+`-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces - NOT in this repo (they live in the private ProjectFaolan-Data repo; the suite reads `Faolan.Tests/Assets/corpus-extract.bin` instead, see **Capture data** below) ·
 `tools/` the tooling that reads them: `capture/` Python dissectors + `tshark_dump.sh`, `ghidra/` RE scripts,
 `frida/` live-client scripts.
 (The old C# `Faolan.PacketAnalyzer` GUI/CLI was retired in #82 - it had no TCP reassembly and dropped ~2/3 of
@@ -197,6 +197,32 @@ were removed, and the MCP tools wrapping them are stale.
 
 **MCP server:** the running server hosts an in-process MCP endpoint at `http://127.0.0.1:7099/mcp`
 (DB queries + live-session inspection + GM-command routing).
+
+## Capture data
+
+The 349 MB of retail traces, the Ghidra project and the baked terrain live in a separate PRIVATE repo,
+[ProjectFaolan-Data](https://git.groenendaal.io/MelvinGr/ProjectFaolan-Data), so this repo stays small
+(and can go public). Clone it as a sibling of this one.
+
+**The test suite does NOT need it.** All 1046 tests read `Faolan.Tests/Assets/corpus-extract.bin` (12 MB,
+committed): the six IIR types the whole-corpus gates walk, pulled out of the corpus and deflated, with each
+packet's source file, index and tshark frame preserved so a byte-exact failure still names one packet in one
+capture. Regenerate it with the data repo present:
+
+```zsh
+ln -s ../../ProjectFaolan-Data/Captures Captures   # only needed for the tools below; gitignored
+dotnet run --project Faolan.Importer -- --report corpus-extract
+```
+
+⚠️ The extract is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
+gate while they all still pass - the exact failure mode those gates exist to catch. Its manifest pins the
+per-IIR counts and `CorpusExtract` throws on a short extract rather than letting coverage narrow. It also
+records all 213 capture FILE NAMES so the doc linters (`DocReferenceTests`, `ProtocolCitationTests`) can
+verify `[Vn:]` citations without the data.
+
+You only need the real corpus to regenerate the extract, or to run `Faolan.Importer` / its `--report` tools.
+`Terrain/` needs no symlink - it is the `TerrainDir` key in `faolan.json`; if it is missing the server logs
+that ground-snap and line-of-sight are DISABLED and carries on, so check that line rather than assuming.
 
 ## Conventions
 

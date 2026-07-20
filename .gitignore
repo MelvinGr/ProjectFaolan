@@ -284,8 +284,9 @@ Faolan.Web/faolan.db
 Faolan.Web/faolan.json
 
 # Ghidra project + headless dump outputs (677MB local RE workspace; never commit)
-# Captures/ is a SYMLINK to the ProjectFaolan-Data repo (349 MB of retail traces). The dumps are not
-# tracked here - see Captures-README.md. Terrain/ likewise, though that one is a config path (TerrainDir).
+# The retail traces live in the private ProjectFaolan-Data repo, not here - the test suite reads
+# Faolan.Tests/Assets/corpus-extract.bin instead (see CLAUDE.md "Capture data"). Symlink this path at
+# ../../ProjectFaolan-Data/Captures only when regenerating the extract or running the importer.
 Captures
 Captures/
 
