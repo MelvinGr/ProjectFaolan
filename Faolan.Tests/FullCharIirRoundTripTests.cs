@@ -55,7 +55,7 @@ namespace Faolan.Tests
 					continue; // truncated/non-splitting - covered by the round-trip test above
 				}
 
-				var decoded = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
+				var decoded = rootBytes.FromProtobuf<ProtoFullCharacterIIR>();
 
 				// f2/f3 are absent on every captured snapshot; BuildRoot doesn't author them, so a capture that
 				// carried them would fail here (a guard against a silently-dropped field).
@@ -108,7 +108,7 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				var decoded = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
+				var decoded = rootBytes.FromProtobuf<ProtoFullCharacterIIR>();
 				var reencoded = decoded.ToProtobuf();
 
 				Assert.True(rootBytes.SequenceEqual(reencoded), $"{source}: ProtoFullCharacterIIR did not re-encode byte-identically (root {rootBytes.Length} -> {reencoded.Length})");

@@ -93,7 +93,7 @@ namespace Faolan.Tests
 				stream.ReadArray(5); // the whole prefix
 				var original = stream.ReadArray(rootLength);
 
-				var root = ((ReadOnlySpan<byte>)original).FromProtobuf<ProtoFullCharacterIIR>();
+				var root = original.FromProtobuf<ProtoFullCharacterIIR>();
 
 				var reencoded = root.ToProtobuf();
 				if (!original.SequenceEqual(reencoded))

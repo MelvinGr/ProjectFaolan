@@ -129,7 +129,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// CommandMessage is IExtensible, so any field the schema does not model survives the round-trip.
 		public static byte[] InsertBehaviorPhaseField(byte[] args, uint phase)
 		{
-			var message = ((ReadOnlySpan<byte>)args).FromProtobuf<CommandMessage>();
+			var message = args.FromProtobuf<CommandMessage>();
 			message.CommandqueueServerId = phase;
 			return message.ToProtobuf();
 		}

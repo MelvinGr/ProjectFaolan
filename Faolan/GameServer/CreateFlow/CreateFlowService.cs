@@ -1038,9 +1038,9 @@ namespace Faolan.GameServer.CreateFlow
 			});
 		}
 
-		// Builds an outgoing 0xA36D3B74 script callback: subOpcode + ack(0xC350) + clientInstance +
-		// reserved(0) + pbLength + protobuf{field1=5, field2=2, field3=0, field4=token, field5=value,
-		// field6={0,0}} - the same wire shape the client uses for its own callbacks.
+		// Builds an outgoing 0xA36D3B74 script callback: subOpcode + ack(0xC350) + clientInstance + reserved(0) +
+		// pbLength + a ProtoScryScriptIIR - the same wire shape (and the same message) the INBOUND
+		// HandleCommandPacket already reads typed. It used to be written as raw tag bytes.
 		private static Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
 			return new PacketStream()
@@ -1051,19 +1051,14 @@ namespace Faolan.GameServer.CreateFlow
 					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(client.Session.Account.ClientInstance);
 					s.WriteByte(0x00);
-					s.WriteArrayUInt32Length(pb =>
+					s.WriteProtobufUInt32Length(new ProtoScryScriptIIR
 					{
-						pb.WriteByte(0x08);
-						pb.WriteByte(0x05);
-						pb.WriteByte(0x10);
-						pb.WriteByte(0x02);
-						pb.WriteByte(0x18);
-						pb.WriteByte(0x00);
-						pb.WriteByte(0x22);
-						pb.WriteStringByteLength(token);
-						pb.WriteByte(0x2A);
-						pb.WriteStringByteLength(value);
-						pb.WriteArray(0x32, 0x04, 0x08, 0x00, 0x10, 0x00);
+						Version = 5,
+						type = ProtoScryScriptIIR.Type.ScriptMessage,
+						IntParameter = 0, // sint32 - zigzag(0) is 0, so this is the same `18 00` as before
+						StringParameterOne = token,
+						StringParameterTwo = value,
+						IdParameter = new ProtoID32 { Type = 0, Instance = 0 }
 					});
 				})
 				.SendAsync(client);

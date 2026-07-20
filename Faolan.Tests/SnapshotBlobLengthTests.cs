@@ -71,7 +71,7 @@ namespace Faolan.Tests
 				}
 			};
 
-			var typed = ((ReadOnlySpan<byte>)verbatimRoot).FromProtobuf<ProtoFullCharacterIIR>();
+			var typed = verbatimRoot.FromProtobuf<ProtoFullCharacterIIR>();
 			typed.Inventories.Clear();
 			foreach (var c in FullPlayerCharacterBuilder.BuildContainers(instance, equipped, bagFirst, rows))
 				typed.Inventories.Add(c);

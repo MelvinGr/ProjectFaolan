@@ -11,6 +11,11 @@ namespace Faolan.Core.Extensions
 			return Serializer.Deserialize<T>(data);
 		}
 
+		public static T FromProtobuf<T>(this byte[] data) where T : IExtensible
+		{
+			return Serializer.Deserialize<T>(data);
+		}
+
 		public static byte[] ToProtobuf(this IExtensible obj)
 		{
 			using var ms = new MemoryStream();

@@ -39,8 +39,8 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out var error), error);
 
 			// Decompose the captured scaffold into the from-scratch builder's inputs.
-			var position = DecodeVec3(scaffold.Vec3);
-			var rotation = DecodeQuat(scaffold.Quat);
+			var position = scaffold.Vec3.FromProtobuf<ProtoVec3>();
+			var rotation = scaffold.Quat.FromProtobuf<ProtoQuat>();
 
 			// The scaffold rows (entry table / id list) on a Character. Strie is an Assassin; the pre-IIR frame is now
 			// reconstructed from that class (not stored), so the from-scratch body equals the template's CONSTRUCTED
@@ -96,21 +96,9 @@ namespace Faolan.Tests
 
 			Assert.NotNull(body);
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out var err), err);
-			var back = ((ReadOnlySpan<byte>)rebuilt.CharacterIir).FromProtobuf<ProtoCoreCharacterIIR>();
+			var back = rebuilt.CharacterIir.FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal("Newcomer", back.Name);
 			Assert.Equal(0x0A1B2C3Du, rebuilt.Handle);
-		}
-
-		private static Quaternion DecodeQuat(byte[] q)
-		{
-			return new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(6, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(11, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(16, 4)));
-		}
-
-		private static Vector3 DecodeVec3(byte[] v)
-		{
-			return new Vector3(BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(6, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(11, 4)));
 		}
 	}
 }

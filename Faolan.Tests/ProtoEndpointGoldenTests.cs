@@ -16,7 +16,7 @@ namespace Faolan.Tests
 		public void Endpoint_RoundTripsTypeAndInstance()
 		{
 			var bytes = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, 20016753);
-			var decoded = ((ReadOnlySpan<byte>)bytes).FromProtobuf<ProtoEndpoint>();
+			var decoded = bytes.FromProtobuf<ProtoEndpoint>();
 
 			Assert.Equal(Endpoints.GameInterfaceType, decoded.Type);
 			Assert.Equal(20016753u, decoded.Instance);

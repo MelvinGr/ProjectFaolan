@@ -1,5 +1,6 @@
-using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
@@ -11,8 +12,16 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	//
 	// Wire (subopcode onward; the 4-byte packet length is added by the send layer):
 	//   [subop 0xA36D3B74][ack 0x0000C350][u32 playerHandle][u8 flag=0][u32 BE pbLen][protobuf pbLen bytes]
-	// protobuf: f1=5 (version), f2=mode, f3=flag, f4=stepToken (string), f5=resources (string, usually empty),
-	//   f6 = sub-message {f1=0, f2=0}.
+	// The protobuf is a ProtoScryScriptIIR: version=1, type=2, int_parameter=3, string_parameter_one=4 (the step
+	// token), string_parameter_two=5 (resources), id_parameter=6 (a ProtoID32 pair).
+	//
+	// ⚠️ int_parameter (field 3) is a **sint32 - ZIGZAG encoded**. The callers here pass the RAW WIRE VARINT (the
+	// values were lifted straight out of captures, e.g. 48126 / 385910), not the decoded integer, so the raw value
+	// is zigzag-DECODED on the way in and protobuf-net re-encodes it to the identical bytes. Evidence it really is
+	// zigzag: across the corpus field 3 is even in 1151 occurrences and odd in only 14 - exactly the signature of
+	// zigzag (positives even, negatives odd), not of arbitrary ids. So a "scriptGroupId" of 48126 is really
+	// int_parameter 24063. Renaming the call sites to the decoded values is a follow-up; what matters here is that
+	// the bytes on the wire stay identical to retail's.
 	public static class ScryScript
 	{
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
@@ -23,21 +32,20 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// = {f1=5 version, f2=0 type, f3=scriptGroupId, f6={0,0}}.
 		public static byte[] BuildStartScriptGroup(uint playerHandle, uint scriptGroupId)
 		{
-			var pb = new FaolanStream();
-			WriteVarintField(pb, 1, 5); // version
-			WriteVarintField(pb, 2, 0); // type = StartScriptGroupOnClient
-			WriteVarintField(pb, 3, scriptGroupId);
-			var f6 = new FaolanStream();
-			WriteVarintField(f6, 1, 0);
-			WriteVarintField(f6, 2, 0);
-			WriteBytesField(pb, 6, f6.ToArray());
+			var pb = new ProtoScryScriptIIR
+			{
+				Version = 5,
+				type = ProtoScryScriptIIR.Type.StartScriptGroupOnClient,
+				IntParameter = ZigZagDecode(scriptGroupId),
+				IdParameter = new ProtoID32 { Type = 0, Instance = 0 }
+			}.ToProtobuf();
 
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(playerHandle)
 				.WriteByte(0x00)
-				.WriteArrayUInt32Length(pb.ToArray())
+				.WriteArrayUInt32Length(pb)
 				.ToArray();
 		}
 
@@ -47,42 +55,31 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// pair (both 0 for the simple steps).
 		public static byte[] BuildStep(uint playerHandle, string stepToken, uint mode = 2, uint flag = 0, string resources = "", ulong f6Field1 = 0, ulong f6Field2 = 0)
 		{
-			var pb = new FaolanStream();
-			WriteVarintField(pb, 1, 5); // version
-			WriteVarintField(pb, 2, mode);
-			WriteVarintField(pb, 3, flag);
-			WriteStringField(pb, 4, stepToken);
-			WriteStringField(pb, 5, resources);
-			var f6 = new FaolanStream();
-			WriteVarintField(f6, 1, f6Field1);
-			WriteVarintField(f6, 2, f6Field2);
-			WriteBytesField(pb, 6, f6.ToArray());
+			var pb = new ProtoScryScriptIIR
+			{
+				Version = 5,
+				type = (ProtoScryScriptIIR.Type)mode,
+				IntParameter = ZigZagDecode(flag),
+				StringParameterOne = stepToken ?? "",
+				StringParameterTwo = resources ?? "",
+				IdParameter = new ProtoID32 { Type = (uint)f6Field1, Instance = (uint)f6Field2 }
+			}.ToProtobuf();
 
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(playerHandle)
 				.WriteByte(0x00) // framing flag
-				.WriteArrayUInt32Length(pb.ToArray()) // u32 BE protobuf length + body
+				.WriteArrayUInt32Length(pb) // u32 BE protobuf length + body
 				.ToArray();
 		}
 
-		private static void WriteBytesField(FaolanStream w, int field, byte[] value)
-		{
-			w.WriteVarint((ulong)((field << 3) | 2)); // wire type 2 (length-delimited)
-			w.WriteVarint((ulong)value.Length);
-			w.WriteArray(value);
-		}
 
-		private static void WriteStringField(FaolanStream w, int field, string value)
-		{
-			WriteBytesField(w, field, Encoding.UTF8.GetBytes(value ?? ""));
-		}
 
-		private static void WriteVarintField(FaolanStream w, int field, ulong value)
+		// The raw wire varint -> the sint32 protobuf-net will zigzag-RE-encode back to that exact varint.
+		private static int ZigZagDecode(ulong raw)
 		{
-			w.WriteVarint((ulong)(field << 3)); // wire type 0 (varint)
-			w.WriteVarint(value);
+			return (int)(raw >> 1) ^ -(int)(raw & 1);
 		}
 	}
 }

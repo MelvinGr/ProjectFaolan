@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -19,10 +21,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	public static class PlayerSpawnBuilder
 	{
 		// A fresh player spawn carries no per-instance scale; the transform's optional 0x25 scale field is absent.
-		private const byte VecField1 = 0x0D; // protobuf field 1 fixed32 (x)
-		private const byte VecField2 = 0x15; // field 2 (y)
-		private const byte VecField3 = 0x1D; // field 3 (z)
-		private const byte VecField4 = 0x25; // field 4 (w) - quat only
 
 		// Produces the FA015807 player body (the packet[bodyStart..] form: [u32 bodyLen][subop][ack][handle][fieldA]
 		// [transform][preFrame][CharacterIIR][post-IIR]). Returns null when the character has no scaffold rows yet
@@ -36,8 +34,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				Ack = EntityClass.Character,
 				Handle = handle,
 				FieldA = 0,
-				Vec3 = EncodeVec3(position),
-				Quat = EncodeQuat(rotation),
+				// The scaffold carries these as raw field payloads (it round-trips captured bodies), but BUILDING them
+				// from a Vector3/Quaternion is construction, so it goes through the generated classes: ProtoVec3 is
+				// {0D x, 15 y, 1D z} and ProtoQuat adds {25 w}, each a little-endian fixed32 - byte-identical to the
+				// hand-written encoders this replaces, and the same path WorldObjectBuilder already used.
+				Vec3 = ((ProtoVec3)position).ToProtobuf(),
+				Quat = ((ProtoQuat)rotation).ToProtobuf(),
 				Scale = null,
 				Playfield = playfield,
 				CharacterIir = characterIir
@@ -50,32 +52,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return PlayerSpawnScaffoldCodec.Generate(scaffold);
 		}
 
-		// Quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
-		private static byte[] EncodeQuat(Quaternion q)
-		{
-			return new FaolanStream()
-				.WriteByte(VecField1)
-				.WriteFloatLittleEndian(q.X)
-				.WriteByte(VecField2)
-				.WriteFloatLittleEndian(q.Y)
-				.WriteByte(VecField3)
-				.WriteFloatLittleEndian(q.Z)
-				.WriteByte(VecField4)
-				.WriteFloatLittleEndian(q.W)
-				.ToArray();
-		}
 
-		// Vec3 = [0D x][15 y][1D z], each a little-endian fixed32 - the transform's protobuf float triple (15 bytes).
-		private static byte[] EncodeVec3(Vector3 v)
-		{
-			return new FaolanStream()
-				.WriteByte(VecField1)
-				.WriteFloatLittleEndian(v.X)
-				.WriteByte(VecField2)
-				.WriteFloatLittleEndian(v.Y)
-				.WriteByte(VecField3)
-				.WriteFloatLittleEndian(v.Z)
-				.ToArray();
-		}
 	}
 }

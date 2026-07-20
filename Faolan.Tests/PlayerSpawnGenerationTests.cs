@@ -66,7 +66,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerCharacterMessage_DecodesExpectedIdentity()
 		{
-			var decoded = ((ReadOnlySpan<byte>)CharacterMessage(Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();
+			var decoded = CharacterMessage(Golden.Bytes("SpawnStrieTemplate")).FromProtobuf<ProtoCoreCharacterIIR>();
 
 			Assert.Equal("Strie", decoded.Name);
 			Assert.NotNull(decoded.Stats);
@@ -92,7 +92,7 @@ namespace Faolan.Tests
 		{
 			var message = CharacterMessage(Golden.Bytes("SpawnStrieTemplate"));
 
-			var decoded = ((ReadOnlySpan<byte>)message).FromProtobuf<ProtoCoreCharacterIIR>();
+			var decoded = message.FromProtobuf<ProtoCoreCharacterIIR>();
 			var reencoded = decoded.ToProtobuf();
 
 			Assert.Equal(message.Length, reencoded.Length);
@@ -238,14 +238,14 @@ namespace Faolan.Tests
 		public void SetCharacterMessage_ChangingName_ResizesAndStaysConsistent()
 		{
 			var body = Golden.Bytes("SpawnStrieTemplate");
-			var message = ((ReadOnlySpan<byte>)CharacterMessage(body)).FromProtobuf<ProtoCoreCharacterIIR>();
+			var message = CharacterMessage(body).FromProtobuf<ProtoCoreCharacterIIR>();
 			message.Name = "Tester"; // 6 chars vs "Strie" (5)
 
 			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);
 
 			Assert.Equal(body.Length + 1, rebuilt.Length);
 			Assert.Equal((uint)(rebuilt.Length - 4), BinaryPrimitives.ReadUInt32BigEndian(rebuilt.AsSpan(0, 4)));
-			var back = ((ReadOnlySpan<byte>)CharacterMessage(rebuilt)).FromProtobuf<ProtoCoreCharacterIIR>();
+			var back = CharacterMessage(rebuilt).FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal("Tester", back.Name);
 			Assert.NotNull(back.Bcc); // the tail (after the name) survived the splice
 		}
@@ -255,7 +255,7 @@ namespace Faolan.Tests
 		public void SetCharacterMessage_WithUnchangedDecodedMessage_IsByteIdentical()
 		{
 			var body = Golden.Bytes("SpawnStrieTemplate");
-			var message = ((ReadOnlySpan<byte>)CharacterMessage(body)).FromProtobuf<ProtoCoreCharacterIIR>();
+			var message = CharacterMessage(body).FromProtobuf<ProtoCoreCharacterIIR>();
 
 			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);
 

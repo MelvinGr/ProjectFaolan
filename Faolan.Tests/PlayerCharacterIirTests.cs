@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			var template = File.ReadAllBytes(TemplatePath);
 
 			// The template with its worn-gear entries stripped (Build always replaces them per character).
-			var stripped = ((ReadOnlySpan<byte>)template).FromProtobuf<ProtoCoreCharacterIIR>();
+			var stripped = template.FromProtobuf<ProtoCoreCharacterIIR>();
 			stripped.InventoryEntries.Clear();
 			var strippedBytes = stripped.ToProtobuf();
 
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 		public void Template_CarriesOnlyWornGearThatIsAlwaysReplaced()
 		{
 			var template = File.ReadAllBytes(TemplatePath);
-			var msg = ((ReadOnlySpan<byte>)template).FromProtobuf<ProtoCoreCharacterIIR>();
+			var msg = template.FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal(4, msg.InventoryEntries.Count);
 			Assert.Empty(PlayerCharacterIir.Build(null, null).InventoryEntries);
 		}
