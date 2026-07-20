@@ -166,7 +166,7 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
 			var original = parts.SubClass.ToArray();
 			parts.SubClass.Level = parts.SubClass.Level; // same-value writes are a no-op

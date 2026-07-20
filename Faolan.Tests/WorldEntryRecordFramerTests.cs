@@ -13,7 +13,7 @@ namespace Faolan.Tests
 {
 	// Proves the from-scratch world-entry record framers (#210) reproduce their captured packets byte-for-byte when
 	// given the capture's own record body - i.e. the shared RpcHeader, the IIR record framing and (for the snapshot)
-	// the 8-byte blob prefix are all assembled from the live session with NO captured packet as a template. The body
+	// the 5-byte blob prefix are all assembled from the live session with NO captured packet as a template. The body
 	// generation is proven separately (FullCharIirRoundTripTests / BeachTailsFromScratchTests / the SpawnPacketBuilder
 	// override engine, which the live login path already exercises in-client).
 	public class WorldEntryRecordFramerTests
@@ -33,9 +33,9 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
 
-			var built = GameServerListener.BuildSnapshotPrefix(root.Length);
+			var built = FullCharSnapshotCodec.BuildPrefix(root.Length);
 			Assert.Equal(parts.Prefix, built);
 		}
 
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
 			return (parts.Root.ToProtobuf(), parts.SubClass.ToArray());
 		}
 	}

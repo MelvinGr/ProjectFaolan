@@ -31,7 +31,7 @@ namespace Faolan.Tests
 		public void BeachPrefix_BuildsFromScratch_ByteIdentical()
 		{
 			var (prefix, root, _) = SplitBeach();
-			var built = GameServerListener.BuildSnapshotPrefix(root.Length);
+			var built = FullCharSnapshotCodec.BuildPrefix(root.Length);
 			Assert.Equal(prefix, built);
 		}
 
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 		public void BeachSnapshot_PrefixPlusTails_ReassemblesConsistently()
 		{
 			var (_, root, tails) = SplitBeach();
-			var prefix = GameServerListener.BuildSnapshotPrefix(root.Length);
+			var prefix = FullCharSnapshotCodec.BuildPrefix(root.Length);
 
 			using var content = new FaolanStream();
 			content.WriteUInt32(0x737A6DF9);
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			s.ReadUInt32();
-			var reparsed = FullCharSnapshotReader.ParseInventoryPacketBody(s);
+			var reparsed = FullCharSnapshotCodec.ParseInventoryPacketBody(s);
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(root));
 			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails));
 		}
@@ -114,7 +114,7 @@ namespace Faolan.Tests
 				s.ReadUInt32();
 				s.ReadUInt32();
 				s.ReadUInt32();
-				return FullCharSnapshotReader.ParseInventoryPacketBody(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
+				return FullCharSnapshotCodec.ParseInventoryPacketBody(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
 			}
 		}
 
@@ -125,7 +125,7 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
 			return (parts.Prefix, parts.Root.ToProtobuf(), parts.SubClass.ToArray());
 		}
 	}

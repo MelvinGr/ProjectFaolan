@@ -273,24 +273,6 @@ namespace Faolan.GameServer
 			return ps.WriteLengthHash().ToArray();
 		}
 
-		// The 5-byte IIR blob prefix the client (n3InfoItemRemote::Construct) reads before the FullCharacterIIR root:
-		// [u8 flag=0][u32 BE blobLen], where blobLen == rootLength (the client reads EXACTLY blobLen bytes as the
-		// protobuf root, then expects the 0x18 tails version). Built from scratch - there is no captured prefix to
-		// patch, which is what retired the old SetSnapshotBlobLength.
-		//
-		// This used to append a captured 3-byte "field5" (28 81 06) after the length. Those bytes are not a frame at
-		// all - they are the ROOT's own `subscription_flags` (field 5) varint, which BuildRoot already emits typed
-		// (FullSubscriptionFlags), so the wire carried the field TWICE (the client's last-wins parse hid it). See
-		// FullCharSnapshotReader for the read side and the level-80 snapshots the fixed 3-byte skip corrupted.
-		internal static byte[] BuildSnapshotPrefix(int rootLength)
-		{
-			ArgumentOutOfRangeException.ThrowIfNegative(rootLength);
-
-			var prefix = new byte[5];
-			prefix[0] = 0x00; // flag
-			BinaryPrimitives.WriteUInt32BigEndian(prefix.AsSpan(1, 4), (uint)rootLength);
-			return prefix;
-		}
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared
 		// with the CombatService); this delegates so the existing SendStatUpdate/SendVitals/BuildVitals callers
@@ -329,27 +311,14 @@ namespace Faolan.GameServer
 		}
 
 		// Assembles the complete world-entry snapshot packet for `client` from a pre-built root + tails. The record
-		// body is [IirType=0x737A6DF9][TypeTag=0xC350][Handle=instance][prefix][root][tails]; the RpcHeader + outer
-		// length/CRC come from the proven framing path. No captured packet is consulted.
+		// body ([IirType=0x737A6DF9][TypeTag][Handle=instance][prefix][root][tails]) is built by
+		// FullCharSnapshotWriter, which owns the prefix model next to the reader that parses it - it used to be
+		// stated here as well, and the two drifted (see that type's header). This adds only the client-dependent
+		// outer wrap: the RpcHeader + outer length/CRC. No captured packet is consulted.
 		internal static byte[] BuildWorldEntrySnapshot(INetworkClient client, byte[] rootBytes, byte[] tailsBytes)
 		{
-			ArgumentNullException.ThrowIfNull(rootBytes);
-			ArgumentNullException.ThrowIfNull(tailsBytes);
-
-			var instance = client.Session.Account.ClientInstance;
-			var prefix = BuildSnapshotPrefix(rootBytes.Length);
-
-			using var body = new FaolanStream();
-			body.WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(FullPlayerCharacterBuilder.Opcode);
-				s.WriteUInt32(SnapshotTypeTag);
-				s.WriteUInt32(instance);
-				s.WriteArray(prefix);
-				s.WriteArray(rootBytes);
-				s.WriteArray(tailsBytes);
-			});
-			return FrameWorldEntryRecord(client, body.ToArray());
+			var body = FullCharSnapshotCodec.BuildBody(client.Session.Account.ClientInstance, rootBytes, tailsBytes);
+			return FrameWorldEntryRecord(client, body);
 		}
 
 		// Assembles the complete world-entry player/NPC FA015807 spawn packet for `client` from a pre-built spawn body.

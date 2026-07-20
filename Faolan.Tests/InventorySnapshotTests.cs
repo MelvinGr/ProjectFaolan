@@ -33,7 +33,7 @@ namespace Faolan.Tests
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xFF, 0xBD, 0xD9, 0x10];
@@ -80,7 +80,7 @@ namespace Faolan.Tests
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
 			using var rebuilt = new FaolanStream();
 			rebuilt.WriteUInt32(subOpcode);
@@ -132,7 +132,7 @@ namespace Faolan.Tests
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, .. EncodeVarint(newInstance)];
@@ -182,7 +182,7 @@ namespace Faolan.Tests
 			var instance = body.ReadUInt32();
 			var headerLen = body.Position; // bytes consumed before the inventory body proper
 
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
 			using var rebuilt = new FaolanStream();
 			rebuilt.WriteUInt32(subOpcode);

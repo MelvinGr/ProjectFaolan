@@ -80,7 +80,7 @@ namespace Faolan.Tests
 
 			// BuildSnapshotPrefix is the production path (the old SetSnapshotBlobLength patched a CAPTURED prefix and
 			// was retired when the prefix started being built from scratch).
-			var newPrefix = GameServerListener.BuildSnapshotPrefix(genRoot.Length);
+			var newPrefix = FullCharSnapshotCodec.BuildPrefix(genRoot.Length);
 			Assert.Equal((uint)genRoot.Length, BinaryPrimitives.ReadUInt32BigEndian(newPrefix.AsSpan(1, 4)));
 
 			// Reassemble [subop][c350][instance][newPrefix][genRoot][tails] and re-split.
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 			s2.ReadUInt32();
 			s2.ReadUInt32();
 			s2.ReadUInt32();
-			var reparsed = FullCharSnapshotReader.ParseInventoryPacketBody(s2);
+			var reparsed = FullCharSnapshotCodec.ParseInventoryPacketBody(s2);
 			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
 			return;
@@ -121,12 +121,12 @@ namespace Faolan.Tests
 
 			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
 			{
-				var p = GameServerListener.BuildSnapshotPrefix(newRoot);
+				var p = FullCharSnapshotCodec.BuildPrefix(newRoot);
 				Assert.Equal((uint)newRoot, BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));
 				Assert.Equal(prefix[0], p[0]); // flag
 			}
 
-			Assert.Equal(prefix, GameServerListener.BuildSnapshotPrefix(rootLen));
+			Assert.Equal(prefix, FullCharSnapshotCodec.BuildPrefix(rootLen));
 		}
 
 		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)
@@ -136,7 +136,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			s.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(s);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(s);
 			return (parts.Prefix, parts.Root.ToProtobuf().Length, parts.SubClass.ToArray());
 		}
 
@@ -148,7 +148,7 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			var instance = s.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(s);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(s);
 			var root = parts.Root.ToProtobuf();
 			return (parts.Prefix, root.Length, parts.SubClass.ToArray(), instance, root);
 		}

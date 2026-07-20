@@ -1074,7 +1074,7 @@ namespace Faolan.Importer.Cli
 					s.ReadUInt32();
 					s.ReadUInt32();
 					s.ReadUInt32();
-					var rootMsg = FullCharSnapshotReader.ParseInventoryRoot(s);
+					var rootMsg = FullCharSnapshotCodec.ParseInventoryRoot(s);
 					Console.WriteLine($"    inventory-root: OK ({rootMsg.Inventories.Count} containers)");
 				}
 				catch (Exception ex)

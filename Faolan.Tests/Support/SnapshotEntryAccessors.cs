@@ -6,11 +6,11 @@ using Faolan.Core.Protobuf;
 namespace Faolan.Tests.Support
 {
 	// Convenience readers over a snapshot inventory entry, used only by the snapshot tests. These lived on
-	// FullCharSnapshotReader but had ZERO production callers (confirmed with the Roslyn language server, not grep -
+	// FullCharSnapshotCodec but had ZERO production callers (confirmed with the Roslyn language server, not grep -
 	// comment mentions make grep unreliable here), so they were test scaffolding sitting in the protocol layer.
 	//
 	// They are one-liners over already-typed protobuf properties, so moving them costs nothing: no production model
-	// is duplicated. That is the line to hold when moving "test-only" code out of a codec - FullCharSnapshotReader's
+	// is duplicated. That is the line to hold when moving "test-only" code out of a codec - FullCharSnapshotCodec's
 	// ParseInventoryPacketBody is ALSO test-only by reference count, but it encodes production's prefix/root/tails
 	// SPLIT, so moving it would leave the round-trip tests asserting their own copy of the model instead of the
 	// server's. It deliberately stays put. See [[self_referential_golden_tests]].
@@ -43,7 +43,7 @@ namespace Faolan.Tests.Support
 
 		private static IEnumerable<ProtoInventoryGame.InventoryListEntry> Entries(ProtoInventoryGame container)
 		{
-			return FullCharSnapshotReader.GetContainerEntries(container);
+			return FullCharSnapshotCodec.GetContainerEntries(container);
 		}
 
 		private static uint? Stat(ProtoInventoryGame.InventoryListEntry entry, uint stat)

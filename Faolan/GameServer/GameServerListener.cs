@@ -81,10 +81,6 @@ namespace Faolan.GameServer
 		// step, so any genuine step cancels the cast while aiming a ground-target reticle does not.
 		private const float CastMoveCancelEpsilonSq = 0.04f; // (0.2 world units)^2
 
-		// The snapshot record's TypeTag - the 0x0000C350 constant every 0x737A6DF9 carrier carries (= the IIR
-		// conversation tag, shared with the 0x201C handshake bodies).
-		private const uint SnapshotTypeTag = 0x0000C350;
-
 		// The 0x205A PerformSpecialAction body word that identifies the necro spellweave activate/deactivate toggle
 		// (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
 		// spellweaves.

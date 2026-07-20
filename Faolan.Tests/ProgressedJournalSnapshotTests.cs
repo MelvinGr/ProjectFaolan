@@ -50,7 +50,7 @@ namespace Faolan.Tests
 				_ = stream.ReadUInt32();
 				_ = stream.ReadUInt32();
 
-				var parts = FullCharSnapshotReader.ParseInventoryPacketBody(stream);
+				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
 
 				// The tails as they arrived: everything after [subop][typeTag][instance][prefix][root].
 				Assert.True(parts.SubClass.OriginalData.SequenceEqual(parts.SubClass.ToArray()),
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 					stream.ReadUInt32();
 					stream.ReadUInt32();
 					stream.ReadUInt32();
-					return (x.Source, Parts: FullCharSnapshotReader.ParseInventoryPacketBody(stream));
+					return (x.Source, Parts: FullCharSnapshotCodec.ParseInventoryPacketBody(stream));
 				})
 				.FirstOrDefault(x => x.Parts.SubClass.Quests.Records.Count > 1);
 

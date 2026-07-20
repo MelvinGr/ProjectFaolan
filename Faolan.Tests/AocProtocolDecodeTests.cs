@@ -39,8 +39,8 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
-			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Equipped);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+			var equipped = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Equipped);
 			var captured = SnapshotEntryAccessors.EntryBySlot(equipped, Slot);
 			Assert.NotNull(captured);
 
@@ -83,7 +83,7 @@ namespace Faolan.Tests
 
 		// Proves protobuf-net re-serializes BYTE-IDENTICALLY to the captured wire - both a single inventory entry and
 		// the whole 0x737A6DF9 snapshot body (ProtoFullCharacterIIR). This is the guarantee that lets the typed schema
-		// replace the hand-rolled SnapshotItemBuilder / FullCharSnapshotReader without changing any output byte.
+		// replace the hand-rolled SnapshotItemBuilder / FullCharSnapshotCodec without changing any output byte.
 		[Fact]
 		public async Task GeneratedSchema_RoundTrips_CapturedSnapshot_ByteIdentical()
 		{
@@ -95,10 +95,10 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
 			// One inventory entry round-trips exactly.
-			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Equipped);
+			var equipped = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Equipped);
 			var entryBytes = SnapshotEntryAccessors.EntryBySlot(equipped, Slot)!.ToProtobuf();
 			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(new MemoryStream(entryBytes));
 			using var em = new MemoryStream();

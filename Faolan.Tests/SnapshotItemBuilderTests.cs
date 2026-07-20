@@ -46,8 +46,8 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
-			var equipped = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Equipped);
+			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+			var equipped = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Equipped);
 			var captured = SnapshotEntryAccessors.EntryBySlot(equipped, Slot);
 			Assert.NotNull(captured);
 			var expected = captured!.ToProtobuf();
@@ -115,10 +115,10 @@ namespace Faolan.Tests
 				body.ReadUInt32();
 				body.ReadUInt32();
 				body.ReadUInt32();
-				var parts = FullCharSnapshotReader.ParseInventoryPacketBody(body);
+				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
-				var bag = FullCharSnapshotReader.GetContainer(parts.Root, ContainerKind.Bag);
-				var before = FullCharSnapshotReader.GetContainerEntries(bag).ToList();
+				var bag = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Bag);
+				var before = FullCharSnapshotCodec.GetContainerEntries(bag).ToList();
 				var original = before[0];
 				var slot = SnapshotEntryAccessors.EntrySlot(original);
 				var itemId = SnapshotEntryAccessors.EntryItemId(original) ?? 0;
@@ -131,13 +131,13 @@ namespace Faolan.Tests
 				// Re-serialize the whole root and re-parse, as the live path does.
 				using var reparsedStream = new MemoryStream(parts.Root.ToProtobuf(), false);
 				var reparsed = Serializer.Deserialize<ProtoFullCharacterIIR>(reparsedStream);
-				var bag2 = FullCharSnapshotReader.GetContainer(reparsed, ContainerKind.Bag);
-				var after = FullCharSnapshotReader.GetContainerEntries(bag2).ToList();
+				var bag2 = FullCharSnapshotCodec.GetContainer(reparsed, ContainerKind.Bag);
+				var after = FullCharSnapshotCodec.GetContainerEntries(bag2).ToList();
 
 				Assert.Equal(before.Count, after.Count); // entry count unchanged (in-place replace)
 				var first = SnapshotEntryAccessors.EntryBySlot(bag2, slot);
 				Assert.NotNull(first);
-				Assert.Equal(SlaveManaclesId, FullCharSnapshotReader.GetEntryTemplateId(first!));
+				Assert.Equal(SlaveManaclesId, FullCharSnapshotCodec.GetEntryTemplateId(first!));
 				Assert.Equal(itemId, SnapshotEntryAccessors.EntryItemId(first!));
 				Assert.Equal(recordId, SnapshotEntryAccessors.EntryRecordId(first!));
 			}
