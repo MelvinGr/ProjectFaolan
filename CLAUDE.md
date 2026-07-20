@@ -202,7 +202,8 @@ were removed, and the MCP tools wrapping them are stale.
 
 The 349 MB of retail traces, the Ghidra project and the baked terrain live in a separate PRIVATE repo,
 [ProjectFaolan-Data](https://git.groenendaal.io/MelvinGr/ProjectFaolan-Data), so this repo stays small
-(and can go public). Clone it as a sibling of this one.
+(and can go public). Clone it near this repo (it holds `Captures/`, `Ghidra/`, `Terrain/`) and pass its
+`Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--rdb`/`--db` likewise).
 
 **The test suite does NOT need it.** All 1046 tests read `Faolan.Tests/Assets/corpus-extract.bin` (12 MB,
 committed): the eight IIR types the gates need, pulled out of the corpus and deflated, with each
