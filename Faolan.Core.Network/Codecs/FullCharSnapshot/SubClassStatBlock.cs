@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		[
 			(CharacterStatId.Unknown0, 0x0), (CharacterStatId.Unknown1, 0x0), (CharacterStatId.Unknown2, 0x0), (CharacterStatId.Unknown3, 0x0), (CharacterStatId.Unknown4, 0x1), (CharacterStatId.Unknown5, 0x0), (CharacterStatId.Unknown6, 0x2), (CharacterStatId.Unknown7, 0x2),
 			(CharacterStatId.PlayfieldToken, 0x4FE428), (CharacterStatId.Unknown9, 0x0), (CharacterStatId.HealthMax, 0x2328), (CharacterStatId.HealthCurrent, 0x2648), (CharacterStatId.Level, 0x1), (CharacterStatId.Exp, 0x0), (CharacterStatId.MaxExp, 0x64),
-			(CharacterStatId.Unknown10, 0x0), (CharacterStatId.Unknown11, 0x0)
+			(CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.Unknown11, 0x0)
 		];
 
 		// One half of StatList#2; the client carries it twice (base + current). Its last two slots (Unknown63 then
@@ -54,7 +54,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.Unknown12, 0x0), (CharacterStatId.Unknown13, 0x0), (CharacterStatId.Unknown14, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC), (CharacterStatId.Unknown16, 0x0), (CharacterStatId.Unknown17, 0x6F),
 			(CharacterStatId.Unknown18, 0x0), (CharacterStatId.Unknown19, 0x8), (CharacterStatId.HealthCurrent, 0x2648), (CharacterStatId.HealthMax, 0x2328), (CharacterStatId.Intelligence, 0xA), (CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.ManaMax, 0x0),
 			(CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.StaminaMax, 0x59D8), (CharacterStatId.StaminaCurrent, 0x5C30), (CharacterStatId.Strength, 0xA), (CharacterStatId.Unknown20, 0x0), (CharacterStatId.Unknown21, 0x0), (CharacterStatId.Unknown22, 0x0),
-			(CharacterStatId.Unknown23, 0x3), (CharacterStatId.MaxExp, 0x64), (CharacterStatId.Unknown10, 0x0), (CharacterStatId.Level, 0x1), (CharacterStatId.PvpLevel, 0x0), (CharacterStatId.PvpExp, 0x0), (CharacterStatId.Exp, 0x0), (CharacterStatId.Unknown24, 0x3E8),
+			(CharacterStatId.Unknown23, 0x3), (CharacterStatId.MaxExp, 0x64), (CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.Level, 0x1), (CharacterStatId.PvpLevel, 0x0), (CharacterStatId.PvpExp, 0x0), (CharacterStatId.Exp, 0x0), (CharacterStatId.Unknown24, 0x3E8),
 			(CharacterStatId.Unknown25, 0xBA), (CharacterStatId.Unknown26, 0x0), (CharacterStatId.Unknown27, 0x0), (CharacterStatId.Unknown28, 0x0), (CharacterStatId.Unknown29, 0x0), (CharacterStatId.Unknown30, 0x59EA506E), (CharacterStatId.Unknown31, 0x14),
 			(CharacterStatId.Unknown32, 0x0), (CharacterStatId.Unknown33, 0x0), (CharacterStatId.Unknown34, 0x0), (CharacterStatId.Unknown35, 0x0), (CharacterStatId.Unknown36, 0x0), (CharacterStatId.Unknown37, 0x0), (CharacterStatId.Unknown38, 0x0), (CharacterStatId.Unknown39, 0x0),
 			(CharacterStatId.Unknown40, 0x64), (CharacterStatId.Unknown41, 0x64), (CharacterStatId.Unknown42, 0x64), (CharacterStatId.Unknown43, 0x64), (CharacterStatId.Unknown44, 0x0), (CharacterStatId.Unknown45, 0x0), (CharacterStatId.Unknown46, 0x0),

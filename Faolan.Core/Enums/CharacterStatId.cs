@@ -57,8 +57,28 @@ namespace Faolan.Core.Enums
 		Mount = 0x00BA,
 		MountSpeed = 0x00BB,
 
-		// Undecoded slots of the 0x737A6DF9 tails stat sheet, numbered Unknown{i} so the whole block is enumerable
-		// (StatBlockSchema). Values are the raw wire stat ids; rename to a real name as each is decoded.
+		// The current LEVEL's base experience: the total XP at which the current level began, so the in-client XP bar
+		// fills (Exp - ExpCurrentLevelBase) / (MaxExp - ExpCurrentLevelBase). Decoded by value-correlation across 29
+		// archetype snapshots (#393): ExpCurrentLevelBase <= Exp <= MaxExp everywhere, it equals Exp for a freshly-
+		// dinged char (loot L2: base==Exp==100), and level 24's base (263640) is EXACTLY level 23's MaxExp (263640) -
+		// each level's base is the previous level's cap. See docs/re/fullplayer-snapshot-reader.md.
+		ExpCurrentLevelBase = 0x0039,
+
+		// Undecoded slots of the 0x737A6DF9 tails stat sheet, numbered Unknown{i} so the whole block is enumerable.
+		// Values are the raw wire stat ids; rename to a real name as each is decoded.
+		//
+		// ⚠️ #393 finding: this sheet is a BASELINE SKELETON, not the character's live stats. The attributes are the
+		// fixed base (Strength 0x324 / Intelligence 0x328 == 10 for EVERY char, L1 through L80), and ~two-thirds of the
+		// slots are 0/constant across all 29 archetype captures. Only vitals (HP/mana/stamina), XP/level, the PvP
+		// counters, PlayfieldToken and a handful below actually vary per character - the real leveled stats arrive via
+		// the live StatIIR (0xF98E10B3) / vitals (0x96B8DC59) updates, not here. So the remaining Unknown## are mostly
+		// not worth chasing from captures; the few that vary need in-client .setstat probing (the method that pinned
+		// HP/mana/stamina) to name. Notable ones already characterised by value:
+		//   0x044A (Unknown14) - a UNIX EPOCH timestamp (values decode to 2010 dates; only veteran/L80 chars carry a
+		//                        non-zero one), NOT a scalar stat.
+		//   0x025F (Unknown30) - a per-character 32-bit HASH/checksum constant (3 distinct values corpus-wide), not a scalar.
+		//   0x0398/0x039A/0x039B/0x039D (Unknown42/43/41/40) - a co-varying group of four SIGNED values, base -300
+		//                        (0xFFFFFED4) on a fresh char, equal to each other per char (likely a resist/rating quad).
 		Unknown0 = 0x252,
 		Unknown1 = 0x253,
 		Unknown2 = 0x254,
@@ -68,7 +88,6 @@ namespace Faolan.Core.Enums
 		Unknown6 = 0x0AE,
 		Unknown7 = 0x0AD,
 		Unknown9 = 0x40B,
-		Unknown10 = 0x039,
 		Unknown11 = 0x0A9,
 		Unknown12 = 0x534,
 		Unknown13 = 0x16B,

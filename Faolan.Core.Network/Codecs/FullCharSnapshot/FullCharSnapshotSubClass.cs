@@ -197,12 +197,16 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			List<(uint Id, uint Value)> sheet;
 			if (imported)
 			{
-				// The character's REAL captured sheet, with the character-derived XP-companion slots (0x15E MaxExp, 0x39)
-				// reset to baseline. XP (0x34) is authored positionally below; the playfield-token slot (0xBF) is set for
-				// BOTH paths just below (from the live zone token, not the stale captured one).
+				// The character's REAL captured sheet, with the character-derived XP-companion slots (0x15E MaxExp and
+				// 0x39 ExpCurrentLevelBase - the current level's base XP, decoded #393) reset to baseline. XP (0x34) is
+				// authored positionally below; the playfield-token slot (0xBF) is set for BOTH paths just below (from the
+				// live zone token, not the stale captured one). NB this leaves the snapshot's XP bar internally
+				// inconsistent for an imported char (base 0 / MaxExp 100 vs real Exp) - harmless only if the client reads
+				// XP from the live StatIIR rather than this baseline sheet; preserving the captured MaxExp/base is a
+				// candidate fix pending in-client check (the sheet is a baseline skeleton, see CharacterStatId).
 				sheet = [.. statSheet.Select(s => ((uint)s.Id, s.Value))];
 				SetSheet(sheet, (uint)CharacterStatId.MaxExp, SubClassStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
-				SetSheet(sheet, 0x39, SubClassStatBlock.SkeletonValueOf(0x39));
+				SetSheet(sheet, (uint)CharacterStatId.ExpCurrentLevelBase, SubClassStatBlock.SkeletonValueOf((uint)CharacterStatId.ExpCurrentLevelBase));
 			}
 			else
 			{

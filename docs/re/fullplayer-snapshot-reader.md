@@ -91,6 +91,33 @@ byte-exact for all 141. GENERATION from the DB is byte-exact only for the single
 multi-area per-quest sequences/trailers are not modelled in the DB yet (generation follow-up, #389), and
 `IsSnapshotEligible` remains gated off, so nothing ships that path.
 
+## UPDATE 2026-07-20 (#393) — the PostAccessBlock stat sheet is a BASELINE skeleton, not live stats
+
+The two `StatList_t` (regions 9-10) are the last semi-opaque part of the tails. They are NOT opaque bytes —
+`StatList.Read` already models them as `[u32 statId][u32 value]` pairs and they round-trip byte-exact — but
+most `statId`s were named `CharacterStatId.Unknown##`. Dumping the sheet (`SubClassStatBlock.ExtractFromSnapshot`)
+across **29 distinct archetype characters** (L1 fresh through L80, every class) settles what they are:
+
+- **The sheet is a fixed BASELINE skeleton.** The attributes are the unmodified base — `Strength` (0x324) and
+  `Intelligence` (0x328) are **10 for every character, L1 to L80** — and ~two-thirds of the slots are 0/constant
+  across all 29. The character's real leveled stats do NOT ride here; they arrive via the live `StatIIR`
+  (0xF98E10B3, 23838 packets in the corpus) and vitals (0x96B8DC59) updates. So there is no large hidden stat
+  block to decode — the snapshot sheet is a template with a handful of per-character value islands.
+- **The only slots that vary per character** are: `PlayfieldToken` (session), the vitals (HP/mana/stamina, by
+  class+level), XP/level, the PvP counters (already named), and ~10 genuine unknowns.
+- **Newly decoded:** `0x0039` = **`ExpCurrentLevelBase`** — the total XP at which the current level began, so the
+  XP bar fills `(Exp - base) / (MaxExp - base)`. Airtight: `base <= Exp <= MaxExp` everywhere, `base == Exp` for a
+  freshly-dinged char, and **level 24's base (263640) is exactly level 23's `MaxExp` (263640)** — each level's
+  base is the previous level's cap.
+- **Characterised but not scalar stats** (documented on the enum, left `Unknown`): `0x044A` is a unix epoch
+  timestamp (2010-era, veterans only); `0x025F` is a per-character 32-bit hash constant; `0x0398/9A/9B/9D` are a
+  co-varying signed quad (base -300).
+
+The remaining per-character unknowns cannot be named from captures (the values track level/class but map to no
+independently-observable quantity). Naming them needs **in-client `.setstat <id> <value>` probing** — the method
+that pinned HP/mana/stamina current-vs-max (see `CharacterStatId`). That is the open tail of #393; the bytes
+already round-trip, so it is labelling, not decoding.
+
 DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Quest_c (`@0..609`)** — `QuestcRegion`/`QuestcRecord` codec (byte-exact round-trip), wired into
   `FullCharSnapshotSubClass`, and `QuestcRecord.BuildSingle` GENERATES it from `faolan.db` (`QuestcGenerationTests`).
