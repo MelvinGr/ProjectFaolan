@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 {
 	// Byte-exact codec for the 0x2038 DispatchGuildRankingsUpdate body - the global guild leaderboard behind the
 	// client's "Guild Renown Rankings" window (tabs Total/Valor/Glory/Artistry). Format decoded from the hoxxling
-	// guild_invite_accepted capture (Captures/scripts/decode_guild_rankings.py, GuildRankingsTests). Every list is
+	// guild_invite_accepted capture (tools/capture/decode_guild_rankings.py, GuildRankingsTests). Every list is
 	// AoC-count-framed: a leading u32 word == (elementCount + 1) * 0x3F1 (the client's readers assert word % 0x3F1
 	// == 0 and take count = word/0x3F1 - 1). Body:
 	//   [u32 (guildCount+1)*0x3F1][ guild records... ]

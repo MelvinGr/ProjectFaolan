@@ -575,12 +575,12 @@ decompiling each `<Class>InterfaceDispatch_t::DispatchMethod` (a `switch(index)`
 the handler's own `Dispatch_t::<Method>` string). True s2c sizes vs catalog: UniverseInterface 6 (=), GameInterface
 16 (+3), GameCharInterfaceProject 16 (+1), TradepostInterface 8 (+1), GameCharInterface **181 (+24)**,
 CSPlayerInterface **211 (+33)**. Full tables: **`docs/re/aoc-rpc-method-opcodes.md`**; recovery scripts:
-`Captures/ghidra/`. In-client-verified anchors all match: s2c GameCharInterface DispatchUpdateBindLocation=0x2002,
+`tools/ghidra/`. In-client-verified anchors all match: s2c GameCharInterface DispatchUpdateBindLocation=0x2002,
 **DispatchUpdateCash=0x2005**, DispatchShopData=0x2033, DispatchItemSoldToShop=0x2035, DispatchAddSpecialAbility
 =0x2052, DispatchPong=0x2082. NOTE corrections to old content-guesses: GameServer s2c `0x2009`=DispatchChangeItem
 StackSize (not "Pong" — real per-char Pong is `0x2082`), `0x2008`=DispatchSetQuestMarker, and `0x2020`=
 **DispatchAddItem** exists. PlayerInterface s2c is still open (its dispatcher isn't a flat switch). Methodology:
-README "Client reverse-engineering"; verification corpus: `Captures/scripts/decode_guild.py` + `Captures/ghidra/`.
+README "Client reverse-engineering"; verification corpus: `tools/capture/decode_guild.py` + `tools/ghidra/`.
 
 The raw per-server counts below are kept as the original observation record:
 

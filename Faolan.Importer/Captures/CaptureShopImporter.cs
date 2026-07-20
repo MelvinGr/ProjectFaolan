@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Importer.Captures
 {
 	// Imports NPC vendor shops from captured DispatchShopData (0x2033) packets into Shop/ShopItem rows
-	// (grammar: ShopContentCodec / Captures/scripts/decode_shopdata.py). Shops are keyed by the vendor NPC NAME -
+	// (grammar: ShopContentCodec / tools/capture/decode_shopdata.py). Shops are keyed by the vendor NPC NAME -
 	// the shop id and NPC handle are session-volatile, the name is stable (resolved from the same capture's
 	// FA015807 spawns, exactly like conversations). The wares' item identities land in the Items table via
 	// ItemHashHarvester's shop source (CaptureItemImporter runs over the same packets first), so the

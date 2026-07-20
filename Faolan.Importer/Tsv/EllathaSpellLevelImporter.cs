@@ -10,7 +10,7 @@ namespace Faolan.Importer.Tsv
 {
 	// Backfills Spell.Level from the scraped ellatha spell list (Captures/ellatha_spells.tsv) - the only text source
 	// for a spell's per-rank unlock level, since the level is NOT in the client RDB spell record (it's class-
-	// progression data; see Captures/scripts/decode_spell_fields.py). LEVEL ONLY: ellatha's mana/cast are unreliable
+	// progression data; see tools/capture/decode_spell_fields.py). LEVEL ONLY: ellatha's mana/cast are unreliable
 	// (Chill rank 5 lists mana 107 vs the in-game 417), so this never touches other columns.
 	//
 	// Match is the exact "<name> (Rank <rank>)" form (the dominant DB naming). Base-name-only rows (the DB has the

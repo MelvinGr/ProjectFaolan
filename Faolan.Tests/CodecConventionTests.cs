@@ -42,7 +42,7 @@ namespace Faolan.Tests
 		// Files where the word is deliberately still a literal, with the reason. NOT a place to silence the test.
 		// Currently EMPTY, and that is the finding: the client never treats this word as a constant. Of the 136
 		// functions in AgeOfConan.exe that touch 0x3F1/0x7E2, 77 divide by 0x3F1 to read a count and 59 multiply to
-		// write one - ZERO compare it to a constant (Captures/ghidra/DumpListFraming.java). Every "0x7E2 constant"
+		// write one - ZERO compare it to a constant (tools/ghidra/DumpListFraming.java). Every "0x7E2 constant"
 		// we ever wrote down was a 1-element list. If you are about to add an entry here, that is the prior.
 		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal);
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);

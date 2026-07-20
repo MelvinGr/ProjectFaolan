@@ -147,7 +147,7 @@ namespace Faolan.Importer.Rdb
 
 				// The item base VALUE = property-table field 74 (validated: vendor sell = round(value/10) per unit
 				// against the captured sell anchors, #137). The property table is the run of [fieldId][value] u32 pairs
-				// with strictly-decreasing fieldId after the body header (same parse as Captures/scripts/decode_item_template.py).
+				// with strictly-decreasing fieldId after the body header (same parse as tools/capture/decode_item_template.py).
 				// Some templates' tables don't carry field 74 (left at 0 -> the shop falls back to the level price).
 				if (TryReadPropertyField(template.AsSpan(12), 74, out var value) && value != item.Value)
 				{
@@ -299,7 +299,7 @@ namespace Faolan.Importer.Rdb
 
 		// Reads the value of property-table field `fieldId` from a decrypted template body (the span AFTER the
 		// 12-byte RDB-Id header). The property table is the longest run of [fieldId u32][value u32] LE pairs with
-		// strictly-decreasing fieldId in (0, 2000] - the same grammar Captures/scripts/decode_item_template.py validated.
+		// strictly-decreasing fieldId in (0, 2000] - the same grammar tools/capture/decode_item_template.py validated.
 		// Returns false when no such run contains the field (some template kinds don't carry it).
 		private static bool TryReadPropertyField(ReadOnlySpan<byte> body, uint fieldId, out uint value)
 		{

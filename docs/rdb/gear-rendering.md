@@ -43,7 +43,7 @@ on this mapping.
 
 ### Ghidra investigation (2026-06-30) — subsystems mapped, resolution is templated client code
 
-Static RE of `AgeOfConan.exe` (Ghidra project `Captures/ghidra/output`, no-ASLR base 0x400000 =
+Static RE of `AgeOfConan.exe` (Ghidra project `tools/ghidra/output`, no-ASLR base 0x400000 =
 Ghidra image base, so FUN_ addresses are live runtime addresses) confirmed the architecture but not (yet) the
 exact resolution function — the item/visual code is fcVector/template-heavy and string-cached, so the look→mesh
 lookup has no clean static anchor:
@@ -97,14 +97,14 @@ Offline RE narrowed the resolution exactly (no live client needed for these):
   attrId)` is the generic runtime-attribute getter (aggregates base+mods); attr 0x2da/0x30b are NOT static
   template fields (the gown template has neither field 730 nor 779). ~7 sibling builders for other slots:
   008b9ca0/008b9d40/008afd00/008b00b0/008b0370/008b0600/0080acd0 (call-site EAX-dump addrs in
-  `Captures/ghidra/capture_armorbuild.gdb`).
+  `tools/ghidra/capture_armorbuild.gdb`).
 - **`VisualCatMesh` string is a logging tag** for the FUN_00fe*/00ff* visual subsystem (e.g. FUN_00feee20
   "Animpool is empty!"), not the resolver — earlier note retracted.
 
 **Capture plan (supersedes the RDB-fetch-breakpoint plan above): cache-proof in-world re-equip.** The builder
 recomputes the meshindex every time the avatar visual is (re)built, regardless of whether the mesh DATA is
 cached — so the fragile "catch the load on world entry" path (and its loading-screen crash) is unnecessary.
-Instead: be in-world, attach `Captures/ghidra/capture_armorbuild.gdb` (set its `attach PIDHERE` to the live
+Instead: be in-world, attach `tools/ghidra/capture_armorbuild.gdb` (set its `attach PIDHERE` to the live
 `Z:\...AgeOfConan.exe` wow64 pid), then **re-equip the gown** (server/GM) → breakpoint 0x008b9d05 logs
 `meshindex=<id>`. Then `--report rdb-assets --report-arg <id>` extracts the actual gown mesh. Note `FUN_005b07e0`
 got 0 hits as a world-entry breakpoint (client crashed mid-load before render) — it is the loader but not a

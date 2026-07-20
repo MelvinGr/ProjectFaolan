@@ -6,7 +6,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// The Quest_c (List A) region at the START of the 0x737A6DF9 FullChar snapshot tails - the quest JOURNAL.
 	// Grammar recovered from the client reader FullPlayerCharacterIIR::ReadSubClass (FUN_0148c210 -> base
 	// FUN_00797440 -> List A driver FUN_0091f5c0 -> per-record FUN_0091df50) and validated byte-exact against
-	// BeachTailsTemplate.bin (docs/re/fullplayer-snapshot-reader.md, Captures/scripts/decode_questc.py).
+	// BeachTailsTemplate.bin (docs/re/fullplayer-snapshot-reader.md, tools/capture/decode_questc.py).
 	//
 	// Wire: u32 version(0x18) ; u32 listA_count = (records+1)*0x3F1 ; then per record:
 	//   u32 listKey(=questId) ; u32 ver(=1) ; u32 questId ; u32 state ; u32 0 ; u32 N ; u32 0x412 ;

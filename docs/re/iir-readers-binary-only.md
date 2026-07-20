@@ -2,7 +2,7 @@
 
 Wire grammars for IIR records that exist in `AgeOfConan.exe` but **never appear in our retail
 captures** — so the readers are recovered authoritatively from the decompile (vtable-xref,
-`Captures/ghidra/DumpVtableReaders.java`, slot 8), but **cannot be byte-validated against samples**.
+`tools/ghidra/DumpVtableReaders.java`, slot 8), but **cannot be byte-validated against samples**.
 Treat the field counts as decompile-accurate and the framing as the standard
 `[len][sub][0xC350][handle][u8 env][reader]` (unverified env size for these specific types).
 

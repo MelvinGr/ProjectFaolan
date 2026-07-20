@@ -1119,7 +1119,7 @@ namespace Faolan.GameServer.World
 		// The object class the sit remoteformat names (capture: startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel).
 		private const string BenchObjectClass = "TavernBenchSimpleDynel";
 
-		// Seat the player on a BENCH (the sit interaction - Captures/scripts/decode_sit.py). Interacting with a bench
+		// Seat the player on a BENCH (the sit interaction - tools/capture/decode_sit.py). Interacting with a bench
 		// plays the actor's "chair_sit_calm" animation (a server-originated BehaviorControlCenterIIR) and marks the
 		// session seated; standing back up is triggered by the next move (StandUpIfSeated). Recognized by the object
 		// NAME ("Bench"), the same stable key as shop vendors / the auctioneer. Returns false when the used object is

@@ -44,7 +44,7 @@ dotnet run --project Faolan.Importer -- --report burst-coverage       # read-onl
 # build+install once, then open captures in Wireshark (filter: faolan) or dump to JSON.
 cmake -S Faolan.Wireshark -B Faolan.Wireshark/build && cmake --build Faolan.Wireshark/build -j \
   && cmake --build Faolan.Wireshark/build --target install-faolan-plugin
-Captures/scripts/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshark.json the importer reads:
+tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshark.json the importer reads:
 # TCP-reassembled, one record per packet, includes the compressed DL packets.
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
@@ -80,9 +80,11 @@ networking + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World
 GM-command tools) · `Faolan.Web/` + `Faolan.Web.Content/` Blazor armory/3D-viewer + GM tools + CDN proxy ·
 `Faolan.Tests/` the test suite · `Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib +
 RpcHeader endpoints + named opcodes/IIR types (generated from `Opcodes.cs`) + handoff auto-follow (ground truth, TCP-reassembled; use
-`-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces + Python dissectors.
+`-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces (a SYMLINK to the ProjectFaolan-Data repo - see `Captures-README.md`) ·
+`tools/` the tooling that reads them: `capture/` Python dissectors + `tshark_dump.sh`, `ghidra/` RE scripts,
+`frida/` live-client scripts.
 (The old C# `Faolan.PacketAnalyzer` GUI/CLI was retired in #82 - it had no TCP reassembly and dropped ~2/3 of
-the compressed GameServer downloads; the Wireshark plugin + `Captures/scripts/tshark_dump.sh` fully replace it.)
+the compressed GameServer downloads; the Wireshark plugin + `tools/capture/tshark_dump.sh` fully replace it.)
 
 **Listeners** are partial classes split across many files — inspect all partials before changing
 behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` files named by role:
@@ -143,7 +145,7 @@ Two things already run ahead of that move:
 - 16-bit RPC opcodes are **method indices**: `wire = 0x2000 + registration index`, per interface, base
   0x2000 for every interface except PlayerAgent/PlayerInterface (32-bit hash dispatch — login, still open).
   Both directions are recovered from the client (`docs/re/aoc-rpc-method-opcodes.md`, scripts in
-  `Captures/ghidra/`): c2s order == `docs/re/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
+  `tools/ghidra/`): c2s order == `docs/re/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
   per-class dispatcher switches (the old "drift" was just extra no-arg dispatch methods the string catalog
   missed). Full per-class catalogs are in `Faolan.Core.Network/Constants/Opcodes.cs`. 32-bit sub-opcodes
   inside 0x2000 are BKDR-31 hashes of the client's IIR type names (`docs/re/aoc-opcode-ids.md`).
@@ -171,14 +173,14 @@ Two things already run ahead of that move:
   `0x7E2` reads as magic and has been written down as a constant repeatedly (resurrection spots #372, the AH search
   `head`, `SendMail` #378, GameActionList). **There is no such thing as a `0x3F1`/`0x7E2` constant**: of the 136
   functions in `AgeOfConan.exe` that touch the word, **77 divide by `0x3F1`** to read a count and **59 multiply** to
-  write one — **zero** compare it to a constant (`Captures/ghidra/DumpListFraming.java`). So when a "constant" equals
+  write one — **zero** compare it to a constant (`tools/ghidra/DumpListFraming.java`). So when a "constant" equals
   `n * 0x3F1` it IS a list count; distrust any grammar pinned only by single-element captures. Enforced across
   `Codecs/` **and** `Faolan/` by `CodecConventionTests` — a wire rule must cover everywhere the wire is written.
 - Files are one-type-per-file named after that type (a tightly cohesive group may share one file, e.g.
   `FullCharSnapshot/FullCharSnapshotSubClass.cs`), filed under their domain folder.
 
 **Capture workflow for protocol work:** decode first, implement second. Each decoded subsystem gets a
-Python dissector in `Captures/scripts/decode_*.py` that parses the relevant packets out of the capture JSONs and
+Python dissector in `tools/capture/decode_*.py` that parses the relevant packets out of the capture JSONs and
 validates the grammar to the packet end, then a C# builder proven by a byte-exact golden test in
 `Faolan.Tests` against the captured bytes. Direction is "construct, don't replay": structured DB rows +
 builders replace verbatim blob replay subsystem by subsystem; remaining verbatim blobs are deliberate

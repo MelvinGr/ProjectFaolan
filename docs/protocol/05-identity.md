@@ -19,7 +19,7 @@ The `typeTag` in an IIR record ([`03-iir-carrier.md`](03-iir-carrier.md)) is the
 | `0x0000C87D` | ClimbingDynel | climbing dynels |
 | `0x0000C748` | ZoneLabel | zone / city label objects |
 
-[V1: Captures/ghidra/DumpIirReaders.java]
+[V1: tools/ghidra/DumpIirReaders.java]
 
 ## Sex
 

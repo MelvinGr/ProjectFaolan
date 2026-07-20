@@ -10,7 +10,7 @@ registration index`**, and the registration index is per-interface and contiguou
 > tables, is the canonical machine-readable form (`Faolan.Wireshark/scripts/gen_opcode_names.py`).
 > Regenerated `*.tshark.json` dumps carry the name as an additive `Method` key.
 
-Recovery method (reproducible — scripts in `Captures/ghidra/`):
+Recovery method (reproducible — scripts in `tools/ghidra/`):
 - **c2s (Agent/Proxy):** each `<Class>AgentProxy_t` constructor registers its methods in order via repeated
   `register(); setName("Method", len)` calls (decompiled from the `"...Proxy_t::called with a too low id!
   min allowed"` constructors). The registration order is identical to the address order of the
@@ -512,7 +512,7 @@ on the 32-bit id.
 **s2c POST-AUTH table recovered** (`PlayerInterfaceDispatch_t::DispatchMethod` = `FUN_00484270`, a binary-search
 tree over 32-bit constants; `DumpDispatch.java` + `DumpHandlerNames.java`). 26 methods, e.g. `0x5DC18991`
 DispatchAuthenticateAck, `0xA7C86A29` DispatchSetStats, `0xF899B14C` DispatchSetDimensionList. Full table:
-`Captures/ghidra/output/playerinterface_postauth_s2c.json` (external, not committed).
+`tools/ghidra/output/playerinterface_postauth_s2c.json` (external, not committed).
 
 **c2s method list recovered** (`PlayerAgentProxy_t`, registration order, `DumpRpcTables.java`): 25 methods —
 Authenticate, AuthenticateLoggedIn, LoginFromCrash, CreateCharacter, LoginCharacter (= our EnterWorld),
@@ -552,7 +552,7 @@ methods, each as `key = 0x…; register(); setName("Method", len)`:
 | SetHardcoreLevel | `0x6A6B621C` | | ClientReplyKeepCookie | `0x43D90C1B` |
 | GetDimensionList | `0x43476328` | | | |
 
-(Full JSON: `Captures/ghidra/output/playeragent_c2s_catalog.json`.) The **mechanism**: `register`
+(Full JSON: `tools/ghidra/output/playeragent_c2s_catalog.json`.) The **mechanism**: `register`
 (`FUN_00487900`) inserts the method into a **binary tree keyed by that internal key**; the proxy send passes the
 key to `rpc::Proxy_t::SendMethodInvocation` (`FUN_0046c910`), which builds the `RpcHeader`. The **internal key is
 what each proxy method passes at its send call** (matches the constants dumped from the method bodies).
@@ -587,7 +587,7 @@ fall out cleanly. The login exercised 7 c2s methods, giving a **proven `name →
 | `ReceivedCharacterSettings` | `0x20EC` | `0xA4F2E303` | Ox20EC |
 
 All seven wire ids matched the capture-derived enum exactly (independent confirmation), and `Opcodes.cs` +
-`PlayerAgentMethodIds` are renamed to these proven client names. Method: `Captures/frida/` pattern + a hook on
+`PlayerAgentMethodIds` are renamed to these proven client names. Method: `tools/frida/` pattern + a hook on
 `0x0046C910`; the c2s names come from the `PlayerAgentProxy_t` constructor keys above.
 
 **Remaining:** the c2s methods NOT sent during a plain login (CreateCharacter/RenameCharacter/Delete/Facebook-

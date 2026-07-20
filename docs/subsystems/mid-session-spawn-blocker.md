@@ -108,8 +108,8 @@ GameCharAgent conversation, not a world-entity spawn, and is in-client verified.
 ## Ghidra progress (2026-06-16) — the client-side "register handle" chain mapped
 
 The step that must run for the client to start polling `0x2020` for a handle is the dynel's insertion into the
-**playfield spaces** (the spatial/interest grid). Located it client-side (analyzed project `Captures/ghidra/output`;
-run headless scripts from a path WITHOUT spaces — the repo's `Captures/ghidra` dir fails Ghidra's bundle loader
+**playfield spaces** (the spatial/interest grid). Located it client-side (analyzed project `tools/ghidra/output`;
+run headless scripts from a path WITHOUT spaces — the repo's `tools/ghidra` dir fails Ghidra's bundle loader
 because of the `#`/space, so copy the `.java` to e.g. `/tmp/aocscripts` and run there):
 
 - **`n3Dynel::AddToPlayfieldSpaces` = `FUN_00590b70`** — logs `"n3Dynel::AddToPlayfieldSpaces() id "` (gated on the
@@ -260,7 +260,7 @@ spawn misses the playfield map → dropped. The burst renders because its spawns
 vs the token we stamp; OR finish tracing client descriptor[8] → its wire field and compare to what our world-entry
 sends; (b) if they differ, stamp mid-session spawns with the world-load-registered instance instead of the
 snapshot token. Also still open: the CharInPlayIIR *Activate* slot (same `+0x94` "cant resolve simplechar"
-family). Helper scripts: `Captures/ghidra/{DumpVtableX,ReadSlotFn,Xrefs}.java`. (Any candidate fix still needs an
+family). Helper scripts: `tools/ghidra/{DumpVtableX,ReadSlotFn,Xrefs}.java`. (Any candidate fix still needs an
 in-client render to confirm — packet/golden tests can't see the client's poll loop.)
 
 Memory: `protocol_midsession_spawn_blocked`. Related: `protocol_201c_spawn_subprotocol` (the poll loop),

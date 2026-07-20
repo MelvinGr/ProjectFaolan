@@ -16,7 +16,7 @@ randochar :7016→4000 / :7015→4010; strickenen :7012→4000 / :7013→4010.
 
 ## Camera paths are PLAYFIELD-SCOPED (the "invalid camera path" root cause)
 
-From `AgeOfConan.exe` (Ghidra, project `Captures/ghidra/output`, scripts in `Captures/ghidra/`):
+From `AgeOfConan.exe` (Ghidra, project `tools/ghidra/output`, scripts in `tools/ghidra/`):
 
 - **`CameraPathMap_c::LoadPlayfieldPaths`** (`FUN_00515420`) loads an RDB resource of **type `0xF426F`
   = 1000047** (`e_RDB_CameraPaths`) keyed by the **playfield id** (its `param_2`). On failure it logs
@@ -73,6 +73,6 @@ runtime divergence (timing of the deadlock-breaker post-ready flush vs. the play
 prerequisite spawn). The static data says our packets are correct, so the remaining isolation is a live-run
 diff.
 
-Reproduce the RE: `Captures/ghidra/DumpCutscene.java` (strings + xrefs), `DecompileFns.java`
-(`FNS=00515420,005230b0,014514c0`), `FindStr.java` (`NEEDLE=…`) against `Captures/ghidra/output` (see
-`Captures/ghidra/README.md`).
+Reproduce the RE: `tools/ghidra/DumpCutscene.java` (strings + xrefs), `DecompileFns.java`
+(`FNS=00515420,005230b0,014514c0`), `FindStr.java` (`NEEDLE=…`) against `tools/ghidra/output` (see
+`tools/ghidra/README.md`).

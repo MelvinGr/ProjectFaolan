@@ -6,7 +6,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// The NPC SimpleCharFullUpdate (FA015807) post-IIR scaffold - the stream that follows the embedded
 	// ProtoCoreCharacterIIR. Unlike the player's post-IIR (PlayerSpawnScaffoldCodec, keyed on the 0x3F1
 	// buff-table multiple), the NPC post-IIR is its own grammar (dissected 2026-06-12, workbench
-	// Captures/scripts/dissect_npc_spawn.py over the Strie beach burst, 42 NPCs):
+	// tools/capture/dissect_npc_spawn.py over the Strie beach burst, 42 NPCs):
 	//
 	//   header:  [u32 0][u32 firstRecordLen = len(post) - 36][u32 recordCount]
 	//            - word0 is 0 on ALL 42 (the player has 2 here).

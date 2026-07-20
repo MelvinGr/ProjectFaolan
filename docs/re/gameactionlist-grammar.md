@@ -1,6 +1,6 @@
 # GameActionListIIR_t (0xF508F4C1) wire grammar — a property-map action list
 
-Recovered from `AgeOfConan.exe` (Ghidra `Captures/ghidra/output`). The "GameActionList" is the per-dynel
+Recovered from `AgeOfConan.exe` (Ghidra `tools/ghidra/output`). The "GameActionList" is the per-dynel
 **spell/action list** — a `0x3F1`-framed list of action elements, each a **keyed stat/property map** (not the
 flat "header + verbatim tail" the capture-only model first suggested). Gitea #190.
 
@@ -19,7 +19,7 @@ flat "header + verbatim tail" the capture-only model first suggested). Gitea #19
 
 Each action carries a DIFFERENT set of properties (an animation action has a string name property; a
 positional action has numeric properties), so the element length varies (4–91 B) — it's a property bag, not a
-fixed record. The capture taxonomy (`Captures/scripts/decode_gameactionlist.py`) reflects this: the clean
+fixed record. The capture taxonomy (`tools/capture/decode_gameactionlist.py`) reflects this: the clean
 `[u16 len][anim name]` form is one string-valued property; the rest are numeric property sets.
 
 ## Element deserialize — recovered 2026-07 (`FUN_00899a60`, #271)
@@ -63,13 +63,13 @@ pulls keys `0x463` (caster/line) and `0x2f9` (recast centiseconds).
 - Header/list framing fully decoded + validated 925/925; `GameActionListCodec` round-trips element bytes verbatim.
 - The full element grammar is now recovered (positional, type-descriptor-driven; string vs u32 by key).
 - **Type id + key list: RECOVERED** (2026-07-11 live Frida dump — see the RESOLVED section below).
-  `Captures/re/gameaction_types.json` holds all 68 types' value orders, so any element (recast included) is
+  `docs/re/gameaction_types.json` holds all 68 types' value orders, so any element (recast included) is
   byte-constructible. The grammar is no longer a blocker; #271's residue is an in-client base-cooldown check +
   an optional low-prio override emit.
 
 ## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
 
-Decompiled the actual (de)serializer + tables (scripts `Captures/ghidra/DumpRecastDescriptor.java`,
+Decompiled the actual (de)serializer + tables (scripts `tools/ghidra/DumpRecastDescriptor.java`,
 `DumpDescriptorInit.java`; `DecompileFns` on `FUN_00899a60`/`FUN_008c3910`/`FUN_008b0f50`/`FUN_00897bd0`).
 
 **Element wire layout — confirmed byte-for-byte from the deserializer `FUN_00899a60`:**
@@ -118,14 +118,14 @@ Chased the per-class registration to confirm whether the typeId+keyList can be r
   (searched memory for its little-endian address: 0 hits). The GameAction objects are created via an
   inlined/data-driven factory Ghidra can't resolve, so the recast typeId + keyList are **not statically
   recoverable**. The runtime tables (`DAT_025077c8` / `DAT_025073c0`) are the only source ⇒ a **live client
-  memory dump is the sole remaining path**. Scripts: `Captures/ghidra/DumpRecastReg.java`, `DumpRecastDescriptor.java`.
+  memory dump is the sole remaining path**. Scripts: `tools/ghidra/DumpRecastReg.java`, `DumpRecastDescriptor.java`.
 
 ## RESOLVED 2026-07-11 — live Frida dump of the runtime descriptor table (#271)
 
 Attached Frida to the running client (frida-server-under-Wine, no ASLR ⇒ Ghidra VAs == runtime — see the
 `frida_under_wine_client_re` memory) and read the two runtime tables directly. Scripts committed:
-`Captures/frida/dump_gameaction_types.py` (walks the descriptor table) + `dump_gameaction_names.py` (resolves
-each descriptor's name pointer). Full catalog: **`Captures/re/gameaction_types.json`** (68 named types).
+`tools/frida/dump_gameaction_types.py` (walks the descriptor table) + `dump_gameaction_names.py` (resolves
+each descriptor's name pointer). Full catalog: **`docs/re/gameaction_types.json`** (68 named types).
 
 **Descriptor layout — confirmed from live memory** (stride corrected: **`0x41` BYTES per slot**, not `0x104`;
 consecutive named types' `descriptor+8` enum ids increment by exactly 1, which only holds at a 0x41-byte stride):

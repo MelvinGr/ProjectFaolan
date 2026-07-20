@@ -8,7 +8,7 @@ namespace Faolan.Tests
 	// Byte-exact construct of the AttributeChanged / Increased on-screen feedback (the visible half of a level-up).
 	// Oracle: the strickenbla "create-...-combat-levelup-questcomplete" capture, frame 9939, the Strength(804) +=3
 	// message of the level-up burst. Proves the XML template + FormatFeedbackCodec wrapper reconstruct the captured
-	// bytes from (instance, attributeId, amount, keys). See Captures/scripts/decode_levelup_feedback.py.
+	// bytes from (instance, attributeId, amount, keys). See tools/capture/decode_levelup_feedback.py.
 	public class AttributeChangedFeedbackTests
 	{
 		// frame 9939, the 532-byte AttributeChanged packet (attr 804 += 3) addressed to instance 0x01316d8a.

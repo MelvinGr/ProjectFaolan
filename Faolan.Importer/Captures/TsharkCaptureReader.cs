@@ -9,7 +9,7 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Captures
 {
-	// Reads a Faolan-Wireshark tshark dump (`*.tshark.json`, produced by Captures/scripts/tshark_dump.sh) into the same
+	// Reads a Faolan-Wireshark tshark dump (`*.tshark.json`, produced by tools/capture/tshark_dump.sh) into the same
 	// CapturedPacket list the analyzer-JSON reader produces. tshark is the AUTHORITATIVE capture source: it
 	// TCP-reassembles, so it KEEPS the compressed download packets (conversation responses, world bursts) that the
 	// C# PacketAnalyzer drops (~2/3 of compressed downloads). The dump's records carry the IIR body + the framing

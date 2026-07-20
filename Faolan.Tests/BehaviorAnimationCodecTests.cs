@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct of the server-originated BehaviorControlCenterIIR (0x642CD3D6) animations vs the captured
-	// bytes in NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving (Captures/scripts/decode_spellweave.py).
+	// bytes in NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving (tools/capture/decode_spellweave.py).
 	// caster = 0x0802E5D4; the golden hex is the frame body with the 0x2000 carrier's u32 length prefix stripped.
 	public class BehaviorAnimationCodecTests
 	{
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			Assert.Equal("642cd3d60000c3500802e5d40004000000010000000c08d6c202180628083000584f0000000400000027000000000000000000000000", Convert.ToHexStringLower(bytes));
 		}
 
-		// Sit / stand on a bench - NecroL80_mage-necromancer_login_path-of-azura_sit-bench (Captures/scripts/decode_sit.py).
+		// Sit / stand on a bench - NecroL80_mage-necromancer_login_path-of-azura_sit-bench (tools/capture/decode_sit.py).
 		// actor = 0x0802E5D4, target bench handle = 0x12174; the remoteformat is passed verbatim (its key is the bench's
 		// captured localized action key).
 		[Fact]

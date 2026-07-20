@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// Retail sends ONE such message per attribute that went up, then a 0x96B8DC59 vitals push with the new maxima.
 	// There is no "You reached level N" banner in any capture - this attribute burst is the level-up feedback (#209).
 	//
-	// Grammar decoded in Captures/scripts/decode_levelup_feedback.py, golden-tested in AttributeChangedFeedbackTests.
+	// Grammar decoded in tools/capture/decode_levelup_feedback.py, golden-tested in AttributeChangedFeedbackTests.
 	// The XML is entity-escaped (&quot;=" &lt;/&gt;=</> ). The three key="..." values are random per-burst nonces the
 	// client does not validate - reuse is in-client proven (the GenericDisplayAreaName banner reuses one captured
 	// key), so the live builder reuses fixed captured keys.

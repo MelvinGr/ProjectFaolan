@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// captures: a freshly created character's snapshot has ZERO quest blocks (the starter quest is delivered LIVE
 		// instead - QuestLogList + QuestFullUpdate - then rides the snapshot only on later logins). Words:
 		//   version 0x18 ; empty Quest_c list 0x3F1 ; index tag 0x3F1 ; index marker (0+1)*0x3F1 ; count 0 ;
-		//   terminal 0x000156E7 (constant). See Captures/scripts/decode_snapshot_quests.py + the *-create captures.
+		//   terminal 0x000156E7 (constant). See tools/capture/decode_snapshot_quests.py + the *-create captures.
 		private const uint EmptyQuestTerminal = 0x000156E7;
 
 		// The game-static PFAccessWindow_ playfield catalog (the tails region @1292..7917) - the one tails region that
@@ -54,7 +54,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public byte[] UnknownAfterAccessWindowTable { get; init; }
 
 		// Everything between the @609 objective region and the access-window table (the quest INDEX + any tail);
-		// still opaque (decoded by Captures/scripts/decode_snapshot_quests.py).
+		// still opaque (decoded by tools/capture/decode_snapshot_quests.py).
 		public byte[] UnknownBeforeAccessWindowTable { get; init; }
 
 		public int KnownHeaderLength { get; init; }

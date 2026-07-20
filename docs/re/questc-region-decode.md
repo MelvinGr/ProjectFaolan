@@ -6,7 +6,7 @@ round-trips the **beach create template** byte-exact, but the beach template is 
 from the client reader (Ghidra) + validated against NecroL80's lvl80 login (27 quests, real progress), so the
 generator can eventually emit arbitrary journals.
 
-## Readers (Ghidra `AgeOfConan.exe`, project `Captures/ghidra/output`)
+## Readers (Ghidra `AgeOfConan.exe`, project `tools/ghidra/output`)
 
 - `FUN_0091f5c0` — **List-A driver**: reads `u32 count = 0x3F1*(records+1)`, then loops `records` times, each
   iteration reading one `u32` (the record's listKey) + calling the per-record reader.
@@ -62,7 +62,7 @@ byte-exact.
 > distinct in every entry (NecroL80's journal: 39 anchors, 39 distinct tokens — `WTHD`, `1LJL`, `UFWN`, `HIB4`,
 > `C9PY`, …), the same flavour of random key the `<remoteformat key="...">` attributes carry.
 >
-> Verified by `Captures/scripts/decode_questc_progress.py` across **all 141 captured snapshots** (beach L1,
+> Verified by `tools/capture/decode_questc_progress.py` across **all 141 captured snapshots** (beach L1,
 > L23, L24, and both L80 journals), and gated in the suite by `ProgressedJournalSnapshotTests` — 141 bodies,
 > 85 of them multi-quest, tails byte-exact.
 

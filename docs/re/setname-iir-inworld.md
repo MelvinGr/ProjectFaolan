@@ -2,7 +2,7 @@
 
 The dev spawn-area nameplate labels (`.togglenpcgroup`) need to change the name shown over a live NPC. This
 documents why the obvious approach fails and the byte-exact grammar that works, recovered from `AgeOfConan.exe`
-(PE32, ImageBase 0x400000, no ASLR → Ghidra addresses == runtime; project `Captures/ghidra/output/aoc.gpr`).
+(PE32, ImageBase 0x400000, no ASLR → Ghidra addresses == runtime; project `tools/ghidra/output/aoc.gpr`).
 
 ## Why the spawn-body name is ignored
 
@@ -59,5 +59,5 @@ stored but the existing plate isn't redrawn.
 - Parses but nothing shows → `nameType` was outside 1..4 (silent `default` in `FUN_006ed100`), or the message
   arrived before the OverheadText existed / without the refresh (`nameType` not 3/4).
 
-Scripts: `Captures/ghidra/DumpSetNameReader.java`, `DumpConstruct.java`, `DumpNameRender.java`,
+Scripts: `tools/ghidra/DumpSetNameReader.java`, `DumpConstruct.java`, `DumpNameRender.java`,
 `DumpSetNameVtable.java`. Golden test: `Faolan.Tests/WorldSetNameIirTests.cs`.

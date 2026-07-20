@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// its objective region are INTERLEAVED per quest, not two separate top-level regions. The writer already
 		// emitted them that way (FullCharSnapshotSubClass); the reader did not consume it, so QuestcRegion.Read
 		// desynced on the SECOND record of any multi-quest journal and blew up with "marker 0x2 != 0x412" (#384).
-		// Null only for a record read/built without one. See Captures/scripts/decode_questc_progress.py, which
+		// Null only for a record read/built without one. See tools/capture/decode_questc_progress.py, which
 		// validates the interleaved grammar across all 141 captured snapshots.
 		public QuestObjectiveRegion? Objectives { get; set; }
 		public string Area { get; init; } = ""; // <remoteformat category=50300>

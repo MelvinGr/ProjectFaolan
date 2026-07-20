@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	//
 	//   [V3: BurstGoldenTests.CreateWorldEntryBurst_IsByteStable]   -> a real xUnit test method
 	//   [V2: DemoL80_..._create-guild.tshark.json frame 366]         -> a real file under Captures/
-	//   [V1: Captures/ghidra/DumpRpcTables.java]                    -> a real repo path
+	//   [V1: tools/ghidra/DumpRpcTables.java]                    -> a real repo path
 	//   [V0: ...]                                                   -> must be listed in docs/protocol/gaps.md
 	//
 	// A stale citation is worse than none - it looks authoritative. This test already caught three: PLAN.md's own

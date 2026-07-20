@@ -39,7 +39,7 @@ namespace Faolan.Tests
 
 		// The unlocked FEAT list (spawn pre-IIR) extracts to CharacterFeat rows in wire/train order - a DIFFERENT
 		// region + id-space than the post-IIR skill scaffold (CharacterSkill). NecroL80 (L80 Necro) carries 25 feats;
-		// the ids + order are locked to the capture (Captures/scripts/decode_unlocked_feats.py). Feats and skills
+		// the ids + order are locked to the capture (tools/capture/decode_unlocked_feats.py). Feats and skills
 		// share NO ids.
 		[Fact]
 		public void ExtractTo_ReadsTheUnlockedFeatList_InTrainOrder()

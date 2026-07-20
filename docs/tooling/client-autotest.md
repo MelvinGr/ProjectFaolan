@@ -1,6 +1,6 @@
 # Client `-autotest` / `autotest.txt` — what it actually is (Ghidra, 2026-06-15)
 
-RE'd from `AgeOfConan.exe` (`Captures/ghidra/DumpAutotest.java` → anchor on the `"autotest.txt"` / `"Autotest"`
+RE'd from `AgeOfConan.exe` (`tools/ghidra/DumpAutotest.java` → anchor on the `"autotest.txt"` / `"Autotest"`
 string literals, decompile the referencing functions). Corrects the earlier guess in `client-launcher.md`
 that `-autotest` was a single "XML ScriptCommand test engine". It is **two separate mechanisms**:
 

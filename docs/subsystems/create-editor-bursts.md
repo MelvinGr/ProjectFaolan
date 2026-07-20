@@ -24,7 +24,7 @@ choreography remain, gated on #185/#190). The former verbatim beach NPC intro co
 through the live constructed `ConversationService` (#188, `d208fc82`). This doc is the decode that makes the
 construction possible.
 
-Dissector: `Captures/scripts/decode_create_editor.py` (default-globs and validates across every `*create*.tshark.json` capture).
+Dissector: `tools/capture/decode_create_editor.py` (default-globs and validates across every `*create*.tshark.json` capture).
 
 ## 1. `0x2000` is multiplexed — split by endpoint-class pair first
 
@@ -127,7 +127,7 @@ create-specific to decode, only builder wiring to do:
 4. **Remaining** — every record in `RetailCreateEditorInitialBurst` is now constructed except the live
    `Character…` preview (`IirId`, intentionally verbatim — see item 1). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
-   + wired** (dissectors `Captures/scripts/decode_character_action.py` + `decode_create_iir_records.py`, builders in
+   + wired** (dissectors `tools/capture/decode_character_action.py` + `decode_create_iir_records.py`, builders in
    `CreateEditorRecordBuilder`, locked by `CreateEditorRecordTests` + the burst goldens):
    - `CharacterActionIIR` (0x6B6FD368) — action/ability grant (26 records).
    - `ComboBookIIR` (0xA8BBEB7F) — combo-book grant (12 records).
@@ -146,7 +146,7 @@ create-specific to decode, only builder wiring to do:
      burst but recurs throughout login/gameplay) and confirmed in the client: `RegenIIR_c::ReadSubClass`
      (Ghidra `FUN_0079dea0`, vtable slot 8) reads exactly three big-endian u32 into +0x2c/+0x30/+0x34 — the three
      resource/regen pools; the lone `flag` byte is the base IIR's (0 in every capture). Decoded by
-     `decode_create_iir_records.py` + `Captures/ghidra/DumpRegenReader.java`, built by
+     `decode_create_iir_records.py` + `tools/ghidra/DumpRegenReader.java`, built by
      `CreateEditorRecordBuilder.BuildRegenIir`.
    - `StatIIR` (0xF98E10B3) / `EnergyIIR` (0x40749B8A) / `StatUpdateIIR` (0x96B8DC59) — had builders, and as of
      c2611b23 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /

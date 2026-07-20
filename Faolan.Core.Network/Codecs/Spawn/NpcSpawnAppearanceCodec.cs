@@ -140,7 +140,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// an optional texscript string (e.g. the "*ii=-1;*bl=-1" colour ref carried on the id 0x10D entry). This is
 	// the data the minimal post-IIR drops, which renders the NPC bald (Gitea #243). Lifting it into rows lets the
 	// post-IIR generate from the DB so NpcSpawn.Data can be retired (#185). Grammar + round-trip oracle:
-	// Captures/scripts/decode_npc_morphs.py.
+	// tools/capture/decode_npc_morphs.py.
 	public sealed class NpcAppearanceMorph
 	{
 		public uint MorphId { get; set; }

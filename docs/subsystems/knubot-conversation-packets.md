@@ -1,6 +1,6 @@
 # Knubot conversation packets — wire grammar (Gitea #188)
 
-Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `Captures/ghidra/DumpIirReaders.java`).
+Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `tools/ghidra/DumpIirReaders.java`).
 These are the NPC-dialogue packets served by `ConversationService.ServeScreen`. The **whole Knubot s2c set is
 CONSTRUCTED** via `KnubotCodec` (`Faolan.Core.Network/Codecs/Dialogue/KnubotCodec.cs`) — `KnubotAppendText` (the
 spoken line), `KnubotOpenChatWindow`, `KnubotAnswerList` (the option buttons) and `KnubotCloseChatWindow` —

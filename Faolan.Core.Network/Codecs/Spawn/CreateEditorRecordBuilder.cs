@@ -7,7 +7,7 @@ using Faolan.Core.Protobuf;
 namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Constructive builders for the fixed-grammar IIR records the character-create EDITOR streams on its
-	// GameAgent->GameInterface 0x2000 conversation (issue #189). Decoded by Captures/scripts/decode_create_editor.py and
+	// GameAgent->GameInterface 0x2000 conversation (issue #189). Decoded by tools/capture/decode_create_editor.py and
 	// validated byte-exact against every create capture (docs/subsystems/create-editor-bursts.md). These are the small,
 	// fully-decoded records; the big entity full-updates (SimpleChar/SimpleDynel) reuse the existing spawn
 	// builders (ProtoVec3/ProtoQuat transform + the recovered embedded protobufs) rather than a bespoke decoder.
@@ -42,7 +42,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// big-endian u32 (the same x/y/z + rotation values the paired DispatchAddItem carries as fixed32 protobuf
 		// fields), also repeated; `ownerStamp` (0xB290805C 0x29E627CA) is the fixed creator/timestamp pair that
 		// recurs across the whole WorldPrep burst (semantics unpinned). Decoded from WorldPrepBurst.bin by
-		// Captures/scripts/decode_create_iir_records.py and locked byte-exact by CreateEditorRecordTests.
+		// tools/capture/decode_create_iir_records.py and locked byte-exact by CreateEditorRecordTests.
 		private static readonly byte[] BehaviorOwnerStamp = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
 
 		// BehaviorControlCenterIIR (0x642CD3D6), registration form: registers one behavior on an entity.
@@ -50,9 +50,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// protobuf = base varint fields `08 <behaviorId> [10 <field2>] 18 <phase> 28 <field5> 30 <field6>
 		// [58 <field11>] [60 <field12>]`, msgLen = its length. The optional fields (2/11/12) and the 20-byte
 		// "bound" tail (`[u32 boundA][u32 boundB][12x 00]`) were decoded from the create-world cutscene burst
-		// (Captures/scripts/decode_behaviorcc.py, #234): of its 90 records the field set is {1,3,5,6} with optional
+		// (tools/capture/decode_behaviorcc.py, #234): of its 90 records the field set is {1,3,5,6} with optional
 		// {2,11,12} and a 0- or 20-byte tail. (A separate 88-byte item-bound long form has its own builder,
-		// BuildBehaviorControlCenterIirLong below.) Decoded by Captures/scripts/decode_create_iir_records.py + decode_behaviorcc.py.
+		// BuildBehaviorControlCenterIirLong below.) Decoded by tools/capture/decode_create_iir_records.py + decode_behaviorcc.py.
 		// `form` is 0x0004 for the common registration; the rarer 0x0007 subtype adds protobuf field 4 (a varint,
 		// between phase and field5). Protobuf wire order: f1=behaviorId, [f2], f3=phase, [f4], f5, f6, [f11], [f12].
 		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint type = EntityClass.Character, uint? field2 = null,
@@ -115,7 +115,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// CharacterActionIIR (0x6B6FD368): grants one action/ability id to an entity. 41 bytes:
 		//   [u32 type][u32 handle][u32 0][u8 0x1D][16x 0x00][u32 actionId][8x 0x00]
 		// The create-editor WorldPrep burst streams one per granted id (the same ability/feat id space as the
-		// player-spawn scaffold's id list - e.g. 0x050E24). Decoded by Captures/scripts/decode_character_action.py and
+		// player-spawn scaffold's id list - e.g. 0x050E24). Decoded by tools/capture/decode_character_action.py and
 		// validated byte-exact against every record in the WorldPrep capture (CreateEditorRecordTests).
 		public static byte[] BuildCharacterActionIir(uint handle, uint actionId, uint type = EntityClass.Character)
 		{
@@ -133,7 +133,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// ComboBookIIR (0xA8BBEB7F): grants one combo/ability to the entity's combo book. 14 bytes:
 		//   [u32 type][u32 handle][u16 0x0001][u32 comboId]
-		// The WorldPrep burst streams one per combo id. Decoded by Captures/scripts/decode_create_iir_records.py.
+		// The WorldPrep burst streams one per combo id. Decoded by tools/capture/decode_create_iir_records.py.
 		public static byte[] BuildComboBookIir(uint handle, uint comboId, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16(0x0001).WriteUInt32(comboId).ToArray();
@@ -212,7 +212,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// RegenIIR_c::ReadSubClass (Ghidra FUN_0079dea0) reads exactly three big-endian u32 (via the ReadU32 helper
 		// FUN_0048f900) into fields +0x2c/+0x30/+0x34 - the three consecutive resource pools (the health/stamina/mana
 		// regen family); the single `flag` byte belongs to the base IIR and is 0 in every capture. Decoded by
-		// Captures/scripts/decode_create_iir_records.py + Captures/ghidra/DumpRegenReader.java and validated byte-exact
+		// tools/capture/decode_create_iir_records.py + tools/ghidra/DumpRegenReader.java and validated byte-exact
 		// against 590 records across the login/gameplay/create captures (all type 0xC350, flag 0, three clean u32).
 		public static byte[] BuildRegenIir(uint handle, uint v1, uint v2, uint v3, byte flag = 0, uint type = EntityClass.Character)
 		{

@@ -8,7 +8,7 @@ Only the login handshake is encrypted. Once the client reaches the world, packet
 ## The scheme
 
 Diffie–Hellman key agreement over a 1024-bit safe prime `N` with generator `g = 5`, then TEA in CBC mode.
-[V1: Captures/ghidra/DumpFns.java]
+[V1: tools/ghidra/DumpFns.java]
 
 The client sends, as one ASCII field, `"<clientPub hex>-<TEA-CBC ciphertext hex>"`. The low 128 bits of the DH
 shared secret are the TEA key. The plaintext block is three fields: `username | challenge | password`.

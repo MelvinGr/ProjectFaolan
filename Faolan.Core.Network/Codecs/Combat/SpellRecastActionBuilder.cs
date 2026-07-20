@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Builds a spell-cooldown OVERRIDE as a GameActionData element inside a GameActionListIIR (0xF508F4C1) - the wire
 	// mechanism by which the retail server sets a spell's recast timer on the client (#271). The element grammar is
 	// POSITIONAL and fully recovered: from the client deserializer FUN_00899a60 plus the live Frida type catalog
-	// Captures/re/gameaction_types.json (docs/re/gameactionlist-grammar.md). An element is:
+	// docs/re/gameaction_types.json (docs/re/gameactionlist-grammar.md). An element is:
 	//
 	//   [u32 typeId][u32 field][u32 version=4][u32 subCount]
 	//   [u32 v(0x2d5)][u32 v(0x2d6)][u32 v(0x2f2)][u32 v(0x2f5)]     // four ALWAYS-present positional int values
@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// ships on the wire.
 	public static class SpellRecastActionBuilder
 	{
-		// GameAction wire type ids (Captures/re/gameaction_types.json). ChangeRecastTime is the direct per-spell recast
+		// GameAction wire type ids (docs/re/gameaction_types.json). ChangeRecastTime is the direct per-spell recast
 		// override; the SpellStatModifier family (0xcfdd/0xd009) is what FUN_008b0f50 Applies, via key 0x463 instead.
 		public const uint ChangeRecastTimeType = 0xCF81; // keyList: [0x4c3 spell, 0x2f9 recast]
 

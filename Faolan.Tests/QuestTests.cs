@@ -83,7 +83,7 @@ namespace Faolan.Tests
 			Assert.Equal("97e023140000c35001316e71000000000100000002000034a700000000", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
-		// Journal CONTENT packets (Captures/scripts/decode_quest.py). The Casilda quest 0x34A7 = 13479,
+		// Journal CONTENT packets (tools/capture/decode_quest.py). The Casilda quest 0x34A7 = 13479,
 		// goal 0x1670 = 5744, area 1054, map 4010. Keys are the deterministic content hashes harvested
 		// from the captures (identical across characters/sessions).
 		[Fact]

@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// Server->client it pushes the action list bound to a dynel (NPC/object): emote loops ("idle2_emote"), the
 	// creation-step template-choice list, and numeric position/timer action records. This is the SIMULATION layer's
 	// output (the world model decides which action a dynel runs), so the action TAIL is per-action-type and not yet
-	// fully decoded; this codec models the FIXED header (decoded + validated 570/570, Captures/scripts/decode_gameactionlist.py)
+	// fully decoded; this codec models the FIXED header (decoded + validated 570/570, tools/capture/decode_gameactionlist.py)
 	// and carries the action tail VERBATIM, round-tripping byte-exact (GameActionListCodecTests). That replaces the
 	// fully-verbatim emit with a header CONSTRUCTED for the live frame/dynel handle + the (still-opaque) action bytes -
 	// the construct-don't-replay step, mirroring how QuestcRegion types a header and carries unknowns verbatim.

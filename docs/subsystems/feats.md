@@ -10,7 +10,7 @@ protocol we recovered, what the capture dumps do and don't contain, and the orde
   of feat ids. Decoded; added to `Opcodes.cs`.
 - **The full unlocked-feat set IS in the captures — it rides the player spawn (`FA015807`), NOT the FullChar
   snapshot.** It lives in the spawn's **pre-IIR** region (the block `parse_spawn_scaffold.py` keeps raw), as a
-  `0x3F1`-framed `u32` feat-id list. Decoded 2026-07-14 by `Captures/scripts/decode_unlocked_feats.py`. **This
+  `0x3F1`-framed `u32` feat-id list. Decoded 2026-07-14 by `tools/capture/decode_unlocked_feats.py`. **This
   retires the former "#1 blocker".** Every high-level captured char yields a stable set (NecroL80 necro 25, DemoL80
   demo 25, Hakotep hox 6); every fresh/create char yields the empty `0x3F1` marker.
 - **The spawn scaffold is NOT feats.** `CharacterSkill` / `PlayerSpawnScaffoldRows` / `decode_skill_scaffold.py` read the
@@ -57,7 +57,7 @@ The `(count+1)*0x3F1` word is the standard `0x3F1`-framed list marker (`0x7E2` =
 
 **The former #1 blocker ("the full unlocked-feat set at login is not in any capture") was wrong.** The set ships
 in the char's own **player spawn** (`FA015807`), in the spawn's **pre-IIR** region — the block that
-`Captures/scripts/parse_spawn_scaffold.py` deliberately keeps RAW ("its internal structure is analyzed
+`tools/capture/parse_spawn_scaffold.py` deliberately keeps RAW ("its internal structure is analyzed
 separately"), which is why earlier passes never saw it: `decode_skill_scaffold.py` reads the *post-IIR* skill id-list, a
 different region.
 
@@ -68,7 +68,7 @@ Grammar (body-relative; a constant `0x07E2` landmark sits 9 zero bytes before th
   count == 0  ->  the bare 0x3F1 marker, no ids (fresh char / all feats untrained)
 ```
 
-Decoder: `Captures/scripts/decode_unlocked_feats.py` (`perchar` / `list` / `dump <cap> <idx>`). Per-character
+Decoder: `tools/capture/decode_unlocked_feats.py` (`perchar` / `list` / `dump <cap> <idx>`). Per-character
 sets recovered:
 
 | char | class | feats | example ids |
@@ -126,14 +126,14 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 
 ## RE assets & tools
 
-- `Captures/scripts/decode_unlocked_feats.py` — **the feat decoder**: reads the char's full unlocked feat set from
+- `tools/capture/decode_unlocked_feats.py` — **the feat decoder**: reads the char's full unlocked feat set from
   the `FA015807` player-spawn **pre-IIR** region (modes `perchar` / `list` / `dump <cap> <idx>`).
-- `Captures/scripts/decode_skill_scaffold.py` — reads the **ability/skill scaffold** (id + tag) from the spawn's *post-IIR*
+- `tools/capture/decode_skill_scaffold.py` — reads the **ability/skill scaffold** (id + tag) from the spawn's *post-IIR*
   region; self-IDs class from the profession id (`featId // 100 == Class` enum value). Modes: per-class / `discover` /
   `dump` / `json`. NB it reads skills, not feats (documented in its header).
-- `Captures/scripts/find_missing_opcodes.py` — sweeps captures for IIR hashes/opcodes missing from `Opcodes.cs` and
+- `tools/capture/find_missing_opcodes.py` — sweeps captures for IIR hashes/opcodes missing from `Opcodes.cs` and
   enumerates client IIR classes we've never named/seen. This is how `FeatIIR` was found.
-- `Captures/ghidra/DumpVtableReaders.java` — recovers any IIR's `ReadSubClass` reader (vtable slot 8) → authoritative
+- `tools/ghidra/DumpVtableReaders.java` — recovers any IIR's `ReadSubClass` reader (vtable slot 8) → authoritative
   hash + grammar. Run headless via the `#`-free symlink (see the `ghidra_hash_path_symlink` memory).
 - RDB feat catalog: type 1000020, ~20,417 plaintext feats (id + name + tree + rank; all tree names present); ~79% are
   TEA-encrypted with server-only keys (costs/prereqs unrecoverable from captures — see the `feat_trees_decode_251` memory).
@@ -141,7 +141,7 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 ## Open questions / blockers
 
 1. ~~**Login-time full feat-set delivery — not captured.**~~ **RESOLVED 2026-07-14** — it rides the player spawn
-   (`FA015807` pre-IIR), decoded by `Captures/scripts/decode_unlocked_feats.py`. No fresh capture needed.
+   (`FA015807` pre-IIR), decoded by `tools/capture/decode_unlocked_feats.py`. No fresh capture needed.
 2. **id → name / tree mapping.** Scaffold and `FeatIIR` ids are GDB ids; they do not join the RDB 1000020 catalog
    id-space. The tree STRUCTURE (trees/tiers/prereqs/costs) is in the client RDB (partly plaintext) and on the wiki
    (https://aoc.fandom.com/wiki/Feat_Tree); the id↔name bridge is server-GDB-only and never transmitted.

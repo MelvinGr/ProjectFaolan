@@ -62,9 +62,9 @@ is not yet derivable from the data; it stays a parameter with the capture defaul
 ## Status
 
 Both bodies are built by the named `TeleportCodec` (was inline spliced templates in `GMCommands`), now fully
-**reader-structural** — the `begin` / PlayfieldProxy / `dest` readers are decompiled (`Captures/ghidra/
+**reader-structural** — the `begin` / PlayfieldProxy / `dest` readers are decompiled (`tools/ghidra/
 DumpTeleportReaders.java` → `FUN_005bfce0` / `FUN_00a6a600` / `FUN_005d1ae0`; the position-blob reader
-`FUN_00cbf5d0` is dumped in `Captures/ghidra/out/helpers.txt`) and every dest byte is accounted for. Sibling lift under #219 — the **guild renown block** — is
+`FUN_00cbf5d0` is dumped in `tools/ghidra/out/helpers.txt`) and every dest byte is accounted for. Sibling lift under #219 — the **guild renown block** — is
 likewise a typed builder (`Faolan.Core.Network/Codecs/Guild/GuildRenownBlock.cs`, `GuildRenownBlockTests`; full reader walk
 documented in `docs/subsystems/guilds.md`). Remaining: in-client verification of the GM teleport path, and the semantic
 meaning of `destDescriptor`.

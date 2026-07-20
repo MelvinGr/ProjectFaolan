@@ -15,7 +15,7 @@ Immediately after the packet's `[length][crc32][hdrlen]` head, and inside `hdrle
 
 `0x0A` and `0x12` are protobuf field tags (fields 1 and 2, length-delimited). The optional `headerData` after the
 opcode is **not a generic grammar** — across every capture it is exactly four per-opcode / constant cases
-(`Captures/scripts/decode_rpc_headerdata.py` tallies them: 7366 / 1425 / 340 / 89 packets):
+(`tools/capture/decode_rpc_headerdata.py` tallies them: 7366 / 1425 / 340 / 89 packets):
 
 | bytes | what | notes |
 |---|---|---|
@@ -25,7 +25,7 @@ opcode is **not a generic grammar** — across every capture it is exactly four 
 | 13 | PlayerInterface `OverrideGameTweaks` (`0x1A07`) | a **protobuf endpoint reference**, not an opaque block: `0x0D <fixed32 class id 0x7D155738 = PlayerInterface> 0x10 <varint 1> 0x20 <varint per-session instance id>` — consumes all 13 bytes. |
 
 So it is the PlayerInterface method id (decoded) plus a constant `0x01` marker plus two PlayerInterface specials —
-not a mystery appended to arbitrary packets. [V1: Captures/scripts/decode_rpc_headerdata.py]
+not a mystery appended to arbitrary packets. [V1: tools/capture/decode_rpc_headerdata.py]
 
 (The `0x01` marker is always exactly `0x01` in every capture; only its *semantic* — a flag? a version? — is unproven,
 the sole micro-residual on #319. The 13-byte endpoint above is decoded.)
@@ -58,7 +58,7 @@ wire opcode = 0x2000 + registration index
 
 The index is the method's position in the client's per-class RPC registration. Both directions were recovered
 from the client: c2s order is the registration order; s2c "Dispatch" opcodes are the per-class dispatcher switch
-indices. [V1: Captures/ghidra/DumpRpcTables.java]
+indices. [V1: tools/ghidra/DumpRpcTables.java]
 
 The full per-interface catalog — 819 entries across 16 enums, with direction and class id — is **generated** from
 `Opcodes.cs`, not written here: [`gen/opcodes.md`](gen/opcodes.md).
@@ -81,7 +81,7 @@ technique. [V0: PlayerAgent 32-bit hash dispatch]
 One GameServer TCP connection carries roughly four RPC class-pairs at once (e.g. GameCharAgent ↔
 GameCharInterface, plus project/tradepost variants). A packet is routed by the pair `(receiver class id, opcode)`,
 never by the connection. This is why the same opcode number means different things on different class ids, and why
-cross-listener actions go through dispatcher seams rather than direct references. [V1: Captures/ghidra/DumpDispatch.java]
+cross-listener actions go through dispatcher seams rather than direct references. [V1: tools/ghidra/DumpDispatch.java]
 
 Direction convention: `*Agent` classes receive client→server calls; `*Interface` classes receive server→client
 dispatches.

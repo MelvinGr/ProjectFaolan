@@ -49,7 +49,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// quest with no captured full-update (Level == 0) - 3 is Casilda 13479's level, a sane Tortage default.
 		public const uint DefaultQuestLevel = 3;
 
-		// --- Journal CONTENT packets (Captures/scripts/decode_quest.py, byte-exact golden tests) ----------
+		// --- Journal CONTENT packets (tools/capture/decode_quest.py, byte-exact golden tests) ----------
 		//
 		// These carry the J-panel text the player reads. Text is NEVER literal: every slot is a
 		// <remoteformat .../> or <localized .../> token packed as  00 <u8 len> <ascii>.  The client

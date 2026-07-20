@@ -207,7 +207,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// UNLOCKED FEAT list here: [u32 (featCount+1)*0x3F1][featCount x u32 featId BE]. Everything up to & including
 		// the marker is the 126-byte HEAD; the feats splice in after it; a constant 113-byte TAIL (zero padding + the
 		// 41 00 00 82 08 closer) follows. So PreFrame length = 126 + 4*featCount + 113. See docs/subsystems/feats.md
-		// + Captures/scripts/decode_unlocked_feats.py.
+		// + tools/capture/decode_unlocked_feats.py.
 		public const int FeatMarkerOffset = 122;
 		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
 		private const int PreFrameTail = 113;

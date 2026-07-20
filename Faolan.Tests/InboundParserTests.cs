@@ -35,7 +35,7 @@ namespace Faolan.Tests
 		// DeleteItemIIR carries ProtoDeleteItemIIR { container_id, item_pos, template_id } - NOT the sibling move
 		// message. Proven from the client: DeleteItemIIR_t's constructor installs ProtoDeleteItemIIR::vftable and
 		// fills three fields, while MoveInventoryItemIIR_t installs ProtoMoveInventoryItemIIR::vftable and fills a
-		// fourth (Captures/ghidra/DumpDeleteItemFns.java).
+		// fourth (tools/ghidra/DumpDeleteItemFns.java).
 		[Fact]
 		public void InventoryDelete_RoundTrips_FramingAndDescriptor()
 		{

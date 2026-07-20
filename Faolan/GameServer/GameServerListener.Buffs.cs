@@ -286,7 +286,7 @@ namespace Faolan.GameServer
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
 		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
 		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in
-		// Captures/scripts/decode_learn_spell.py, byte-exact in LearnSpellTests). The client pops the "learned a new spell"
+		// tools/capture/decode_learn_spell.py, byte-exact in LearnSpellTests). The client pops the "learned a new spell"
 		// toast itself. (The sibling DispatchForgetSpell 0x200B / RemoveSpecialAbility 0x2053 / UntrainSingleFeat
 		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
 		private Task SendLearnSpell(INetworkClient client, uint spellId)

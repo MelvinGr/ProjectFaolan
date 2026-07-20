@@ -1,6 +1,6 @@
 # MoveTaskIIR_c (0x96C46740) wire grammar — RECURSIVE move tasks
 
-Recovered from `AgeOfConan.exe` (Ghidra `Captures/ghidra/output`; scripts `Captures/ghidra/DumpMoveTask.java`
+Recovered from `AgeOfConan.exe` (Ghidra `tools/ghidra/output`; scripts `tools/ghidra/DumpMoveTask.java`
 + `DumpMoveTaskTypeReaders.java`, the vtable-slot method). The MoveTask is a **recursive composite**: a move
 can be a *list* of nested moves, which is why the captured bodies span 49–370 B. Gitea #53.
 
@@ -86,7 +86,7 @@ validates the spline and reads nothing), so both PathMoveTask branches end with 
 
 ## Status (#53)
 
-- **Decode COMPLETE (2026-06-17)**: the full recursive grammar is pinned — `Captures/scripts/decode_movetask.py`
+- **Decode COMPLETE (2026-06-17)**: the full recursive grammar is pinned — `tools/capture/decode_movetask.py`
   round-trips **9468/9468 captured MoveTask records (100%)** byte-exact. Scripts: `DumpMoveTaskList.java`,
   `DumpMoveTaskLeafReaders.java`, `DumpPathHelpers.java`, `DumpMoveTaskTail.java`.
 - **Built byte-exact** (`MoveTaskCodec`, golden tests): mode 0 bare-position, mode 1 PathMoveTask

@@ -28,7 +28,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual RespawnPoint? BindRespawnPoint { get; set; }
 
 		// Guild membership; null = guildless. Rank 0 = fresh member (retail's invite-accept record), higher =
-		// promoted; the guild creator gets GuildLeaderRank. See Captures/scripts/decode_guild.py for the wire records.
+		// promoted; the guild creator gets GuildLeaderRank. See tools/capture/decode_guild.py for the wire records.
 		public uint? GuildId { get; set; }
 
 		[ForeignKey(nameof(GuildId))]
@@ -93,7 +93,7 @@ namespace Faolan.Core.Database.Tables
 		// True while the character is DEAD and awaiting resurrection (#214). Persisted so a player who logs out
 		// dead returns dead: the world-entry FullPlayerChar snapshot then carries current-health = 0 (the tails
 		// stat block's HealthCurrent stat 0x1B), which is what the retail client reads at SimpleChar construction
-		// to show the release/resurrect window (Captures/scripts/decode_death_snapshot.py). Set on death
+		// to show the release/resurrect window (tools/capture/decode_death_snapshot.py). Set on death
 		// (WorldSimulation.TickPlayerDeaths), cleared on respawn (RespawnPlayer).
 		public bool IsDead { get; set; }
 

@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public const int ByteCount = 6;
 
 		// The wire index of the one word that is reliably non-zero on a freshly-spawned NPC. The cross-capture
-		// sweep (Captures/scripts/classify_fa015807_fields.py over 5026 scaffolds) showed every other word is per-instance
+		// sweep (tools/capture/classify_fa015807_fields.py over 5026 scaffolds) showed every other word is per-instance
 		// runtime state (target/owner handles, timers, action counters) that is 0 on an idle fresh spawn, and that
 		// the most-minimal captured scaffolds carry exactly ONE non-zero word here. Its struct offset is 0x1fc.
 		public const int CategoryWordIndex = 17;

@@ -28,7 +28,7 @@ Citation format, inline, immediately after the claim:
 ```
 The create-world entry burst is byte-stable.               [V3: BurstGoldenTests.CreateWorldEntryBurst_IsByteStable]
 Guild leader wire rank is 4.                               [V2: DemoL80_mage-demonologist_login_create-guild.tshark.json frame 366]
-16-bit opcodes are method indices (0x2000 + registration). [V1: Captures/ghidra/DumpRpcTables.java]
+16-bit opcodes are method indices (0x2000 + registration). [V1: tools/ghidra/DumpRpcTables.java]
 ```
 
 These three are linted, not decorative: `ProtocolCitationTests` resolves each against the repo. They are the

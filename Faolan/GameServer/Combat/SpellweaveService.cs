@@ -11,7 +11,7 @@ namespace Faolan.GameServer.Combat
 {
 	// The spellweaving state machine (docs/subsystems/combos.md). Spellweaving is the caster analogue of the melee combo:
 	// the player ACTIVATES the weave (entering a trance), ADDS components one at a time while in the trance, then
-	// DEACTIVATES to fire the accumulated blend. Decoded wire (Captures/scripts/decode_spellweave.py):
+	// DEACTIVATES to fire the accumulated blend. Decoded wire (tools/capture/decode_spellweave.py):
 	//   - activate/deactivate = c2s PerformSpecialAction (0x205A), a TOGGLE (body [u32 0x000000fc]);
 	//   - add-component       = c2s CombatReactiveIIR_c (0x54C02089), body carrying the componentIndex;
 	//   - fire                = s2c 0xF98E10B3 burst on deactivate; the 0xE9F24184 meter drains during the trance.
@@ -69,7 +69,7 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// A component add (CombatReactiveIIR) - only meaningful inside an open trance. componentIndex indexes into the
-		// caster's weave-element list. Retail answers each add with a burst (Captures/scripts/decode_spellweave.py, frames
+		// caster's weave-element list. Retail answers each add with a burst (tools/capture/decode_spellweave.py, frames
 		// 1657-1661): the component's OWN spell applied immediately as a self-buff (necro: add idx0->Arcane Renewal
 		// 0x396AE9, idx1->Arcane Surge 0x3969D8, idx3->Death God 0x396A22 - so necro components take effect as you
 		// weave them), then a re-sent element list. Without that response the client only ever registers the FIRST

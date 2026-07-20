@@ -2,7 +2,7 @@
 
 The geometry blob a `MESHINDEXFILE` (type 1010030) points at via `<RenderMesh file="ID"/>`. This is the format the
 #275 feasibility ticket called the "hard blocker"; it is now **decoded and validated** (decode-first dissector:
-`Captures/scripts/decode_rendermesh.py`) and ported to C# — `RenderMeshReader`
+`tools/capture/decode_rendermesh.py`) and ported to C# — `RenderMeshReader`
 (`Faolan.Core.Rdb/Assets/RenderMeshReader.cs`), which drives the `GlbWriter` → glTF pipeline into the Blazor viewer.
 
 ## Container

@@ -64,7 +64,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// player it hit - and the args carry NO Mode field (the player-only distinguisher). Sending it makes the client
 		// play the NPC's swing animation + the player's hit-react. The damage here is the floating combat number; the
 		// authoritative HP move still rides the world-tick StatUpdate (kept separate so we don't double-apply).
-		// Decoded in Captures/scripts/decode_combat_npc_ack.py (98/98 frames); byte-exact against frame 6472 of the strickenbla
+		// Decoded in tools/capture/decode_combat_npc_ack.py (98/98 frames); byte-exact against frame 6472 of the strickenbla
 		// capture in CombatPacketCodecTests. The animation params (typeId/swingCounter/f5/f11/f12) + the result codes
 		// (resultType/resultK1/resultK2) are not semantically decoded - capture-typical defaults for the live send,
 		// the exact captured values for the golden test.

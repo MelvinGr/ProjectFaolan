@@ -43,7 +43,7 @@ namespace Faolan.Tests
 			"MapWorldBurstExtractor",
 			"Faolan.PacketAnalyzer.Tests/ArchiveDataImporterTests.cs",
 			"Faolan/Helpers/ArchiveDataImporter.cs",
-			"Captures/scripts/extract_conversations.py",
+			"tools/capture/extract_conversations.py",
 		};
 
 		private static readonly Regex TypeDef =

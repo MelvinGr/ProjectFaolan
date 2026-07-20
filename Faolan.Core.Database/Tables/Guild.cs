@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// A player guild. Wire identity is ID32 [type 0x0000DEB7][instance = Id]; members are Characters with
-	// GuildId set (rank lives on the Character). Protocol: Captures/scripts/decode_guild.py / the hoxxling
+	// GuildId set (rank lives on the Character). Protocol: tools/capture/decode_guild.py / the hoxxling
 	// guild_invite_accepted capture.
 	// Guild names are unique PER REALM, not globally (#324): realm Crom and realm Fury may each have a "Knights".
 	[Index(nameof(RealmId), nameof(Name), IsUnique = true)]

@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// retail NPC casts are exactly these (28 caster NPCs on the beach, applyFrom = the NPC's spawn handle).
 	//
 	// The 54-byte effect `payload` is DB-sourced (NpcSpell.Payload) and now DECODED (diffed across all 21 distinct
-	// captured payloads, zero unexplained bytes - Captures/scripts one-off): byte-packed, big-endian:
+	// captured payloads, zero unexplained bytes - tools/capture one-off): byte-packed, big-endian:
 	//   @10 u16 = DURATION (wire unit; 100..4000)   @13/@17/@33 = effect flags (0/1, 1/2, 0/1)
 	//   @23 u32 = the effect SPELL ID (== the cast spell id, bar one capture-data mismatch)
 	//   @29 + @45 bytes = the two magnitude/rank values (equal on most casts = the rank; differ on a few = a

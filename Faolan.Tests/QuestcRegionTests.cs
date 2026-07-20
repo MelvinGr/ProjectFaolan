@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	{
 		// Where Quest_c ends in the beach template. 1168, not the old 609: the journal record's own @609 objective
 		// region is part of the record (interleaved per quest), so the region does not end until past it (#384).
-		// Cross-checked by Captures/scripts/decode_questc_progress.py, which reports the same boundary.
+		// Cross-checked by tools/capture/decode_questc_progress.py, which reports the same boundary.
 		private const int RegionEnd = 1168;
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private readonly ITestOutputHelper _o;

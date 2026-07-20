@@ -11,7 +11,7 @@ carrier content is:
 the target. The **54-byte PAYLOAD** is the `MagicBuffIIR` effect descriptor.
 
 ## It is a BUFF descriptor, not raw damage
-Ghidra `MagicBuffIIR_c::ReadSubClass` (`FUN_007a12a0`, `Captures/ghidra/DumpMagicBuffReader.java`) reads a type
+Ghidra `MagicBuffIIR_c::ReadSubClass` (`FUN_007a12a0`, `tools/ghidra/DumpMagicBuffReader.java`) reads a type
 byte (`+0x7c`, 0 or 2) then a sequence of `ReadU32`s + a 7-word sub-block (`FUN_00897b60`) + a `ReadU64`. The
 class's `Activate` logs `"MagicBuffIIR_c::Activate, UpdateBuff with parameters: BuffTemplate ..."` — so the
 payload is a **buff/effect record** (template + magnitude + duration + flags), NOT a damage number. The actual
@@ -19,7 +19,7 @@ HP change rides a separate vitals `StatUpdate` (`0x96B8DC59`), as combat already
 
 ## Field map (54-byte payload)
 Initially recovered by the reader grammar + an empirical diff of same-spell instances (per-cast fields) vs
-different spells (spell params) in `Captures/scripts/decode_applyspell.py`; then fully decoded and modelled as
+different spells (spell params) in `tools/capture/decode_applyspell.py`; then fully decoded and modelled as
 columns in #304 (`Faolan.Core.Network/Codecs/Combat/NpcSpellEffect.cs`, byte-exact over all 21 distinct captured
 payloads — `Faolan.Tests/NpcSpellEffectCodecTests.cs`). The payload is a sparse fixed-offset layout, big-endian,
 with every other byte a constant 0:

@@ -9,7 +9,7 @@ namespace Faolan.Tests
 {
 	// Byte-layout proof for the ChangeRecastTime GameAction override (#271). There is no capture of a recast
 	// GameAction (retail sends none on a normal cast - base cooldowns are client-side), so this asserts the element
-	// against the RE'd POSITIONAL grammar (FUN_00899a60 + Captures/re/gameaction_types.json), not a golden capture.
+	// against the RE'd POSITIONAL grammar (FUN_00899a60 + docs/re/gameaction_types.json), not a golden capture.
 	public class SpellRecastActionBuilderTests
 	{
 		private static byte[] Be(params uint[] words)

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// An NPC vendor's shop window, imported from captured DispatchShopData (0x2033) packets
-	// (Captures/scripts/decode_shopdata.py for the wire grammar). Keyed by the vendor NPC TEMPLATE id (#244) - shop ids
+	// (tools/capture/decode_shopdata.py for the wire grammar). Keyed by the vendor NPC TEMPLATE id (#244) - shop ids
 	// and NPC handles are session-volatile, and the internal NAME is not unique (25 templates share "Halen van Dummy",
 	// so keying by name merged distinct vendors and leaked a shop onto non-vendor same-named NPCs like Atraxus).
 	[Index(nameof(NpcTemplateId), IsUnique = true)]

@@ -19,13 +19,13 @@ decode; values from `Spell.Cooldown` (combos) + `Captures/spell_cooldowns_observ
 
 
 **Why this exists:** an accurate emulator needs the *formulas*, not per-value lookups. Reverse-engineered from
-`AgeOfConan.exe` (Ghidra project `Captures/ghidra/output`, scripts in `Captures/ghidra/` +
-`Captures/scripts/`). Status: **foundation decoded; per-property completion is incremental.**
+`AgeOfConan.exe` (Ghidra project `tools/ghidra/output`, scripts in `tools/ghidra/` +
+`tools/capture/`). Status: **foundation decoded; per-property completion is incremental.**
 
 ## Headline finding
 
 Spell stats shown in the tooltip — **mana, recast (cooldown), damage, range** — are **COMPUTED at runtime,
-not stored**. Proven empirically (`Captures/scripts/decode_spell_fields.py`): the displayed value (e.g. Chill
+not stored**. Proven empirically (`tools/capture/decode_spell_fields.py`): the displayed value (e.g. Chill
 rank 5 recast 4s, mana 417 @L80) appears in **no** RDB record in any unit (int/u16/float, s/ds/cs/ms), and no
 field is proportional to it. The RDB spell record (type `1040005`) holds only **base** fields; the client
 applies modifiers + level/stat scaling. This is why ellatha's spell stats are wrong (it lists static bases)
@@ -42,7 +42,7 @@ display value   = computed * 0.01                          // fields are x100, s
 final           = + a stat-0x17d scaling layer            // FUN_008d7080, vtable call (0x17d, 2, value*0.01)
 ```
 
-### Constants (Ghidra `Captures/ghidra/ReadFloat.java`)
+### Constants (Ghidra `tools/ghidra/ReadFloat.java`)
 | addr | value | role |
 |---|---|---|
 | `0x01f2800c` | `0.01` | stored→display (fields stored ×100) |

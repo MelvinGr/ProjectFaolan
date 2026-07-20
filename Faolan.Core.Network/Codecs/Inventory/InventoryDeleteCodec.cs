@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	//     unaff_ESI[7] = ProtoDeleteItemIIR::vftable;
 	// and fills exactly three fields, while the MoveInventoryItemIIR_t constructor (FUN_008d6090) sets
 	// ProtoMoveInventoryItemIIR::vftable and fills a FOURTH (hasbit | 8). Recovered by
-	// Captures/ghidra/DumpDeleteItemIir.java + DumpDeleteItemFns.java -> Captures/ghidra/output/delete_item_fns.txt.
+	// tools/ghidra/DumpDeleteItemIir.java + DumpDeleteItemFns.java -> tools/ghidra/output/delete_item_fns.txt.
 	public static class InventoryDeleteCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.DeleteItemIIR;

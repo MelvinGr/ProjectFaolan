@@ -6,7 +6,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// The structured form of a player SimpleCharFullUpdate (FA015807) body: everything around the embedded
 	// ProtoCoreCharacterIIR, per the validated grammar in docs/re/player-spawn-generation-plan.md ("VALIDATED
 	// GRAMMAR"). Parse + Generate round-trip byte-exact over every captured player-own spawn (proven by
-	// Captures/scripts/parse_spawn_scaffold.py over all 34, locked here by PlayerSpawnScaffoldCodecTests on the
+	// tools/capture/parse_spawn_scaffold.py over all 34, locked here by PlayerSpawnScaffoldCodecTests on the
 	// representative golden fixtures). This is what lets the spawn scaffold live as DB rows instead of the
 	// captured template/burst bytes.
 	public sealed class PlayerSpawnScaffold

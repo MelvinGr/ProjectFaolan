@@ -11,7 +11,7 @@ using ProtoBuf;
 namespace Faolan.Core.Network.Codecs.Economy
 {
 	// Parses/builds the DispatchShopData (DL 0x2033) vendor-window body. Wire grammar (decoded 2026-06-12,
-	// validated on all 11 captured vendor windows; dissector Captures/scripts/decode_shopdata.py):
+	// validated on all 11 captured vendor windows; dissector tools/capture/decode_shopdata.py):
 	//   [shop ID32 (type 0xC75B)][vendor NPC ID32 (type 0xC350)][u32 contentLength][ProtoInventoryGame]
 	// The content is the SAME ProtoInventoryGame the FullChar snapshot uses for the player's bag, with
 	// inventory_id.type = 111 (the shop container; bag = 104) and per-slot InventoryListEntry items whose

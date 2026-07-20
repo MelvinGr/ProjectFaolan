@@ -115,19 +115,19 @@ Or every MoveTask the server streamed: `-Y 'faolan.pkt.iir == 0x96c46740'`.
 
 ## JSON export (analyzer-style dumps)
 
-`Captures/scripts/tshark_dump.sh` converts a capture into an analyzer-style dump - one record per
+`tools/capture/tshark_dump.sh` converts a capture into an analyzer-style dump - one record per
 Faolan/chat packet with frame/time/endpoints/direction/opcode/classes/body:
 
 ```zsh
-Captures/scripts/tshark_dump.sh <capture.pcapng> [output.json]   # default output: <capture>.tshark.json
+tools/capture/tshark_dump.sh <capture.pcapng> [output.json]   # default output: <capture>.tshark.json
 ```
 
 Under the hood: `tshark -T json` emits the full dissection tree (one object per frame; each
-"Conan packet N" subtree is self-contained) and `Captures/scripts/tshark_to_dump.py` re-groups it:
+"Conan packet N" subtree is self-contained) and `tools/capture/tshark_to_dump.py` re-groups it:
 
 ```zsh
 tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE -T json \
-  | Captures/scripts/tshark_to_dump.py > capture.tshark.json
+  | tools/capture/tshark_to_dump.py > capture.tshark.json
 ```
 
 The reshape pass is python3 (was a jq filter; #106) - same dump, but ~10x faster on large

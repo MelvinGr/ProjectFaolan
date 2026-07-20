@@ -63,7 +63,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine($"- **{rpcTotal}** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).");
 			sb.AppendLine($"- **{iirTypes.Count}** IIR carrier types: **{v3} V3** (byte-exact builder), **{v2} V2** (built, no golden), **{v1} V1** (no builder found).");
 			sb.AppendLine($"- **{codecGoldenCount}** codec classes, **{codecsWithGolden}** with a byte-exact test.");
-			sb.AppendLine($"- **{dissectors}** Python dissectors (`Captures/scripts/decode_*.py`).");
+			sb.AppendLine($"- **{dissectors}** Python dissectors (`tools/capture/decode_*.py`).");
 			sb.AppendLine();
 			sb.AppendLine("### The distinction this table exists to make");
 			sb.AppendLine();

@@ -106,11 +106,11 @@ stack**, and **winedbg isn't shipped by Proton**. **Frida works**, but only via 
    address to its entry via prologue `8B FF 55 8B EC` or `55 8B EC`. Never run two attaches concurrently
    (VirtualAllocEx 0x5 race). Injection is a bit fragile; expect the odd client crash + relog.
 
-Frida probe scripts are in `Captures/frida/` (frida_stack.py = RequestResource full stack; frida_write.py =
+Frida probe scripts are in `tools/frida/` (frida_stack.py = RequestResource full stack; frida_write.py =
 Preview.bin write backtrace; frida_add.py = AddSkinnedMesh; frida_attr.py = attr-getter+builder; frida_up.py =
 RequestResource caller; frida_entry.py/frida_capture.py = generic). Ghidra decompile:
-`FNS=<hexaddr,hexaddr> /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process
-AgeOfConan.exe -noanalysis -scriptPath Captures/ghidra/output/scripts -postScript DecompileFns.java`.
+`FNS=<hexaddr,hexaddr> /opt/ghidra/support/analyzeHeadless tools/ghidra/output aoc -process
+AgeOfConan.exe -noanalysis -scriptPath tools/ghidra/output/scripts -postScript DecompileFns.java`.
 
 ## Architecture found (the call graph)
 

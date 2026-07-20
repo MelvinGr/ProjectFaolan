@@ -1,0 +1,671 @@
+[
+ {
+  "typeId": 53005,
+  "enumId": 53002,
+  "name": "e_Type_GC_GameAction_Hit",
+  "keys": [
+   722,
+   724,
+   759,
+   794
+  ]
+ },
+ {
+  "typeId": 53009,
+  "enumId": 53003,
+  "name": "e_Type_GC_GameAction_AddLayeredSkinnedMesh",
+  "keys": [
+   1226,
+   761
+  ]
+ },
+ {
+  "typeId": 53013,
+  "enumId": 53004,
+  "name": "e_Type_GC_GameAction_StartParticleEffectOnHead",
+  "keys": [
+   1241,
+   1121,
+   1178,
+   750,
+   751,
+   752
+  ]
+ },
+ {
+  "typeId": 53017,
+  "enumId": 53005,
+  "name": "e_Type_GC_GameAction_BindAtLocation",
+  "keys": []
+ },
+ {
+  "typeId": 53021,
+  "enumId": 53006,
+  "name": "e_Type_GC_GameAction_TeleportToBindLocation",
+  "keys": []
+ },
+ {
+  "typeId": 53025,
+  "enumId": 53007,
+  "name": "e_Type_GC_GameAction_HitPercentage",
+  "keys": [
+   722,
+   761,
+   723,
+   794
+  ]
+ },
+ {
+  "typeId": 53029,
+  "enumId": 53008,
+  "name": "e_Type_GC_GameAction_Remove",
+  "keys": [
+   734
+  ]
+ },
+ {
+  "typeId": 53033,
+  "enumId": 53009,
+  "name": "e_Type_GC_GameAction_Charge",
+  "keys": [
+   1219,
+   1280,
+   1277,
+   1275,
+   1286
+  ]
+ },
+ {
+  "typeId": 53037,
+  "enumId": 53010,
+  "name": "e_Type_GC_GameAction_SetMorphValue",
+  "keys": [
+   1241,
+   761
+  ]
+ },
+ {
+  "typeId": 53041,
+  "enumId": 53011,
+  "name": "e_Type_GC_GameAction_AudioEffect",
+  "keys": [
+   739,
+   740,
+   741,
+   742,
+   733
+  ]
+ },
+ {
+  "typeId": 53045,
+  "enumId": 53012,
+  "name": "e_Type_GC_GameAction_Skill",
+  "keys": [
+   722,
+   761,
+   746
+  ]
+ },
+ {
+  "typeId": 53049,
+  "enumId": 53013,
+  "name": "e_Type_GC_GameAction_DPSHit",
+  "keys": [
+   722,
+   761,
+   789,
+   794
+  ]
+ },
+ {
+  "typeId": 53053,
+  "enumId": 53014,
+  "name": "e_Type_GC_GameAction_TimedEffect",
+  "keys": [
+   722,
+   761,
+   733,
+   769,
+   747
+  ]
+ },
+ {
+  "typeId": 53057,
+  "enumId": 53015,
+  "name": "e_Type_GC_GameAction_AddFormation",
+  "keys": [
+   1219
+  ]
+ },
+ {
+  "typeId": 53061,
+  "enumId": 53016,
+  "name": "e_Type_GC_GameAction_Teleport",
+  "keys": [
+   750,
+   751,
+   752,
+   1182,
+   753
+  ]
+ },
+ {
+  "typeId": 53069,
+  "enumId": 53018,
+  "name": "e_Type_GC_GameAction_AreaRangeFormula",
+  "keys": [
+   1123,
+   724,
+   733
+  ]
+ },
+ {
+  "typeId": 53073,
+  "enumId": 53019,
+  "name": "e_Type_GC_GameAction_Spell",
+  "keys": [
+   761
+  ]
+ },
+ {
+  "typeId": 53077,
+  "enumId": 53020,
+  "name": "e_Type_GC_GameAction_Bandaging",
+  "keys": []
+ },
+ {
+  "typeId": 53081,
+  "enumId": 53021,
+  "name": "e_Type_GC_GameAction_RenewMana",
+  "keys": []
+ },
+ {
+  "typeId": 53085,
+  "enumId": 53022,
+  "name": "e_Type_GC_GameAction_LayeredVisualLocation",
+  "keys": [
+   1225,
+   1226,
+   1227,
+   1228,
+   1229,
+   1230,
+   1231,
+   1232,
+   1233,
+   761
+  ]
+ },
+ {
+  "typeId": 53089,
+  "enumId": 53023,
+  "name": "e_Type_GC_GameAction_CatMesh",
+  "keys": [
+   766
+  ]
+ },
+ {
+  "typeId": 53093,
+  "enumId": 53024,
+  "name": "e_Type_GC_GameAction_SetFollowerScriptGroup",
+  "keys": [
+   789
+  ]
+ },
+ {
+  "typeId": 53097,
+  "enumId": 53025,
+  "name": "e_Type_GC_GameAction_AddHateToPets",
+  "keys": [
+   789
+  ]
+ },
+ {
+  "typeId": 53101,
+  "enumId": 53026,
+  "name": "e_Type_GC_GameAction_Set",
+  "keys": [
+   778,
+   722,
+   761
+  ]
+ },
+ {
+  "typeId": 53105,
+  "enumId": 53027,
+  "name": "e_Type_GC_GameAction_ItemText",
+  "keys": [
+   761,
+   1241
+  ]
+ },
+ {
+  "typeId": 53109,
+  "enumId": 53028,
+  "name": "e_Type_GC_GameAction_PolyMorph",
+  "keys": [
+   799,
+   1275,
+   1226,
+   730,
+   1121,
+   761,
+   796,
+   1230,
+   1231,
+   1232
+  ]
+ },
+ {
+  "typeId": 53113,
+  "enumId": 53029,
+  "name": "e_Type_GC_GameAction_ChangeModifyPercent",
+  "keys": [
+   1219,
+   761,
+   778
+  ]
+ },
+ {
+  "typeId": 53117,
+  "enumId": 53030,
+  "name": "e_Type_GC_GameAction_ChangeHitPercent",
+  "keys": [
+   1219,
+   761,
+   778
+  ]
+ },
+ {
+  "typeId": 53121,
+  "enumId": 53031,
+  "name": "e_Type_GC_GameAction_ChangeRecastTime",
+  "keys": [
+   1219,
+   761
+  ]
+ },
+ {
+  "typeId": 53125,
+  "enumId": 53032,
+  "name": "e_Type_GC_GameAction_AOERadiusModification",
+  "keys": [
+   1219,
+   733
+  ]
+ },
+ {
+  "typeId": 53129,
+  "enumId": 53033,
+  "name": "e_Type_GC_GameAction_ApplyFactionRank",
+  "keys": [
+   789,
+   790
+  ]
+ },
+ {
+  "typeId": 53133,
+  "enumId": 53034,
+  "name": "e_Type_GC_GameAction_SummonFollower",
+  "keys": []
+ },
+ {
+  "typeId": 53137,
+  "enumId": 53035,
+  "name": "e_Type_GC_GameAction_EnterSiegeTargeting",
+  "keys": []
+ },
+ {
+  "typeId": 53141,
+  "enumId": 53036,
+  "name": "e_Type_GC_GameAction_SpawnQuest",
+  "keys": [
+   1241
+  ]
+ },
+ {
+  "typeId": 53145,
+  "enumId": 53037,
+  "name": "e_Type_GC_GameAction_Charmed",
+  "keys": [
+   789,
+   790,
+   791,
+   792,
+   1194,
+   761
+  ]
+ },
+ {
+  "typeId": 53149,
+  "enumId": 53038,
+  "name": "e_Type_GC_GameAction_PlaceTrap",
+  "keys": [
+   1110,
+   1119,
+   1123,
+   747,
+   789,
+   790,
+   791
+  ]
+ },
+ {
+  "typeId": 53157,
+  "enumId": 53040,
+  "name": "e_Type_GC_GameAction_StartTracking",
+  "keys": [
+   761
+  ]
+ },
+ {
+  "typeId": 53161,
+  "enumId": 53041,
+  "name": "e_Type_GC_GameAction_ModifyBasedOnStat",
+  "keys": [
+   1206,
+   1207,
+   722,
+   1239
+  ]
+ },
+ {
+  "typeId": 53165,
+  "enumId": 53042,
+  "name": "e_Type_GC_GameAction_Modify_PowerSurge",
+  "keys": [
+   761
+  ]
+ },
+ {
+  "typeId": 53169,
+  "enumId": 53043,
+  "name": "e_Type_GC_GameAction_ExecuteBccAction",
+  "keys": [
+   1275
+  ]
+ },
+ {
+  "typeId": 53177,
+  "enumId": 53045,
+  "name": "e_Type_GC_GameAction_Modify",
+  "keys": [
+   722,
+   761
+  ]
+ },
+ {
+  "typeId": 53181,
+  "enumId": 53046,
+  "name": "e_Type_GC_GameAction_AddAbsorb",
+  "keys": [
+   722,
+   793,
+   755,
+   756,
+   1123
+  ]
+ },
+ {
+  "typeId": 53185,
+  "enumId": 53047,
+  "name": "e_Type_GC_GameAction_CameraShake",
+  "keys": [
+   1236,
+   1281,
+   1223
+  ]
+ },
+ {
+  "typeId": 53189,
+  "enumId": 53048,
+  "name": "e_Type_GC_GameAction_Name",
+  "keys": [
+   1241
+  ]
+ },
+ {
+  "typeId": 53193,
+  "enumId": 53049,
+  "name": "e_Type_GC_GameAction_SpawnMonster",
+  "keys": [
+   770,
+   771,
+   761,
+   795,
+   796,
+   750,
+   751,
+   752,
+   1110
+  ]
+ },
+ {
+  "typeId": 53197,
+  "enumId": 53050,
+  "name": "e_Type_GC_GameAction_RemoveBuffs",
+  "keys": []
+ },
+ {
+  "typeId": 53201,
+  "enumId": 53051,
+  "name": "e_Type_GC_GameAction_CastNano",
+  "keys": [
+   761
+  ]
+ },
+ {
+  "typeId": 53205,
+  "enumId": 53052,
+  "name": "e_Type_GC_GameAction_StrTexture",
+  "keys": [
+   781,
+   779,
+   730
+  ]
+ },
+ {
+  "typeId": 53209,
+  "enumId": 53053,
+  "name": "e_Type_GC_GameAction_CameraRoll",
+  "keys": [
+   1223
+  ]
+ },
+ {
+  "typeId": 53213,
+  "enumId": 53054,
+  "name": "e_Type_GC_GameAction_SpellStatModifier",
+  "keys": [
+   1123,
+   722,
+   761,
+   1207
+  ]
+ },
+ {
+  "typeId": 53217,
+  "enumId": 53055,
+  "name": "e_Type_GC_GameAction_AttractorMesh",
+  "keys": [
+   779,
+   730
+  ]
+ },
+ {
+  "typeId": 53221,
+  "enumId": 53056,
+  "name": "e_Type_GC_GameAction_RemoveCowardStatus",
+  "keys": []
+ },
+ {
+  "typeId": 53225,
+  "enumId": 53057,
+  "name": "e_Type_GC_GameAction_HeadText",
+  "keys": [
+   1241,
+   761
+  ]
+ },
+ {
+  "typeId": 53229,
+  "enumId": 53058,
+  "name": "e_Type_GC_GameAction_SpawnRemotePet",
+  "keys": [
+   1110,
+   761,
+   1123,
+   1207
+  ]
+ },
+ {
+  "typeId": 53233,
+  "enumId": 53059,
+  "name": "e_Type_GC_GameAction_LineTeleport",
+  "keys": [
+   731,
+   732,
+   753,
+   1135
+  ]
+ },
+ {
+  "typeId": 53237,
+  "enumId": 53060,
+  "name": "e_Type_GC_GameAction_MonsterShape",
+  "keys": [
+   761,
+   747
+  ]
+ },
+ {
+  "typeId": 53241,
+  "enumId": 53061,
+  "name": "e_Type_GC_GameAction_BCCCastSpell",
+  "keys": [
+   761
+  ]
+ },
+ {
+  "typeId": 53245,
+  "enumId": 53062,
+  "name": "e_Type_GC_GameAction_SpellLineStatModifier",
+  "keys": [
+   723,
+   722,
+   761,
+   1207
+  ]
+ },
+ {
+  "typeId": 53249,
+  "enumId": 53063,
+  "name": "e_Type_GC_GameAction_SpawnMonsterACG",
+  "keys": [
+   1110,
+   1119,
+   795,
+   796,
+   750,
+   751,
+   752,
+   1138
+  ]
+ },
+ {
+  "typeId": 53253,
+  "enumId": 53064,
+  "name": "e_Type_GC_GameAction_SpawnItemOnCharacter",
+  "keys": [
+   1110,
+   1119,
+   1120,
+   795,
+   796,
+   750,
+   751,
+   752
+  ]
+ },
+ {
+  "typeId": 53257,
+  "enumId": 53065,
+  "name": "e_Type_GC_GameAction_CoreSpellStatModifier",
+  "keys": [
+   1123,
+   722,
+   761,
+   1207,
+   747
+  ]
+ },
+ {
+  "typeId": 53261,
+  "enumId": 53066,
+  "name": "e_Type_GC_GameAction_TeamFormula",
+  "keys": [
+   1123
+  ]
+ },
+ {
+  "typeId": 53265,
+  "enumId": 53067,
+  "name": "e_Type_GC_GameAction_ModifyAsRating",
+  "keys": [
+   722,
+   761
+  ]
+ },
+ {
+  "typeId": 53269,
+  "enumId": 53068,
+  "name": "e_Type_GC_GameAction_InterpolatedModifyAsRating",
+  "keys": [
+   722,
+   1206,
+   1204,
+   1207,
+   1205
+  ]
+ },
+ {
+  "typeId": 53273,
+  "enumId": 53069,
+  "name": "e_Type_GC_GameAction_ChangeLineRecastTime",
+  "keys": [
+   723,
+   761
+  ]
+ },
+ {
+  "typeId": 53277,
+  "enumId": 53070,
+  "name": "e_Type_GC_GameAction_AddSpellLineProc",
+  "keys": [
+   1123,
+   1268,
+   723,
+   1151,
+   1269,
+   796
+  ]
+ },
+ {
+  "typeId": 53281,
+  "enumId": 53071,
+  "name": "e_Type_GC_GameAction_DoorToAutoDoor",
+  "keys": [
+   753,
+   1125,
+   1126
+  ]
+ },
+ {
+  "typeId": 53285,
+  "enumId": 53072,
+  "name": "e_Type_GC_GameAction_StopAudioEffect",
+  "keys": [
+   739
+  ]
+ }
+]

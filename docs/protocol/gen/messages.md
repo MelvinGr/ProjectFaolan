@@ -23,8 +23,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` | [V3: BehaviorPhaseFieldTests.InsertBehaviorPhaseField_AppendsWhenNoField2] |
 | V3 | `ChainKillIIR` | `0x0EED7068` | `ChainKillCodec` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
 | V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: DeadReckoningCodecTests.CharDCMove_RoundTripsByteExact] |
-| V3 | `CharInPlayIIR` | `0x864CFEF8` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
-| V3 | `CharacterActionIIR` | `0x6B6FD368` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
+| V3 | `CharInPlayIIR` | `0x864CFEF8` | `CreateEditorRecordBuilder` | [V3: WorldSetNameIirTests.BuildWorldSetNameIir_MatchesRecoveredGrammar] |
+| V3 | `CharacterActionIIR` | `0x6B6FD368` | `CreateEditorRecordBuilder` | [V3: WorldSetNameIirTests.BuildWorldSetNameIir_MatchesRecoveredGrammar] |
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
 | V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `CombatReactiveIIR` | `0x54C02089` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
@@ -38,7 +38,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `EnergyIIR` | `0x40749B8A` | `CombatPacketCodec` | [V3: CombatPacketCodecTests.DamageResultBody_MatchesExpectedLayout] |
 | V3 | `FeatIIR` | `0x28DA68A0` | `FeatIirCodec` | [V3: FeatIirCodecTests.Build_MatchesTheCapturedAck] |
 | V3 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIirCodec` | [V3: V1IirCodecTests.Feedback_RoundTripsCapturedBody] |
-| V3 | `FormatFeedbackIIR` | `0x8D5A8B6B` | `FormatFeedbackCodec` | [V3: AttributeChangedFeedbackTests.Build_FromFields_MatchesCapturedLevelUpMessage] |
+| V3 | `FormatFeedbackIIR` | `0x8D5A8B6B` | `FormatFeedbackCodec` | [V3: FormatFeedbackCodecTests.Build_FromParsedFields_MatchesCapture] |
 | V3 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `FullPlayerCharacterBuilder` | [V3: FullCharIirRoundTripTests.BuildRoot_FromCapturedFields_ReEncodesByteIdentically] |
 | V3 | `GameActionListIIR` | `0xF508F4C1` | `GameActionListCodec` | [V3: GameActionListCodecTests.Parse_ThenBuild_RoundTripsByteExact] |
 | V3 | `GameTimeIIR` | `0x4F57DC08` | `GameTimeCodec` | [V3: GameTimeCodecTests.Build_MatchesCapturedSnapshot] |
@@ -72,8 +72,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestLogListIIR` | `0x504B7924` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` | [V3: V1IirCodecTests.Regen_RoundTripsCapturedBody] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScript` | [V3: ScryScriptCreateBurstTests.PlayOrSkipStep_BuildsTheCapturedRecord] |
-| V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
-| V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIir_MatchesCapturedBytes] |
+| V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: WorldSetNameIirTests.BuildWorldSetNameIir_MatchesRecoveredGrammar] |
+| V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: WorldSetNameIirTests.BuildWorldSetNameIir_MatchesRecoveredGrammar] |
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `PlayerSpawnScaffoldCodec` | [V3: PlayerSpawnScaffoldCodecTests.Generate_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `WorldDeath` | [V3: WorldDeathTests.BuildDeathEffect_ReproducesCapturedRecord_ByteExact] |

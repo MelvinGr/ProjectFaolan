@@ -63,7 +63,7 @@ namespace Faolan.Importer.Extractors
 
 			// Third source: vendor windows (DispatchShopData 0x2033) - every ware carries the same ProtoAcgItem
 			// identity (quad + template + hash), so a single shop capture adds its whole stock to the
-			// buildable-item catalog. See ShopContentCodec / Captures/scripts/decode_shopdata.py.
+			// buildable-item catalog. See ShopContentCodec / tools/capture/decode_shopdata.py.
 			try
 			{
 				ExtractFromShopData(packetBytes, found);

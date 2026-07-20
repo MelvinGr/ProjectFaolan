@@ -1,6 +1,6 @@
 # FullPlayerCharacterIIR (0x737A6DF9) wire-reader — the snapshot "tails" grammar
 
-Recovered from `AgeOfConan.exe` via the vtable-xref method (`Captures/ghidra/DumpFullCharReader.java` +
+Recovered from `AgeOfConan.exe` via the vtable-xref method (`tools/ghidra/DumpFullCharReader.java` +
 `DumpFullCharRecords.java`, slot 8 = `ReadSubClass`; see the agent memory `ghidra_vtable_xref_readers`).
 Goal (ACHIEVED for the tails, see Status): replace the captured `BeachTailsTemplate.bin` tails with a real,
 generated grammar so the `.bin` can be retired and the character's **class/progression** authored instead of
@@ -181,7 +181,7 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    that include a **nested `0x3F1`-framed string list** (`FUN_004d55b0`) and `FUN_0079b760`/`FUN_00922eb0`.
    Genuinely complex (nested string-lists + hashes). **EMPIRICALLY EMPTY (#258, 2026-06-21):** the
    per-record grammar — `u32 field0` + 3× `ReadString` + `u32 ACGHash` + `u32` + `u32 innerCount` +
-   `innerCount ×{ u32 a, u32 b, nested 0x3F1 string-list }` — was probed by `Captures/scripts/decode_listb.py`
+   `innerCount ×{ u32 a, u32 b, nested 0x3F1 string-list }` — was probed by `tools/capture/decode_listb.py`
    against BOTH a fresh char (beach template / Faolanx) AND a developed char (NecroL80, 9 quests + a changemap).
    It matches NOTHING: there is no `0x3F1`-framed region anywhere in either tails whose first record reads 3
    printable strings. So List B carries **no records in practice** (it's a count-only empty list, like Lists
@@ -273,7 +273,7 @@ Each populated **`ObjRec`** (0x48-byte heap node; not exercised by the beach sta
 In the template, `Quest_c` ends at byte `@609` (its 4 numeric objective lists are **empty** for quest 10238 —
 counts at `@581/@585/@601/@605` are all 0). The bytes from `@609` up to the quest index (`@1168`) are a
 **per-GOAL objective-detail block** — its OWN grammar, fully decoded + validated by
-`Captures/scripts/decode_snapshot_609.py` (parses to the index boundary exactly) and locked by
+`tools/capture/decode_snapshot_609.py` (parses to the index boundary exactly) and locked by
 `Faolan.Tests/Snapshot609AnalysisTests`:
 
 ```
@@ -310,7 +310,7 @@ fits none — likely List B/C / MainQuest are empty here and consume only a few 
 start; pinning the exact reader needs a **dynamic trace**. NOT blocking the *generator* now that the wire
 grammar above is decoded — the blocker is the per-goal `QuestDefinition` model, not the byte layout.
 
-Validated by the dissector `Captures/scripts/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
+Validated by the dissector `tools/capture/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
 it consumes exactly to the objective-block boundary `@609`; `listKey == questId`). A C# codec
 `QuestcRegion`/`QuestcRecord` (Parse/ToArray + typed fields) round-trips the template's `@0–609` **byte-exact**
 (`QuestcRegionTests`) and is **wired into `FullCharSnapshotSubClass`** — it now models the tails' front region instead of
@@ -362,7 +362,7 @@ Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin
   the captured region, no per-character generation (identical for every char). This closes the #193
   construct-don't-replay purity goal for the tails.
 
-Dumps: `Captures/ghidra/output/fullchar_reader.txt`, `Captures/ghidra/output/fullchar_records.txt` (regenerate with the two
+Dumps: `tools/ghidra/output/fullchar_reader.txt`, `tools/ghidra/output/fullchar_records.txt` (regenerate with the two
 scripts above).
 
 ## Per-character CLASS identity still open; class-derived stats now authored (2026-06-17, #239/#4/#186)

@@ -6,7 +6,7 @@ namespace Faolan.Core.Database.Tables
 	// One unlocked FEAT (talent-tree) the character has trained. This is the FEAT tree, distinct from the
 	// ability/skill scaffold (CharacterSkill): feats ride the player spawn's PRE-IIR feat list (a 0x3F1-framed
 	// u32 id list), skills ride the POST-IIR id list. Different regions, different id-spaces. Decoded from the
-	// captures by Captures/scripts/decode_unlocked_feats.py; see docs/subsystems/feats.md + [[feat_trees_decode_251]].
+	// captures by tools/capture/decode_unlocked_feats.py; see docs/subsystems/feats.md + [[feat_trees_decode_251]].
 	//
 	// FeatId is the on-wire composite id. The low two digits track the trained RANK (working hypothesis:
 	// FeatId = featBase*100 + rank, e.g. Hellfire base 1127 -> 112700 at rank 0, and hakotep's base 1100 at rank 4

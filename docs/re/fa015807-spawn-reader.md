@@ -6,7 +6,7 @@ token; it is now the SOLE NPC-spawn path (every FA015807 is dropped from the log
 there is no verbatim-burst fallback anymore — #185).
 
 > **RESOLVED (2026-06-17): the scaffolds are RUNTIME state, not config — generate the minimal form from scratch.**
-> A cross-capture sweep (`Captures/scripts/classify_fa015807_fields.py` for the pre-IIR, `classify_fa015807_postiir.py` for
+> A cross-capture sweep (`tools/capture/classify_fa015807_fields.py` for the pre-IIR, `classify_fa015807_postiir.py` for
 > the post-IIR; **5026 / 5151 scaffolds across all 45 captures**) overturned the "per-NPC RDB-config" theory below.
 > The scaffolds carry **no per-NPC config and no session-volatile reference**; **every** non-zero word is
 > per-instance runtime state (target/owner handles, timers, action counters) that is **0 on an idle fresh spawn**.
@@ -17,9 +17,9 @@ there is no verbatim-burst fallback anymore — #185).
 > extraction, no DB columns, no re-addressing** — see "Resolution" at the bottom. The earlier sections are kept
 > for the wire-grammar RE (still correct) but their *construction* conclusions are superseded.
 
-Decompiled from `AgeOfConan.exe` (Ghidra) — reproduce with `Captures/ghidra/DumpSpawnIir.java` +
+Decompiled from `AgeOfConan.exe` (Ghidra) — reproduce with `tools/ghidra/DumpSpawnIir.java` +
 `DumpFns.java` (both committed). Grammar **validated against 4558 captured FA015807 records** (zero
-framing failures) by `Captures/scripts/decode_fa015807_reader.py`.
+framing failures) by `tools/capture/decode_fa015807_reader.py`.
 
 ## Reader primitives (`DumpFns.java`)
 
@@ -61,7 +61,7 @@ the embedded CoreCharacter.
 
 ## Validation
 
-`python3 Captures/scripts/decode_fa015807_reader.py` walks the fixed scaffold for every captured FA015807 record and
+`python3 tools/capture/decode_fa015807_reader.py` walks the fixed scaffold for every captured FA015807 record and
 checks three predictions: leading version `0x05`, the sub-list's first word is a multiple of `0x3F1`, and the
 embedded CoreCharacter version `0x41` lands at the exact predicted offset. Across all login + create captures:
 
@@ -74,7 +74,7 @@ CoreChar ver==0x41 (count==0 records): 4444/4444
 The original plan was a **column↔offset map**: diff the 53 scaffold U32s across spawn rows, find the few
 that vary, feed each from a DB column. That model was wrong, and so was a first guess that the slots were a
 mix of `ReadFloat` / string-blob reads. Decompiling the readers themselves settles it
-(`Captures/ghidra/out/spawn_iir.txt` + `spawn_fns.txt`):
+(`tools/ghidra/out/spawn_iir.txt` + `spawn_fns.txt`):
 
 - `FUN_01121c00` (`SimpleCharFullUpdateIIR_t::ReadSubClass`) reads, after the `u8 version==0x05`, exactly
   **53× `FUN_0048f900` + 6× `FUN_004e0390`**, then the sublist, then the embedded CoreCharacter. There are
@@ -150,7 +150,7 @@ confirmation), zero stream errors. So the minimal scaffold was made the **defaul
 removed — construct-don't-replay is now the only NPC spawn path. The per-spawn sub-list (`@1122b10`) entry
 sub-object grammar stays unobserved (`count==0` everywhere)
 but is irrelevant to the minimal build. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
-(#187, done) — see `Captures/ghidra/DumpIirReaders.java`.
+(#187, done) — see `tools/ghidra/DumpIirReaders.java`.
 
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
 `NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte

@@ -15,14 +15,14 @@ primitives.
 The FA015807 reader was found by anchoring on its `"...ReadSubClass() Received a bad stream upon entering!"`
 assert. **Only `SimpleChar`/`CoreChar`/`SimpleCharKilledBy` carry that string** — the dynel/loot/movetask/etc.
 readers don't, and Ghidra creates no usable xref to their `.cpp` filename string. So they're found via the
-**vtable** instead (`Captures/ghidra/DumpVtableReaders.java`):
+**vtable** instead (`tools/ghidra/DumpVtableReaders.java`):
 
 1. In the *known* `SimpleCharFullUpdateIIR_t::vftable`, find the slot whose pointer == its reader
    (`FUN_01121c00`). That is **vtable slot 8** = the `ReadSubClass` virtual.
 2. Read slot 8 of every other `<Class>IIR*::vftable` → that class's `ReadSubClass` → decompile.
 
 Reproduce: `DumpVtableReaders.java` then `DumpHelpers.java` (the shared reader helpers). Decompiles committed
-under `Captures/ghidra/out/`.
+under `tools/ghidra/out/`.
 
 ## Shared stream primitives
 | Decompiled fn | Meaning |
@@ -43,7 +43,7 @@ ReadSubClass:
   BLOB  -> ProtoSimpleDynelIIR protobuf      (FUN_00cbfb80; name/display_name/template_item_id/flags)
   KDTREE                                       (FUN_0080c620)
 ```
-**Validated** by `Captures/scripts/decode_iir_subclass_readers.py` against **all** captured dynel records (every
+**Validated** by `tools/capture/decode_iir_subclass_readers.py` against **all** captured dynel records (every
 login capture, 100%): the `[u32 blobLen]` frames a protobuf that starts with field 1 (`0x08`, kdtree) and
 carries the name field. The protobuf is the already-recovered `ProtoSimpleDynelIIR` — so the dynel is
 constructible from DB rows + that proto, no bespoke decoder.

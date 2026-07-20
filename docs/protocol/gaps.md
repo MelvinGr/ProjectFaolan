@@ -17,7 +17,7 @@ Every gap below is a tracked Gitea issue (`melvin/projectfaolan`), so it lives o
 
 ### RpcHeader trailing headerData — the `0x01` marker's meaning
 **Tracked: Gitea #319.** The blob's grammar is decoded — four per-opcode/constant cases (see [`02-rpc.md`](02-rpc.md)
-and `Captures/scripts/decode_rpc_headerdata.py`). The 13-byte `OverrideGameTweaks` case, previously called an opaque
+and `tools/capture/decode_rpc_headerdata.py`). The 13-byte `OverrideGameTweaks` case, previously called an opaque
 block, is now decoded too: it is a protobuf endpoint reference to PlayerInterface (class `0x7D155738`) + a per-session
 instance id. The **only** thing left is the *semantic* of the constant 1-byte `0x01` marker (a flag? a version?
 present on ping/pong `0x2085`/`0x2082` and a few CSPlayerInterface dispatches, always exactly `0x01`). We emit it

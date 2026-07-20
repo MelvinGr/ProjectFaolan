@@ -54,7 +54,7 @@ namespace Faolan.Tests
 		// The NPC counter-attack animation ack (BehaviorControlCenterIIR 0x642CD3D6 with actor = NPC handle), byte-exact
 		// against frame 6472 of the strickenbla combat capture (NPC 0x2c56 swings at player 0x01316d8a for 0x53). The
 		// expected hex is the captured 0x2000 body MINUS its 4-byte totalLen prefix (the builder produces the inner
-		// record that WriteArrayUInt32Length wraps). Decode: Captures/scripts/decode_combat_npc_ack.py.
+		// record that WriteArrayUInt32Length wraps). Decode: tools/capture/decode_combat_npc_ack.py.
 		[Fact]
 		public void NpcAttackAnimationAck_MatchesCapturedFrame6472()
 		{

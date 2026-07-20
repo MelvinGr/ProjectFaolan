@@ -22,7 +22,7 @@ namespace Faolan.Tests
 
 		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
 		// starter) carries the empty quest region. Byte-exact across all 20 *-create captures (the starter quest is
-		// delivered LIVE on create-world entry, not in the snapshot). See Captures/scripts/decode_snapshot_quests.py.
+		// delivered LIVE on create-world entry, not in the snapshot). See tools/capture/decode_snapshot_quests.py.
 		[Fact]
 		public void BuildEmptyQuestPortion_MatchesTheCreateCaptureRegion()
 		{

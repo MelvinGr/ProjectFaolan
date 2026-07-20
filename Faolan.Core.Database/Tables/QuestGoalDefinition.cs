@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Faolan.Core.Database.Tables
 {
 	// One goal of a quest as it appears in the snapshot's @609 objective-detail region (decoded:
-	// Captures/scripts/decode_snapshot_609.py, codec QuestObjectiveRegion). Construct, don't replay: the numeric fields +
+	// tools/capture/decode_snapshot_609.py, codec QuestObjectiveRegion). Construct, don't replay: the numeric fields +
 	// the two text refs (objective cat 50304, trailing cat 51200 remoteformat / 51000 localized) regenerate the
 	// per-goal record byte-exact via QuestObjectiveGoal.BuildSingle.
 	public class QuestGoalDefinition

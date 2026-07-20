@@ -4,7 +4,7 @@ How to drive the retail AoC client against a local Faolan server without manual 
 automated, capture-backed integration testing. Proven end-to-end 2026-06-10 (login → EnterWorld, unattended).
 
 Pieces: **`Faolan.ClientLauncher`** (launches + drives the client), the **server** (`Faolan` project), **loopback
-packet capture** (`tshark`/`dumpcap` on `lo`), and the capture tooling (`Captures/scripts/*.py` + the Wireshark plugin
+packet capture** (`tshark`/`dumpcap` on `lo`), and the capture tooling (`tools/capture/*.py` + the Wireshark plugin
 `Faolan.Wireshark`). Related: [01-crypto.md](../protocol/01-crypto.md),
 README "Client launch flags".
 
@@ -134,7 +134,7 @@ realm row; the world connection shares this same port — the handoff advertises
 ```
 tshark -i lo -f "tcp portrange 7001-7014" -w /tmp/session.pcap &
 ```
-The result is a normal pcap the capture tools read (`Captures/scripts/*.py`, the Wireshark plugin) — diff it
+The result is a normal pcap the capture tools read (`tools/capture/*.py`, the Wireshark plugin) — diff it
 against a retail capture for regressions, or `--dump` it.
 
 ### Launch + drive the client

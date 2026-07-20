@@ -2,7 +2,7 @@
 
 Opening the in-client **Crafting → Recipes** window is a request/response on the GameServer connection,
 decoded from `Captures/NecroL80_mage-necromancer_shops_open-crrafting-receipies.tshark.json` (frame 2916 →
-2926) + Ghidra (`AgeOfConan.exe`, project `Captures/ghidra/output`).
+2926) + Ghidra (`AgeOfConan.exe`, project `tools/ghidra/output`).
 
 ## The exchange
 
