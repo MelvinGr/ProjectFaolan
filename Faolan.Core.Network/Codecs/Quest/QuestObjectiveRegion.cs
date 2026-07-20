@@ -38,9 +38,22 @@ namespace Faolan.Core.Network.Codecs.Quest
 			if (tag == 0 || tag % Frame != 0)
 				throw new InvalidOperationException($"@609 region: lead word 0x{tag:X} is not a multiple of 0x{Frame:X}");
 
+			// STRICT: the lead word IS the count - read exactly that many goals rather than consuming while the next
+			// word happens to be GoalLead. The tolerant peek made this reader accept output the CLIENT rejects: a
+			// record whose goal count disagreed with the goals actually written round-tripped here and then desynced
+			// the client's cursor, which died at the next StatList_t (assert "(nSize%1009)==0 && nSize>0, inconsistent
+			// IdentityList", statlist.cpp:134 = FUN_0139d450). Reader and writer sharing a tolerant model is exactly
+			// what hides a wire bug - see the snapshot-prefix and packed-repeated cases.
+			var count = ListFrame.CountOf(tag);
 			var region = new QuestObjectiveRegion();
-			while (r.Position + 4 <= r.Length && Peek(r) == GoalLead)
+			for (var i = 0; i < count; i++)
+			{
+				if (r.Position + 4 > r.Length || Peek(r) != GoalLead)
+					throw new InvalidOperationException(
+						$"@609 region: lead word 0x{tag:X} promises {count} goals, but goal {i} is absent");
+
 				region.Goals.Add(QuestObjectiveGoal.Read(r));
+			}
 
 			return region;
 		}

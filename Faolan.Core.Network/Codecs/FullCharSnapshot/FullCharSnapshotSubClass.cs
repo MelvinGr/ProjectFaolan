@@ -372,6 +372,17 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (def is not { HasSnapshotRecord: true })
 				return false;
 
+			// The snapshot's quest portion is Quest_c records AND the quest INDEX region, and the index needs per-quest
+			// data the Quest_c record does not carry (the goal-table name word + its goal-step ids). A definition
+			// harvested from the journal region alone has HasSnapshotRecord but IndexMagic 0 and no steps, and putting
+			// one in the snapshot produced a client assert - statlist.cpp "(nSize%1009)==0 && nSize>0, inconsistent
+			// IdentityList" - i.e. the client read a list size that was not a positive multiple of 0x3F1. Our own
+			// reader round-trips that same portion losslessly, which is precisely why it is not evidence: reader and
+			// writer share the model. Until the index side is decoded for harvested quests, they ride the LIVE path
+			// (RestorePlayerQuests -> QuestFullUpdate), which needs no index data. See Gitea #227 for the same assert.
+			if (def.IndexMagic == 0)
+				return false;
+
 			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
 			return HeaderSlots.All(slots.Contains);
 		}
