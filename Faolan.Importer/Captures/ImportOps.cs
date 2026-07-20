@@ -665,7 +665,7 @@ namespace Faolan.Importer.Captures
 				return;
 
 			quest.SnapshotUnknown118 = 4;
-			quest.SnapshotGoalCount = QuestcRegion.BeachN; // the beach record's `n` (@+0x14)
+			quest.SnapshotUnknown14 = QuestcRegion.BeachN; // the beach record's `n` (@+0x14)
 			quest.SnapshotUnknownEc = 1;
 			quest.SnapshotUnknownF0 = 0x96;
 			quest.SnapshotUnknownF8 = 15;
@@ -754,7 +754,7 @@ namespace Faolan.Importer.Captures
 			quest.Level = 3;
 			quest.HasSnapshotRecord = true;
 			quest.SnapshotUnknown118 = 3;
-			quest.SnapshotGoalCount = QuestcRegion.BeachN;
+			quest.SnapshotUnknown14 = QuestcRegion.BeachN;
 			quest.SnapshotUnknownEc = 1;
 			quest.SnapshotUnknownF0 = 80;
 			quest.SnapshotUnknownF8 = 7;

@@ -84,7 +84,7 @@ namespace Faolan.Core.Database.Tables
 
 		// A level-ADJACENT value: across the captured journals it runs level..level+5 (NecroL80 L80 -> 80-83,
 		// Hakotep L24 -> 19-30). Its exact meaning is undecoded, hence the name. Was called SnapshotN, which was
-		// doubly wrong - it is not `n` (that is SnapshotGoalCount, a different word at a different offset).
+		// doubly wrong - it is not `n` (that is SnapshotUnknown14, a different word at a different offset).
 		public uint SnapshotUnknown118 { get; set; }
 
 		// The Quest_c record's `n` word (@+0x14) - the per-quest goal count. NOT the 0x412 the beach template happens
@@ -92,7 +92,7 @@ namespace Faolan.Core.Database.Tables
 		// beach constant for every quest, which is fine while the only generated journal IS the beach one, and wrong
 		// the moment a real character's journal is regenerated - so it is stored per quest. Beach 10238 keeps 0x412,
 		// so its golden stays byte-exact.
-		public uint SnapshotGoalCount { get; set; }
+		public uint SnapshotUnknown14 { get; set; }
 
 		public ulong SnapshotUnknownF8 { get; set; }
 

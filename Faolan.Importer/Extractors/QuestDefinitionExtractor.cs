@@ -131,7 +131,7 @@ namespace Faolan.Importer.Extractors
 			if (def.Level == 0)
 				def.Level = record.State;
 
-			def.SnapshotGoalCount = record.N;
+			def.SnapshotUnknown14 = record.Unknown14;
 			def.SnapshotUnknown118 = record.Field118;
 			def.SnapshotUnknownEc = record.FieldEc;
 			def.SnapshotUnknownF0 = record.FieldF0;
