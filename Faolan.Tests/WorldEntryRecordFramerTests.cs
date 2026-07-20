@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		private static readonly string SnapshotCap = TestPaths.Asset("strie-login-inventory.bin");
 		private static readonly string WorldObjectCap = TestPaths.Asset("strie-login-worldobject.bin");
 
-		// The 8-byte blob prefix built from scratch equals the captured beach prefix (the BE32 blobLen model).
+		// The 5-byte blob prefix built from scratch equals the captured beach prefix (the BE32 blobLen model).
 		[Fact]
 		public void BuildSnapshotPrefix_MatchesCapturedBeachPrefix()
 		{

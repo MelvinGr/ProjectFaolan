@@ -36,7 +36,10 @@ namespace Faolan.Core.Enums
 		// way). Add the enum member + the CharacterEquipment slot + the quest-container sizing once one surfaces.
 
 		// Vanity ("costume") item slots = 1000 + the base equip slot id. VanityHead (1002) and VanityChest (1005) are
-		// capture-confirmed by the ToggleVanityArmorFilter slot arg (base slot 2/5); the rest are extrapolated.
+		// capture-confirmed by the ToggleVanityArmorFilter slot arg (base slot 2/5); 1007/1011/1014/1018 are confirmed
+		// on the wire by NecroL80's L80 FullChar snapshot, whose EQUIPPED container (kind 101) carries pos 1002, 1007,
+		// 1011, 1014 and 1018 next to the worn set (faolan-account-login-necrol80-necro-lvl80). Only VanityChest (1005)
+		// has yet to appear in a captured equipped container.
 		VanityHead = 1002,
 		VanityChest = 1005,
 		VanityBelt = 1007,

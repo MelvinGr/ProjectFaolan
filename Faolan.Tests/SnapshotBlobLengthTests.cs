@@ -20,21 +20,21 @@ namespace Faolan.Tests
 	// 2026-06-13): n3InfoItemRemote::Construct -> FUN_00cbfb80 reads the protobuf root as a 4-byte BIG-ENDIAN
 	// length-prefixed blob (then ReadSubClass reads the 0x18 version immediately after). The body layout is
 	// [u32 KEY][u32 type=50000][u32 instance][u8 flag][u32 BE blobLen][blob = blobLen bytes][u32 BE 0x18][tails],
-	// where blob = field5 (prefix[5..]) + the FullCharacterIIR root. So blobLen == (prefix.Length - 5) + rootLen.
+	// where the blob IS the whole FullCharacterIIR root. So blobLen == rootLen and the prefix is exactly 5 bytes.
 	// The old varint model (AdjustSnapshotPrefixRootLength) was byte-misaligned and corrupted this length on resize.
 	public class SnapshotBlobLengthTests
 	{
-		// The captured prefix's BE32 at offset 1 already equals field5Len + rootLen (the client's blob length), and
-		// the byte immediately after that many blob bytes is the 0x18 version — proven across both beach captures.
+		// The captured prefix's BE32 at offset 1 already equals rootLen (the client's blob length), and the byte
+		// immediately after that many blob bytes is the 0x18 version — proven across both beach captures.
 		[Theory, InlineData("strie-login-inventory.bin", 686), InlineData("account-stricken997-character-Strie-login-randomActions-bigboy.bin", 681)]
 		public void CapturedPrefix_EncodesBe32BlobLength(string bin, uint expectedBlobLen)
 		{
 			var (prefix, rootLen, tails) = Split(bin);
 			var be32 = BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(1, 4));
 			Assert.Equal(expectedBlobLen, be32); // matches the byte-level capture
-			Assert.Equal((uint)(prefix.Length - 5 + rootLen), be32); // blobLen == field5Len + rootLen
+			Assert.Equal((uint)rootLen, be32); // blobLen == rootLen (the prefix carries no payload of its own)
 			Assert.Equal((byte)0x00, prefix[0]); // flag
-			// field5 (prefix[5..]) is the start of the blob; the version 0x18 sits at tails offset 0 (= blob end).
+			// The blob ends exactly at the root's end; the version 0x18 sits at tails offset 0 (= blob end).
 			Assert.True(tails.Length >= 4);
 			Assert.Equal(0x18u, BinaryPrimitives.ReadUInt32BigEndian(tails.AsSpan(0, 4)));
 		}
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
 
 			var newPrefix = GameServerListener.SetSnapshotBlobLength(prefix, genRoot.Length);
-			Assert.Equal((uint)(prefix.Length - 5 + genRoot.Length), BinaryPrimitives.ReadUInt32BigEndian(newPrefix.AsSpan(1, 4)));
+			Assert.Equal((uint)genRoot.Length, BinaryPrimitives.ReadUInt32BigEndian(newPrefix.AsSpan(1, 4)));
 
 			// Reassemble [subop][c350][instance][newPrefix][genRoot][tails] and re-split.
 			using var content = new FaolanStream();
@@ -111,18 +111,17 @@ namespace Faolan.Tests
 		}
 
 		// SetSnapshotBlobLength writes the correct BE32 length for ANY regenerated root length, keeping the flag
-		// and field5 bytes; a round-trip back through the captured length reproduces the original prefix.
+		// byte; a round-trip back through the captured length reproduces the original prefix.
 		[Fact]
-		public void SetSnapshotBlobLength_WritesBe32_PreservesFlagAndField5()
+		public void SetSnapshotBlobLength_WritesBe32_PreservesFlag()
 		{
 			var (prefix, rootLen, _) = Split("strie-login-inventory.bin");
 
 			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
 			{
 				var p = GameServerListener.SetSnapshotBlobLength(prefix, newRoot);
-				Assert.Equal((uint)(prefix.Length - 5 + newRoot), BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));
+				Assert.Equal((uint)newRoot, BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));
 				Assert.Equal(prefix[0], p[0]); // flag preserved
-				Assert.Equal(prefix.Skip(5).ToArray(), p.Skip(5).ToArray()); // field5 preserved
 			}
 
 			// Writing the original root length reproduces the captured prefix byte-for-byte.

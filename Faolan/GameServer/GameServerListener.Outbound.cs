@@ -273,18 +273,22 @@ namespace Faolan.GameServer
 			return ps.WriteLengthHash().ToArray();
 		}
 
-		// The 8-byte IIR blob prefix the client (n3InfoItemRemote::Construct) reads before the FullCharacterIIR root:
-		// [u8 flag=0][u32 BE blobLen][field5]. blobLen = field5.Length + rootLength (the client reads EXACTLY blobLen
-		// bytes as the protobuf blob = field5 + root, then expects the 0x18 tails version). Identical BE32 model to
-		// SetSnapshotBlobLength, but built from scratch rather than patched onto a captured prefix.
+		// The 5-byte IIR blob prefix the client (n3InfoItemRemote::Construct) reads before the FullCharacterIIR root:
+		// [u8 flag=0][u32 BE blobLen], where blobLen == rootLength (the client reads EXACTLY blobLen bytes as the
+		// protobuf root, then expects the 0x18 tails version). Identical BE32 model to SetSnapshotBlobLength, but
+		// built from scratch rather than patched onto a captured prefix.
+		//
+		// This used to append a captured 3-byte "field5" (28 81 06) after the length. Those bytes are not a frame at
+		// all - they are the ROOT's own `subscription_flags` (field 5) varint, which BuildRoot already emits typed
+		// (FullSubscriptionFlags), so the wire carried the field TWICE (the client's last-wins parse hid it). See
+		// FullCharSnapshotReader for the read side and the level-80 snapshots the fixed 3-byte skip corrupted.
 		internal static byte[] BuildSnapshotPrefix(int rootLength)
 		{
 			ArgumentOutOfRangeException.ThrowIfNegative(rootLength);
 
-			var prefix = new byte[5 + SnapshotPrefixField5.Length];
+			var prefix = new byte[5];
 			prefix[0] = 0x00; // flag
-			BinaryPrimitives.WriteUInt32BigEndian(prefix.AsSpan(1, 4), (uint)(SnapshotPrefixField5.Length + rootLength));
-			SnapshotPrefixField5.CopyTo(prefix, 5);
+			BinaryPrimitives.WriteUInt32BigEndian(prefix.AsSpan(1, 4), (uint)rootLength);
 			return prefix;
 		}
 
@@ -369,22 +373,20 @@ namespace Faolan.GameServer
 			return ps.WriteLengthHash().ToArray();
 		}
 
-		// Sets the snapshot's protobuf-blob length to match a regenerated root. The 8-byte prefix the client reads
-		// is [u8 flag][u32 BE blobLen][field5 = the rest], where the client (n3InfoItemRemote::Construct ->
-		// FUN_00cbfb80 in AgeOfConan.exe) reads EXACTLY blobLen bytes as the protobuf blob = field5 + the
-		// FullCharacterIIR root, then expects the 0x18 version. So blobLen = field5Len + rootLength, written as a
-		// 4-byte big-endian int at prefix offset 1. (This SUPERSEDES AdjustSnapshotPrefixRootLength, which adjusted
-		// a byte-misaligned protobuf-varint model and corrupted the real length on resize — see
-		// [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
-		// the 4 length bytes); the captured field5 bytes at prefix[5..] are preserved unchanged.
+		// Sets the snapshot's protobuf-blob length to match a regenerated root. The 5-byte prefix the client reads
+		// is [u8 flag][u32 BE blobLen], where the client (n3InfoItemRemote::Construct -> FUN_00cbfb80 in
+		// AgeOfConan.exe) reads EXACTLY blobLen bytes as the FullCharacterIIR root, then expects the 0x18 version.
+		// So blobLen = rootLength, written as a 4-byte big-endian int at prefix offset 1. (This SUPERSEDES
+		// AdjustSnapshotPrefixRootLength, which adjusted a byte-misaligned protobuf-varint model and corrupted the
+		// real length on resize — see [[protocol_containeradditem]].) Any bytes past offset 5 are extra prefix the
+		// caller owns and are preserved unchanged.
 		internal static byte[] SetSnapshotBlobLength(byte[] prefix, int rootLength)
 		{
 			if (prefix.Length < 5 || rootLength < 0)
 				return prefix;
 
-			var field5Len = prefix.Length - 5;
 			var result = (byte[])prefix.Clone();
-			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(1, 4), (uint)(field5Len + rootLength));
+			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(1, 4), (uint)(prefix.Length - 5 + rootLength));
 			return result;
 		}
 

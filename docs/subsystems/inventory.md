@@ -16,14 +16,17 @@ all **big-endian**:
 ```
 
 - **The protobuf root is length-prefixed by a 4-byte BIG-ENDIAN length** (`FUN_00cbfb80` reads exactly
-  `blobLen` bytes, then `ReadSubClass` reads the `0x18` version). The "blob" = `field5` (the constant
-  `28 81 06` = protobuf field 5 varint 769) + the FullCharacterIIR root, so **`blobLen = field5Len + rootLen`**
-  (`field5Len = prefix.Length - 5`). Regenerate the root and that BE32 length MUST be rewritten
-  (`GameServerListener.SetSnapshotBlobLength`) or the client reads the version from the wrong place and rejects
-  the FullChar (`CoreFullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version ...`). The captured 8-byte
-  prefix `00 00 00 02 ae 28 81 06` is really `[00 = flag][00 00 02 ae = blobLen 686][28 81 06 = field5]`.
-  (The earlier `varint = 4483 + rootLength` / `AdjustSnapshotPrefixRootLength` model was byte-misaligned and is
-  retired; `4483` was a coincidence of two near-equal-length captures.)
+  `blobLen` bytes, then `ReadSubClass` reads the `0x18` version). The blob **IS** the whole FullCharacterIIR
+  root, so the prefix is exactly 5 bytes and **`blobLen = rootLen`**. Regenerate the root and that BE32 length
+  MUST be rewritten (`GameServerListener.SetSnapshotBlobLength`) or the client reads the version from the wrong
+  place and rejects the FullChar (`CoreFullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version ...`). The
+  captured beach prefix `00 00 00 02 ae` is `[00 = flag][00 00 02 ae = blobLen 686]`.
+  (Two earlier models are retired. The `varint = 4483 + rootLength` / `AdjustSnapshotPrefixRootLength` one was
+  byte-misaligned — `4483` was a coincidence of two near-equal-length captures. The one after it treated the
+  next 3 bytes `28 81 06` as a constant "field5" and read `root = blobLen - 3`; those bytes are the root's OWN
+  first field, `subscription_flags` (field 5, varint 769), which is only 3 bytes long on the L1 beach captures.
+  A character with `character_tag` (field 1, packed) leads with that instead, so the fixed skip landed
+  mid-varint and EVERY level-80 snapshot failed to deserialize — see #381.)
 - Root = `ProtoFullCharacterIIR` (recovered schema, byte-exact round-trip on the captured snapshots):
   field 6 × N = the containers (Equipped 101 / Bag 104 / Resource 112 / Quest 113), then fields 7, 8.
 - Tails = the 9282-byte record/XML region starting `00 00 00 18` (subclass version 24). The live world-entry

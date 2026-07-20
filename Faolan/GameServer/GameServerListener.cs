@@ -104,13 +104,14 @@ namespace Faolan.GameServer
 		// Starter beach gear (StartingData.StartingMaleLegsItem / StartingWristItem / …) lives in
 		// Faolan.Core.Network/Constants/StartingData.cs.
 
-		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
-		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =
-		[
-			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Bag), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft),
-			(0x09, e => e.RingLeft), (0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist),
-			(0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight), (0x1a, e => e.ResourceBag)
-		];
+		// Equipped-container slot ids = the CharacterEquipmentSlot enum itself, read through the CharacterEquipment
+		// indexer (the same source PlayerSpawnEquipment.BuildInventoryEntries walks for the spawn). This was a
+		// hand-maintained parallel table of the 18 WORN slots, which silently dropped the 6 VANITY slots (1002+) out of
+		// the snapshot's equipped container: the avatar rendered its vanity off the FA015807 spawn, but the client's
+		// equipment/vanity panel came up empty because the container the panel reads never carried them. Retail DOES
+		// ship vanity here - NecroL80's L80 snapshot's equipped container holds pos 1002/1007/1011/1014/1018 alongside the
+		// worn set. FirstPosBag (17) is NOT an enum member and stays handled separately (bagFirst).
+		private static readonly CharacterEquipmentSlot[] InventoryEquippedSlots = Enum.GetValues<CharacterEquipmentSlot>();
 
 		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x58);
 
@@ -132,10 +133,6 @@ namespace Faolan.GameServer
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
 		private static readonly byte[] PlayerDeathSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
-
-		// The trailing bytes of the 8-byte blob prefix after [flag][BE32 blobLen]: the captured beach field5, constant
-		// for the world-entry snapshot (the live splice path preserves these same bytes via SetSnapshotBlobLength).
-		private static readonly byte[] SnapshotPrefixField5 = [0x28, 0x81, 0x06];
 
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the

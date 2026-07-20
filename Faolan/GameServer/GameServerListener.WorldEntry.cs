@@ -986,11 +986,11 @@ namespace Faolan.GameServer
 		private static byte[] BuildBurstlessSnapshotRoot(uint instance, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags)
 		{
 			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
-			foreach (var (slot, get) in InventoryEquippedSlots)
+			foreach (var slot in InventoryEquippedSlots)
 			{
-				var item = get(equipment);
+				var item = equipment[slot];
 				if (item is { Hash: not 0 })
-					equipped[slot] = (item, item.Hash);
+					equipped[(ulong)slot] = (item, item.Hash);
 			}
 
 			(Item, uint)? bagFirst = equipment.FirstPosBag is { Hash: not 0 }

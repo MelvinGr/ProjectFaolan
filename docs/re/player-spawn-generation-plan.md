@@ -219,9 +219,11 @@ memory `snapshot_tails_construction_scope`):
 - **The "prefix" is decoded and built from scratch** (`GameServerListener.BuildSnapshotPrefix`). This
   paragraph's original byte model — `[u32 X][varint root-length][trailing 0x81 0x06]` with the length as a
   protobuf varint at offset 4 (= const `4483` + rootLength) — was a **misread that was later Ghidra-corrected**
-  (`n3InfoItemRemote::Construct`, see `GameServerListener.Outbound.cs`): the 8 bytes are actually
-  `[u8 flag=0][u32 BE blobLen][field5 = 28 81 06]` where `blobLen = field5.Length + rootLength` (a plain
-  big-endian blob length, NOT a varint, NOT `4483`-based). Regenerating the root (a different length) requires
+  (`n3InfoItemRemote::Construct`, see `GameServerListener.Outbound.cs`): the prefix is actually the 5 bytes
+  `[u8 flag=0][u32 BE blobLen]` where `blobLen = rootLength` (a plain big-endian blob length, NOT a varint,
+  NOT `4483`-based). A later intermediate model appended the next 3 bytes `28 81 06` as a constant "field5" —
+  they are the root's own `subscription_flags`, and reading `root = blobLen - 3` broke every level-80 snapshot
+  (#381). Regenerating the root (a different length) requires
   rewriting that length or the client misframes (`ReadSubClass Wrong IIR_t version`); `SetSnapshotBlobLength`
   (burst path, superseding the byte-misaligned `AdjustSnapshotPrefixRootLength`) / `BuildSnapshotPrefix`
   (from-scratch) handle it, locked by `SnapshotBlobLengthTests` (BE32 length) and `BeachSnapshotConstructionTests` (from-scratch prefix).

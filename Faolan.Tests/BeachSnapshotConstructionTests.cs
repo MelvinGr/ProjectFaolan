@@ -40,9 +40,12 @@ namespace Faolan.Tests
 		{
 			var (prefix, root, _) = SplitBeach();
 			_o.WriteLine($"prefix = {Convert.ToHexString(prefix)} rootLen={root.Length}");
-			Assert.Equal(8, prefix.Length);
-			Assert.Equal(new byte[] { 0x00, 0x00, 0x00, 0x02 }, prefix[..4]); // base IIR version 2
-			Assert.Equal(new byte[] { 0x81, 0x06 }, prefix[6..]); // trailing varint (769)
+			// [u8 flag=0][u32 BE blobLen] and nothing else - blobLen delimits the root exactly. The 3 bytes that
+			// used to be read as a trailing "field5" (28 81 06) are the ROOT's own subscription_flags varint.
+			Assert.Equal(5, prefix.Length);
+			Assert.Equal((byte)0x00, prefix[0]); // flag
+			Assert.Equal(root.Length, (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(1, 4)));
+			Assert.Equal(0x28, root[0]); // root leads with field 5 (subscription_flags) on this beach capture
 		}
 
 		// (The byte-exact tails build is proven against this same template by BeachTailsFromScratchTests
