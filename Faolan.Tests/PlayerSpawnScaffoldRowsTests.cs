@@ -261,7 +261,7 @@ namespace Faolan.Tests
 		public void FreshPreFrame_WritesVanityMaskBigEndian(uint mask, string expectedHex)
 		{
 			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.Assassin, mask);
-			var off = PlayerSpawnScaffoldRows.VanityHiddenMaskOffset;
+			var off = PlayerSpawnScaffoldRows.VanityShownMaskOffset;
 			Assert.Equal(expectedHex, Convert.ToHexString(frame.AsSpan(off, 4).ToArray()).ToLowerInvariant());
 		}
 	}

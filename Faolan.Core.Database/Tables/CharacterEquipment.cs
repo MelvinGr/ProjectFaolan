@@ -355,19 +355,27 @@ namespace Faolan.Core.Database.Tables
 			}
 		}
 
-		// --- vanity ("costume") armour hide filter (client method ToggleVanityArmorFilter, GameCharAgentProject 0x200B).
-		// The per-slot "is this slot's piece hidden" toggles are stored as ONE bitmask: bit N set = slot N hidden. The
-		// bit index IS the toggle's wire `slot` arg = the BASE equip slot id, so any slot round-trips by construction
-		// (incl. the still-unidentified 29/30 and the 31 master). This value is emitted VERBATIM to the client on world
-		// entry - the FA015807 self-spawn's PlayerSpawnScaffold PreFrame carries it as 4 bytes big-endian - so the hide
-		// survives relog (the client renders the show/hide itself off the mask). Capture-confirmed by the vanity-head/
-		// -chest login dumps: hiding Head (slot 2) sets bit 2, hiding Chest (slot 5) sets bit 5; the "global" toggle is
-		// slot 31 -> bit 31. toggleState polarity is confirmed too (both toggled OFF - not visible - sent 0, so
-		// toggleState 0 = hidden). See PlayerSpawnScaffoldRows + docs/subsystems/vanity-armor-filter.md (#336).
-		public uint VanityHiddenMask { get; set; }
+		// --- vanity ("costume") armour filter (client method ToggleVanityArmorFilter, GameCharAgentProject 0x200B).
+		// The per-slot toggles are stored as ONE bitmask: bit N SET = slot N's vanity piece is SHOWN. The bit index IS
+		// the toggle's wire `slot` arg = the BASE equip slot id, so any slot round-trips by construction (incl. the
+		// still-unidentified 29/30 and the 31 master). Emitted VERBATIM to the client on world entry - the FA015807
+		// self-spawn's PlayerSpawnScaffold PreFrame carries it as 4 bytes big-endian - so the setting survives relog
+		// (the client renders the show/hide off it).
+		//
+		// ⚠️ POLARITY: 1 = enabled = SHOWN. This was modelled backwards and called VanityHiddenMask, which read as the
+		// exact opposite of what it holds, and every comment describing it inherited the inversion. The code was
+		// always right (`if (toggleState) mask |= bit`, and the wire's toggleState 1 = enabled); only the NAME and the
+		// prose were wrong. NecroL80's captured mask 0x000450A4 is bits 2/5/7/12/14/18 = her Head/Belt/Boots/Wrist
+		// vanity SHOWN, which is what the client actually renders - under the old "hidden" reading four of her five
+		// vanity pieces would have been hidden, which they visibly are not.
+		//
+		// Capture-confirmed slot mapping: the vanity-head login dump carries bit 2 (Head), vanity-chest carries bit 5
+		// (Chest); the "global" master toggle is slot 31 -> bit 31. See PlayerSpawnScaffoldRows (#336).
+		public uint VanityShownMask { get; set; }
 
-		// Apply one ToggleVanityArmorFilter(slot, hidden): set/clear the slot's bit in the mask. The wire `slot` is the
-		// bit index directly (0..31), so no per-slot mapping is needed. Returns false for an out-of-range slot.
+		// Apply one ToggleVanityArmorFilter(slot, toggleState): set/clear the slot's bit. toggleState 1 = enabled =
+		// SHOWN, so it sets the bit. The wire `slot` is the bit index directly (0..31) - no per-slot mapping needed.
+		// Returns false for an out-of-range slot.
 		public bool SetVanityFilter(uint slot, bool toggleState)
 		{
 			if (slot > 31)
@@ -375,9 +383,9 @@ namespace Faolan.Core.Database.Tables
 
 			var bit = 1u << (int)slot;
 			if (toggleState)
-				VanityHiddenMask |= bit;
+				VanityShownMask |= bit;
 			else
-				VanityHiddenMask &= ~bit;
+				VanityShownMask &= ~bit;
 
 			return true;
 		}

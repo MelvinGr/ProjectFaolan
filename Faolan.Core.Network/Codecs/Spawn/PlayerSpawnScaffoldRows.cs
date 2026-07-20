@@ -187,10 +187,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 		}
 
-		// Offset of the vanity hidden-slots bitmask within the 239-byte PreFrame (4 bytes, big-endian; bit = base equip
-		// slot id). 0 = nothing hidden (the fresh default); the FA015807 self-spawn carries it so a hidden piece
-		// survives relog - the client renders the show/hide off it (#336).
-		public const int VanityHiddenMaskOffset = 18;
+		// Offset of the vanity SHOWN-slots bitmask within the 239-byte PreFrame (4 bytes, big-endian; bit = base equip
+		// slot id, SET = that slot's vanity piece is shown). 0 = no vanity shown, which is the fresh default. The
+		// FA015807 self-spawn carries it so the setting survives relog - the client renders the show/hide off it
+		// (#336). See CharacterEquipment.VanityShownMask for the polarity, which was modelled backwards.
+		public const int VanityShownMaskOffset = 18;
+
+		// The vanity shown-mask carried by a captured spawn's PreFrame. The write side is FreshPreFrame; this is the
+		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
+		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
+		{
+			var preFrame = scaffold?.PreFrame;
+			return preFrame is { } f && f.Length >= VanityShownMaskOffset + 4
+				? BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(VanityShownMaskOffset, 4))
+				: 0u;
+		}
 
 		// Offset of the u32 feat-list count marker within the PreFrame. The pre-IIR frame carries the character's
 		// UNLOCKED FEAT list here: [u32 (featCount+1)*0x3F1][featCount x u32 featId BE]. Everything up to & including
@@ -201,12 +212,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
 		private const int PreFrameTail = 113;
 
-		public static byte[] FreshPreFrame(Class @class, uint vanityHiddenMask = 0, IReadOnlyList<uint> feats = null)
+		public static byte[] FreshPreFrame(Class @class, uint vanityShownMask = 0, IReadOnlyList<uint> feats = null)
 		{
 			var featCount = feats?.Count ?? 0;
 			var f = new byte[PreFrameHead + 4 * featCount + PreFrameTail];
 			f[0] = 0x05;
-			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(VanityHiddenMaskOffset, 4), vanityHiddenMask); // vanity hide mask (#336)
+			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(VanityShownMaskOffset, 4), vanityShownMask); // vanity shown mask (#336)
 			f[70] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
 			f[71] = (byte)@class; // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
 			f[76] = 0x6F; // constant marker
@@ -315,7 +326,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// piece survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
 			// EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
 			var feats = character.Feats?.OrderBy(f => f.Sequence).Select(f => f.FeatId).ToList();
-			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityHiddenMask ?? 0, feats);
+			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, feats);
 			scaffold.EntryTableX = 0xB7;
 			scaffold.BuffRecords.Clear();
 

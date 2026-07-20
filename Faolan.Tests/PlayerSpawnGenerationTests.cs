@@ -189,7 +189,7 @@ namespace Faolan.Tests
 		}
 
 		// ToggleVanityArmorFilter (0x200B) does NOT withhold anything from the spawn: every worn + vanity item always
-		// ships, and hiding a slot is carried purely by the VanityHiddenMask bitmask in the spawn header (the client
+		// ships, and hiding a slot is carried purely by the VanityShownMask bitmask in the spawn header (the client
 		// renders the show/hide off it). So the snapshot equipment is invariant under the toggle - only the mask moves.
 		[Fact]
 		public void PlayerSpawnEquipment_ShipsAllItems_HideIsMaskOnly()
@@ -209,7 +209,7 @@ namespace Faolan.Tests
 			// Toggle head + the global master: the mask picks up bits 2 and 31, but the shipped entries are unchanged.
 			Assert.True(equipment.SetVanityFilter((uint)CharacterEquipmentSlot.Head, true));
 			Assert.True(equipment.SetVanityFilter(CharacterEquipment.VanityFilterMainSlot, true));
-			Assert.Equal((1u << 2) | (1u << 31), equipment.VanityHiddenMask);
+			Assert.Equal((1u << 2) | (1u << 31), equipment.VanityShownMask);
 
 			var after = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
 			Assert.Equal(before, after); // nothing withheld

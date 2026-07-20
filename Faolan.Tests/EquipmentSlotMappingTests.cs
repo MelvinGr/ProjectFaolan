@@ -57,16 +57,16 @@ namespace Faolan.Tests
 			var e = new CharacterEquipment();
 
 			Assert.True(e.SetVanityFilter((uint)CharacterEquipmentSlot.Head, true)); // slot 2 -> bit 2
-			Assert.Equal(1u << 2, e.VanityHiddenMask);
+			Assert.Equal(1u << 2, e.VanityShownMask);
 
 			Assert.True(e.SetVanityFilter((uint)CharacterEquipmentSlot.Chest, true)); // slot 5 -> bit 5 (additive)
-			Assert.Equal((1u << 2) | (1u << 5), e.VanityHiddenMask);
+			Assert.Equal((1u << 2) | (1u << 5), e.VanityShownMask);
 
 			Assert.True(e.SetVanityFilter((uint)CharacterEquipmentSlot.Head, false)); // clearing one leaves the other
-			Assert.Equal(1u << 5, e.VanityHiddenMask);
+			Assert.Equal(1u << 5, e.VanityShownMask);
 
 			Assert.True(e.SetVanityFilter(CharacterEquipment.VanityFilterMainSlot, true)); // global master -> bit 31
-			Assert.Equal((1u << 5) | (1u << 31), e.VanityHiddenMask);
+			Assert.Equal((1u << 5) | (1u << 31), e.VanityShownMask);
 
 			Assert.Equal(31, CharacterEquipment.VanityFilterMainSlot);
 			Assert.False(e.SetVanityFilter(32, true)); // out of range -> no-op

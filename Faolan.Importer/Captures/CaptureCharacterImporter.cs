@@ -319,7 +319,14 @@ namespace Faolan.Importer.Captures
 			// Worn equipment: every IIR InventoryEntry whose template is a DB item.
 			var equipment = new CharacterEquipment
 			{
-				CharacterId = character.Id
+				CharacterId = character.Id,
+
+				// The vanity shown-mask, lifted back out of the captured spawn's PreFrame. Without this every
+				// imported character came in at 0 (NO vanity shown) no matter what the capture held - the one piece
+				// of per-character vanity state the import silently dropped. NecroL80's login capture carries
+				// 0x000450A4 (bits 2/5/7/12/14/18); the vanity-head/-chest dumps carry 0x04 and 0x20 respectively,
+				// which is what pinned the bit = base equip slot mapping in the first place (#336).
+				VanityShownMask = PlayerSpawnScaffoldRows.ReadVanityShownMask(scaffold)
 			};
 			var worn = 0;
 			foreach (var entry in message.InventoryEntries)
