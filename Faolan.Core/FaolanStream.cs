@@ -114,14 +114,26 @@ namespace Faolan.Core
 			return ReadArray(Length - Position);
 		}
 
+		// WIRE STRINGS ARE RAW BYTES - use Latin1, never ASCII or UTF-8.
+		//
+		// The client's BinaryStream::ReadString (FUN_00cbf840 <- FUN_0048f840) memcpy's the length-prefixed bytes
+		// straight into an MSVC std::string. It does NOT transcode. So a wire string is a byte string, and the only
+		// correct .NET mapping is Latin1: it is a bijection between bytes 0x00-0xFF and chars U+0000-U+00FF, so every
+		// byte round-trips.
+		//   - Encoding.ASCII is LOSSY both ways: it turns any byte >= 0x80 into '?' on read, and any non-ASCII char
+		//     into '?' on write. It silently destroys accented characters.
+		//   - Encoding.UTF8 re-encodes a high char into a multi-byte sequence the client never sent, and throws or
+		//     substitutes on bytes that are not valid UTF-8 - which raw byte strings frequently are not.
+		// (The captures cannot show this: every decodable captured string is pure ASCII, where all three agree - the
+		// quest XML escapes non-ASCII as &#nn; entities. The client is the oracle here, not the corpus.)
 		public string ReadString()
 		{
-			return Encoding.UTF8.GetString(ReadArrayUInt16Length());
+			return Encoding.Latin1.GetString(ReadArrayUInt16Length());
 		}
 
 		public string ReadStringByteLength()
 		{
-			return Encoding.UTF8.GetString(ReadArrayByteLength());
+			return Encoding.Latin1.GetString(ReadArrayByteLength());
 		}
 
 		public ushort ReadUInt16()
@@ -315,14 +327,17 @@ namespace Faolan.Core
 			return WriteFloat(value.W);
 		}
 
+		// The u16-length-prefixed form is the client's DEFAULT string framing (BinaryStream::ReadString mode 0:
+		// read a u16; a value >= 0x8000 escapes to a u32 long form, which nothing we emit approaches). See ReadString
+		// for why Latin1 and not ASCII/UTF-8.
 		public FaolanStream WriteString(string value)
 		{
-			return WriteArrayUInt16Length(Encoding.UTF8.GetBytes(value ?? ""));
+			return WriteArrayUInt16Length(Encoding.Latin1.GetBytes(value ?? ""));
 		}
 
 		public FaolanStream WriteStringByteLength(string value)
 		{
-			return WriteArrayByteLength(Encoding.UTF8.GetBytes(value ?? ""));
+			return WriteArrayByteLength(Encoding.Latin1.GetBytes(value ?? ""));
 		}
 
 		public FaolanStream WriteUInt16(IConvertible value)

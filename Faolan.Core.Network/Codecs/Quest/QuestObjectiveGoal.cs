@@ -44,11 +44,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var zero2 = r.ReadUInt32();
 
 			var objective = r.ReadArrayUInt32Length();
-			var leadByte = r.ReadByte();
-			if (leadByte != 0)
-				throw new InvalidOperationException($"@609 goal: text-record lead 0x{leadByte:X} != 0");
 
-			var text = r.ReadArrayByteLength();
+			// The trailing text record is a u16-length-prefixed string, NOT [0x00][u8 len]. Those are the same bytes
+			// below 256 - the "lead 0x00" is the length's high byte - and the longest captured record is 119 B, so the
+			// corpus could never tell them apart (#388). The CLIENT settles it: BinaryStream::ReadString
+			// (FUN_00cbf840 <- FUN_0048f840) reads a u16 in its default mode, and this record is read through that
+			// same primitive (FUN_00922c90 = u32 + 3x ReadString). The sibling QuestcRecord already read it as u16.
+			var text = r.ReadArrayUInt16Length();
 
 			return new QuestObjectiveGoal
 			{
@@ -91,8 +93,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(Zero1);
 			w.WriteUInt32(Zero2);
 			w.WriteArrayUInt32Length(Objective);
-			w.WriteByte(0);
-			w.WriteArrayByteLength(TextRecord);
+			w.WriteArrayUInt16Length(TextRecord); // u16-framed - see Read (#388)
 		}
 
 		// Builds one goal record from its MEANINGFUL fields, synthesizing the constants (Lead/One = 1, GoalIdRepeat =

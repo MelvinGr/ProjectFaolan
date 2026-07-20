@@ -383,27 +383,19 @@ namespace Faolan.Core.Network.Codecs.Quest
 		private const int HeaderLength = 29;
 		private const int EntrySize = 8;
 
-		// A quest text record: the <remoteformat>/<localized> XML with its length prefix.
+		// A quest text record: the <remoteformat>/<localized> XML, u16-length-prefixed.
 		//
-		// This was hand-rolled (allocate, poke b[0]=0, poke b[1]=len, CopyTo). It is WriteByte(0) +
-		// WriteStringByteLength - the same shape QuestObjectiveGoal.Read parses back (ReadByte()==0 then
-		// ReadArrayByteLength), so the write side now mirrors the read side through the helpers.
+		// This was hand-rolled as [0x00][u8 len][ascii] with a >255 guard. Both were wrong, and invisibly so: the
+		// bytes are identical below 256 (the "lead 0x00" is the u16 length's high byte) and the longest of 2850
+		// captured records is 119 B, so no capture could discriminate. The client decides it - BinaryStream::
+		// ReadString (FUN_00cbf840) reads a u16 in its default mode, escaping to a u32 form only at >= 0x8000, so
+		// the real ceiling is 0x7FFF and the old 0xFF guard was an artificial limit (#388).
 		//
-		// ⚠️ NOT written as FaolanStream.WriteString, even though [0x00][u8 len] and a [u16 BE len] are the SAME
-		// BYTES for any record under 256: which of the two the client actually reads is UNDECIDED, and using
-		// WriteString here would quietly assert the u16 answer. The captures cannot decide it - across 2850 captured
-		// goal text records the longest is 119 bytes, so every observed record sits in the range where the two
-		// models coincide. Note the same <remoteformat> content IS read u16-framed elsewhere in this subsystem
-		// (QuestcRecord.Read -> ReadString) while QuestObjectiveGoal reads it as [0x00][u8] - one content type,
-		// two models, neither disprovable from the corpus. Until a client read or a >255 record settles it, this
-		// keeps the modelled framing and the guard that goes with it.
+		// Latin1, not ASCII: the client memcpy's these bytes into a std::string without transcoding, so ASCII's
+		// lossy '?' substitution would corrupt any accented text. See FaolanStream.ReadString.
 		private static byte[] TextRecord(string xml)
 		{
-			var ascii = Encoding.ASCII.GetBytes(xml);
-			if (ascii.Length > 0xFF)
-				throw new ArgumentException($"text record too long ({ascii.Length} B): {xml}");
-
-			return new FaolanStream().WriteByte(0).WriteArrayByteLength(ascii).ToArray();
+			return new FaolanStream().WriteString(xml).ToArray();
 		}
 
 		private static void WriteHeader(FaolanStream w, uint subOpcode, uint playerHandle)
