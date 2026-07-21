@@ -1061,6 +1061,10 @@ namespace Faolan.Importer.Captures
 			goal1.TrailingKey = "b2Y2],LfVfAVps*9JX*G";
 			goal1.TrailingLocalized = false;
 			goal1.TrailingFlags = "";
+			// #262: goal 1448 = "Enter the jungle" - a REACH objective (region ref 180/cat 51200, NOT a kill). Solved
+			// when the player walks within range of its map marker (416,701 on 4010, the jungle mouth on the way to
+			// Saddur), via the move-handler reach check. No TargetName (it's a place, not an NPC).
+			goal1.GoalType = QuestGoalType.ReachArea;
 
 			var goal2 = quest.Goals.FirstOrDefault(g => g.GoalId == 3490) ?? Add(quest, 3490);
 			goal2.Sequence = 2;
@@ -1081,8 +1085,18 @@ namespace Faolan.Importer.Captures
 			goal2.TrailingLocalized = true;
 			goal2.TrailingFlags = "m";
 
+			// #262: the SERVER-trigger fields (the wire/@609 detail above only drives the journal DISPLAY). 10238 is
+			// "Shipwrecked / I. The Slaver" (start Kalanthes, aoc.fandom.com/wiki/Quest:Shipwrecked): its completing goal
+			// is 3490 = "Kill slavemaster Saddur" (TrailingRefId 9500 = Saddur's template, at his 521/757 spawn), which
+			// supersedes to stage II "The Acheronian Gate" (12369) - proven by the Hoxxling gameplay capture
+			// (Saddur dies fr11942 -> 10238 completes -> 12369 -> 12373). Goal 1448 ("Enter the jungle", a region ref
+			// 180/cat 51200 - NOT a kill) has no trigger type yet and is pre-satisfied at grant (CreateFlowService).
+			quest.NextQuestId = 12369;
+			goal2.GoalType = QuestGoalType.Kill;
+			goal2.TargetName = "Saddur";
+
 			await db.SaveChangesAsync();
-			Console.WriteLine("Seeded beach quest 10238 goal-detail (2 goals) for the @609 objective region.");
+			Console.WriteLine("Seeded beach quest 10238 goal-detail (2 goals) + Saddur kill trigger -> 12369 (#262).");
 
 			static QuestGoalDefinition Add(QuestDefinition q, uint goalId)
 			{

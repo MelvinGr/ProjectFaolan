@@ -5,11 +5,39 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		// #262: solve any ReachArea quest goal the player has just walked into range of. Called from the move handler
+		// on every accepted player move; the goal targets are cached on the player WorldEntity (lazily loaded once, so
+		// this stays a pure in-memory distance test with no DB hit until a goal actually fires). A solved target is
+		// removed so it fires exactly once; SolveGoal handles the tick / completion / chain supersession.
+		private async Task CheckPlayerReachGoals(INetworkClient client, WorldEntity player, Vector3 position)
+		{
+			player.PendingReachGoals ??= await _questProgression.LoadReachGoals(client.Session.Character.Id);
+			if (player.PendingReachGoals.Count == 0)
+				return;
+
+			for (var i = player.PendingReachGoals.Count - 1; i >= 0; i--)
+			{
+				var target = player.PendingReachGoals[i];
+				if (target.MapId != player.MapId)
+					continue;
+
+				var dx = position.X - target.X;
+				var dz = position.Z - target.Z;
+				if (dx * dx + dz * dz > target.RadiusSq)
+					continue;
+
+				player.PendingReachGoals.RemoveAt(i);
+				Logger.LogInformation("#262: player {Char} reached quest {Quest} goal {Goal} area ({X},{Z}).", client.Session.Character.Name, target.QuestId, target.GoalId, target.X, target.Z);
+				await _questProgression.SolveGoal(client, target.GoalId);
+			}
+		}
+
 		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
 		{
 			return _broadcaster.BroadcastEntityFade(entity);

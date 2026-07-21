@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
@@ -6,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Quest
@@ -41,10 +43,13 @@ namespace Faolan.GameServer.Quest
 			_logger = logger;
 		}
 
-		// A kill of `npcName` by the player: advance any active kill goal targeting it.
-		public Task AdvanceKillGoals(INetworkClient client, string npcName)
+		// A kill of the NPC (`templateId` = its NpcTemplateId, `npcName` = its name) by the player: advance any active
+		// kill goal targeting it. Matched primarily by the STABLE template id (the goal's TrailingRefId), with the name
+		// as a fallback for group-kill goals - see QuestProgress.MatchingKillGoal (#262). templateId is nullable (null =
+		// no type id known, match by name only).
+		public Task AdvanceKillGoals(INetworkClient client, uint? templateId, string npcName)
 		{
-			return Advance(client, QuestGoalType.Kill, npcName);
+			return Advance(client, QuestGoalType.Kill, npcName, templateId);
 		}
 
 		// The player looted `sourceNpcName`'s corpse bag: advance any active loot-from-NPC goal targeting it. The quest
@@ -58,6 +63,40 @@ namespace Faolan.GameServer.Quest
 		public Task AdvanceTalkGoals(INetworkClient client, string npcName)
 		{
 			return Advance(client, QuestGoalType.TalkToNpc, npcName);
+		}
+
+		// How close (world units, horizontal) the player must get to a ReachArea goal's marker to solve it (#262). The
+		// markers are approximate (Shipwrecked's "Enter the jungle" is at 416/701, ~28u off the spawn->Saddur path), so
+		// this is generous enough to fire while walking past yet far enough (94u) not to trip at the spawn.
+		private const float ReachRadius = 40f;
+
+		// #262: the ReachArea goals the player still needs to reach, as in-memory targets for the move-handler proximity
+		// check (WorldEntity.PendingReachGoals). Loaded ONCE at first move so the per-move test hits no DB; skips goals
+		// already solved (a relog past the area doesn't re-fire) and every non-ReachArea goal. A ReachArea goal has no
+		// TargetName - its objective is the (MapId, MarkerX, MarkerY) point, which IS the objective's world location.
+		public async Task<List<ReachGoalTarget>> LoadReachGoals(uint characterId)
+		{
+			var targets = new List<ReachGoalTarget>();
+			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			{
+				if (quest.State != QuestState.Active)
+					continue;
+
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				if (def == null)
+					continue;
+
+				foreach (var goal in def.Goals.Where(g => g.GoalType == QuestGoalType.ReachArea))
+				{
+					var required = GoalRequired(quest, def, goal);
+					if (await GoalProgressOf(characterId, quest, def, goal) >= required)
+						continue; // already reached
+
+					targets.Add(new ReachGoalTarget(quest.QuestId, goal.GoalId, goal.MapId ?? 0, goal.MarkerX ?? 0, goal.MarkerY ?? 0, ReachRadius * ReachRadius));
+				}
+			}
+
+			return targets;
 		}
 
 		// #356: a Lua EFFECT script resolved goal `goalId` (player:SolveGoal(goalId)) - the RDB quest engine's way of
@@ -105,10 +144,10 @@ namespace Faolan.GameServer.Quest
 		// goal has reached its required count. A tick that leaves the quest incomplete (this goal not yet done, or a
 		// sibling goal still pending) just refreshes the HUD and stays Active; a complete quest supersedes to the next
 		// stage, or (chainless kill) awaits turn-in at the giver - the legacy #47 path.
-		private async Task Advance(INetworkClient client, QuestGoalType triggerType, string targetName)
+		private async Task Advance(INetworkClient client, QuestGoalType triggerType, string targetName, uint? targetTemplateId = null)
 		{
 			var character = client?.Session?.Character;
-			if (character == null || string.IsNullOrEmpty(targetName))
+			if (character == null || (string.IsNullOrEmpty(targetName) && targetTemplateId is null))
 				return;
 
 			// Snapshot the quests up front: CompleteAndSupersede writes the next stage Active, but the captured chain
@@ -123,7 +162,11 @@ namespace Faolan.GameServer.Quest
 				if (def == null)
 					continue;
 
-				var goal = QuestProgress.MatchingGoal(def.Goals, triggerType, targetName);
+				// A kill matches by the STABLE target template id (TrailingRefId), name as fallback (#262); other triggers
+				// (loot/talk/escort) are inherently name-keyed - the corpse bag's source name, the NPC greeting's name.
+				var goal = triggerType == QuestGoalType.Kill
+					? QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName)
+					: QuestProgress.MatchingGoal(def.Goals, triggerType, targetName);
 				if (goal == null)
 					continue;
 

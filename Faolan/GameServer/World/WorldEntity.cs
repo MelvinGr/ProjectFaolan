@@ -187,6 +187,11 @@ namespace Faolan.GameServer.World
 		// quest givers), so it generalises to any number of quests/NPCs. See IsVisibleTo.
 		public IReadOnlyList<uint> GateQuestIds { get; set; }
 
+		// For a PLAYER: the pending ReachArea quest goals (#262) - a location objective is solved when the player moves
+		// within range of its point. Loaded once at world entry (null = not yet loaded) so the per-move check is a pure
+		// in-memory distance test, no DB hit; entries are removed as they're reached. Empty list = nothing to watch.
+		public List<ReachGoalTarget> PendingReachGoals { get; set; }
+
 		// #266 patrol: the captured waypoint route (absolute world coords) this NPC walks + its walk speed; empty for a
 		// stationary NPC. Sent as a patrol MoveTask after the NPC spawns - retail drives idle patrol client-side (the
 		// client walks the route), so the server just issues the captured route once per spawn/respawn.
@@ -490,4 +495,9 @@ namespace Faolan.GameServer.World
 	// A spell a caster NPC casts at its target (#232): the full wire spell id + the captured ApplySpell effect
 	// payload (interim verbatim). Sourced from the NpcSpell table by NPC name.
 	public readonly record struct NpcSpellCast(uint SpellId, byte[] Payload);
+
+	// A pending ReachArea quest goal (#262): the goal is solved when the player is within `RadiusSq` (horizontal, on
+	// map `MapId`) of the world point (X, Z) - the goal's map marker, which IS the objective's world location
+	// (verified: Saddur's kill-goal marker == his spawn). QuestId is kept so a solved goal names its quest in logs.
+	public readonly record struct ReachGoalTarget(uint QuestId, uint GoalId, uint MapId, float X, float Z, float RadiusSq);
 }

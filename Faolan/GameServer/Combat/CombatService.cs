@@ -440,7 +440,8 @@ namespace Faolan.GameServer.Combat
 						: $"respawns in {npcEntity.RespawnDelaySeconds}s");
 				// Quest chain (#261): a kill advances/completes any matching kill goal. A chained stage (e.g. Casilda's
 				// 13479) completes + supersedes to the next stage; a chainless kill quest keeps the legacy turn-in path.
-				await _questProgression.AdvanceKillGoals(killer, npcEntity.Name);
+				// Matched by the STABLE target template id (the goal's TrailingRefId), name as fallback (#262).
+				await _questProgression.AdvanceKillGoals(killer, npcEntity.NpcTemplateId, npcEntity.Name);
 				return;
 			}
 

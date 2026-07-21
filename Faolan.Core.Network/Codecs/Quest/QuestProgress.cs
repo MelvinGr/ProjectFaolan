@@ -29,5 +29,26 @@ namespace Faolan.Core.Network.Codecs.Quest
 				.OrderBy(g => g.Sequence)
 				.FirstOrDefault(g => g.GoalType == triggerType && !string.IsNullOrEmpty(g.TargetName) && g.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase));
 		}
+
+		// The Kill goal a kill of the NPC with `templateId` advances (#262). The target key is the goal's TrailingRefId -
+		// the CAPTURE-DERIVED target template (e.g. Saddur 9500, Scavenger Tuut 11561), which equals the killed entity's
+		// NpcTemplateId. That id is STABLE where a name string is fragile: localized, and collision-prone (three distinct
+		// "Scavenger Lackey" templates share one name). `name` is a fallback for a goal seeded WITHOUT a matching template
+		// id - either a name-only seed, or a "kill N <group>" goal whose TrailingRefId is a monster-GROUP id (no single
+		// template), where the shared name is the only key that catches every variant. Kill-typed goals only.
+		public static QuestGoalDefinition MatchingKillGoal(IEnumerable<QuestGoalDefinition> goals, uint? templateId, string name)
+		{
+			if (goals == null)
+				return null;
+
+			var kills = goals.Where(g => g.GoalType == QuestGoalType.Kill).OrderBy(g => g.Sequence).ToList();
+
+			if (templateId is { } id && kills.FirstOrDefault(g => g.TrailingRefId == id) is { } byId)
+				return byId;
+
+			return string.IsNullOrEmpty(name)
+				? null
+				: kills.FirstOrDefault(g => !string.IsNullOrEmpty(g.TargetName) && g.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase));
+		}
 	}
 }

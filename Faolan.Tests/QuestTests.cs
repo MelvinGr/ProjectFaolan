@@ -142,6 +142,27 @@ namespace Faolan.Tests
 			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.TalkToNpc, "Nobody")); // no such target
 		}
 
+		[Fact]
+		public void MatchingKillGoal_PrefersTemplateId_FallsBackToName()
+		{
+			// Shipwrecked 10238 (#262): goal 3490 = kill Saddur (TrailingRefId 9500 = his template); goal 1448 =
+			// ReachArea "enter jungle", which the kill matcher must never return.
+			var goals = new[]
+			{
+				new QuestGoalDefinition { Sequence = 1, GoalId = 1448, GoalType = QuestGoalType.ReachArea, TrailingRefId = 180 },
+				new QuestGoalDefinition { Sequence = 2, GoalId = 3490, GoalType = QuestGoalType.Kill, TargetName = "Saddur", TrailingRefId = 9500 }
+			};
+			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, "Saddur")?.GoalId); // by STABLE template id
+			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, null)?.GoalId); // id alone, no name needed
+			Assert.Null(QuestProgress.MatchingKillGoal(goals, 12141, "Some Lackey")); // wrong id + unknown name -> no match
+
+			// Fallback: a goal seeded by NAME only (no TrailingRefId - e.g. a "kill N <group>" whose ref is a group id).
+			var byName = new[] { new QuestGoalDefinition { Sequence = 1, GoalId = 700, GoalType = QuestGoalType.Kill, TargetName = "Scavenger Lackey" } };
+			Assert.Equal(700u, QuestProgress.MatchingKillGoal(byName, 12141, "scavenger lackey")?.GoalId); // id misses -> name, case-insensitive
+			Assert.Equal(700u, QuestProgress.MatchingKillGoal(byName, null, "Scavenger Lackey")?.GoalId); // no id -> name
+			Assert.Null(QuestProgress.MatchingKillGoal(byName, null, "Nobody")); // no id, wrong name
+		}
+
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back
 		// through the builders reproduces the captured packets byte-for-byte (proves QuestDefinitionExtractor's
 		// refs + objective marker, and the QuestTextRef -> record mapping).

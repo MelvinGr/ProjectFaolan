@@ -153,6 +153,11 @@ namespace Faolan.GameServer
 							var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
 							var liveRotation = moveEntity?.Rotation.ToVector3() ?? sessionCharacter.Rotation.ToVector3();
 
+							// #262: a move can satisfy a ReachArea quest goal (e.g. Shipwrecked's "Enter the jungle") - solve
+							// any whose area this position falls in. In-memory distance test (targets cached on the entity).
+							if (moveEntity != null)
+								await CheckPlayerReachGoals(client, moveEntity, livePosition);
+
 							// Moving cancels an in-flight cast (#347): a real translation (the position actually changed -
 							// turning in place leaves it unchanged, so aiming a ground-target reticle like Deadly Blizzard
 							// never self-cancels) bumps the cast token so the deferred Resolve() aborts. Server-side, so it
