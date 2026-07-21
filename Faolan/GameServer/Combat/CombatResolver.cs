@@ -98,20 +98,27 @@ namespace Faolan.GameServer.Combat
 		// the caller passes a random roll for per-swing variance, default 50 = the midpoint), scaled down, plus a small
 		// level contribution (so progression still shows and an early low-damage weapon isn't trivial). Falls back to the
 		// level placeholder when the attacker has no weapon damage (unarmed, or a weapon whose RDB damage wasn't imported).
-		public static int ResolveMeleeDamage(int? weaponMinDamage, int? weaponMaxDamage, ushort casterLevel, int rollPercent = 50)
+		// The divisor turning a raw Combat Rating (0x36B) into a flat melee damage bonus. PROVISIONAL (#399): Combat
+		// Rating's real role is hit-rate (offense vs the target's defense), which needs a hit/miss model we don't have;
+		// until then a geared attacker's Combat Rating (~14-262) adds a modest offensive bump. Tune in-client.
+		public const int CombatRatingDamageDivisor = 10;
+
+		public static int ResolveMeleeDamage(int? weaponMinDamage, int? weaponMaxDamage, ushort casterLevel, int rollPercent = 50, uint combatRating = 0)
 		{
 			var level = casterLevel == 0
 				? (ushort)1
 				: casterLevel;
 
+			var combatBonus = (int)combatRating / CombatRatingDamageDivisor;
+
 			if (weaponMinDamage is { } min && weaponMaxDamage is { } max && max > 0)
 			{
 				var roll = Math.Clamp(rollPercent, 0, 100);
 				var rolled = min + (max - min) * roll / 100; // interpolate min..max
-				return Math.Max(1, rolled / WeaponDamageScale + level);
+				return Math.Max(1, rolled / WeaponDamageScale + level + combatBonus);
 			}
 
-			return ResolveSpellDamage(0, level);
+			return ResolveSpellDamage(0, level) + combatBonus;
 		}
 
 		// The half-mitigation point for the provisional armor curve: the total armor rating at which incoming physical

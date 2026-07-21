@@ -263,6 +263,10 @@ namespace Faolan.GameServer.World
 		public uint CriticalRating { get; set; }
 		public uint CriticalDamageRating { get; set; }
 
+		// The player's aggregated Combat Rating from worn gear (#399, generic 0x36B), added as a provisional flat
+		// melee damage bonus (its real hit-rate role needs a hit/miss model). 0 for NPCs / no gear.
+		public uint CombatRating { get; set; }
+
 		// The player's aggregated Magic Damage rating from worn gear (#399), summed at world entry; added flat to the
 		// damage of spells they cast (CombatResolver.ResolveSpellDamage). 0 for NPCs and players with no such gear.
 		public uint MagicDamage { get; set; }

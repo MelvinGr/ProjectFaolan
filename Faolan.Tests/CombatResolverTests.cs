@@ -29,6 +29,16 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void CombatRating_AddsAFlatMeleeBonus()
+		{
+			var baseDmg = CombatResolver.ResolveMeleeDamage(1000, 5000, 5, 50);
+			var geared = CombatResolver.ResolveMeleeDamage(1000, 5000, 5, 50, 200); // +200 Combat Rating
+
+			Assert.Equal(baseDmg + 200 / CombatResolver.CombatRatingDamageDivisor, geared);
+			Assert.Equal(baseDmg, CombatResolver.ResolveMeleeDamage(1000, 5000, 5, 50, 0)); // no rating = no bonus
+		}
+
+		[Fact]
 		public void Weapon_RollInterpolatesMinToMax()
 		{
 			// roll 0 -> min end, 100 -> max end, 50 -> midpoint (the default).

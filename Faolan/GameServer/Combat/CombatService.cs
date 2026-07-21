@@ -212,14 +212,14 @@ namespace Faolan.GameServer.Combat
 			// #395: melee damage is driven by the equipped main-hand weapon (min/max from the RDB template), not a flat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
 			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
-			// Roll between the weapon's min and max for per-swing variance (#395).
-			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101));
+			var attackerEntity = _sim.PlayerWorldEntity(client);
+			// Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
+			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101), attackerEntity?.CombatRating ?? 0);
 			// #399: roll a critical hit off the player's Critical Rating; a crit scales the damage by the base 1.5x plus
 			// their Critical Damage Rating, and rides the wire as DamageResult type 3 (the client renders it larger).
-			var attacker = _sim.PlayerWorldEntity(client);
-			var crit = CombatResolver.IsCriticalHit(attacker?.CriticalRating ?? 0, Random.Shared.Next(100));
+			var crit = CombatResolver.IsCriticalHit(attackerEntity?.CriticalRating ?? 0, Random.Shared.Next(100));
 			if (crit)
-				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attacker?.CriticalDamageRating ?? 0);
+				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attackerEntity?.CriticalDamageRating ?? 0);
 			var hitType = crit
 				? 3u
 				: 2u;
