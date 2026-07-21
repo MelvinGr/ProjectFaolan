@@ -8,7 +8,7 @@ Data quad). They live in the **encrypted RDB item-template**, which we already T
 `Key1..4` quad, stored as `Item.Key`; `RdbItemImporter`). Dump the decrypted templates with:
 
 ```
-dotnet run --project Faolan.Importer -- --only rdb-items --rdb <RDB dir> --dump-templates <dir>
+dotnet run --project Faolan.Importer -- --only rdb-items --rdb <RDB dir> --captures <data-repo>/Captures --dump-templates <dir>
 ```
 
 Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `DispatchAddItemTests`.
@@ -30,34 +30,57 @@ Self-validation: across all 1964 decrypted templates, field 972 holds an attribu
 and a non-attribute value in **0** — so this slot is safe to import as a `(statId, amount)` attribute bonus.
 In practice only Str (178) and Dex (75) appear as the *primary* attribute.
 
-## OPEN — what's NOT decoded yet (blocks the #3 headline)
+## VALIDATED — the full stat-modifier list (the `[2][9]` record region)
 
-1. **Secondary modifier list.** After the property table there's a separate region of repeating
-   `[2][9][statId][amount][…]` records that ALSO carry attribute ids — Con/Int/Wis turn up *only* here. But
-   the amounts look too large to be raw attribute points (e.g. Con=30 on a Tortage bow), so the semantic
-   (requirement? scaled? percentage?) is unconfirmed. **Needs a reference item with a known tooltip** to
-   disambiguate before import.
-2. **Vital / HP gear bonuses — the actual bar-fill case.** NOT located. A raw scan found the HealthCurrent (`0x1b`)
-   and StaminaMax (`0x1f9`) stat ids in some bodies (HealthMax is actually `0x0001`), but on inspection those were coincidental field VALUES
-   (e.g. field 286 = 505), not stat modifiers. The ring-`+HP` case that motivates #3 therefore can't be
-   imported yet.
+The rich stat list (the whole tooltip: attributes, vitals AND ratings) is a run of fixed **10-word records**
+after the property table, NOT in the strictly-decreasing property run:
+
+```
+[typeMarker u32][0][4][0][1][0][2][9][statId u32][amount u32]
+                        └──────┬──────┘
+             the 6-word signature 4,0,1,0,2,9 anchors each record
+```
+
+- `statId` = the **wire stat id** (same id space as the `0x96B8DC59` vitals / snapshot stat block).
+- `amount` = the bonus **at wire scale** — divide by the stat's `CharacterStatId.GetScale()` to get the
+  displayed value: **÷100 for vitals** (HealthMax `0x0001`, StaminaMax `0x1f9`, ManaMax `0x1fb`) and
+  MagicDamage (`0x35d`), **÷10 for attributes** (Str/Con/Int/Wis/Dex), **÷1 for ratings**.
+
+**Anchor on the 6-word signature, not a raw `[2][9]` scan** — the raw scan yields 2508 hits (958 of them
+coincidental `2,9` word pairs); the signature yields 1550 clean records (the word before the `4` is `0` in
+100% of them). Even so a handful of signature hits carry an RDB **resource type id** as `statId`
+(`1000017`/`1000018`) or garbage (`0x3de071`, `0xd00d`) — filter by a **known-stat-id whitelist**, exactly as
+field 972 is whitelisted to the 5 attribute ids.
+
+### Scale/divisibility proof + in-client ground truth
+
+Across all 3201 decrypted templates every vital `amount` is divisible by 100 and every attribute `amount` by
+10 — **0 violations in 448 records** (`gcd` per stat id = its scale). And it reproduces an
+**independently in-client-verified tooltip** (`docs/re/spawn-dissection-plan.md` STEP (b), 2026-06-07): the
+**Royal Signet** (template `3774542`) shows *+30 Constitution / +52 Magic Damage / +15 Hit Rating* in-client,
+and its three records decode **exactly**:
+
+| record | ÷ scale | tooltip |
+|--------|---------|---------|
+| Con `0x326` = 300 | ÷10 | **+30 Constitution** |
+| `0x35d` = 5200 | ÷100 | **+52 Magic Damage** (⇒ `0x35d` = Magic Damage, ×100) |
+| `0x136` = 15 | ÷1 | **+15 Hit Rating** (⇒ `0x136` = Hit Rating, ×1) |
+
+So the `[2][9]` region is the authoritative modifier list; the earlier "amounts too large for attribute
+points" read was just the missing ÷10 scale. Con/Int/Wis appear only here; **Str/Dex appear here too** (the
+big values), largely disjoint from the small `972` primary — of 468 items with a `972` primary attribute only
+17 also carry that attribute in the region, so the two are near-complementary sources, not duplicates.
 
 ## Status / next step
 
-- Decoded + validated: primary-attribute modifier (`972`/`971`).
-- **IMPORTED:** the modifier is stored on flattened `Item` columns - `StrengthBonus` / `ConstitutionBonus` /
-  `IntelligenceBonus` / `WisdomBonus` / `DexterityBonus` (nullable `int`, `NULL` = no bonus), populated by
-  `RdbItemImporter` from field 972/971. Clean across the decrypted templates: field 972 only ever Str (804) or Dex
-  (814), `Amount` only +1/+2/+3 (matching this doc) - 306 +Str and 157 +Dex items. Each template carries at most one
-  primary attribute, so `SetAttributeBonus` sets one column and clears the other four. `MaxStatAggregator.AggregateGearBonuses`
-  sums a character's equipped `Item` bonus columns by wire stat id (unit-tested). This is the decode-first-clean
-  foundation. (These replaced the old per-`(item,stat)` `ItemStat` table, flattened to columns in
-  `FlattenItemStatsToItemColumns`.)
-- **STILL OPEN (reference-gated, needs an item tooltip):**
-  1. the **secondary-modifier list** semantics + the **vital/HP bonus** field - not decoded, so not stored yet
-     (they slot in as further `Item` columns + the same aggregator sum when a known-tooltip reference pins them);
-  2. the **wire application** - adding the gear bonus onto the character's base attribute IN the stat block. The
-     base attributes are currently the fixed baseline (`SubClassStatBlock`, e.g. `Strength = 0xA`), and the exact
-     ×10 scale a +N modifier displays as isn't proven without a reference, so the aggregator's total is not yet
-     patched into the sent stats. That last hop is what makes the +Str/+Dex visible in-client (and, with the vital
-     field, fixes the health-bar-fill bug).
+- **Decoded + validated:** `972`/`971` primary attribute (Str/Dex +1/+2/+3) AND the full `[2][9]` region
+  (vitals + attributes + Magic Damage + Hit Rating, wire-scaled) — Royal-Signet-anchored.
+- **IMPORTED (attributes, legacy):** the `972`/`971` primary sits on flattened `Item` columns -
+  `StrengthBonus` / `ConstitutionBonus` / `IntelligenceBonus` / `WisdomBonus` / `DexterityBonus` (nullable
+  `int`), populated by `RdbItemImporter` (only Str/Dex ever appear in `972`). Summed by
+  `MaxStatAggregator.AggregateGearBonuses`.
+- **NEXT (this decode):** import the `[2][9]` records into an `ItemStatModifier` child table
+  (`ItemId, StatId, Amount`), whitelisted to the known stat ids, then (a) aggregate vital + attribute totals
+  into the character's derived `MaxHealth`/`MaxStamina`/`MaxMana` (`EntityVitals`) so the regen bar fills past
+  the class base — the #3 headline — and (b) patch attribute totals into the sent stat block. Spells almost
+  certainly share this exact record encoding — see #367 (buff stat-effect engine), likely the same parser.
