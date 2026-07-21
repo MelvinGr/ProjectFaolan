@@ -92,6 +92,10 @@ we've seen_, and names the gaps). Regenerate with
   you act aggressively (#361)
 - ✅ **NPC death animations** — enemies play a proper death on the killing blow instead of vanishing or teleporting
   back to spawn; verified in-client per creature type, with more being harvested (#362)
+- 🟡 **Gear-driven combat stats** — your equipped gear feeds the fight: weapon damage rolls per swing, worn armour and
+  magical Protection mitigate incoming physical/spell hits, and Critical Rating / Critical Damage Rating produce crits
+  (the larger "critical" numbers). The damage/mitigation/crit curves are provisional pending in-client tuning (#395,
+  #399, #401)
 - 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
   cadence are still approximate (#349)
 - 🟡 **Buff stat effects** — buffs show as icon + timer today; applying their actual stat bonuses needs a data
@@ -127,8 +131,12 @@ we've seen_, and names the gaps). Regenerate with
   claims like Double XP, delivered straight to your bag (#359)
 - ✅ **Consumables** — right-click a potion, food, or drink to use it and apply its effect
 - ✅ **Creature loot** — killed enemies drop a lootable bag or chest, chosen per creature type (#363)
-- 🟡 **Gear stat bonuses** — a ring's +HP filling your bar: modifiers are imported and summed; the final wire scale
-  needs a reference tooltip (#3)
+- 🟡 **Gear stat bonuses** — worn gear now actually matters. Each item's whole tooltip stat list is decoded from its
+  RDB template (validated against in-game tooltips, ~17 rating types named): a +HP/+Mana ring fills your bar past the
+  class base, better weapons hit harder (min–max per swing), armour and magical Protection reduce incoming damage,
+  Critical Rating / Critical Damage Rating drive crits, Magic Damage boosts spells, Combat Rating boosts melee, and
+  Natural Mana/Stamina Regen speed the bars. The exact per-hit damage/mitigation/crit formulas are provisional
+  (server-side in retail) pending in-client tuning (#3, #395, #399, #401)
 - 🟡 Guild bank (#132)
 - ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing for attribute bonuses (#311)
 
