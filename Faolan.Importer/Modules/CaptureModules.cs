@@ -811,7 +811,7 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert
 		};
 
-		public string Description => "Quest definitions + beach/Casilda snapshot seeds.";
+		public string Description => "Quest definitions + areas + @609 objective goals (harvest; wiring is the quest-wiring module).";
 		public string Name => "quests";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
@@ -839,8 +839,34 @@ namespace Faolan.Importer.Modules
 			var (verified, verifiable) = await ImportOps.VerifyObjectiveRegions(ctx.Db, ObjectiveGoalExtractor.CapturedRegions(packets));
 			Console.WriteLine($"  objective regions verified byte-exact: {verified} of {verifiable} quests.");
 
-			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {addedGoals} objective goals, {areaCount} quest areas " +
+			return new ImportResult($"{defs.Count} quest definitions, {addedGoals} objective goals, {areaCount} quest areas " +
 			                        $"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");
+		}
+	}
+
+	// The hand-authored quest WIRING overlay (#358): the server-trigger fields (GoalType/TargetName/QuestItemId), chain
+	// successors (NextQuestId) and byte-exact @609/snapshot detail that captures don't carry - the Casilda + Shipwrecked
+	// chains and the sourced location quests. A distinct module (not baked into `quests`) so it's selectable/skippable and
+	// keeps the definition harvest pure. Runs AFTER quests (DependsOn) so it overlays last; trigger/chain seeds are
+	// BOOTSTRAP-ONLY, so a re-run never reverts a Quest-editor edit (only wire fields refresh from the capture).
+	public sealed class QuestWiringModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => [nameof(QuestsModule), nameof(MapsModule)];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
+
+		public string Description => "Hand-authored quest wiring (trigger fields + chains + @609 detail) onto the harvested definitions.";
+		public string Name => "quest-wiring";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			await ImportOps.WireQuests(ctx.Db);
+			return new ImportResult("quest wiring applied (Casilda + Shipwrecked chains + sourced location quests).");
 		}
 	}
 

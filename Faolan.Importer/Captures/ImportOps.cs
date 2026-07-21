@@ -706,7 +706,16 @@ namespace Faolan.Importer.Captures
 			}
 
 			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated, {skipped} skipped (map not in catalog).");
+		}
 
+		// Overlay the hand-authored quest WIRING onto the harvested definitions - the fields captures don't carry: the
+		// server trigger (GoalType/TargetName/QuestItemId via SeedGoal), the chain successor (NextQuestId via Chain), and
+		// the byte-exact @609/snapshot detail the beach + Casilda quests need. Run as its OWN importer module
+		// (QuestWiringModule) AFTER the `quests` module, so it applies last - the trigger fields are preserved by the
+		// objective-goals refresh, and the @609-detail seeds are authoritative (they're calibrated to match the capture).
+		// Trigger/chain seeds are BOOTSTRAP-ONLY (see SeedGoal/Chain), so a re-run never reverts a Quest-editor edit.
+		public static async Task WireQuests(DatabaseContext db)
+		{
 			await SeedBeachQuestGoals(db);
 			await SeedShipwreckedCityChain(db);
 			await SeedCaptureReachQuests(db);
