@@ -91,6 +91,20 @@ namespace Faolan.Core.Enums
 		PvpArmor = 0x01C6,
 		PvpProtection = 0x01CA,
 
+		// Further region ratings named from granted-item tooltips (2026-07-22), matched by value. Fatality/Heal/XP/
+		// movement are their own (unmodelled) systems; Combat Rating and Protection have per-weapon-type / per-element
+		// variants (0x362-0x369 = Combat Rating by weapon; 0x39x = Protection by element) - only the CONFIRMED ids are
+		// named here (Polearm 0x367, Bow 0x368; Protection(Electrical) 0x39f).
+		FatalityRating = 0x01DB,
+		HealRating = 0x02C9,
+		CombatRatingBow = 0x0368,
+		CombatRatingPolearm = 0x0367,
+		ProtectionElectrical = 0x039F,
+		PerceptionSkill = 0x033E,
+		OutOfCombatMovementSpeed = 0x00F1,
+		BowRangeModifier = 0x0123,
+		XpModifier = 0x013F,
+
 		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
 		// 0xBF..0x40B in the snapshot; see WorldDespawn) - session/map state, not a real character stat. The snapshot is
 		// built with the live zone's token here.
@@ -209,7 +223,7 @@ namespace Faolan.Core.Enums
 			return statId switch
 			{
 				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax
-					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen or CharacterStatId.PvpMagicDamage or CharacterStatId.MagicDamageHoly => 100,
+					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen or CharacterStatId.PvpMagicDamage or CharacterStatId.MagicDamageHoly or CharacterStatId.BowRangeModifier => 100,
 
 				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
 
