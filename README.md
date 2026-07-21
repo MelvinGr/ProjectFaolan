@@ -15,9 +15,9 @@ decoded and working; others are partially implemented or gated on further revers
 
 ## Feature status
 
-Where things stand, by subsystem. This is a research/preservation project, so "works" means _reproduced
-byte-for-byte against a retail capture and (usually) confirmed in-client_ — not production-hardened. Open work
-is tracked as Gitea issues; the `#NNN` refs point there.
+What you can actually do, by subsystem. This is a research/preservation project, so "works" means _reproduced
+byte-for-byte against a retail capture and (usually) confirmed in a real game client_ — not production-hardened.
+Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issue.
 
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
@@ -38,171 +38,119 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Connection & session
 
-- ✅ Login / auth — Diffie–Hellman + TEA-CBC handshake (any password is accepted until the client is key-patched)
-- ✅ Character roster, selection, and existing-character world entry
-- ✅ Character creation — the create-editor flow (appearance/morphs, race/sex gating, the Casilda tableau)
-- 🟡 Intermittent wrong appearance on a new character (hair/mustache/size) — late appearance edits were not
-  persisted; fixed, awaits in-client confirm (#314)
-- 🟡 Create→world intro cutscene — plays, and Kalanthes speaks (stock-phrase response decoded); some scene
-  actors are still verbatim capture bytes (blocked on clean per-type captures, #234)
+- ✅ **Log in and play** — the full login handshake (encrypted; any password is accepted until the client is
+  key-patched), character roster and selection, and world entry with your existing characters
+- ✅ **Create a character** — the appearance editor (face morphs, race/sex options) and the Tortage opening tableau
+- 🟡 New characters occasionally import the wrong look (hair/mustache/size) — fixed, pending an in-client confirm (#314)
+- 🟡 The create→world intro cutscene plays and Kalanthes speaks; a few background actors still render from raw
+  capture data (#234)
 
 ### Realms & deployment
 
-- 🟡 Multiple realms (game servers) — **process-per-realm**: `dotnet run --project Faolan` is all-in-one (dev),
-  `--role login` runs the shared login/router tier, and `--role realm=<id>` runs one realm's isolated world (its own
-  GameServer + chat + guilds, bound to that `Realm` row's `IpAddress`/ports). Guilds, auction house, mail, and
-  character names are all `RealmId`-scoped; the client is routed to its selected character's realm. Server-side
-  complete and fleet-verified (1 login + N realm processes on a shared DB); awaits an in-client 2-realm shakedown (#324)
+- 🟡 **Run multiple realms** — one shared login tier fronts any number of independent realm servers, each with its
+  own world, chat, and guilds, all on a shared database; guilds, the auction house, mail, and character names are
+  realm-scoped, and you're routed to your selected character's realm. Server-side complete and fleet-tested;
+  pending a live two-realm shakedown (#324)
 
 ### World & simulation
 
-- ✅ World built from DB rows, not replayed — snapshot, player spawn, world objects, NPC interest-streaming
-- ✅ NPC AI — aggro/chase, leash-back + heal on disengage, patrol routes; faction disposition (friendly/neutral
-  NPCs never aggro and render green names, hostiles red)
-- 🟡 Open-world ambient spawn layout — the authoritative per-playfield spawn groups (roam area + population
-  count) decoded from the client RDB (type 1010506) into `NpcSpawnArea` (2,664 groups across 119 playfields).
-  The creature TYPE isn't in the client (it's server-authoritative), so it's inferred from captures (~21% of
-  groups: name / in-bounds vote / guarded id-propagation) then confirmed by hand — a dev nameplate label
-  (`.togglenpcgroup`, shows `group | tier xcount` over each NPC via a SetNameIIR override) + the `.setnpcgroup` GM command assign
-  the rest. A live **area-managed ambient spawner** now consumes these pools — per-pool respawn/refill timers
-  keep each group at its population count, and members roam their area between spawn anchors (preferring a free
-  anchor so they stop stacking). Now on by default for every resolved group — the experimental config toggle was
-  retired (#332 done, #363)
-- 🟡 NPC line-of-sight — NPCs don't aggro over a hill / across a drop / through a building wall, and loot bags +
-  corpses snap to the ground, driven by a baked per-map terrain file (heightmap + PhysX collision mesh; the game
-  server never touches the client RDB at runtime). The ground-snap is tolerance-gated: the heightmap is the OUTDOOR
-  surface only, so an interior/cave kill keeps its death Y instead of flinging the bag up to open sky (#369). Aggro
-  gating awaits in-client confirm (#284)
-- ✅ Interactive world objects — doors/gates open on use; interacting with a prop with no behavior floats a
-  "nothing to interact with here yet" bubble instead of a silent no-op
-- ✅ Zone-line / teleport doors — using a door that changes location teleports the player (same-playfield and
-  cross-playfield, in-client verified), destinations auto-imported from captured UseObject→teleport sequences;
-  the ~52 un-harvested zone-lines still fall through to the open animation (#341). The client's real teleport
-  GameAction ids are now recovered from Ghidra (Teleport `0xCF45` / ProxyTeleport `0xD04D`); our door path is a
-  server-side discriminator, so it never needs to emit them (#338)
-- ✅ Area-name banners — crossing into a named **sub-area** floats the on-screen area title (`GenericDisplayAreaName`
-  via `FormatFeedbackIIR`), verified in-client. A playfield has many (Old Tarantia fires six: Bridge of Vilerus I,
-  The East Gate, The West Gate, …), so the world tick drives it off the `MapArea` child table. The boundary triggers
-  are **server-side** — no client record references a banner id — so the regions are reconstructed from captures:
-  each banner is paired with the player position it fired at, and the hull over those sightings is the region. Areas
-  are keyed by the client's localized-string id — the client renders the text, so the server never needs the name
-  (the LDB holds these strings as plaintext zlib, but the record→textId→page-base mapping is still unsolved, so
-  reading one back server-side isn't wired, #291). Coverage is capture-bound
-  (10 areas, 4 maps of 520) and the hulls under-cover by construction; both improve with more dumps (#377)
-- 🟡 Sit on benches — decoded + built byte-exact as a two-phase `UseObject` handshake (the client double-sends the
-  interact; retail answers each with a hold-state ack and only the second commits the pose). Now wired to answer
-  both phases; awaits an in-client confirm that the pose holds instead of reverting after the ~2.6 s blend (#355)
-- 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
-  client-side movement jitter (#272)
-- ✅ Per-map playfield token — sourced per-map from `Map.PlayfieldToken` (seeded with a captured token per map;
-  the tokens are session-minted instance ids pooled by region, so the seed is a representative value) (#305)
-- ✅ Playfield instancing — world keyed by `(mapId, instanceId)`; a Solo map (e.g. the beach) gives each player
-  their own instance (verified in-client with two clients) (#268)
+- ✅ **A living world, built from data** — the world, its objects, and its NPCs are all constructed from the
+  database and streamed to you as you move, never replayed from a recording
+- ✅ **NPC AI** — enemies aggro and give chase, leash back and heal when you break away, and walk patrol routes;
+  friendly and neutral NPCs never attack and show green names, hostiles red
+- ✅ **Interactive objects** — doors and gates open when used; anything not yet interactive tells you so instead of
+  silently doing nothing
+- ✅ **Zone-line doors** — a doorway that changes your location teleports you, both within a zone and across a
+  loading screen, with destinations learned from captures (a handful of rarer ones still just play the open
+  animation, #341)
+- ✅ **Area-name banners** — crossing into a named district floats its title on screen (Old Tarantia alone has
+  six); coverage grows as more of the map is captured (#377)
+- ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy, verified with two
+  clients side by side
+- 🟡 **Ambient wildlife & spawns** — each zone's spawn groups (roam area + population) are decoded from the client,
+  and a live spawner keeps every group stocked, roaming, and refilling as you hunt them. On by default; because the
+  creature type per group is server-only, ~21% are auto-matched from captures and the rest are hand-confirmed with
+  in-game tools (#332, #363)
+- 🟡 **Line-of-sight & terrain** — NPCs won't aggro over a hill or through a wall, and loot and corpses settle to
+  the ground, driven by baked per-map terrain; the aggro gating is pending an in-client confirm (#284)
+- 🟡 **Sit on benches** — the sit animation plays; making the pose hold is wired and pending an in-client confirm (#355)
+- 🟡 **Fuller simulation** — a continuous AI heartbeat and smoother movement are in progress (#190, #225, #272)
 
 ### Combat
 
-- ✅ Melee & spell-cast FSM, weapon draw, damage, vitals; threat / hate list
-- ✅ Floating damage numbers + combat-log lines for player→NPC hits — melee via `DamageResultIIR`, spell via
-  `StatDamageIIR` (retail's two distinct damage packets)
-- ✅ Moving cancels an in-progress cast — the client's cancel is answered with retail's state-`0x0007` abort BCC,
-  which drops the cast bar + plays the "Interrupted" text (#347)
-- ✅ Death window + resurrect/respawn — the release screen carries the points you have discovered, ordered
-  nearest-first (the wire order retail renders), and a point revives you at its own `RestorationLevel` (10/50/100%)
-  rather than always full (#375). The spots body is fully decoded: what were three "capture-derived constants" are
-  a list count `(count+1) × 0x3F1`, a per-record terminator, and `RestorationLevel` — all three invisible while only
-  one spot was ever sent, and all three matching the RDB for every spot id in the captures, to the byte (#372)
-- ✅ Resurrection-point discovery — walking near an undiscovered point floats retail's own "point discovered"
-  banner and re-sends the spots list with the point added, both in one frame, verified in-client (#372). Works for
-  all **538** imported points, not just the 2 any capture discovers: retail carries a per-point key for the point's
-  name string, but a keyless banner renders correctly, and the rest are underivable. No name crosses the wire — the
-  banner passes the point **id** under LDB category 270 and the client resolves "Water's Edge" itself
-- ✅ Buff application, damage-over-time, buff-expiry lifecycle (timers clear the icon at 0), and right-click cancel
-  (server-driven icon removal). Self-buffs and hostile debuffs both verified in-client (#274, #370)
-- ✅ Shield of the Risen — the top-of-screen protection buff, re-applied on login and every map change; dispels on
-  the first aggressive action with the `LostGraceEffect` toast (#361)
-- 🟡 Ground-targeted AoE (Deathly Blizzard) — ticks damage over its channel with floating numbers; the per-spell
-  blast radius + tick cadence are still interim constants (not in the RDB spell record) (#349)
-- 🟡 Buff stat effects — buffs are icon + timer only; nothing applies a stat delta. Damage-over-time is the one live
-  effect (`Spells.DotDelta`, 34 spells); the other ~11,600 duration-bearing spells render an icon and do nothing.
-  `Spells` has no stat-delta columns, so this needs an RDB decode + schema + apply/revert engine (#367)
-- 🟡 Spell cooldowns — fully RE'd (68-type GameAction catalog recovered from a live client). **Base cooldowns are
-  client-side**: retail sends nothing on a normal cast, the client reads the recast from its own RDB when the spell
-  is granted — so we deliberately emit nothing either. `SpellRecastActionBuilder` is byte-exact and construct-only,
-  for the server-OVERRIDE case (cooldown resets / AA reductions). Awaits an in-client check that the client runs the
-  sweep unaided (#271)
-- 🟡 Spellweaving (necromancer) — byte-exact builders; energy-bar drop still open (#141)
-- 🟡 Combat shields — server-side broadcast exists; the client guard-arc render is not yet decoded (#20)
-- ✅ NPC death animations — the death-pose MoveTask + death-behavior BCC play on kill (no more disappear /
-  teleport-to-spawn / attack-while-dead for patrolling NPCs). The per-creature death anim is carried on
-  `NpcTemplate.DeathBehaviorId` and verified in-client for humanoid (41877) and beast (215333); 43 types harvested,
-  the remaining 543 fall back to the humanoid anim until harvested (#362)
-- ⬜ Directional combat + defensive shield arcs ("real combat", #20) · combo finishers — the client owns the whole
-  combo FSM (swings already ride the normal `NormalAttack` path); the finisher's bonus damage is server-GDB data
-  not in the client RDB, and no capture shows a combo landing on a live target (#139) · fatalities — catalog is
-  plaintext anim names (RDB 1010219), but the server-side trigger wire is un-pinned and un-captured (#140)
+- ✅ **Melee & spellcasting** — the full attack/cast cycle: weapon draw, cast bar, hits, damage, and vitals, with a
+  threat/hate list driving who NPCs go after
+- ✅ **Floating damage numbers & combat log** for your hits, matching retail's distinct melee and spell number styles
+- ✅ **Interrupts** — moving mid-cast cancels the spell and shows the "Interrupted" message, exactly like retail (#347)
+- ✅ **Death & resurrection** — the release screen lists the resurrection points you've discovered, nearest first,
+  and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
+- ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
+  it to your list in one frame; works for all **538** imported points, verified in a real client (#372)
+- ✅ **Buffs & debuffs** — apply, tick (damage-over-time), expire on a timer, and right-click to cancel; self-buffs
+  and enemy debuffs both verified in-client (#274, #370)
+- ✅ **Shield of the Risen** — the newcomer protection buff, re-applied on login and each zone, dropping the moment
+  you act aggressively (#361)
+- ✅ **NPC death animations** — enemies play a proper death on the killing blow instead of vanishing or teleporting
+  back to spawn; verified in-client per creature type, with more being harvested (#362)
+- 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
+  cadence are still approximate (#349)
+- 🟡 **Buff stat effects** — buffs show as icon + timer today; applying their actual stat bonuses needs a data
+  decode still in progress (damage-over-time already works) (#367)
+- 🟡 **Spell cooldowns** — fully reverse-engineered; the client runs the recast timer from its own data (retail
+  sends nothing), pending an in-client confirm of the server-override case (#271)
+- 🟡 **Spellweaving** (necromancer) — built and playable; the energy-bar drain is the last piece (#141)
+- 🟡 **Combat shields** — the guard-arc render is not yet decoded (#20)
+- ⬜ **Real directional combat** with defensive shield arcs (#20) · **combos** — the client already drives the whole
+  combo chain; the finisher's bonus damage needs server-side data not present in the client (#139) · **fatalities**
+  — the finishing-move animations are catalogued, but their trigger needs a capture we don't yet have (#140)
 
 ### Character progression
 
-- ✅ Learned-spell grant on login; level-up spell / ability / combo grants; starting abilities & combos. Every rank
-  is learned and visible (retail's snapshot known-list carries R1..Rn); collapsing a family to its top rank is a
-  client-side UI option, not something the server does
-- ✅ Combos persist across relog — re-emitted on every world entry, not just on level-up (#299)
-- 🟡 XP curve — provisional ramp; real thresholds only partially harvested (#297)
-- 🟡 Class spell/combo catalog data — sparse (#296) · abilities panel completeness — mount/travel/class-inherent
-  abilities are client-RDB-derived (#303) · a few spellbook entries render nameless — legit `0x200A` grants whose
-  names live in the LDB string index, so blocked on #291 (#300)
-- 🟡 Feat trees / talent system — feat **training + reset are wired to the live protocol**: training adds feats
-  (`FeatIIR` 0x28DA68A0 state 4 → byte-exact ack) and reset/untrain clears them (`UntrainFeat` 0x2041 → world
-  reload), driveable via the `.feat` GM command (list / train / reset). Still open: the tree structure, feat
-  points + prerequisites, and the per-class tree definitions — the RDB feat catalog (type 1000020) is ~21% decoded
-  plaintext (tree + rank + name), the rest TEA-encrypted, and the spell↔feat map level-gated casting needs is
-  server-GDB-only, not in the RDB (#251, blocks #298)
+- ✅ **Learn spells, abilities & combos** — granted on login and at each level-up, with every rank learned and
+  shown (collapsing a family to its top rank is a client-side UI choice)
+- ✅ Combos stick across relogs, not just at level-up
+- 🟡 **Feat trees** — training and resetting feats work against the live protocol (via a GM command for now); the
+  tree structure, feat points, and per-class layouts are still being decoded (#251)
+- 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
+- 🟡 Class spell / combo / ability catalogs are still filling in, and a few spellbook entries render nameless
+  (#296, #303, #300)
 - ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144)
 
 ### Items & economy
 
-- ✅ Inventory (DB containers, equip, move, starting gear)
-- ✅ Item quality tiers — each item's rarity (Mundane→Legendary) decoded from its RDB template's field 499 (the
-  client's own 0-indexed tier id) and imported for 2,904 items, so tooltip rarity / name colour match retail (#397)
-- ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
-  (taking an attachment now clears it: `Mail`'s primary key is the wire `MailId` itself, so the attachment FK can no
-  longer mismatch the id every caller passes — the old surrogate row key silently deleted nothing and duplicated the
-  item on relog, #368)
-- ✅ Item claims / Redeem window (`CoreClaimIIR`) — the per-account claim list + redeem (Claim / Claim All),
-  infinite vs. multi-charge (Double XP) claims, delivered to the backpack; item keys harvested from the claim
-  list, rendered by key on relog (#359)
-- ✅ Consumable use — right-click a potion/food/drink to apply its on-use buff + consume one, data-driven from
-  `Items.OnUseSpell` (harvested from captures), no-op if the buff is already active
-- ✅ Creature loot drops — a killed NPC drops a lootable container, its variant chosen per-type from
-  `NpcTemplate.LootContainerTemplateId` (a bag by default, or a Large Chest — both ship as the same
-  `LootBagFullUpdateIIR`, differing only by model / overhead name / bounds; the raid-chest variant awaits a
-  captured template) (#363)
-- ✅ Shop-OPEN trigger — interacting with a vendor opens its shop window
-- 🟡 Max-stat aggregation from gear (a ring's +HP fills the bar) — item attribute modifiers imported + summed
-  (`ItemStat` + `MaxStatAggregator`); the vital/HP field + wire scale still need a reference tooltip (#3)
-- 🟡 Guild bank — bodies uncaptured (#132)
-- ⬜ Tradeskills: gathering nodes + crafting professions (#148)
-- ⬜ Gems / item socketing — gem slots that grant attribute bonuses (#311)
+- ✅ **Inventory** — containers, equipping, moving items, and starting gear
+- ✅ **Item quality** — every item's rarity from Mundane to Legendary, so tooltips and name colours match retail (#397)
+- ✅ **The full economy** — buy and sell at vendors (the shop window opens on use), bank storage, the auction house
+  (list and buy), and mail carrying money and item attachments
+- ✅ **Item claims** — the account claim/redeem window (Claim, Claim All), including infinite and multi-charge
+  claims like Double XP, delivered straight to your bag (#359)
+- ✅ **Consumables** — right-click a potion, food, or drink to use it and apply its effect
+- ✅ **Creature loot** — killed enemies drop a lootable bag or chest, chosen per creature type (#363)
+- 🟡 **Gear stat bonuses** — a ring's +HP filling your bar: modifiers are imported and summed; the final wire scale
+  needs a reference tooltip (#3)
+- 🟡 Guild bank (#132)
+- ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing for attribute bonuses (#311)
 
 ### Social & guilds
 
-- ✅ Chat — local say, channels, system, whisper (plus a live "Claude" MCP channel)
-- ✅ Guild create, invite/accept, tag, renown
-- ✅ Guild-create no-relog window (`DispatchGuildCreated 0x2044`) — the guild window + tag appear without a relog (#306)
-- 🟡 Member kick/promote/demote fan-out — bodies uncaptured (#104)
-- ⬜ Friends list + presence (#99, #100) · player↔player trade, quest sharing, team quests (#101)
+- ✅ **Chat** — say, channels, system messages, and whispers
+- ✅ **Guilds** — create, invite and accept, guild tag, and renown, with the guild window appearing instantly on
+  create (no relog) (#306)
+- 🟡 Member kick / promote / demote (#104)
+- ⬜ Friends list & presence (#99, #100) · player-to-player trade, quest sharing, team quests (#101)
 
 ### Quests & dialogue
 
-- ✅ Quest state model (kill / loot / talk goals), journal, the Casilda Tortage intro chain (kill→loot→free→follow)
-- ✅ NPC conversations — Knubot stage machine, routed by NPC name
-- 🟡 Escort-arrival completion (#262) · turn-in / reward dialog content (#260) · Lua quest-VM live wiring
+- ✅ **Quests** — kill / loot / talk objectives, the journal, and the Casilda Tortage intro chain end to end
+  (kill → loot → free → follow)
+- ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine
+- 🟡 Escort completion (#262) · turn-in and reward dialogs (#260) · Lua quest scripting
 - ⬜ Tortage day/night destiny phasing (#149)
 
 ### Mounts & pets
 
-- ✅ Necromancer pets/minions — `.pet`, type-based spawn + follow
-- 🟡 Mounts — Work but need more dumps to import
+- ✅ **Necromancer pets** — summon minions by type and have them follow
+- 🟡 **Mounts** — working; importing more from captures
 - ⬜ Mounted combat (#142)
 
 ### Group PvE content (not started)
@@ -210,10 +158,8 @@ we've seen_, and names the gaps). Regenerate with
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
   scripting; #309)
 - ⬜ Factions & reputation — the Khitai / _Rise of the Godslayer_ system: faction ranks, faction vendors, and
-  faction companions (#310). The client's **Factions window already populates** for imported characters: the
-  per-faction standings are stored + sent, riding the player-spawn scaffold's first ending pair list (faction id →
-  signed standing) (#315). What's missing is the semantic layer — a faction catalog and standing _changes_ from
-  quests/kills (#310)
+  faction companions. The in-game Factions window already populates with standings for imported characters; what's
+  missing is the catalog and the reputation _changes_ from quests and kills (#310, #315)
 
 ### Guild base & large-scale (not started)
 
@@ -225,11 +171,12 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Tooling
 
-- 🟡 Importer (captures + client RDB → `faolan.db`)
-- ✅ Wireshark dissector
-- ✅ Client Launcher ·
-- ✅ In-process MCP server
-- ✅ Content-CDN mirror
+- ✅ **Wireshark dissector** — full Conan-protocol decoding for capture analysis
+- ✅ **Client launcher** — drives the game client unattended, straight into the world
+- ✅ **Content-CDN mirror** — serves the client's streamed assets so it loads cleanly offline
+- ✅ **In-process MCP server** — live database + session inspection for tooling
+- ✅ **Web armory & 3D viewer** — browser character/equipment viewer plus GM tools
+- 🟡 **Importer** — rebuilds the game database from captures + the client's asset files
 
 ## Build
 
