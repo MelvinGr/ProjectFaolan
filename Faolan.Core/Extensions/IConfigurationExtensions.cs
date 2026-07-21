@@ -17,12 +17,6 @@ namespace Faolan.Core.Extensions
 
 			public string DatabasePath => Path.GetFullPath(config["DatabasePath"]);
 
-			// The live AMBIENT spawner (#363): when true, each RESOLVED NpcSpawnArea spawns its creature at every one of
-			// its RDB spawn points on zone load (the capture-independent open-world population). OFF by default - it's
-			// experimental (density overlaps the captured NpcSpawn set until graduation, wander not yet wired). Set
-			// "AmbientSpawnsEnabled": true in faolan.json to try it.
-			public bool AmbientSpawnsEnabled => bool.TryParse(config["AmbientSpawnsEnabled"], out var on) && on;
-
 			public string ServerIpAddress => config["ServerIpAddress"];
 
 			public string WelcomeString => config["WelcomeString"];

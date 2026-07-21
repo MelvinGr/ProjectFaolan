@@ -9,8 +9,6 @@
 	"McpEnabled": true,
 	"McpPort": 7099,
 
-	"WelcomeString": "Welcome to Project Faolan!",
-
-	"AmbientSpawnsEnabled": true
+	"WelcomeString": "Welcome to Project Faolan!"
 }
 

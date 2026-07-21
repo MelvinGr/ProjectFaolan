@@ -325,10 +325,7 @@ namespace Faolan.GameServer
 			}
 
 			var creature = resolved[0].NpcTemplate?.Name ?? "?";
-			var note = WorldBroadcaster.AmbientSpawns
-				? " Takes effect on zone reload (relog)."
-				: " Takes effect on zone reload - NB the ambient spawner is OFF, so the area is empty until you enable it.";
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Graduated '{name}' ({creature}) on map {mapId}: removed {removed} captured spawn row(s); the ambient pool now owns this population.{note}");
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Graduated '{name}' ({creature}) on map {mapId}: removed {removed} captured spawn row(s); the ambient pool now owns this population. Takes effect on zone reload (relog).");
 		}
 
 		// The RDB spawn area a position sits in (nearest centroid; bounds padded), or null when outside every area.

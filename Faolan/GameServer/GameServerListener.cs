@@ -232,7 +232,6 @@ namespace Faolan.GameServer
 			// into it (Casilda's captive pose) without a construction cycle.
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler);
-			WorldBroadcaster.AmbientSpawns = configuration.AmbientSpawnsEnabled; // #363 live ambient spawner (off by default)
 			_questProgression = new QuestProgressionService(database, _broadcaster, _questHandler, agentServerDispatcher, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
 				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)

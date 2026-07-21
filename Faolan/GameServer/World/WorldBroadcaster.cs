@@ -70,11 +70,6 @@ namespace Faolan.GameServer.World
 		// Off by default; toggled live per-session by the `.togglenpcgroup` GM command (ToggleAreaLabels) - no config.
 		public static bool DebugAreaLabels;
 
-		// The live AMBIENT spawner (#363): when true, each RESOLVED NpcSpawnArea spawns its creature at every RDB spawn
-		// point on zone load. OFF by default (experimental - overlaps the captured NpcSpawn set until graduation, wander
-		// not yet wired). Set from config (IConfiguration.AmbientSpawnsEnabled) at startup.
-		public static bool AmbientSpawns;
-
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
@@ -854,8 +849,8 @@ namespace Faolan.GameServer.World
 				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
 				// to graduating/deleting it). It renders with its captured appearance but the POOL owns its respawn (fades
 				// on death, replaced by the pool), and it counts toward MaxCount so the pool only tops up the DEFICIT -
-				// no captured/ambient overlap. Only when the ambient spawner is on; otherwise it's an ordinary spawn.
-				if (AmbientSpawns && npc.NpcSpawnAreaId is { } linkedAreaId)
+				// no captured/ambient overlap.
+				if (npc.NpcSpawnAreaId is { } linkedAreaId)
 				{
 					entity.SpawnAreaId = linkedAreaId;
 					entity.NoRespawn = true;
@@ -864,15 +859,14 @@ namespace Faolan.GameServer.World
 				zone.Add(entity);
 			}
 
-			if (AmbientSpawns)
-				await LoadAmbientSpawns(mapId, instanceId, zone);
+			await LoadAmbientSpawns(mapId, instanceId, zone);
 
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
 			_logger.LogDebug("World: #363 {Labelled}/{Total} captured spawns have a spawn-area label on map {Map} (.togglenpcgroup to show; sample: {Sample}).",
 				labelledCount, npcs.Length, mapId, labelSample ?? "<none>");
 		}
 
-		// #363 live ambient spawner (OFF by default, WorldBroadcaster.AmbientSpawns): the capture-INDEPENDENT open-world
+		// #363 live ambient spawner: the capture-INDEPENDENT open-world
 		// population, managed as spawn-group POOLS. Each RESOLVED NpcSpawnArea becomes an AmbientPool that keeps ~MaxCount
 		// of its creature alive within the group's area: the initial fill spawns one per RDB point, each member roams the
 		// group's points (its PatrolWaypoints -> the #266 wander) and fades on death (NoRespawn); MaintainAmbientPools
@@ -951,12 +945,9 @@ namespace Faolan.GameServer.World
 		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
 		// MaxCount. A killed member fades + is removed (LootExpired), dropping the pool's live count; here we respawn ONE
 		// replacement per under-strength pool per pass (a gentle trickle - the cadence IS the respawn delay) at a free
-		// point, streamed to nearby players. No-op unless the ambient spawner is enabled.
+		// point, streamed to nearby players.
 		public async Task MaintainAmbientPools()
 		{
-			if (!AmbientSpawns)
-				return;
-
 			foreach (var ((mapId, instanceId), pools) in _ambientPools)
 			{
 				var zone = _sim.World.ZoneFor(mapId, instanceId);
