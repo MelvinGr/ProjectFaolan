@@ -212,7 +212,8 @@ namespace Faolan.GameServer.Combat
 			// #395: melee damage is driven by the equipped main-hand weapon (min/max from the RDB template), not a flat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
 			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
-			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level);
+			// Roll between the weapon's min and max for per-swing variance (#395).
+			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101));
 			// #399: roll a critical hit off the player's aggregated Hit Rating - a crit scales the damage and rides the
 			// wire as DamageResult type 3 (the client renders it larger).
 			var crit = CombatResolver.IsCriticalHit(_sim.PlayerWorldEntity(client)?.HitRating ?? 0, Random.Shared.Next(100));

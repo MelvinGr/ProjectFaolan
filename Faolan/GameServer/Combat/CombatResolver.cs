@@ -94,10 +94,11 @@ namespace Faolan.GameServer.Combat
 		public const int WeaponDamageScale = 100;
 
 		// Melee swing damage: driven by the EQUIPPED WEAPON's damage (#395) instead of the flat level placeholder, so a
-		// better weapon hits harder. Uses the weapon's average (min+max)/2 scaled down, plus a small level contribution
-		// (so progression still shows and an early low-damage weapon isn't trivial). Falls back to the level placeholder
-		// when the attacker has no weapon damage (unarmed, or a weapon whose RDB damage wasn't imported).
-		public static int ResolveMeleeDamage(int? weaponMinDamage, int? weaponMaxDamage, ushort casterLevel)
+		// better weapon hits harder. Each swing ROLLS between the weapon's min and max (rollPercent 0..100 interpolates;
+		// the caller passes a random roll for per-swing variance, default 50 = the midpoint), scaled down, plus a small
+		// level contribution (so progression still shows and an early low-damage weapon isn't trivial). Falls back to the
+		// level placeholder when the attacker has no weapon damage (unarmed, or a weapon whose RDB damage wasn't imported).
+		public static int ResolveMeleeDamage(int? weaponMinDamage, int? weaponMaxDamage, ushort casterLevel, int rollPercent = 50)
 		{
 			var level = casterLevel == 0
 				? (ushort)1
@@ -105,8 +106,9 @@ namespace Faolan.GameServer.Combat
 
 			if (weaponMinDamage is { } min && weaponMaxDamage is { } max && max > 0)
 			{
-				var avg = (min + max) / 2 / WeaponDamageScale;
-				return Math.Max(1, avg + level);
+				var roll = Math.Clamp(rollPercent, 0, 100);
+				var rolled = min + (max - min) * roll / 100; // interpolate min..max
+				return Math.Max(1, rolled / WeaponDamageScale + level);
 			}
 
 			return ResolveSpellDamage(0, level);

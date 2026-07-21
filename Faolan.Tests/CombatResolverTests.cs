@@ -29,6 +29,20 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Weapon_RollInterpolatesMinToMax()
+		{
+			// roll 0 -> min end, 100 -> max end, 50 -> midpoint (the default).
+			var atMin = CombatResolver.ResolveMeleeDamage(1000, 5000, 1, 0);
+			var atMax = CombatResolver.ResolveMeleeDamage(1000, 5000, 1, 100);
+			var atMid = CombatResolver.ResolveMeleeDamage(1000, 5000, 1, 50);
+
+			Assert.Equal(1000 / CombatResolver.WeaponDamageScale + 1, atMin);
+			Assert.Equal(5000 / CombatResolver.WeaponDamageScale + 1, atMax);
+			Assert.Equal(CombatResolver.ResolveMeleeDamage(1000, 5000, 1), atMid); // default == midpoint
+			Assert.True(atMin < atMax);
+		}
+
+		[Fact]
 		public void Weapon_NeverDealsLessThanOne_AndLevelZeroMapsToOne()
 		{
 			Assert.True(CombatResolver.ResolveMeleeDamage(1, 1, 0) >= 1);
