@@ -520,11 +520,15 @@ namespace Faolan.GameServer.World
 
 				// Base rate-based regen + the worn-gear Natural Mana/Stamina Regen (flat per second, from the item ratings).
 				var entity = pair.Value;
+				uint beforeH = vitals.Health, beforeM = vitals.Mana, beforeS = vitals.Stamina;
 				var changed = vitals.Regenerate(RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec (provisional)
 					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds),
 					RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
 				if (changed)
-					await _output.PushVitals(client, vitals);
+					// Send retail's compact RegenIIR delta (the client adds it to its bars) instead of a full 0x96B8DC59
+					// push - the per-tick rise per pool, ×100 to the wire vitals scale.
+					await _output.SendRegen(client, entity.Handle,
+						(int)(vitals.Health - beforeH) * 100, (int)(vitals.Mana - beforeM) * 100, (int)(vitals.Stamina - beforeS) * 100);
 			}
 		}
 

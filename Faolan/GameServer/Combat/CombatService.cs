@@ -618,6 +618,18 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, school));
 		}
 
+		// Retail's per-tick vitals regen (RegenIIR 0x28D0AC99, decoded): a compact [+hp][+mana][+stamina] delta the
+		// client ADDS to the current bars, ×100 wire scale. Lets the bars regen smoothly without pushing a full
+		// 0x96B8DC59 block every tick. RegenCodec.Build already frames it as the [u32 len][iir] carrier body, so it
+		// rides the DispatchPassBlob directly (WriteArray, not WriteArrayUInt32Length).
+		public static Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
+				.WriteArray(RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta))
+				.SendAsync(client);
+		}
+
 		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
 		// prefix 0x65 + state = the destination equip slot for a move INTO a slot, prefix 0x68 + state 0 for a move
 		// OUT of one (combat capture frames 289-290/320-321/375-376).

@@ -22,6 +22,11 @@ namespace Faolan.GameServer
 			return CombatService.SendDamageNumber(client, targetHandle, attackerHandle, damage);
 		}
 
+		Task IWorldOutbound.SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
+		{
+			return CombatService.SendRegen(client, handle, healthDelta, manaDelta, staminaDelta);
+		}
+
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
 			return new PacketStream()
