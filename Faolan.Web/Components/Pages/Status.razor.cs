@@ -44,7 +44,7 @@ namespace Faolan.Web.Components.Pages
 			_recent = chars
 				.OrderByDescending(c => c.LastConnection ?? DateTimeOffset.MinValue)
 				.Take(12)
-				.Select(c => new RecentRow(c.Id, c.Name, c.Level, c.Class.ToString(), c.Map?.Name ?? "—", c.LastConnection))
+				.Select(c => new RecentRow(c.Id, c.Name ?? "", c.Level, c.Class.ToString(), c.Map?.Name ?? "—", c.LastConnection))
 				.ToList();
 
 			_classes = chars.GroupBy(c => c.Class).Select(g => new ClassRow(g.Key.ToString(), g.Count())).OrderByDescending(x => x.Count).ToList();

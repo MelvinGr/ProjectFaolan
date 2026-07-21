@@ -445,9 +445,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// 1030 differ at equal length). Shipping it asserts the client on statlist.cpp:134.
 			//
 			// The quest index and the completed journal DO regenerate byte-exact (23/23 and 81/81), so this is the one
-			// region left. Remove this line when the objective gate is green - not before: a snapshot the client
-			// rejects takes the whole login with it, and the completed journal rides along with the active one.
-			return false;
+			// region left. Flip objectiveGateGreen to true when the @609 objective region reproduces the wire - not
+			// before: a snapshot the client rejects takes the whole login with it, and the completed journal rides
+			// along with the active one.
+			// ReSharper disable once ConditionIsAlwaysTrueOrFalse
+			var objectiveGateGreen = false;
+			if (!objectiveGateGreen)
+				return false;
 
 			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
 			return HeaderSlots.All(slots.Contains);

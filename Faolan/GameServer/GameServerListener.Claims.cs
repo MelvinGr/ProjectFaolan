@@ -192,7 +192,7 @@ namespace Faolan.GameServer
 		// Push the "new claims available" glow (sub 0x0009) at world entry, but only when the account has UNSEEN claims
 		// (Account.ClaimsAvailable) - retail sends this on a fresh login with new claims and omits it once viewed. The
 		// session account is loaded at login, so the flag is current here.
-		private async Task SendNewClaimsGlowIfAny(INetworkClient client)
+		private static async Task SendNewClaimsGlowIfAny(INetworkClient client)
 		{
 			if (!client.Session.Account.ClaimsAvailable)
 				return;
@@ -205,7 +205,7 @@ namespace Faolan.GameServer
 
 		// The sub-0x05 refresh for a multi-charge claim: echo the redeemed row (at its 1-based list index) with its new
 		// remaining amount so the client updates that row in place (retail's window "refresh" - it sends no re-list).
-		private async Task SendRedeemAck(INetworkClient client, AccountClaim claim, uint index, uint remaining)
+		private static async Task SendRedeemAck(INetworkClient client, AccountClaim claim, uint index, uint remaining)
 		{
 			var guid = DeriveBytes($"claim-batch:{client.Session.Account.Id}", ClaimEntry.BatchGuidLength);
 			var code = string.IsNullOrEmpty(claim.Code)

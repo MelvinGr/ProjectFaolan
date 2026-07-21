@@ -22,8 +22,7 @@ namespace Faolan.Core.Network.Packets.Conan
 			Crc32 = Stream.ReadUInt32();
 
 			IsValid = Crc32 == Crypt.Crc32.Calculate(Stream);
-			if (!IsValid)
-				; //Console.WriteLine($"Invalid {GetType().Name}");
+			// if (!IsValid) Console.WriteLine($"Invalid {GetType().Name}");
 
 			using var header = new FaolanStream(Stream.ReadArrayUInt32Length());
 			Sender = ProtoEndpoint.Read(header);

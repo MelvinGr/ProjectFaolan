@@ -212,8 +212,8 @@ namespace Faolan.GameServer.Inventory
 
 				await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, sourceSlot, src.ItemId, src.Count - splitSize);
 				await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, targetSlot, src.ItemId, splitSize);
-				_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, src.Count - splitSize,
-					targetSlot, splitSize, character.Id);
+				_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, sourceSlot,
+					src.Count - splitSize, targetSlot, splitSize, character.Id);
 			}
 			catch (Exception ex)
 			{

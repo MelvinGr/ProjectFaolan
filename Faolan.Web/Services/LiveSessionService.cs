@@ -175,7 +175,7 @@ namespace Faolan.Web.Services
 			else if (mapId is { } mo)
 				cmd = $"teleport {mo}";
 			else
-				return Task.FromResult("Give a map and/or x y z.");
+				return Task.FromResult<string?>("Give a map and/or x y z.");
 
 			return RunGmCommandAsync(characterId, cmd, ct);
 		}

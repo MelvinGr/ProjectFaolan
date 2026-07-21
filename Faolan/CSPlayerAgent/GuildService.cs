@@ -349,7 +349,7 @@ namespace Faolan.CSPlayerAgent
 			return _gameServerDispatcher.GetSessions().Any(s => s.CharacterId == characterId || s.ClientInstance == characterId);
 		}
 
-		private async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
+		private static async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
 		{
 			var ps = new PacketStream().WriteHeader(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildCreated);
 			WriteGuildCreatedBody(ps, guild, creator, form, creator.MapId);
@@ -418,7 +418,7 @@ namespace Faolan.CSPlayerAgent
 		// the stored MOTD + pops the "message of the day" toast, without re-sending the whole roster (unlike 0x203F).
 		// No capture for it; the body is the single string arg from the client method sig, s16-framed like the other
 		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
-		private async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
+		private static async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
 		{
 			await new PacketStream().WriteHeader(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged).WriteString(motd).SendAsync(client);
 		}

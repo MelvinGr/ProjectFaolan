@@ -20,8 +20,11 @@ namespace Faolan.Importer.Cli
 			var counts = new Dictionary<string, int>();
 			foreach (var table in tables)
 			{
-				// Table names come from the trusted EF model (not user input), so the interpolation is safe.
+				// Table names come from the trusted EF model (not user input) and a table identifier can't be a SQL
+				// parameter anyway, so the interpolation is safe - suppress the raw-SQL injection advisory.
+#pragma warning disable EF1002
 				var count = await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*) AS Value FROM \"{table}\"").SingleAsync();
+#pragma warning restore EF1002
 				counts[table!] = count;
 			}
 

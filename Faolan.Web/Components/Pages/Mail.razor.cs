@@ -44,7 +44,7 @@ namespace Faolan.Web.Components.Pages
 			_isAdmin = user.IsInRole("Admin");
 
 			await using var db = await DbFactory.CreateDbContextAsync();
-			_characters = await db.Characters.Where(c => c.AccountId == accountId && c.Name != null && c.Name != "").OrderBy(c => c.Name).Select(c => c.Name).ToListAsync();
+			_characters = await db.Characters.Where(c => c.AccountId == accountId && c.Name != null && c.Name != "").OrderBy(c => c.Name).Select(c => c.Name!).ToListAsync();
 
 			if (_characters.Count > 0)
 			{

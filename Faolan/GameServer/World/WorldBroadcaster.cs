@@ -1066,7 +1066,7 @@ namespace Faolan.GameServer.World
 		// #262: remove a picked-up quest dynel from the player's view (SimpleDynel visual change, state 0x09 = the
 		// GenericSimpleDynelPickup vanish retail sends, Hoxxling gameplay2 @4310) so the brick disappears when taken.
 		// Live-only: the static DB object re-streams on the next zone load (it respawns, retail-style).
-		public Task HidePickupObject(INetworkClient client, uint handle)
+		public static Task HidePickupObject(INetworkClient client, uint handle)
 		{
 			return SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
 		}

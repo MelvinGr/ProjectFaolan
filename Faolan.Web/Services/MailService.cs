@@ -72,7 +72,7 @@ namespace Faolan.Web.Services
 			{
 				MailId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
 				RecipientClass = MailConstants.EndpointClass,
-				RecipientName = recipient.Name,
+				RecipientName = recipient.Name ?? "",
 				SenderClass = MailConstants.EndpointClass,
 				SenderName = senderName ?? "",
 				BodyXml = body ?? "",

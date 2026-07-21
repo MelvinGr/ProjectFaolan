@@ -672,7 +672,7 @@ namespace Faolan.GameServer
 											if (await _questProgression.TryAdvanceCollectPickup(client) is { } pickedItem)
 											{
 												await GrantItemToBackpack(client, pickedItem, 1);
-												await _broadcaster.HidePickupObject(client, target);
+												await WorldBroadcaster.HidePickupObject(client, target);
 											}
 
 											break; // inert (no active collect quest) still swallows the use - don't open a window on a brick

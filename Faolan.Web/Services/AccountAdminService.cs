@@ -46,7 +46,7 @@ namespace Faolan.Web.Services
 				.Characters.Where(c => !string.IsNullOrEmpty(c.Name))
 				.OrderByDescending(c => c.Level)
 				.ThenBy(c => c.Name)
-				.Select(c => new AccountChar(c.Id, c.Name, c.Level, c.Class.ToString(), c.Race.ToString(), c.Money, c.LastConnection))
+				.Select(c => new AccountChar(c.Id, c.Name!, c.Level, c.Class.ToString(), c.Race.ToString(), c.Money, c.LastConnection))
 				.ToList();
 
 			return new AccountDetail(a.Id, a.UserName, a.Type, a.State, a.CreationDate, a.LastConnection, string.IsNullOrEmpty(a.LastIpAddress)

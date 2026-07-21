@@ -25,7 +25,7 @@ namespace Faolan.Web.Auth
 
 		public Task<string?> GetPasswordHashAsync(Account user, CancellationToken ct)
 		{
-			return Task.FromResult(user.Password);
+			return Task.FromResult<string?>(user.Password);
 		}
 
 		public Task<bool> HasPasswordAsync(Account user, CancellationToken ct)
@@ -95,7 +95,7 @@ namespace Faolan.Web.Auth
 
 		public Task<string?> GetUserNameAsync(Account user, CancellationToken ct)
 		{
-			return Task.FromResult(user.UserName);
+			return Task.FromResult<string?>(user.UserName);
 		}
 
 		public Task SetNormalizedUserNameAsync(Account user, string? normalizedName, CancellationToken ct)

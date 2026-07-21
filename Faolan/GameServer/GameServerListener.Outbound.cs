@@ -173,7 +173,7 @@ namespace Faolan.GameServer
 		//
 		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
 		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
-		private Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
+		private static Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
 			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
 		}
@@ -218,7 +218,7 @@ namespace Faolan.GameServer
 		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
 		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
 		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
-		private Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
+		private static Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
 		{
 			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
 		}

@@ -47,7 +47,7 @@ namespace Faolan.Web.Services
 			IsNullable = Nullable.GetUnderlyingType(prop.PropertyType) != null || !Type.IsValueType;
 		}
 
-		private object Convert(string text)
+		private object? Convert(string text)
 		{
 			if (string.IsNullOrWhiteSpace(text))
 			{

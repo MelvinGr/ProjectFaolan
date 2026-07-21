@@ -385,10 +385,12 @@ namespace Faolan.GameServer
 			// the intro destiny flow.
 
 			// record 3: 0x00002000, 35-byte body - the GameCode script-message (script id 0x5F376, no name string, 			// unlike record 2 StartFixed3d / record 4 WelcomeTutorial) that triggers the on-screen TUTORIAL overlay.
-			// DISABLED (if(false)) so the tutorial no longer pops on world entry; re-enable to restore it. (Note: this
-			// is NOT the item-shop window - that one is opened client-side and persists even with the whole post-ready
-			// burst removed, so it can't be suppressed from here.)
-			if (false)
+			// DISABLED so the tutorial no longer pops on world entry; flip to true to restore it. (Note: this is NOT the
+			// item-shop window - that one is opened client-side and persists even with the whole post-ready burst
+			// removed, so it can't be suppressed from here.)
+			var enableTutorialOverlay = false;
+			// ReSharper disable once ConditionIsAlwaysTrueOrFalse
+			if (enableTutorialOverlay)
 			{
 				await new PacketStream()
 					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
