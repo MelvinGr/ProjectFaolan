@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -65,6 +66,9 @@ namespace Faolan.Importer.Rdb
 
 			var byId = (await db.Spells.ToListAsync()).ToDictionary(s => s.Id);
 			var toAdd = new List<Spell>();
+			// #367: (spellId -> stat deltas) from the [2][9] region, synced into SpellStatEffects after the spells save.
+			// Inner map dedups a stat the region lists twice (last == authoritative write wins, as for items).
+			var statEffects = new Dictionary<uint, Dictionary<uint, int>>();
 
 			var seen = 0;
 			var inserted = 0;
@@ -111,6 +115,16 @@ namespace Faolan.Importer.Rdb
 				var level = fields.TryGetValue(LevelField, out var lv) && lv <= byte.MaxValue
 					? (byte)lv
 					: (byte)0;
+
+				// #367: buff/debuff stat deltas live in the same [2][9] region as item templates.
+				var mods = ItemTemplateStatModifiers.Parse(body.AsSpan(12));
+				if (mods.Count > 0)
+				{
+					var deltas = new Dictionary<uint, int>();
+					foreach (var m in mods)
+						deltas[m.StatId] = (int)m.WireAmount; // last write wins on a repeated stat
+					statEffects[entry.Id] = deltas;
+				}
 
 				if (!byId.TryGetValue(entry.Id, out var spell))
 				{
@@ -163,7 +177,22 @@ namespace Faolan.Importer.Rdb
 				db.Spells.AddRange(toAdd);
 			await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set.", seen, inserted, namesSet, castTimesSet);
+			// #367: sync the SpellStatEffect rows now that every affected spell exists (FK). Delete-then-insert per
+			// spell is idempotent and matches the region being authoritative for a spell's stat deltas.
+			var affected = statEffects.Keys.ToList();
+			var stale = await db.SpellStatEffects.Where(e => affected.Contains(e.SpellId)).ToListAsync();
+			if (stale.Count > 0)
+				db.SpellStatEffects.RemoveRange(stale);
+			var effectRows = 0;
+			foreach (var (spellId, deltas) in statEffects)
+				foreach (var (statId, amount) in deltas)
+				{
+					db.SpellStatEffects.Add(new SpellStatEffect { SpellId = spellId, StatId = (CharacterStatId)statId, Amount = amount });
+					effectRows++;
+				}
+			await db.SaveChangesAsync();
+
+			logger?.LogInformation("RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects.", seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet);
 		}
 

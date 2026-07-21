@@ -81,6 +81,7 @@ namespace Faolan.Core.Database
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
 		DbSet<Spell> Spells { get; }
+		DbSet<SpellStatEffect> SpellStatEffects { get; }
 		DbSet<StockPhrase> StockPhrases { get; }
 		DbSet<TradepostListing> TradepostListings { get; }
 		DbSet<WorldObject> WorldObjects { get; }
@@ -157,6 +158,7 @@ namespace Faolan.Core.Database
 		public DbSet<Shop> Shops { get; set; }
 		public DbSet<ShopItem> ShopItems { get; set; }
 		public DbSet<Spell> Spells { get; set; }
+		public DbSet<SpellStatEffect> SpellStatEffects { get; set; }
 		public DbSet<StockPhrase> StockPhrases { get; set; }
 		public DbSet<TradepostListing> TradepostListings { get; set; }
 		public DbSet<WorldObject> WorldObjects { get; set; }
@@ -191,6 +193,7 @@ namespace Faolan.Core.Database
 
 			// The item's equipped stat bonuses (#3); cascade-delete with the item.
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).HasForeignKey(m => m.ItemId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).HasForeignKey(m => m.SpellId).OnDelete(DeleteBehavior.Cascade); // #367
 
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
