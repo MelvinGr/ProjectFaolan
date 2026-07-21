@@ -213,6 +213,14 @@ namespace Faolan.GameServer.Combat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
 			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
 			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level);
+			// #399: roll a critical hit off the player's aggregated Hit Rating - a crit scales the damage and rides the
+			// wire as DamageResult type 3 (the client renders it larger).
+			var crit = CombatResolver.IsCriticalHit(_sim.PlayerWorldEntity(client)?.HitRating ?? 0, Random.Shared.Next(100));
+			if (crit)
+				damage = (uint)CombatResolver.ApplyCritDamage((int)damage);
+			var hitType = crit
+				? 3u
+				: 2u;
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
@@ -251,8 +259,8 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(0))
 				.SendAsync(client);
 
-			// 2) DamageResultIIR - the hit / floating number.
-			await SendDamageNumber(client, targetHandle, instance, damage);
+			// 2) DamageResultIIR - the hit / floating number (type 3 on a crit).
+			await SendDamageNumber(client, targetHandle, instance, damage, hitType);
 
 			// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
 			// lifecycle (despawn + scheduled respawn) on death.
@@ -599,9 +607,10 @@ namespace Faolan.GameServer.Combat
 		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
 		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
 		// bar move. Byte-exact builder (CombatEffectBuilder), golden-tested vs the captured NPC->player hit. #274.
-		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
+		// hitType is the DamageResult category: 2 = normal, 3 = critical / big hit (the client renders type 3 larger).
+		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage, uint hitType = 2)
 		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, 2));
+			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, hitType));
 		}
 
 		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:

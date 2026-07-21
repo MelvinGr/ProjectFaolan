@@ -128,6 +128,33 @@ namespace Faolan.GameServer.Combat
 			return Math.Max(1, (int)Math.Round(mitigated, MidpointRounding.AwayFromZero));
 		}
 
+		// Provisional critical-hit tuning (#399 - consumes the decoded Hit Rating stat 0x136). A crit multiplies the hit
+		// and rides the wire as DamageResult type 3 (2 = normal, 3 = crit/big hit - capture-derived, CombatEffectBuilder).
+		// The CHANCE curve + the ×1.5 magnitude are provisional (the real crit rate/damage is server-GDB); tune in-client.
+		public const int CritDamageMultiplierPercent = 150; // a crit hits for 1.5x
+		public const int BaseCritChancePercent = 5; // everyone crits sometimes, even with no Hit Rating gear
+		public const int MaxCritChancePercent = 75;
+
+		// Crit chance from the attacker's aggregated Hit Rating: base + rating/20 (a full set of Hit-Rating gear ~ a few
+		// hundred rating -> a meaningful bump), capped. Provisional scaling.
+		public static int CritChancePercent(uint hitRating)
+		{
+			return Math.Min(MaxCritChancePercent, BaseCritChancePercent + (int)(hitRating / 20));
+		}
+
+		// Whether a swing crits, given the attacker's Hit Rating and a 0..99 roll (the caller supplies the roll so this
+		// stays pure/testable; CombatService rolls with Random.Shared).
+		public static bool IsCriticalHit(uint hitRating, int rollPercent)
+		{
+			return rollPercent < CritChancePercent(hitRating);
+		}
+
+		// The critical-hit damage (the normal hit scaled by the crit multiplier), floored at 1.
+		public static int ApplyCritDamage(int damage)
+		{
+			return Math.Max(1, damage * CritDamageMultiplierPercent / 100);
+		}
+
 		// Provisional mana cost for a cast. Per-spell costs aren't decoded from captures yet (like damage), so this
 		// is a simple level-scaled value just so casting visibly drains the mana bar (the spell/mana analogue of the
 		// melee stamina cost).

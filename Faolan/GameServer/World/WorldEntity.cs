@@ -250,6 +250,10 @@ namespace Faolan.GameServer.World
 		// mitigate incoming physical damage (CombatResolver.ApplyPhysicalMitigation). 0 for NPCs and unarmored players.
 		public uint ArmorRating { get; set; }
 
+		// The player's aggregated Hit Rating from worn gear (#399), summed at world entry; drives the crit chance of
+		// their melee swings (CombatResolver.CritChancePercent). 0 for NPCs and players with no Hit-Rating gear.
+		public uint HitRating { get; set; }
+
 		public uint AttackSwingCounter { get; set; }
 
 		// Coins carried by a loot bag (tin, the wallet wire unit), rolled when the bag drops; zeroed once looted

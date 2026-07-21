@@ -35,6 +35,21 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Crit_ChanceRisesWithHitRating_IsCapped_AndScalesDamage()
+		{
+			Assert.Equal(CombatResolver.BaseCritChancePercent, CombatResolver.CritChancePercent(0)); // no gear = base chance
+			Assert.True(CombatResolver.CritChancePercent(1000) > CombatResolver.CritChancePercent(100)); // more Hit Rating = more crits
+			Assert.Equal(CombatResolver.MaxCritChancePercent, CombatResolver.CritChancePercent(1_000_000)); // capped
+
+			// A roll below the chance crits; at/above does not.
+			Assert.True(CombatResolver.IsCriticalHit(0, CombatResolver.BaseCritChancePercent - 1));
+			Assert.False(CombatResolver.IsCriticalHit(0, CombatResolver.BaseCritChancePercent));
+
+			Assert.Equal(150, CombatResolver.ApplyCritDamage(100)); // 1.5x
+			Assert.True(CombatResolver.ApplyCritDamage(0) >= 1); // floored at 1
+		}
+
+		[Fact]
 		public void ArmorMitigation_ReducesDamage_DiminishingAndNeverToZero()
 		{
 			const uint k = CombatResolver.ArmorHalfMitigation;
