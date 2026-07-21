@@ -149,7 +149,9 @@ namespace Faolan.GameServer.World
 				// #401: cache the worn-gear physical armor rating for incoming-damage mitigation (0 when unarmored).
 				ArmorRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0),
 				// #399: cache the worn-gear Hit Rating that drives the player's melee crit chance.
-				HitRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0)
+				HitRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0),
+				// #399: cache the worn-gear Magic Damage added flat to the player's spell hits.
+				MagicDamage = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0)
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.

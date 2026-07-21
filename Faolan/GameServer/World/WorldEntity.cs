@@ -254,6 +254,10 @@ namespace Faolan.GameServer.World
 		// their melee swings (CombatResolver.CritChancePercent). 0 for NPCs and players with no Hit-Rating gear.
 		public uint HitRating { get; set; }
 
+		// The player's aggregated Magic Damage rating from worn gear (#399), summed at world entry; added flat to the
+		// damage of spells they cast (CombatResolver.ResolveSpellDamage). 0 for NPCs and players with no such gear.
+		public uint MagicDamage { get; set; }
+
 		public uint AttackSwingCounter { get; set; }
 
 		// Coins carried by a loot bag (tin, the wallet wire unit), rolled when the bag drops; zeroed once looted

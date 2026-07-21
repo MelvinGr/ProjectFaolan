@@ -84,7 +84,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ChannelGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int channelMs, uint castToken)
 		{
 			var casterLevel = client.Session.Character.Level;
-			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamage ?? 0);
 			var tickCount = Math.Max(1, channelMs / GroundAoeTickIntervalMs);
 			var perTick = Math.Max(1, total / tickCount);
 
@@ -140,7 +140,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
 		{
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamage ?? 0);
 			var count = await ApplyAoeTick(client, casterHandle, target, spellId, damage);
 			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, count, damage);
 		}
@@ -151,7 +151,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamage ?? 0);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
 			await SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId);
 		}

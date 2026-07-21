@@ -35,6 +35,16 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void SpellDamage_AddsMagicDamageFlat()
+		{
+			var baseDmg = CombatResolver.ResolveSpellDamage(123, 10);
+			var geared = CombatResolver.ResolveSpellDamage(123, 10, 52); // +52 Magic Damage (a Royal Signet's worth)
+
+			Assert.Equal(baseDmg + 52, geared);
+			Assert.Equal(baseDmg, CombatResolver.ResolveSpellDamage(123, 10, 0)); // no gear = base
+		}
+
+		[Fact]
 		public void Crit_ChanceRisesWithHitRating_IsCapped_AndScalesDamage()
 		{
 			Assert.Equal(CombatResolver.BaseCritChancePercent, CombatResolver.CritChancePercent(0)); // no gear = base chance

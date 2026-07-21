@@ -75,12 +75,16 @@ namespace Faolan.GameServer.Combat
 			return 5u + lvl * 3u;
 		}
 
-		public static int ResolveSpellDamage(uint spellId, ushort casterLevel)
+		// Spell damage: the level-scaled base plus the caster's aggregated Magic Damage rating (#399), added flat like
+		// retail's spell-damage bonus. magicDamage is 0 for NPC casts / callers without gear. Per-spell power isn't
+		// decoded (every spell shares the base), so this is still provisional; Magic Damage at least makes geared
+		// casters hit harder.
+		public static int ResolveSpellDamage(uint spellId, ushort casterLevel, uint magicDamage = 0)
 		{
 			var level = casterLevel == 0
 				? (ushort)1
 				: casterLevel;
-			return 20 + level * 5;
+			return 20 + level * 5 + (int)magicDamage;
 		}
 
 		// The divisor turning the raw RDB weapon-damage template values (fields 286/285 = min/max, #395) into a
