@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -51,7 +52,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Parse a decompressed 1066611 resource. `tilemapExtent` is the playfield's world-unit width (from the 1070003
 		// <tilemap Width>) used only to derive the cell size; pass 0 (or == W) to assume 1 unit/cell.
-		public static bool TryParse(ReadOnlySpan<byte> body, out RdbHeightmap heightmap, float tilemapExtent = 0f, float originX = 0f, float originZ = 0f)
+		public static bool TryParse(ReadOnlySpan<byte> body, [NotNullWhen(true)] out RdbHeightmap? heightmap, float tilemapExtent = 0f, float originX = 0f, float originZ = 0f)
 		{
 			heightmap = null;
 			if (body.Length < 12)

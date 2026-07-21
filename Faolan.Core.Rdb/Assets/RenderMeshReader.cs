@@ -322,7 +322,7 @@ namespace Faolan.Core.Rdb.Assets
 					}
 				}
 
-				if (bones != null)
+				if (bones != null && weights != null)
 				{
 					var io = biEl!.Value.Offset;
 					var wo = bwEl!.Value.Offset;

@@ -18,7 +18,7 @@ namespace Faolan.Core.Rdb.Assets
 		// Reads a terrain file. Returns null if the stream isn't a valid FTR1 file. The Heightmap/Collision bodies are
 		// the DECOMPRESSED resource payloads (ready for RdbHeightmap.TryParse / RdbCollisionMesh.TryParse); either may
 		// be empty.
-		public static Data Read(Stream stream)
+		public static Data? Read(Stream stream)
 		{
 			using var buffer = new MemoryStream();
 			stream.CopyTo(buffer);

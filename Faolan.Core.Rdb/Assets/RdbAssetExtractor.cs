@@ -1182,9 +1182,7 @@ namespace Faolan.Core.Rdb.Assets
 				? s with
 				{
 					BonePalette = pal
-						.Select(n => n == null
-							? null
-							: prefix + n)
+						.Select(n => prefix + n)
 						.ToArray()
 				}
 				: s;

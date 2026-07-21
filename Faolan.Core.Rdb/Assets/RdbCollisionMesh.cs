@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 
 namespace Faolan.Core.Rdb.Assets
@@ -68,7 +69,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Parse an NXUSTREAM (type 1000012) body into world triangles + a 2D X/Z grid index. Returns false only on an
 		// empty/garbage stream (a map with no collision).
-		public static bool TryParse(ReadOnlySpan<byte> body, out RdbCollisionMesh mesh)
+		public static bool TryParse(ReadOnlySpan<byte> body, [NotNullWhen(true)] out RdbCollisionMesh? mesh)
 		{
 			mesh = null;
 			var verts = new List<float>();

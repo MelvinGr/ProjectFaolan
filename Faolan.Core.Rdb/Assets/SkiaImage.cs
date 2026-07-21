@@ -130,13 +130,13 @@ namespace Faolan.Core.Rdb.Assets
 
 		// SKCanvas.DrawBitmap is obsolete in SkiaSharp 4.x; the supported path is SKImage.FromBitmap + DrawImage.
 		// `default` sampling = nearest, matching the prior DrawBitmap behaviour (no FilterQuality was ever set).
-		private static void Blit(SKCanvas canvas, SKBitmap bmp, float x, float y, SKPaint paint = null)
+		private static void Blit(SKCanvas canvas, SKBitmap bmp, float x, float y, SKPaint? paint = null)
 		{
 			using var img = SKImage.FromBitmap(bmp);
 			canvas.DrawImage(img, x, y, default, paint);
 		}
 
-		private static void Blit(SKCanvas canvas, SKBitmap bmp, SKRect source, SKRect dest, SKPaint paint = null)
+		private static void Blit(SKCanvas canvas, SKBitmap bmp, SKRect source, SKRect dest, SKPaint? paint = null)
 		{
 			using var img = SKImage.FromBitmap(bmp);
 			canvas.DrawImage(img, source, dest, default, paint);
