@@ -1,0 +1,126 @@
+@page "/admin/quests"
+@rendermode InteractiveServer
+@inject IDbContextFactory<DatabaseContext> DbFactory
+@inject NavigationManager Nav
+@using Faolan.Core.Database
+@using Faolan.Core.Database.Tables
+@using Microsoft.EntityFrameworkCore
+@implements IDisposable
+
+<PageTitle>Quests — Admin</PageTitle>
+
+<div class="qe">
+	<div class="qe-head">
+		<h1>Quest editor</h1>
+		<span class="warn">⚠ edits the live game DB — restart the server to pick up changes</span>
+	</div>
+
+	@if (!_authorized)
+	{
+		<p class="muted">Checking access…</p>
+	}
+	else
+	{
+		@if (_status != null)
+		{
+			<p class="qe-status @(_error ? "err" : "")">@_status</p>
+		}
+
+		<div class="qe-grid">
+			<aside class="qe-list">
+				<input class="filter" placeholder="Filter by id / next / target…" @bind="_filter" @bind:event="oninput"/>
+				<div class="rowlist">
+					@foreach (var q in Filtered())
+					{
+						<button class="@(ReferenceEquals(q, _quest) ? "sel" : "")" @onclick="() => Select(q)">
+							<span class="qid">@q.QuestId</span>
+							@if (q.NextQuestId is { } nx)
+							{
+								<span class="arrow">→ @nx</span>
+							}
+							<span class="gcount">@q.Goals.Count goal(s)</span>
+						</button>
+					}
+				</div>
+			</aside>
+
+			<section class="qe-detail">
+				@if (_quest == null)
+				{
+					<p class="muted">Select a quest.</p>
+				}
+				else
+				{
+					<div class="qe-fields">
+						<label>Quest id<input value="@_quest.QuestId" disabled/></label>
+						<label>Next quest (supersedes to)<input @bind="_quest.NextQuestId" placeholder="(chain end)"/></label>
+						<label>Level<input @bind="_quest.Level"/></label>
+						<label>Area id<input @bind="_quest.AreaId"/></label>
+					</div>
+					@if (Next(_quest) is { } nextDef)
+					{
+						<p class="chainhint">Chains to <b>@nextDef.QuestId</b> — @nextDef.Goals.Count goal(s).</p>
+					}
+
+					<div class="qe-goals-head">
+						<h2>Goals</h2>
+						<button class="add" @onclick="AddGoal">+ Add goal</button>
+					</div>
+					<div class="tablewrap">
+						<table class="qe-goals">
+							<thead>
+							<tr>
+								<th title="objective order">Seq</th>
+								<th title="goal id (wire)">GoalId</th>
+								<th title="what the trigger is">Type</th>
+								<th title="Kill/Loot/Talk/Escort target NPC name">TargetName</th>
+								<th title="Kill: NPC template id · Collect: item id (the STABLE match key)">TrailingRefId</th>
+								<th title="how many (⚠ in the byte-exact objective region)">Req</th>
+								<th title="ReachArea/marker map">MapId</th>
+								<th title="ReachArea trigger / marker X (world)">MarkerX</th>
+								<th title="ReachArea trigger / marker Y (world)">MarkerY</th>
+								<th title="granted quest item id">ItemId</th>
+								<th></th>
+							</tr>
+							</thead>
+							<tbody>
+							@foreach (var g in Goals())
+							{
+								<tr>
+									<td><input class="n" @bind="g.Sequence"/></td>
+									<td><input class="n" @bind="g.GoalId"/></td>
+									<td>
+										<select @bind="g.GoalType">
+											@foreach (var t in GoalTypes)
+											{
+												<option value="@t">@t</option>
+											}
+										</select>
+									</td>
+									<td><input @bind="g.TargetName" placeholder="—"/></td>
+									<td><input class="n" @bind="g.TrailingRefId"/></td>
+									<td><input class="n" @bind="g.RequiredCount"/></td>
+									<td><input class="n" @bind="g.MapId" placeholder="—"/></td>
+									<td><input class="n" @bind="g.MarkerX" placeholder="—"/></td>
+									<td><input class="n" @bind="g.MarkerY" placeholder="—"/></td>
+									<td><input class="n" @bind="g.QuestItemId" placeholder="—"/></td>
+									<td><button class="del" title="Remove goal" @onclick="() => RemoveGoal(g)">✕</button></td>
+								</tr>
+							}
+							</tbody>
+						</table>
+					</div>
+					<p class="hint">
+						<b>Type</b> is the runtime trigger (server-side): <b>Kill</b>/<b>CollectItem</b> match by <b>TrailingRefId</b>
+						(template / item id); <b>LootFromNpc</b>/<b>TalkToNpc</b>/<b>Escort</b> match by <b>TargetName</b>;
+						<b>ReachArea</b> fires at (MapId, MarkerX, MarkerY). Editing markers/Req can break byte-exact quests.
+					</p>
+
+					<div class="qe-actions">
+						<button class="save" @onclick="Save">Save</button>
+					</div>
+				}
+			</section>
+		</div>
+	}
+</div>
