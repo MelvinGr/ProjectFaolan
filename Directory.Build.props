@@ -14,7 +14,7 @@
 		<Copyright>Copyright © Project Faolan $([System.DateTime]::Now.Year)</Copyright>
 		<ApplicationIcon>..\logo.ico</ApplicationIcon>
 		<!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
-		<!--<Nullable>enable</Nullable>-->
+		<Nullable>enable</Nullable>
 		<!--<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>-->
 	</PropertyGroup>
 
