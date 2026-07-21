@@ -11,7 +11,6 @@ using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Quest;
-using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +19,7 @@ namespace Faolan.GameServer.Dialogue
 	// The NPC dialogue runtime: routes a TalkToNpc / KnubotAnswer to the captured conversation node for the
 	// requested (NPC, typeId, answer-path), re-addresses its packets to the live player + clicked NPC, advances
 	// the tree, and grants quests reached in a branch. Extracted from GameServerListener as a composed
-	// collaborator; quest-journal pushes go through the WorldBroadcaster, branch conditions through the Lua VM.
+	// collaborator; quest-journal pushes go through the WorldBroadcaster, branch conditions match the player's quest state.
 	public sealed class ConversationService
 	{
 		// The GameAgent sender instance to use when a packet has none stored (retail's most common value); the real
@@ -49,17 +48,15 @@ namespace Faolan.GameServer.Dialogue
 
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
-		private readonly LuaScriptVm _luaVm;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
 
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, LuaScriptVm luaVm)
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression)
 		{
 			_database = database;
 			_logger = logger;
 			_broadcaster = broadcaster;
 			_questProgression = questProgression;
-			_luaVm = luaVm;
 		}
 
 		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
@@ -149,86 +146,49 @@ namespace Faolan.GameServer.Dialogue
 			return true;
 		}
 
-		// #356: runs the screen's EffectScript (the RDB quest engine's state mutation) and PERSISTS what it recorded:
-		// AddTag -> CharacterTag, SolveGoal -> QuestProgressionService.SolveGoal (advances/supersedes the owning quest).
-		// SpawnItem/CastSpell are recorded but deferred (no resource resolver yet). No-op when the screen has no effect.
-		// This is the conversation half of closing the Lua effect->quest-state loop; the .lua run GM command shares the
-		// same apply shape for out-of-dialogue testing.
-		private async Task ApplyScreenEffect(INetworkClient client, ConversationNode node)
-		{
-			if (string.IsNullOrEmpty(node.EffectScript))
-				return;
-
-			var character = client.Session?.Character;
-			if (character == null)
-				return;
-
-			var player = await BuildLuaPlayer(character);
-			if (!LuaScriptVm.RunEffect(node.EffectScript, player))
-			{
-				_logger.LogWarning("Conversation: effect script failed for npc={Name} path='{Path}'.", node.NpcName, node.AnswerPath);
-				return;
-			}
-
-			foreach (var tag in player.AddedTags)
-				await _database.AddCharacterTag(character.Id, (uint)tag);
-			foreach (var goalId in player.SolvedGoals)
-				await _questProgression.SolveGoal(client, (uint)goalId);
-
-			if (player.AddedTags.Count > 0 || player.SolvedGoals.Count > 0)
-			{
-				_logger.LogInformation("Conversation: effect (npc={Name} path='{Path}') +tags [{Tags}], solved goals [{Goals}] for {Char}.", node.NpcName, node.AnswerPath,
-					string.Join(",", player.AddedTags), string.Join(",", player.SolvedGoals), character.Name);
-			}
-		}
-
-		// Builds the GameLuaPlayer for the live character (preloaded tags + completed/active quests - script calls are
-		// sync, so state is read up front). Shared by the condition gate (PickConversationScreen) and the effect run
-		// (ApplyScreenEffect). Returns an empty-state player when there's no character (pre-login create flow).
-		private async Task<GameLuaPlayer> BuildLuaPlayer(Character character)
-		{
-			if (character == null)
-				return new GameLuaPlayer([], []);
-
-			var tags = await _database.GetCharacterTags(character.Id);
-			var quests = await _database.GetCharacterQuests(character.Id);
-			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
-			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
-			return new GameLuaPlayer(tags, completed, active);
-		}
-
-		// Picks the conversation-screen variant whose Lua CONDITION passes for the live player (quest/tag-gated
-		// dialogue, issue #37). Most screens have a single unconditional variant - fast path. When conditioned
-		// variants exist, evaluate each (conditioned-first) against the character's tags + completed quests via the
-		// LuaScriptVm, and serve the first that passes; the unconditional "" variant is the fallback. A condition
-		// script error is treated as "doesn't match" (permissive=false) so a bad gate can't hijack every player.
+		// Picks the conversation-screen variant whose quest-state CONDITION matches the live player (quest-gated
+		// dialogue, issue #37). Most screens have a single unconditional variant - fast path. When conditioned variants
+		// exist, evaluate each (conditioned-first) against the character's quest states and serve the first that
+		// matches; the unconditional (null-gate) variant is the fallback. A variant with no matching quest is skipped,
+		// so a stale gate can't hijack a player who isn't in that state.
 		private async Task<ConversationNode?> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath, uint clickedTemplateId)
 		{
 			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath, clickedTemplateId);
 			if (variants.Length == 0)
 				return null;
-			if (variants.Length == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
+			if (variants.Length == 1 || variants.All(v => v.ConditionQuestId == null))
 				return variants[0]; // GetConversationScreens orders the unconditional fallback last
 
-			var player = await BuildLuaPlayer(client.Session.Character);
+			var character = client.Session.Character;
+			var quests = character == null
+				? []
+				: await _database.GetCharacterQuests(character.Id);
 
 			ConversationNode? fallback = null;
 			foreach (var v in variants)
 			{
-				if (string.IsNullOrEmpty(v.ConditionScript))
+				if (v.ConditionQuestId == null)
 				{
 					fallback = v;
 					continue;
 				}
 
-				if (LuaScriptVm.RunCondition(v.ConditionScript, player, false))
+				if (QuestConditionMet(v, quests))
 				{
-					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant.", npcName, answerPath);
+					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant (quest {Quest} {State}).", npcName, answerPath, v.ConditionQuestId, v.ConditionQuestState);
 					return v;
 				}
 			}
 
 			return fallback;
+		}
+
+		// A conditioned variant applies when the player holds ConditionQuestId in state ConditionQuestState - the two
+		// shapes retail's dialogue Lua actually used: HasCompletedQuest(X) == (X, Completed), and HasQuest(X) and not
+		// HasCompletedQuest(X) == (X, Active). Kept internal-static so ConversationConditionTests can pin the gate.
+		internal static bool QuestConditionMet(ConversationNode node, IReadOnlyCollection<CharacterQuest> quests)
+		{
+			return node.ConditionQuestId is { } questId && quests.Any(q => q.QuestId == questId && q.State == node.ConditionQuestState);
 		}
 
 		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
@@ -362,12 +322,6 @@ namespace Faolan.GameServer.Dialogue
 				// quest) - re-run interest so they stream in immediately, not only after the player next moves.
 				await _broadcaster.RefreshQuestVisibility(client);
 			}
-
-			// #356: run this screen's Lua EFFECT (if any) and persist what it did - the RDB quest engine's state
-			// mutation (SolveGoal advances the owning quest, AddTag records progress). Runs AFTER the grant so a screen
-			// that both grants and solves finds the just-granted quest active. Before the terminal return so a
-			// close-only screen still fires its effect.
-			await ApplyScreenEffect(client, node);
 
 			// A pure terminal screen (a CloseChatWindow with NO AnswerList) ENDS the dialogue: the window is now shut
 			// on the client. Recording it as the active position left the session "inside" a finished conversation,

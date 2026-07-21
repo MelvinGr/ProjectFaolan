@@ -129,11 +129,10 @@ namespace Faolan.GameServer.Quest
 			return targets;
 		}
 
-		// #356: a Lua EFFECT script resolved goal `goalId` (player:SolveGoal(goalId)) - the RDB quest engine's way of
-		// completing an objective. Finds the active quest that OWNS `goalId` (primary or secondary, #357) and jumps that
-		// goal to its required count; the quest completes only once every goal is done (no target-name match: the script
-		// already decided it's solved). This closes the Lua effect->quest-state loop so scripted quests advance without
-		// bespoke C#.
+		// #356: solve goal `goalId` directly (the reach-a-spot / proximity path in GameServerListener.World.cs). Finds
+		// the active quest that OWNS `goalId` (primary or secondary, #357) and jumps that goal to its required count; the
+		// quest completes only once every goal is done (no target-name match: reaching the spot already decided it's
+		// solved). Advances scripted objectives without bespoke per-quest C#.
 		public async Task SolveGoal(INetworkClient client, uint goalId)
 		{
 			var character = client?.Session?.Character;
@@ -162,7 +161,7 @@ namespace Faolan.GameServer.Quest
 				else
 					await SendGoalUpdate(client!, quest.QuestId, goal.GoalId, required); // this goal done, others pending
 
-				_logger.LogInformation("Quest {Quest} goal {Goal} solved by Lua effect for {Char}.", quest.QuestId, goalId, character.Name);
+				_logger.LogInformation("Quest {Quest} goal {Goal} solved (reach) for {Char}.", quest.QuestId, goalId, character.Name);
 			}
 
 			if (changed)

@@ -65,7 +65,7 @@ namespace Faolan.Core.Database.Repositories
 				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId))
 				.ToListAsync();
 
-			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToArray();
+			return nodes.OrderBy(n => n.ConditionQuestId == null).ToArray(); // conditioned variants first, unconditional fallback last
 		}
 
 		public async Task<NpcTemplate?> GetNpcByName(string name)

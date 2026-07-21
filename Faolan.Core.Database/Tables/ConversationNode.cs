@@ -41,21 +41,16 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string AnswerPath { get; set; } = null!;
 
-		// A Lua CONDITION source (run against the live player via LuaScriptVm.RunCondition) that gates this screen
-		// variant - how the SAME (NpcName, TypeId, AnswerPath) serves different dialogue by quest/tag state (e.g.
-		// Casilda's pre- vs post-first-quest greeting). "" = unconditional (the fallback / current behaviour). The
-		// runtime picks the first variant whose condition passes for the player, else the "" one. Part of the
-		// tag/quest dialogue VM (issue #37 / §6); the importer tags each captured variant with the state it came from.
-		[MaxLength(256)]
-		public string ConditionScript { get; set; } = "";
-
-		// A Lua EFFECT source (run against the live player via LuaScriptVm.RunEffect) that fires when this screen is
-		// served - the RDB quest engine's state mutation (player:SolveGoal/AddTag/SpawnItem/CastSpell). "" = no effect
-		// (the current behaviour). The runtime persists the recorded effects: AddTag -> CharacterTag, SolveGoal ->
-		// QuestProgressionService.SolveGoal (advances the owning quest). Closes the Lua effect->quest-state loop (#356)
-		// so scripted accept/branch/turn-in advance without bespoke C#; the importer harvests it per reached screen.
-		[MaxLength(256)]
-		public string EffectScript { get; set; } = "";
+		// The QUEST-STATE gate for this screen variant - how the SAME (NpcName, TypeId, AnswerPath) serves different
+		// dialogue by quest state (e.g. Casilda's pre- vs post-first-quest greeting). NULL = unconditional (the fallback).
+		// When set, the variant applies only while the player holds quest ConditionQuestId in state ConditionQuestState
+		// (Active = accepted-not-completed, Completed = turned in). The runtime picks the first variant whose gate passes,
+		// else the unconditional one. The importer tags each captured variant with the state it was captured in
+		// (ConversationConditions). Replaced the old free-form Lua condition source (issue #37); the two shapes retail's
+		// Lua actually used - HasCompletedQuest(X) and HasQuest(X) and not HasCompletedQuest(X) - are exactly these two
+		// columns, so no interpreter is needed.
+		public uint? ConditionQuestId { get; set; }
+		public QuestState? ConditionQuestState { get; set; }
 
 		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. Display/routing hint;
 		// the runtime now gates on NpcTemplateId (below), not the name alone.

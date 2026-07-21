@@ -305,7 +305,8 @@ namespace Faolan.Core.Database
 					n.NpcName,
 					n.TypeId,
 					n.AnswerPath,
-					n.ConditionScript // a screen can have quest/tag-conditioned variants under one (name,type,path)
+					n.ConditionQuestId, // a screen can have quest-state-gated variants under one (name,type,path)
+					n.ConditionQuestState
 				})
 				.IsUnique();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);

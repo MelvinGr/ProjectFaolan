@@ -1,43 +1,61 @@
-using Faolan.GameServer.Scripting;
+using Faolan.Core.Database.Tables;
+using Faolan.GameServer.Dialogue;
 using Xunit;
 
 namespace Faolan.Tests
 {
-	// The condition-gated dialogue VM building blocks (issue #37): a ConversationNode.ConditionScript is a Lua
-	// snippet run against the live player (tags + completed quests) by LuaScriptVm.RunCondition; the runtime serves
-	// the variant whose condition passes (unconditional = fallback). This locks the quest-gate evaluation that picks
-	// Casilda's pre- vs post-first-quest dialogue.
+	// The quest-state-gated dialogue building block (issue #37): a ConversationNode carries a (ConditionQuestId,
+	// ConditionQuestState) gate, and the runtime serves the variant whose gate matches the player's quest state
+	// (unconditional = fallback). This locks the quest-gate evaluation that picks Casilda's pre- vs post-first-quest
+	// dialogue. Replaced the old Lua-interpreter conditions - the two shapes retail's dialogue Lua used map exactly
+	// onto (X, Completed) and (X, Active), so the gate is a plain state match, no interpreter.
 	public class ConversationConditionTests
 	{
-		[Fact]
-		public void BadCondition_DoesNotMatch_WhenNonPermissive()
+		private static ConversationNode Gate(uint questId, QuestState state)
 		{
-			var vm = new LuaScriptVm();
-			// A malformed gate must not hijack every player (the runtime uses permissive: false).
-			Assert.False(LuaScriptVm.RunCondition("this is not lua", new GameLuaPlayer([], []), false));
+			return new ConversationNode
+			{
+				ConditionQuestId = questId,
+				ConditionQuestState = state
+			};
+		}
+
+		private static CharacterQuest Held(uint questId, QuestState state)
+		{
+			return new CharacterQuest
+			{
+				QuestId = questId,
+				State = state
+			};
 		}
 
 		[Fact]
-		public void HasCompletedQuest_GatesTheVariant()
+		public void CompletedGate_MatchesOnlyWhenCompleted()
 		{
-			var vm = new LuaScriptVm();
-			const string condition = "return player:HasCompletedQuest(13479)";
+			var gate = Gate(13480, QuestState.Completed);
 
-			var afterQuest = new GameLuaPlayer([], [13479u]);
-			var beforeQuest = new GameLuaPlayer([], []);
-
-			Assert.True(LuaScriptVm.RunCondition(condition, afterQuest, false));
-			Assert.False(LuaScriptVm.RunCondition(condition, beforeQuest, false));
+			Assert.True(ConversationService.QuestConditionMet(gate, [Held(13480, QuestState.Completed)]));
+			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13480, QuestState.Active)])); // has it, not done
+			Assert.False(ConversationService.QuestConditionMet(gate, [])); // doesn't have it
 		}
 
 		[Fact]
-		public void HasTag_GatesTheVariant()
+		public void ActiveGate_MatchesOnlyWhileInProgress()
 		{
-			var vm = new LuaScriptVm();
-			const string condition = "return player:HasTag(5001)";
+			var gate = Gate(13479, QuestState.Active);
 
-			Assert.True(LuaScriptVm.RunCondition(condition, new GameLuaPlayer([5001u], []), false));
-			Assert.False(LuaScriptVm.RunCondition(condition, new GameLuaPlayer([], []), false));
+			Assert.True(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Active)]));
+			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)])); // already turned in
+			Assert.False(ConversationService.QuestConditionMet(gate, [])); // not accepted
+		}
+
+		[Fact]
+		public void Gate_IsQuestSpecific()
+		{
+			var gate = Gate(13480, QuestState.Completed);
+
+			// Completing a DIFFERENT quest must not satisfy this gate.
+			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)]));
 		}
 	}
 }

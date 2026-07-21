@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
@@ -32,7 +33,8 @@ namespace Faolan.Importer.Extractors
 		List<byte[]> Packets,
 		string NpcName,
 		uint? NpcTemplateId = null,
-		string ConditionScript = "",
+		uint? ConditionQuestId = null,
+		QuestState? ConditionQuestState = null,
 		uint GrantQuestId = 0,
 		uint QuestContextId = 0);
 
@@ -203,15 +205,15 @@ namespace Faolan.Importer.Extractors
 		// is a 4-byte varint (re-addresses to any normal character), then the most packets.
 		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
 		{
-			var best = new Dictionary<(string, uint, string, string), (int score, ConversationEntry entry)>();
+			var best = new Dictionary<(string, uint, string, uint?, QuestState?), (int score, ConversationEntry entry)>();
 			foreach (var e in all)
 			{
 				var identity = string.IsNullOrEmpty(e.NpcName)
 					? $"#{e.CapturedNpcHandle}"
 					: e.NpcName;
-				// The ConditionScript is part of the key so a NPC's quest/tag-conditioned variants (e.g. Casilda's
-				// pre- vs post-first-quest greeting) stay SEPARATE rows instead of merging into one mixed screen.
-				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionScript);
+				// The quest-state gate is part of the key so a NPC's conditioned variants (e.g. Casilda's pre- vs
+				// post-first-quest greeting) stay SEPARATE rows instead of merging into one mixed screen.
+				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState);
 				var score = (VarintLength(e.CapturedInstance) == 4
 					? 1_000_000
 					: 0) + e.Packets.Count;

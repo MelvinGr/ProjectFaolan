@@ -1,13 +1,15 @@
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.Importer.Extractors
 {
-	// Quest/tag conditions for captured NPC dialogue (issue #37 - the tag/quest dialogue VM). Some NPCs say
+	// Quest conditions for captured NPC dialogue (issue #37 - the quest-gated dialogue VM). Some NPCs say
 	// DIFFERENT things depending on quest state (e.g. Casilda's pre- vs post-first-quest greeting, and she's chained
 	// only before the quest). The captured dialogue is the RESULT the retail server sent for THAT char's state, so we
-	// tag each capture's screens for an NPC with the Lua condition (run live by LuaScriptVm) under which they apply.
-	// The runtime then serves the matching variant; without a tag the dialogue would MERGE into one mixed screen.
+	// tag each capture's screens for an NPC with the quest-STATE gate (ConditionQuestId + ConditionQuestState, matched
+	// live) under which they apply. The runtime then serves the matching variant; without a tag the dialogue would
+	// MERGE into one mixed screen.
 	//
 	// For a STATE-MANAGED NPC (any NpcName that appears in Rules) the classification is AUTHORITATIVE: only the
 	// captures listed here contribute that NPC's dialogue. An unlisted capture's nodes for the NPC are DROPPED, so a
@@ -21,20 +23,20 @@ namespace Faolan.Importer.Extractors
 		// Casilda gives the "Casilda" quest, id 13479 (capture: …randochar-login-get-casilda-quest, QuestFullUpdate
 		// 0x63268258 id=13479 after the ApproachCasilda destiny step). Her dialogue + her chained/unchained state flip
 		// on it. (Separate from the "Shipwrecked" quest, given after the Kalanthes conversation — id not yet captured.)
-		private const int CasildaFirstQuest = 13479;
+		private const uint CasildaFirstQuest = 13479;
 
-		// Per-(capture, NPC) quest-STATE classification. Condition = the Lua gate under which the capture's whole tree
-		// applies; "" marks the OFFER state (the unconditional fallback a fresh char gets, since it fails every gate).
-		// Captures sharing a Condition UNION into one consistent tree (the offer captures below all grant 13479 at the
-		// same path 0>0>0>0, so unioning them only fills in branches).
-		//   OFFER (not yet accepted)         = "" (fallback)
-		//   IN PROGRESS (accepted, not done) = `HasQuest(X) and not HasCompletedQuest(X)`
-		//   DONE                             = `HasCompletedQuest(X)`
-		// (The two non-empty gates are mutually exclusive, so runtime order doesn't matter; the offer fallback is
-		// served only when both fail.)
+		// Per-(capture, NPC) quest-STATE classification. The gate = the (quest id, state) under which the capture's
+		// whole tree applies; a NULL quest id marks the OFFER state (the unconditional fallback a fresh char gets, since
+		// it holds no gating quest). Captures sharing a gate UNION into one consistent tree (the offer captures below all
+		// grant 13479 at the same path 0>0>0>0, so unioning them only fills in branches).
+		//   OFFER (not yet accepted)         = (null, -)                    -> unconditional fallback
+		//   IN PROGRESS (accepted, not done) = (X, QuestState.Active)
+		//   DONE                             = (X, QuestState.Completed)
+		// (The two non-null gates are mutually exclusive, so runtime order doesn't matter; the offer fallback is served
+		// only when both fail.)
 		// The Casilda chain (#261/#264): 13479 (kill) -> 13563 (loot) -> 13480 (free) -> 12407 (escort). She is
 		// "freed" when 13480 is completed; her dialogue flips per chain stage.
-		private const int CasildaFreeQuest = 13480;
+		private const uint CasildaFreeQuest = 13480;
 
 		// RequiredContextId = the quest that must have been ACTIVE at the captured greeting (ConversationEntry.
 		// QuestContextId) for this rule to apply; AnyContext (-1) = apply regardless. This splits ONE capture that talks
@@ -43,26 +45,26 @@ namespace Faolan.Importer.Extractors
 		// them apart.
 		private const long AnyContext = -1;
 
-		private static readonly List<(string CaptureBaseName, string NpcName, long RequiredContextId, string Condition)> Rules =
+		private static readonly List<(string CaptureBaseName, string NpcName, long RequiredContextId, uint? ConditionQuestId, QuestState? ConditionQuestState)> Rules =
 		[
 			// Casilda OFFER (fresh char, quest 13479 not yet accepted) = the canonical fresh first-quest capture:
 			// greeting -> 0 -> 0>0 -> 0>0>0 -> 0>0>0>0 grants 13479, then the next pick CLOSES (6 screens, matches
 			// retail). The Strie/strickenbla walks are deliberately NOT unioned in here: they continue past the grant
 			// to a FOLLOW-UP quest 13480 (at 0>0>0>0>0), which made the accept grant two quests / fire two
 			// notifications. Keeping the offer to randochar alone reproduces retail's single-quest first-offer flow.
-			("Ranochar_mage-necromancer_login_get-casilda-quest", "Casilda", AnyContext, ""),
+			("Ranochar_mage-necromancer_login_get-casilda-quest", "Casilda", AnyContext, null, null),
 			// Casilda AFTER accepting but BEFORE completing (in-progress greeting; this char already had the quest).
-			("Stihetfv_soldier-conqueror_login", "Casilda", AnyContext, $"return player:HasQuest({CasildaFirstQuest}) and not player:HasCompletedQuest({CasildaFirstQuest})"),
+			("Stihetfv_soldier-conqueror_login", "Casilda", AnyContext, CasildaFirstQuest, QuestState.Active),
 			// Casilda FREEING dialogue (#264): the gameplay capture talks to her with the key (quest 13480 active at the
-			// greeting - QuestContextId 13480), the "I'll protect you now" one-off. Gate it on HasQuest(13480); the
-			// runtime serves it while 13480 is still active, THEN the talk completes the stage (-> escort 12407). Only the
+			// greeting - QuestContextId 13480), the "I'll protect you now" one-off. Gate it on 13480 Active; the runtime
+			// serves it while 13480 is still active, THEN the talk completes the stage (-> escort 12407). Only the
 			// context-13480 entries are kept; that capture's offer/other-state Casilda screens are dropped (covered above).
-			("Hoxxling_mage-heraldofxotli_login_gameplay", "Casilda", CasildaFreeQuest, $"return player:HasQuest({CasildaFreeQuest}) and not player:HasCompletedQuest({CasildaFreeQuest})"),
+			("Hoxxling_mage-heraldofxotli_login_gameplay", "Casilda", CasildaFreeQuest, CasildaFreeQuest, QuestState.Active),
 			// Casilda AFTER she is freed (chain stage 13480 completed): the unchained post-quest greeting. Was gated on
-			// HasCompletedQuest(13479) (true from stage 1, so it wrongly showed during the whole chain, #264) - move it to
-			// HasCompletedQuest(13480) so it only shows once she's actually been freed.
-			("Stihetfv_soldier-conqueror_login_compat_compeltefirstquest", "Casilda", AnyContext, $"return player:HasCompletedQuest({CasildaFreeQuest})"),
-			("Stihetfv_soldier-conqueror_login_after_first_quest_kalanthes_chat", "Casilda", AnyContext, $"return player:HasCompletedQuest({CasildaFreeQuest})")
+			// completed-13479 (true from stage 1, so it wrongly showed during the whole chain, #264) - move it to
+			// completed-13480 so it only shows once she's actually been freed.
+			("Stihetfv_soldier-conqueror_login_compat_compeltefirstquest", "Casilda", AnyContext, CasildaFreeQuest, QuestState.Completed),
+			("Stihetfv_soldier-conqueror_login_after_first_quest_kalanthes_chat", "Casilda", AnyContext, CasildaFreeQuest, QuestState.Completed)
 		];
 
 		private static readonly HashSet<string> ManagedNpcs = Rules.Select(r => r.NpcName).ToHashSet();
@@ -77,7 +79,7 @@ namespace Faolan.Importer.Extractors
 		{
 			foreach (var e in entries)
 			{
-				if (!string.IsNullOrEmpty(e.ConditionScript))
+				if (e.ConditionQuestId != null)
 				{
 					yield return e;
 
@@ -93,11 +95,12 @@ namespace Faolan.Importer.Extractors
 				if (managed && rule.NpcName == null)
 					continue; // managed NPC, unclassified capture/state -> drop so it can't pollute the per-state tree
 
-				yield return string.IsNullOrEmpty(rule.Condition)
-					? e // unmanaged NPC, or the OFFER fallback (empty condition)
+				yield return rule.ConditionQuestId == null
+					? e // unmanaged NPC, or the OFFER fallback (no gate)
 					: e with
 					{
-						ConditionScript = rule.Condition
+						ConditionQuestId = rule.ConditionQuestId,
+						ConditionQuestState = rule.ConditionQuestState
 					};
 			}
 		}

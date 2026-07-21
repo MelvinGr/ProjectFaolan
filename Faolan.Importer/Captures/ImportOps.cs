@@ -273,7 +273,8 @@ namespace Faolan.Importer.Captures
 						? t
 						: null,
 					CapturedInstance = e.CapturedInstance,
-					ConditionScript = e.ConditionScript,
+					ConditionQuestId = e.ConditionQuestId,
+					ConditionQuestState = e.ConditionQuestState,
 					GrantQuestId = e.GrantQuestId == 0
 						? null
 						: e.GrantQuestId,

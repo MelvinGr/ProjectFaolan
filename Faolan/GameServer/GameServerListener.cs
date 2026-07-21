@@ -21,7 +21,6 @@ using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Quest;
-using Faolan.GameServer.Scripting;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Configuration;
@@ -176,9 +175,6 @@ namespace Faolan.GameServer
 		// item-grant/wallet ports. The loot Inbound cases delegate to it. See World/LootService.cs.
 		private readonly LootService _loot;
 
-		// The RDB Lua VM (conversation/quest scripting); stateless + reusable.
-		private readonly LuaScriptVm _luaVm = new LuaScriptVm();
-
 		// Player-state persistence (autosave loop + logout/teleport/.save flushes), composed off the listener (#200).
 		private readonly PlayerPersistenceService _persistence;
 
@@ -241,7 +237,7 @@ namespace Faolan.GameServer
 				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
-			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
+			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
 			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_keepAlive = new KeepAliveService();
