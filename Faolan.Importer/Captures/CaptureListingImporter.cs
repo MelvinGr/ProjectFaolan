@@ -116,7 +116,7 @@ namespace Faolan.Importer.Captures
 
 			foreach (var e in merged)
 			{
-				e.TemplateItem = null; // key already harvested into Items above; persist only the Template FK column
+				e.TemplateItem = null!; // key already harvested into Items above; persist only the Template FK column
 				var existing = await db.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == e.SaleId);
 				if (existing == null)
 				{

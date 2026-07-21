@@ -156,7 +156,7 @@ namespace Faolan.Importer.Extractors
 			{
 				if (active && screen.Count > 0)
 				{
-					entries.Add(new ConversationEntry(typeId, path, npc, instance, [.. screen], namesByHandle.GetValueOrDefault(npc), templatesByHandle.TryGetValue(npc, out var tpl)
+					entries.Add(new ConversationEntry(typeId, path, npc, instance, [.. screen], namesByHandle.GetValueOrDefault(npc)!, templatesByHandle.TryGetValue(npc, out var tpl)
 						? tpl
 						: null, GrantQuestId: grant, QuestContextId: instanceContext));
 				}
@@ -289,7 +289,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
-		private static string ReadSpawnName(ReadOnlySpan<byte> body)
+		private static string? ReadSpawnName(ReadOnlySpan<byte> body)
 		{
 			for (var i = 16; i + 2 < body.Length; i++)
 			{

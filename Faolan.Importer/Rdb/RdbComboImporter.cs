@@ -74,7 +74,7 @@ namespace Faolan.Importer.Rdb
 					existing[e.Id] = row;
 				}
 
-				row.Name = (string)combo.Attribute("name") ?? "";
+				row.Name = (string?)combo.Attribute("name") ?? "";
 				row.Level = (byte)ParseUint(combo, "level");
 				var featId = ParseUint(combo, "featid");
 				row.FeatId = featId == 0
@@ -86,8 +86,8 @@ namespace Faolan.Importer.Rdb
 				row.Stamina = (int)ParseUint(combo, "stamina");
 				row.Criteria = (int)ParseUint(combo, "criteria");
 				row.Quality = (int)ParseUint(combo, "quality");
-				row.Animation = (string)combo.Attribute("animation") ?? "";
-				row.Actions = string.Join(",", combo.Elements("action").Select(a => (string)a.Attribute("name")).Where(n => !string.IsNullOrEmpty(n)));
+				row.Animation = (string?)combo.Attribute("animation") ?? "";
+				row.Actions = string.Join(",", combo.Elements("action").Select(a => (string?)a.Attribute("name")).Where(n => !string.IsNullOrEmpty(n)));
 				imported++;
 			}
 

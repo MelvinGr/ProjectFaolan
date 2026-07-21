@@ -752,9 +752,9 @@ namespace Faolan.Importer.Modules
 
 		// The stored zone-line row for a harvested link: same map + name, nearest to the captured source position
 		// (a name can repeat across maps; within a map the position disambiguates). Null when none is within tolerance.
-		private static WorldObject NearestZoneLine(IReadOnlyList<WorldObject> zoneLines, TeleportLink link)
+		private static WorldObject? NearestZoneLine(IReadOnlyList<WorldObject> zoneLines, TeleportLink link)
 		{
-			WorldObject best = null;
+			WorldObject? best = null;
 			var bestSq = PositionTolerance * PositionTolerance;
 			foreach (var o in zoneLines)
 			{

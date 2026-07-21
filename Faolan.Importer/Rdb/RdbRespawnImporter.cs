@@ -157,7 +157,7 @@ namespace Faolan.Importer.Rdb
 			return new Result(maps, points, empty, fetchFailed);
 		}
 
-		private static string Attr(Match m, string name)
+		private static string? Attr(Match m, string name)
 		{
 			foreach (Match a in AttrRx.Matches(m.Groups[1].Value))
 			{

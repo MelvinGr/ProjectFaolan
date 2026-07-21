@@ -118,7 +118,7 @@ namespace Faolan.Importer.Modules
 			return new ImportResult($"{npcs} NPC templates with chatter, {lines} bark lines.");
 		}
 
-		private static byte[] Body(JsonElement p)
+		private static byte[]? Body(JsonElement p)
 		{
 			if (!p.TryGetProperty("BodyHex", out var bh) || bh.ValueKind != JsonValueKind.String)
 				return null;
@@ -137,7 +137,7 @@ namespace Faolan.Importer.Modules
 			}
 		}
 
-		private static string Str(JsonElement p, string name)
+		private static string? Str(JsonElement p, string name)
 		{
 			return p.TryGetProperty(name, out var v)
 				? v.GetString()

@@ -91,7 +91,7 @@ namespace Faolan.Importer.Extractors
 		// up to the client's first 0x2020 spawn poll - the same window MapWorldBurstExtractor delimits). This is the
 		// retail-shaped set as it arrives on world entry; it EXCLUDES the mid-session interest/respawn spawns that
 		// otherwise accrete duplicates (Gitea #185 / #244). `allowedMaps` (null = all) restricts which maps to lift.
-		public static List<NpcSpawnEntry> ExtractLoginBurst(IReadOnlyList<CapturedPacket> packets, ISet<uint> allowedMaps = null)
+		public static List<NpcSpawnEntry> ExtractLoginBurst(IReadOnlyList<CapturedPacket> packets, ISet<uint>? allowedMaps = null)
 		{
 			var entries = new List<NpcSpawnEntry>();
 			uint currentMap = 0;
@@ -194,7 +194,7 @@ namespace Faolan.Importer.Extractors
 		// entry (all defaults) if the body has no decodable IIR - the offset-based transform/name path still works.
 		private static NpcSpawnEntry LiftIdentity(byte[] body)
 		{
-			var empty = new NpcSpawnEntry(0, string.Empty, 0, 0, 0, 0, null);
+			var empty = new NpcSpawnEntry(0, string.Empty, 0, 0, 0, 0, null!);
 			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				return empty;
 
@@ -250,7 +250,7 @@ namespace Faolan.Importer.Extractors
 		// false for a body too short to hold the transform, or the player's own spawn (handle in the instance range).
 		private static bool TryBuildEntry(byte[] body, byte[] fullBytes, uint currentMap, out NpcSpawnEntry entry)
 		{
-			entry = null;
+			entry = null!;
 			if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
 				return false; // too short to hold the transform (position + rotation)
 

@@ -62,7 +62,7 @@ namespace Faolan.Importer.Captures
 						Container = kind,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
-						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
+						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
 					});
 					stored++;
 				}

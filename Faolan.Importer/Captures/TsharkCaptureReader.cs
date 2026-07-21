@@ -92,7 +92,7 @@ namespace Faolan.Importer.Captures
 		// internal so CorpusExtractWriter can store the FULL rebuilt packet, not just the body: the extractors
 		// (QuestDefinitionExtractor, SnapshotJournalReader, ...) take CapturedPacket and strip the framing
 		// themselves, so an extract holding only bodies cannot feed them.
-		internal static byte[] Rebuild(JsonElement p, byte[] body, uint opcode)
+		internal static byte[]? Rebuild(JsonElement p, byte[] body, uint opcode)
 		{
 			if (!TryEndpoint(p, "SenderClass", "SenderInstance", out var sender))
 				return null;
@@ -139,7 +139,7 @@ namespace Faolan.Importer.Captures
 		// endpoint = 0x0d <class u32 LE> [0x10 <instance varint>]. Instance is omitted when the dump reports "None".
 		private static bool TryEndpoint(JsonElement p, string classKey, string instanceKey, out byte[] endpoint)
 		{
-			endpoint = null;
+			endpoint = null!;
 			if (!p.TryGetProperty(classKey, out var clsEl) || clsEl.ValueKind != JsonValueKind.String)
 				return false;
 			if (!TryParseHexUInt(clsEl.GetString(), out var cls))
@@ -163,7 +163,7 @@ namespace Faolan.Importer.Captures
 			return true;
 		}
 
-		private static bool TryParseHexUInt(string s, out uint value)
+		private static bool TryParseHexUInt(string? s, out uint value)
 		{
 			value = 0;
 			if (string.IsNullOrEmpty(s))
@@ -174,7 +174,7 @@ namespace Faolan.Importer.Captures
 			return uint.TryParse(s, NumberStyles.HexNumber, null, out value);
 		}
 
-		private static bool TryParseHexULong(string s, out ulong value)
+		private static bool TryParseHexULong(string? s, out ulong value)
 		{
 			value = 0;
 			if (string.IsNullOrEmpty(s) || s == "None")

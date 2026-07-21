@@ -38,7 +38,7 @@ namespace Faolan.Importer.Extractors
 		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
 		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the
 		// same template are reported (should not happen).
-		public static void Harvest(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IList<string> conflicts = null, IDictionary<uint, ItemType> types = null)
+		public static void Harvest(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IList<string>? conflicts = null, IDictionary<uint, ItemType>? types = null)
 		{
 			var found = new Dictionary<uint, CapturedItem>();
 			try
@@ -163,7 +163,7 @@ namespace Faolan.Importer.Extractors
 		// add and NEVER present in any snapshot quest container - is typed Quest straight from the wire, no hardcoded
 		// override. Body grammar mirrors WriteAddItemBody: [u32 containerType][u32 charId][u32 itemPos][u32 len + entry]
 		// [u32 feedback]; the entry is a bare ProtoInventoryGameEntry (no Pos wrapper).
-		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType> types)
+		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType>? types)
 		{
 			var packet = new ConanPacket(packetBytes);
 			if (packet.Opcode != 0x2020)
@@ -306,7 +306,7 @@ namespace Faolan.Importer.Extractors
 		// `types` (optional) receives the item's classification from the container it was found in - only the
 		// specific kinds (Quest/Resource) are recorded; Normal items are left to the DB default. Kept separate from
 		// CapturedItem so the identity quad's equality (the conflict check) is unaffected.
-		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoFullCharacterIIR root, IDictionary<uint, ItemType> types = null)
+		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoFullCharacterIIR root, IDictionary<uint, ItemType>? types = null)
 		{
 			var map = new Dictionary<uint, CapturedItem>();
 
@@ -315,7 +315,7 @@ namespace Faolan.Importer.Extractors
 				var container = FullCharSnapshotCodec.GetContainer(root, kind);
 				var itemType = ClassifyContainer(kind);
 
-				foreach (var entry in FullCharSnapshotCodec.GetContainerEntries(container))
+				foreach (var entry in FullCharSnapshotCodec.GetContainerEntries(container!))
 				{
 					var template = FullCharSnapshotCodec.GetEntryTemplateId(entry);
 					var hash = FullCharSnapshotCodec.GetEntryArchetype(entry);
@@ -390,7 +390,7 @@ namespace Faolan.Importer.Extractors
 
 		private static bool TryReadInventoryRoot(byte[] packetBytes, out ProtoFullCharacterIIR root)
 		{
-			root = null;
+			root = null!;
 
 			var packet = new ConanPacket(packetBytes);
 			if (packet.Opcode != 0x2000)

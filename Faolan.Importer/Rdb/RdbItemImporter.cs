@@ -51,7 +51,7 @@ namespace Faolan.Importer.Rdb
 		private static readonly HashSet<uint> AttributeStatIds = [804u, 806u, 808u, 810u, 814u];
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
-		public static string ExtractName(ReadOnlySpan<byte> template)
+		public static string? ExtractName(ReadOnlySpan<byte> template)
 		{
 			var body = template.Length > 12
 				? template[12..]
@@ -84,7 +84,7 @@ namespace Faolan.Importer.Rdb
 			return null;
 		}
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string dumpDir = null, string? cdnBase = null)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? dumpDir = null, string? cdnBase = null)
 		{
 			using var rdb = new RdbReader(rdbDir, cdnBase);
 

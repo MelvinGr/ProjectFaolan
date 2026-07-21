@@ -184,7 +184,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				await AddCharacter(db, accountId, realmId, name, mapId, classId, scaffold, read.Message, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
+				await AddCharacter(db, accountId, realmId, name, mapId, classId, scaffold!, read.Message!, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
 				added++;
 			}
 
@@ -192,7 +192,7 @@ namespace Faolan.Importer.Captures
 		}
 
 		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, PlayerSpawnScaffold scaffold, ProtoCoreCharacterIIR message,
-			List<byte[]> snapshots, CharListEntry listEntry)
+			List<byte[]>? snapshots, CharListEntry? listEntry)
 		{
 			var stats = message.Stats ?? new ProtoCoreCharacterIIR.CharacterStats();
 
@@ -502,7 +502,7 @@ namespace Faolan.Importer.Captures
 		{
 			// Largest snapshot first; analyzer-truncated ones (the TCP-reassembly gap) fail to split and the
 			// next-largest is tried instead.
-			ProtoFullCharacterIIR root = null;
+			ProtoFullCharacterIIR? root = null;
 			foreach (var snapshotBody in snapshotBodies.OrderByDescending(b => b.Length))
 			{
 				try
@@ -544,7 +544,7 @@ namespace Faolan.Importer.Captures
 						Container = (ContainerKind)container.InventoryId.Type,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
-						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
+						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
 					});
 					stored++;
 				}
@@ -561,7 +561,7 @@ namespace Faolan.Importer.Captures
 		// deserialize). The largest snapshot that yields a list wins; idempotent (skips already-recorded spells).
 		private static async Task<int> ImportKnownSpells(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
 		{
-			KnownSpellList known = null;
+			KnownSpellList? known = null;
 			foreach (var body in snapshotBodies.OrderByDescending(b => b.Length))
 			{
 				if (KnownSpellList.TryExtractFromSnapshot(body, out known))
@@ -606,7 +606,7 @@ namespace Faolan.Importer.Captures
 		// instead of the fixed fresh skeleton. The snapshot is the whole sheet, so it replaces any existing rows.
 		private static async Task<int> ImportStatBlock(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
 		{
-			List<(uint Id, uint Value)> pairs = null;
+			List<(uint Id, uint Value)>? pairs = null;
 			foreach (var body in snapshotBodies.OrderByDescending(b => b.Length))
 			{
 				pairs = SubClassStatBlock.ExtractFromSnapshot(body);
@@ -645,7 +645,7 @@ namespace Faolan.Importer.Captures
 			return name.Length > 9 && name.StartsWith("Character", StringComparison.Ordinal) && name.Skip(9).All(char.IsAsciiDigit);
 		}
 
-		private static async Task<uint> ResolveMapId(DatabaseContext db, uint spawnMapId, CharListEntry listEntry)
+		private static async Task<uint> ResolveMapId(DatabaseContext db, uint spawnMapId, CharListEntry? listEntry)
 		{
 			foreach (var candidate in new[] { spawnMapId, listEntry?.MapId ?? 0 })
 			{

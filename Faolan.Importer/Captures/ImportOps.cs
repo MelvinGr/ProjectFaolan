@@ -352,7 +352,7 @@ namespace Faolan.Importer.Captures
 		// loader reads spells via the FK (NpcTemplate.Spells).
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
-			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n.ToLowerInvariant()).ToHashSet();
+			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n!.ToLowerInvariant()).ToHashSet();
 			var typeByName = (await db.NpcTemplates.Where(n => n.Name != null).ToListAsync()).GroupBy(n => n.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First().TemplateId);
 
 			var inserted = 0;
@@ -956,7 +956,7 @@ namespace Faolan.Importer.Captures
 			row.RotationW = e.RotW;
 
 			// Lift the identity columns + geometry tail from the dump body (the captured Data is no longer stored).
-			SimpleDynelMessageCodec.TryLiftColumns(row, WorldObjectBuilder.ExtractBody(e.Data));
+			SimpleDynelMessageCodec.TryLiftColumns(row, WorldObjectBuilder.ExtractBody(e.Data)!);
 			return row;
 		}
 
@@ -1299,7 +1299,7 @@ namespace Faolan.Importer.Captures
 		// BOOTSTRAP-ONLY (#262): only configures an UN-WIRED goal (still the fresh-harvest default: GoalType Kill, no
 		// TargetName/QuestItemId), so a re-import never clobbers trigger fields set by hand (the Quest editor) or a prior
 		// run. A newly-created goal is un-wired, so a fresh import still bootstraps.
-		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string target = null, uint? questItemId = null, uint? required = null)
+		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string? target = null, uint? questItemId = null, uint? required = null)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 			if (quest == null)

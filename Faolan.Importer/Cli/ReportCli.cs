@@ -254,7 +254,7 @@ namespace Faolan.Importer.Cli
 		// we import. Capture-relative by necessity (there is no authoritative game-wide vendor/dialogue list - retail
 		// dialogue is TEA-encrypted in the RDB), so it measures import completeness OF WHAT WE'VE SEEN and names the
 		// gaps to go capture/decode. `--report-arg readme` rewrites the marked section of README.md; else it prints.
-		private static async Task Coverage(string dbPath, IReadOnlyList<NamedCapture> captures, string arg, string rdbDir)
+		private static async Task Coverage(string dbPath, IReadOnlyList<NamedCapture> captures, string? arg, string? rdbDir)
 		{
 			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
 			var greeted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -407,7 +407,7 @@ namespace Faolan.Importer.Cli
 				: null;
 		}
 
-		private static void ItemTemplate(string rdbDir, string dbPath, string arg, string outDir = null)
+		private static void ItemTemplate(string rdbDir, string dbPath, string? arg, string? outDir = null)
 		{
 			if (!uint.TryParse(arg, out var itemId))
 			{
@@ -426,7 +426,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"item {itemId} \"{item.Name}\" type={item.Type} cat={item.SearchCategory} key={item.Key.Key1:X8},{item.Key.Key2:X8},{item.Key.Key3:X8},{item.Key.Key4:X8}");
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
-			byte[] template = null;
+			byte[]? template = null;
 			foreach (var type in new uint[] { 1000020, 1000620 })
 			{
 				if (rdb.TryGet(type, itemId, out var e) && e.Size > 0 && rdb.CanRead(e))
@@ -702,7 +702,7 @@ namespace Faolan.Importer.Cli
 		// MESHINDEXFILE manifests resolve to geometry, how their textures are split local vs CDN). With --report-arg
 		// <meshIndexId>: print that model's graph (RenderMesh id, materials, texture refs) and, if --out <dir> is given,
 		// extract its FCTX textures to DDS (+ --dump-mesh to also write the raw 1010001 geometry blob for the Phase 1 spike).
-		private static void RdbAssets(string rdbDir, string arg, string? outDir, bool dumpMesh)
+		private static void RdbAssets(string rdbDir, string? arg, string? outDir, bool dumpMesh)
 		{
 			using var rdb = new RdbReader(rdbDir);
 
@@ -1045,7 +1045,7 @@ namespace Faolan.Importer.Cli
 		// specific spell's full increasing field table (--report-arg <decimal id>) or, with no arg, a histogram of how
 		// often each field id appears across all named spell records (so a duration field stands out as near-universal
 		// with ms-range values). Field 0x126=cast/0x11F=range/0x15C=damage are already known.
-		private static void SpellFields(string rdbDir, string arg)
+		private static void SpellFields(string rdbDir, string? arg)
 		{
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			var counts = new Dictionary<uint, int>();
@@ -1107,7 +1107,7 @@ namespace Faolan.Importer.Cli
 		// Matrix CSV for ONE opcode (arg, e.g. "0x2000"; default 0x2000): one row per capture, one column per
 		// (direction, sub-opcode) seen under that opcode, cell = packet count. This is the drill-down of opcodes-csv -
 		// e.g. every S2C 0x2000 IIR type as its own column. High-cardinality opcodes (0x2008/0x2020 handles) will be wide.
-		private static void SubOpcodeCsv(IReadOnlyList<NamedCapture> captures, string arg)
+		private static void SubOpcodeCsv(IReadOnlyList<NamedCapture> captures, string? arg)
 		{
 			var op = string.IsNullOrWhiteSpace(arg)
 				? 0x2000u
@@ -1230,13 +1230,13 @@ namespace Faolan.Importer.Cli
 		private static async Task WorldObj(string dbPath, string target)
 		{
 			await using var db = OpenDb(dbPath);
-			foreach (var row in await db.WorldObjects.Where(o => o.Name.Contains(target)).ToListAsync())
+			foreach (var row in await db.WorldObjects.Where(o => o.Name!.Contains(target)).ToListAsync())
 			{
 				var baseOk = WorldObjectBuilder.TryBuild(row, row.CapturedHandle, out var baseBody);
-				var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody, 0x01EA985Cu);
+				var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody!, 0x01EA985Cu);
 				Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} kd={row.KdTreeTail?.Length}");
 				if (baseOk)
-					Console.WriteLine("  BUILT: " + Convert.ToHexString(baseBody).ToLowerInvariant());
+					Console.WriteLine("  BUILT: " + Convert.ToHexString(baseBody!).ToLowerInvariant());
 			}
 		}
 	}

@@ -450,7 +450,7 @@ namespace Faolan.Importer.Captures
 		private static bool TryReadChangeClass(byte[] packetBytes, out uint classId, out string token)
 		{
 			classId = 0;
-			token = null;
+			token = null!;
 			var packet = new ConanPacket(packetBytes);
 			var s = packet.Body;
 			if (s.Length < 21)

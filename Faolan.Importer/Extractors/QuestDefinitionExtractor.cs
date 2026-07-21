@@ -49,7 +49,7 @@ namespace Faolan.Importer.Extractors
 			return byQuest.Values.Where(q => q.TextRefs.Any(r => r.Slot == QuestTextSlot.Title)).ToList();
 		}
 
-		private static string Attr(string xml, string name)
+		private static string? Attr(string xml, string name)
 		{
 			var m = Regex.Match(xml, name + "=\"([^\"]*)\"");
 			return m.Success
@@ -100,7 +100,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Bytes = [..8..][u32 headerLen][header][body]; body = [u32 len][u32 subop][u32 ack][u32 player][record area...].
-		private static byte[] InnerBody(byte[] bytes)
+		private static byte[]? InnerBody(byte[] bytes)
 		{
 			if (bytes == null || bytes.Length < 12)
 				return null;
@@ -258,7 +258,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// A <remoteformat>/<localized> slot: 00 <u8 len> <ascii xml>. Returns null if no record starts at off.
-		private static TextRecord ReadRecord(byte[] b, int off)
+		private static TextRecord? ReadRecord(byte[] b, int off)
 		{
 			if (off + 2 > b.Length || b[off] != 0x00 || b[off + 2] != (byte)'<')
 				return null;
@@ -273,7 +273,7 @@ namespace Faolan.Importer.Extractors
 			var cat = AttrUInt(xml, "category");
 			var key = Attr(xml, "key");
 			var flags = Attr(xml, "flags");
-			return new TextRecord(off, 2 + len, tag, id, cat, key, flags);
+			return new TextRecord(off, 2 + len, tag, id, cat, key!, flags!);
 		}
 
 		private static IEnumerable<TextRecord> Records(byte[] b, int from)
@@ -292,7 +292,7 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		private static void SetRef(QuestDefinition def, QuestTextSlot slot, TextRecord rec)
+		private static void SetRef(QuestDefinition def, QuestTextSlot slot, TextRecord? rec)
 		{
 			if (rec == null)
 				return;
@@ -315,7 +315,7 @@ namespace Faolan.Importer.Extractors
 
 		// A Quest_c header string is the full <remoteformat .../> XML; the slot is identified by position in the
 		// record, so only the attributes matter here.
-		private static TextRecord TextRef(string xml)
+		private static TextRecord? TextRef(string xml)
 		{
 			if (string.IsNullOrEmpty(xml))
 				return null;
@@ -325,7 +325,7 @@ namespace Faolan.Importer.Extractors
 				? null
 				: new TextRecord(0, xml.Length, xml.Contains("<localized", StringComparison.Ordinal)
 					? "localized"
-					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags"));
+					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags")!);
 		}
 
 		// Find-or-create the goal by GoalId within the quest and set the WIRE fields (map/marker/objective ref). Leaves
