@@ -182,6 +182,65 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "spell-template":
+				{
+					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					var ids = (arg ?? "").Split(',', System.StringSplitOptions.RemoveEmptyEntries);
+					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					foreach (var idStr in ids)
+					{
+						var id = uint.Parse(idStr.Trim());
+						if (!rdb.TryGet(1040005, id, out var e))
+						{
+							Console.WriteLine($"{id}: no 1040005 entry");
+							continue;
+						}
+						var b = rdb.ReadDecompressed(e);
+						// The [2][9] stat-modifier region - SAME parser as item templates. Body = the span after the
+						// 12-byte RDB-Id header.
+						var mods = Faolan.Core.Rdb.ItemTemplateStatModifiers.Parse(b.AsSpan(12));
+						var mag = 0u;
+						var w = new uint[b.Length / 4];
+						for (var i = 3; i + 1 < w.Length; i += 2)
+						{
+							var f = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(i * 4, 4));
+							if (f == 551)
+								mag = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan((i + 1) * 4, 4));
+						}
+						var modStr = string.Join(", ", mods.Select(m => $"0x{m.StatId:x}={m.WireAmount}"));
+						Console.WriteLine($"  {id}: mag(551)={mag}  region[{mods.Count}]: {modStr}");
+					}
+					return 0;
+				}
+
+				case "spell-stat-coverage":
+				{
+					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					int total = 0, withMods = 0, records = 0;
+					var byStat = new System.Collections.Generic.Dictionary<uint, int>();
+					foreach (var e in rdb.EntriesOfType(1040005).Where(x => x.IsLocal))
+					{
+						byte[] dec;
+						try { dec = rdb.ReadDecompressed(e); }
+						catch { continue; }
+						if (dec.Length < 12)
+							continue;
+						total++;
+						var mods = Faolan.Core.Rdb.ItemTemplateStatModifiers.Parse(dec.AsSpan(12));
+						if (mods.Count == 0)
+							continue;
+						withMods++;
+						records += mods.Count;
+						foreach (var m in mods)
+							byStat[m.StatId] = byStat.GetValueOrDefault(m.StatId) + 1;
+					}
+					Console.WriteLine($"spells scanned={total}  with [2][9] stat mods={withMods}  total records={records}");
+					foreach (var kv in byStat.OrderByDescending(k => k.Value).Take(30))
+						Console.WriteLine($"  stat 0x{kv.Key:x} ({kv.Key}): {kv.Value} spells");
+					return 0;
+				}
+
 				case "ldb-strings":
 				{
 					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
