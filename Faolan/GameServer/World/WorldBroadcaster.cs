@@ -100,6 +100,7 @@ namespace Faolan.GameServer.World
 		// Quest-gated NPC name -> the quest ids that reveal it (#261). Cached once; an NPC in this map is streamed only
 		// to players holding one of its quests active (see WorldEntity.GateQuestIds / IsVisibleTo).
 		private Dictionary<string, uint[]> _questGatedNpcs;
+		private Dictionary<uint, uint> _escortHiddenNpcs;
 
 		// Quest-giver NPC name -> granted quest id, cached once (small set).
 		private Dictionary<string, uint> _questGivers;
@@ -757,6 +758,7 @@ namespace Faolan.GameServer.World
 
 			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
+			_escortHiddenNpcs ??= await _database.GetEscortHiddenNpcMap();
 
 			// NpcSpawns is the SOURCE OF TRUTH: the importer's burst-truth extraction (#266, BuildBurstTruthSpawns)
 			// already produced one clean row per intended placement (keyed by MapId + exact XYZ), so this load path
@@ -804,6 +806,11 @@ namespace Faolan.GameServer.World
 				entity.Level = npc.Level;
 				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
 				// players holding one of them (e.g. Scavenger Tuut while you carry Casilda's kill quest).
+				// #262: an escortee NPC vanishes once its escort quest is COMPLETED (e.g. Casilda after the beach escort);
+				// keyed by template id, complement of the "show while active" gate below.
+				if (_escortHiddenNpcs.TryGetValue(npc.NpcTemplateId, out var hideQuest))
+					entity.HideWhenQuestCompletedId = hideQuest;
+
 				if (npcName != null && _questGatedNpcs.TryGetValue(npcName, out var gateQuests))
 				{
 					entity.GateQuestIds = gateQuests;
@@ -1532,10 +1539,13 @@ namespace Faolan.GameServer.World
 
 			var quests = await _database.GetCharacterQuests(characterId.Value);
 			entity.ActiveQuestIds.Clear();
+			entity.CompletedQuestIds.Clear();
 			foreach (var quest in quests)
 			{
 				if (quest.State == QuestState.Active)
 					entity.ActiveQuestIds.Add(quest.QuestId);
+				else if (quest.State == QuestState.Completed)
+					entity.CompletedQuestIds.Add(quest.QuestId); // #262: drives "hide once done" NPC gating
 			}
 		}
 

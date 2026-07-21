@@ -168,6 +168,10 @@ namespace Faolan.GameServer.World
 		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
 		public HashSet<uint> ActiveQuestIds { get; } = [];
 
+		// For a PLAYER: the quest ids the player has COMPLETED. Drives "hide once done" NPC gating (#262) - e.g. Casilda
+		// is gone from the beach once her escort quest is completed. Loaded alongside ActiveQuestIds.
+		public HashSet<uint> CompletedQuestIds { get; } = [];
+
 		// For a player: the handles the client has actually CONFIRMED constructing - i.e. polled via 0x2020 (the poll's
 		// requestId is the entity handle; the server answers with a 0x2008 SpawnCheck that renders it). Known means "spawn
 		// sent"; Confirmed means "client built it". A despawn (n3ToClientQuit) for a Known-but-not-Confirmed handle hits a
@@ -186,6 +190,11 @@ namespace Faolan.GameServer.World
 		// you carry Casilda's kill quest. Data-driven from the quest goal definitions (kill-target NPCs that aren't
 		// quest givers), so it generalises to any number of quests/NPCs. See IsVisibleTo.
 		public IReadOnlyList<uint> GateQuestIds { get; set; }
+
+		// For an NPC: a quest that, once the VIEWER has COMPLETED it, HIDES this NPC (they don't spawn / are despawned).
+		// The complement of GateQuestIds ("show while active") - e.g. Casilda vanishes from the beach once her escort
+		// quest is completed. Data-driven from the Escort goal (escortee template -> escort quest id). null = never hidden.
+		public uint? HideWhenQuestCompletedId { get; set; }
 
 		// For a PLAYER: the pending ReachArea quest goals (#262) - a location objective is solved when the player moves
 		// within range of its point. Loaded once at world entry (null = not yet loaded) so the per-move check is a pure
@@ -313,6 +322,10 @@ namespace Faolan.GameServer.World
 		// a gated NPC requires the viewer to hold one of its gating quests active.
 		public bool IsVisibleTo(WorldEntity viewer)
 		{
+			// #262: hidden once the viewer has COMPLETED the gating quest (e.g. Casilda after her escort is done).
+			if (HideWhenQuestCompletedId is { } hideQuest && viewer != null && viewer.CompletedQuestIds.Contains(hideQuest))
+				return false;
+
 			if (GateQuestIds == null || GateQuestIds.Count == 0)
 				return true;
 			if (viewer == null)
