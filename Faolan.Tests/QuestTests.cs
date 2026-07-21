@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void AllGoalsComplete_EmptyIsComplete_ZeroRequiredClampsToOne()
 		{
-			Assert.True(QuestProgress.AllGoalsComplete(Array.Empty<QuestGoalDefinition>(), _ => 0)); // no goals -> complete
+			Assert.True(QuestProgress.AllGoalsComplete([], _ => 0)); // no goals -> complete
 			var goals = new[] { GoalReq(100, 0) };
 			Assert.False(QuestProgress.AllGoalsComplete(goals, _ => 0)); // RequiredCount 0 treated as 1
 			Assert.True(QuestProgress.AllGoalsComplete(goals, _ => 1));

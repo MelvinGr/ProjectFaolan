@@ -43,7 +43,7 @@ namespace Faolan.Core.Database.Tables
 		// The worn equipment (CharacterIIR f23) lifted from the captured spawn (#185) - empty for unarmed NPCs.
 		// When present, NpcSpawnBuilder rebuilds the spawn's inventory_entry list from these rows instead of the
 		// captured Data blob's (the NPC counterpart of the player's DB-sourced equipment, PlayerSpawnEquipment).
-		public virtual ICollection<NpcSpawnEquipment> Equipment { get; set; } = new List<NpcSpawnEquipment>();
+		public virtual ICollection<NpcSpawnEquipment> Equipment { get; set; } = [];
 
 		// Race/Sex moved to the NpcTemplate TYPE table (#287): they are type-level identity (every placement of a type shares
 		// them), so they live on `NpcTemplate` now and are reached via the `NpcTemplate` navigation.
@@ -51,7 +51,7 @@ namespace Faolan.Core.Database.Tables
 		// The humanoid appearance / morph table lifted from the captured post-IIR (#185) - empty for animals, which
 		// carry no such table. When present, NpcSpawnBuilder generates the post-IIR from these rows instead of
 		// keeping the captured blob's (the from-DB lift of the bald-fix's verbatim post-IIR, #243).
-		public virtual ICollection<NpcSpawnMorph> Morphs { get; set; } = new List<NpcSpawnMorph>();
+		public virtual ICollection<NpcSpawnMorph> Morphs { get; set; } = [];
 
 		// The captured patrol route this spawn walks (#316), or null for a stationary NPC. One-to-one; cascade-deletes
 		// with the spawn.

@@ -39,7 +39,7 @@ namespace Faolan.Core
 			// NowUnixTimeSeconds, must never depend on the build info being present.
 			var entryAssembly = Assembly.GetEntryAssembly();
 
-			var assemblyMetadata = entryAssembly?.GetCustomAttributes<AssemblyMetadataAttribute>().ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, string>();
+			var assemblyMetadata = entryAssembly?.GetCustomAttributes<AssemblyMetadataAttribute>().ToDictionary(k => k.Key, v => v.Value) ?? [];
 
 			BuildConfiguration = assemblyMetadata.GetValueOrDefault("BuildConfiguration", "unknown");
 			BuildDateTimeUtc = assemblyMetadata.TryGetValue("BuildDateTimeUtc", out var buildDate)
@@ -57,14 +57,14 @@ namespace Faolan.Core
 			BuildString = $"{BuildConfiguration} {gitSha} @ {BuildDateTimeUtc:G} UTC";
 
 			StartupBanner = "-------------------------------------------------------------------------------\n" + //
-			                "|  ####  ####   ###    # #### ### #####    ####   #    ###  #      #   #   #  |\n" + //
-			                "|  #   # #   # #   #   # #    #     #      #     # #  #   # #     # #  ##  #  |\n" + //
-			                "|  ####  ####  #   #   # #### #     #      #### #   # #   # #    #   # # # #  |\n" + //
-			                "|  #     #  #  #   #   # #    #     #      #    ##### #   # #    ##### #  ##  |\n" + //
-			                "|  #     #   #  ###  ### #### ###   #      #    #   #  ###  #### #   # #   #  |\n" + //
-			                "-------------------------------------------------------------------------------\n" + //
-			                "| " + BuildString.PadBoth(75) + " |\n" + //
-			                "-------------------------------------------------------------------------------\n";
+							"|  ####  ####   ###    # #### ### #####    ####   #    ###  #      #   #   #  |\n" + //
+							"|  #   # #   # #   #   # #    #     #      #     # #  #   # #     # #  ##  #  |\n" + //
+							"|  ####  ####  #   #   # #### #     #      #### #   # #   # #    #   # # # #  |\n" + //
+							"|  #     #  #  #   #   # #    #     #      #    ##### #   # #    ##### #  ##  |\n" + //
+							"|  #     #   #  ###  ### #### ###   #      #    #   #  ###  #### #   # #   #  |\n" + //
+							"-------------------------------------------------------------------------------\n" + //
+							"| " + BuildString.PadBoth(75) + " |\n" + //
+							"-------------------------------------------------------------------------------\n";
 		}
 	}
 }

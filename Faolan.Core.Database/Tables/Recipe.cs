@@ -18,7 +18,7 @@ namespace Faolan.Core.Database.Tables
 		// The decoded ingredient (input) + result (output) items - the recipe's ingredient/result element lists
 		// (TradeskillRecipeCodec elements). Each references an item template whose TEA key + hash supply the rest of
 		// the wire element, so those are not duplicated here.
-		public virtual ICollection<RecipeItem> Items { get; set; } = new List<RecipeItem>();
+		public virtual ICollection<RecipeItem> Items { get; set; } = [];
 
 		// The record's trailing flag byte (@0x5c): 0 or 1.
 		public byte TrailingFlag { get; set; }

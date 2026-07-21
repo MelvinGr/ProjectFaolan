@@ -28,7 +28,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		public Dictionary<string, SortedSet<string>> IirToCodecs { get; } = new(StringComparer.Ordinal); // IIR type -> codec classes
 		public Dictionary<string, string> BuiltIn { get; } = new(StringComparer.Ordinal); // IIR type -> representative file (inline builders)
 		public Dictionary<string, string> CodecGoldenMethod { get; } = new(StringComparer.Ordinal); // codec -> "TestClass.Method" (byte-exact), when found
-		public Dictionary<uint, string> NameByValue { get; } = new();
+		public Dictionary<uint, string> NameByValue { get; } = [];
 		public HashSet<string> BuiltSomewhere { get; } = new(StringComparer.Ordinal); // IIR types built anywhere
 		public int CodecsWithGolden => CodecGolden.Count(kv => kv.Value);
 		public int Dissectors { get; private set; }

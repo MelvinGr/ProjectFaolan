@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Tables
 
 		public uint ScreenId { get; set; } // remoteformat @id (0 for the close screen)
 
-		public virtual ICollection<ConversationScreenParameter> Parameters { get; set; } = new List<ConversationScreenParameter>();
+		public virtual ICollection<ConversationScreenParameter> Parameters { get; set; } = [];
 
 		public int Sequence { get; set; } // order within the packet's screen list
 

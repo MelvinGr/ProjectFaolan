@@ -5,9 +5,14 @@
 		<LangVersion>latest</LangVersion>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-		<!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
+		<!--<RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>-->
+		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
+		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</RuntimeIdentifier>
+		<SatelliteResourceLanguages>en;nl</SatelliteResourceLanguages>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 		<Authors>Project Faolan</Authors>
 		<ApplicationIcon>..\logo.ico</ApplicationIcon>
+		<!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
 		<!--<Nullable>enable</Nullable>-->
 		<!--<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>-->
 	</PropertyGroup>
@@ -41,7 +46,7 @@
 		</ItemGroup>
 	</Target>
 
-	<Target Name="RemoveUnneededRuntimeFolders" AfterTargets="CopyFilesToOutputDirectory"
+	<!--<Target Name="RemoveUnneededRuntimeFolders" AfterTargets="CopyFilesToOutputDirectory"
 	        Condition="'$(Configuration)' == 'Debug'">
 		<ItemGroup>
 			<RuntimeFolders
@@ -57,7 +62,7 @@
 		         Condition="'@(RuntimeFoldersToRemove)' != ''" />
 
 		<RemoveDir Directories="@(RuntimeFoldersToRemove)" />
-	</Target>
+	</Target>-->
 
 	<Import Project="Directory.Build.user.props" Condition="Exists('Directory.Build.user.props')" />
 </Project>

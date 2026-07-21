@@ -16,10 +16,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void Extract_IgnoresSpawnsBeforeAnyMapChange()
 		{
-			var entries = NpcSpawnExtractor.Extract(new List<CapturedPacket>
-			{
+			var entries = NpcSpawnExtractor.Extract(
+			[
 				Spawn(0x0004DE8A, 1f, 2f, 3f, "Orphan")
-			});
+			]);
 
 			Assert.Empty(entries); // no current map yet
 		}

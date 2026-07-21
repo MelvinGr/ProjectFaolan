@@ -699,7 +699,7 @@ namespace Faolan.GameServer
 			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
 			// Empty for a null character; ungated objects (the default) ignore it.
 			var activeQuestIds = character == null
-				? new HashSet<uint>()
+				? []
 				: (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).Select(q => q.QuestId).ToHashSet();
 
 			QuestDefinition beachDef = null;

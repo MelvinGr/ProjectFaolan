@@ -45,8 +45,8 @@ namespace Faolan.Core.Database.Tables
 		// quest. A quest can have several goals each with its own world marker + objective text (the beach starter has
 		// two: 1448 + 3490). Distinct from TextRefs (the journal header); these drive QuestObjectiveRegion generation
 		// so the snapshot's objective region builds from the DB instead of BeachTailsTemplate.bin (#186).
-		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = new List<QuestGoalDefinition>();
-		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
+		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = [];
+		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = [];
 
 		// True once this quest's Quest_c record scalars are known (seeded, or harvested from a captured journal), i.e.
 		// the record can be GENERATED. Previously inferred from `SnapshotState != 0` - but that word turned out to be

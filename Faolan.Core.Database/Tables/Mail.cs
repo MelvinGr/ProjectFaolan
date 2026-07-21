@@ -35,7 +35,7 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(RealmId))]
 		public virtual Realm Realm { get; set; } = null!;
 
-		public virtual ICollection<MailAttachment> Attachments { get; set; } = new List<MailAttachment>();
+		public virtual ICollection<MailAttachment> Attachments { get; set; } = [];
 
 		// DB-only: whether the recipient has read the mail (MarkMailRead). Not on this body.
 		public bool IsRead { get; set; }

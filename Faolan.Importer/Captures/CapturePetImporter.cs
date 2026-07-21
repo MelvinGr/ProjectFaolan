@@ -90,7 +90,7 @@ namespace Faolan.Importer.Captures
 						? dm
 						: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lm)
 							? lm
-							: new List<NpcAppearanceMorph>();
+							: [];
 					for (var i = 0; i < morphs.Count; i++)
 					{
 						type.Morphs.Add(new NpcMorph

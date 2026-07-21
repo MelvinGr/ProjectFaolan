@@ -40,7 +40,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// Live path: the new level with an empty (all-zero) delta summary - enough to fire the banner + effect.
 		public static byte[] Build(uint instance, uint newLevel)
 		{
-			return Build(instance, newLevel, ReadOnlySpan<uint>.Empty);
+			return Build(instance, newLevel, []);
 		}
 
 		// The NewLevelIIR_t body as a self-serializing codec (ICodec): Write frames the whole

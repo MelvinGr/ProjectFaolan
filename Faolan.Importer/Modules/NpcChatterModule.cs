@@ -85,7 +85,7 @@ namespace Faolan.Importer.Modules
 							continue;
 
 						if (!byTemplate.TryGetValue(template, out var set))
-							byTemplate[template] = set = new HashSet<string>();
+							byTemplate[template] = set = [];
 						set.Add(text);
 					}
 				}

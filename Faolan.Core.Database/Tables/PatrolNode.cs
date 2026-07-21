@@ -25,10 +25,10 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(PatrolPathId))]
 		public virtual PatrolPath PatrolPath { get; set; } = null!;
 
-		public virtual ICollection<PatrolNode> Children { get; set; } = new List<PatrolNode>();
+		public virtual ICollection<PatrolNode> Children { get; set; } = [];
 
 		// mode 1 PathMoveTask else-branch waypoints (empty for other modes / the packed branch).
-		public virtual ICollection<PatrolNodeWaypoint> Waypoints { get; set; } = new List<PatrolNodeWaypoint>();
+		public virtual ICollection<PatrolNodeWaypoint> Waypoints { get; set; } = [];
 
 		// MoveTaskNode.Mode (0 Wait, 1 Path, 2 Rotate, 3 Jump, 4 List, 5 Ballistic, 7 Formation, 8 Approach, 10 SetPos, 11 GroundAlign).
 		public byte Mode { get; set; }

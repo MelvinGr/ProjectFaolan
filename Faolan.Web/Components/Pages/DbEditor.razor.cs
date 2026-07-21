@@ -18,7 +18,7 @@ namespace Faolan.Web.Components.Pages
 
 		private const int RowCap = 500;
 		private static readonly MethodInfo SetMethod = typeof(DbContext).GetMethod(nameof(DbContext.Set), 1, Type.EmptyTypes)!;
-		private readonly Dictionary<string, FkOptions> _fks = new();
+		private readonly Dictionary<string, FkOptions> _fks = [];
 		private readonly List<object> _rows = [];
 		private bool _authorized;
 		private bool _error;

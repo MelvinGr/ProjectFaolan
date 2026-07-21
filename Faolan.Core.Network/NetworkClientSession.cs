@@ -191,8 +191,8 @@ namespace Faolan.Core.Network
 		public byte[] PendingCastArgs { get; set; }
 		public Character Character { get; set; }
 
-		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new();
-		public Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; } = new();
+		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = [];
+		public Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; } = [];
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }

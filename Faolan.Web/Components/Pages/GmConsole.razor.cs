@@ -10,13 +10,13 @@ namespace Faolan.Web.Components.Pages
 {
 	public partial class GmConsole
 	{
-		private readonly Dictionary<uint, string> _cmds = new();
-		private readonly Dictionary<uint, string> _msgs = new();
-		private readonly Dictionary<uint, string> _tpMap = new();
-		private readonly Dictionary<uint, string> _tpX = new();
-		private readonly Dictionary<uint, string> _tpY = new();
-		private readonly Dictionary<uint, string> _tpZ = new();
-		private readonly Dictionary<uint, uint> _tpTarget = new();
+		private readonly Dictionary<uint, string> _cmds = [];
+		private readonly Dictionary<uint, string> _msgs = [];
+		private readonly Dictionary<uint, string> _tpMap = [];
+		private readonly Dictionary<uint, string> _tpX = [];
+		private readonly Dictionary<uint, string> _tpY = [];
+		private readonly Dictionary<uint, string> _tpZ = [];
+		private readonly Dictionary<uint, uint> _tpTarget = [];
 
 		private bool _authorized;
 		private bool _busy;

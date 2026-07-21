@@ -37,7 +37,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual NpcTemplate? NpcTemplate { get; set; }
 
 		// The primary spawn-point anchors of this group (the exact retail spots); cascade-delete with the area.
-		public virtual ICollection<NpcSpawnAreaPoint> Points { get; set; } = new List<NpcSpawnAreaPoint>();
+		public virtual ICollection<NpcSpawnAreaPoint> Points { get; set; } = [];
 		public float BoundsMaxX { get; set; }
 		public float BoundsMaxY { get; set; }
 		public float BoundsMaxZ { get; set; }

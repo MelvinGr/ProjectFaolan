@@ -18,7 +18,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The decoded remoteformat dialogue screen(s), STRUCTURED (#188) - the runtime builds the wire XML from these
 		// rows (ConversationScreenColumns.ToScreen -> RemoteFormatXml.Build). Empty for OpenChatWindow / non-Knubot.
-		public virtual ICollection<ConversationScreen> Screens { get; set; } = new List<ConversationScreen>();
+		public virtual ICollection<ConversationScreen> Screens { get; set; } = [];
 
 		public byte? Env { get; set; } // KnubotBaseIIR env byte
 		public byte? Flag { get; set; } // OpenChatWindow/AppendText trailing flag (null otherwise)

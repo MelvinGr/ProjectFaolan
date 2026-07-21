@@ -1025,7 +1025,7 @@ namespace Faolan.GameServer.CreateFlow
 		// resend the set when a creation session is resumed). Persisted with the character graph at name-commit.
 		private static void RecordBodyResource(Character character, string resourceRef)
 		{
-			character.BodyResources ??= new List<CharacterBodyResource>();
+			character.BodyResources ??= [];
 			if (character.BodyResources.Any(r => r.Ref == resourceRef))
 				return;
 

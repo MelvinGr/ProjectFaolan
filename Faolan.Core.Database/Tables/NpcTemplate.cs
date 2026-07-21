@@ -30,20 +30,20 @@ namespace Faolan.Core.Database.Tables
 		public uint TemplateId { get; set; }
 
 		// Ambient chatter bark lines this NPC type periodically says (per-NPC; see NpcChatter).
-		public virtual ICollection<NpcChatter> Chatter { get; set; } = new List<NpcChatter>();
+		public virtual ICollection<NpcChatter> Chatter { get; set; } = [];
 
 		// The type-level worn equipment + appearance/morph table (#307), for a summon-only creature that has no NpcSpawn
 		// placement to carry them - the per-TYPE counterpart of NpcSpawnEquipment/NpcSpawnMorph. Empty for a plain map
 		// NPC type (its placements carry these). TryBuildFromType builds the spawn body from these + StatCore.
-		public virtual ICollection<NpcEquipment> Equipment { get; set; } = new List<NpcEquipment>();
+		public virtual ICollection<NpcEquipment> Equipment { get; set; } = [];
 
-		public virtual ICollection<NpcMorph> Morphs { get; set; } = new List<NpcMorph>();
+		public virtual ICollection<NpcMorph> Morphs { get; set; } = [];
 
 		// The placements of this type across all maps.
-		public virtual ICollection<NpcSpawn> Spawns { get; set; } = new List<NpcSpawn>();
+		public virtual ICollection<NpcSpawn> Spawns { get; set; } = [];
 
 		// The spells this NPC type casts (#232) - now FK'd to the type instead of joined by name string.
-		public virtual ICollection<NpcSpell> Spells { get; set; } = new List<NpcSpell>();
+		public virtual ICollection<NpcSpell> Spells { get; set; } = [];
 
 		// The type-level CharacterIIR stat core (#244), lifted off the captured body into a 1:1 NpcStatCore side table
 		// (keyed by NpcTemplateId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.

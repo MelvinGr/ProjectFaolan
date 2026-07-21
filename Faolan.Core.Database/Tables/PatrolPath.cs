@@ -19,6 +19,6 @@ namespace Faolan.Core.Database.Tables
 
 		// The columnarized MoveTask task tree: every AST node of this patrol (the root has ParentId == null).
 		// Cascade-deletes with the path.
-		public virtual ICollection<PatrolNode> Nodes { get; set; } = new List<PatrolNode>();
+		public virtual ICollection<PatrolNode> Nodes { get; set; } = [];
 	}
 }

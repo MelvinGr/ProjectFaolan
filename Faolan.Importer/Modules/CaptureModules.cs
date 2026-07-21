@@ -486,7 +486,7 @@ namespace Faolan.Importer.Modules
 			foreach (var (name, category) in NpcDispositionExtractor.Extract(cap.Packets))
 			{
 				if (!nameVotes.TryGetValue(name, out var byCat))
-					nameVotes[name] = byCat = new Dictionary<uint, int>();
+					nameVotes[name] = byCat = [];
 				byCat[category] = byCat.GetValueOrDefault(category) + 1;
 			}
 
@@ -514,7 +514,7 @@ namespace Faolan.Importer.Modules
 					? c
 					: NullCommunity;
 				if (!commVotes.TryGetValue(comm, out var byCat))
-					commVotes[comm] = byCat = new Dictionary<uint, int>();
+					commVotes[comm] = byCat = [];
 				foreach (var (cat, n) in votes)
 					byCat[cat] = byCat.GetValueOrDefault(cat) + n;
 			}

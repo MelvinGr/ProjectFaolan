@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Base chosen to sit in the same low range retail uses while staying clear of character instances
 		// (which are >= 0x02000000). Allocation is sequential from here.
 		public const uint HandleBase = 0x00090000;
-		private readonly Dictionary<string, uint> _byKey = new Dictionary<string, uint>();
+		private readonly Dictionary<string, uint> _byKey = [];
 
 		private readonly Lock _lock = new Lock();
 		private uint _next = HandleBase;

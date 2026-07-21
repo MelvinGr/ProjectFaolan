@@ -159,8 +159,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					SkillId = id
 				})
 				.ToList();
-			character.ScaffoldPairs = new List<CharacterScaffoldPair>();
-			character.Feats = new List<CharacterFeat>(); // a fresh character has trained no feats
+			character.ScaffoldPairs = [];
+			character.Feats = []; // a fresh character has trained no feats
 			return true;
 		}
 

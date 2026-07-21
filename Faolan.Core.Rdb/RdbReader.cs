@@ -20,7 +20,7 @@ namespace Faolan.Core.Rdb
 			Timeout = TimeSpan.FromSeconds(40)
 		};
 
-		private readonly Dictionary<int, FileStream> _dataFiles = new();
+		private readonly Dictionary<int, FileStream> _dataFiles = [];
 		private readonly HashSet<string> _cdnMisses = [];
 		private readonly List<Entry> _entries = [];
 

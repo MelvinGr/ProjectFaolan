@@ -82,9 +82,9 @@ namespace Faolan.Importer.Captures
 				if (dmg.SpellBaseId == 0 || dmg.Delta == 0)
 					return;
 
-				deltas.TryAdd(dmg.SpellBaseId, new Dictionary<int, int>());
+				deltas.TryAdd(dmg.SpellBaseId, []);
 				deltas[dmg.SpellBaseId][dmg.Delta] = deltas[dmg.SpellBaseId].GetValueOrDefault(dmg.Delta) + 1;
-				types.TryAdd(dmg.SpellBaseId, new Dictionary<uint, int>());
+				types.TryAdd(dmg.SpellBaseId, []);
 				types[dmg.SpellBaseId][dmg.StatId] = types[dmg.SpellBaseId].GetValueOrDefault(dmg.StatId) + 1;
 			}
 			catch

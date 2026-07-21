@@ -111,7 +111,7 @@ namespace Faolan.Importer.Captures
 				}
 
 				var existing = await db.CharacterQuests.Where(q => q.CharacterId == characterId).ToDictionaryAsync(q => q.QuestId);
-				var progress = progressByChar.GetValueOrDefault(characterId) ?? new Dictionary<uint, uint>();
+				var progress = progressByChar.GetValueOrDefault(characterId) ?? [];
 				var touched = false;
 				foreach (var (questId, state) in merged)
 				{
@@ -173,7 +173,7 @@ namespace Faolan.Importer.Captures
 					if (SnapshotJournalReader.TryReadCompleted(packetBytes, out var completed) && completed != null)
 					{
 						if (!completedByChar.TryGetValue(charId, out var set))
-							completedByChar[charId] = set = new HashSet<uint>();
+							completedByChar[charId] = set = [];
 						foreach (var area in completed.Areas)
 						foreach (var q in area.Quests)
 						{
@@ -188,7 +188,7 @@ namespace Faolan.Importer.Captures
 				if (WorldQuest.TryParseQuestLogList(inner, out var logHandle, out _, out var logIds))
 				{
 					if (!logListByChar.TryGetValue(logHandle, out var set))
-						logListByChar[logHandle] = set = new HashSet<uint>();
+						logListByChar[logHandle] = set = [];
 					foreach (var id in logIds)
 					{
 						if (id != 0)
@@ -205,7 +205,7 @@ namespace Faolan.Importer.Captures
 
 					(stateByChar.TryGetValue(handle, out var m)
 						? m
-						: stateByChar[handle] = new Dictionary<uint, uint>())[questId] = state;
+						: stateByChar[handle] = [])[questId] = state;
 				}
 				else if (WorldQuest.TryParseQuestGoal(inner, out handle, out questId, out _, out var count))
 				{
@@ -214,7 +214,7 @@ namespace Faolan.Importer.Captures
 
 					(progressByChar.TryGetValue(handle, out var m)
 						? m
-						: progressByChar[handle] = new Dictionary<uint, uint>())[questId] = count;
+						: progressByChar[handle] = [])[questId] = count;
 				}
 			}
 			catch
