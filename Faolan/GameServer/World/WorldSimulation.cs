@@ -146,8 +146,9 @@ namespace Faolan.GameServer.World
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
 			{
 				Vitals = EntityVitals.FromCharacter(character, gearBonuses),
-				// #401: cache the worn-gear physical armor rating for incoming-damage mitigation (0 when unarmored).
+				// #401: cache the worn-gear physical armor + magical Protection for incoming-damage mitigation.
 				ArmorRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0),
+				Protection = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Protection) ?? 0),
 				// #399: cache the worn-gear Hit Rating (hit chance, not yet consumed) + the crit stats.
 				HitRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0),
 				CriticalRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.CriticalRating) ?? 0),
@@ -364,7 +365,9 @@ namespace Faolan.GameServer.World
 			}
 
 			npc.AttackSwingCounter++;
-			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
+			// #401: an NPC cast is magic damage, so the player's worn-gear Protection mitigates it (the magical mirror
+			// of armor mitigating melee).
+			var damage = CombatResolver.ApplyMagicMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.Protection);
 			await _output.SendNpcSpellCast(client!, npc.Handle, spell);
 
 			// Track the NPC's cast as a timed DEBUFF on the player so it counts down and clears its icon at 0, like a

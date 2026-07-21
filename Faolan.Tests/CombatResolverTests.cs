@@ -75,6 +75,15 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void MagicMitigation_UsesProtection_ItsOwnHalfPoint()
+		{
+			const uint k = CombatResolver.ProtectionHalfMitigation;
+			Assert.Equal(100, CombatResolver.ApplyMagicMitigation(100, 0)); // no Protection = no reduction
+			Assert.Equal(50, CombatResolver.ApplyMagicMitigation(100, k)); // Protection == K halves the hit
+			Assert.True(CombatResolver.ApplyMagicMitigation(100, k * 9) >= 1); // never fully negates
+		}
+
+		[Fact]
 		public void ArmorMitigation_ReducesDamage_DiminishingAndNeverToZero()
 		{
 			const uint k = CombatResolver.ArmorHalfMitigation;

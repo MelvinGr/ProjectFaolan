@@ -250,6 +250,10 @@ namespace Faolan.GameServer.World
 		// mitigate incoming physical damage (CombatResolver.ApplyPhysicalMitigation). 0 for NPCs and unarmored players.
 		public uint ArmorRating { get; set; }
 
+		// The player's aggregated magical Protection rating from worn gear (#401); mitigates incoming MAGIC damage
+		// (CombatResolver.ApplyMagicMitigation). 0 for NPCs and players with no Protection gear.
+		public uint Protection { get; set; }
+
 		// The player's aggregated Hit Rating from worn gear (#399). Hit Rating governs HIT chance (miss avoidance),
 		// which isn't modelled yet, so it is currently unused. 0 for NPCs / no gear.
 		public uint HitRating { get; set; }

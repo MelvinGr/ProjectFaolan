@@ -122,15 +122,32 @@ namespace Faolan.GameServer.Combat
 		// level-normalization. Tune in-client (gaps.md / #401).
 		public const uint ArmorHalfMitigation = 2000;
 
+		// The half-mitigation point for the provisional MAGIC-damage curve (Protection rating 0x1C3). Protection values
+		// are much smaller than Armor (a high piece ~185 vs armor ~1500), so the half-point is lower. Provisional (#401),
+		// tune in-client.
+		public const uint ProtectionHalfMitigation = 400;
+
 		// Reduces incoming PHYSICAL damage by the defender's aggregated armor rating (#401), diminishing-returns:
 		// mitigated = raw × K / (armor + K), so armor == K halves it and it never fully negates a hit (floor 1). Armor 0
 		// (unarmored, or a type with no armor data) returns the raw damage unchanged.
 		public static int ApplyPhysicalMitigation(int rawDamage, uint armorRating)
 		{
-			if (rawDamage <= 0 || armorRating == 0)
+			return Mitigate(rawDamage, armorRating, ArmorHalfMitigation);
+		}
+
+		// Reduces incoming MAGIC damage by the defender's aggregated Protection rating - the magical mirror of armor
+		// mitigation (same diminishing-returns curve, its own half-point).
+		public static int ApplyMagicMitigation(int rawDamage, uint protection)
+		{
+			return Mitigate(rawDamage, protection, ProtectionHalfMitigation);
+		}
+
+		private static int Mitigate(int rawDamage, uint rating, uint halfPoint)
+		{
+			if (rawDamage <= 0 || rating == 0)
 				return rawDamage;
 
-			var mitigated = (double)rawDamage * ArmorHalfMitigation / (armorRating + ArmorHalfMitigation);
+			var mitigated = (double)rawDamage * halfPoint / (rating + halfPoint);
 			return Math.Max(1, (int)Math.Round(mitigated, MidpointRounding.AwayFromZero));
 		}
 

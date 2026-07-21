@@ -68,7 +68,8 @@ namespace Faolan.Importer.Rdb
 			(uint)CharacterStatId.NaturalManaRegen, // gear mana regen (added to the regen tick)
 			(uint)CharacterStatId.NaturalStaminaRegen, // gear stamina regen (added to the regen tick)
 			(uint)CharacterStatId.CriticalRating, // #399: melee crit chance
-			(uint)CharacterStatId.CriticalDamageRating // #399: melee crit magnitude
+			(uint)CharacterStatId.CriticalDamageRating, // #399: melee crit magnitude
+			(uint)CharacterStatId.Protection // #401: magical mitigation of incoming NPC-cast damage
 		];
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
