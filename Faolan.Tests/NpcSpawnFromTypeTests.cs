@@ -40,7 +40,7 @@ namespace Faolan.Tests
 			Assert.NotEmpty(types); // the necro pet family is imported by default in the shipped DB
 			foreach (var npc in types)
 			{
-				Assert.True(NpcSpawnBuilder.TryBuildFromType(npc, 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity, out var body), $"{npc.Name} failed to build from type");
+				var body = NpcSpawnBuilder.BuildFromType(npc, 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity);
 				Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read), $"{npc.Name} body did not parse");
 
 				// The built body carries the type's worn equipment and (for a humanoid) its appearance table.

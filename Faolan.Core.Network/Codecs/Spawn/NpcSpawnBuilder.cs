@@ -116,11 +116,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
 		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
 		// lifted stat core.
-		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, [NotNullWhen(true)] out byte[]? body)
+		public static byte[] BuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation)
 		{
-			body = null;
 			if (npc?.StatCore?.IirHeader is not { } x)
-				return false;
+				throw new InvalidOperationException($"NpcTemplate '{npc?.Name ?? "?"}' (id {npc?.TemplateId}) has no lifted StatCore.IirHeader - the type is not imported/lifted (or StatCore was not Included).");
 
 			var morphs = npc
 				.Morphs.OrderBy(m => m.Ordinal)
@@ -134,25 +133,24 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var message = BuildMessageFromType(npc);
 
 			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
-			body = BuildBody(handle, x, position, rotation, 0, message, morphs, minimalRc);
-			return true;
+			return BuildBody(handle, x, position, rotation, 0, message, morphs, minimalRc);
 		}
 
 		// The LIVE spawn path (#244/#243): assemble the whole body from typed columns with `playfieldToken` baked into
 		// the transform - no captured Data, no SpawnPlayfieldRewriter. Every shipped spawn is expressible from scratch:
 		// an ANIMAL (no equipment -> minimal post-IIR), a humanoid whose APPEARANCE is lifted into morph rows (-> the
 		// appearance table), or a NO-MORPH spawn whose type carries a known minimal recordCount (-> the minimal form
-		// with that count, #243). Returns false only for a row with no lifted type (no StatCore.IirHeader) or a no-morph
-		// spawn whose type recordCount was never derived - neither occurs in the shipped DB (988/988 build). The returned
-		// body already carries the live token, so the caller never post-patches it.
+		// with that count, #243). THROWS for a row with no lifted type (no StatCore.IirHeader) or a no-morph spawn whose
+		// type recordCount was never derived - neither occurs in the shipped DB (988/988 build), so a throw signals
+		// un-lifted / partially-imported data or a missing Include, not a normal outcome. The returned body already
+		// carries the live token, so the caller never post-patches it.
 		// NB the dev nameplate LABEL (#363) is NOT baked into the spawn name here: the client draws an NPC's floating
 		// name from its template_id LDB, ignoring the spawn-body Name, so the label is pushed separately as a
 		// SetNameIIR after the spawn (WorldBroadcaster.SendWorldSpawn / CreateEditorRecordBuilder.BuildWorldSetNameIir).
-		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, [NotNullWhen(true)] out byte[]? body)
+		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken)
 		{
-			body = null;
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
-				return false;
+				throw new InvalidOperationException($"NpcSpawn (id {row?.Id}, type '{row?.NpcTemplate?.Name ?? "?"}') has no lifted StatCore.IirHeader - the type is not imported/lifted (or StatCore was not Included).");
 
 			var morphs = row
 				.Morphs.OrderBy(m => m.Ordinal)
@@ -168,17 +166,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			// Animal or morph-humanoid: minimal record count is 1 (unused when morphs are present).
 			if (!row.HasEquipment || morphs.Count > 0)
-			{
-				body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
-				return true;
-			}
+				return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
 
-			// No-morph spawn: build the minimal form with the type's fresh record count (1 or 2) when known.
+			// No-morph spawn: build the minimal form with the type's fresh record count (1 or 2).
 			if (row.NpcTemplate.StatCore.MinimalPostIirRecordCount is not { } minimalRecordCount)
-				return false;
+				throw new InvalidOperationException($"NpcSpawn (id {row.Id}, type '{row.NpcTemplate.Name}') is an equipped no-morph humanoid whose type has no derived MinimalPostIirRecordCount.");
 
-			body = BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs, minimalRecordCount);
-			return true;
+			return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs, minimalRecordCount);
 		}
 
 		// Constructs the CharacterIIR stat core (#244) from the type-level NpcTemplate.StatCore + this placement's overrides,

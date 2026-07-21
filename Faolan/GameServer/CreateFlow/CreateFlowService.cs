@@ -620,9 +620,10 @@ namespace Faolan.GameServer.CreateFlow
 			// WorldObjectBuilder, re-addressed to the captured handle + editor playfield), in retail send order.
 			foreach (var handle in EditorSceneDynelHandles)
 			{
-				if (dynelRows != null && dynelRows.TryGetValue(handle, out var dynelRow) &&
-				    WorldObjectBuilder.TryBuild(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance, out var dynel))
-					await Iir(GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, dynel[8..]);
+				if (dynelRows == null || !dynelRows.TryGetValue(handle, out var dynelRow))
+					continue;
+				var dynel = WorldObjectBuilder.Build(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance);
+				await Iir(GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, dynel[8..]);
 			}
 
 			// The editor scene pedestals: each SimpleChar is RECONSTRUCTED from its own bytes via IirChar (#189) -

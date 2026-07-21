@@ -21,7 +21,7 @@ namespace Faolan.Tests
 			var row = RowFromCapturedBody(capturedBody);
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(capturedBody.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
 
-			Assert.True(WorldObjectBuilder.TryBuild(row, handle, ReadToken(capturedBody), out var body));
+			var body = WorldObjectBuilder.Build(row, handle, ReadToken(capturedBody));
 			Assert.Equal(capturedBody, body);
 		}
 
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			var capturedBody = Golden.Bytes("WorldObjChest");
 			var row = RowFromCapturedBody(capturedBody);
 
-			Assert.True(WorldObjectBuilder.TryBuild(row, 0x000B5678u, ReadToken(capturedBody), out var body));
+			var body = WorldObjectBuilder.Build(row, 0x000B5678u, ReadToken(capturedBody));
 
 			Assert.Equal(capturedBody.Length, body.Length);
 			Assert.Equal(0x000B5678u, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.HandleOffset, 4)));

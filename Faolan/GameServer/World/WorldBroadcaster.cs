@@ -930,8 +930,7 @@ namespace Faolan.GameServer.World
 					labelSample ??= areaLabel;
 				}
 
-				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody))
-					entity.SpawnBody = spawnBody;
+				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
 				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
@@ -1190,14 +1189,16 @@ namespace Faolan.GameServer.World
 				return null;
 
 			var npc = await _database.GetNpcSpawnByName(npcName);
-			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
-			// baked ones are just placeholders (the player's zone token here).
-			if (npc == null || !NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken, out var body))
+			if (npc == null)
 			{
 				_logger.LogInformation("Spawn: no spawnable '{NpcTemplate}' template found.", npcName);
 				return null;
 			}
+
+			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
+			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
+			// baked ones are just placeholders (the player's zone token here).
+			var body = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken);
 
 			EntityVitals? vitals = null;
 			if (killable)
@@ -1242,23 +1243,19 @@ namespace Faolan.GameServer.World
 		}
 
 		// Spawns a creature TYPE at the player as a PET (#307/#244) - the RIGHT model: no NpcSpawns world placement,
-		// the FA015807 is assembled from the type's columns (StatCore + Equipment + Morphs) via TryBuildFromType at the
+		// the FA015807 is assembled from the type's columns (StatCore + Equipment + Morphs) via BuildFromType at the
 		// summoner's position, then streamed to nearby viewers. The PetIIR owner-assign + follow are done by the caller
-		// (SummonPetForPlayer). Returns null if the type carries no lifted stat core (not yet imported/lifted).
+		// (SummonPetForPlayer). BuildFromType throws if the type carries no lifted stat core (not yet imported/lifted).
 		public async Task<WorldEntity?> SpawnPetForPlayer(INetworkClient client, NpcTemplate npcType)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
 				return null;
 
-			// TryBuildFromType is the single stat-core guard (it returns false for a type with no lifted
-			// StatCore.IirHeader) - no redundant pre-check.
+			// BuildFromType throws for a type with no lifted StatCore.IirHeader - the fail-fast signal for un-lifted /
+			// partially-imported data; it never happens for a shipped pet/mount type.
 			var handle = NextRuntimeHandle();
-			if (!NpcSpawnBuilder.TryBuildFromType(npcType, handle, player.Position, player.Rotation, out var body))
-			{
-				_logger.LogInformation("Pet spawn: creature type '{Type}' has no buildable stat core.", npcType.Name);
-				return null;
-			}
+			var body = NpcSpawnBuilder.BuildFromType(npcType, handle, player.Position, player.Rotation);
 
 			var level = npcType.StatCore?.Level ?? 0;
 			var maxHealth = level > 0
@@ -1755,12 +1752,11 @@ namespace Faolan.GameServer.World
 
 		// Builds one member of an ambient pool at `pos` and adds it to the zone (no wire send - the interest stream, or
 		// the maintenance caller, does that). The member roams the pool's points and fades-not-revives on death so the
-		// POOL owns its respawn. Returns the entity, or null if the type won't build.
-		private WorldEntity? SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
+		// POOL owns its respawn. BuildFromType throws if the pool's type has no lifted stat core (a misconfigured pool).
+		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
 		{
 			var handle = NextRuntimeHandle();
-			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
-				return null;
+			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity);
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
 			entity.InstanceId = zone.InstanceId;
@@ -1806,8 +1802,7 @@ namespace Faolan.GameServer.World
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
 			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
-			if (!WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, LootContainerTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
-				return null;
+			var body = WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, LootContainerTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
 
 			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l))]); // OUR items/cash, Pos 0..n-1
 

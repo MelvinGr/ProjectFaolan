@@ -53,10 +53,7 @@ namespace Faolan.GameServer
 				if (!row.SpawnsFor(activeQuestIds))
 					continue;
 
-				if (WorldObjectBuilder.TryBuild(row, row.CapturedHandle, playfieldInstance, out var body))
-					yield return FrameWorldEntryRecord(client, body);
-				else
-					Logger.LogWarning("World-object: SKIPPED '{Name}' (id {Id}) - TryBuild failed.", row.Name, row.Id);
+				yield return FrameWorldEntryRecord(client, WorldObjectBuilder.Build(row, row.CapturedHandle, playfieldInstance));
 			}
 		}
 

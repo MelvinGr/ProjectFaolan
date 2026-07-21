@@ -21,13 +21,12 @@ namespace Faolan.Core.Network.Codecs.World
 		// identity message generated from the row's columns (SimpleDynelMessageCodec) + the row's KdTreeTail (the
 		// static geometry). Byte-identical to a captured body when fed that object's columns + KdTreeTail + transform
 		// (WorldObjectBuilderTests). This is how a loot bag is spawned with NO captured world-object row in the world
-		// (the loot system's bag definition is a baked constant - LootBagTemplate). Returns false if the row has no
-		// lifted columns (DisplayName) or no KdTreeTail.
-		public static bool BuildBody(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, [NotNullWhen(true)] out byte[]? body)
+		// (the loot system's bag definition is a baked constant - LootBagTemplate). THROWS if the row has no lifted
+		// columns (DisplayName) or no KdTreeTail - an un-lifted / partially-imported row, not a normal outcome.
+		public static byte[] BuildBody(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken)
 		{
-			body = null;
 			if (row?.DisplayName == null || row.KdTreeTail == null)
-				return false;
+				throw new InvalidOperationException($"WorldObject '{row?.Name ?? "?"}' (id {row?.Id}) is not lifted: no DisplayName/KdTreeTail. Re-run the importer to lift it (or Include the columns).");
 
 			var head = new FaolanStream()
 				.WriteUInt32(0) // body length placeholder @0 (set below)
@@ -50,12 +49,12 @@ namespace Faolan.Core.Network.Codecs.World
 
 			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row)); // [u32 len][record]
 
-			body = new byte[head.Length + identity.Length + row.KdTreeTail.Length];
+			var body = new byte[head.Length + identity.Length + row.KdTreeTail.Length];
 			head.CopyTo(body, 0);
 			identity.CopyTo(body, head.Length);
 			row.KdTreeTail.CopyTo(body, head.Length + identity.Length);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
-			return true;
+			return body;
 		}
 
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
@@ -100,16 +99,16 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// Builds a world-object body from the row's TYPED COLUMNS + KdTreeTail (the retired Data blob is no longer read),
 		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
-		// Returns false when the row isn't lifted (no DisplayName / KdTreeTail).
-		public static bool TryBuild(WorldObject row, uint handle, uint playfieldInstance, [NotNullWhen(true)] out byte[]? body)
+		// THROWS when the row isn't lifted (no DisplayName / KdTreeTail) - see BuildBody.
+		public static byte[] Build(WorldObject row, uint handle, uint playfieldInstance)
 		{
-			return BuildBody(row, handle, row?.Position ?? default, row?.Rotation ?? Quaternion.Identity, TypeTagForClass(row?.SubOpcode ?? 0), playfieldInstance, out body);
+			return BuildBody(row, handle, row?.Position ?? default, row?.Rotation ?? Quaternion.Identity, TypeTagForClass(row?.SubOpcode ?? 0), playfieldInstance);
 		}
 
-		// As TryBuild but with a placeholder playfield token (0) - for diagnostics / callers that re-stamp per recipient.
-		public static bool TryBuild(WorldObject row, uint handle, [NotNullWhen(true)] out byte[]? body)
+		// As Build but with a placeholder playfield token (0) - for diagnostics / callers that re-stamp per recipient.
+		public static byte[] Build(WorldObject row, uint handle)
 		{
-			return TryBuild(row, handle, 0u, out body);
+			return Build(row, handle, 0u);
 		}
 
 		// The wire typeTag (the 0x0000C8xx EntityClass ack in the object header) for a world-object CLASS. Class-stable

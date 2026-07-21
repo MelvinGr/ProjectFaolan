@@ -1232,7 +1232,19 @@ namespace Faolan.Importer.Cli
 			await using var db = OpenDb(dbPath);
 			foreach (var row in await db.WorldObjects.Where(o => o.Name!.Contains(target)).ToListAsync())
 			{
-				var baseOk = WorldObjectBuilder.TryBuild(row, row.CapturedHandle, out var baseBody);
+				byte[]? baseBody = null;
+				var baseOk = false;
+				try
+				{
+					baseBody = WorldObjectBuilder.Build(row, row.CapturedHandle);
+					baseOk = true;
+				}
+				catch (InvalidOperationException)
+				{
+					// Un-lifted row - this diagnostic REPORTS buildability per row, so catch the fail-fast throw and
+					// record it as a failure instead of aborting the sweep.
+				}
+
 				var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody!, 0x01EA985Cu);
 				Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} kd={row.KdTreeTail?.Length}");
 				if (baseOk)

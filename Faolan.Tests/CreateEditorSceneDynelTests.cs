@@ -45,7 +45,7 @@ namespace Faolan.Tests
 				// 3072626 and 347659 - which share an exact spot - both survive the dedup (#222).
 				Assert.True(rowsByIdentity.TryGetValue(identity, out var row), $"no DB row for handle 0x{handle:X8} (identity '{identity}')");
 
-				Assert.True(WorldObjectBuilder.TryBuild(row, handle, CreateSessionPlayfield, out var built), $"build failed for handle 0x{handle:X8}");
+				var built = WorldObjectBuilder.Build(row, handle, CreateSessionPlayfield);
 				// WorldObjectBuilder returns the full carrier payload [u32 len][u32 subOpcode][record]; the burst's
 				// Iir() helper writes those two words itself, so the comparable record is built[8..].
 				Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(built.AsSpan(8).ToArray()));
