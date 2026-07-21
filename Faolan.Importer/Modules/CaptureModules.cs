@@ -852,7 +852,7 @@ namespace Faolan.Importer.Modules
 	public sealed class QuestWiringModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [nameof(QuestsModule), nameof(MapsModule)];
+		public IReadOnlyList<string> DependsOn => [nameof(QuestsModule), nameof(MapsModule), nameof(WorldObjectsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

@@ -721,6 +721,23 @@ namespace Faolan.Importer.Captures
 			await SeedCaptureReachQuests(db);
 			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
+			await SeedQuestWorldEffects(db);
+		}
+
+		// After-quest world-object EFFECTS (#262): tag decor with the quest whose state changes its dynel look
+		// (WorldObject.EffectQuestId/EffectDynelState, applied by WorldBroadcaster.ApplyQuestWorldEffects). The Tortage
+		// beach "invisible wall" = the Casilda chain decor's collision, dropped (SimpleDynel visual-change state 5) once
+		// the escort quest (12407) is active - data now, replacing the hard-coded DropBeachWall lookup. Idempotent.
+		private static async Task SeedQuestWorldEffects(DatabaseContext db)
+		{
+			var chain = await db.WorldObjects.FirstOrDefaultAsync(o => o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
+			if (chain == null)
+				return;
+
+			chain.EffectQuestId = 12407;
+			chain.EffectDynelState = 5;
+			await db.SaveChangesAsync();
+			Console.WriteLine("Seeded after-quest world effect: beach chain-wall (decor_chain_hangingwoman) -> drop on quest 12407 (state 5).");
 		}
 
 		// Other capture-harvested quests whose single objective is a LOCATION (TrailingCategory 100 + a map marker),

@@ -68,12 +68,6 @@ namespace Faolan.GameServer.World
 		// before each mob's first swing it pushes `CombatMode = 4`, which is what draws its weapon. (The player uses 1
 		// and one non-swinging entity used 1 - the field is a stance/mode code that isn't fully decoded, but 4 is the
 		// value every actual melee swinger sends.)
-		// #262: Casilda's NPC template - the escortee shown CHAINED (captive pose) on interest-spawn until she's freed.
-		// Her captive/freed pose is inherently Casilda-specific (hard-coded behaviorIds), and the gate runs BEFORE she's
-		// freed (no escort quest yet to resolve her from), so this is the one place her identity stays a constant - kept
-		// as a TEMPLATE id (stable) rather than a name compare.
-		private const uint CasildaTemplateId = 9411;
-
 		private const uint NpcCombatModeValue = 4;
 
 		// The combat-mode stat value a PLAYER sends when it draws its weapon (#218/#259): 1, vs the mob's 4 (the field is
@@ -1011,6 +1005,32 @@ namespace Faolan.GameServer.World
 			return SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
 		}
 
+		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
+		// they hold ACTIVE or COMPLETED gets its SimpleDynel visual-change pushed (e.g. the beach chain-wall collision
+		// dropping when the escort begins). Data-driven (WorldObject.EffectQuestId/EffectDynelState), no hard-coded
+		// lookup. Called at world entry (a returning player isn't re-blocked by the burst) and on quest supersession /
+		// completion (the change fires the instant the player reaches the quest state).
+		public async Task ApplyQuestWorldEffects(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			var player = _sim.PlayerWorldEntity(client);
+			if (character == null || player == null)
+				return;
+
+			var held = (await _database.GetCharacterQuests(character.Id))
+				.Where(q => q.State is QuestState.Active or QuestState.Completed)
+				.Select(q => q.QuestId)
+				.ToHashSet();
+			if (held.Count == 0)
+				return;
+
+			foreach (var obj in await _database.GetWorldObjects(player.MapId))
+			{
+				if (obj.EffectQuestId is { } eq && held.Contains(eq))
+					await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(obj.CapturedHandle, obj.EffectDynelState));
+			}
+		}
+
 		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
 		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
 		// correct, state-driven marker instead of a hardcoded value.
@@ -1483,7 +1503,7 @@ namespace Faolan.GameServer.World
 						// death/loot/aggro land where the client actually has it.
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
-						if (!ev.Subject.IsPlayer && ev.Subject.NpcTemplateId == CasildaTemplateId && recipient.Session?.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
+						if (!ev.Subject.IsPlayer && ev.Subject.NpcTemplateId == QuestHandlerService.CasildaTemplateId && recipient.Session?.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
 							await _questHandler.SendCasildaPose(recipient, ev.Subject.Handle, true);
 						break;
 					}

@@ -407,10 +407,11 @@ namespace Faolan.GameServer
 					.SendAsync(client);
 			}
 
-			// #267: if this character has ALREADY freed Casilda (relog after the beach talk stage), drop the chain-wall
-			// collision up-front so they aren't re-blocked by the world-entry burst's chain dynel.
-			if (client.Session.Character?.MapId == Map.TortageBeachId)
-				await _questHandler.SendBeachGateOnEntry(client);
+			// #262: apply any after-quest world-object effects up-front (e.g. a relog after freeing Casilda drops the
+			// beach chain-wall collision, so the returning player isn't re-blocked by the world-entry burst's chain
+			// dynel), and clear the escortee's captive pose if she's already freed. Both data-driven / no-op when N/A.
+			await _broadcaster.ApplyQuestWorldEffects(client);
+			await _questHandler.ClearCasildaCaptivePose(client);
 
 			// Bind the character on entry if it has never bound. Every recall targets BindRespawnPointId - the Totem of
 			// Origin, the Path of Asura spell, .recall, and the death-resurrect - so an unbound character (imported or

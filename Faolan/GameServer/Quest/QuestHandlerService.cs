@@ -48,33 +48,23 @@ namespace Faolan.GameServer.Quest
 		}
 
 		// ---- Casilda beach rescue --------------------------------------------------------------------------------
-		// #267: drop the beach "invisible wall". The wall is the Casilda chain decor's COLLISION (the
-		// `004709_Global__decor_chain_hangingwoman` SimpleDynel sent at world entry; its mesh doesn't render for us, so
-		// it reads as an invisible barrier). Retail flips it off with a SimpleDynel visual-change (state 5) to that dynel
-		// the instant Casilda is freed on the beach (Hoxxling gameplay idx 2053). Looked up by the chain world-object's
-		// identity so the handle matches what the client was sent at entry (its CapturedHandle). No-op off-beach / if the
-		// map has no such chain.
-		public async Task DropBeachWall(INetworkClient client)
+		// Casilda's NPC template. Her captive/freed poses (below) are decoded byte-exact for HER alone, so anything that
+		// sends them is gated to this id - the follow + beach-wall generalised (Escort goal / WorldObject.EffectQuestId),
+		// but the POSE stays Casilda-specific until per-NPC pose data exists.
+		public const uint CasildaTemplateId = 9411;
+
+		// #262/#267: clear CASILDA's captive (chained) struggle pose so she stands/walks normally as she follows - the
+		// live counterpart to the captive pose the interest stream sends while she's a prisoner. Deliberately NOT
+		// generic: unlike the follow (Escort goal) and the wall (WorldObject.EffectQuestId), the pose BCC behaviorIds
+		// (159428 captive / 42010 freed) are Casilda's alone, so this is GATED to her template and no-ops for any other
+		// escortee (they'd need their own decoded poses). Called on the escort start + world entry.
+		public async Task ClearCasildaCaptivePose(INetworkClient client)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
+			if (player == null || await EscorteeTemplateId(client.Session.Character.Id) != CasildaTemplateId)
 				return;
 
-			var chain = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o =>
-				o.SubOpcode == SimpleDynelMessageCodec.Opcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
-			if (chain == null)
-				return;
-
-			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(chain.CapturedHandle, 0x05));
-			_logger.LogInformation("#267: dropped beach chain-wall collision (handle 0x{Handle:X8}) for {Player}.", chain.CapturedHandle, player.Name);
-
-			// She's freed now: clear the captive (chained) struggle pose so she stands/walks normally as she follows
-			// (the live counterpart to the captive pose the interest stream sends while she's a prisoner). Resolve the
-			// escortee by her TEMPLATE id (the Escort goal's TrailingRefId), not by name.
-			var escorteeTpl = await EscorteeTemplateId(client.Session.Character.Id);
-			var casilda = escorteeTpl == 0
-				? null
-				: _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.NpcTemplateId == escorteeTpl);
+			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.NpcTemplateId == CasildaTemplateId);
 			if (casilda != null)
 				await SendCasildaPose(client, casilda.Handle, false);
 		}
@@ -103,19 +93,6 @@ namespace Faolan.GameServer.Quest
 			}
 
 			return 0;
-		}
-
-		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
-		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
-		// off the beach or before she's freed.
-		public async Task SendBeachGateOnEntry(INetworkClient client)
-		{
-			var character = client.Session?.Character;
-			if (character == null || character.MapId != Map.TortageBeachId)
-				return;
-
-			if (await IsCasildaFreed(character.Id))
-				await DropBeachWall(client);
 		}
 
 		// #267/#266: Casilda's captive (chained) vs freed pose, as a BehaviorControlCenterIIR. Both decoded byte-exact

@@ -37,6 +37,10 @@ namespace Faolan.GameServer.Quest
 		// NPC is loaded; returns true if applied.
 		bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow);
 
+		// #262: apply the after-quest world-object effects for the player (WorldObject.EffectQuestId) - e.g. drop the
+		// beach chain-wall collision the instant the escort quest becomes active. Data-driven; no-op if nothing matches.
+		Task ApplyQuestWorldEffects(INetworkClient client);
+
 		// #262: drop the player's cached pending ReachArea goals (WorldEntity.PendingReachGoals) so the next move
 		// reloads them from the DB. Called after a supersession changes the active quest set - a newly-granted stage
 		// may carry a ReachArea goal (e.g. Shipwrecked II's "find the gate key", III's "enter the city") that the

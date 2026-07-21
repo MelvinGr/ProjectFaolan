@@ -83,6 +83,14 @@ namespace Faolan.Core.Database.Tables
 		// change (like RefreshQuestVisibility for NPCs) is a follow-up.
 		public uint? GateQuestId { get; set; }
 
+		// #262: an AFTER-QUEST EFFECT. When the viewing player has EffectQuestId ACTIVE or COMPLETED, this object is
+		// shown with the SimpleDynel visual-change state EffectDynelState (instead of its default), pushed both at world
+		// entry and the instant the player reaches that quest state. Generalises the Casilda beach "wall drop" (the chain
+		// decor's collision, dropped when the escort begins - EffectQuestId 12407, state 5): data now, not a hard-coded
+		// lookup. null = no effect (the default). Business columns, NOT wire fields.
+		public uint? EffectQuestId { get; set; }
+		public byte EffectDynelState { get; set; }
+
 		// Whether this object SPAWNS for a player holding `activeQuestIds` - i.e. whether it is sent at world entry. A
 		// gated object the player doesn't qualify for simply isn't delivered (it never spawns; it is NOT spawned-and-
 		// hidden). Ungated objects always spawn.

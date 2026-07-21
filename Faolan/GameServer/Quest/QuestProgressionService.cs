@@ -288,10 +288,11 @@ namespace Faolan.GameServer.Quest
 			if (nextGoal is { GoalType: QuestGoalType.Escort, TrailingRefId: not 0 })
 			{
 				_outbound.SetNpcFollowByTemplate(character.MapId, nextGoal.TrailingRefId, client.Session.Account.ClientInstance, true);
-				// #267: on the Tortage beach, freeing the escortee drops the chain-decor "invisible wall" collision - the
-				// SimpleDynel visual-change retail sends at this moment (Hoxxling gameplay idx 2053). Beach-scene only.
-				if (character.MapId == Map.TortageBeachId)
-					await _questHandler.DropBeachWall(client);
+				// After-quest world effects now that the escort is active - e.g. the beach chain-wall collision drops
+				// (data-driven off WorldObject.EffectQuestId; map-scoped, so it no-ops off the beach). Then clear the
+				// escortee's captive struggle pose so she stands/walks as she follows.
+				await _outbound.ApplyQuestWorldEffects(client);
+				await _questHandler.ClearCasildaCaptivePose(client);
 			}
 
 			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).", quest.QuestId, character.Name, nextQuestId, nextGoal?.GoalType,
