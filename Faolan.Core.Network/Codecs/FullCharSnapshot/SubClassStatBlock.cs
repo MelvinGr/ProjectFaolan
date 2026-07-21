@@ -62,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.Unknown26, 0x0), (CharacterStatId.Unknown27, 0x0), (CharacterStatId.Unknown28, 0x0), (CharacterStatId.Unknown29, 0x0), (CharacterStatId.Unknown30, 0x59EA506E),
 			(CharacterStatId.Unknown31, 0x14), (CharacterStatId.Unknown32, 0x0), (CharacterStatId.Unknown33, 0x0), (CharacterStatId.Unknown34, 0x0), (CharacterStatId.Unknown35, 0x0),
 			(CharacterStatId.Unknown36, 0x0), (CharacterStatId.Unknown37, 0x0), (CharacterStatId.Unknown38, 0x0), (CharacterStatId.Unknown39, 0x0), (CharacterStatId.Unknown40, 0x64),
-			(CharacterStatId.Unknown41, 0x64), (CharacterStatId.Unknown42, 0x64), (CharacterStatId.Unknown43, 0x64), (CharacterStatId.Unknown44, 0x0), (CharacterStatId.Unknown45, 0x0),
+			(CharacterStatId.Unknown41, 0x64), (CharacterStatId.AttackRating, 0x64), (CharacterStatId.DefenseRating, 0x64), (CharacterStatId.Unknown44, 0x0), (CharacterStatId.Unknown45, 0x0),
 			(CharacterStatId.Unknown46, 0x0), (CharacterStatId.Unknown47, 0x0), (CharacterStatId.Unknown48, 0x0), (CharacterStatId.Unknown49, 0x0), (CharacterStatId.Unknown50, 0x0),
 			(CharacterStatId.Unknown51, 0x0), (CharacterStatId.Unknown52, 0x0), (CharacterStatId.Unknown53, 0x0), (CharacterStatId.Unknown54, 0x0), (CharacterStatId.Unknown55, 0x0),
 			(CharacterStatId.Unknown56, 0x0), (CharacterStatId.CaptureSkullLose, 0x0), (CharacterStatId.Unknown57, 0x0), (CharacterStatId.CaptureSkullWin, 0x0), (CharacterStatId.Unknown58, 0x0),

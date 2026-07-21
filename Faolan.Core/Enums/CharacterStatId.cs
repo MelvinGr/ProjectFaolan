@@ -134,8 +134,11 @@ namespace Faolan.Core.Enums
 		Unknown39 = 0x332,
 		Unknown40 = 0x39D,
 		Unknown41 = 0x39B,
-		Unknown42 = 0x398,
-		Unknown43 = 0x39A,
+		// Two of the level-scaled rating quad (0x398/0x39A/0x39B/0x39D) pinned via the client (Ghidra 2026-07-21):
+		// CoreCombatManager::GetAttackRating() reads 0x398, GetDefenseRating() reads 0x39A. The other two
+		// (Unknown40/41 = 0x39D/0x39B) are the quad's remaining members (_rating/_effect or melee/ranged - Unknown).
+		AttackRating = 0x398,
+		DefenseRating = 0x39A,
 		Unknown44 = 0x07F,
 		Unknown45 = 0x05B,
 		Unknown46 = 0x03C,
