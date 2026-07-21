@@ -134,31 +134,33 @@ namespace Faolan.GameServer.Combat
 			return Math.Max(1, (int)Math.Round(mitigated, MidpointRounding.AwayFromZero));
 		}
 
-		// Provisional critical-hit tuning (#399 - consumes the decoded Hit Rating stat 0x136). A crit multiplies the hit
-		// and rides the wire as DamageResult type 3 (2 = normal, 3 = crit/big hit - capture-derived, CombatEffectBuilder).
-		// The CHANCE curve + the ×1.5 magnitude are provisional (the real crit rate/damage is server-GDB); tune in-client.
-		public const int CritDamageMultiplierPercent = 150; // a crit hits for 1.5x
-		public const int BaseCritChancePercent = 5; // everyone crits sometimes, even with no Hit Rating gear
+		// Critical-hit tuning (#399), driven by the decoded crit stats: Critical Rating (0x138) = chance, Critical
+		// Damage Rating (0x2C7) = magnitude. A crit multiplies the hit and rides the wire as DamageResult type 3
+		// (2 = normal, 3 = crit/big hit - capture-derived, CombatEffectBuilder). The CHANCE/MAGNITUDE CURVES are still
+		// provisional (the real crit formula is server-GDB) but now use the right stats; tune in-client.
+		public const int BaseCritDamagePercent = 150; // a crit with no Critical Damage Rating hits for 1.5x
+		public const int BaseCritChancePercent = 5; // everyone crits sometimes, even with no Critical Rating gear
 		public const int MaxCritChancePercent = 75;
 
-		// Crit chance from the attacker's aggregated Hit Rating: base + rating/20 (a full set of Hit-Rating gear ~ a few
-		// hundred rating -> a meaningful bump), capped. Provisional scaling.
-		public static int CritChancePercent(uint hitRating)
+		// Crit chance from the attacker's aggregated Critical Rating: base + rating/10 (geared Critical Rating ~ 30-75
+		// -> a meaningful bump), capped. Provisional scaling.
+		public static int CritChancePercent(uint criticalRating)
 		{
-			return Math.Min(MaxCritChancePercent, BaseCritChancePercent + (int)(hitRating / 20));
+			return Math.Min(MaxCritChancePercent, BaseCritChancePercent + (int)(criticalRating / 10));
 		}
 
-		// Whether a swing crits, given the attacker's Hit Rating and a 0..99 roll (the caller supplies the roll so this
-		// stays pure/testable; CombatService rolls with Random.Shared).
-		public static bool IsCriticalHit(uint hitRating, int rollPercent)
+		// Whether a swing crits, given the attacker's Critical Rating and a 0..99 roll (the caller supplies the roll so
+		// this stays pure/testable; CombatService rolls with Random.Shared).
+		public static bool IsCriticalHit(uint criticalRating, int rollPercent)
 		{
-			return rollPercent < CritChancePercent(hitRating);
+			return rollPercent < CritChancePercent(criticalRating);
 		}
 
-		// The critical-hit damage (the normal hit scaled by the crit multiplier), floored at 1.
-		public static int ApplyCritDamage(int damage)
+		// The critical-hit damage: the normal hit scaled by (base 1.5x + the attacker's Critical Damage Rating, each
+		// point ~ +1%). So more Critical Damage Rating -> harder crits. Floored at 1.
+		public static int ApplyCritDamage(int damage, uint criticalDamageRating)
 		{
-			return Math.Max(1, damage * CritDamageMultiplierPercent / 100);
+			return Math.Max(1, damage * (BaseCritDamagePercent + (int)criticalDamageRating) / 100);
 		}
 
 		// Provisional mana cost for a cast. Per-spell costs aren't decoded from captures yet (like damage), so this

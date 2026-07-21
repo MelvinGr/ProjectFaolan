@@ -250,9 +250,14 @@ namespace Faolan.GameServer.World
 		// mitigate incoming physical damage (CombatResolver.ApplyPhysicalMitigation). 0 for NPCs and unarmored players.
 		public uint ArmorRating { get; set; }
 
-		// The player's aggregated Hit Rating from worn gear (#399), summed at world entry; drives the crit chance of
-		// their melee swings (CombatResolver.CritChancePercent). 0 for NPCs and players with no Hit-Rating gear.
+		// The player's aggregated Hit Rating from worn gear (#399). Hit Rating governs HIT chance (miss avoidance),
+		// which isn't modelled yet, so it is currently unused. 0 for NPCs / no gear.
 		public uint HitRating { get; set; }
+
+		// Aggregated crit stats from worn gear (#399): Critical Rating drives the melee crit CHANCE, Critical Damage
+		// Rating the crit MAGNITUDE (CombatResolver). 0 for NPCs / no gear.
+		public uint CriticalRating { get; set; }
+		public uint CriticalDamageRating { get; set; }
 
 		// The player's aggregated Magic Damage rating from worn gear (#399), summed at world entry; added flat to the
 		// damage of spells they cast (CombatResolver.ResolveSpellDamage). 0 for NPCs and players with no such gear.

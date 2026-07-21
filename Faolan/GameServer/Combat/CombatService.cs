@@ -214,11 +214,12 @@ namespace Faolan.GameServer.Combat
 			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
 			// Roll between the weapon's min and max for per-swing variance (#395).
 			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101));
-			// #399: roll a critical hit off the player's aggregated Hit Rating - a crit scales the damage and rides the
-			// wire as DamageResult type 3 (the client renders it larger).
-			var crit = CombatResolver.IsCriticalHit(_sim.PlayerWorldEntity(client)?.HitRating ?? 0, Random.Shared.Next(100));
+			// #399: roll a critical hit off the player's Critical Rating; a crit scales the damage by the base 1.5x plus
+			// their Critical Damage Rating, and rides the wire as DamageResult type 3 (the client renders it larger).
+			var attacker = _sim.PlayerWorldEntity(client);
+			var crit = CombatResolver.IsCriticalHit(attacker?.CriticalRating ?? 0, Random.Shared.Next(100));
 			if (crit)
-				damage = (uint)CombatResolver.ApplyCritDamage((int)damage);
+				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attacker?.CriticalDamageRating ?? 0);
 			var hitType = crit
 				? 3u
 				: 2u;

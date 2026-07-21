@@ -73,6 +73,24 @@ namespace Faolan.Core.Enums
 		NaturalStaminaRegen = 0x0385,
 		ImmunityRating = 0x01EA,
 
+		// More region ratings named from tooltip screenshots (2026-07-21), matched by value across several items:
+		//   Critical Rating 0x138 (crit CHANCE): Skirmisher 75, Helm 45. Critical Damage Rating 0x2C7 (crit MAGNITUDE):
+		//   Skirmisher 95, Poderes 50. Protection 0x1C3 (magical mitigation, the armor-fn sibling): Helm 184->185.
+		//   Hate Decrease 0x1E8 / Hate Increase 0x1EB. Magic Damage (Holy) 0x36E x100: Poderes 2400->24.
+		//   The PvP-* ratings only apply in PvP (named, not consumed): PvP Combat 0xE1, PvP Magic Dmg 0xE2 x100,
+		//   PvP Hit 0x137, PvP Armor 0x1C6, PvP Protection 0x1CA.
+		CriticalRating = 0x0138,
+		CriticalDamageRating = 0x02C7,
+		Protection = 0x01C3,
+		HateDecreaseRating = 0x01E8,
+		HateIncreaseRating = 0x01EB,
+		MagicDamageHoly = 0x036E,
+		PvpCombatRating = 0x00E1,
+		PvpMagicDamage = 0x00E2,
+		PvpHitRating = 0x0137,
+		PvpArmor = 0x01C6,
+		PvpProtection = 0x01CA,
+
 		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
 		// 0xBF..0x40B in the snapshot; see WorldDespawn) - session/map state, not a real character stat. The snapshot is
 		// built with the live zone's token here.
@@ -191,7 +209,7 @@ namespace Faolan.Core.Enums
 			return statId switch
 			{
 				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax
-					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen => 100,
+					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen or CharacterStatId.PvpMagicDamage or CharacterStatId.MagicDamageHoly => 100,
 
 				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
 

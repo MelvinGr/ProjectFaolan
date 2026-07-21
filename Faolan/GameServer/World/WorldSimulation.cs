@@ -148,8 +148,10 @@ namespace Faolan.GameServer.World
 				Vitals = EntityVitals.FromCharacter(character, gearBonuses),
 				// #401: cache the worn-gear physical armor rating for incoming-damage mitigation (0 when unarmored).
 				ArmorRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0),
-				// #399: cache the worn-gear Hit Rating that drives the player's melee crit chance.
+				// #399: cache the worn-gear Hit Rating (hit chance, not yet consumed) + the crit stats.
 				HitRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0),
+				CriticalRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.CriticalRating) ?? 0),
+				CriticalDamageRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.CriticalDamageRating) ?? 0),
 				// #399: cache the worn-gear Magic Damage added flat to the player's spell hits.
 				MagicDamage = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0),
 				// Cache the worn-gear natural mana/stamina regen added onto the base regen tick.
