@@ -150,8 +150,11 @@ namespace Faolan.GameServer.Combat
 		// ApplySpell VFX is broadcast by the caller.
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
+			var caster = _sim.PlayerWorldEntity(client);
+			if (caster != null)
+				caster.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamage ?? 0);
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamage ?? 0);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
 			await SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId);
 		}
@@ -213,6 +216,8 @@ namespace Faolan.GameServer.Combat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
 			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
 			var attackerEntity = _sim.PlayerWorldEntity(client);
+			if (attackerEntity != null)
+				attackerEntity.LastCombatAt = DateTimeOffset.UtcNow; // attacking -> in combat (halts HP/mana regen)
 			// Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
 			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101), attackerEntity?.CombatRating ?? 0);
 			// #399: roll a critical hit off the player's Critical Rating; a crit scales the damage by the base 1.5x plus

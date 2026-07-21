@@ -58,6 +58,9 @@ namespace Faolan.GameServer.World
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
 
+		// How long after dealing/taking damage a player counts as "in combat" (HP + mana regen halted). Provisional.
+		private const double CombatRegenPause = 6.0;
+
 		// #348: how far OUTSIDE a captured area hull still counts as inside. The hull is built from the positions
 		// retail was seen firing the banner at, so it can only cover ground a captured player walked - it is always
 		// an under-estimate of the real region. The slack buys back some of that; the vertical one is looser because
@@ -328,6 +331,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
+			target.LastCombatAt = DateTimeOffset.UtcNow; // taking damage -> in combat (halts HP/mana regen)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
 			await _output.PushVitals(client!, vitals);
@@ -392,6 +396,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
+			target.LastCombatAt = DateTimeOffset.UtcNow; // taking damage -> in combat (halts HP/mana regen)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
 			await _output.PushVitals(client!, vitals);
@@ -518,12 +523,19 @@ namespace Faolan.GameServer.World
 				if (vitals.IsDead)
 					continue; // corpses don't regen - the respawn timer revives them
 
-				// Base rate-based regen + the worn-gear Natural Mana/Stamina Regen (flat per second, from the item ratings).
+				// HP + mana regen is OUT-OF-COMBAT only (retail's OOCHealth/ManaRegeneration): halt them while the player
+				// has dealt/taken damage within CombatRegenPause. Stamina (the action resource) keeps regenerating.
 				var entity = pair.Value;
+				var inCombat = (DateTimeOffset.UtcNow - entity.LastCombatAt).TotalSeconds < CombatRegenPause;
 				uint beforeH = vitals.Health, beforeM = vitals.Mana, beforeS = vitals.Stamina;
-				var changed = vitals.Regenerate(RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec (provisional)
+				var changed = vitals.Regenerate(
+					inCombat
+						? 0u
+						: RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec out of combat (provisional)
 					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds),
-					RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
+					inCombat
+						? 0u
+						: RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
 				if (changed)
 					// Send retail's compact RegenIIR delta (the client adds it to its bars) instead of a full 0x96B8DC59
 					// push - the per-tick rise per pool, ×100 to the wire vitals scale.

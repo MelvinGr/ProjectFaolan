@@ -278,6 +278,11 @@ namespace Faolan.GameServer.World
 
 		public uint AttackSwingCounter { get; set; }
 
+		// UTC time this player last dealt or took damage. HP/mana regen is OUT-OF-COMBAT only in retail (the client's
+		// OOCHealth/ManaRegeneration stats), so while within WorldSimulation.CombatRegenPause of this the HP+mana regen
+		// is halted; stamina (the action resource) keeps regenerating. MinValue = never in combat (fresh player regens).
+		public System.DateTimeOffset LastCombatAt { get; set; } = System.DateTimeOffset.MinValue;
+
 		// Coins carried by a loot bag (tin, the wallet wire unit), rolled when the bag drops; zeroed once looted
 		// (TryLootCash is granted exactly once per bag).
 		public uint CashTin { get; set; }
