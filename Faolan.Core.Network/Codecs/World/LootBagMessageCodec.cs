@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
@@ -76,7 +77,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// 0x2000 carrier's [u32 len][u32 iirType] prefix). The contents blob is the FINAL length-prefixed message:
 		// its [u32 len] is the unique offset where len + 4 consumes exactly to the end of the record. Returns false
 		// if no such framing exists. `contentsStart` is the offset of the [u32 len] prefix.
-		public static bool TryParse(ReadOnlySpan<byte> record, out ProtoLootBagIIR contents, out int contentsStart)
+		public static bool TryParse(ReadOnlySpan<byte> record, [NotNullWhen(true)] out ProtoLootBagIIR? contents, out int contentsStart)
 		{
 			contents = null;
 			contentsStart = 0;

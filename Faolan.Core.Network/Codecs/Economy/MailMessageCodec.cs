@@ -50,7 +50,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 			if (count > 0)
 			{
-				foreach (var a in attachments)
+				foreach (var a in attachments!)
 				{
 					s.WriteUInt64(a.ItemInstanceId);
 

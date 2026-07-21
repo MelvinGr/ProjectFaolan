@@ -87,13 +87,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The <remoteformat> token text the client resolves by (id, category) against its RDB; `key` is the
 		// pre-escaped deterministic content hash from QuestTextRef.KeyText. Matches WorldQuest.RemoteFormat's
 		// exact spelling (incl. the trailing knubot="0" and two spaces) so it reproduces the captured bytes.
-		public static string RemoteFormat(uint id, uint category, string key)
+		public static string RemoteFormat(uint id, uint category, string? key)
 		{
 			return $"<remoteformat id=\"{id}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
 		}
 
 		// The token-addressed form: `token="Noname"` instead of `id="0"`. See QuestObjectiveRegion.LocalizedToken.
-		public static string RemoteFormatToken(string token, uint category, string key)
+		public static string RemoteFormatToken(string token, uint category, string? key)
 		{
 			return $"<remoteformat token=\"{token}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
 		}

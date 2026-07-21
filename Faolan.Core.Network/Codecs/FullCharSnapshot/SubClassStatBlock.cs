@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
@@ -80,7 +81,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// byte [id][0xFFFFFFFF][type] record; a null/empty list is just the count 0x3F1 (byte-identical to the fresh
 		// skeleton). Everything is CONSTRUCTED directly, so nothing scans the whole list (SetStat would otherwise also
 		// overwrite the trailer's 0x1 word and the known-list ids - the reason this used to be a fragile post-hoc splice).
-		public static SubClassPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet, KnownSpellList known = null)
+		public static SubClassPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet, KnownSpellList? known = null)
 		{
 			var displayedCount = StatList1.Length;
 			var sheetCount = sheet.Count - displayedCount;
@@ -129,7 +130,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			};
 		}
 
-		public static SubClassPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
+		public static SubClassPostAccessBlock CreateFreshBlock(KnownSpellList? known = null)
 		{
 			// The fresh skeleton is just the baseline sheet run through the generic builder - byte-identical to the
 			// captured beach block (proven by BeachTailsFromScratchTests).
@@ -140,7 +141,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// StatList#1 (the 17 displayed stats, count word 0x46F2) then StatList#2's first copy (the 74 sheet stats - the
 		// sheet is written TWICE on the wire, base + current; we keep one). Null when not found. This is the inverse of
 		// the generated block - the importer uses it to store a character's REAL stat sheet from its login snapshot.
-		public static List<(uint Id, uint Value)> ExtractFromSnapshot(ReadOnlySpan<byte> body)
+		public static List<(uint Id, uint Value)>? ExtractFromSnapshot(ReadOnlySpan<byte> body)
 		{
 			for (var i = 0; i + 8 <= body.Length; i++)
 			{
@@ -214,7 +215,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return 0;
 		}
 
-		private static bool TryReadStatList(ReadOnlySpan<byte> body, int off, out List<(uint Id, uint Value)> list, out int end)
+		private static bool TryReadStatList(ReadOnlySpan<byte> body, int off, [NotNullWhen(true)] out List<(uint Id, uint Value)>? list, out int end)
 		{
 			list = null;
 			end = off;

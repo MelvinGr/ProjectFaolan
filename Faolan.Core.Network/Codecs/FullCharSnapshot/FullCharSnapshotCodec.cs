@@ -82,7 +82,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// ---- root accessors ------------------------------------------------------------------------------------
 
-		public static ProtoInventoryGame GetContainer(ProtoFullCharacterIIR root, ContainerKind kind)
+		public static ProtoInventoryGame? GetContainer(ProtoFullCharacterIIR root, ContainerKind kind)
 		{
 			return root.Inventories.FirstOrDefault(c => c.InventoryId.Type == (uint)kind);
 		}

@@ -151,12 +151,12 @@ namespace Faolan.Core.Network.Codecs.World
 					}
 
 					m.TrailerByte = n.TrailerByte!.Value;
-					var mid = UnpackWords(n.WordsData, 3);
+					var mid = UnpackWords(n.WordsData!, 3);
 					m.TrailerWords = [ToBits(n.Speed), mid[0], mid[1], mid[2], ToBits(n.AnchorX), ToBits(n.AnchorY), ToBits(n.AnchorZ)];
 					break;
 
 				case 2:
-					m.Vec7 = UnpackWords(n.WordsData, 7);
+					m.Vec7 = UnpackWords(n.WordsData!, 7);
 					m.RotateTail = (ushort)n.RotateTail!.Value;
 					break;
 
@@ -174,7 +174,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 				case 5:
 					CopyHeaderToTask(n, m);
-					m.Ballistic7 = UnpackWords(n.WordsData, 7);
+					m.Ballistic7 = UnpackWords(n.WordsData!, 7);
 					m.Flag = n.Flag!.Value;
 					break;
 
@@ -182,17 +182,17 @@ namespace Faolan.Core.Network.Codecs.World
 					break;
 
 				case 7:
-					m.Formation6 = UnpackWords(n.WordsData, 6);
+					m.Formation6 = UnpackWords(n.WordsData!, 6);
 					break;
 
 				case 8:
 					m.ApproachType = n.ApproachType!.Value;
 					m.ApproachTarget = n.ApproachTarget!.Value;
-					m.ApproachTail = n.WordsData;
+					m.ApproachTail = n.WordsData!;
 					break;
 
 				case 10:
-					m.Vec7 = UnpackWords(n.WordsData, 7);
+					m.Vec7 = UnpackWords(n.WordsData!, 7);
 					break;
 
 				default:

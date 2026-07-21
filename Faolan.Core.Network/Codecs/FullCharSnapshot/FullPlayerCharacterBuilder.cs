@@ -66,14 +66,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			foreach (var row in (rows ?? []).Where(r => r.Item != null).OrderBy(r => r.Slot))
 			{
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item, row.Item.Hash));
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item!, row.Item!.Hash));
 			}
 
 			return container;
 		}
 
 		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Hash)> equipped, (Item Item, uint Hash)? bagFirst,
-			IReadOnlyCollection<CharacterInventory> inventoryRows = null)
+			IReadOnlyCollection<CharacterInventory>? inventoryRows = null)
 		{
 			// The backpack grows by the bag equipped in the bag slot (slot 3): base 24 + its BagExtraSlots.
 			var backpackSlots = BaseBackpackSlots + (equipped.TryGetValue(BagEquipSlot, out var bagItem)
@@ -108,7 +108,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 					continue;
 
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item, row.Item.Hash));
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item!, row.Item!.Hash));
 				if ((ContainerKind)container.InventoryId.Type == BagKind)
 					bagSlotsTaken.Add(slot);
 			}

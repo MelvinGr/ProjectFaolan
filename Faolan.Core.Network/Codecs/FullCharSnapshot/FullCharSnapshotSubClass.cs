@@ -51,11 +51,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		[JsonIgnore]
 		public byte[] OriginalData { get; private init; } = [];
 
-		public byte[] UnknownAfterAccessWindowTable { get; init; }
+		public byte[] UnknownAfterAccessWindowTable { get; init; } = null!;
 
 		// Everything between the @609 objective region and the access-window table (the quest INDEX + any tail);
 		// still opaque (decoded by tools/capture/decode_snapshot_quests.py).
-		public byte[] UnknownBeforeAccessWindowTable { get; init; }
+		public byte[] UnknownBeforeAccessWindowTable { get; init; } = null!;
 
 		// The COMPLETED-quest journal, grouped by area - the Completed tab's data, sitting directly after the active
 		// journal (#390). Null for tails without one: the beach template holds no completed quests, which is exactly
@@ -64,7 +64,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public int KnownHeaderLength { get; init; }
 
-		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; }
+		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; } = null!;
 
 		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
 		// the recovered FullPlayerCharacterIIR grammar (docs/re/fullplayer-snapshot-reader.md) instead of an opaque
@@ -150,8 +150,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the template .bin is no longer needed.
 		// Single-quest convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
 		// the beach quest. BuildFromScratch([beach], beach) == BuildFromScratch(beach), so byte-identical.
-		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null,
-			IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null)
+		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint>? knownSpellIds = null,
+			IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null)
 		{
 			ArgumentNullException.ThrowIfNull(beachDef);
 			return BuildFromScratch([beachDef], beachDef, character, instance, playfieldToken, knownSpellIds, statSheet);
@@ -163,7 +163,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// character's learned spells - built INTO the stat block's known-list so they persist across relog + place on
 		// the action bar (#74/#71); null/empty leaves the list empty (byte-identical to the captured beach tails).
 		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null,
-			IReadOnlyList<uint> knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null,
+			IReadOnlyList<uint>? knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null,
 			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null, IReadOnlyDictionary<uint, QuestArea>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
@@ -203,7 +203,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				// inconsistent for an imported char (base 0 / MaxExp 100 vs real Exp) - harmless only if the client reads
 				// XP from the live StatIIR rather than this baseline sheet; preserving the captured MaxExp/base is a
 				// candidate fix pending in-client check (the sheet is a baseline skeleton, see CharacterStatId).
-				sheet = [.. statSheet.Select(s => ((uint)s.Id, s.Value))];
+				sheet = [.. statSheet!.Select(s => ((uint)s.Id, s.Value))];
 				SetSheet(sheet, (uint)CharacterStatId.MaxExp, SubClassStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
 				SetSheet(sheet, (uint)CharacterStatId.ExpCurrentLevelBase, SubClassStatBlock.SkeletonValueOf((uint)CharacterStatId.ExpCurrentLevelBase));
 			}
@@ -1064,7 +1064,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public PfAccessWindowChild? Child { get; init; }
 
-		public string InternalName { get; init; }
+		public string InternalName { get; init; } = null!;
 
 		public uint Kind { get; init; }
 
@@ -1121,11 +1121,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public byte DetailUnknown { get; init; }
 
-		public string DisplayName { get; init; }
+		public string DisplayName { get; init; } = null!;
 
-		public string ParentName { get; init; }
+		public string ParentName { get; init; } = null!;
 
-		public string ShortCode { get; init; }
+		public string ShortCode { get; init; } = null!;
 
 		public override string ToString()
 		{

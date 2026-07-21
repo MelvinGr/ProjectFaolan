@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -36,7 +37,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Decodes the pre-IIR scaffold from an FA015807 body. `offset` returns the scaffold's start (the version
 		// byte). Returns false if the body has no CharacterIIR, or the scaffold isn't the fixed count==0 form
 		// (wrong version byte / the walk doesn't land exactly on the embedded CoreCharacter).
-		public static bool TryDecode(byte[] body, out NpcSpawnPreIir scaffold, out int offset)
+		public static bool TryDecode(byte[] body, [NotNullWhen(true)] out NpcSpawnPreIir? scaffold, out int offset)
 		{
 			scaffold = null;
 			offset = 0;

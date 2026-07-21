@@ -25,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Produces the FA015807 player body (the packet[bodyStart..] form: [u32 bodyLen][subop][ack][handle][fieldA]
 		// [transform][preFrame][CharacterIIR][post-IIR]). Returns null when the character has no scaffold rows yet
 		// (the caller falls back to the captured-spawn splice path). `characterIir` is the ProtoCoreCharacterIIR blob.
-		public static byte[] BuildFromScratch(uint handle, ulong playfield, Vector3 position, Quaternion rotation, byte[] characterIir, Character scaffoldCharacter)
+		public static byte[]? BuildFromScratch(uint handle, ulong playfield, Vector3 position, Quaternion rotation, byte[] characterIir, Character scaffoldCharacter)
 		{
 			ArgumentNullException.ThrowIfNull(characterIir);
 

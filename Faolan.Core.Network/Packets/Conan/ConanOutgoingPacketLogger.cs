@@ -11,9 +11,9 @@ namespace Faolan.Core.Network.Packets.Conan
 		private readonly ILogger _logger;
 		private readonly string _channelName;
 		private readonly Type _opcodeEnumType;
-		private readonly Type _subOpcodeEnumType;
+		private readonly Type? _subOpcodeEnumType;
 
-		public ConanOutgoingPacketLogger(ILogger logger, string channelName, Type opcodeEnumType, Type subOpcodeEnumType = null)
+		public ConanOutgoingPacketLogger(ILogger logger, string channelName, Type opcodeEnumType, Type? subOpcodeEnumType = null)
 		{
 			_logger = logger;
 			_channelName = channelName;

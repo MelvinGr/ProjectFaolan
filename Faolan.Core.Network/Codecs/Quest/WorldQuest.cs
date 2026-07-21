@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Faolan.Core.Network.Constants;
 
@@ -338,7 +339,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// Reading sequentially surfaced two regions the fixed-offset version stepped straight over: the [u32 one=1]
 		// [u32 areaId] pair after the marker (offsets 13..21 - areaId is real data this parser DISCARDS; see
 		// BuildQuestLogList, which writes it), and the per-entry 1-based ordinal that precedes each quest id.
-		public static bool TryParseQuestLogList(byte[] body, out uint playerHandle, out uint trackedQuestId, out List<uint> questIds)
+		public static bool TryParseQuestLogList(byte[] body, out uint playerHandle, out uint trackedQuestId, [NotNullWhen(true)] out List<uint>? questIds)
 		{
 			playerHandle = 0;
 			trackedQuestId = 0;

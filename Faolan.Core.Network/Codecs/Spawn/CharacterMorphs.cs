@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Generates the spawn-scaffold morph entries for the body's non-default sliders, indexed from
 		// startIndex, in the retail wire order. A null body (character never touched a slider) yields none -
 		// exactly the captured shape of an unmorphed character.
-		public static List<ScaffoldEntry> BuildEntries(CharacterBody body, uint startIndex)
+		public static List<ScaffoldEntry> BuildEntries(CharacterBody? body, uint startIndex)
 		{
 			var entries = new List<ScaffoldEntry>();
 			if (body == null)

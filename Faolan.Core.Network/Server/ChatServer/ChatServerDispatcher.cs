@@ -36,7 +36,7 @@ namespace Faolan.Core.Network.Server.ChatServer
 			}
 		}
 
-		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint> recipientCharacterIds = null)
+		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
 			if (_provider != null)
 				await _provider.CharacterSay(characterId, message, recipientCharacterIds);

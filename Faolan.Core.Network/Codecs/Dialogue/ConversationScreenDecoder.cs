@@ -33,7 +33,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR
 		];
 
-		public static Columns Decode(byte[] data)
+		public static Columns? Decode(byte[] data)
 		{
 			if (data == null || data.Length < 12)
 				return null;
@@ -114,7 +114,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// DispatchSetDialogueCamera (opcode 0x2015 in the rpcHeader, not an IIR sub). Payload (after the rpcHeader)
 		// = [u32 0xC350][u32 npc][u32 0xC350][u32 player][CameraParams]. We store the GameCharAgent sender instance
 		// (varies per conversation) + the param bytes; the npc/player are re-addressed live at send time.
-		private static Columns DecodeCamera(byte[] data, int headerLen, int start)
+		private static Columns? DecodeCamera(byte[] data, int headerLen, int start)
 		{
 			// opcode is the 16-bit word ending the rpcHeader (at headerLen-2 from the header start @ offset 12).
 			if (10 + headerLen + 2 > data.Length || BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(10 + headerLen, 2)) != SetDialogueCamera)
@@ -163,6 +163,6 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToRow). SenderInstance
 		// is the rpcHeader caller endpoint instance (retail varies it per conversation), stored so the send path
 		// re-frames from columns instead of the raw Data blob; CameraParams is the SetDialogueCamera payload.
-		public sealed record Columns(uint SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string> Screens, uint? SenderInstance = null, byte[] CameraParams = null);
+		public sealed record Columns(uint SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string>? Screens, uint? SenderInstance = null, byte[]? CameraParams = null);
 	}
 }

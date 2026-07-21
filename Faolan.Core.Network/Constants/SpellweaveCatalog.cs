@@ -42,7 +42,7 @@ namespace Faolan.Core.Network.Constants
 			};
 		}
 
-		public static SpellweaveProfile ForClass(Class characterClass)
+		public static SpellweaveProfile? ForClass(Class characterClass)
 		{
 			return Profiles.GetValueOrDefault(characterClass);
 		}

@@ -168,7 +168,7 @@ namespace Faolan.Core.Network
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
 		public uint ConversationTypeId { get; set; }
-		public Account Account { get; set; }
+		public Account Account { get; set; } = null!;
 
 		public bool AwaitingEnterWorld { get; set; }
 		public bool EnergyLoopActive { get; set; }
@@ -187,9 +187,9 @@ namespace Faolan.Core.Network
 		// then reverts after the ~2.6s blend. This gates the assert to fire exactly once per sit.
 		public bool SeatedHoldConfirmed { get; set; }
 		public bool WorldEntered { get; set; }
-		public byte[] ClientConversation { get; set; }
-		public byte[] PendingCastArgs { get; set; }
-		public Character Character { get; set; }
+		public byte[] ClientConversation { get; set; } = null!;
+		public byte[] PendingCastArgs { get; set; } = null!;
+		public Character Character { get; set; } = null!;
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = [];
 		public Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; } = [];
@@ -203,8 +203,8 @@ namespace Faolan.Core.Network
 		public IReadOnlyList<uint>? ClaimSlots { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> WeaveComponents { get; } = [];
-		public string ConversationAnswerPath { get; set; }
-		public string ConversationNpcName { get; set; }
+		public string ConversationAnswerPath { get; set; } = null!;
+		public string ConversationNpcName { get; set; } = null!;
 		public uint ActiveCastToken { get; set; }
 		public uint ConversationAgentInstance { get; set; }
 		public uint ConversationEndedNpcHandle { get; set; }

@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Packets
 			return client.SendAsync(ToArray());
 		}
 
-		public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, T opcode, byte[] headerData = null) where T : struct
+		public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, T opcode, byte[]? headerData = null) where T : struct
 		{
 			WriteUInt32(0); // Write empty length
 			WriteUInt32(0); // write empty crc32
@@ -68,7 +68,7 @@ namespace Faolan.Core.Network.Packets
 		// Typed header: build the sender/receiver ProtoEndpoints (type + instance) instead of hand-rolled byte
 		// arrays. Serializes each endpoint to its [0x0D <type> 0x10 <instance>] bytes and reuses the byte[] framing,
 		// so the output is byte-identical to the literal-array overload (locked by ProtoEndpointGoldenTests).
-		public PacketStream WriteHeader<T>(ProtoEndpoint sender, ProtoEndpoint receiver, T opcode, byte[] headerData = null) where T : struct
+		public PacketStream WriteHeader<T>(ProtoEndpoint sender, ProtoEndpoint receiver, T opcode, byte[]? headerData = null) where T : struct
 		{
 			return WriteHeader(sender.ToProtobuf(), receiver.ToProtobuf(), opcode, headerData);
 		}

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
@@ -27,7 +28,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// and reads the mapId + optional PlayfieldFlags. The single place that knows these offsets, so the importer's
 		// three MapChange call sites (CaptureMapImporter / CaptureCharacterImporter / AreaNameExtractor) stop copying
 		// them. Returns false on a non-MapChange or too-short body.
-		public static bool TryParse(ReadOnlySpan<byte> iirContent, out Parsed parsed)
+		public static bool TryParse(ReadOnlySpan<byte> iirContent, [NotNullWhen(true)] out Parsed? parsed)
 		{
 			parsed = null;
 			if (iirContent.Length < 4 + MapIdBodyOffset + 4)

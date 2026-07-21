@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
@@ -22,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// (WorldObjectBuilderTests). This is how a loot bag is spawned with NO captured world-object row in the world
 		// (the loot system's bag definition is a baked constant - LootBagTemplate). Returns false if the row has no
 		// lifted columns (DisplayName) or no KdTreeTail.
-		public static bool BuildBody(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, out byte[] body)
+		public static bool BuildBody(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, [NotNullWhen(true)] out byte[]? body)
 		{
 			body = null;
 			if (row?.DisplayName == null || row.KdTreeTail == null)
@@ -60,7 +61,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
 		// object body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
 		// Public so the importer can lift the dynel identity columns from the same body the builder consumes.
-		public static byte[] ExtractBody(byte[] data)
+		public static byte[]? ExtractBody(byte[] data)
 		{
 			if (data == null || data.Length < 12)
 				return null;
@@ -100,13 +101,13 @@ namespace Faolan.Core.Network.Codecs.World
 		// Builds a world-object body from the row's TYPED COLUMNS + KdTreeTail (the retired Data blob is no longer read),
 		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
 		// Returns false when the row isn't lifted (no DisplayName / KdTreeTail).
-		public static bool TryBuild(WorldObject row, uint handle, uint playfieldInstance, out byte[] body)
+		public static bool TryBuild(WorldObject row, uint handle, uint playfieldInstance, [NotNullWhen(true)] out byte[]? body)
 		{
 			return BuildBody(row, handle, row?.Position ?? default, row?.Rotation ?? Quaternion.Identity, TypeTagForClass(row?.SubOpcode ?? 0), playfieldInstance, out body);
 		}
 
 		// As TryBuild but with a placeholder playfield token (0) - for diagnostics / callers that re-stamp per recipient.
-		public static bool TryBuild(WorldObject row, uint handle, out byte[] body)
+		public static bool TryBuild(WorldObject row, uint handle, [NotNullWhen(true)] out byte[]? body)
 		{
 			return TryBuild(row, handle, 0u, out body);
 		}

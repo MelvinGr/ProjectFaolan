@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
@@ -63,7 +64,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			}
 		}
 
-		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds)
+		public static KnownSpellList FromSpellIds(IReadOnlyList<uint>? spellIds)
 		{
 			return new KnownSpellList
 			{
@@ -109,7 +110,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// 0xFFFFFFFF slot word together are extremely selective, and Parse then validates EVERY record's slot word, so
 		// a false hit is rejected. Returns the LARGEST valid list (the real spellbook; a snapshot can carry a smaller
 		// unrelated 0xFFFFFFFF-framed list too). False when none is found.
-		public static bool TryExtractFromSnapshot(ReadOnlySpan<byte> body, out KnownSpellList list)
+		public static bool TryExtractFromSnapshot(ReadOnlySpan<byte> body, [NotNullWhen(true)] out KnownSpellList? list)
 		{
 			list = null;
 			for (var i = 0; i + 4 + RecordSize <= body.Length; i++)

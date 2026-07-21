@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
@@ -37,12 +38,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// NPC rather than store something the builder would not reproduce byte-for-byte. The row stores just the slot +
 		// template + level; the quad + hash it validates against belong to the Items row the FK on Template points at
 		// (harvested from this same spawn packet, so they match by construction - verified template-canonical).
-		public static bool TryLift<T>(ProtoCoreCharacterIIR.InventoryEntry entry, out T row) where T : INpcEquipment, new()
+		public static bool TryLift<T>(ProtoCoreCharacterIIR.InventoryEntry entry, [MaybeNullWhen(false)] out T row) where T : INpcEquipment, new()
 		{
-			row = default;
+			row = default!;
 			var item = entry?.Item;
 			var k = item?.Key1;
-			if (k == null || item.Key2 == null || item.Key3 == null)
+			if (k == null || item!.Key2 == null || item.Key3 == null)
 				return false;
 			if (!SameKey(k, item.Key2) || !SameKey(k, item.Key3))
 				return false;
@@ -52,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// Byte-exact gate: the entry must be fully described by (pos, template, level) + the canonical identity
 			// (quad + hash). Rebuild from exactly those and require an exact match, so we never store an entry carrying
 			// fields the FK model can't reproduce (extra ProtoAcgItem fields, an absent level/hash, etc.).
-			if (!BuildEntry(entry.Pos, item.Template1, item.Level, k, item.Hash).ToProtobuf().SequenceEqual(entry.ToProtobuf()))
+			if (!BuildEntry(entry!.Pos, item.Template1, item.Level, k, item.Hash).ToProtobuf().SequenceEqual(entry.ToProtobuf()))
 				return false;
 
 			row = new T

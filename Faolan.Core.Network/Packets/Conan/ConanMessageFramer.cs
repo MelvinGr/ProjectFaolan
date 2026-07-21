@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Packets.Conan
 
 		// The frame currently being filled: [HeaderSize big-endian length][payload], allocated once when the length is
 		// known so a completed packet is emitted with no extra copy. Null while the 4-byte length header is being read.
-		private byte[] _frame;
+		private byte[]? _frame;
 		private int _lengthBytesRead;
 		private int _markerSkipRemaining;
 		private int _payloadBytesRead;

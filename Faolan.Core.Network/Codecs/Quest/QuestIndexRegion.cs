@@ -278,7 +278,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return region;
 		}
 
-		public static List<uint> ParseGoalSteps(string csv)
+		public static List<uint> ParseGoalSteps(string? csv)
 		{
 			return (csv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToList();
 		}

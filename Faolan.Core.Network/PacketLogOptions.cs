@@ -14,7 +14,7 @@ namespace Faolan.Core.Network
 
 		// The " label={ .. } .." suffix appended to a packet's single log line, or "" when bytes are suppressed.
 		// Each (label, data) pair with data is rendered as " <label>({len})={hex}".
-		public static string BytesSuffix(ILogger logger, params (string Label, byte[] Data)[] segments)
+		public static string BytesSuffix(ILogger logger, params (string Label, byte[]? Data)[] segments)
 		{
 			if (!ShouldLogBytes(logger))
 				return "";

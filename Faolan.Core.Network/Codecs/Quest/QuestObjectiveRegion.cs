@@ -116,7 +116,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		// The <localized> text-record spelling (mirrors QuestcRegion.RemoteFormat); the trailing record of a goal is
 		// either a <remoteformat> (cat 51200) or this <localized> form (cat 51000), with the exact trailing " >".
-		public static string Localized(uint id, uint category, string flags, string key)
+		public static string Localized(uint id, uint category, string flags, string? key)
 		{
 			return $"<localized id=\"{id}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >";
 		}
@@ -124,7 +124,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// A text record addresses its string EITHER by numeric id OR by a name token - `token="Noname"` rather than
 		// `id="0"`. Modelling only the id form emitted `id="0"` where the wire carries a token, which is 8 bytes short
 		// and desynced everything after it. Same split as the feedback records in #372.
-		public static string LocalizedToken(string token, uint category, string flags, string key)
+		public static string LocalizedToken(string token, uint category, string flags, string? key)
 		{
 			return $"<localized token=\"{token}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >";
 		}

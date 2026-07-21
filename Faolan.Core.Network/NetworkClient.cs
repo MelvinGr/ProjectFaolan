@@ -14,7 +14,7 @@ namespace Faolan.Core.Network
 	{
 		INetworkClientSession Session { get; }
 
-		string IpAddress { get; }
+		string? IpAddress { get; }
 
 		void Send(byte[] value);
 		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
@@ -88,7 +89,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// NpcTemplate.StatCore (no per-placement overrides - a type has no placement) + worn equipment from NpcTemplate.Equipment.
 		public static ProtoCoreCharacterIIR BuildMessageFromType(NpcTemplate npc)
 		{
-			var core = npc.StatCore;
+			var core = npc.StatCore!;
 			var msg = new ProtoCoreCharacterIIR
 			{
 				Name = npc.Name ?? "",
@@ -115,7 +116,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
 		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
 		// lifted stat core.
-		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
+		public static bool TryBuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, [NotNullWhen(true)] out byte[]? body)
 		{
 			body = null;
 			if (npc?.StatCore?.IirHeader is not { } x)
@@ -147,7 +148,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// NB the dev nameplate LABEL (#363) is NOT baked into the spawn name here: the client draws an NPC's floating
 		// name from its template_id LDB, ignoring the spawn-body Name, so the label is pushed separately as a
 		// SetNameIIR after the spawn (WorldBroadcaster.SendWorldSpawn / CreateEditorRecordBuilder.BuildWorldSetNameIir).
-		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, out byte[] body)
+		public static bool TryBuildLive(NpcSpawn row, uint handle, uint playfieldToken, [NotNullWhen(true)] out byte[]? body)
 		{
 			body = null;
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)

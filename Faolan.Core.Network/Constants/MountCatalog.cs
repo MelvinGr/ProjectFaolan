@@ -52,12 +52,12 @@ namespace Faolan.Core.Network.Constants
 		private static readonly Dictionary<uint, MountDef> ById = BuildById();
 		private static readonly Dictionary<string, MountDef> ByName = BuildByName();
 
-		public static MountDef ForId(uint id)
+		public static MountDef? ForId(uint id)
 		{
 			return ById.GetValueOrDefault(id);
 		}
 
-		public static MountDef ForName(string name)
+		public static MountDef? ForName(string name)
 		{
 			return name != null && ByName.TryGetValue(name.ToLowerInvariant(), out var m)
 				? m

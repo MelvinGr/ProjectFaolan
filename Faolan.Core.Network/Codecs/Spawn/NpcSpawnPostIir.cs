@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -29,7 +30,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Decodes the post-IIR scaffold from an FA015807 body (the bytes after the embedded CoreCharacterIIR,
 		// located via PlayerSpawnReader). Returns false if no CharacterIIR is found or the post-IIR is too short
 		// to hold the header.
-		public static bool TryDecode(byte[] body, out NpcSpawnPostIir scaffold)
+		public static bool TryDecode(byte[] body, [NotNullWhen(true)] out NpcSpawnPostIir? scaffold)
 		{
 			scaffold = null;
 			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))

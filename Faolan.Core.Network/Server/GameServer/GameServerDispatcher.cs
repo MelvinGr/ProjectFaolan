@@ -42,7 +42,7 @@ namespace Faolan.Core.Network.Server.GameServer
 			return disconnected;
 		}
 
-		public CharacterLiveState GetCharacterLiveState(uint characterId)
+		public CharacterLiveState? GetCharacterLiveState(uint characterId)
 		{
 			return _providers.Keys.Select(p => p.GetCharacterLiveState(characterId)).FirstOrDefault(s => s != null);
 		}

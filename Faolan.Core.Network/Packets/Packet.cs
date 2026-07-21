@@ -4,7 +4,7 @@ namespace Faolan.Core.Network.Packets
 	{
 		public readonly byte[] Bytes; // for serializing/testing
 		public bool IsValid { get; protected init; }
-		public FaolanStream Body { get; protected init; }
+		public FaolanStream Body { get; protected init; } = null!;
 
 		public uint Length { get; protected init; }
 		protected PacketStream Stream { get; }

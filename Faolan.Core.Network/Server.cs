@@ -147,12 +147,12 @@ namespace Faolan.Core.Network
 			return Task.CompletedTask;
 		}
 
-		protected INetworkClient ClientForAccount(uint accountId)
+		protected INetworkClient? ClientForAccount(uint accountId)
 		{
 			return NetworkClients.FirstOrDefault(nc => nc.Session?.Account?.Id == accountId);
 		}
 
-		protected INetworkClient ClientForCharacter(uint characterId)
+		protected INetworkClient? ClientForCharacter(uint characterId)
 		{
 			return NetworkClients.FirstOrDefault(nc => nc.Session?.Account?.ClientInstance == characterId || nc.Session?.Character?.Id == characterId);
 		}

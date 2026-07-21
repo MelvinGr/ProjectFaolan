@@ -25,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Reconstructs the SimpleChar record from its own Iir-carrier body (`record` = the bytes after the carrier's
 		// [u32 len][u32 iirType] prefix: [u32 0x0000C350][u32 handle][u32 0] 2C ...), threading `playfieldInstance`.
 		// Returns the input unchanged if it can't be framed/decoded (safety fallback - the verbatim bytes ship).
-		public static byte[] Reconstruct(byte[] record, uint playfieldInstance)
+		public static byte[]? Reconstruct(byte[]? record, uint playfieldInstance)
 		{
 			if (record == null || record.Length < SpawnPacketBuilder.RotWOffset - 8 + 4)
 				return record;

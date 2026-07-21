@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// that type naming that target. Multi-goal quests can have several goals; a trigger fires the one it matches, not
 		// always goal[0]. Returns null if no goal matches (wrong type/target, or an unsourced target). The Sequence order
 		// makes the choice deterministic when two goals share a type+target (rare).
-		public static QuestGoalDefinition MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName)
+		public static QuestGoalDefinition? MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName)
 		{
 			if (goals == null || string.IsNullOrEmpty(targetName))
 				return null;
@@ -36,7 +36,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// "Scavenger Lackey" templates share one name). `name` is a fallback for a goal seeded WITHOUT a matching template
 		// id - either a name-only seed, or a "kill N <group>" goal whose TrailingRefId is a monster-GROUP id (no single
 		// template), where the shared name is the only key that catches every variant. Kill-typed goals only.
-		public static QuestGoalDefinition MatchingKillGoal(IEnumerable<QuestGoalDefinition> goals, uint? templateId, string name)
+		public static QuestGoalDefinition? MatchingKillGoal(IEnumerable<QuestGoalDefinition> goals, uint? templateId, string name)
 		{
 			if (goals == null)
 				return null;
@@ -54,7 +54,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The CollectItem goal for `itemId` (#262): the lowest-Sequence CollectItem goal whose TrailingRefId is that item
 		// (the item a quest-pickup grants, e.g. Shipwrecked V's stone brick 193400). Null if none - the pickup is inert
 		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.
-		public static QuestGoalDefinition MatchingCollectGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
+		public static QuestGoalDefinition? MatchingCollectGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
 		{
 			if (goals == null || itemId == 0)
 				return null;

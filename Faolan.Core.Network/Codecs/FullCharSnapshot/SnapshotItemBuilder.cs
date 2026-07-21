@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Protobuf;
 
@@ -65,7 +66,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// Convenience overload: an item is buildable iff it has an hash (DB column, harvested from captures).
 		// Returns false otherwise so the caller can fall back to the verbatim capture for that item.
-		public static bool TryBuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, out ProtoInventoryGame.InventoryListEntry entry, ulong flags = 1, ulong f7 = 1)
+		public static bool TryBuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, [NotNullWhen(true)] out ProtoInventoryGame.InventoryListEntry? entry, ulong flags = 1, ulong f7 = 1)
 		{
 			entry = null;
 			if (item == null || item.Hash == 0)

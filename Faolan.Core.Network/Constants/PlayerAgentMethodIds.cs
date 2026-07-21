@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Constants
 
 		// The 4-byte big-endian header id for `opcode`, or null if it carries none (the two special-case methods
 		// above, and any opcode not in this interface).
-		public static byte[] HeaderId(ushort opcode)
+		public static byte[]? HeaderId(ushort opcode)
 		{
 			return ById.TryGetValue(opcode, out var id)
 				? [(byte)(id >> 24), (byte)(id >> 16), (byte)(id >> 8), (byte)id]

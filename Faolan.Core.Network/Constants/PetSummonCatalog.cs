@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Constants
 			[0x00127EDD] = new PetSummon(0x00127EDD, "Mutilator", true)
 		};
 
-		public static PetSummon ForSpell(uint spellId)
+		public static PetSummon? ForSpell(uint spellId)
 		{
 			return BySpell.GetValueOrDefault(spellId);
 		}

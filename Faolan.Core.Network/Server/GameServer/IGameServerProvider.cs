@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Server.GameServer
 		///     The live world state of a connected character (position, vitals, buffs), or null when the
 		///     character is not connected to this listener (so a dispatcher can try the next provider).
 		/// </summary>
-		CharacterLiveState GetCharacterLiveState(uint characterId);
+		CharacterLiveState? GetCharacterLiveState(uint characterId);
 
 		/// <summary>Snapshot of clients connected to this listener. Cheap, read-only.</summary>
 		IReadOnlyList<SessionInfo> GetSessions();

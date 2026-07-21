@@ -83,7 +83,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 					if (data?.Key1 == null)
 						continue;
 
-					var stats = item.StatLists.ToDictionary(st => st.Stat, st => st.Value);
+					var stats = item!.StatLists.ToDictionary(st => st.Stat, st => st.Value);
 					entries.Add(new ShopEntry(slot.Pos, data.Template1, stats.GetValueOrDefault(26u, 1u), stats.GetValueOrDefault(356u), data.Level, data.Hash, data.Key1.Key1, data.Key1.Key2,
 						data.Key1.Key3, data.Key1.Key4));
 				}

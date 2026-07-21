@@ -106,7 +106,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// send order (Sequence). Category 2 (face paint, e.g. the always-sent *texscript_183875) is never
 		// emitted in captured spawns and is skipped; unresolvable refs are skipped too. Returns null when
 		// nothing resolves - the caller then falls back to the Dikketest defaults.
-		public static List<ScaffoldEntry> BuildWeightedEntries(IEnumerable<CharacterBodyResource> resources, IReadOnlyDictionary<string, MorphTarget> registry)
+		public static List<ScaffoldEntry>? BuildWeightedEntries(IEnumerable<CharacterBodyResource> resources, IReadOnlyDictionary<string, MorphTarget> registry)
 		{
 			if (resources == null || registry == null)
 				return null;
@@ -128,7 +128,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Seeds a character that has no scaffold rows yet with the fresh-character defaults. Returns true when it
 		// seeded (caller persists). weightedAppearance (from BuildWeightedEntries) replaces the Dikketest
 		// weighted-attribute defaults when the character's own editor choices are resolvable.
-		public static bool EnsureFreshRows(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance = null)
+		public static bool EnsureFreshRows(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance = null)
 		{
 			if (character.Attributes is { Count: > 0 })
 				return false;
@@ -225,7 +225,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 		}
 
-		public static byte[] FreshPreFrame(Class @class, uint vanityShownMask = 0, IReadOnlyList<uint> feats = null)
+		public static byte[] FreshPreFrame(Class @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
 		{
 			var featCount = feats?.Count ?? 0;
 			var f = new byte[PreFrameHead + 4 * featCount + PreFrameTail];
@@ -244,7 +244,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// 0x3F1 marker and no ids - byte-identical to the old constant-239 fresh frame.
 			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(FeatMarkerOffset, 4), ListFrame.ForCount(featCount));
 			for (var k = 0; k < featCount; k++)
-				BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(PreFrameHead + 4 * k, 4), feats[k]);
+				BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(PreFrameHead + 4 * k, 4), feats![k]);
 
 			var tail = PreFrameHead + 4 * featCount;
 			f[tail + 108] = 0x41; // closer 41 00 00 82 08
@@ -266,7 +266,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The full high-level feat scaffold for a class (harvested from a captured retail char), or null when we have
 		// no high-level capture for that class. Used on level-up to make the class's learned spells castable (the
 		// feat-presence gate; see FullSkillIdsByClass). Ascending ids.
-		public static uint[] FullSkillIdsFor(Class @class)
+		public static uint[]? FullSkillIdsFor(Class @class)
 		{
 			return FullSkillIdsByClass.TryGetValue(@class, out var ids)
 				? ids
@@ -290,7 +290,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// character's progression the way a full EnsureFreshRows would. Returns false when there's no scaffold to
 		// refresh (the caller then seeds a fresh one). For an unedited character it reproduces the same entries it was
 		// seeded with, so it is a no-op in effect.
-		public static bool RefreshAppearance(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance = null)
+		public static bool RefreshAppearance(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance = null)
 		{
 			if (character?.Attributes is not { Count: > 0 })
 				return false;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Feats
@@ -41,7 +42,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 		// Read SEQUENTIALLY: the old fixed offsets ran 0 -> 8 -> 13 -> 18, stepping silently over the 0xC350 type
 		// word, the 0x00 byte before `state`, and the zero word before the list marker. Every field the record
 		// carries is now named.
-		public static bool TryParse(byte[] body, out uint charHandle, out byte state, out List<uint> featIds)
+		public static bool TryParse(byte[] body, out uint charHandle, out byte state, [NotNullWhen(true)] out List<uint>? featIds)
 		{
 			charHandle = 0;
 			state = 0;

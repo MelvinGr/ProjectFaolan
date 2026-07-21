@@ -13,19 +13,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		// The embedded ProtoCoreCharacterIIR bytes (typed round-trip via FromProtobuf/ToProtobufBytes is
 		// byte-identical; see PlayerSpawnGenerationTests).
-		public byte[] CharacterIir { get; set; }
+		public byte[] CharacterIir { get; set; } = null!;
 
 		// The pre-IIR frame between the transform and the CharacterIIR length prefix: a near-constant skeleton
 		// with per-character value islands (228 bytes editor-constant / 239 normal / 339 geared+table). Kept raw;
 		// PlayerSpawnScaffoldRows.FreshPreFrame builds the fresh-character variant.
-		public byte[] PreFrame { get; set; }
+		public byte[] PreFrame { get; set; } = null!;
 
-		public byte[] Quat { get; set; } // #352: columnize (kept raw - typed would lose the exact captured field-set)
-		public byte[] Scale { get; set; } // null when absent
+		public byte[] Quat { get; set; } = null!; // #352: columnize (kept raw - typed would lose the exact captured field-set)
+		public byte[]? Scale { get; set; } // null when absent
 
 		// Transform component payloads (the 0x2C group), kept as raw field payloads: 0x0A vec3 (3 x fixed32),
 		// 0x12 quat (4 x fixed32), optional 0x25 scale (4 bytes), 0x18 playfield varint.
-		public byte[] Vec3 { get; set; } // #352: columnize (kept raw - typed would lose the exact captured field-set)
+		public byte[] Vec3 { get; set; } = null!; // #352: columnize (kept raw - typed would lose the exact captured field-set)
 
 		// Post-IIR stream. Buff/timer records are 60-byte transient state (only on captured chars with active
 		// buffs); the entry table / ID list / end pairs are the per-character skill+feat scaffold.

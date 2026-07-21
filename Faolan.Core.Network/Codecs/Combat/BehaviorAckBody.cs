@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// The echo-ack for air swings: echoes the request with field3 (phase) spliced in + 12 zero bytes (or the tail
 		// override / bare tail for the vendor trade-open ack, padTail=false).
-		public static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null, bool padTail = true)
+		public static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[]? tailOverride = null, bool padTail = true)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
 			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
@@ -48,7 +48,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// Decoupled relay: acks the raw behaviour request for `instance` (was BehaviorAckBody.BuildBehaviorRelayBody
 		// taking the live client). Null when the payload is too short. The phase is the request's own mode (or 1).
-		public static byte[] BuildBehaviorRelayBody(uint instance, byte[] rawPayload, uint mode)
+		public static byte[]? BuildBehaviorRelayBody(uint instance, byte[] rawPayload, uint mode)
 		{
 			if (rawPayload.Length < 26)
 				return null;

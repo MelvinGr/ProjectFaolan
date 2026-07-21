@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
@@ -147,7 +148,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// Parses the typed ProtoSimpleDynelIIR out of a SimpleDynel IIR record body. `consumed` is the number of bytes
 		// the message occupies (the 4-byte length prefix + the protobuf), so the caller knows where the kd-tree tail
 		// begins. Returns false if the record can't be framed.
-		public static bool TryParse(ReadOnlySpan<byte> record, out ProtoSimpleDynelIIR message, out int messageStart, out int consumed)
+		public static bool TryParse(ReadOnlySpan<byte> record, [NotNullWhen(true)] out ProtoSimpleDynelIIR? message, out int messageStart, out int consumed)
 		{
 			message = null;
 			messageStart = 0;
@@ -170,7 +171,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// keeping the header + transform + kd-tree tail. Byte-identical to the original when the columns match the
 		// captured message (proven for every captured field-shape). Returns false (and leaves `result` null) if the
 		// body can't be framed as a dynel or the row has no lifted identity (DisplayName null = not a dynel row).
-		public static bool TryReplaceIdentityFromColumns(ReadOnlySpan<byte> body, WorldObject row, out byte[] result)
+		public static bool TryReplaceIdentityFromColumns(ReadOnlySpan<byte> body, WorldObject row, [NotNullWhen(true)] out byte[]? result)
 		{
 			result = null;
 			if (row?.DisplayName == null || !TryParse(body, out _, out var start, out var consumed))
