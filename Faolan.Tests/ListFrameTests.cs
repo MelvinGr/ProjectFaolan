@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		{
 			// Writing a bare 0 for an empty list is the mistake this constant exists to prevent: the client's readers
 			// assert word % 0x3F1 == 0 and would reject it.
-			Assert.Equal(ListFrame.ForCount(0), ListFrame.Empty);
+			Assert.Equal(ListFrame.Empty, ListFrame.ForCount(0));
 			Assert.Equal(ListFrame.Unit, ListFrame.Empty);
 			Assert.NotEqual(0u, ListFrame.Empty);
 		}
@@ -52,3 +52,4 @@ namespace Faolan.Tests
 		}
 	}
 }
+

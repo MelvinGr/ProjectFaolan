@@ -28,8 +28,8 @@ namespace Faolan.Tests
 				// Arrange: import items from a capture, seed a character + equipment (Wrist + FirstPosBag).
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
-					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(inventoryCapture)]);
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(inventoryCapture, TestContext.Current.CancellationToken)]);
 
 					db.Accounts.Add(new Account
 					{
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 						Id = Map.TortageBeachId,
 						Name = "Tortage Beach"
 					});
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 					db.Characters.Add(new Character
 					{
 						Id = characterId,
@@ -63,29 +63,29 @@ namespace Faolan.Tests
 					db.CharacterEquipment.Add(new CharacterEquipment
 					{
 						CharacterId = characterId,
-						Wrist = await db.Items.FindAsync(3361557u),
-						FirstPosBag = await db.Items.FindAsync(royalSignet)
+						Wrist = await db.Items.FindAsync([3361557u], TestContext.Current.CancellationToken),
+						FirstPosBag = await db.Items.FindAsync([royalSignet], TestContext.Current.CancellationToken)
 					});
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				// Act: replicate PersistEquip - load equipment, resolve item, set slot, clear bag, save.
 				await using (var db = NewContext(dbPath))
 				{
-					var equipment = await db.CharacterEquipment.FirstOrDefaultAsync(e => e.CharacterId == characterId);
-					var item = await db.Items.FirstOrDefaultAsync(i => i.Id == royalSignet);
+					var equipment = await db.CharacterEquipment.FirstOrDefaultAsync(e => e.CharacterId == characterId, TestContext.Current.CancellationToken);
+					var item = await db.Items.FirstOrDefaultAsync(i => i.Id == royalSignet, TestContext.Current.CancellationToken);
 
 					equipment![CharacterEquipmentSlot.LeftRing] = item;
 					if (equipment!.FirstPosBag != null && equipment.FirstPosBag.Id == item!.Id)
 						equipment.FirstPosBag = null;
 
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				// Assert: a fresh context sees RingLeft set and FirstPosBag cleared.
 				await using (var db = NewContext(dbPath))
 				{
-					var equipment = await db.CharacterEquipment.Include(e => e.RingLeft).Include(e => e.FirstPosBag).FirstAsync(e => e.CharacterId == characterId);
+					var equipment = await db.CharacterEquipment.Include(e => e.RingLeft).Include(e => e.FirstPosBag).FirstAsync(e => e.CharacterId == characterId, TestContext.Current.CancellationToken);
 					Assert.NotNull(equipment.RingLeft);
 					Assert.Equal(royalSignet, equipment.RingLeft!.Id);
 					Assert.Null(equipment.FirstPosBag);
@@ -105,3 +105,7 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+
+

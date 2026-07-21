@@ -38,9 +38,9 @@ namespace Faolan.Tests
 				const ContainerKind bag = FullPlayerCharacterBuilder.BagKind; // 104
 
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Accounts.Add(new Account
 					{
 						Id = accountId,
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 						Id = Map.TortageBeachId,
 						Name = "Tortage Beach"
 					});
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				var character = await repo.CreateCharacter(accountId, realmId);
@@ -109,13 +109,13 @@ namespace Faolan.Tests
 				const uint realmId = 1;
 
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
 					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
 					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				var character = await repo.CreateCharacter(accountId, realmId);
@@ -160,8 +160,8 @@ namespace Faolan.Tests
 			try
 			{
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
-					await ctx.Database.EnsureCreatedAsync();
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
 				var t0 = DateTimeOffset.UtcNow;
 				await repo.SaveChatMessage(new ChatMessage
@@ -222,9 +222,9 @@ namespace Faolan.Tests
 				const uint realmId = 1;
 
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Accounts.Add(new Account
 					{
 						Id = accountId,
@@ -244,7 +244,7 @@ namespace Faolan.Tests
 						Id = Map.TortageBeachId,
 						Name = "Tortage Beach"
 					});
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				// CreateCharacter should cascade-insert a default MaxStats row (level-1 baseline).
@@ -279,10 +279,10 @@ namespace Faolan.Tests
 				var (repo, factory) = NewRepo(dbPath);
 
 				// Arrange schema + items (imported from a real capture) + base rows via a one-off context.
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
-					await CaptureItemImporter.ImportAsync(ctx, [await File.ReadAllBytesAsync(inventoryCapture)]);
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					await CaptureItemImporter.ImportAsync(ctx, [await File.ReadAllBytesAsync(inventoryCapture, TestContext.Current.CancellationToken)]);
 					ctx.Accounts.Add(new Account
 					{
 						Id = accountId,
@@ -311,7 +311,7 @@ namespace Faolan.Tests
 						Class = Class.Barbarian,
 						Race = Race.Cimmerian
 					});
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				// 1) No equipment yet.
@@ -363,9 +363,9 @@ namespace Faolan.Tests
 			try
 			{
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Realms.Add(new Realm { Id = 1, Name = "R", IpAddress = "127.0.0.1", Port = 1 }); // #324: RealmId FK
 					// ItemId is FK-restricted to Items.Id (#212), so seed the referenced catalog items first.
 					ctx.Items.Add(new Item
@@ -405,7 +405,7 @@ namespace Faolan.Tests
 						Price = 1,
 						SellerName = "c"
 					}); // other item
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				var listings = await repo.GetTradepostListings(0x7530, 1);
@@ -431,9 +431,9 @@ namespace Faolan.Tests
 			try
 			{
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Accounts.Add(new Account
 					{
 						Id = 1,
@@ -472,7 +472,7 @@ namespace Faolan.Tests
 						Id = 200,
 						Name = "B"
 					});
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				await repo.SetCharacterInventorySlot(5,(ContainerKind)104, 2, 100);
@@ -510,9 +510,9 @@ namespace Faolan.Tests
 				const uint realmId = 1;
 
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Accounts.Add(new Account
 					{
 						Id = accountId,
@@ -532,7 +532,7 @@ namespace Faolan.Tests
 						Id = Map.TortageBeachId,
 						Name = "Tortage Beach"
 					});
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				// Creation seeds the level-1 rogue baseline.
@@ -552,8 +552,8 @@ namespace Faolan.Tests
 				Assert.Equal(expected.Mana, reloaded!.MaxStats!.Mana);
 				Assert.Equal(expected.Health, reloaded.MaxStats.Health);
 
-				await using (var ctx = await factory.CreateDbContextAsync())
-					Assert.Equal(1, await ctx.CharacterMaxStats.CountAsync(s => s.CharacterId == created.Id));
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+					Assert.Equal(1, await ctx.CharacterMaxStats.CountAsync(s => s.CharacterId == created.Id, TestContext.Current.CancellationToken));
 			}
 			finally
 			{
@@ -572,9 +572,9 @@ namespace Faolan.Tests
 				const uint characterId = 35020545;
 
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Accounts.Add(new Account
 					{
 						Id = accountId,
@@ -602,7 +602,7 @@ namespace Faolan.Tests
 						Class = Class.Barbarian,
 						Race = Race.Cimmerian
 					});
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				// Simulate the create-editor: accumulate name + body morph on the detached character, then commit.
@@ -642,9 +642,9 @@ namespace Faolan.Tests
 				const uint realmId = 1;
 
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Accounts.Add(new Account
 					{
 						Id = accountId,
@@ -676,7 +676,7 @@ namespace Faolan.Tests
 						Name = "Test Bind",
 						AlwaysKnown = true
 					}); // Character.BindRespawnPointId FK target
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				var created = await repo.CreateCharacter(accountId, realmId); // seeds a MaxStats nav row
@@ -721,9 +721,9 @@ namespace Faolan.Tests
 			try
 			{
 				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
-					await ctx.Database.EnsureCreatedAsync();
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					ctx.Realms.Add(new Realm { Id = 1, Name = "R", IpAddress = "127.0.0.1", Port = 1 }); // #324: RealmId FK
 					// The listing's ItemId (search key) AND Template (instance, where the key lives) are both FK-restricted
 					// to Items.Id, so seed both referenced catalog items.
@@ -749,7 +749,7 @@ namespace Faolan.Tests
 						Template = 0x3E0A97,
 						ItemLevel = 5
 					});
-					await ctx.SaveChangesAsync();
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
 				// Resolve + remove the listing (the buy).
@@ -832,3 +832,7 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+
+

@@ -11,7 +11,6 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
@@ -221,3 +220,4 @@ namespace Faolan.Tests
 
 	}
 }
+

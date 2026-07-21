@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			{
 				var options = TestDb.Options(dbPath);
 				await using var db = new DatabaseContext(options);
-				await db.Database.EnsureCreatedAsync();
+				await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 				db.Accounts.Add(new Account
 				{
 					Id = 7,
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 					Id = 4000,
 					Name = "Slave Galley"
 				});
-				await db.SaveChangesAsync();
+				await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 				const uint dikketestHandle = 0x01316D2B; // the spawn handle = on-wire instance = the imported char id
 
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 
 				Assert.Equal((1, 1, 0), result);
 
-				var character = await db.Characters.Include(c => c.MaxStats).Include(c => c.Body).Include(c => c.Attributes).Include(c => c.Skills).SingleAsync(c => c.Name == "Dikketest");
+				var character = await db.Characters.Include(c => c.MaxStats).Include(c => c.Body).Include(c => c.Attributes).Include(c => c.Skills).SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
 				Assert.Equal(0x01316D2Bu, character.Id); // the ORIGINAL retail id (the spawn handle)
 				Assert.Equal(7u, character.AccountId);
 				Assert.Equal(Sex.Female, character.Sex); // dikketest: editor ChangeSex 6 -> wire 3 = female
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 				Assert.Equal(18u, (uint)character.Class); // the pre-frame island's low byte @135/136
 				Assert.Equal(4000u, character.MapId);
 				// RealmId is required; the importer find-or-creates the server's realm (none seeded here).
-				Assert.Equal(await db.Realms.OrderBy(r => r.Id).Select(r => r.Id).FirstAsync(), character.RealmId);
+				Assert.Equal(await db.Realms.OrderBy(r => r.Id).Select(r => r.Id).FirstAsync(TestContext.Current.CancellationToken), character.RealmId);
 				Assert.Equal(1142847u, character.Body!.HeadMesh); // the TRUE wire value (editor sent 2285694 = 2x)
 				Assert.Equal(322.5f, character.PositionX); // the Tortage beach intro spawn (ProtoVec3 fields)
 				Assert.Equal(145.3113250732f, character.PositionY, 0.001f);
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 				// Re-run: nothing added, nothing changed.
 				var rerun = await CaptureCharacterImporter.ImportAsync(db, [capture]);
 				Assert.Equal((1, 0, 1), rerun);
-				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest"));
+				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken));
 			}
 			finally
 			{
@@ -135,3 +135,9 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+
+
+
+

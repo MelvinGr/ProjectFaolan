@@ -25,7 +25,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					// Two id-range rows share the name "Smite (Rank 1)" (both must get the level).
 					db.Spells.Add(new Spell
 					{
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 						Name = "Chill",
 						Level = 0
 					}); // base-name only -> NOT matched
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 					var (rows, matched, updated) = await EllathaSpellLevelImporter.ImportAsync(db, tsv);
 					Assert.Equal(4, rows); // 4 data lines (comment skipped)
@@ -100,7 +100,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					db.Spells.Add(new Spell
 					{
 						Id = 1,
@@ -129,7 +129,7 @@ namespace Faolan.Tests
 						Level = 0,
 						Cooldown = 0
 					}); // untouched
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 					var (combos, matched, updated) = await EllathaSpellLevelImporter.ImportCombosAsync(db, tsv);
 					Assert.Equal(2, combos); // Sweep, Slam (deduped by name)
@@ -159,3 +159,6 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+

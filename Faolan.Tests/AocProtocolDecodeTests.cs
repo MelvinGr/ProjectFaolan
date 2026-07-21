@@ -34,7 +34,7 @@ namespace Faolan.Tests
 				return;
 
 			// 1) Pull the real captured Slave Manacles equipped entry bytes (an InventoryGame list entry).
-			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture));
+			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
 			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
@@ -63,9 +63,9 @@ namespace Faolan.Tests
 				Item item;
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
-					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture)]);
-					item = await db.Items.FindAsync(SlaveManaclesId);
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken)]);
+					item = await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken);
 				}
 
 				Assert.NotNull(item);
@@ -90,7 +90,7 @@ namespace Faolan.Tests
 			if (!File.Exists(InventoryCapture))
 				return;
 
-			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture));
+			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
 			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
@@ -121,3 +121,6 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+

@@ -5,7 +5,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Network.Codecs.Spawn;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
@@ -66,3 +65,4 @@ namespace Faolan.Tests
 		}
 	}
 }
+

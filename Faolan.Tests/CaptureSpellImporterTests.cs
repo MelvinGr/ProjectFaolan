@@ -37,7 +37,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					var (seen, inserted) = await CaptureSpellImporter.ImportAsync(db, [packet]);
 					Assert.Equal(1, seen);
 					Assert.Equal(1, inserted);
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					var spell = await db.Spells.FindAsync(4061768u); // 0x3dfa48
+					var spell = await db.Spells.FindAsync([4061768u], TestContext.Current.CancellationToken); // 0x3dfa48
 					Assert.NotNull(spell);
 				}
 			}
@@ -66,7 +66,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					db.Accounts.Add(new Account
 					{
 						Id = 1,
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 					// CharacterSpell.SpellId FKs Spells - the granted spell must be in the catalog (in production the
 					// scrape/cast modules populate it; uncataloged grants are skipped, not seeded).
 					db.Spells.Add(new Spell { Id = 0x4213cd, Name = "" });
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 					// DemoL80 is the grant's target; the other character must NOT receive the spell.
 					db.Characters.Add(new Character
 					{
@@ -109,7 +109,7 @@ namespace Faolan.Tests
 						Class = Class.Barbarian,
 						Race = Race.Cimmerian
 					});
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 					var (characters, inserted) = await CaptureSpellImporter.ImportLearnedSpellsAsync(db, [packet]);
 					Assert.Equal(1, characters);
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					Assert.Equal([0x4213cdu], await db.CharacterSpells.Where(s => s.CharacterId == DemoL80Id).Select(s => s.SpellId).ToListAsync());
+					Assert.Equal([0x4213cdu], await db.CharacterSpells.Where(s => s.CharacterId == DemoL80Id).Select(s => s.SpellId).ToListAsync(TestContext.Current.CancellationToken));
 					Assert.Empty(db.CharacterSpells.Where(s => s.CharacterId == 0xDEAD));
 				}
 
@@ -143,7 +143,7 @@ namespace Faolan.Tests
 			try
 			{
 				await using var db = NewContext(dbPath);
-				await db.Database.EnsureCreatedAsync(); // no characters seeded
+				await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken); // no characters seeded
 				var (characters, inserted) = await CaptureSpellImporter.ImportLearnedSpellsAsync(db, [Convert.FromHexString(LearnSpellHex)]);
 				Assert.Equal(0, characters);
 				Assert.Equal(0, inserted);
@@ -162,3 +162,8 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+
+
+

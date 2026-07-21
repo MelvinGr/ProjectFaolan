@@ -8,10 +8,8 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 using Faolan.Importer.Captures;
-using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Faolan.Importer.Extractors;
-using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Sdk;
 
@@ -318,3 +316,4 @@ namespace Faolan.Tests
 		}
 	}
 }
+

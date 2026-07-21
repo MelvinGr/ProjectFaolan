@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
@@ -108,3 +107,4 @@ namespace Faolan.Tests
 		}
 	}
 }
+

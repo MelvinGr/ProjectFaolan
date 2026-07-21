@@ -10,7 +10,6 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
@@ -58,7 +57,7 @@ namespace Faolan.Tests
 		public async Task CapturedObjectiveRegions_RebuildFromTheDatabase_ByteExact()
 		{
 			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
-			var defs = await db.QuestDefinitions.Include(q => q.Goals).ToDictionaryAsync(q => q.QuestId);
+			var defs = await db.QuestDefinitions.Include(q => q.Goals).ToDictionaryAsync(q => q.QuestId, TestContext.Current.CancellationToken);
 
 			int compared = 0, exact = 0, skipped = 0, lenDiff = 0, sameLenDiff = 0;
 			_ = lenDiff;
@@ -293,9 +292,9 @@ namespace Faolan.Tests
 		public async Task CapturedQuestIndexes_RebuildFromTheDatabase_ByteExact()
 		{
 			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
-			var defs = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId);
-			var areaRows = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId);
-			var catalogs = (await db.QuestDefinitions.Where(q => q.AreaId != 0).ToListAsync())
+			var defs = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId, TestContext.Current.CancellationToken);
+			var areaRows = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId, TestContext.Current.CancellationToken);
+			var catalogs = (await db.QuestDefinitions.Where(q => q.AreaId != 0).ToListAsync(TestContext.Current.CancellationToken))
 				.GroupBy(q => q.AreaId)
 				.ToDictionary(g => g.Key, g => (IReadOnlyList<QuestDefinition>)[.. g.OrderBy(q => q.JournalSequence)]);
 
@@ -387,8 +386,8 @@ namespace Faolan.Tests
 		{
 			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
 
-			var defs = await db.QuestDefinitions.Include(q => q.TextRefs).ToDictionaryAsync(q => q.QuestId);
-			var areas = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId);
+			var defs = await db.QuestDefinitions.Include(q => q.TextRefs).ToDictionaryAsync(q => q.QuestId, TestContext.Current.CancellationToken);
+			var areas = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId, TestContext.Current.CancellationToken);
 			o.WriteLine($"catalog: {defs.Count} quest definitions, {areas.Count} areas");
 
 			int regions = 0, rebuilt = 0, skippedUnknown = 0, mismatched = 0;
@@ -458,3 +457,5 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+

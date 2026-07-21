@@ -12,7 +12,6 @@ using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
@@ -137,3 +136,4 @@ namespace Faolan.Tests
 		}
 	}
 }
+

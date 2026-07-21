@@ -10,5 +10,6 @@
 		<PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
 		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+		<PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
 	</ItemGroup>
 </Project>

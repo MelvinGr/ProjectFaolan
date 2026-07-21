@@ -43,7 +43,7 @@ namespace Faolan.Tests
 		{
 			db.Maps.Add(new Map { Id = 4010, Name = "Tortage Island" });
 			db.NpcTemplates.AddRange(Spawnable(100, "Poacher"), Spawnable(101, "Jungle Ape"), Spawnable(102, "Crocodile"));
-			await db.SaveChangesAsync();
+			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 			// Two captured Jungle Apes inside the Ape2 area's bounds -> unanimous containment resolution.
 			db.NpcSpawns.AddRange(
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 				Area(4010, 1, "Slaver1", "Community", 60, 300, 300, 300, 300),  // shared id 60, no slaver template -> GUARD must block
 				Area(4010, 2, "Ape2", "Race", 31, 0, 0, 10, 10),               // tier2 containment -> Jungle Ape; defines Race 31
 				Area(4010, 3, "Ape5", "Race", 31, 500, 500, 510, 510));        // tier3 id-prop -> Jungle Ape (name agrees)
-			await db.SaveChangesAsync();
+			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 		}
 
 		[Fact]
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 			{
 				await using (var db = new DatabaseContext(TestDb.Options(path)))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					await Seed(db);
 					var stats = await SpawnAreaResolver.ResolveAsync(db);
 					Assert.Equal(1, stats.Name);
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 
 				await using (var db = new DatabaseContext(TestDb.Options(path)))
 				{
-					var byOrd = await db.NpcSpawnAreas.ToDictionaryAsync(a => a.GroupOrdinal);
+					var byOrd = await db.NpcSpawnAreas.ToDictionaryAsync(a => a.GroupOrdinal, TestContext.Current.CancellationToken);
 
 					Assert.Equal(100u, byOrd[0].NpcTemplateId); // Poacher1 -> Poacher
 					Assert.Equal(SpawnResolutionSource.Name, byOrd[0].ResolvedBy);
@@ -109,21 +109,21 @@ namespace Faolan.Tests
 			{
 				await using (var db = new DatabaseContext(TestDb.Options(path)))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					db.Maps.Add(new Map { Id = 4010, Name = "Tortage Island" });
 					db.NpcTemplates.AddRange(Spawnable(100, "Poacher"), Spawnable(200, "Hand Picked"));
 					var a = Area(4010, 0, "Poacher1", "Community", 60);
 					a.NpcTemplateId = 200; // a human said this area is "Hand Picked"
 					a.ResolvedBy = SpawnResolutionSource.Manual;
 					db.NpcSpawnAreas.Add(a);
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 					await SpawnAreaResolver.ResolveAsync(db);
 				}
 
 				await using (var db = new DatabaseContext(TestDb.Options(path)))
 				{
-					var a = await db.NpcSpawnAreas.SingleAsync();
+					var a = await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken);
 					Assert.Equal(200u, a.NpcTemplateId); // NOT overwritten by the name tier's Poacher (100)
 					Assert.Equal(SpawnResolutionSource.Manual, a.ResolvedBy);
 				}
@@ -136,3 +136,8 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+
+
+

@@ -3,7 +3,6 @@ using System.Linq;
 using Faolan.Core.Database;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Faolan.Tests
 {
@@ -46,3 +45,4 @@ namespace Faolan.Tests
 		}
 	}
 }
+

@@ -33,7 +33,7 @@ namespace Faolan.Tests
 			try
 			{
 				await using var db = NewContext(dbPath);
-				await db.Database.EnsureCreatedAsync();
+				await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
 				var (seen, seeded) = await CaptureMountImporter.ImportAsync(db, [packets]);
 
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 
 				// Mounts are now TYPES (#307), not sentinel-map NpcSpawn placements: the creature builds wholly from
 				// columns via TryBuildFromType, so its type carries a lifted stat core (no NpcTemplate.Data blob).
-				var mountTypes = await db.NpcTemplates.Include(t => t.StatCore).ToListAsync();
+				var mountTypes = await db.NpcTemplates.Include(t => t.StatCore).ToListAsync(TestContext.Current.CancellationToken);
 				Assert.Contains(mountTypes, t => string.Equals(t.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && t.StatCore?.IirHeader != null);
 			}
 			finally
@@ -59,3 +59,6 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+

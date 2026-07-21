@@ -27,14 +27,14 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					// A map NOT in the capture is left entirely alone (not in `found`).
 					db.Maps.Add(new Map
 					{
 						Id = 4010,
 						Name = "Tortage Beach"
 					});
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 					var (inserted, reflagged) = await CaptureMapImporter.ImportAsync(db, [packet]);
 					Assert.Equal(1, inserted);
@@ -43,13 +43,13 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					var map = await db.Maps.FindAsync(2040u);
+					var map = await db.Maps.FindAsync([2040u], TestContext.Current.CancellationToken);
 					Assert.NotNull(map);
 					Assert.Equal(string.Empty, map!.Name); // capture-discovered, no name
 					Assert.Equal(0u, map.PlayfieldFlags); // the captured per-area rule word
 
 					// A map absent from the capture was not overwritten.
-					var beach = await db.Maps.FindAsync(4010u);
+					var beach = await db.Maps.FindAsync([4010u], TestContext.Current.CancellationToken);
 					Assert.Equal("Tortage Beach", beach!.Name);
 				}
 			}
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					await db.Database.EnsureCreatedAsync();
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					// Curated row with a STALE/wrong flag word - the mount-rule bug this import fixes (#340).
 					db.Maps.Add(new Map
 					{
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 						Name = "Castle of King Conan",
 						PlayfieldFlags = 7
 					});
-					await db.SaveChangesAsync();
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 					var (inserted, reflagged) = await CaptureMapImporter.ImportAsync(db, [packet]);
 					Assert.Equal(0, inserted); // already present
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					var map = await db.Maps.FindAsync(2040u);
+					var map = await db.Maps.FindAsync([2040u], TestContext.Current.CancellationToken);
 					Assert.Equal(0u, map!.PlayfieldFlags); // refreshed to the captured value
 					Assert.Equal("Castle of King Conan", map.Name); // name curation preserved
 				}
@@ -106,3 +106,8 @@ namespace Faolan.Tests
 		}
 	}
 }
+
+
+
+
+
