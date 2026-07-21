@@ -8,7 +8,7 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 
 | IIR | opcode | reader | grammar | capture check |
 |---|---|---|---|---|
-| **RegenIIR** | `0x28D0AC99` | `FUN_0079dea0` | `[u32][u32][u32]` (obs: `0,0,value`; value tracks HP) | 1045/1045 = 12 B ✓ |
+| **RegenIIR** | `0x28D0AC99` | `FUN_0079dea0` | `[i32 hpDelta][i32 manaDelta][i32 staminaDelta]` — DECODED: the apply method `FUN_0079dd10` ADDS each to a CURRENT vital (health 0x1B, mana 0x1FA, stamina 0x1F8), ×100 wire scale. Retail's per-tick regen channel | 1045/1045 = 12 B ✓ |
 | **LockedToChangedIIR** | `0x6B0AEC58` | `FUN_007a0630` | `[u32 a][u32 b]` (target-lock pair) | 78/78 = 8 B ✓ |
 | **ChainKillIIR** | `0x0EED7068` | `FUN_0079c0b0` | `[u32]` | 30/30 = 4 B ✓ |
 | **FeedbackIIR** | `0xBA1FD222` | `FUN_0079f8e0` | `[u32][u32][u32]` + uses the env byte | 21/21 = 13 B (3×u32 + 1) |
@@ -22,9 +22,11 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 
 ## Notes
 
-- **RegenIIR** is by far the most frequent (1045 instances) — it drives the live regen the server currently
-  fakes (`WorldSimulation` "~5%/sec provisional"). The observed `0,0,value` shape suggests two reserved/id words
-  and one value; the exact HP/mana/stamina split needs correlating the value against the vitals it moves.
+- **RegenIIR** is by far the most frequent (1045 instances) — it IS retail's live regen channel. DECODED
+  (2026-07-22, `FUN_0079dd10`): the three fields are per-tick `[+health][+mana][+stamina]` deltas (×100 wire
+  scale, signed - can drain) that the client ADDS to the current vitals (stats 0x1B/0x1FA/0x1F8). So retail
+  regenerates the bars smoothly with a compact 12-byte delta instead of pushing a full 0x96B8DC59 stat block;
+  `RegenCodec` now models this and the `WorldSimulation` regen can emit it (delta = the per-tick rise).
 - **KnubotStartTradeIIR** is the vendor/shop item list (per-item: name + four u32s = template/price/stock/flags,
   TBD). It's constructible once those four fields are named. (Our shops already open from the captured burst; this
   is the from-scratch path.)

@@ -98,9 +98,9 @@ namespace Faolan.Tests
 			var body = Convert.FromHexString("0000001928d0ac990000c35002165eff00000000000000000000000415");
 			var r = RegenCodec.Parse(body);
 			Assert.Equal(0x02165effu, r.Handle);
-			Assert.Equal(0u, r.FieldA);
-			Assert.Equal(0u, r.FieldB);
-			Assert.Equal(1045u, r.Value);
+			Assert.Equal(0, r.HealthDelta);
+			Assert.Equal(0, r.ManaDelta);
+			Assert.Equal(1045, r.StaminaDelta); // ×100 wire scale = +10.45 stamina (a sprint-stamina refill tick)
 			Assert.Equal(body, r.ToArray());
 		}
 
