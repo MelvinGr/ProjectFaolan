@@ -4,6 +4,7 @@
              EXECUTABLE whose entry point is the Claude Code channel bridge (ChannelBridge.Main - spawned by
              Claude Code over stdio via .mcp.json "faolan-chat"). Exe-to-exe project references are fine. -->
         <OutputType>Exe</OutputType>
+        <Nullable>enable</Nullable>
         <StartupObject>Faolan.Mcp.ChannelBridge</StartupObject>
         <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     </PropertyGroup>

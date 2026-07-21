@@ -35,7 +35,7 @@ namespace Faolan.Mcp
 	{
 		private const string ChannelNotificationMethod = "notifications/claude/channel";
 
-		private static McpClient _gameServer;
+		private static McpClient? _gameServer;
 
 		private static readonly string FaolanMcpUrl = Environment.GetEnvironmentVariable("FAOLAN_MCP_URL") ?? "http://127.0.0.1:7099/mcp";
 
@@ -130,7 +130,7 @@ namespace Faolan.Mcp
 
 		// read_claude_channel returns either a JSON array of messages or
 		// "No messages after sequence N (latest sequence: M)." - normalize both.
-		private static (IReadOnlyList<ChannelMessage> Messages, ulong Latest) ParseChannelRead(string text)
+		private static (IReadOnlyList<ChannelMessage> Messages, ulong Latest) ParseChannelRead(string? text)
 		{
 			if (string.IsNullOrEmpty(text))
 				return ([], 0);
@@ -158,7 +158,7 @@ namespace Faolan.Mcp
 				try
 				{
 					var client = await GameServer(cancellationToken);
-					var read = ParseChannelRead(ResultText(await client.CallToolAsync("read_claude_channel", new Dictionary<string, object>
+					var read = ParseChannelRead(ResultText(await client.CallToolAsync("read_claude_channel", new Dictionary<string, object?>
 					{
 						["afterSequence"] = cursor ?? 0
 					}, cancellationToken: cancellationToken)));
@@ -220,7 +220,7 @@ namespace Faolan.Mcp
 
 		[Description("Reply in-game as \"Claude\": a private whisper to one player (pass whisper_to = the channel event's sender_id) or a broadcast on the Claude channel (omit whisper_to).")]
 		private static async Task<string> Reply([Description("The chat message to send in-game.")] string text,
-			[Description("Character id to whisper privately (the sender_id from the channel event). Omit to broadcast on the channel.")] string whisper_to = null)
+			[Description("Character id to whisper privately (the sender_id from the channel event). Omit to broadcast on the channel.")] string? whisper_to = null)
 		{
 			try
 			{
@@ -234,21 +234,21 @@ namespace Faolan.Mcp
 			}
 		}
 
-		private static string ResultText(CallToolResult result)
+		private static string? ResultText(CallToolResult result)
 		{
 			return result?.Content?.OfType<TextContentBlock>().FirstOrDefault()?.Text;
 		}
 
-		private static async Task<string> SendInGame(string text, string whisperTo)
+		private static async Task<string> SendInGame(string text, string? whisperTo)
 		{
 			var client = await GameServer(CancellationToken.None);
 			var result = uint.TryParse(whisperTo, out var characterId)
-				? await client.CallToolAsync("send_claude_whisper", new Dictionary<string, object>
+				? await client.CallToolAsync("send_claude_whisper", new Dictionary<string, object?>
 				{
 					["characterId"] = characterId,
 					["message"] = text
 				})
-				: await client.CallToolAsync("send_claude_channel_message", new Dictionary<string, object>
+				: await client.CallToolAsync("send_claude_channel_message", new Dictionary<string, object?>
 				{
 					["message"] = text
 				});
@@ -261,18 +261,18 @@ namespace Faolan.Mcp
 			public bool FromClaude { get; set; }
 			public bool ViaWhisper { get; set; }
 			public DateTime TimestampUtc { get; set; }
-			public string Message { get; set; }
-			public string SenderName { get; set; }
+			public string Message { get; set; } = null!;
+			public string SenderName { get; set; } = null!;
 			public ulong Sequence { get; set; }
 		}
 
 		private sealed class ChannelEvent
 		{
 			[JsonPropertyName("meta")]
-			public Dictionary<string, string> Meta { get; set; }
+			public Dictionary<string, string> Meta { get; set; } = null!;
 
 			[JsonPropertyName("content")]
-			public string Content { get; set; }
+			public string Content { get; set; } = null!;
 		}
 	}
 }

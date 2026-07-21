@@ -107,7 +107,7 @@ namespace Faolan.Mcp.Tools
 		 Description(
 			 "Browse auction-house (Tradepost) listings from faolan.db, cheapest first. Filter by itemId (the search/category id rows are filed under) and/or sellerName; both optional. Read-only. Note: a listing's ItemId is the search category and its Template is the actual item delivered.")]
 		public async Task<string> ListTradepostListings([Description("Optional: only listings filed under this itemId (0 = any)")] uint itemId = 0,
-			[Description("Optional: only listings by this exact seller name")] string sellerName = null, [Description("Max results (default 25)")] int limit = 25)
+			[Description("Optional: only listings by this exact seller name")] string? sellerName = null, [Description("Max results (default 25)")] int limit = 25)
 		{
 			var rows = await _db.Query(ctx => ctx.TradepostListings.Where(l => (itemId == 0 || l.ItemId == itemId) && (sellerName == null || l.SellerName == sellerName)).Take(1000).ToListAsync());
 
@@ -159,7 +159,7 @@ namespace Faolan.Mcp.Tools
 				Timestamp2 = now + MailConstants.ExpirySeconds
 			};
 
-			string itemNote = null;
+			string? itemNote = null;
 			if (itemId != 0)
 			{
 				var item = await _db.GetItem(itemId);

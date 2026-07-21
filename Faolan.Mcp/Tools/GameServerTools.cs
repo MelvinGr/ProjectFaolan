@@ -145,7 +145,7 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		private static bool Contains(string haystack, string needle)
+		private static bool Contains(string? haystack, string needle)
 		{
 			return haystack != null && haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
 		}
