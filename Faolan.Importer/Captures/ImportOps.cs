@@ -749,6 +749,13 @@ namespace Faolan.Importer.Captures
 			await SeedGoal(db, 10320, 436, QuestGoalType.TalkToNpc, "Turach");  // IV The Blacksmith - talk Turach (pre-quarry)
 			await SeedGoal(db, 10286, 399, QuestGoalType.TalkToNpc, "Laranga"); // VI The Guard - talk the city guard
 			await SeedGoal(db, 10287, 400, QuestGoalType.TalkToNpc, "Tina");    // VII The Barmaid - talk Tina
+
+			// VIII "Nadini" (10915, granted by Tina): the wiki objective is "Talk to Nadini", but Nadini 806 has NO
+			// conversation imported, so her greeting can't fire the talk trigger (PickConversationScreen returns null).
+			// Her spawn (1026,670 @4022 night city) EXACTLY matches the goal marker, so wire it as ReachArea (reach her)
+			// - the robust stand-in until her dialogue is imported. Chain end (Shipwrecked -> "The Awakening I" is a
+			// separate destiny quest, out of scope; Nadini can't grant it without dialogue).
+			await SeedGoal(db, 10915, 1352, QuestGoalType.ReachArea);
 		}
 
 		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
