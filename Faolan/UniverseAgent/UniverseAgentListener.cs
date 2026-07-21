@@ -34,7 +34,7 @@ namespace Faolan.UniverseAgent
 					var accountName = packet.Body.ReadString();
 					var unk0 = packet.Body.ReadUInt32();
 
-					client.Session.Account = await Database.GetAccount(accountName);
+					client.Session.Account = (await Database.GetAccount(accountName))!;
 					if (client.Session.Account == null)
 					{
 						// Unknown account (e.g. a client still configured for a retail account name we don't have) -
@@ -102,7 +102,7 @@ namespace Faolan.UniverseAgent
 					}
 
 					Logger.LogInformation("UniverseAgent login accepted for user {UserName} ({AccountId})", account.UserName, account.Id.ToHex());
-					await Database.SetAccountLastInfo(account.Id, client.IpAddress);
+					await Database.SetAccountLastInfo(account.Id, client.IpAddress!);
 
 					await SetRegionState(client);
 					await SendPlayerAgentRealm(client);

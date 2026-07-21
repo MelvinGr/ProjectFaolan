@@ -10,9 +10,9 @@ namespace Faolan.GameServer.World
 	public static class RespawnResolver
 	{
 		// The known respawn point closest to `from`, or null if the player knows none on this map.
-		public static RespawnPoint ClosestKnown(Vector3 from, IEnumerable<RespawnPoint> points, ISet<uint> discoveredIds)
+		public static RespawnPoint? ClosestKnown(Vector3 from, IEnumerable<RespawnPoint> points, ISet<uint> discoveredIds)
 		{
-			RespawnPoint best = null;
+			RespawnPoint? best = null;
 			var bestDistance = float.MaxValue;
 			foreach (var point in points)
 			{

@@ -21,7 +21,7 @@ namespace Faolan.GameServer.Dialogue
 		private readonly ILogger _logger;
 
 		// {stock_N} -> captured remoteformat, loaded once from the DB (small, stable server content).
-		private Dictionary<string, byte[]> _phrases;
+		private Dictionary<string, byte[]>? _phrases;
 
 		public StockConversationService(ILogger logger, IDatabaseRepository database)
 		{
@@ -71,7 +71,7 @@ namespace Faolan.GameServer.Dialogue
 		// Returns false if the body is malformed.
 		internal static bool TryParsePlayStockphraseRequest(ReadOnlySpan<byte> body, out string stockKey, out uint threadContext)
 		{
-			stockKey = null;
+			stockKey = null!;
 			threadContext = 0;
 			if (body.Length < 8 + 2 + 4)
 				return false;

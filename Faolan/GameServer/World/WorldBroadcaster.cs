@@ -99,11 +99,11 @@ namespace Faolan.GameServer.World
 
 		// Quest-gated NPC name -> the quest ids that reveal it (#261). Cached once; an NPC in this map is streamed only
 		// to players holding one of its quests active (see WorldEntity.GateQuestIds / IsVisibleTo).
-		private Dictionary<string, uint[]> _questGatedNpcs;
-		private Dictionary<uint, uint> _escortHiddenNpcs;
+		private Dictionary<string, uint[]> _questGatedNpcs = null!;
+		private Dictionary<uint, uint> _escortHiddenNpcs = null!;
 
 		// Quest-giver NPC name -> granted quest id, cached once (small set).
-		private Dictionary<string, uint> _questGivers;
+		private Dictionary<string, uint> _questGivers = null!;
 
 		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs, GM
 		// `.spawnnpc`, and the #363 ambient pool members (not loot-specific despite the range's origin). CRITICAL: the
@@ -232,7 +232,7 @@ namespace Faolan.GameServer.World
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null)
-				player.PendingReachGoals = null;
+				player.PendingReachGoals = null!;
 		}
 
 		// Called after items are taken from a bag (loot-all OR a single drag): confirm the take to the client with
@@ -274,7 +274,7 @@ namespace Faolan.GameServer.World
 		// The SOURCE NPC name of a loot bag (a corpse bag REUSES the dead NPC's WorldEntity + handle, so its Name is the
 		// NPC's, e.g. "Scavenger Tuut") - the match key for a LootFromNpc quest goal (#261), since the quest item itself
 		// is RDB content we don't materialise. Null for a non-bag handle or a bag with no source name (.spawnbag).
-		public string BagSourceName(INetworkClient client, uint bagHandle)
+		public string? BagSourceName(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) && bag.IsLootable)
@@ -749,7 +749,7 @@ namespace Faolan.GameServer.World
 		// once at world entry), so a handle that isn't a live entity may still be one. Despawns it live for nearby
 		// players AND deletes its DB row so it's gone on relog too. Returns the deleted row, or null if the handle isn't
 		// a known world object on the player's map.
-		public async Task<WorldObject> DeleteWorldObjectForPlayer(INetworkClient client, uint handle)
+		public async Task<WorldObject?> DeleteWorldObjectForPlayer(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
@@ -779,7 +779,7 @@ namespace Faolan.GameServer.World
 		// Despawns a non-player entity by handle in the calling player's zone: the decoded n3ToClientQuit removal
 		// to every player in range + drop from the model (the cleanup complement to SpawnNpcForPlayer; also works
 		// on burst NPCs and loot bags). Returns the removed entity, or null when the handle is unknown or a player.
-		public async Task<WorldEntity> DespawnEntityForPlayer(INetworkClient client, uint entityHandle)
+		public async Task<WorldEntity?> DespawnEntityForPlayer(INetworkClient client, uint entityHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(entityHandle, out var entity) || entity.IsPlayer)
@@ -834,7 +834,7 @@ namespace Faolan.GameServer.World
 				? 1u
 				: npcs.Max(n => n.CapturedHandle) + 1u;
 			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
-			string labelSample = null;
+			string? labelSample = null;
 			foreach (var npc in npcs)
 			{
 				// The type identity (name/community) lives on the NpcTemplate type now (#244); a spawn with no type is a phantom
@@ -1163,7 +1163,7 @@ namespace Faolan.GameServer.World
 		// world tick (WorldState) then steps it toward the player and broadcasts a MoveTask each step. Returns the NPC,
 		// or null if the handle isn't a non-player entity in the caller's zone. Used by the .npcfollow GM command and by
 		// the Casilda rescue trigger.
-		public WorldEntity SetNpcFollow(INetworkClient client, uint npcHandle, bool follow)
+		public WorldEntity? SetNpcFollow(INetworkClient client, uint npcHandle, bool follow)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(npcHandle, out var npc) || npc.IsPlayer)
@@ -1183,7 +1183,7 @@ namespace Faolan.GameServer.World
 		// map-load NPC spawns), re-framed + position-patched per recipient by SendWorldSpawn. When killable, the
 		// entity gets vitals/level/hostility from its row exactly like EnsureZoneNpcs, so it joins combat + loot
 		// as a full world citizen. Returns the spawned entity, or null when no spawnable row matches the name.
-		public async Task<WorldEntity> SpawnNpcForPlayer(INetworkClient client, string npcName, bool killable = true)
+		public async Task<WorldEntity?> SpawnNpcForPlayer(INetworkClient client, string npcName, bool killable = true)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
@@ -1199,7 +1199,7 @@ namespace Faolan.GameServer.World
 				return null;
 			}
 
-			EntityVitals vitals = null;
+			EntityVitals? vitals = null;
 			if (killable)
 			{
 				var maxHealth = npc.Health > 0
@@ -1245,7 +1245,7 @@ namespace Faolan.GameServer.World
 		// the FA015807 is assembled from the type's columns (StatCore + Equipment + Morphs) via TryBuildFromType at the
 		// summoner's position, then streamed to nearby viewers. The PetIIR owner-assign + follow are done by the caller
 		// (SummonPetForPlayer). Returns null if the type carries no lifted stat core (not yet imported/lifted).
-		public async Task<WorldEntity> SpawnPetForPlayer(INetworkClient client, NpcTemplate npcType)
+		public async Task<WorldEntity?> SpawnPetForPlayer(INetworkClient client, NpcTemplate npcType)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || npcType?.StatCore?.IirHeader == null)
@@ -1597,7 +1597,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			var quests = await _database.GetCharacterQuests(characterId.Value);
-			entity.ActiveQuestIds.Clear();
+			entity!.ActiveQuestIds.Clear();
 			entity.CompletedQuestIds.Clear();
 			foreach (var quest in quests)
 			{
@@ -1754,7 +1754,7 @@ namespace Faolan.GameServer.World
 		// Builds one member of an ambient pool at `pos` and adds it to the zone (no wire send - the interest stream, or
 		// the maintenance caller, does that). The member roams the pool's points and fades-not-revives on death so the
 		// POOL owns its respawn. Returns the entity, or null if the type won't build.
-		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
+		private WorldEntity? SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
 		{
 			var handle = NextRuntimeHandle();
 			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
@@ -1784,8 +1784,8 @@ namespace Faolan.GameServer.World
 		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
-		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle,
-			string lootSourceName = null, LootContainerTemplateId variant = LootContainerTemplateId.Bag)
+		private async Task<WorldEntity?> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle,
+			string? lootSourceName = null, LootContainerTemplateId variant = LootContainerTemplateId.Bag)
 		{
 			// #363 container variant: default is the generic bag; a boss/raid drop passes a bigger chest (LargeChest, …).
 			var template = GetLootTemplate(variant);
@@ -1813,7 +1813,7 @@ namespace Faolan.GameServer.World
 			bag.InstanceId = instanceId; // the bag lives in the same map COPY as whatever dropped it (#268)
 			bag.CashTin = cashTin;
 			bag.AllowedLooterHandle = allowedLooterHandle;
-			bag.LootSourceName = lootSourceName; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
+			bag.LootSourceName = lootSourceName!; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
 			bag.LootItems.AddRange(loot.Select(l => l.Id)); // exactly the displayed set, same order as the window
 			_sim.World.ZoneFor(mapId, instanceId).Add(bag);
 
@@ -1887,10 +1887,10 @@ namespace Faolan.GameServer.World
 		}
 
 		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
-		private static NpcSpawnArea AreaContaining(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
+		private static NpcSpawnArea? AreaContaining(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
 		{
 			const float pad = 5f;
-			NpcSpawnArea best = null;
+			NpcSpawnArea? best = null;
 			var bestDistSq = float.MaxValue;
 			foreach (var a in areas)
 			{
@@ -1913,9 +1913,9 @@ namespace Faolan.GameServer.World
 		// #363 dev label for a captured spawn's nameplate: LINK-first - the area it's a confirmed MEMBER of
 		// (NpcSpawnAreaId), even if it sits outside the bounds (a hand-linked stray); else the area its POSITION lands in
 		// (so an unlinked NPC still previews which area it's in). Null when neither. See FormatAreaLabel.
-		private static string AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, NpcSpawn npc)
+		private static string? AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, NpcSpawn npc)
 		{
-			NpcSpawnArea area = null;
+			NpcSpawnArea? area = null;
 			if (npc.NpcSpawnAreaId is { } id)
 				area = areas.FirstOrDefault(a => a.Id == id);
 

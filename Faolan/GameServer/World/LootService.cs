@@ -63,7 +63,7 @@ namespace Faolan.GameServer.World
 
 			// Quest chain (#261): looting an NPC's corpse bag completes a LootFromNpc goal targeting it (the scavenger's
 			// key from Tuut's bag). Faithful even though the key item itself is RDB content - the bag's source IS the key.
-			await _questProgression.AdvanceLootGoals(client, sourceNpc);
+			await _questProgression.AdvanceLootGoals(client, sourceNpc!);
 
 			// Confirm the take + (since loot-all empties it) consume/fade the bag.
 			await _broadcaster.AfterLootTake(client, bagHandle);
@@ -100,7 +100,7 @@ namespace Faolan.GameServer.World
 			if (item != null)
 			{
 				await _outbound.GrantItemToBackpack(client, item.Value);
-				await _questProgression.AdvanceLootGoals(client, sourceNpc); // #261 loot-from-NPC goal (the key)
+				await _questProgression.AdvanceLootGoals(client, sourceNpc!); // #261 loot-from-NPC goal (the key)
 			}
 
 			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake

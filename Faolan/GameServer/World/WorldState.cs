@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Threading;
 using Faolan.Core.Database.Tables;
@@ -96,13 +97,13 @@ namespace Faolan.GameServer.World
 
 		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight below (#284). Null = terrain
 		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
-		private readonly TerrainService _terrain;
+		private readonly TerrainService? _terrain;
 		private readonly TickAccumulator _chatter = new(ChatterCheckSeconds);
 		private readonly TickAccumulator _heartbeat = new(HeartbeatIntervalSeconds);
 
 		private uint _nextPlayfieldToken = 0x00A00000;
 
-		public WorldState(TerrainService terrain = null)
+		public WorldState(TerrainService? terrain = null)
 		{
 			_terrain = terrain;
 		}
@@ -149,7 +150,7 @@ namespace Faolan.GameServer.World
 		// the player's EXISTING world entity (null on a fresh login) (#268). Same-map re-entry (respawn/teleport back)
 		// keeps the player's current copy; a fresh entry mints a private copy for a Solo map and joins the shared copy
 		// otherwise. Group is treated as Shared until party routing exists. The result is fed to Place.
-		public uint ResolveEntryInstance(WorldEntity existing, uint mapId, MapInstanceMode mode)
+		public uint ResolveEntryInstance(WorldEntity? existing, uint mapId, MapInstanceMode mode)
 		{
 			if (existing != null && existing.MapId == mapId && existing.InstanceId != DefaultInstance)
 				return existing.InstanceId; // already in a private copy of this same map - stay in it
@@ -285,7 +286,7 @@ namespace Faolan.GameServer.World
 						entity.ArmAttackCooldown(NpcAttackInterval);
 						if (homeDist > NpcMeleeRange)
 						{
-							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null);
+							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null!);
 							continue;
 						}
 
@@ -313,7 +314,7 @@ namespace Faolan.GameServer.World
 							// #363 ambient anti-stacking: an area-managed pool member (SpawnAreaId set) avoids drifting onto a
 							// point another live entity already occupies (within ~2u, matching FreeAmbientPoint), so a pool
 							// spreads across its area instead of piling up. Captured patrols (no SpawnAreaId) keep their route.
-							Func<Vector3, bool> occupied = entity.SpawnAreaId == null
+							Func<Vector3, bool>? occupied = entity.SpawnAreaId == null
 								? null
 								: pt =>
 								{
@@ -382,7 +383,7 @@ namespace Faolan.GameServer.World
 			// Flips an NPC's combat-engaged state and, on the transition, queues the combat-mode effect the broadcaster
 			// turns into the stat-20 weapon draw/sheathe (#218). No-op when already in that state, so it fires once per
 			// engage/disengage.
-			void SetCombat(WorldEntity e, bool inCombat, WorldEntity target = null)
+			void SetCombat(WorldEntity e, bool inCombat, WorldEntity? target = null)
 			{
 				if (e.InCombat == inCombat)
 					return;
@@ -437,7 +438,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// Read-only lookup of the default shared instance; does NOT mint a zone for an untracked map.
-		public bool TryGetZone(uint mapId, out Zone zone)
+		public bool TryGetZone(uint mapId, [MaybeNullWhen(false)] out Zone zone)
 		{
 			return _zones.TryGetValue((mapId, DefaultInstance), out zone);
 		}
@@ -477,9 +478,9 @@ namespace Faolan.GameServer.World
 		}
 
 		// The closest player within `range` of the NPC (its aggro target), or null if none.
-		private WorldEntity NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
+		private WorldEntity? NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
 		{
-			WorldEntity nearest = null;
+			WorldEntity? nearest = null;
 			var nearestDist = float.MaxValue;
 			foreach (var player in zone.PlayersInRange(npc.Position, range))
 			{

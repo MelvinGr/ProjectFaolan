@@ -346,7 +346,7 @@ namespace Faolan.GameServer
 									? "dismount"
 									: "mount", args);
 
-								var self = client.Session.Account.ClientInstance;
+								var self = client.Session.Account!.ClientInstance;
 								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId); // cast begin: bar + animation
 
 								if (dismounting)
@@ -434,7 +434,7 @@ namespace Faolan.GameServer
 								{
 									client.Session.ActiveCastToken++; // a pending Resolve() now sees a mismatched token and aborts
 									var beginArgs = client.Session.PendingCastArgs;
-									client.Session.PendingCastArgs = null;
+									client.Session.PendingCastArgs = null!;
 
 									// Retail answers the cancel with a state=0x0007 abort BCC (NOT an echo of the cancel) - that
 									// is what drops the cast bar, cancels the animation and pops the client's "Interrupted" text
@@ -458,7 +458,7 @@ namespace Faolan.GameServer
 								var spellId = target != 0
 									? target
 									: args.Target?.Type ?? args.BccActionId;
-								var casterHandle = client.Session.Account.ClientInstance;
+								var casterHandle = client.Session.Account!.ClientInstance;
 								var targetHandle = args.Target?.Instance ?? 0;
 
 								// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
@@ -531,7 +531,7 @@ namespace Faolan.GameServer
 									if (client.Session.ActiveCastToken != castToken)
 										return;
 
-									client.Session.PendingCastArgs = null; // cast completed; no abort needed
+									client.Session.PendingCastArgs = null!; // cast completed; no abort needed
 
 									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
 									// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
@@ -811,7 +811,7 @@ namespace Faolan.GameServer
 
 										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
-										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem);
+										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
 										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
@@ -832,7 +832,7 @@ namespace Faolan.GameServer
 
 										// Retail's reply: the behavior ack with null identity + a 0x201C entry
 										// (prefix 0x68, state 0). Capture frames 320-321.
-										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null);
+										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
 										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
@@ -871,7 +871,7 @@ namespace Faolan.GameServer
 						// differs - other-players-visible capture). Limited to the world-visible combat behaviors.
 						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell)
 						{
-							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account.ClientInstance, rawPayload, args.CommandqueueClientId);
+							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
 							if (behaviorRelay != null)
 								await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
 						}
@@ -1046,7 +1046,7 @@ namespace Faolan.GameServer
 					// (the client-instance ack/keepalive stream). With the create flow now using the real
 					// character id, that id is dynamic (not a fixed enum value like the old 0x021662C8), so
 					// it lands here. Treat it as a benign ping: log quietly, don't spam system messages.
-					if ((uint)pbOpcode == client.Session.Account.ClientInstance || (uint)pbOpcode == client.Session.Character?.Id)
+					if ((uint)pbOpcode == client.Session.Account!.ClientInstance || (uint)pbOpcode == client.Session.Character?.Id)
 					{
 						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
 						break;
@@ -1115,13 +1115,13 @@ namespace Faolan.GameServer
 					var accountId = packet.Body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
 					var clientVersion = packet.Body.ReadString();
 
-					client.Session.Account = await Database.GetAccount(accountId);
+					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
 						throw new Exception($"Account not found: {accountId:X}");
 
 					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
 					client.Session.Account.ClientInstance = clientInstance;
-					client.Session.Character = resolvedCharacter;
+					client.Session.Character = resolvedCharacter!;
 					if (resolvedCharacter?.Id != clientInstance)
 					{
 						Logger.LogInformation(
@@ -1144,7 +1144,7 @@ namespace Faolan.GameServer
 					//  2) ENTER-WORLD: after the player customises + names, the world entry is sent (handled
 					//     out of the post-0x205F / ReadyForPlayScreen path), not here.
 					// Existing-character login uses the legacy conversation family + the world entry.
-					var isNewCharacter = client.Session.Character.Name == null;
+					var isNewCharacter = client.Session!.Character.Name == null;
 
 					// Post-creation WORLD connection: the client reconnects with the same (now named) character
 					// instance, but this is the SECOND GameServer connection - the one opened after the 0x2002
@@ -1258,9 +1258,9 @@ namespace Faolan.GameServer
 				{
 					// 0x2002 = GameAgent.ChatVicinity (typed chat, carries GM commands). The GameCharAgent.RequestBindLocation
 					// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
-					LogPacketBodyDebug("GameServer ChatCommand body", packet.Body?.ToArray());
+					LogPacketBodyDebug("GameServer ChatCommand body", packet.Body?.ToArray()!);
 
-					var unk0 = packet.Body.ReadUInt32();
+					var unk0 = packet.Body!.ReadUInt32();
 					var unk1 = packet.Body.ReadUInt32();
 					var unk2 = packet.Body.ReadUInt32();
 					var unk3 = packet.Body.ReadUInt32();
@@ -1569,7 +1569,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
 				{
-					LogPacketBodyDebug("GameServer 0x207B body", packet.Body?.ToArray());
+					LogPacketBodyDebug("GameServer 0x207B body", packet.Body?.ToArray()!);
 
 					//Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
 
@@ -1610,7 +1610,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
 				{
-					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray());
+					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray()!);
 
 					/*var part1 = packet.Data.ReadUInt32();
 					var spawnId = packet.Data.ReadUInt32();

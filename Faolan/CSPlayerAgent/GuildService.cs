@@ -53,12 +53,12 @@ namespace Faolan.CSPlayerAgent
 		private readonly ConcurrentDictionary<INetworkClient, (ProtoEndpoint Sender, ProtoEndpoint Receiver)> _replyEndpoints = [];
 
 		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = [];
-		private readonly Func<uint, INetworkClient> _clientForCharacter;
+		private readonly Func<uint, INetworkClient?> _clientForCharacter;
 		private readonly IDatabaseRepository _database;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 		private readonly ILogger _logger;
 
-		public GuildService(IDatabaseRepository database, ILogger logger, IGameServerDispatcher gameServerDispatcher, Func<uint, INetworkClient> clientForCharacter)
+		public GuildService(IDatabaseRepository database, ILogger logger, IGameServerDispatcher gameServerDispatcher, Func<uint, INetworkClient?> clientForCharacter)
 		{
 			_database = database;
 			_logger = logger;
@@ -68,7 +68,7 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x201D DeclineGuildInvitation: drop the pending invite (logs the guild it was for). Returns the declined
 		// invite's guild name (or null when there was none) so the listener can log it.
-		public string DeclineGuildInvitation(uint characterId)
+		public string? DeclineGuildInvitation(uint characterId)
 		{
 			return _pendingGuildInvites.TryRemove(characterId, out var declined)
 				? declined.GuildName
@@ -309,7 +309,7 @@ namespace Faolan.CSPlayerAgent
 			}
 		}
 
-		private async Task InviteCharacterToGuild(INetworkClient client, Character target, string targetLabel)
+		private async Task InviteCharacterToGuild(INetworkClient client, Character? target, string targetLabel)
 		{
 			var inviter = client.Session.Character;
 			if (inviter?.GuildId is not { } guildId)
@@ -337,8 +337,8 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			_pendingGuildInvites[target.Id] = new PendingGuildInvite(guild.Id, guild.Name, inviter.Name);
-			await SendGuildInvite(targetClient, endpoints.Sender, endpoints.Receiver, guild, target.Id, inviter.Name);
+			_pendingGuildInvites[target.Id] = new PendingGuildInvite(guild.Id, guild.Name, inviter.Name!);
+			await SendGuildInvite(targetClient, endpoints.Sender, endpoints.Receiver, guild, target.Id, inviter.Name!);
 			_logger.LogInformation("Guild invite: {Inviter} invited {Target} to \"{Guild}\".", inviter.Name, target.Name, guild.Name);
 		}
 
@@ -489,7 +489,7 @@ namespace Faolan.CSPlayerAgent
 				.WriteByte(0x03)
 				.WriteUInt32(member.Id)
 				.WriteString(member.Name ?? "")
-				.WriteByte(member.GuildRank)
+				.WriteByte(member.GuildRank!)
 				.WriteByte(online)
 				.WriteUInt32(playfield)
 				.WriteByte((byte)member.Level)

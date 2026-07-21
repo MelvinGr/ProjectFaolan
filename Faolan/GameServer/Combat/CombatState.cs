@@ -28,7 +28,7 @@ namespace Faolan.GameServer.Combat
 			_vitals[handle] = vitals;
 		}
 
-		public bool TryGet(uint handle, out EntityVitals vitals)
+		public bool TryGet(uint handle, out EntityVitals? vitals)
 		{
 			return _vitals.TryGetValue(handle, out vitals);
 		}

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
@@ -101,12 +102,12 @@ namespace Faolan.GameServer.World
 
 		// Server-side terrain (RDB heightmap): ground-height snapping + terrain line-of-sight (#284). Reached by the
 		// broadcaster (loot-bag Y) and the WorldState tick (aggro line-of-sight).
-		public TerrainService Terrain { get; }
+		public TerrainService? Terrain { get; }
 
 		// The live world model + the connected players' authoritative world entities (transform + vitals).
 		public WorldState World { get; }
 
-		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, TerrainService terrain = null)
+		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, TerrainService? terrain = null)
 		{
 			_output = output;
 			_database = database;
@@ -118,7 +119,7 @@ namespace Faolan.GameServer.World
 
 		// The player's live world entity for this connection (authoritative transform + vitals), or null if not in the
 		// world yet.
-		public WorldEntity PlayerWorldEntity(INetworkClient client)
+		public WorldEntity? PlayerWorldEntity(INetworkClient client)
 		{
 			return Players.TryGetValue(client, out var entity)
 				? entity
@@ -135,7 +136,7 @@ namespace Faolan.GameServer.World
 			if (character == null)
 				return;
 
-			var handle = client.Session.Account.ClientInstance;
+			var handle = client.Session!.Account.ClientInstance;
 			// The player's pre-existing entity (null on a fresh login) decides whether this is a re-entry that should
 			// keep its current instance vs. a fresh placement that picks one from the map's mode (#268).
 			Players.TryGetValue(client, out var existing);
@@ -178,15 +179,15 @@ namespace Faolan.GameServer.World
 			await _database.SaveCharacterTransform(character.Id, destination, character.Rotation, character.MapId);
 
 			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
-			await _output.SendReviveTeleport(client, entity.Handle, character.MapId, liveToken);
-			await _output.SendReviveDestination(client, entity.Handle, character.MapId, destination, 1f, 0f);
+			await _output.SendReviveTeleport(client!, entity.Handle, character.MapId, liveToken);
+			await _output.SendReviveDestination(client!, entity.Handle, character.MapId, destination, 1f, 0f);
 			_logger.LogInformation("World: {Player} same-map relocated to {Dest} on map {Map} (token 0x{Token:X}).", character.Name, destination, character.MapId, liveToken);
 		}
 
 		// Removes the player from the world model on disconnect. The caller broadcasts the despawn FIRST (while the
 		// leaver is still in the zone so its viewers resolve), then calls this. Returns false if the player wasn't in
 		// the world.
-		public bool RemovePlayer(INetworkClient client, out WorldEntity entity)
+		public bool RemovePlayer(INetworkClient client, [MaybeNullWhen(false)] out WorldEntity entity)
 		{
 			if (!Players.TryRemove(client, out entity))
 				return false;
@@ -296,7 +297,7 @@ namespace Faolan.GameServer.World
 			if (character == null)
 				return;
 
-			var vitals = target.Vitals ??= EntityVitals.FromCharacter(character);
+			var vitals = target!.Vitals ??= EntityVitals.FromCharacter(character);
 			if (vitals.IsDead)
 				return;
 
@@ -304,15 +305,15 @@ namespace Faolan.GameServer.World
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
 			// The swing ALWAYS plays - .godmode mobs still visibly attack, they just deal no damage.
-			await _output.SendNpcAttackAnimation(client, npc.Handle, (uint)damage, ++npc.AttackSwingCounter);
+			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter);
 
 			if (target.GodMode) // .godmode: the NPC swings and aggros normally, but the hit deals no damage
 				return;
 
 			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
 			vitals.ApplyHealthDelta(-damage);
-			await _output.SendDamageNumber(client, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
-			await _output.PushVitals(client, vitals);
+			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
+			await _output.PushVitals(client!, vitals);
 
 			if (vitals.IsDead)
 				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}.", character.Name, npc.Name);
@@ -329,7 +330,7 @@ namespace Faolan.GameServer.World
 			if (character == null || npc.Spells.Count == 0)
 				return;
 
-			var vitals = target.Vitals ??= EntityVitals.FromCharacter(character);
+			var vitals = target!.Vitals ??= EntityVitals.FromCharacter(character);
 			if (vitals.IsDead)
 				return;
 
@@ -349,7 +350,7 @@ namespace Faolan.GameServer.World
 
 			npc.AttackSwingCounter++;
 			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
-			await _output.SendNpcSpellCast(client, npc.Handle, spell);
+			await _output.SendNpcSpellCast(client!, npc.Handle, spell);
 
 			// Track the NPC's cast as a timed DEBUFF on the player so it counts down and clears its icon at 0, like a
 			// self-buff (#274). The duration is the cast payload's +8 field (centiseconds, see DurationMsFromPayload).
@@ -373,8 +374,8 @@ namespace Faolan.GameServer.World
 
 			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
 			vitals.ApplyHealthDelta(-damage);
-			await _output.SendDamageNumber(client, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
-			await _output.PushVitals(client, vitals);
+			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
+			await _output.PushVitals(client!, vitals);
 
 			if (vitals.IsDead)
 				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}'s spell.", character.Name, npc.Name);
@@ -511,7 +512,7 @@ namespace Faolan.GameServer.World
 		// the same playfield and doesn't reload), then the CharDCMove teleport that actually JUMPS the avatar there
 		// (the IntendedTeleport alone only confirms the playfield - the move is the CharDCMove) (#214). No-op if the
 		// point or entity is missing (revive in place).
-		private async Task RelocateToRespawnPoint(INetworkClient client, WorldEntity entity, Character character, RespawnPoint point)
+		private async Task RelocateToRespawnPoint(INetworkClient client, WorldEntity? entity, Character character, RespawnPoint? point)
 		{
 			if (entity == null || point == null)
 				return;
@@ -671,14 +672,14 @@ namespace Faolan.GameServer.World
 									// Gated by NpcAutoAttackEnabled (the once-feared respawn/world-re-entry death-loop on a
 									// dense zone); the swing now plays the decoded attack-animation ack (see ApplyNpcAttack).
 									if (NpcAutoAttackEnabled)
-										await ApplyNpcAttack(effect.Entity, effect.Target);
+										await ApplyNpcAttack(effect.Entity, effect.Target!);
 									break;
 								}
 
 								case WorldTickEffectType.NpcCast:
 								{
 									if (NpcAutoAttackEnabled)
-										await ApplyNpcCast(effect.Entity, effect.Target);
+										await ApplyNpcCast(effect.Entity, effect.Target!);
 									break;
 								}
 

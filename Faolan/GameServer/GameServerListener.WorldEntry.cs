@@ -62,7 +62,7 @@ namespace Faolan.GameServer
 
 		// Loads the character's CharacterEquipment (creating it and seeding default starter gear if absent), with the
 		// item navs included so they can be built into the snapshot. Beach characters only.
-		private async Task<CharacterEquipment> EnsureBeachStarterEquipment(Character character)
+		private async Task<CharacterEquipment?> EnsureBeachStarterEquipment(Character character)
 		{
 			if (character == null)
 				return null;
@@ -212,7 +212,7 @@ namespace Faolan.GameServer
 		// Loads the character's spawn-scaffold rows, seeding the fresh-character defaults once for characters that
 		// have none (like EnsureBeachStarterEquipment seeds starter gear). Returns null on failure - the spawn
 		// then keeps the captured scaffold frame.
-		private async Task<Character> EnsureSpawnScaffoldRows(Character character)
+		private async Task<Character?> EnsureSpawnScaffoldRows(Character character)
 		{
 			if (character == null)
 				return null;
@@ -224,7 +224,7 @@ namespace Faolan.GameServer
 				// Resolve the character's chosen appearance resources (editor SetMorphValue refs) to the
 				// weighted entry tags via the imported client registry; null (nothing stored / registry not
 				// imported) falls back to the Dikketest defaults inside EnsureFreshRows.
-				List<ScaffoldEntry> weighted = null;
+				List<ScaffoldEntry>? weighted = null;
 				if (scaffoldCharacter.BodyResources is { Count: > 0 })
 				{
 					var registry = await Database.GetMorphTargets(scaffoldCharacter.BodyResources.Select(r => r.Ref).ToArray());
@@ -573,7 +573,7 @@ namespace Faolan.GameServer
 		{
 			if (packet.Body == null || packet.Body.Length < sizeof(uint) * 4)
 			{
-				LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray());
+				LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray()!);
 				return;
 			}
 
@@ -611,11 +611,11 @@ namespace Faolan.GameServer
 			foreach (var row in rows.Where(r => r.Container == FullPlayerCharacterBuilder.BagKind && r.ItemId != null && r.Item is { Hash: 0 }))
 			{
 				var slot = (ulong)row.Slot;
-				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, slot), row.Item, 0,
+				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, slot), row.Item!, 0,
 				[
 					new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(character.Id, FullPlayerCharacterBuilder.BagKind, slot)),
 					new SnapshotItemBuilder.ItemStat(26, row.Count)
-				], row.Item.Level);
+				], row.Item!.Level);
 				await SendAddItem(client, InventoryContainerBackpack, (uint)row.Slot, entry);
 				pushed++;
 			}
@@ -695,7 +695,7 @@ namespace Faolan.GameServer
 			var characterTags = character != null
 				? (await Database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray()
 				: [];
-			var scaffoldCharacter = await EnsureSpawnScaffoldRows(character);
+			var scaffoldCharacter = await EnsureSpawnScaffoldRows(character!);
 			var worldObjectRows = await Database.GetWorldObjects(mapId);
 
 			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
@@ -704,7 +704,7 @@ namespace Faolan.GameServer
 				? []
 				: (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).Select(q => q.QuestId).ToHashSet();
 
-			QuestDefinition beachDef = null;
+			QuestDefinition? beachDef = null;
 			try
 			{
 				beachDef = await Database.GetQuestDefinition(BeachStarterQuestId);
@@ -746,8 +746,8 @@ namespace Faolan.GameServer
 			// login, and empty on create.
 			var isCreateEntry = client.Session.IsCreateWorldSession;
 			var (snapshotQuests, primaryQuest) = isCreateEntry
-				? (new List<QuestDefinition>(), (QuestDefinition)null)
-				: await LoadSnapshotQuests(character);
+				? (new List<QuestDefinition>(), (QuestDefinition?)null)
+				: await LoadSnapshotQuests(character!);
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
 			// action bar (instead of the per-login DispatchLearnSpell band-aid). Loaded after EnsureCharacterLoadout has
 			// seeded a fresh character's class spells.
@@ -777,20 +777,20 @@ namespace Faolan.GameServer
 			// The Completed tab rides the snapshot too (#390); a create-world entry has none.
 			var completedJournal = isCreateEntry
 				? []
-				: await LoadCompletedJournal(character);
+				: await LoadCompletedJournal(character!);
 			// The quest INDEX needs, per active quest, its AREA's 4CC and that area's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
 			var (indexAreas, areaCatalog) = await LoadAreaCatalog(snapshotQuests);
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken, completedJournal, indexAreas,
+			var snapshot = BuildBurstlessSnapshot(client, equipment!, inventoryRows, characterTags, snapshotQuests, primaryQuest!, knownSpellIds, statSheet, playfieldToken, completedJournal, indexAreas,
 				areaCatalog);
 
 			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
 			{
-				BuildMapChange(client, map, playfieldToken)
+				BuildMapChange(client, map!, playfieldToken)
 			};
 			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken, activeQuestIds));
 
-			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, playfieldToken);
+			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment!, scaffoldCharacter!, playfieldToken);
 			if (playerSpawn != null)
 			{
 				toSend.Add(playerSpawn);
@@ -991,7 +991,7 @@ namespace Faolan.GameServer
 		private async Task SendWorldHandoff(INetworkClient client)
 		{
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
-			var address = $"{realm.IpAddress}:{realm.Port}";
+			var address = $"{realm!.IpAddress}:{realm.Port}";
 
 			await new PacketStream()
 				.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchRedirectToServer)
@@ -1003,7 +1003,7 @@ namespace Faolan.GameServer
 		}
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
-		private static byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
+		private static byte[]? BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
 		{
 			var character = client.Session.Character;
 			// The CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258):

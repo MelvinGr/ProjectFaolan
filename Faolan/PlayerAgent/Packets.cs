@@ -43,7 +43,7 @@ namespace Faolan.PlayerAgent
 				aBuffer.WriteUInt32(character.Id);
 				aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // PlayerInstance
 				aBuffer.WriteUInt32(character.Id);
-				aBuffer.WriteString(character.Name);
+				aBuffer.WriteString(character.Name!);
 				aBuffer.WriteUInt32(character.RealmId);
 				aBuffer.WriteUInt32(character.Sex);
 				aBuffer.WriteString((character.LastConnection ?? character.CreationDate).ToString("MM/dd/yyyy HH:mm:ss"));
@@ -56,10 +56,10 @@ namespace Faolan.PlayerAgent
 				aBuffer.WriteUInt32(0x60355308);
 				aBuffer.WriteUInt32(0x00000002);
 				aBuffer.WriteUInt32(character.Race);
-				aBuffer.WriteString(character.Language); // enEN
+				aBuffer.WriteString(character.Language!); // enEN
 				aBuffer.WriteUInt32(0x00000000);
 				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteString(character.AuthChallenge);
+				aBuffer.WriteString(character.AuthChallenge!);
 				aBuffer.WriteUInt32(0x00000000);
 				aBuffer.WriteUInt32(0x00000001);
 			}
@@ -177,7 +177,7 @@ namespace Faolan.PlayerAgent
 			foreach (var character in characters)
 			{
 				buffer.WriteUInt32(character.Id);
-				buffer.WriteString(character.AuthChallenge);
+				buffer.WriteString(character.AuthChallenge!);
 			}
 
 			await buffer.SendAsync(client);

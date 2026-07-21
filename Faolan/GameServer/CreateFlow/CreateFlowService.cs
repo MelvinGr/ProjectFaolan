@@ -224,12 +224,12 @@ namespace Faolan.GameServer.CreateFlow
 					if (commit == NameCommitResult.Committed && client.Session.Character?.Name == valueString)
 					{
 						// Confirm the name (NicknameOk + CharCreationFinished) so the client advances to enter-world.
-						await SendNicknameAccepted(client, valueString);
+						await SendNicknameAccepted(client, valueString!);
 
 						// The character is now named; its NEXT GameServer connection (opened after the 0x2002
 						// enter-world handoff) is the create-world entry and must get the intro/cutscene. Mark it
 						// pending so the world Hello recognises that connection (and not later normal logins).
-						PendingCreateWorldEntry.TryAdd(client.Session.Character.Id, 0);
+						PendingCreateWorldEntry.TryAdd(client.Session.Character!.Id, 0);
 						_logger.LogInformation("Create-editor: character {CharacterId:X8} named '{Name}'; marked pending create-world entry.", client.Session.Character.Id, valueString);
 					}
 					else
@@ -237,7 +237,7 @@ namespace Faolan.GameServer.CreateFlow
 						// Reject the name so the client re-prompts instead of silently stalling (no loading screen).
 						// NicknameTaken = already in use; NicknameInvalid = empty/unsaveable (retail callbacks, see
 						// SendNicknameRejected). Without this the create flow dead-ends on a duplicate name.
-						await SendNicknameRejected(client, valueString, commit == NameCommitResult.Taken);
+						await SendNicknameRejected(client, valueString!, commit == NameCommitResult.Taken);
 					}
 
 					break;
@@ -369,7 +369,7 @@ namespace Faolan.GameServer.CreateFlow
 				.SendAsync(client);
 		}
 
-		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string name)
+		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string? name)
 		{
 			var character = client.Session.Character;
 			if (character == null || string.IsNullOrWhiteSpace(name))
@@ -598,7 +598,7 @@ namespace Faolan.GameServer.CreateFlow
 		// rows 30-65. This stage front-loads MapChange + SpawnObject/Spawn + AccessWindow + SetDayTime
 		// + the first 9x 0xF98E10B3 before the client sends its first 0x205F.
 
-		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository database = null)
+		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository? database = null)
 		{
 			var id = client.Session.Account.ClientInstance;
 			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
@@ -795,7 +795,7 @@ namespace Faolan.GameServer.CreateFlow
 			// "Character..." preview stays on IirId (it carries the live client instance as its handle).
 			Task IirChar(params byte[] verbatim)
 			{
-				return Iir(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, CreateEditorCharBuilder.Reconstruct(verbatim, CreateEditorCharBuilder.EditorPlayfieldInstance));
+				return Iir(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, CreateEditorCharBuilder.Reconstruct(verbatim, CreateEditorCharBuilder.EditorPlayfieldInstance)!);
 			}
 
 			Task IirId(GameServer0X2000Opcodes iir, byte[] prefix, params byte[] suffix)
@@ -1009,7 +1009,7 @@ namespace Faolan.GameServer.CreateFlow
 		}
 
 		// The editor map's scene-prop WorldObjects, keyed by captured handle. Null when no DB is available.
-		private static async Task<Dictionary<uint, WorldObject>> LoadEditorSceneDynels(IDatabaseRepository database)
+		private static async Task<Dictionary<uint, WorldObject>?> LoadEditorSceneDynels(IDatabaseRepository? database)
 		{
 			if (database == null)
 				return null;

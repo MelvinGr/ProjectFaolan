@@ -202,7 +202,7 @@ namespace Faolan.GameServer.Dialogue
 		// variants exist, evaluate each (conditioned-first) against the character's tags + completed quests via the
 		// LuaScriptVm, and serve the first that passes; the unconditional "" variant is the fallback. A condition
 		// script error is treated as "doesn't match" (permissive=false) so a bad gate can't hijack every player.
-		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath, uint clickedTemplateId)
+		private async Task<ConversationNode?> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath, uint clickedTemplateId)
 		{
 			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath, clickedTemplateId);
 			if (variants.Length == 0)
@@ -212,7 +212,7 @@ namespace Faolan.GameServer.Dialogue
 
 			var player = await BuildLuaPlayer(client.Session.Character);
 
-			ConversationNode fallback = null;
+			ConversationNode? fallback = null;
 			foreach (var v in variants)
 			{
 				if (string.IsNullOrEmpty(v.ConditionScript))
@@ -235,7 +235,7 @@ namespace Faolan.GameServer.Dialogue
 		// definition so ServeScreen can deliver the single QuestFullUpdate inline (the retail grant shape - see above).
 		// Returns null when the player already has the quest (re-serving the node must not re-grant) or it has no
 		// definition (state is still persisted; there is just nothing to render).
-		private async Task<QuestDefinition> PrepareQuestGrant(INetworkClient client, ConversationNode node)
+		private async Task<QuestDefinition?> PrepareQuestGrant(INetworkClient client, ConversationNode node)
 		{
 			var character = client.Session?.Character;
 			if (character == null)
@@ -344,7 +344,7 @@ namespace Faolan.GameServer.Dialogue
 				// from the typed screen columns re-addressed to the live player + clicked NPC.
 				var senderInstance = p.SenderInstance ?? DefaultSenderInstance;
 				if (subOp == ConversationScreenDecoder.SetDialogueCamera)
-					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, p.CameraParams);
+					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, p.CameraParams!);
 				else
 					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
 			}
@@ -382,7 +382,7 @@ namespace Faolan.GameServer.Dialogue
 				return;
 			}
 
-			client.Session.ConversationNpcName = node.NpcName;
+			client.Session.ConversationNpcName = node.NpcName!;
 			client.Session.ConversationTypeId = node.TypeId;
 			client.Session.ConversationAnswerPath = node.AnswerPath;
 			client.Session.ConversationNpcHandle = clickedNpcHandle;
@@ -432,8 +432,8 @@ namespace Faolan.GameServer.Dialogue
 			if (client.Session.ConversationNpcHandle != 0)
 				client.Session.ConversationEndedNpcHandle = client.Session.ConversationNpcHandle;
 
-			client.Session.ConversationAnswerPath = null;
-			client.Session.ConversationNpcName = null;
+			client.Session.ConversationAnswerPath = null!;
+			client.Session.ConversationNpcName = null!;
 			client.Session.ConversationTypeId = 0;
 			client.Session.ConversationNpcHandle = 0;
 			client.Session.ConversationAgentInstance = 0;

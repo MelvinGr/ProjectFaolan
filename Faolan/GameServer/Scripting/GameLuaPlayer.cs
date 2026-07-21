@@ -17,7 +17,7 @@ namespace Faolan.GameServer.Scripting
 		public List<int> CastSpells { get; } = [];
 		public List<int> SolvedGoals { get; } = [];
 
-		public GameLuaPlayer(IEnumerable<uint> tags, IEnumerable<uint> completedQuests, IEnumerable<uint> activeQuests = null)
+		public GameLuaPlayer(IEnumerable<uint> tags, IEnumerable<uint> completedQuests, IEnumerable<uint>? activeQuests = null)
 		{
 			_tags = [];
 			foreach (var t in tags)

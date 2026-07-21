@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 
@@ -67,7 +68,7 @@ namespace Faolan.GameServer.World
 			return _entities.TryRemove(handle, out _);
 		}
 
-		public bool TryGet(uint handle, out WorldEntity entity)
+		public bool TryGet(uint handle, [MaybeNullWhen(false)] out WorldEntity entity)
 		{
 			return _entities.TryGetValue(handle, out entity);
 		}

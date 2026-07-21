@@ -199,7 +199,7 @@ namespace Faolan.GameServer
 
 		// Lists maps for `.maps`, optionally filtered to those whose name CONTAINS `search` (case-insensitive) -
 		// e.g. `.maps castle`. A blank search lists all maps.
-		private async Task SendListAllMaps(uint characterId, string search = null)
+		private async Task SendListAllMaps(uint characterId, string? search = null)
 		{
 			var maps = (await Database.GetMaps()).OrderBy(m => m.Name).AsEnumerable();
 			if (!string.IsNullOrWhiteSpace(search))

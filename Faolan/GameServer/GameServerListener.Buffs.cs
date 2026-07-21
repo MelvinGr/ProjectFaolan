@@ -52,7 +52,7 @@ namespace Faolan.GameServer
 		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
 		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
 		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
-		internal async Task<WorldEntity> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
+		internal async Task<WorldEntity?> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
 		{
 			// The RIGHT model (#244/#307): spawn the pet from its creature TYPE (columns: StatCore + Equipment + Morphs), no world
 			// placement. Fall back to the placement path only as a GM-test convenience (`.pet <any world NPC>`), so a
@@ -361,7 +361,7 @@ namespace Faolan.GameServer
 		// `sender` defaults to the login/world grant sender (GameCharAgent 0x58); the create-editor world-prep grant
 		// rides its own conversation (GameCharAgent 0x0C), so it passes that in - the only thing that differs between
 		// the two grant sites (the 81-byte body incl. the TEA key comes wholly from the Ability row either way).
-		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, byte[] sender = null)
+		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, byte[]? sender = null)
 		{
 			return new PacketStream()
 				.WriteHeader(sender ?? LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchAddSpecialAbility)

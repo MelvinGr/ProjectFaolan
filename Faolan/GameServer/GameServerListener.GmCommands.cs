@@ -277,7 +277,7 @@ namespace Faolan.GameServer
 		private async Task HandleGmCommand(INetworkClient client, string commandText)
 		{
 			string command;
-			string arguments = null;
+			string? arguments = null;
 
 			if (!commandText.Contains(' '))
 				command = commandText[1..];
@@ -292,7 +292,7 @@ namespace Faolan.GameServer
 			{
 				try
 				{
-					await _gmCommandsDict[command].Invoke(client, arguments);
+					await _gmCommandsDict[command].Invoke(client, arguments!);
 				}
 				catch (Exception e)
 				{
@@ -714,7 +714,7 @@ namespace Faolan.GameServer
 
 			// .teleport <x> <y> <z>  - three numeric tokens = a position on the CURRENT map (no map change).
 			// Invariant culture so a comma-decimal locale doesn't reject the dotted coordinates.
-			var tokens = arg.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) &&
 			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
 			{
@@ -816,10 +816,10 @@ namespace Faolan.GameServer
 		}
 
 		// The RDB spawn area a position sits in (nearest centroid; bounds padded), or null when outside every area.
-		private static NpcSpawnArea NearestContainingArea(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
+		private static NpcSpawnArea? NearestContainingArea(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
 		{
 			const float pad = 5f;
-			NpcSpawnArea best = null;
+			NpcSpawnArea? best = null;
 			var bestDistSq = float.MaxValue;
 			foreach (var a in areas)
 			{
@@ -838,11 +838,11 @@ namespace Faolan.GameServer
 		}
 
 		// Strips the " [Area]" dev-label suffix (DebugSpawnAreaLabels) from a nameplate so feedback shows the creature.
-		private static string StripAreaLabel(string name)
+		private static string? StripAreaLabel(string? name)
 		{
 			var i = name?.LastIndexOf(" [", StringComparison.Ordinal) ?? -1;
 			return i >= 0
-				? name[..i]
+				? name![..i]
 				: name;
 		}
 

@@ -51,11 +51,11 @@ namespace Faolan.GameServer.Combat
 		// The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
 		// it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
 		// composition pattern prescribes (CLAUDE.md). Null-safe for tests that construct the service without it.
-		private readonly Func<INetworkClient, Ability, Task> _announceAddSpecialAbility;
+		private readonly Func<INetworkClient, Ability, Task>? _announceAddSpecialAbility;
 
 		// The listener's live spell-learn op (DispatchLearnSpell 0x200A), for the level-up spell unlocks (#209). Same
 		// narrow-seam pattern as _announceAddSpecialAbility. Null-safe for tests that construct the service without it.
-		private readonly Func<INetworkClient, uint, Task> _learnSpell;
+		private readonly Func<INetworkClient, uint, Task>? _learnSpell;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
@@ -65,7 +65,7 @@ namespace Faolan.GameServer.Combat
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			Func<INetworkClient, Ability, Task> announceAddSpecialAbility = null, Func<INetworkClient, uint, Task> learnSpell = null)
+			Func<INetworkClient, Ability, Task>? announceAddSpecialAbility = null, Func<INetworkClient, uint, Task>? learnSpell = null)
 		{
 			_sim = sim;
 			_database = database;
@@ -356,7 +356,7 @@ namespace Faolan.GameServer.Combat
 			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
 
 			if (target.IsDead)
-				await OnNpcKilled(client, targetHandle, npcEntity, cause);
+				await OnNpcKilled(client, targetHandle, npcEntity!, cause);
 		}
 
 		// Awards the killer XP for a kill, advancing levels when the XP bar fills (LevelingResolver), and pushes a
@@ -381,7 +381,7 @@ namespace Faolan.GameServer.Combat
 				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
 				character.RegenerateMaxStats();
 				await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
-				await PushLevelUp(killer, character, levelsGained);
+				await PushLevelUp(killer!, character, levelsGained);
 				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
 				return;
 			}
@@ -389,7 +389,7 @@ namespace Faolan.GameServer.Combat
 			await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
 
 			var block = new CharacterStatBlock().Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
-			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
+			await SendStatUpdate(killer!, block, killer!.Session.Account.ClientInstance);
 			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
 		}
 
@@ -530,13 +530,13 @@ namespace Faolan.GameServer.Combat
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
 		// caller can run its death lifecycle), otherwise the per-session vitals (npcEntity null).
-		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity npcEntity)
+		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity? npcEntity)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim.World.ZoneForEntity(player).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
 				return npcEntity.Vitals;
 
-			npcEntity = null;
+			npcEntity = null!;
 			return GetOrAddNpcVitals(client, targetHandle);
 		}
 

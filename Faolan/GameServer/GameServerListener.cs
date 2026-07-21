@@ -138,7 +138,7 @@ namespace Faolan.GameServer
 		// on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
 		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new ConcurrentDictionary<uint, byte>();
 
-		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
+		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict = null!;
 
 		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
 		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
@@ -214,7 +214,7 @@ namespace Faolan.GameServer
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
 		// surfaces instead of being swallowed.
-		private CancellationTokenSource _loopCts;
+		private CancellationTokenSource _loopCts = null!;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
 			IGameServerDispatcher gameServerDispatcher) : base(realm.Port, logger, configuration, database,
@@ -263,7 +263,7 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		public CharacterLiveState GetCharacterLiveState(uint characterId)
+		public CharacterLiveState? GetCharacterLiveState(uint characterId)
 		{
 			var client = ClientForCharacter(characterId);
 			var entity = client == null
@@ -284,7 +284,7 @@ namespace Faolan.GameServer
 				{
 					var account = nc.Session?.Account;
 					var character = nc.Session?.Character;
-					return new SessionInfo(nc.IpAddress, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name);
+					return new SessionInfo(nc.IpAddress!, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name);
 				})
 				.ToArray();
 		}
@@ -483,7 +483,7 @@ namespace Faolan.GameServer
 		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw. An ineligible held quest is
 		// simply ABSENT from the journal: there is no live restore path any more (#389/#390), so widening
 		// IsSnapshotEligible is what makes such a quest appear.
-		private async Task<(List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character)
+		private async Task<(List<QuestDefinition> Quests, QuestDefinition? Primary)> LoadSnapshotQuests(Character character)
 		{
 			var quests = new List<QuestDefinition>();
 			if (character == null)
@@ -511,13 +511,13 @@ namespace Faolan.GameServer
 		// The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
 		// in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
 		// partials (broadcast, combat, GM) read it unchanged.
-		private WorldEntity PlayerWorldEntity(INetworkClient client)
+		private WorldEntity? PlayerWorldEntity(INetworkClient client)
 		{
 			return _simulation.PlayerWorldEntity(client);
 		}
 
 		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
-		private async Task<Map> ResolveMap(string arg)
+		private async Task<Map?> ResolveMap(string arg)
 		{
 			if (uint.TryParse(arg, out var id))
 			{

@@ -47,17 +47,17 @@ namespace Faolan.GameServer.Combat
 		// The "Exhausted" debuff (spell 0xB90, 100s) applied when stamina hits 0 - the standard stamina-depletion
 		// debuff. Not in the capture (the client applies it locally), so the id is our choice; applied server-side.
 		private const uint ExhaustedBuff = 0xB90 << 8;
-		private readonly Action<INetworkClient> _ensureEnergyLoop; // starts the persistent energy tracking/regen loop
-		private readonly Func<INetworkClient, byte[], Task> _sendIir; // send a record on the world-framed IIR carrier
+		private readonly Action<INetworkClient>? _ensureEnergyLoop; // starts the persistent energy tracking/regen loop
+		private readonly Func<INetworkClient, byte[], Task>? _sendIir; // send a record on the world-framed IIR carrier
 		private readonly Func<INetworkClient, string, Task> _feedback;
-		private readonly Func<INetworkClient, uint, Task> _sendSprintBar; // DispatchUpdateSprintbar (0x200E) - the energy bar
-		private readonly Func<INetworkClient, uint, uint, uint, Task> _applySpell; // ApplySpell(client, applyTo, applyFrom, spellId)
-		private readonly Func<INetworkClient, uint, uint, uint, Task> _removeBuff; // SendBuffRemoval end-twin
+		private readonly Func<INetworkClient, uint, Task>? _sendSprintBar; // DispatchUpdateSprintbar (0x200E) - the energy bar
+		private readonly Func<INetworkClient, uint, uint, uint, Task>? _applySpell; // ApplySpell(client, applyTo, applyFrom, spellId)
+		private readonly Func<INetworkClient, uint, uint, uint, Task>? _removeBuff; // SendBuffRemoval end-twin
 		private readonly ILogger _logger;
 
-		public SpellweaveService(ILogger logger, Func<INetworkClient, string, Task> feedback, Func<INetworkClient, uint, uint, uint, Task> applySpell = null,
-			Func<INetworkClient, byte[], Task> sendIir = null, Func<INetworkClient, uint, uint, uint, Task> removeBuff = null, Func<INetworkClient, uint, Task> sendSprintBar = null,
-			Action<INetworkClient> ensureEnergyLoop = null)
+		public SpellweaveService(ILogger logger, Func<INetworkClient, string, Task> feedback, Func<INetworkClient, uint, uint, uint, Task>? applySpell = null,
+			Func<INetworkClient, byte[], Task>? sendIir = null, Func<INetworkClient, uint, uint, uint, Task>? removeBuff = null, Func<INetworkClient, uint, Task>? sendSprintBar = null,
+			Action<INetworkClient>? ensureEnergyLoop = null)
 		{
 			_logger = logger;
 			_feedback = feedback;
@@ -96,13 +96,13 @@ namespace Faolan.GameServer.Combat
 			// The component-add gesture animation (BCC begin + complete), carrying the added element.
 			if (hasElement && _sendIir != null)
 			{
-				await _sendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], false));
+				await _sendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile!.WeaveElements[componentIndex], false));
 				await _sendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], true));
 			}
 
 			// Immediate component effect: apply the element's own spell as a self-buff (the full id is the base << 8).
 			if (hasElement && _applySpell != null)
-				await _applySpell(client, caster, caster, profile.WeaveElements[componentIndex] << 8);
+				await _applySpell(client, caster, caster, profile!.WeaveElements[componentIndex] << 8);
 
 			// Do NOT re-send the reactive list now: the client HIDES the component picker itself once a component is
 			// picked (the capture sends no list after an add - the next one is frame 1705, ~8s later). Re-sending it

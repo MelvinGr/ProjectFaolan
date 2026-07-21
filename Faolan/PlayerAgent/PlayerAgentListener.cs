@@ -36,7 +36,7 @@ namespace Faolan.PlayerAgent
 					var accountId = packet.Body.ReadUInt32();
 					var cookie = packet.Body.ReadUInt32();
 
-					client.Session.Account = await Database.GetAccount(accountId);
+					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
 						throw new Exception("client.Account == null");
 
@@ -107,8 +107,8 @@ namespace Faolan.PlayerAgent
 					var unk6 = packet.Body.ReadUInt32();
 
 					client.Session.Account.ClientInstance = characterId;
-					client.Session.Character = await Database.GetCharacter(characterId);
-					await Database.UpdateLastInfo(client.Session.Character.Id, client.IpAddress);
+					client.Session.Character = (await Database.GetCharacter(characterId))!;
+					await Database.UpdateLastInfo(client.Session.Character!.Id, client.IpAddress!);
 					await Database.SaveAccount(client.Session.Account);
 
 					await SendOx20B9(client);

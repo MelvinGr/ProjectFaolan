@@ -12,7 +12,7 @@ namespace Faolan.ChatServer
 {
 	partial class ChatServerListener
 	{
-		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint> recipientCharacterIds = null)
+		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
 			// "say" is proximity chat: the GameServer (which holds the live positions) passes the in-range character
 			// ids in `recipientCharacterIds`; we deliver the CharacterChat (0x0022) only to those clients. A null list

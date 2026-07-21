@@ -43,7 +43,7 @@ namespace Faolan.ChatServer
 				{
 					var account = nc.Session?.Account;
 					var character = nc.Session?.Character;
-					return new SessionInfo(nc.IpAddress, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name);
+					return new SessionInfo(nc.IpAddress!, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name);
 				})
 				.ToArray();
 		}
@@ -72,7 +72,7 @@ namespace Faolan.ChatServer
 					var clientInstance = packet.Body.ReadUInt32();
 					var accountId = packet.Body.ReadUInt32();
 
-					client.Session.Account = await Database.GetAccount(accountId);
+					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
 						throw new Exception($"Account not found: {accountId:X}");
 
@@ -84,7 +84,7 @@ namespace Faolan.ChatServer
 
 					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
 					client.Session.Account.ClientInstance = clientInstance;
-					client.Session.Character = resolvedCharacter;
+					client.Session.Character = resolvedCharacter!;
 
 					Logger.LogInformation("ChatServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
 
@@ -250,7 +250,7 @@ namespace Faolan.ChatServer
 					IsWhisper = isWhisper,
 					Text = message?.Length > 512
 						? message[..512]
-						: message
+						: message!
 				});
 			}
 			catch (Exception ex)

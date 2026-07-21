@@ -196,11 +196,11 @@ namespace Faolan.GameServer.Economy
 			foreach (var ware in shop.Items)
 			{
 				if (!resolved.ContainsKey(ware.ItemTemplateId))
-					resolved[ware.ItemTemplateId] = await _database.GetItem(ware.ItemTemplateId);
+					resolved[ware.ItemTemplateId] = (await _database.GetItem(ware.ItemTemplateId))!;
 			}
 
 			var instance = (uint)(0x00010000 + (Interlocked.Increment(ref _shopInstanceSeq) & 0xFFFF));
-			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id));
+			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id)!);
 
 			// Track only the wares that actually resolved (the codec skips the rest, so their slots aren't on the wire).
 			var waresByPos = shop.Items.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null).ToDictionary(w => w.Pos);

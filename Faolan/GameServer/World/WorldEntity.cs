@@ -136,7 +136,7 @@ namespace Faolan.GameServer.World
 
 		// The captured MoveTask record re-addressed to THIS entity (kept as the wander-anchor source only; no longer
 		// replayed verbatim - retail does NOT walk a continuous route, see Patrols/NextWanderPoint).
-		public byte[] PatrolBody { get; set; }
+		public byte[] PatrolBody { get; set; } = null!;
 
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client. Constructed
 		// FROM SCRATCH - never a verbatim capture: NPCs via NpcSpawnBuilder.TryBuildLive from the typed NpcSpawn columns
@@ -145,7 +145,7 @@ namespace Faolan.GameServer.World
 		// in-memory cache of that built body - never persisted, never touched by the importer - which the broadcaster
 		// re-frames per recipient (current position + live playfield token) in SendWorldSpawn, so it isn't rebuilt for
 		// every viewer. Null until built / for entities with no spawn.
-		public byte[] SpawnBody { get; set; }
+		public byte[] SpawnBody { get; set; } = null!;
 
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
 		// On a server-initiated cancel the server pushes the decoded buff-removal IIR (#253: the ApplySpell rank-1
@@ -162,7 +162,7 @@ namespace Faolan.GameServer.World
 
 		// Live vitals (NPCs are seeded at load; null for entities the combat/world layer doesn't track here yet).
 		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
-		public EntityVitals Vitals { get; set; }
+		public EntityVitals Vitals { get; set; } = null!;
 
 		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
 		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
@@ -189,7 +189,7 @@ namespace Faolan.GameServer.World
 		// NPC is streamed only to a viewer holding one of these quests active - e.g. Scavenger Tuut appears only while
 		// you carry Casilda's kill quest. Data-driven from the quest goal definitions (kill-target NPCs that aren't
 		// quest givers), so it generalises to any number of quests/NPCs. See IsVisibleTo.
-		public IReadOnlyList<uint> GateQuestIds { get; set; }
+		public IReadOnlyList<uint> GateQuestIds { get; set; } = null!;
 
 		// For an NPC: a quest that, once the VIEWER has COMPLETED it, HIDES this NPC (they don't spawn / are despawned).
 		// The complement of GateQuestIds ("show while active") - e.g. Casilda vanishes from the beach once her escort
@@ -199,7 +199,7 @@ namespace Faolan.GameServer.World
 		// For a PLAYER: the pending ReachArea quest goals (#262) - a location objective is solved when the player moves
 		// within range of its point. Loaded once at world entry (null = not yet loaded) so the per-move check is a pure
 		// in-memory distance test, no DB hit; entries are removed as they're reached. Empty list = nothing to watch.
-		public List<ReachGoalTarget> PendingReachGoals { get; set; }
+		public List<ReachGoalTarget> PendingReachGoals { get; set; } = null!;
 
 		// #266 patrol: the captured waypoint route (absolute world coords) this NPC walks + its walk speed; empty for a
 		// stationary NPC. Sent as a patrol MoveTask after the NPC spawns - retail drives idle patrol client-side (the
@@ -225,18 +225,18 @@ namespace Faolan.GameServer.World
 		// decoupled entity (#246) whose own Name is the generic "Bag of loot", so the source is recorded separately - it
 		// is the match key for a LootFromNpc quest goal (#261), since the quest item itself is RDB content we don't
 		// materialise. Null for a standalone .spawnbag (no source NPC).
-		public string LootSourceName { get; set; }
+		public string LootSourceName { get; set; } = null!;
 		public string Name { get; }
 
 		// #363 dev nameplate override: the FULL labelled overhead name ("Crocodile [Ape2 | id-prop x8]") to push via a
 		// SetNameIIR right after this NPC's spawn, when DebugAreaLabels is on. The client resolves an NPC's floating
 		// nameplate from its template_id LDB name and IGNORES the free spawn-body `Name` string, so the label can only
 		// be shown by a SetNameIIR (0xADCE0CDA) - the same per-entity name-commit the create flow uses. Null = no label.
-		public string OverheadNameOverride { get; set; }
+		public string OverheadNameOverride { get; set; } = null!;
 
 		// Ambient bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
 		// zone load. Null/empty = this NPC has no captured chatter group and stays silent.
-		public string[] ChatterLines { get; set; }
+		public string[] ChatterLines { get; set; } = null!;
 
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the .spawnbag player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever
@@ -356,7 +356,7 @@ namespace Faolan.GameServer.World
 		// `isOccupied` (#363 ambient pools): when supplied, PREFER an anchor no other entity is parked on, so pool
 		// members spread across their area's points instead of stacking; falls back to any non-current anchor when
 		// every free one is taken. Null (captured patrols) keeps the plain random-non-current pick.
-		public Vector3 NextWanderPoint(Func<Vector3, bool> isOccupied = null)
+		public Vector3 NextWanderPoint(Func<Vector3, bool>? isOccupied = null)
 		{
 			if (PatrolWaypoints.Count == 1)
 				return PatrolWaypoints[0];
@@ -479,7 +479,7 @@ namespace Faolan.GameServer.World
 		// FA-family world-object body (re-framed per recipient like any spawn).
 		public static WorldEntity ForLoot(uint handle, uint mapId, Vector3 position, Quaternion rotation, string name, byte[] spawnBody, double expirySeconds)
 		{
-			return new WorldEntity(handle, mapId, false, name, null)
+			return new WorldEntity(handle, mapId, false, name, null!)
 			{
 				Position = position,
 				Rotation = rotation,
@@ -491,15 +491,15 @@ namespace Faolan.GameServer.World
 
 		// Convenience factory for an NPC (no owning client) placed at a fixed transform. The transform is also recorded
 		// as the spawn point the NPC returns to on respawn. Optional vitals make it killable + respawnable by the tick.
-		public static WorldEntity ForNpc(uint handle, uint mapId, Vector3 position, Quaternion rotation, string name, EntityVitals vitals = null, uint templateId = 0)
+		public static WorldEntity ForNpc(uint handle, uint mapId, Vector3 position, Quaternion rotation, string name, EntityVitals? vitals = null, uint templateId = 0)
 		{
-			return new WorldEntity(handle, mapId, false, name, null)
+			return new WorldEntity(handle, mapId, false, name, null!)
 			{
 				Position = position,
 				Rotation = rotation,
 				SpawnPosition = position,
 				SpawnRotation = rotation,
-				Vitals = vitals,
+				Vitals = vitals!,
 				NpcTemplateId = templateId
 			};
 		}

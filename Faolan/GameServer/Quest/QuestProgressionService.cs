@@ -85,10 +85,10 @@ namespace Faolan.GameServer.Quest
 				if (goal == null || goal.TrailingRefId == 0)
 					continue;
 
-				if (await GoalProgressOf(character.Id, quest, def, goal) >= GoalRequired(quest, def, goal))
+				if (await GoalProgressOf(character.Id, quest, def!, goal) >= GoalRequired(quest, def!, goal))
 					continue; // this collect goal is already full
 
-				await Advance(client, QuestGoalType.CollectItem, null, goal.TrailingRefId);
+				await Advance(client!, QuestGoalType.CollectItem, null!, goal.TrailingRefId);
 				return goal.TrailingRefId;
 			}
 
@@ -151,22 +151,22 @@ namespace Faolan.GameServer.Quest
 				if (goal == null)
 					continue;
 
-				var required = GoalRequired(quest, def, goal);
-				if (await GoalProgressOf(character.Id, quest, def, goal) >= required)
+				var required = GoalRequired(quest, def!, goal);
+				if (await GoalProgressOf(character.Id, quest, def!, goal) >= required)
 					continue; // already solved
 
 				changed = true;
-				await PersistGoalProgress(character.Id, quest, def, goal, required); // solve = jump to required
-				if (await AllGoalsComplete(character.Id, quest, def, goal, required))
-					await CompleteObjective(client, character, quest, def, goal, required);
+				await PersistGoalProgress(character.Id, quest, def!, goal, required); // solve = jump to required
+				if (await AllGoalsComplete(character.Id, quest, def!, goal, required))
+					await CompleteObjective(client!, character, quest, def!, goal, required);
 				else
-					await SendGoalUpdate(client, quest.QuestId, goal.GoalId, required); // this goal done, others pending
+					await SendGoalUpdate(client!, quest.QuestId, goal.GoalId, required); // this goal done, others pending
 
 				_logger.LogInformation("Quest {Quest} goal {Goal} solved by Lua effect for {Char}.", quest.QuestId, goalId, character.Name);
 			}
 
 			if (changed)
-				await _outbound.RefreshQuestVisibility(client);
+				await _outbound.RefreshQuestVisibility(client!);
 		}
 
 		// Advance the goal of `triggerType`/`targetName` for each of the player's active quests. #357: a quest can have
@@ -222,19 +222,19 @@ namespace Faolan.GameServer.Quest
 				// The whole quest is done only when THIS goal hit its count AND every other goal is already complete.
 				if (progress >= required && await AllGoalsComplete(character.Id, quest, def, goal, progress))
 				{
-					await CompleteObjective(client, character, quest, def, goal, required);
+					await CompleteObjective(client!, character, quest, def, goal, required);
 					continue;
 				}
 
 				// Objective tick (e.g. 2/5 kills, or one of several goals done): refresh the HUD, leave the quest Active.
-				await SendGoalUpdate(client, quest.QuestId, goal.GoalId, progress);
+				await SendGoalUpdate(client!, quest.QuestId, goal.GoalId, progress);
 				await _agents.SendSystemMessage(character.Id, $"Objective {progress}/{required}.");
 			}
 
 			// #261: a stage change can un-gate or re-gate NPCs (e.g. completing Casilda's kill stage despawns Tuut) -
 			// re-run the player's interest pass so gated visibility tracks the new quest state immediately.
 			if (changed)
-				await _outbound.RefreshQuestVisibility(client);
+				await _outbound.RefreshQuestVisibility(client!);
 		}
 
 		// Whether every goal of the quest has now reached its required count. `justTicked`/`justProgress` is the goal we

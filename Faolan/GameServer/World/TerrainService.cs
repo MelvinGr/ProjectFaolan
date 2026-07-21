@@ -30,7 +30,7 @@ namespace Faolan.GameServer.World
 
 		private readonly ConcurrentDictionary<uint, RdbHeightmap> _heightmaps = [];
 		private readonly ILogger _logger;
-		private readonly string _terrainDir;
+		private readonly string? _terrainDir;
 
 		public bool Available { get; }
 
@@ -90,16 +90,16 @@ namespace Faolan.GameServer.World
 				if (!File.Exists(path))
 					return;
 
-				TerrainFile.Data data;
+				TerrainFile.Data? data;
 				using (var fs = File.OpenRead(path))
 					data = TerrainFile.Read(fs);
 				if (data == null)
 					return;
 
-				RdbHeightmap hm = null;
+				RdbHeightmap? hm = null;
 				var hasHeightmap = data.Heightmap.Length > 0 && RdbHeightmap.TryParse(data.Heightmap, out hm, data.TilemapExtent);
 				if (hasHeightmap)
-					_heightmaps[mapId] = hm;
+					_heightmaps[mapId] = hm!;
 
 				var tris = 0;
 				if (data.Collision.Length > 0 && RdbCollisionMesh.TryParse(data.Collision, out var col))
