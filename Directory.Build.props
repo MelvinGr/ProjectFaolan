@@ -8,9 +8,10 @@
 		<!--<RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>-->
 		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
 		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</RuntimeIdentifier>
-		<SatelliteResourceLanguages>en;nl</SatelliteResourceLanguages>
+		<SatelliteResourceLanguages>en</SatelliteResourceLanguages>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 		<Authors>Project Faolan</Authors>
+		<Copyright>Copyright © Project Faolan $([System.DateTime]::Now.Year)</Copyright>
 		<ApplicationIcon>..\logo.ico</ApplicationIcon>
 		<!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
 		<!--<Nullable>enable</Nullable>-->
