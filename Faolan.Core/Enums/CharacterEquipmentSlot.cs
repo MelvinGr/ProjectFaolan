@@ -57,7 +57,7 @@ namespace Faolan.Core.Enums
 
 	public static class CharacterEquipmentSlotExtensions
 	{
-		public static readonly ImmutableArray<CharacterEquipmentSlot> StatBearingSlots =
+		private static readonly ImmutableHashSet<CharacterEquipmentSlot> StatBearingSlots =
 		[
 			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon,
 			CharacterEquipmentSlot.Belt, CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing,
@@ -67,7 +67,7 @@ namespace Faolan.Core.Enums
 
 		extension(CharacterEquipmentSlot)
 		{
-			public static ImmutableArray<CharacterEquipmentSlot> StatBearing => StatBearingSlots;
+			public static ImmutableHashSet<CharacterEquipmentSlot> StatBearing => StatBearingSlots;
 		}
 	}
 }

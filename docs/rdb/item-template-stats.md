@@ -84,7 +84,12 @@ big values), largely disjoint from the small `972` primary — of 468 items with
   unimported until a consumer lands. This retired the old flattened `Item.*Bonus` columns.
   `MaxStatAggregator.AggregateGearBonuses` sums the rows across equipped gear, dividing each by its
   `CharacterStatId.GetScale()` to a display total.
-- **NEXT:** (a) apply the vital totals to the character's derived `MaxHealth`/`MaxStamina`/`MaxMana`
-  (`EntityVitals`) so the regen bar fills past the class base — the #3 headline, needs in-client verification;
-  (b) patch attribute totals into the sent stat block so `+Str`/`+Dex` show. Spells almost certainly share this
-  exact record encoding — see #367 (buff stat-effect engine), likely the same parser.
+- **APPLIED (vitals):** at world entry `GetEquippedStatItems` -> `MaxStatAggregator` folds the gear vital totals
+  onto the class/level base in `EntityVitals.FromCharacter`, seeding current == the geared max, so a `+HP` piece
+  raises the ceiling and the regen bar starts full. ⚠️ **Needs in-client verification** of the client's
+  max-computation model: this sends the *geared* max as the wire `HealthMax`. If the client instead adds gear on
+  top of a base max (the #3 320→648 observation), that double-counts — flip to sending the base max on the wire
+  and keeping only the regen ceiling geared.
+- **NEXT:** patch attribute totals (`+Str`/`+Dex`) into the sent stat block so worn attributes show in-client.
+  Spells almost certainly share this exact `[2][9]` record encoding — see #367 (buff stat-effect engine), likely
+  the same parser.

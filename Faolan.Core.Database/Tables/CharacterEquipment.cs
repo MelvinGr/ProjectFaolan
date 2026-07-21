@@ -183,36 +183,35 @@ namespace Faolan.Core.Database.Tables
 		// Enum.IsDefined. Get returns the slot's item (null when empty).
 		public Item? this[CharacterEquipmentSlot slot]
 		{
-			get =>
-				slot switch
-				{
-					CharacterEquipmentSlot.Neck          => Neck,
-					CharacterEquipmentSlot.Head          => Head,
-					CharacterEquipmentSlot.Bag           => Bag,
-					CharacterEquipmentSlot.ResourceBag   => ResourceBag,
-					CharacterEquipmentSlot.Chest         => Chest,
-					CharacterEquipmentSlot.MainWeapon    => MainHandLeft,
-					CharacterEquipmentSlot.Belt          => Belt,
-					CharacterEquipmentSlot.OffHandWeapon => OffHandLeft,
-					CharacterEquipmentSlot.LeftRing      => RingLeft,
-					CharacterEquipmentSlot.RightRing     => RingRight,
-					CharacterEquipmentSlot.Cape          => Cloak,
-					CharacterEquipmentSlot.Shoulder      => Shoulder,
-					CharacterEquipmentSlot.Boots         => Boots,
-					CharacterEquipmentSlot.Hands         => Hands,
-					CharacterEquipmentSlot.Legs          => Legs,
-					CharacterEquipmentSlot.Wrist         => Wrist,
-					CharacterEquipmentSlot.RangedWeapon  => MainHandRight,
-					CharacterEquipmentSlot.Ammo          => OffHandRight,
-					CharacterEquipmentSlot.VanityHead    => VanityHead,
-					CharacterEquipmentSlot.VanityChest   => VanityChest,
-					CharacterEquipmentSlot.VanityBelt    => VanityBelt,
-					CharacterEquipmentSlot.VanityCape    => VanityCape,
-					CharacterEquipmentSlot.VanityBoots   => VanityBoots,
-					CharacterEquipmentSlot.VanityLegs    => VanityLegs,
-					CharacterEquipmentSlot.VanityWrist   => VanityWrist,
-					_                                    => throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot")
-				};
+			get => slot switch
+			{
+				CharacterEquipmentSlot.Neck          => Neck,
+				CharacterEquipmentSlot.Head          => Head,
+				CharacterEquipmentSlot.Bag           => Bag,
+				CharacterEquipmentSlot.ResourceBag   => ResourceBag,
+				CharacterEquipmentSlot.Chest         => Chest,
+				CharacterEquipmentSlot.MainWeapon    => MainHandLeft,
+				CharacterEquipmentSlot.Belt          => Belt,
+				CharacterEquipmentSlot.OffHandWeapon => OffHandLeft,
+				CharacterEquipmentSlot.LeftRing      => RingLeft,
+				CharacterEquipmentSlot.RightRing     => RingRight,
+				CharacterEquipmentSlot.Cape          => Cloak,
+				CharacterEquipmentSlot.Shoulder      => Shoulder,
+				CharacterEquipmentSlot.Boots         => Boots,
+				CharacterEquipmentSlot.Hands         => Hands,
+				CharacterEquipmentSlot.Legs          => Legs,
+				CharacterEquipmentSlot.Wrist         => Wrist,
+				CharacterEquipmentSlot.RangedWeapon  => MainHandRight,
+				CharacterEquipmentSlot.Ammo          => OffHandRight,
+				CharacterEquipmentSlot.VanityHead    => VanityHead,
+				CharacterEquipmentSlot.VanityChest   => VanityChest,
+				CharacterEquipmentSlot.VanityBelt    => VanityBelt,
+				CharacterEquipmentSlot.VanityCape    => VanityCape,
+				CharacterEquipmentSlot.VanityBoots   => VanityBoots,
+				CharacterEquipmentSlot.VanityLegs    => VanityLegs,
+				CharacterEquipmentSlot.VanityWrist   => VanityWrist,
+				_                                    => throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot")
+			};
 			set
 			{
 				switch (slot)
