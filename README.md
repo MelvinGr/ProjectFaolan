@@ -22,7 +22,7 @@ is tracked as Gitea issues; the `#NNN` refs point there.
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 520 maps · 586 NPC types / 1,086 placements · 3,188 items · 20,822 spells · 27 abilities · 242 conversation nodes · 29 shops · 28 quests · 1,053 world objects · 139 patrol routes
+**Imported content** (the DB is the server's source of truth): 530 maps · 586 NPC types / 1,086 placements · 3,245 items · 20,822 spells · 27 abilities · 242 conversation nodes · 29 shops · 2,036 quests · 1,053 world objects · 139 patrol routes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -33,7 +33,7 @@ we've seen_, and names the gaps). Regenerate with
 <!-- coverage:start -->
 - **NPC conversations** — 34/37 greeted dialogue NPCs imported (91.9%)
 - **Vendor shops** — 21/21 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,178/77,631 decrypted, **4.1% of the total encrypted**. Keys held per category: 3,151 items, 27 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,234/77,631 decrypted, **4.2% of the total encrypted**. Keys held per category: 3,207 items, 27 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -66,7 +66,8 @@ we've seen_, and names the gaps). Regenerate with
   (`.togglenpcgroup`, shows `group | tier xcount` over each NPC via a SetNameIIR override) + the `.setnpcgroup` GM command assign
   the rest. A live **area-managed ambient spawner** now consumes these pools — per-pool respawn/refill timers
   keep each group at its population count, and members roam their area between spawn anchors (preferring a free
-  anchor so they stop stacking); disabled by default until a group's creature type is confirmed (#332 done, #363)
+  anchor so they stop stacking). Now on by default for every resolved group — the experimental config toggle was
+  retired (#332 done, #363)
 - 🟡 NPC line-of-sight — NPCs don't aggro over a hill / across a drop / through a building wall, and loot bags +
   corpses snap to the ground, driven by a baked per-map terrain file (heightmap + PhysX collision mesh; the game
   server never touches the client RDB at runtime). The ground-snap is tolerance-gated: the heightmap is the OUTDOOR
@@ -76,18 +77,21 @@ we've seen_, and names the gaps). Regenerate with
   "nothing to interact with here yet" bubble instead of a silent no-op
 - ✅ Zone-line / teleport doors — using a door that changes location teleports the player (same-playfield and
   cross-playfield, in-client verified), destinations auto-imported from captured UseObject→teleport sequences;
-  the ~52 un-harvested zone-lines still fall through to the open animation (#341) and the GameAction type ids are
-  placeholders (#338)
+  the ~52 un-harvested zone-lines still fall through to the open animation (#341). The client's real teleport
+  GameAction ids are now recovered from Ghidra (Teleport `0xCF45` / ProxyTeleport `0xD04D`); our door path is a
+  server-side discriminator, so it never needs to emit them (#338)
 - ✅ Area-name banners — crossing into a named **sub-area** floats the on-screen area title (`GenericDisplayAreaName`
   via `FormatFeedbackIIR`), verified in-client. A playfield has many (Old Tarantia fires six: Bridge of Vilerus I,
   The East Gate, The West Gate, …), so the world tick drives it off the `MapArea` child table. The boundary triggers
   are **server-side** — no client record references a banner id — so the regions are reconstructed from captures:
   each banner is paired with the player position it fired at, and the hull over those sightings is the region. Areas
   are keyed by the client's localized-string id — the client renders the text, so the server never needs the name
-  (decode one via the LDB if you want to read it: `textId = pageBase + index`, #291). Coverage is capture-bound
+  (the LDB holds these strings as plaintext zlib, but the record→textId→page-base mapping is still unsolved, so
+  reading one back server-side isn't wired, #291). Coverage is capture-bound
   (10 areas, 4 maps of 520) and the hulls under-cover by construction; both improve with more dumps (#377)
-- 🟡 Sit on benches — the sit/stand/hold-state animations are decoded + built byte-exact, but the pose reverts
-  to standing after the animation (does not yet hold in-client) (#355)
+- 🟡 Sit on benches — decoded + built byte-exact as a two-phase `UseObject` handshake (the client double-sends the
+  interact; retail answers each with a hold-state ack and only the second commits the pose). Now wired to answer
+  both phases; awaits an in-client confirm that the pose holds instead of reverting after the ~2.6 s blend (#355)
 - 🟡 Full simulation fidelity — continuous AI heartbeat / generated (not replayed) behavior (#190, #225);
   client-side movement jitter (#272)
 - ✅ Per-map playfield token — sourced per-map from `Map.PlayfieldToken` (seeded with a captured token per map;
@@ -132,7 +136,10 @@ we've seen_, and names the gaps). Regenerate with
   teleport-to-spawn / attack-while-dead for patrolling NPCs). The per-creature death anim is carried on
   `NpcTemplate.DeathBehaviorId` and verified in-client for humanoid (41877) and beast (215333); 43 types harvested,
   the remaining 543 fall back to the humanoid anim until harvested (#362)
-- ⬜ Directional combat + defensive shield arcs ("real combat", #20) · Fatalities (#140)
+- ⬜ Directional combat + defensive shield arcs ("real combat", #20) · combo finishers — the client owns the whole
+  combo FSM (swings already ride the normal `NormalAttack` path); the finisher's bonus damage is server-GDB data
+  not in the client RDB, and no capture shows a combo landing on a live target (#139) · fatalities — catalog is
+  plaintext anim names (RDB 1010219), but the server-side trigger wire is un-pinned and un-captured (#140)
 
 ### Character progression
 
@@ -155,6 +162,8 @@ we've seen_, and names the gaps). Regenerate with
 ### Items & economy
 
 - ✅ Inventory (DB containers, equip, move, starting gear)
+- ✅ Item quality tiers — each item's rarity (Mundane→Legendary) decoded from its RDB template's field 499 (the
+  client's own 0-indexed tier id) and imported for 2,904 items, so tooltip rarity / name colour match retail (#397)
 - ✅ Vendor shop buy/sell · bank storage · auction house (tradepost) list/buy · mail with money + attachments
   (taking an attachment now clears it: `Mail`'s primary key is the wire `MailId` itself, so the attachment FK can no
   longer mismatch the id every caller passes — the old surrogate row key silently deleted nothing and duplicated the
@@ -366,6 +375,8 @@ captures against the local server (no root needed) and retail-session captures a
   (#185, and thereby #304 / #234)
 - A **necromancer pet summon in the open world** (#307), a **friend** add/remove + come-online (#99), a
   **player↔player trade** (#101)
+- A **combo landing on a live target** and a **melee-class fatality** on a killing blow → the combo-finisher bonus
+  damage and the fatality trigger wire (both server-authored, so un-recoverable from the client alone; #139, #140)
 - **Level-up** captures across more classes/levels → fill the combo/spell/XP tables (#296, #297)
 - A **dungeon run**, the **faction/reputation** UI, and an **item socket** action → the roadmap features
   (#309, #310, #311)
