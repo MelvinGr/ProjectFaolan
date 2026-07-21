@@ -735,6 +735,16 @@ namespace Faolan.Importer.Captures
 			// Decoded from Hoxxling gameplay2 (pickups fr4310/4367/4447 = DispatchAddItem+SimpleDynelPickup; deliver fr5102).
 			await SeedGoal(db, 12371, 3495, QuestGoalType.CollectItem);
 			await SeedGoal(db, 12371, 3497, QuestGoalType.TalkToNpc, "Turach");
+
+			// The city TALK stages (#358), progressed by each NPC's conversation GrantQuestId (already imported) - so no
+			// Chain() is needed, only the goal TARGET. Confirmed in the Hoxxling gameplay2 dump by the talk-then-complete
+			// pairs: Laranga (guard, 0x4FDA) convo fr5680 -> 10286 done fr5829; Tina (0x4FF0) convo fr9214 -> 10287 done
+			// fr9738. 10320 "talk Turach" (granted by the entry guard Laranga; talking to Turach completes it + his
+			// dialogue grants the quarry 12371) is the pre-quarry "The Blacksmith" stage - inferred from the grant graph
+			// + wiki, its dump proof is the quarry grant that predates gameplay2.
+			await SeedGoal(db, 10320, 436, QuestGoalType.TalkToNpc, "Turach");  // IV The Blacksmith - talk Turach (pre-quarry)
+			await SeedGoal(db, 10286, 399, QuestGoalType.TalkToNpc, "Laranga"); // VI The Guard - talk the city guard
+			await SeedGoal(db, 10287, 400, QuestGoalType.TalkToNpc, "Tina");    // VII The Barmaid - talk Tina
 		}
 
 		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
