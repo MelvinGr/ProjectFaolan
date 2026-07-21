@@ -110,5 +110,24 @@ flat level placeholder. `[V0: exact combat scale/formula — the real per-hit da
   top of a base max (the #3 320→648 observation), that double-counts — flip to sending the base max on the wire
   and keeping only the regen ceiling geared.
 - **NEXT:** patch attribute totals (`+Str`/`+Dex`) into the sent stat block so worn attributes show in-client.
-  Spells almost certainly share this exact `[2][9]` record encoding — see #367 (buff stat-effect engine), likely
-  the same parser.
+
+## Spells share the region — but it is per-stat scaled (#367)
+
+Buff/debuff spell templates (RDB `1040005`) carry the SAME `[2][9]` record region, decoded by the same
+`ItemTemplateStatModifiers.Parse`. `RdbSpellImporter` imports it into the `SpellStatEffect` table (natural key
+`(SpellId, StatId)`, `Amount` = raw wire value) — **863 spells / 1708 rows**. This region is the client's own
+source for a buff's tooltip stat lines, so the stored `Amount` matches what the client renders.
+
+The catch, found while scoping the apply engine: **the spell region is heterogeneous and per-stat scaled, and
+its scale is NOT the item scale.**
+
+- **Attributes store DISPLAY units** — `Dexterity Buff 1/2` = `0x32E` `+1/+2` (dumped: `--report spell-template
+  --report-arg 3199,3200`). Items store the *same* attribute at `×10`, so `CharacterStatId.GetScale()` (built for
+  the item convention) does **not** transfer to spells.
+- **Movement / percentage / rank stats store large scaled magnitudes** — `0x1` = `190000` on every `Mounted`
+  mount-speed buff; `Sustaining Wrath` ranks step `108000 → 180000`. A health entry (`0x1B`) even carries a
+  `-100000000` drain/kill sentinel on non-buff spells.
+
+So a live **apply/revert engine** needs a per-stat scale table **verified against in-client buff tooltips** before
+the server can honor these (a blind apply would corrupt combat/vitals). The decoded `SpellStatEffect` table is kept
+as the foundation; the apply engine is deferred to that verification (#367, `needs-testing`).
