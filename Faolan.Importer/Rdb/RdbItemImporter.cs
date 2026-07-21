@@ -47,8 +47,22 @@ namespace Faolan.Importer.Rdb
 		private const uint StringTag = 0x21;
 
 		// The 5 primary-attribute wire stat ids field 972 is validated to hold (Str/Con/Int/Wis/Dex) - the guard that
-		// keeps the attribute-bonus import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
-		private static readonly HashSet<uint> AttributeStatIds = [804u, 806u, 808u, 810u, 814u];
+		// keeps the field-972 import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
+		private static readonly HashSet<uint> AttributeStatIds =
+		[
+			(uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution, (uint)CharacterStatId.Intelligence,
+			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity
+		];
+
+		// The [2][9]-region stats we import + apply today: vitals (the #3 health-bar-fill headline) + the five
+		// attributes. The region also carries ratings (Magic Damage, Hit Rating, ...) that are decoded but have no
+		// server consumer yet, so they're left unimported until one lands (#367 / a ratings pass).
+		private static readonly HashSet<uint> ApplicableStatIds =
+		[
+			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax,
+			(uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution, (uint)CharacterStatId.Intelligence,
+			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity
+		];
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
 		public static string? ExtractName(ReadOnlySpan<byte> template)
@@ -98,7 +112,7 @@ namespace Faolan.Importer.Rdb
 					byTypeId[(type, e.Id)] = e;
 			}
 
-			var items = await db.Items.Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).ToListAsync();
+			var items = await db.Items.Include(i => i.StatModifiers).Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).ToListAsync();
 
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
@@ -182,14 +196,25 @@ namespace Faolan.Importer.Rdb
 					qualitiesAdded++;
 				}
 
-				// The VALIDATED primary-attribute modifier (docs/rdb/item-template-stats.md, #3): field 972 = the wire
-				// stat id (only ever 804/806/808/810/814 = Str/Con/Int/Wis/Dex across all 1964 templates), field 971 =
-				// the amount (+1/+2/+3). Stored on the matching Item.*Bonus column - the (attribute, amount) foundation
-				// the MaxStatAggregator sums over equipped gear. Same property-table parse as field 74. (The
-				// secondary-modifier list + the vital/HP bonus need a reference tooltip to decode, so they are NOT
-				// imported here.)
-				if (TryReadPropertyField(template.AsSpan(12), 972, out var statId) && AttributeStatIds.Contains(statId) && TryReadPropertyField(template.AsSpan(12), 971, out var amount) &&
-				    amount is > 0 and <= 100 && SetAttributeBonus(item, statId, (int)amount))
+				// The item's equipped stat bonuses (docs/rdb/item-template-stats.md, #3), as ItemStatModifier rows keyed
+				// (ItemId, StatId). Two decoded sources, unioned - the region wins on the rare overlap:
+				//  - the [2][9] stat-modifier region (ItemTemplateStatModifiers.Parse): the whole tooltip stat list
+				//    (attributes, vitals, ratings) at wire scale, whitelisted to the stats we can name (ApplicableStatIds);
+				//  - the field-972 primary attribute (only ever Str/Dex +1/+2/+3), scaled UP to wire (×10) so both
+				//    sources share the raw-wire Amount convention. Complementary: only 17 of 468 items carry the 972
+				//    attribute in the region too.
+				var mods = new Dictionary<uint, int>();
+				foreach (var m in ItemTemplateStatModifiers.Parse(template.AsSpan(12)))
+				{
+					if (ApplicableStatIds.Contains(m.StatId))
+						mods[m.StatId] = (int)m.WireAmount; // region is authoritative; last (== only) write wins
+				}
+
+				if (TryReadPropertyField(template.AsSpan(12), 972, out var primaryStat) && AttributeStatIds.Contains(primaryStat) &&
+				    TryReadPropertyField(template.AsSpan(12), 971, out var primaryAmount) && primaryAmount is > 0 and <= 100 && !mods.ContainsKey(primaryStat))
+					mods[primaryStat] = (int)(primaryAmount * 10); // 971 is the DISPLAY value (+1/+2/+3); attributes scale ×10
+
+				if (SyncStatModifiers(item, mods))
 					statsAdded++;
 
 				// BAG capacity: property field 104 (= the Bag container kind 0x68) holds the extra backpack slots a bag
@@ -256,41 +281,39 @@ namespace Faolan.Importer.Rdb
 			return true;
 		}
 
-		// Sets the item's primary-attribute bonus for wire stat id `statId` (804/806/808/810/814) to `amount`, and
-		// clears the other four (a template carries at most one primary attribute, so a modifier that MOVED to a
-		// different attribute leaves no stale column). Returns whether anything actually changed (drives the counter +
-		// the save). Mirrors how Value/Quality are written onto the tracked Item.
-		private static bool SetAttributeBonus(Item item, uint statId, int amount)
+		// Reconciles the item's StatModifiers collection to exactly `desired` (wire stat id -> raw wire amount): adds new
+		// rows, updates changed amounts, removes rows no longer present (a modifier that moved/vanished leaves nothing
+		// stale). Keyed on (ItemId, StatId), so this is a clean per-(item,stat) upsert on re-import. Returns whether
+		// anything changed (drives the counter + the save).
+		private static bool SyncStatModifiers(Item item, IReadOnlyDictionary<uint, int> desired)
 		{
-			int? str = null, con = null, @int = null, wis = null, dex = null;
-			switch (statId)
+			var changed = false;
+
+			foreach (var existing in item.StatModifiers.ToList())
 			{
-				case 804:
-					str = amount;
-					break;
-				case 806:
-					con = amount;
-					break;
-				case 808:
-					@int = amount;
-					break;
-				case 810:
-					wis = amount;
-					break;
-				case 814:
-					dex = amount;
-					break;
+				if (!desired.ContainsKey((uint)existing.StatId))
+				{
+					item.StatModifiers.Remove(existing);
+					changed = true;
+				}
 			}
 
-			if (item.StrengthBonus == str && item.ConstitutionBonus == con && item.IntelligenceBonus == @int && item.WisdomBonus == wis && item.DexterityBonus == dex)
-				return false;
+			foreach (var (statId, amount) in desired)
+			{
+				var row = item.StatModifiers.FirstOrDefault(m => (uint)m.StatId == statId);
+				if (row == null)
+				{
+					item.StatModifiers.Add(new ItemStatModifier { ItemId = item.Id, StatId = (CharacterStatId)statId, Amount = amount });
+					changed = true;
+				}
+				else if (row.Amount != amount)
+				{
+					row.Amount = amount;
+					changed = true;
+				}
+			}
 
-			item.StrengthBonus = str;
-			item.ConstitutionBonus = con;
-			item.IntelligenceBonus = @int;
-			item.WisdomBonus = wis;
-			item.DexterityBonus = dex;
-			return true;
+			return changed;
 		}
 
 		private static bool TryReadBagSlots(ReadOnlySpan<byte> body, uint fieldId, out uint slots)

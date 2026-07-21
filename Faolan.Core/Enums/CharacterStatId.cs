@@ -46,6 +46,12 @@ namespace Faolan.Core.Enums
 		Wisdom = 0x032A,
 		Dexterity = 0x032E,
 
+		// Combat ratings carried by the item-template stat-modifier region (docs/rdb/item-template-stats.md, #3).
+		// Decoded 3/3 against the in-client Royal Signet tooltip (+52 Magic Damage / +15 Hit Rating): Magic Damage is
+		// wire-scaled ×100 (5200 -> 52), Hit Rating ×1 (15 -> 15).
+		HitRating = 0x0136,
+		MagicDamage = 0x035D,
+
 		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
 		// 0xBF..0x40B in the snapshot; see WorldDespawn) - session/map state, not a real character stat. The snapshot is
 		// built with the live zone's token here.
@@ -161,7 +167,7 @@ namespace Faolan.Core.Enums
 			return statId switch
 			{
 				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax
-					or CharacterStatId.ManaCurrent => 100,
+					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage => 100,
 
 				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
 

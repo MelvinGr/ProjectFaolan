@@ -49,6 +49,7 @@ namespace Faolan.Core.Database
 		DbSet<ConversationScreenParameter> ConversationScreenParameters { get; }
 		DbSet<Guild> Guilds { get; }
 		DbSet<Item> Items { get; }
+		DbSet<ItemStatModifier> ItemStatModifiers { get; }
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
 		DbSet<Map> Maps { get; }
@@ -124,6 +125,7 @@ namespace Faolan.Core.Database
 		public DbSet<ConversationScreenParameter> ConversationScreenParameters { get; set; }
 		public DbSet<Guild> Guilds { get; set; }
 		public DbSet<Item> Items { get; set; }
+		public DbSet<ItemStatModifier> ItemStatModifiers { get; set; }
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }
 		public DbSet<Map> Maps { get; set; }
@@ -186,6 +188,9 @@ namespace Faolan.Core.Database
 
 			modelBuilder.Entity<Item>().OwnsOne(i => i.Key, OwnKey);
 			modelBuilder.Entity<Ability>().OwnsOne(a => a.Key, OwnKey);
+
+			// The item's equipped stat bonuses (#3); cascade-delete with the item.
+			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).HasForeignKey(m => m.ItemId).OnDelete(DeleteBehavior.Cascade);
 
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete

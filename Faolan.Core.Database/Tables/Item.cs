@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Database.Attributes;
@@ -35,19 +36,14 @@ namespace Faolan.Core.Database.Tables
 		// Level requirement / item level. byte on the wire; mostly 0 for capture-harvested items (the RDB carries
 		// the real value), so level-appropriate filtering is limited until RDB item levels are imported.
 		public byte Level { get; set; }
-		public int? ConstitutionBonus { get; set; }
-		public int? DexterityBonus { get; set; }
-		public int? IntelligenceBonus { get; set; }
 
-		// The primary-ATTRIBUTE bonus this item grants when equipped (+1/+2/+3), one nullable column per attribute -
-		// the flattened replacement for the old per-(item,stat) ItemStat rows. Decoded from the RDB item-template
-		// property table (RdbItemImporter, docs/rdb/item-template-stats.md): field 972 = the wire stat id
-		// (804=Str / 806=Con / 808=Int / 810=Wis / 814=Dex), field 971 = the amount. Each template carries at most one
-		// primary-attribute modifier today, so an item sets at most one of these. NULL = no bonus for that attribute.
-		// MaxStatAggregator sums them (by wire stat id) across a character's equipped gear (#3). The amounts are the raw
-		// decoded values; the wire ×10 attribute scale is applied at the aggregator/wire, not baked in here.
-		public int? StrengthBonus { get; set; }
-		public int? WisdomBonus { get; set; }
+		// The stat bonuses this item grants when equipped - the whole tooltip stat list (attributes, vitals AND
+		// ratings), one row per (statId, amount). Decoded from the RDB item-template stat-modifier region
+		// (RdbItemImporter -> ItemTemplateStatModifiers, docs/rdb/item-template-stats.md, #3) PLUS the field-972 primary
+		// attribute. MaxStatAggregator sums these by wire stat id across a character's equipped gear so worn gear raises
+		// the character's derived MaxHealth/MaxStamina/MaxMana (and attributes). Replaced the old flattened
+		// *Bonus columns (Str/Con/Int/Wis/Dex), which could only hold the primary attribute.
+		public virtual ICollection<ItemStatModifier> StatModifiers { get; set; } = [];
 
 		// The item's quality/rarity tier (Mundane..Legendary) = RDB item-template property field 499 (the client's own
 		// tier id; see ItemQuality). Extracted by RdbItemImporter with the same strictly-decreasing property-table parse

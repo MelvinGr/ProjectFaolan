@@ -74,13 +74,17 @@ big values), largely disjoint from the small `972` primary — of 468 items with
 ## Status / next step
 
 - **Decoded + validated:** `972`/`971` primary attribute (Str/Dex +1/+2/+3) AND the full `[2][9]` region
-  (vitals + attributes + Magic Damage + Hit Rating, wire-scaled) — Royal-Signet-anchored.
-- **IMPORTED (attributes, legacy):** the `972`/`971` primary sits on flattened `Item` columns -
-  `StrengthBonus` / `ConstitutionBonus` / `IntelligenceBonus` / `WisdomBonus` / `DexterityBonus` (nullable
-  `int`), populated by `RdbItemImporter` (only Str/Dex ever appear in `972`). Summed by
-  `MaxStatAggregator.AggregateGearBonuses`.
-- **NEXT (this decode):** import the `[2][9]` records into an `ItemStatModifier` child table
-  (`ItemId, StatId, Amount`), whitelisted to the known stat ids, then (a) aggregate vital + attribute totals
-  into the character's derived `MaxHealth`/`MaxStamina`/`MaxMana` (`EntityVitals`) so the regen bar fills past
-  the class base — the #3 headline — and (b) patch attribute totals into the sent stat block. Spells almost
-  certainly share this exact record encoding — see #367 (buff stat-effect engine), likely the same parser.
+  (vitals + attributes + Magic Damage + Hit Rating, wire-scaled) — Royal-Signet-anchored
+  (`ItemTemplateStatModifierTests`).
+- **IMPORTED:** both sources are unioned into the `ItemStatModifier` child table (natural key `(ItemId,
+  StatId)`, `Amount` = raw wire value), populated by `RdbItemImporter` via `ItemTemplateStatModifiers.Parse`
+  (the `[2][9]` region) plus the field-972 primary; the region wins on the rare overlap. Whitelisted to the
+  stats a server consumer exists for today — the three vitals (HealthMax/StaminaMax/ManaMax) and the five
+  attributes (`ApplicableStatIds`); the decoded ratings (Magic Damage `0x35d`, Hit Rating `0x136`, …) are left
+  unimported until a consumer lands. This retired the old flattened `Item.*Bonus` columns.
+  `MaxStatAggregator.AggregateGearBonuses` sums the rows across equipped gear, dividing each by its
+  `CharacterStatId.GetScale()` to a display total.
+- **NEXT:** (a) apply the vital totals to the character's derived `MaxHealth`/`MaxStamina`/`MaxMana`
+  (`EntityVitals`) so the regen bar fills past the class base — the #3 headline, needs in-client verification;
+  (b) patch attribute totals into the sent stat block so `+Str`/`+Dex` show. Spells almost certainly share this
+  exact record encoding — see #367 (buff stat-effect engine), likely the same parser.
