@@ -708,8 +708,40 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated, {skipped} skipped (map not in catalog).");
 
 			await SeedBeachQuestGoals(db);
+			await SeedShipwreckedCityChain(db);
 			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
+		}
+
+		// The Shipwrecked destiny chain past stage I (#262/#358). Beach dump proves the supersession 10238 -> 12369 ->
+		// 12373 (stages I "The Slaver" -> II "The Acheronian Gate" -> III "The City of Tortage"). Stages II/III are wired
+		// as ReachArea goals off their captured MARKERS (verified world X,Z): II's goal 3492 at the beach ruins
+		// (4010, 524/755), III's goal 3498 in the city itself (4020, 913/718) - "enter the city" completes on arrival.
+		// Stage III is chain-final for now: stages IV-VIII (talk Turach 951 / bricks 12371 / guard / Tina 2805 / Nadini
+		// 806) have no imported goal targets yet - tracked on #358. NOT byte-exact; markers/types are best-effort ("polish
+		// later"). Idempotent.
+		private static async Task SeedShipwreckedCityChain(DatabaseContext db)
+		{
+			await SeedReachStage(db, 12369, 12373, 3492); // II: reach the gate/ruins -> III
+			await SeedReachStage(db, 12373, 0, 3498);     // III: enter the City of Tortage (chain end for now)
+		}
+
+		// A single ReachArea stage (#262): set the stage's successor + retype the given goal to ReachArea (solved by
+		// walking to its MarkerX/MarkerY). The goal's map/marker are left as harvested (they ARE the objective's world
+		// location). nextQuestId 0 = chain end.
+		private static async Task SeedReachStage(DatabaseContext db, uint questId, uint nextQuestId, uint goalId)
+		{
+			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
+			var goal = quest?.Goals.FirstOrDefault(g => g.GoalId == goalId);
+			if (quest == null || goal == null)
+				return;
+
+			quest.NextQuestId = nextQuestId == 0
+				? null
+				: nextQuestId;
+			goal.GoalType = QuestGoalType.ReachArea;
+			await db.SaveChangesAsync();
+			Console.WriteLine($"Seeded Shipwrecked reach stage: quest {questId} goal {goalId} = ReachArea -> {nextQuestId}.");
 		}
 
 		// Static world objects (decor/containers/zones), deduped by (map, position). Transient loot bags skipped.

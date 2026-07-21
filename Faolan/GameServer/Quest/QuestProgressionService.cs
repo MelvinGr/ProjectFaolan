@@ -237,6 +237,10 @@ namespace Faolan.GameServer.Quest
 			if (nextGoal?.GoalType == QuestGoalType.TalkToNpc && !string.IsNullOrEmpty(nextGoal.TargetName))
 				await _outbound.RefreshQuestMarkerByName(client, nextGoal.TargetName);
 
+			// #262: the new stage may carry a ReachArea goal (Shipwrecked II "find the gate key", III "enter the city")
+			// - drop the player's once-lazy reach cache so the next move reloads it and starts watching the new area.
+			_outbound.InvalidateReachGoals(client);
+
 			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).", quest.QuestId, character.Name, nextQuestId, nextGoal?.GoalType,
 				nextGoal?.TargetName ?? "-");
 			await _agents.SendSystemMessage(character.Id, "Quest updated.");

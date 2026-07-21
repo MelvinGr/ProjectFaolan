@@ -35,5 +35,11 @@ namespace Faolan.GameServer.Quest
 		// #262: make the named NPC in `mapId`'s zone follow (or stop following) the given player - the quest-driven
 		// companion trigger (Casilda after her rescue). No-op if no such NPC is loaded; returns true if applied.
 		bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow);
+
+		// #262: drop the player's cached pending ReachArea goals (WorldEntity.PendingReachGoals) so the next move
+		// reloads them from the DB. Called after a supersession changes the active quest set - a newly-granted stage
+		// may carry a ReachArea goal (e.g. Shipwrecked II's "find the gate key", III's "enter the city") that the
+		// once-lazy cache would otherwise miss until relog.
+		void InvalidateReachGoals(INetworkClient client);
 	}
 }

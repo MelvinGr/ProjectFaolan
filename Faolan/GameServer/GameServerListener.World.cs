@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Tasks;
@@ -17,22 +18,19 @@ namespace Faolan.GameServer
 		// removed so it fires exactly once; SolveGoal handles the tick / completion / chain supersession.
 		private async Task CheckPlayerReachGoals(INetworkClient client, WorldEntity player, Vector3 position)
 		{
-			player.PendingReachGoals ??= await _questProgression.LoadReachGoals(client.Session.Character.Id);
-			if (player.PendingReachGoals.Count == 0)
+			var pending = player.PendingReachGoals ??= await _questProgression.LoadReachGoals(client.Session.Character.Id);
+			if (pending.Count == 0)
 				return;
 
-			for (var i = player.PendingReachGoals.Count - 1; i >= 0; i--)
+			// Snapshot the in-range targets BEFORE solving: SolveGoal can complete a stage whose supersession calls
+			// InvalidateReachGoals (PendingReachGoals -> null, reloaded next move), so we must not index the live list
+			// across a solve. Removes are null-safe; a target solved after an invalidation is simply excluded from the
+			// reload (LoadReachGoals skips completed goals), so no double-fire.
+			var reached = pending.Where(t => t.MapId == player.MapId
+			                                 && (position.X - t.X) * (position.X - t.X) + (position.Z - t.Z) * (position.Z - t.Z) <= t.RadiusSq).ToList();
+			foreach (var target in reached)
 			{
-				var target = player.PendingReachGoals[i];
-				if (target.MapId != player.MapId)
-					continue;
-
-				var dx = position.X - target.X;
-				var dz = position.Z - target.Z;
-				if (dx * dx + dz * dz > target.RadiusSq)
-					continue;
-
-				player.PendingReachGoals.RemoveAt(i);
+				player.PendingReachGoals?.Remove(target);
 				Logger.LogInformation("#262: player {Char} reached quest {Quest} goal {Goal} area ({X},{Z}).", client.Session.Character.Name, target.QuestId, target.GoalId, target.X, target.Z);
 				await _questProgression.SolveGoal(client, target.GoalId);
 			}

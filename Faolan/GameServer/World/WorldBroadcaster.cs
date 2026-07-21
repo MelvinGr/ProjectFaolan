@@ -217,6 +217,15 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
+		// #262: drop the reach-goal cache so the next move reloads it (a supersession may have granted a stage carrying
+		// a new ReachArea goal). No-op if the player has no live entity yet.
+		public void InvalidateReachGoals(INetworkClient client)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player != null)
+				player.PendingReachGoals = null;
+		}
+
 		// Called after items are taken from a bag (loot-all OR a single drag): confirm the take to the client with
 		// LootRemoveItems, and tear the bag down ONLY once it is FULLY emptied (no items AND no coins). A partial loot
 		// leaves the bag in the world with its remaining contents; it still fades on its own expiry (TickExpiry).
