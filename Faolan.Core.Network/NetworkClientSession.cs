@@ -152,6 +152,7 @@ namespace Faolan.Core.Network
 
 		uint SeatedOnHandle { get; set; }
 		System.Numerics.Vector3 SeatedPosition { get; set; }
+		bool SeatedHoldConfirmed { get; set; }
 
 		// The AccountClaim ids in the order last sent in the claims list (CoreClaimIIR sub 0x0001), so a redeem
 		// (sub 0x0003) resolves its 1-based index against a STABLE snapshot - "Claim All" fires one redeem per row
@@ -215,6 +216,12 @@ namespace Faolan.Core.Network
 		// The player's position at the moment they sat: standup only fires once they've moved away from it (the client
 		// keeps streaming position syncs while seated - and a small seat-snap - which must NOT be read as leaving).
 		public System.Numerics.Vector3 SeatedPosition { get; set; }
+
+		// Whether we've already answered the client's SECOND UseObject with the object-action hold-assert (#355). The
+		// bench sit is a TWO-phase handshake: request #1 gets the hold-echo + sit animation, request #2 (the client's
+		// double-send) gets the hold-assert that COMMITS the pose - without answering request #2 the sit-down plays
+		// then reverts after the ~2.6s blend. This gates the assert to fire exactly once per sit.
+		public bool SeatedHoldConfirmed { get; set; }
 
 		// The claim ids in the order last sent to this client (see the interface), so "Claim All"'s per-row redeems
 		// resolve their original 1-based index even as rows are deleted mid-batch.

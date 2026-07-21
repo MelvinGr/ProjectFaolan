@@ -1138,20 +1138,35 @@ namespace Faolan.GameServer.World
 			if (obj == null || !string.Equals(obj.Name, "Bench", StringComparison.OrdinalIgnoreCase))
 				return false;
 
-			// The client double-sends the interact (like the #217 greeting). Re-sending the whole sit sequence on the
-			// duplicate lands a SECOND chair_sit_calm right after the first, which re-triggers the sit-down and reverts
-			// the pose. Absorb the duplicate: already seated on this bench -> ack it (return true) without re-sitting.
+			// The sit is a TWO-phase handshake (#355, capture sit-bench frames 6805-6813). The client sends the bench
+			// UseObject TWICE: request #1 BEFORE it has the pose, request #2 AFTER it receives the animation. Retail
+			// answers EACH - request #1 with the hold-echo (0x12 seq 0x0004) + the sit animation (0x2A), request #2 with
+			// the hold-assert (0x12 seq 0x000F) that COMMITS the pose. Answering only request #1 (our old behavior: send
+			// all three up-front, then silently absorb the duplicate) leaves the client's second confirm unanswered, so
+			// the sit-down plays and then reverts after the ~2.6s chair_sit_calm blend. Split it: seat + echo + animate
+			// on the first, assert once on the second, absorb any further duplicates.
 			if (client.Session.SeatedOnHandle == handle)
-				return true;
+			{
+				// Phase 2 - the client's confirming re-send. Commit the pose with the hold-assert, exactly once.
+				if (!client.Session.SeatedHoldConfirmed)
+				{
+					var assert = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqObjectHold, handle);
+					await SendWorldIir(client, assert);
+					await BroadcastBehaviorToViewers(client, assert);
+					client.Session.SeatedHoldConfirmed = true;
+					_logger.LogInformation("Sit: {Player} hold-confirmed on 0x{Handle:X8}.", player.Name, handle);
+				}
 
-			// Retail brackets the sit ANIMATION with the object-action STATE (behaviorId 0x12) that commits the client
-			// to "using" the bench - without it the sit-down plays then reverts to idle (F2793 hold-echo BEFORE the
-			// animation, F2795 the animation, F2801 hold-assert AFTER). The animation alone is a one-shot transition.
+				return true;
+			}
+
+			// Phase 1 - the initial UseObject. Retail brackets the sit ANIMATION with the object-action hold STATE
+			// (behaviorId 0x12): the hold-echo BEFORE the animation, then the animation itself. The hold-assert is NOT
+			// sent yet - it answers the client's phase-2 re-send above.
 			var sit = BehaviorAnimationCodec.PlayerSitOnObject(player.Handle, handle, BehaviorAnimationCodec.SitRemoteformat(BenchObjectClass));
 			var holdEcho = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqBegin, handle);
-			var holdAssert = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqObjectHold, handle);
 
-			foreach (var body in new[] { holdEcho, sit, holdAssert })
+			foreach (var body in new[] { holdEcho, sit })
 			{
 				await SendWorldIir(client, body);
 				await BroadcastBehaviorToViewers(client, body);
@@ -1159,6 +1174,7 @@ namespace Faolan.GameServer.World
 
 			client.Session.SeatedOnHandle = handle;
 			client.Session.SeatedPosition = player.Position;
+			client.Session.SeatedHoldConfirmed = false;
 			_logger.LogInformation("Sit: {Player} sat on '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name, handle);
 			return true;
 		}
@@ -1180,6 +1196,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			client.Session.SeatedOnHandle = 0;
+			client.Session.SeatedHoldConfirmed = false;
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
 				return;
