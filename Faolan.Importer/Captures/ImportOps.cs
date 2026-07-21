@@ -738,10 +738,13 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
+		// BOOTSTRAP-ONLY (#262): only sets an UN-chained quest (NextQuestId still null), so a re-import never clobbers a
+		// successor set by hand (the Quest editor) or a prior run. A fresh capture-harvested quest has NextQuestId null,
+		// so it still bootstraps; a chain-end seed (null) is a no-op on the already-null quest.
 		private static async Task Chain(DatabaseContext db, uint questId, uint? nextQuestId)
 		{
 			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == questId);
-			if (quest == null)
+			if (quest == null || quest.NextQuestId != null)
 				return;
 
 			quest.NextQuestId = nextQuestId;
@@ -1099,8 +1102,9 @@ namespace Faolan.Importer.Captures
 			goal1.TrailingFlags = "";
 			// #262: goal 1448 = "Enter the jungle" - a REACH objective (region ref 180/cat 51200, NOT a kill). Solved
 			// when the player walks within range of its map marker (416,701 on 4010, the jungle mouth on the way to
-			// Saddur), via the move-handler reach check. No TargetName (it's a place, not an NPC).
-			goal1.GoalType = QuestGoalType.ReachArea;
+			// Saddur), via the move-handler reach check. No TargetName (it's a place, not an NPC). BOOTSTRAP-ONLY.
+			if (!IsWired(goal1))
+				goal1.GoalType = QuestGoalType.ReachArea;
 
 			var goal2 = quest.Goals.FirstOrDefault(g => g.GoalId == 3490) ?? Add(quest, 3490);
 			goal2.Sequence = 2;
@@ -1125,11 +1129,14 @@ namespace Faolan.Importer.Captures
 			// "Shipwrecked / I. The Slaver" (start Kalanthes, aoc.fandom.com/wiki/Quest:Shipwrecked): its completing goal
 			// is 3490 = "Kill slavemaster Saddur" (TrailingRefId 9500 = Saddur's template, at his 521/757 spawn), which
 			// supersedes to stage II "The Acheronian Gate" (12369) - proven by the Hoxxling gameplay capture
-			// (Saddur dies fr11942 -> 10238 completes -> 12369 -> 12373). Goal 1448 ("Enter the jungle", a region ref
-			// 180/cat 51200 - NOT a kill) has no trigger type yet and is pre-satisfied at grant (CreateFlowService).
-			quest.NextQuestId = 12369;
-			goal2.GoalType = QuestGoalType.Kill;
-			goal2.TargetName = "Saddur";
+			// (Saddur dies fr11942 -> 10238 completes -> 12369 -> 12373). BOOTSTRAP-ONLY (see IsWired / Chain): a
+			// re-import won't revert these once the Quest editor (or a prior run) has wired them.
+			quest.NextQuestId ??= 12369;
+			if (!IsWired(goal2))
+			{
+				goal2.GoalType = QuestGoalType.Kill;
+				goal2.TargetName = "Saddur";
+			}
 
 			await db.SaveChangesAsync();
 			Console.WriteLine("Seeded beach quest 10238 goal-detail (2 goals) + Saddur kill trigger -> 12369 (#262).");
@@ -1211,7 +1218,10 @@ namespace Faolan.Importer.Captures
 		// (Kill/LootFromNpc/TalkToNpc by NAME, Kill also by TrailingRefId template id, CollectItem by TrailingRefId item,
 		// ReachArea by marker). All the WIRE/@609 display fields (markers, keys, counts) are left as harvested. `required`
 		// is set ONLY when given - pass it for a hand-authored chain goal, omit it to PRESERVE the captured RequiredCount
-		// (which is in the byte-exact objective region). Chain the quest separately with Chain(). Idempotent.
+		// (which is in the byte-exact objective region). Chain the quest separately with Chain().
+		// BOOTSTRAP-ONLY (#262): only configures an UN-WIRED goal (still the fresh-harvest default: GoalType Kill, no
+		// TargetName/QuestItemId), so a re-import never clobbers trigger fields set by hand (the Quest editor) or a prior
+		// run. A newly-created goal is un-wired, so a fresh import still bootstraps.
 		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string target = null, uint? questItemId = null, uint? required = null)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
@@ -1219,6 +1229,9 @@ namespace Faolan.Importer.Captures
 				return;
 
 			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == goalId);
+			if (goal != null && IsWired(goal))
+				return; // already configured (by hand or a prior seed) - don't overwrite
+
 			if (goal == null)
 			{
 				goal = new QuestGoalDefinition
@@ -1243,6 +1256,14 @@ namespace Faolan.Importer.Captures
 
 			await db.SaveChangesAsync();
 			Console.WriteLine($"Seeded goal: quest {questId} goal {goalId} = {type}{(target != null ? $" '{target}'" : "")}.");
+		}
+
+		// A goal is "wired" once its server-trigger fields diverge from the fresh-harvest default (GoalType Kill, no
+		// TargetName/QuestItemId) - i.e. a Seed* or the Quest editor has configured it. Bootstrap-only seeds skip a wired
+		// goal so a re-import never reverts a hand edit.
+		private static bool IsWired(QuestGoalDefinition goal)
+		{
+			return goal.GoalType != QuestGoalType.Kill || goal.TargetName != null || goal.QuestItemId != null;
 		}
 
 		// Upserts the NpcTemplate TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.
