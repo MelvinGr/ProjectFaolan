@@ -145,7 +145,9 @@ namespace Faolan.GameServer.World
 			// fresh-entry seed uses it; a re-entry keeps its existing (already gear-aware) vitals via GetOrAdd.
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
 			{
-				Vitals = EntityVitals.FromCharacter(character, gearBonuses)
+				Vitals = EntityVitals.FromCharacter(character, gearBonuses),
+				// #401: cache the worn-gear physical armor rating for incoming-damage mitigation (0 when unarmored).
+				ArmorRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0)
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
@@ -304,7 +306,8 @@ namespace Faolan.GameServer.World
 			if (vitals.IsDead)
 				return;
 
-			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
+			// #401: the NPC's swing is physical, so the player's worn-gear armor rating mitigates it.
+			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.ArmorRating);
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
 			// The swing ALWAYS plays - .godmode mobs still visibly attack, they just deal no damage.

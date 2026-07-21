@@ -108,6 +108,26 @@ namespace Faolan.GameServer.Combat
 			return ResolveSpellDamage(0, level);
 		}
 
+		// The half-mitigation point for the provisional armor curve: the total armor rating at which incoming physical
+		// damage is halved. PROVISIONAL (#401) - the real mitigation is the server-GDB TotalArmorValue formula
+		// (FUN_0113ba00: armor rating × Strength-scaled constants, then a LEVEL-normalized %), whose float constants
+		// aren't extracted. Single armor pieces reach ~1500 and a worn set sums into the thousands, so this is set so a
+		// geared set mitigates ~half while a starter's few hundred armor mitigates little; it ignores the real
+		// level-normalization. Tune in-client (gaps.md / #401).
+		public const uint ArmorHalfMitigation = 2000;
+
+		// Reduces incoming PHYSICAL damage by the defender's aggregated armor rating (#401), diminishing-returns:
+		// mitigated = raw × K / (armor + K), so armor == K halves it and it never fully negates a hit (floor 1). Armor 0
+		// (unarmored, or a type with no armor data) returns the raw damage unchanged.
+		public static int ApplyPhysicalMitigation(int rawDamage, uint armorRating)
+		{
+			if (rawDamage <= 0 || armorRating == 0)
+				return rawDamage;
+
+			var mitigated = (double)rawDamage * ArmorHalfMitigation / (armorRating + ArmorHalfMitigation);
+			return Math.Max(1, (int)Math.Round(mitigated, MidpointRounding.AwayFromZero));
+		}
+
 		// Provisional mana cost for a cast. Per-spell costs aren't decoded from captures yet (like damage), so this
 		// is a simple level-scaled value just so casting visibly drains the mana bar (the spell/mana analogue of the
 		// melee stamina cost).

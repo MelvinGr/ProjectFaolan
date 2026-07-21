@@ -33,5 +33,16 @@ namespace Faolan.Tests
 		{
 			Assert.True(CombatResolver.ResolveMeleeDamage(1, 1, 0) >= 1);
 		}
+
+		[Fact]
+		public void ArmorMitigation_ReducesDamage_DiminishingAndNeverToZero()
+		{
+			const uint k = CombatResolver.ArmorHalfMitigation;
+
+			Assert.Equal(100, CombatResolver.ApplyPhysicalMitigation(100, 0)); // no armor = no reduction
+			Assert.Equal(50, CombatResolver.ApplyPhysicalMitigation(100, k)); // armor == K halves the hit
+			Assert.True(CombatResolver.ApplyPhysicalMitigation(100, k * 9) >= 1); // heavy armor never fully negates
+			Assert.True(CombatResolver.ApplyPhysicalMitigation(100, 4000) < CombatResolver.ApplyPhysicalMitigation(100, 1000)); // more armor = less damage
+		}
 	}
 }

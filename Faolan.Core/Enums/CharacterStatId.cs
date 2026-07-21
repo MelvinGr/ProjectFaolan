@@ -52,6 +52,13 @@ namespace Faolan.Core.Enums
 		HitRating = 0x0136,
 		MagicDamage = 0x035D,
 
+		// The PHYSICAL armor rating (#401): the client's armor-mitigation routine (FUN_0113ba00,
+		// GameCode/ArmorMitigation) reads stat 0x1C0 as the base armor for every physical damage type (Slashing/
+		// Piercing/Crushing/…), scaled by Strength through the TotalArmorValue formula. Carried per-item in the
+		// [2][9] region (armor-specific: on 26% of armor pieces vs 7% elsewhere), ×1 scale. The magical-protection
+		// sibling (0x1C3, Int/Wis-scaled) is left unnamed until it's consumed.
+		Armor = 0x01C0,
+
 		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
 		// 0xBF..0x40B in the snapshot; see WorldDespawn) - session/map state, not a real character stat. The snapshot is
 		// built with the live zone's token here.

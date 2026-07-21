@@ -246,6 +246,10 @@ namespace Faolan.GameServer.World
 
 		// Per-NPC swing counter, incremented each auto-attack to feed the attack-animation ack's per-actor counter
 		// field (mirrors the small incrementing value the capture carries; not a persistence key).
+		// The player's aggregated PHYSICAL armor rating from worn gear (#401), summed once at world entry and used to
+		// mitigate incoming physical damage (CombatResolver.ApplyPhysicalMitigation). 0 for NPCs and unarmored players.
+		public uint ArmorRating { get; set; }
+
 		public uint AttackSwingCounter { get; set; }
 
 		// Coins carried by a loot bag (tin, the wallet wire unit), rolled when the bag drops; zeroed once looted

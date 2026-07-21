@@ -61,7 +61,8 @@ namespace Faolan.Importer.Rdb
 		[
 			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax,
 			(uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution, (uint)CharacterStatId.Intelligence,
-			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity
+			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity,
+			(uint)CharacterStatId.Armor // #401: physical armor rating, applied as incoming-damage mitigation
 		];
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 

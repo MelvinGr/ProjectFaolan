@@ -97,9 +97,10 @@ flat level placeholder. `[V0: exact combat scale/formula — the real per-hit da
 - **IMPORTED:** both sources are unioned into the `ItemStatModifier` child table (natural key `(ItemId,
   StatId)`, `Amount` = raw wire value), populated by `RdbItemImporter` via `ItemTemplateStatModifiers.Parse`
   (the `[2][9]` region) plus the field-972 primary; the region wins on the rare overlap. Whitelisted to the
-  stats a server consumer exists for today — the three vitals (HealthMax/StaminaMax/ManaMax) and the five
-  attributes (`ApplicableStatIds`); the decoded ratings (Magic Damage `0x35d`, Hit Rating `0x136`, …) are left
-  unimported until a consumer lands. This retired the old flattened `Item.*Bonus` columns.
+  stats a server consumer exists for today — the three vitals (HealthMax/StaminaMax/ManaMax), the five
+  attributes, and the physical **Armor** rating `0x1c0` (#401) (`ApplicableStatIds`); the other decoded ratings
+  (Magic Damage `0x35d`, Hit Rating `0x136`, the magical-protection `0x1c3`, …) are left unimported until a
+  consumer lands. This retired the old flattened `Item.*Bonus` columns.
   `MaxStatAggregator.AggregateGearBonuses` sums the rows across equipped gear, dividing each by its
   `CharacterStatId.GetScale()` to a display total.
 - **APPLIED (vitals):** at world entry `GetEquippedStatItems` -> `MaxStatAggregator` folds the gear vital totals
