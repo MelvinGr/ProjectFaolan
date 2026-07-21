@@ -32,9 +32,10 @@ namespace Faolan.GameServer.Quest
 		// QuestIIR (0x97E02314): add/update `questId` in the journal at `state` (StateActive 2 / StateCompleted 4).
 		Task SendQuestIir(INetworkClient client, uint questId, uint state);
 
-		// #262: make the named NPC in `mapId`'s zone follow (or stop following) the given player - the quest-driven
-		// companion trigger (Casilda after her rescue). No-op if no such NPC is loaded; returns true if applied.
-		bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow);
+		// #262: the quest-driven companion trigger - the NPC of TEMPLATE id `templateId` (the Escort goal's TrailingRefId)
+		// follows (or stops following) the player. Id-based (data-driven escort, not a hard-coded name). No-op if no such
+		// NPC is loaded; returns true if applied.
+		bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow);
 
 		// #262: drop the player's cached pending ReachArea goals (WorldEntity.PendingReachGoals) so the next move
 		// reloads them from the DB. Called after a supersession changes the active quest set - a newly-granted stage

@@ -22,11 +22,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// RestorePlayerQuests.
 		public const uint BeachStarterQuestId = 10238;
 
-		// #262 the Casilda intro-chain ESCORT stage (the final stage: 13479 kill -> 13563 loot -> 13480 talk -> 12407
-		// escort). While this stage is active the player has "freed" Casilda and she follows them as their escort; on
-		// login at this stage the follow is restored (BurstlessWorldEntry). Completing it ends the escort (she stops).
-		public const uint CasildaEscortQuestId = 12407;
-
 		// The QuestFullUpdate (0x63268258) carries the quest's LEVEL (the u32 after the second questId) - a quest PROPERTY,
 		// CONSTANT per quest across its whole lifecycle (every captured 13479 full-update uses 3, on grant and on every
 		// re-display: frames 687/8876/9947/10129). It was earlier read as a "state/category" enum, but the harvest across

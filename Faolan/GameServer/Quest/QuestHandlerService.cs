@@ -69,28 +69,40 @@ namespace Faolan.GameServer.Quest
 			_logger.LogInformation("#267: dropped beach chain-wall collision (handle 0x{Handle:X8}) for {Player}.", chain.CapturedHandle, player.Name);
 
 			// She's freed now: clear the captive (chained) struggle pose so she stands/walks normally as she follows
-			// (the live counterpart to the captive pose the interest stream sends while she's a prisoner).
-			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == "Casilda");
+			// (the live counterpart to the captive pose the interest stream sends while she's a prisoner). Resolve the
+			// escortee by her TEMPLATE id (the Escort goal's TrailingRefId), not by name.
+			var escorteeTpl = await EscorteeTemplateId(client.Session.Character.Id);
+			var casilda = escorteeTpl == 0
+				? null
+				: _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.NpcTemplateId == escorteeTpl);
 			if (casilda != null)
 				await SendCasildaPose(client, casilda.Handle, false);
 		}
 
-		// Whether the character has freed Casilda - data-driven (no hard-coded quest ids): any COMPLETED quest whose
-		// first goal is a TalkToNpc goal targeting Casilda (the freeing stage of the intro chain, #261).
+		// Whether the escortee has been freed - data-driven off the ESCORT goal (no hard-coded id/name): the player has a
+		// quest with an Escort goal that is Active or Completed. The escort stage is granted the instant she's freed
+		// (the talk-to-free completes -> escort superseded), so "has an escort quest" == "freed" (#262). The beach gate
+		// then stays down.
 		public async Task<bool> IsCasildaFreed(uint characterId)
+		{
+			return await EscorteeTemplateId(characterId) != 0;
+		}
+
+		// The template id of the escortee the player is (or was) escorting - the Escort goal's TrailingRefId on any
+		// Active/Completed escort quest, or 0 if none. Used to resolve the escortee live by ID rather than by name.
+		private async Task<uint> EscorteeTemplateId(uint characterId)
 		{
 			foreach (var quest in await _database.GetCharacterQuests(characterId))
 			{
-				if (quest.State != QuestState.Completed)
+				if (quest.State != QuestState.Active && quest.State != QuestState.Completed)
 					continue;
 
 				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-				if (goal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
-					return true;
+				if (def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+					return escort.TrailingRefId;
 			}
 
-			return false;
+			return 0;
 		}
 
 		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is

@@ -824,10 +824,24 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
 			}
 
-			// #262: if the player logs in mid-escort (Casilda freed, escort stage active), resume her follow now - the
-			// live talk-trigger only fires on the talk itself, so without this a relog leaves her standing at the cage.
-			if (character != null && Array.Exists(await Database.GetCharacterQuests(character.Id), q => q.QuestId == WorldQuest.CasildaEscortQuestId && q.State == QuestState.Active))
-				_broadcaster.SetNpcFollowByName(mapId, "Casilda", client.Session.Account.ClientInstance, true);
+			// #262: if the player logs in mid-escort (an escort stage active), resume the escortee's follow now - the
+			// live grant-trigger only fires on the talk itself, so without this a relog leaves her at the cage. Data-
+			// driven off the Escort goal + its escortee template id (no hard-coded quest id / name).
+			if (character != null)
+			{
+				foreach (var q in await Database.GetCharacterQuests(character.Id))
+				{
+					if (q.State != QuestState.Active)
+						continue;
+
+					var qdef = await Database.GetQuestDefinition(q.QuestId);
+					if (qdef?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+					{
+						_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Account.ClientInstance, true);
+						break;
+					}
+				}
+			}
 		}
 
 		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002

@@ -1214,6 +1214,17 @@ namespace Faolan.Importer.Captures
 			await SeedGoal(db, 13480, 5745, QuestGoalType.TalkToNpc, "Casilda", required: 1);
 			await Chain(db, 12407, null); // escort is the chain end
 			await SeedGoal(db, 12407, 3544, QuestGoalType.Escort, "Casilda", required: 1);
+
+			// The escortee's TEMPLATE id (Casilda 9411) as the Escort goal's TrailingRefId, so the runtime follow trigger
+			// resolves her by ID not name (#262). Set AUTHORITATIVELY every run (not bootstrap-only): the capture's escort
+			// @609 carries no trailing ref and this module runs after the objective-goals refresh, so it must win. Byte-
+			// safe - 12407's objective region is not in the tested set.
+			var escortGoal = await db.QuestGoalDefinitions.FirstOrDefaultAsync(g => g.QuestDefinitionId == 12407 && g.GoalId == 3544);
+			if (escortGoal != null)
+			{
+				escortGoal.TrailingRefId = 9411;
+				await db.SaveChangesAsync();
+			}
 		}
 
 		// Casilda's quest 13479 snapshot Quest_c scalars (#255): journal-record fields that live ONLY in the

@@ -68,6 +68,12 @@ namespace Faolan.GameServer.World
 		// before each mob's first swing it pushes `CombatMode = 4`, which is what draws its weapon. (The player uses 1
 		// and one non-swinging entity used 1 - the field is a stance/mode code that isn't fully decoded, but 4 is the
 		// value every actual melee swinger sends.)
+		// #262: Casilda's NPC template - the escortee shown CHAINED (captive pose) on interest-spawn until she's freed.
+		// Her captive/freed pose is inherently Casilda-specific (hard-coded behaviorIds), and the gate runs BEFORE she's
+		// freed (no escort quest yet to resolve her from), so this is the one place her identity stays a constant - kept
+		// as a TEMPLATE id (stable) rather than a name compare.
+		private const uint CasildaTemplateId = 9411;
+
 		private const uint NpcCombatModeValue = 4;
 
 		// The combat-mode stat value a PLAYER sends when it draws its weapon (#218/#259): 1, vs the mob's 4 (the field is
@@ -194,24 +200,32 @@ namespace Faolan.GameServer.World
 		// Make the named NPC in `mapId`'s zone follow (or stop following) the given player handle - the quest-driven
 		// entry point (e.g. Casilda after her rescue stage), keyed by NAME since handles are session-volatile. No-op
 		// (returns false) if no such NPC is loaded in the zone.
-		public bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow)
+		// #262: make the NPC of TEMPLATE id `templateId` in `mapId`'s zone follow (or stop following) the player - the
+		// id-based escort companion trigger (prefer ids over names). The escortee's template is the Escort goal's
+		// TrailingRefId (e.g. Casilda 9411). See SetNpcFollow for the instance-aware zone resolution.
+		public bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow)
 		{
-			// Resolve the PLAYER's instance, not the default one: the beach is Solo-instanced (#268), so the player and
-			// their own Casilda live in a private playfield copy (e.g. 0x00A00001), not the shared instance 0. Find the
-			// map's live zone that actually contains this player, then look up Casilda in THAT copy - a TryGetZone(mapId)
-			// default-instance lookup misses her entirely and the follow silently no-ops.
+			return SetNpcFollow(mapId, playerHandle, follow, e => e.NpcTemplateId == templateId, $"template {templateId}");
+		}
+
+		// Resolve the PLAYER's instance, not the default one: the beach is Solo-instanced (#268), so the player and
+		// their own escortee live in a private playfield copy (e.g. 0x00A00001), not the shared instance 0. Find the
+		// map's live zone that actually contains this player, then look up the escortee (by `match`) in THAT copy - a
+		// TryGetZone(mapId) default-instance lookup misses her entirely and the follow silently no-ops.
+		private bool SetNpcFollow(uint mapId, uint playerHandle, bool follow, Func<WorldEntity, bool> match, string label)
+		{
 			var zone = _sim.World.ZonesForMap(mapId).FirstOrDefault(z => z.TryGet(playerHandle, out _));
 			if (zone == null)
 				return false;
 
-			var npc = zone.Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == npcName);
+			var npc = zone.Entities.FirstOrDefault(e => !e.IsPlayer && match(e));
 			if (npc == null)
 				return false;
 
 			npc.FollowTargetHandle = follow
 				? playerHandle
 				: null;
-			_logger.LogInformation("Follow: {Name} {State} player 0x{Player:X8} (by name).", npcName, follow
+			_logger.LogInformation("Follow: {Label} {State} player 0x{Player:X8}.", label, follow
 				? "now follows"
 				: "stopped following", playerHandle);
 			return true;
@@ -1469,7 +1483,7 @@ namespace Faolan.GameServer.World
 						// death/loot/aggro land where the client actually has it.
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
-						if (!ev.Subject.IsPlayer && ev.Subject.Name == "Casilda" && recipient.Session?.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
+						if (!ev.Subject.IsPlayer && ev.Subject.NpcTemplateId == CasildaTemplateId && recipient.Session?.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
 							await _questHandler.SendCasildaPose(recipient, ev.Subject.Handle, true);
 						break;
 					}

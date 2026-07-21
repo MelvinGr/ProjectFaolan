@@ -282,6 +282,18 @@ namespace Faolan.GameServer.Quest
 			// - drop the player's once-lazy reach cache so the next move reloads it and starts watching the new area.
 			_outbound.InvalidateReachGoals(client);
 
+			// #262: a new ESCORT stage means the escortee becomes the player's companion and follows them (the world
+			// tick steps her along). DATA-DRIVEN off the Escort goal - resolved by the escortee's TEMPLATE id
+			// (TrailingRefId, e.g. Casilda 9411), not a hard-coded name; the player's world handle is its ClientInstance.
+			if (nextGoal is { GoalType: QuestGoalType.Escort, TrailingRefId: not 0 })
+			{
+				_outbound.SetNpcFollowByTemplate(character.MapId, nextGoal.TrailingRefId, client.Session.Account.ClientInstance, true);
+				// #267: on the Tortage beach, freeing the escortee drops the chain-decor "invisible wall" collision - the
+				// SimpleDynel visual-change retail sends at this moment (Hoxxling gameplay idx 2053). Beach-scene only.
+				if (character.MapId == Map.TortageBeachId)
+					await _questHandler.DropBeachWall(client);
+			}
+
 			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).", quest.QuestId, character.Name, nextQuestId, nextGoal?.GoalType,
 				nextGoal?.TargetName ?? "-");
 			await _agents.SendSystemMessage(character.Id, "Quest updated.");
@@ -304,23 +316,11 @@ namespace Faolan.GameServer.Quest
 		private async Task CompleteObjective(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint required)
 		{
 			if (def.NextQuestId is not null)
-				await CompleteAndSupersede(client, character, quest, def);
+				await CompleteAndSupersede(client, character, quest, def); // the escort follow / beach wall fire from here when the NEXT stage is an Escort
 			else if (goal.GoalType == QuestGoalType.Kill)
 				await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
 			else
 				await CompleteFinal(client, character, quest, def, required); // chainless loot/talk -> just complete
-
-			// #262: talking to Casilda is what FREES her - on that talk-goal completion she becomes the player's
-			// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
-			// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
-			if (goal.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
-			{
-				_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, true);
-				// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
-				// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
-				// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
-				await _questHandler.DropBeachWall(client);
-			}
 		}
 
 		private async Task<uint> GoalProgressOf(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
