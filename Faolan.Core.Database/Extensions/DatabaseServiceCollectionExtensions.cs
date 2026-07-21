@@ -14,7 +14,14 @@ namespace Faolan.Core.Database.Extensions
 			// boundary touched only at save/load points. So contexts are SHORT-LIVED, one per unit of work, created
 			// from a pooled factory - never held open across a connection or game tick (which would leak/stale and
 			// is not thread-safe). The repository owns all context lifetime via this factory.
-			services.AddPooledDbContextFactory<DatabaseContext>(options => { options.UseSqlite($"Data Source={configuration.DatabasePath}", x => x.MigrationsAssembly("Faolan")); });
+			// SingleQuery splitting (explicit): our multi-collection Includes (GetQuestDefinition = Goals + TextRefs, the
+			// NpcTemplate load = Spells + Equipment + Morphs) all have SMALL collections and run per-quest-check /
+			// per-NPC-at-zone-load, so one query (a tiny cartesian, ONE round-trip) beats split (a round-trip per
+			// collection). Stating it also silences EF's QuerySplittingBehavior warning (which fires when it's unset).
+			services.AddPooledDbContextFactory<DatabaseContext>(options =>
+			{
+				options.UseSqlite($"Data Source={configuration.DatabasePath}", x => x.MigrationsAssembly("Faolan").UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery));
+			});
 
 			services.AddSingleton<IDatabaseRepository, DatabaseRepository>();
 
