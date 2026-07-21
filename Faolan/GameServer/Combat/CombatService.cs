@@ -209,7 +209,10 @@ namespace Faolan.GameServer.Combat
 
 			var echoedArgs = BehaviorAckBody.InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
 			var level = client.Session.Character.Level;
-			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, level);
+			// #395: melee damage is driven by the equipped main-hand weapon (min/max from the RDB template), not a flat
+			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
+			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
+			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level);
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.

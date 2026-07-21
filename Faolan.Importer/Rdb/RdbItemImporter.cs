@@ -117,7 +117,7 @@ namespace Faolan.Importer.Rdb
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
 
-			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0, qualitiesAdded = 0, statsAdded = 0, bagsAdded = 0;
+			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0, qualitiesAdded = 0, statsAdded = 0, bagsAdded = 0, weaponDamageAdded = 0;
 			var firstSampleShown = false;
 
 			foreach (var item in items)
@@ -217,6 +217,22 @@ namespace Faolan.Importer.Rdb
 				if (SyncStatModifiers(item, mods))
 					statsAdded++;
 
+				// Weapon MIN/MAX damage (docs/rdb/item-template-stats.md, #395): property fields 286 (0x11E) = min and
+				// 285 (0x11D) = max, decoded from the client's GUIGetMinDamage()/GUIGetMaxDamage(). Same strict property
+				// run as value/quality. Stored only when both are present and sane (min <= max, non-zero) - non-weapons
+				// (and weapons whose fields sit in the non-monotonic tail) leave them NULL.
+				var hasMin = TryReadPropertyField(template.AsSpan(12), 286, out var minDmg);
+				var hasMax = TryReadPropertyField(template.AsSpan(12), 285, out var maxDmg);
+				if (hasMin && hasMax && minDmg > 0 && minDmg <= maxDmg)
+				{
+					if (item.MinDamage != (int)minDmg || item.MaxDamage != (int)maxDmg)
+					{
+						item.MinDamage = (int)minDmg;
+						item.MaxDamage = (int)maxDmg;
+						weaponDamageAdded++;
+					}
+				}
+
 				// BAG capacity: property field 104 (= the Bag container kind 0x68) holds the extra backpack slots a bag
 				// adds when equipped (the "+N slots" tooltip) - Burlap 24 / Bag of Holding 20 / Veteran's Bag 35. It sits
 				// in the table's non-monotonic tail (after the strictly-decreasing run), so it needs the dedicated scan.
@@ -261,11 +277,14 @@ namespace Faolan.Importer.Rdb
 			// The *Bonus columns were set on tracked Item entities above, so they save with everything else. (The old
 			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
 			// other four, so a changed/moved modifier can't leave a stale value.)
-			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0)
+			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0 || weaponDamageAdded > 0)
 				await db.SaveChangesAsync();
 
 			if (bagsAdded > 0)
 				Console.WriteLine($"  bag capacities (field 104) set on {bagsAdded} item(s).");
+
+			if (weaponDamageAdded > 0)
+				Console.WriteLine($"  weapon min/max damage (fields 286/285) set on {weaponDamageAdded} item(s).");
 
 			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, qualitiesAdded, statsAdded);
 		}

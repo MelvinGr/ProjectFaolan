@@ -71,6 +71,24 @@ points" read was just the missing ÷10 scale. Con/Int/Wis appear only here; **St
 big values), largely disjoint from the small `972` primary — of 468 items with a `972` primary attribute only
 17 also carry that attribute in the region, so the two are near-complementary sources, not duplicates.
 
+## Weapon min/max damage (#395) — property fields 285/286
+
+The weapon's inherent damage is NOT a stat modifier (weapons carry no weapon-specific `[2][9]` record); it's a
+pair of **property-table fields** (the strict-decreasing run, same space as 74/499/972):
+
+| field | meaning | how it was pinned |
+|-------|---------|-------------------|
+| `285` (0x11D) | **MAX** damage | client `CoreCombatManager::GUIGetMaxDamage()` reads `getProp(0x11d, 2)` |
+| `286` (0x11E) | **MIN** damage | client `CoreCombatManager::GUIGetMinDamage()` reads `getProp(0x11e, 2)` |
+
+Pinned by Ghidra (tools/ghidra `StrXref.java` found the internal stat names *MeleeWeaponDamage*/*RangedWeaponDamage*;
+the item property getters were reached via ConstScan on field 972 → the two named GUIGet\*Damage functions). The
+GUI getters ADD character-stat modifiers on top (attribute/rating fields 0x348/0x3cc/0x36b), so 285/286 are the
+weapon BASE; the client layers stats for display. Imported onto `Item.MinDamage`/`Item.MaxDamage` (460 weapons,
+read via the strict property run; min ≤ max). Raw template values — **scale provisional** (`CombatResolver.WeaponDamageScale`
+÷100, tune in-client). `CombatResolver.ResolveMeleeDamage` drives melee off the equipped weapon instead of the
+flat level placeholder. `[V0: exact combat scale/formula — the real per-hit damage is a server-GDB formula, undecoded]`
+
 ## Status / next step
 
 - **Decoded + validated:** `972`/`971` primary attribute (Str/Dex +1/+2/+3) AND the full `[2][9]` region

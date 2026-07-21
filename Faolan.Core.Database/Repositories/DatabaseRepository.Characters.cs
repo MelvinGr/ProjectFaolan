@@ -27,6 +27,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
 		Task<Item[]> GetEquippedStatItems(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
+		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
@@ -305,6 +306,22 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
+		}
+
+		// The (min, max) damage of the character's equipped MELEE main-hand weapon (MainHandLeft), for melee resolution
+		// (#395), or null if that slot is empty or the item carries no imported weapon damage. A lightweight projection -
+		// no nav graph loaded (the combat swing hot path).
+		public async Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var dmg = await ctx.CharacterEquipment
+				.Where(e => e.CharacterId == characterId && e.MainHandLeftId != null)
+				.Join(ctx.Items, e => e.MainHandLeftId, i => i.Id, (_, i) => new { i.MinDamage, i.MaxDamage })
+				.FirstOrDefaultAsync();
+
+			return dmg is { MinDamage: { } min, MaxDamage: { } max }
+				? (min, max)
+				: null;
 		}
 
 		public async Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance)

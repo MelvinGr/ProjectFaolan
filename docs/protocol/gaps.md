@@ -48,6 +48,18 @@ Tracked as the create-burst verbatim residue in Gitea #223.
 
 ---
 
+## Combat
+
+### Weapon damage scale / the melee damage formula
+The weapon min/max damage FIELDS are decoded (RDB item-template 286/285, `docs/rdb/item-template-stats.md`, #395),
+but the exact SCALE those raw values display/combat at, and the real per-hit melee formula, are not: retail computes
+damage server-side (spell-power × weapon × mitigation × gear, a GDB formula not in the client exe or a plain wire
+field). `CombatResolver` uses a provisional ÷100 scale and a weapon-avg-plus-level figure. Close it by correlating
+captured DamageResult numbers against a known equipped weapon, or tune in-client. Tracked in Gitea #395.
+`[V0: exact combat scale/formula — the real per-hit damage is a server-GDB formula, undecoded]`
+
+---
+
 ## How to close a gap
 
 Decode it, add a golden test, then promote the fact to `[V3: …]` in the relevant layer page and delete its entry

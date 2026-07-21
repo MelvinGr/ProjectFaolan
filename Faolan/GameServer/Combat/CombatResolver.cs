@@ -1,3 +1,5 @@
+using System;
+
 namespace Faolan.GameServer.Combat
 {
 	/// <summary>
@@ -79,6 +81,31 @@ namespace Faolan.GameServer.Combat
 				? (ushort)1
 				: casterLevel;
 			return 20 + level * 5;
+		}
+
+		// The divisor turning the raw RDB weapon-damage template values (fields 286/285 = min/max, #395) into a
+		// per-hit damage figure. PROVISIONAL: the field IDs are decoded authoritatively (GUIGetMin/MaxDamage), but the
+		// exact display/combat scale isn't - ÷100 (the vitals convention) gives sane numbers (a starter dagger ~10, a
+		// high-end greatsword ~80). Tune in-client alongside the real damage formula (still server-GDB, undecoded).
+		public const int WeaponDamageScale = 100;
+
+		// Melee swing damage: driven by the EQUIPPED WEAPON's damage (#395) instead of the flat level placeholder, so a
+		// better weapon hits harder. Uses the weapon's average (min+max)/2 scaled down, plus a small level contribution
+		// (so progression still shows and an early low-damage weapon isn't trivial). Falls back to the level placeholder
+		// when the attacker has no weapon damage (unarmed, or a weapon whose RDB damage wasn't imported).
+		public static int ResolveMeleeDamage(int? weaponMinDamage, int? weaponMaxDamage, ushort casterLevel)
+		{
+			var level = casterLevel == 0
+				? (ushort)1
+				: casterLevel;
+
+			if (weaponMinDamage is { } min && weaponMaxDamage is { } max && max > 0)
+			{
+				var avg = (min + max) / 2 / WeaponDamageScale;
+				return Math.Max(1, avg + level);
+			}
+
+			return ResolveSpellDamage(0, level);
 		}
 
 		// Provisional mana cost for a cast. Per-spell costs aren't decoded from captures yet (like damage), so this

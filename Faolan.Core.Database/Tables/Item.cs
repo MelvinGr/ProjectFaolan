@@ -45,6 +45,14 @@ namespace Faolan.Core.Database.Tables
 		// *Bonus columns (Str/Con/Int/Wis/Dex), which could only hold the primary attribute.
 		public virtual ICollection<ItemStatModifier> StatModifiers { get; set; } = [];
 
+		// The weapon's inherent MIN/MAX damage - RDB item-template property fields 286 (0x11E) / 285 (0x11D), decoded
+		// from the client's CoreCombatManager::GUIGetMinDamage()/GUIGetMaxDamage() (docs/rdb/item-template-stats.md,
+		// #395). NULL for non-weapons (and weapons whose fields sit outside the strict property run). The client layers
+		// attribute/rating bonuses on top for display; these are just the weapon base, factored into melee by
+		// CombatResolver. Raw template values (scale provisional).
+		public int? MinDamage { get; set; }
+		public int? MaxDamage { get; set; }
+
 		// The item's quality/rarity tier (Mundane..Legendary) = RDB item-template property field 499 (the client's own
 		// tier id; see ItemQuality). Extracted by RdbItemImporter with the same strictly-decreasing property-table parse
 		// as Value (field 74). NULL when the template carries no field 499 (or the item was never RDB-imported) - the
