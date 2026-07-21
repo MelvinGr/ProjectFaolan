@@ -722,10 +722,14 @@ namespace Faolan.Importer.Captures
 		// later"). Idempotent.
 		private static async Task SeedShipwreckedCityChain(DatabaseContext db)
 		{
-			// II "The Acheronian Gate" -> III "The City of Tortage": reach the gate/ruins (goal 3492 @4010/524,755) then
-			// enter the city (goal 3498 @4020/913,718 - completes on arrival). III is chain-final for now.
+			// II "The Acheronian Gate" -> III "The City of Tortage". II's key objective is LOOTING the Acheronian Gate
+			// Key (item 193186) from Saddur's corpse bag - the same kill->loot pattern as Casilda's Tuut key: Hoxxling
+			// gameplay fr11942 Saddur dies -> fr11947 his corpse becomes a loot bag -> fr12023 the key is added to the
+			// 0x71 quest container. So goal 3492 = LootFromNpc "Saddur" (its 524/755 marker is Saddur's spot). (Retail's
+			// 2nd goal 7134 "unlock the gate" wasn't imported.) III's goal 3498 = enter the city (ReachArea @4020,
+			// completes on arrival). III is chain-final for now.
 			await Chain(db, 12369, 12373);
-			await SeedGoal(db, 12369, 3492, QuestGoalType.ReachArea);
+			await SeedGoal(db, 12369, 3492, QuestGoalType.LootFromNpc, "Saddur", questItemId: 193186);
 			await SeedGoal(db, 12373, 3498, QuestGoalType.ReachArea);
 
 			// V "The Quarry" (12371) - granted by Turach's dialogue (ConversationNodes.GrantQuestId 12371), so NOT chained
