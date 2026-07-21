@@ -25,6 +25,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterByName(string name, uint realmId);
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
+		Task<Item[]> GetEquippedStatItems(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
@@ -278,6 +279,26 @@ namespace Faolan.Core.Database.Repositories
 				.Include(e => e.VanityWrist)
 				.Include(e => e.Wrist)
 				.FirstOrDefaultAsync(e => e.CharacterId == characterId);
+		}
+
+		// The character's worn STAT-BEARING items (the 16 combat slots) with their StatModifiers loaded, one entry per
+		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3). Reads the
+		// equipment's *Id columns (no nav load), then fetches only those Items + their modifiers. Empty when the
+		// character has no equipment row or no stat-bearing gear.
+		public async Task<Item[]> GetEquippedStatItems(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var equipment = await ctx.CharacterEquipment.AsNoTracking().FirstOrDefaultAsync(e => e.CharacterId == characterId);
+			if (equipment == null)
+				return [];
+
+			var ids = equipment.StatBearingItemIds().ToHashSet();
+			if (ids.Count == 0)
+				return [];
+
+			var byId = await ctx.Items.AsNoTracking().Include(i => i.StatModifiers).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
+			// Preserve one entry per occupied slot (duplicates included) so a stat granted by two worn copies stacks.
+			return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
 		}
 
 		public async Task<uint[]> GetCharacterFeats(uint characterId)

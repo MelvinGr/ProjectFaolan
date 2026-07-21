@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -156,6 +157,25 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey(nameof(WristId))]
 		public virtual Item? Wrist { get; set; }
+
+		// The template ids of the STAT-BEARING worn items - the 16 combat slots (armour + jewellery + weapons), reading
+		// the *Id columns directly so no navigation load is needed. Excludes the cosmetic Vanity* slots (appearance
+		// only) and the Bag / ResourceBag / FirstPosBag containers (their capacity is a bag stat, not a combat stat). A
+		// slot occupied by the same template as another (e.g. two identical rings) yields the id twice, so each worn
+		// copy counts once when its stat modifiers are aggregated (#3). 0/null slots are skipped.
+		public IEnumerable<uint> StatBearingItemIds()
+		{
+			uint?[] slots =
+			[
+				NeckId, HeadId, ChestId, MainHandLeftId, BeltId, OffHandLeftId, RingLeftId, RingRightId,
+				CloakId, ShoulderId, BootsId, HandsId, LegsId, WristId, MainHandRightId, OffHandRightId
+			];
+			foreach (var id in slots)
+			{
+				if (id is > 0)
+					yield return id.Value;
+			}
+		}
 
 		// Indexed access by wire slot id (equipment[CharacterEquipmentSlot.Head]). Every CharacterEquipmentSlot maps to
 		// a column - the 17 worn slots plus the 5 vanity slots - so a defined enum value always resolves; the default

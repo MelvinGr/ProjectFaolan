@@ -724,7 +724,11 @@ namespace Faolan.GameServer
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
 			var map = await Database.GetMap(mapId);
-			_simulation.RegisterPlayerInWorld(client, map?.InstanceMode ?? MapInstanceMode.Shared);
+			// #3: aggregate the equipped-gear stat bonuses so the player's live vitals seed with gear-boosted maxes.
+			var gearBonuses = character == null
+				? null
+				: Combat.MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id));
+			_simulation.RegisterPlayerInWorld(client, map?.InstanceMode ?? MapInstanceMode.Shared, gearBonuses);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
 

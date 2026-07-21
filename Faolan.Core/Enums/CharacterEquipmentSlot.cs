@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Faolan.Core.Enums
 {
 	// The worn-equipment slot ids as they appear on the wire (spawn InventoryEntry.pos / the inventory
@@ -51,5 +53,21 @@ namespace Faolan.Core.Enums
 		VanityBoots = 1014,
 		VanityLegs = 1016,
 		VanityWrist = 1018
+	}
+
+	public static class CharacterEquipmentSlotExtensions
+	{
+		public static readonly ImmutableArray<CharacterEquipmentSlot> StatBearingSlots =
+		[
+			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon,
+			CharacterEquipmentSlot.Belt, CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing,
+			CharacterEquipmentSlot.Cape, CharacterEquipmentSlot.Shoulder, CharacterEquipmentSlot.Boots, CharacterEquipmentSlot.Hands,
+			CharacterEquipmentSlot.Legs, CharacterEquipmentSlot.Wrist, CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo
+		];
+
+		extension(CharacterEquipmentSlot)
+		{
+			public static ImmutableArray<CharacterEquipmentSlot> StatBearing => StatBearingSlots;
+		}
 	}
 }

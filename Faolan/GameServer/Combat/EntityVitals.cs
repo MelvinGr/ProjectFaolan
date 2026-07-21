@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -126,19 +127,36 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     Full-health vitals seeded from a character's persisted max stats (class/level defaults if it has none).
-		///     The world model's single seed point for a player's live vitals - used both by combat and by the world
-		///     simulation when a player is registered.
+		///     Full-health vitals seeded from a character's persisted max stats (class/level defaults if it has none),
+		///     PLUS the equipped-gear vital bonuses (#3) so worn +HP/+Stamina/+Mana raises the max and the regen bar can
+		///     fill past the class base. The world model's single seed point for a player's live vitals - used both by
+		///     combat and by the world simulation when a player is registered. <paramref name="gearBonuses" /> is the
+		///     MaxStatAggregator output (display-unit totals by stat); null/absent = no gear bonus.
 		/// </summary>
-		public static EntityVitals FromCharacter(Character character)
+		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null)
 		{
 			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-			var vitals = FromMax(max.Health, max.Mana, max.Stamina);
+			var vitals = FromMax(
+				AddGear(max.Health, gearBonuses, CharacterStatId.HealthMax),
+				AddGear(max.Mana, gearBonuses, CharacterStatId.ManaMax),
+				AddGear(max.Stamina, gearBonuses, CharacterStatId.StaminaMax));
 			// #214: a character that logged out dead is still dead - seed current health at 0 (max stays full) so the
 			// world model agrees with the dead login snapshot and RespawnMe/TryRespawnNow (which gate on IsDead) work.
 			if (character.IsDead)
 				vitals.Health = 0;
 			return vitals;
+		}
+
+		// Adds the gear bonus for one vital stat onto its base max, clamped at 0 (a bonus never drops a pool below zero).
+		private static uint AddGear(uint baseMax, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses, CharacterStatId stat)
+		{
+			if (gearBonuses == null || !gearBonuses.TryGetValue(stat, out var bonus))
+				return baseMax;
+
+			var total = (long)baseMax + bonus;
+			return total < 0
+				? 0
+				: (uint)total;
 		}
 
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Combat;
@@ -130,7 +131,7 @@ namespace Faolan.GameServer.World
 		// transform + vitals from the persisted Character. After this the WorldEntity is the source of truth for live
 		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the
 		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
-		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared)
+		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null)
 		{
 			var character = client.Session?.Character;
 			if (character == null)
@@ -140,9 +141,11 @@ namespace Faolan.GameServer.World
 			// The player's pre-existing entity (null on a fresh login) decides whether this is a re-entry that should
 			// keep its current instance vs. a fresh placement that picks one from the map's mode (#268).
 			Players.TryGetValue(client, out var existing);
+			// #3: seed the max vitals with the equipped-gear bonus so the regen bar fills past the class base. Only the
+			// fresh-entry seed uses it; a re-entry keeps its existing (already gear-aware) vitals via GetOrAdd.
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
 			{
-				Vitals = EntityVitals.FromCharacter(character)
+				Vitals = EntityVitals.FromCharacter(character, gearBonuses)
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
