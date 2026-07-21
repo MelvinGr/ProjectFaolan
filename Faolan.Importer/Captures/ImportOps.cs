@@ -709,8 +709,27 @@ namespace Faolan.Importer.Captures
 
 			await SeedBeachQuestGoals(db);
 			await SeedShipwreckedCityChain(db);
+			await SeedCaptureReachQuests(db);
 			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
+		}
+
+		// Other capture-harvested quests whose single objective is a LOCATION (TrailingCategory 100 + a map marker),
+		// each granted by a SPAWNED NPC's dialogue (ConversationNodes.GrantQuestId). Wire the goal as ReachArea off its
+		// captured marker so it completes on arrival - the most quest data we can source without per-quest capture
+		// correlation (#358). Best-effort ("as much as possible, not 100%"): cat-100 = a location objective (proven for
+		// Shipwrecked III "enter city" / VIII Nadini), but the exact retail purpose (reach vs talk-at-location) isn't
+		// pinned; reaching the marker is a reasonable stand-in. All 7 granting NPCs are spawned and all target maps
+		// exist. Server-trigger field only (not byte-exact); bootstrap-only via SeedGoal.
+		private static async Task SeedCaptureReachQuests(DatabaseContext db)
+		{
+			await SeedGoal(db, 13041, 4833, QuestGoalType.ReachArea);  // giver Alyssa        -> reach @4020 (959,723)
+			await SeedGoal(db, 13986, 6459, QuestGoalType.ReachArea);  // giver Tanner Chael  -> reach @1000 (283,659)
+			await SeedGoal(db, 14092, 6597, QuestGoalType.ReachArea);  // giver Borcha        -> reach @1010 (88,205)
+			await SeedGoal(db, 14617, 7389, QuestGoalType.ReachArea);  // giver Cadarn        -> reach @3000 (992,1134)
+			await SeedGoal(db, 14622, 7394, QuestGoalType.ReachArea);  // giver Serving Wench -> reach @2000 (826,533)
+			await SeedGoal(db, 14627, 7399, QuestGoalType.ReachArea);  // giver Caor          -> reach @1000 (403,445)
+			await SeedGoal(db, 19522, 14328, QuestGoalType.ReachArea); // giver Hadrathus     -> reach @30200 (627,868)
 		}
 
 		// The Shipwrecked destiny chain past stage I (#262/#358). Beach dump proves the supersession 10238 -> 12369 ->
