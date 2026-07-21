@@ -268,17 +268,26 @@ namespace Faolan.GameServer
 
 			if (applyTo == applyFrom)
 			{
+				// #371: only a TIMED self-buff is tracked. A zero-duration spell is an INSTANT effect (the RDB leads:
+				// field 0x008 absent == "no duration"), not a permanent buff - it has nothing for TickBuffExpiry to
+				// expire, renders no icon, and registering it would leak a never-expiring ActiveBuffs entry that also
+				// persists (ExpiresAt NULL) and re-applies on every login. The wire ApplySpell is still SENT above
+				// (retail's carrier); we just don't TRACK an instant as an active buff. Every real buff has a finite
+				// duration (mount ride 24h, Shield 1h/10h, longest is Barrel Blast 1000h), so nothing legitimate needs
+				// the old "lives until cancelled" (null) path. This mirrors the NPC-debuff path (WorldSimulation), which
+				// already tracks only when duration > 0.
 				var durationMs = ActiveBuff.DurationMsFromPayload(payload);
-				var entity = _simulation.PlayerWorldEntity(client);
-				if (entity != null && entity.Handle == applyTo)
+				if (durationMs > 0)
 				{
-					entity.ActiveBuffs[spellId] = new ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, durationMs > 0
-						? durationMs / 1000f
-						: null)
+					var entity = _simulation.PlayerWorldEntity(client);
+					if (entity != null && entity.Handle == applyTo)
 					{
-						// Preserve the effect nonce so the buff can be reconstructed byte-compatibly on relog (#274).
-						Nonce = ActiveBuff.NonceFromPayload(payload)
-					};
+						entity.ActiveBuffs[spellId] = new ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, durationMs / 1000f)
+						{
+							// Preserve the effect nonce so the buff can be reconstructed byte-compatibly on relog (#274).
+							Nonce = ActiveBuff.NonceFromPayload(payload)
+						};
+					}
 				}
 			}
 		}
