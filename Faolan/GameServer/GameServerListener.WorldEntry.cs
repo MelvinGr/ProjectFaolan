@@ -43,10 +43,16 @@ namespace Faolan.GameServer
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on
 		// the row's captured handle + the live playfield instance (the rewrite the live splice path applies).
-		private IEnumerable<byte[]> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance)
+		private IEnumerable<byte[]> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance, IReadOnlySet<uint> activeQuestIds)
 		{
 			foreach (var row in rows)
 			{
+				// #262: quest-GATED objects (GateQuestId set) spawn only for a player holding that quest active - the
+				// world-object analogue of an NPC's gating (but the object simply isn't sent; it doesn't spawn). Ungated
+				// objects (the default, incl. the bricks for now) always spawn.
+				if (!row.SpawnsFor(activeQuestIds))
+					continue;
+
 				if (WorldObjectBuilder.TryBuild(row, row.CapturedHandle, playfieldInstance, out var body))
 					yield return FrameWorldEntryRecord(client, body);
 				else
@@ -689,6 +695,12 @@ namespace Faolan.GameServer
 			var scaffoldCharacter = await EnsureSpawnScaffoldRows(character);
 			var worldObjectRows = await Database.GetWorldObjects(mapId);
 
+			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
+			// Empty for a null character; ungated objects (the default) ignore it.
+			var activeQuestIds = character == null
+				? new HashSet<uint>()
+				: (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).Select(q => q.QuestId).ToHashSet();
+
 			QuestDefinition beachDef = null;
 			try
 			{
@@ -773,7 +785,7 @@ namespace Faolan.GameServer
 			{
 				BuildMapChange(client, map, playfieldToken)
 			};
-			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken));
+			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken, activeQuestIds));
 
 			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, playfieldToken);
 			if (playerSpawn != null)

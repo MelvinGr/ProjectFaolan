@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Numerics;
@@ -73,6 +74,22 @@ namespace Faolan.Core.Database.Tables
 		public uint SubOpcode { get; set; }
 		public uint? QuestItemEffect { get; set; } // proto field 6 (present on ~23%)
 		public uint? WaypointType { get; set; } // proto field 7 (present on zone-label objects)
+
+		// #262: quest GATE - when set, this object is delivered ONLY to a player who has this quest ACTIVE (the
+		// world-object analogue of an NPC's GateQuestIds / IsVisibleTo). null = ungated (delivered to everyone, the
+		// default). A BUSINESS column, NOT a wire field, so it never affects the byte-exact rebuild. Nothing is gated
+		// yet - the mechanism is in place for quest-conditional decor/pickups (e.g. gating the quarry Stone Bricks on
+		// 12371) once needed. Currently only filtered at world entry; mid-session appear/disappear on quest state
+		// change (like RefreshQuestVisibility for NPCs) is a follow-up.
+		public uint? GateQuestId { get; set; }
+
+		// Whether this object SPAWNS for a player holding `activeQuestIds` - i.e. whether it is sent at world entry. A
+		// gated object the player doesn't qualify for simply isn't delivered (it never spawns; it is NOT spawned-and-
+		// hidden). Ungated objects always spawn.
+		public bool SpawnsFor(IReadOnlySet<uint> activeQuestIds)
+		{
+			return GateQuestId is not { } gate || (activeQuestIds != null && activeQuestIds.Contains(gate));
+		}
 
 		[NotMapped]
 		public Vector3? DestinationPosition => DestinationMapId == null
