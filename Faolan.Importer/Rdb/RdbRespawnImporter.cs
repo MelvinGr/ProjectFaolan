@@ -49,7 +49,8 @@ namespace Faolan.Importer.Rdb
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 
-			var ourMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			var mapNames = await db.Maps.ToDictionaryAsync(m => m.Id, m => m.Name ?? "");
+			var ourMaps = mapNames.Keys.ToHashSet();
 
 			// UPSERT keyed on the RDB Guid, rather than the delete-and-rebuild this used to do (#373). The Guid is the
 			// client's resurrection-point id - the spawnPointId the 0x2024 release screen sends (#214) - so re-importing
@@ -57,9 +58,11 @@ namespace Faolan.Importer.Rdb
 			//
 			// ⚠️ The Guid is NOT globally unique, only unique PER MAP: 17 of them repeat across maps because the variant
 			// playfields (Tortage Island 4010 vs "Tortage Island - RIVERS_AUDIO" 944, etc.) are copies of the same place
-			// with the same points exported into each. 557 parsed points collapse to 538 rows, and the map processed
-			// last silently steals the others' points. The real key is (MapId, Guid) - RespawnPoint.Id being the bare
-			// Guid is a modelling bug tracked as #374. Not fixed here: it's a PK change with two FKs hanging off it.
+			// with the same points exported into each. 557 parsed points collapse to 538 rows. Rather than a PK change
+			// to (MapId, Guid) - churny, and pointless since all real collisions are at the SAME position and RespawnMe
+			// echoes only the Guid - the collision is resolved DETERMINISTICALLY in the loop below (#374): the better-
+			// ranked map keeps the Guid (a real playfield beats a variant copy, tie-break lowest id), killing the
+			// RDB-order coin-flip that could otherwise strip a real map's points and hand them to an unreachable variant.
 			//
 			// The old wipe could not run at all on a DB with a bound character: CharacterRespawnPoints cascades, but
 			// Characters.BindRespawnPointId also FKs RespawnPoints with NO cascade, so any bind pinned the row and the
@@ -97,8 +100,6 @@ namespace Faolan.Importer.Rdb
 					if (!uint.TryParse(Attr(m, "Guid"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var guid))
 						continue; // no Guid = not a real point (the <resurrectionpoints> container element)
 
-					seen.Add(guid);
-
 					if (!existing.TryGetValue(guid, out var point))
 					{
 						point = new RespawnPoint
@@ -108,6 +109,23 @@ namespace Faolan.Importer.Rdb
 						existing[guid] = point;
 						db.RespawnPoints.Add(point);
 					}
+
+					// #374: the Guid is unique only PER MAP - 17 repeat across maps because the variant playfields
+					// (Tortage Island 4010 vs "- RIVERS_AUDIO" 944, Conarch Village 1000 vs "- RIVERS", ...) are copies
+					// of the same place, same points exported into each (all real collisions are at the SAME position).
+					// Keying on the bare Guid means the map processed last wins by RDB enumeration ORDER - a coin-flip
+					// that can silently strip a REAL playfield's points and hand them to a dev/audio variant nobody can
+					// reach. Resolve it deterministically instead of a PK change (option 2 on the issue): on a collision
+					// keep the better-RANKED map (a real playfield beats a variant copy; tie-break lowest map id). Since
+					// the colliding points are physically identical, this only stabilises the MapId attribution.
+					if (seen.Contains(guid))
+					{
+						if (MapRankAtLeast(point.MapId, e.Id, mapNames))
+							continue; // the map that already claimed this Guid this run outranks e.Id - keep it
+						// e.Id outranks the current owner (real beats variant / lower id) - fall through and re-claim it
+					}
+					else
+						seen.Add(guid);
 
 					point.MapId = e.Id;
 					point.Name = Attr(m, "name") ?? "";
@@ -166,6 +184,31 @@ namespace Faolan.Importer.Rdb
 			}
 
 			return null;
+		}
+
+		// #374 collision ranking: true when the map that already owns a Guid this run (`current`) is as-good-or-better
+		// than the `candidate` re-claiming it, so the current owner is KEPT. Rank = (isVariant ? 1 : 0, mapId), lower
+		// wins - a real playfield (0) beats a variant copy (1); among equals the lowest map id wins for stability.
+		private static bool MapRankAtLeast(uint current, uint candidate, IReadOnlyDictionary<uint, string> names)
+		{
+			return Rank(current, names).CompareTo(Rank(candidate, names)) <= 0;
+		}
+
+		private static (int Variant, uint Id) Rank(uint mapId, IReadOnlyDictionary<uint, string> names)
+		{
+			return (IsVariantMap(names.GetValueOrDefault(mapId, "")) ? 1 : 0, mapId);
+		}
+
+		// A variant copy of a real playfield (the RIVERS/AUDIO/"BA sounds"/"FPS test" duplicates, e.g. "Tortage Island
+		// - RIVERS_AUDIO"). These are the only maps that legitimately duplicate another map's resurrection Guids; no
+		// real gameplay playfield name carries these tokens, and the check only decides a same-Guid COLLISION, so a
+		// mis-tagged audio/test map can never lose a point it doesn't share with a real map.
+		private static bool IsVariantMap(string name)
+		{
+			return name.Contains("RIVERS", StringComparison.OrdinalIgnoreCase)
+				|| name.Contains("AUDIO", StringComparison.OrdinalIgnoreCase)
+				|| name.Contains("BA sounds", StringComparison.OrdinalIgnoreCase)
+				|| name.Contains("FPS test", StringComparison.OrdinalIgnoreCase);
 		}
 
 		private static float Num(Match m, string name)
