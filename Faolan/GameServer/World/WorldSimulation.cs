@@ -151,7 +151,10 @@ namespace Faolan.GameServer.World
 				// #399: cache the worn-gear Hit Rating that drives the player's melee crit chance.
 				HitRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0),
 				// #399: cache the worn-gear Magic Damage added flat to the player's spell hits.
-				MagicDamage = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0)
+				MagicDamage = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0),
+				// Cache the worn-gear natural mana/stamina regen added onto the base regen tick.
+				NaturalManaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalManaRegen) ?? 0),
+				NaturalStaminaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalStaminaRegen) ?? 0)
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
@@ -509,9 +512,11 @@ namespace Faolan.GameServer.World
 				if (vitals.IsDead)
 					continue; // corpses don't regen - the respawn timer revives them
 
+				// Base rate-based regen + the worn-gear Natural Mana/Stamina Regen (flat per second, from the item ratings).
+				var entity = pair.Value;
 				var changed = vitals.Regenerate(RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec (provisional)
-					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds), // ~10% stamina / sec
-					RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds)); // ~5% mana / sec
+					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds),
+					RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
 				if (changed)
 					await _output.PushVitals(client, vitals);
 			}

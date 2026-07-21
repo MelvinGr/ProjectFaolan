@@ -258,6 +258,11 @@ namespace Faolan.GameServer.World
 		// damage of spells they cast (CombatResolver.ResolveSpellDamage). 0 for NPCs and players with no such gear.
 		public uint MagicDamage { get; set; }
 
+		// The player's aggregated Natural Mana/Stamina Regen from worn gear (display units/sec), summed at world entry
+		// and added onto the base regen tick (WorldSimulation). 0 for NPCs and players with no such gear.
+		public uint NaturalManaRegen { get; set; }
+		public uint NaturalStaminaRegen { get; set; }
+
 		public uint AttackSwingCounter { get; set; }
 
 		// Coins carried by a loot bag (tin, the wallet wire unit), rolled when the bag drops; zeroed once looted

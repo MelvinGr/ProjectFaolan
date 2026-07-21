@@ -64,7 +64,9 @@ namespace Faolan.Importer.Rdb
 			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity,
 			(uint)CharacterStatId.Armor, // #401: physical armor rating, applied as incoming-damage mitigation
 			(uint)CharacterStatId.HitRating, // #399: drives the provisional critical-hit chance
-			(uint)CharacterStatId.MagicDamage // #399: added flat to the caster's spell damage
+			(uint)CharacterStatId.MagicDamage, // #399: added flat to the caster's spell damage
+			(uint)CharacterStatId.NaturalManaRegen, // gear mana regen (added to the regen tick)
+			(uint)CharacterStatId.NaturalStaminaRegen // gear stamina regen (added to the regen tick)
 		];
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 

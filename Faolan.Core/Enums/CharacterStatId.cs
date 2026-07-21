@@ -59,6 +59,20 @@ namespace Faolan.Core.Enums
 		// sibling (0x1C3, Int/Wis-scaled) is left unnamed until it's consumed.
 		Armor = 0x01C0,
 
+		// Item stat-modifier ratings named from in-game tooltip screenshots (2026-07-21), matched by value:
+		//   Combat Rating (0x36B, x1): Defiler Belt 14; the single most common region rating (63 items).
+		//   Combat Rating - Fire (0x3EF, x1): Red Edge 11 (a per-damage-type Combat Rating variant).
+		//   Offhand Rating (0x44B, x1): Red Edge 5.
+		//   Natural Mana Regen (0x1F2, x100): Initiate's Wraps 500 -> +5, Fine Steelsilk Pants 450 -> +4.5.
+		//   Natural Stamina Regen (0x385, x100): Defiler Belt 150 -> +1.5.
+		//   Immunity Rating (0x1EA, x1): Initiate's Wraps 32 -> +32.
+		CombatRating = 0x036B,
+		CombatRatingFire = 0x03EF,
+		OffhandRating = 0x044B,
+		NaturalManaRegen = 0x01F2,
+		NaturalStaminaRegen = 0x0385,
+		ImmunityRating = 0x01EA,
+
 		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
 		// 0xBF..0x40B in the snapshot; see WorldDespawn) - session/map state, not a real character stat. The snapshot is
 		// built with the live zone's token here.
@@ -177,7 +191,7 @@ namespace Faolan.Core.Enums
 			return statId switch
 			{
 				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax
-					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage => 100,
+					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen => 100,
 
 				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
 
