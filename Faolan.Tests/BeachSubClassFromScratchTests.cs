@@ -99,7 +99,7 @@ namespace Faolan.Tests
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			const uint live = 0x0802ABCD;
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null, live);
+			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null!, live);
 
 			// the template instance must be gone, the live one present (raw big-endian)
 			var needleOld = new byte[] { 0x02, 0x16, 0x5E, 0xFF };
@@ -116,7 +116,7 @@ namespace Faolan.Tests
 
 			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
 			// re-addressing: the assembly must equal the captured tails exactly.
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null, TemplateInstance);
+			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null!, TemplateInstance);
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.Equal(template.Length, built.Length);
@@ -181,7 +181,7 @@ namespace Faolan.Tests
 		{
 			var options = TestDb.Options(DbPath);
 			var repo = new DatabaseRepository(new Factory(options));
-			return await repo.GetQuestDefinition(questId);
+			return (await repo.GetQuestDefinition(questId))!;
 		}
 
 		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.

@@ -35,7 +35,7 @@ namespace Faolan.Tests
 				.ToList();
 
 			var fallback = rows
-				.Where(s => !(s.NpcTemplate.StatCore.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.NpcTemplate.StatCore.MinimalPostIirRecordCount is not null)))
+				.Where(s => !(s.NpcTemplate.StatCore!.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.NpcTemplate.StatCore.MinimalPostIirRecordCount is not null)))
 				.ToList();
 
 			_out.WriteLine($"shipped={rows.Count} not-buildable-from-columns={fallback.Count}");

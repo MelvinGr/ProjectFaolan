@@ -118,7 +118,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			foreach (var codec in idx.CodecToIir.Keys)
 			{
 				var re = new Regex(@"\b" + Regex.Escape(codec) + @"\b");
-				string method = null;
+				string? method = null;
 				foreach (var (text, _) in testFiles)
 				{
 					// File-level IsByteExact is only a cheap pre-filter; the authoritative signal is a SINGLE method
@@ -164,7 +164,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		}
 
 		// Finds a `TestClass.Method` whose body references `codec` AND asserts on bytes - a real [V3: ...] citation.
-		private static string FindGoldenMethod(string text, string codec)
+		private static string? FindGoldenMethod(string text, string codec)
 		{
 			var cls = TestClass.Match(text) is { Success: true } m
 				? m.Groups[1].Value

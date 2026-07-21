@@ -18,7 +18,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var map = new Dictionary<(string, string), string>();
 			var src = File.ReadAllText(TestPaths.Repo("Faolan.Core.Network", "Constants", "Opcodes.cs"));
 
-			string currentEnum = null;
+			string? currentEnum = null;
 			foreach (var line in src.Split('\n'))
 			{
 				var em = EnumRe.Match(line);

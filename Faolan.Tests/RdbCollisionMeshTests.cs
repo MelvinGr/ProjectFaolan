@@ -41,7 +41,7 @@ namespace Faolan.Tests
 		public void Segment_Beside_The_Wall_Is_Clear()
 		{
 			RdbCollisionMesh.TryParse(Wall(), out var mesh);
-			Assert.False(mesh.SegmentBlocked(new Vector3(0, 5, 50), new Vector3(20, 5, 50))); // Z=50 misses the quad
+			Assert.False(mesh!.SegmentBlocked(new Vector3(0, 5, 50), new Vector3(20, 5, 50))); // Z=50 misses the quad
 			Assert.False(mesh.SegmentBlocked(new Vector3(0, 50, 5), new Vector3(20, 50, 5))); // Y=50 above the quad
 		}
 
@@ -50,14 +50,14 @@ namespace Faolan.Tests
 		{
 			RdbCollisionMesh.TryParse(Wall(), out var mesh);
 			// Both endpoints on the near side of X=10 - the wall is beyond the segment, so it must not block.
-			Assert.False(mesh.SegmentBlocked(new Vector3(0, 5, 5), new Vector3(9, 5, 5)));
+			Assert.False(mesh!.SegmentBlocked(new Vector3(0, 5, 5), new Vector3(9, 5, 5)));
 		}
 
 		[Fact]
 		public void Segment_Through_The_Wall_Is_Blocked()
 		{
 			RdbCollisionMesh.TryParse(Wall(), out var mesh);
-			Assert.True(mesh.SegmentBlocked(new Vector3(0, 5, 5), new Vector3(20, 5, 5))); // crosses X=10 inside the quad
+			Assert.True(mesh!.SegmentBlocked(new Vector3(0, 5, 5), new Vector3(20, 5, 5))); // crosses X=10 inside the quad
 		}
 
 		[Fact]

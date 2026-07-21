@@ -75,7 +75,7 @@ namespace Faolan.Tests
 			character.RegenerateMaxStats();
 
 			Assert.Same(seeded, character.MaxStats); // same tracked row, not a replacement
-			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Necromancer, 20).Mana, character.MaxStats.Mana);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Necromancer, 20).Mana, character.MaxStats!.Mana);
 		}
 	}
 }

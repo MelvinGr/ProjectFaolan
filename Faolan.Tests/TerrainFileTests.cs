@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			var bytes = ms.ToArray();
 
 			using var read = new MemoryStream(bytes);
-			data = TerrainFile.Read(read);
+			data = TerrainFile.Read(read)!;
 			return bytes;
 		}
 	}

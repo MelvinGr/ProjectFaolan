@@ -42,7 +42,7 @@ namespace Faolan.Tests
 		public void BuildMapChange_ReproducesCapturedRecord()
 		{
 			// map=null -> BuildMapChange uses the beach defaults (instanced, count 2, fieldB 3, flags 0), reproducing the beach capture.
-			var record = DecodeIir(GameServerListener.BuildMapChange(BeachClient(), null, WorldState.DefaultPlayfieldToken));
+			var record = DecodeIir(GameServerListener.BuildMapChange(BeachClient(), null!, WorldState.DefaultPlayfieldToken));
 
 			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal((uint)GameServer0X2000Opcodes.PlayfieldFIIR, record.IirType);

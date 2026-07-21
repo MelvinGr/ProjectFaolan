@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			stripped.InventoryEntries.Clear();
 			var strippedBytes = stripped.ToProtobuf();
 
-			var built = PlayerCharacterIir.Build(null, null).ToProtobuf();
+			var built = PlayerCharacterIir.Build(null!, null!).ToProtobuf();
 
 			Assert.Equal(strippedBytes, built);
 		}
@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			var template = File.ReadAllBytes(TemplatePath);
 			var msg = template.FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal(4, msg.InventoryEntries.Count);
-			Assert.Empty(PlayerCharacterIir.Build(null, null).InventoryEntries);
+			Assert.Empty(PlayerCharacterIir.Build(null!, null!).InventoryEntries);
 		}
 	}
 }

@@ -56,7 +56,7 @@ namespace Faolan.Tests
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken)]);
-					item = await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken);
+					item = (await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken))!;
 				}
 
 				Assert.NotNull(item);

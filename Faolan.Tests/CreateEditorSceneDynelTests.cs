@@ -140,7 +140,7 @@ namespace Faolan.Tests
 			using var ctx = new DatabaseContext(options);
 			var map = new Dictionary<string, WorldObject>();
 			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayName != null).AsNoTracking())
-				map.TryAdd(o.DisplayName, o);
+				map.TryAdd(o.DisplayName!, o);
 			return map;
 		}
 

@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			];
 			Assert.Equal(golden, FullCharSnapshotSubClass.BuildEmptyQuestPortion());
 			// The empty-quest list/null-primary path must route to the same region.
-			Assert.Equal(golden, FullCharSnapshotSubClass.BuildQuestPortion([], null, 0));
+			Assert.Equal(golden, FullCharSnapshotSubClass.BuildQuestPortion([], null!, 0));
 		}
 
 		// The whole 2-quest region (beach + Casilda) must reproduce the captured login snapshot's quest region
@@ -129,7 +129,7 @@ namespace Faolan.Tests
 		{
 			var options = TestDb.Options(DbPath);
 			await using var ctx = new DatabaseContext(options);
-			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
+			return (await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId))!;
 		}
 	}
 }

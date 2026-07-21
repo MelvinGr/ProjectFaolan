@@ -35,8 +35,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildWeightedEntries_SkipsUnresolvedAndReturnsNullWhenEmpty()
 		{
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(null, RegistryDict()));
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), null));
+			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(null!, RegistryDict()));
+			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), null!));
 			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_999999"]), RegistryDict()));
 			// Only the never-emitted face-paint category resolves -> null (fall back to defaults).
 			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_183875"]), RegistryDict()));
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 		{
 			var entries = PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), RegistryDict());
 
-			Assert.Equal(FaolanxWire.Length, entries.Count);
+			Assert.Equal(FaolanxWire.Length, entries!.Count);
 			for (var i = 0; i < entries.Count; i++)
 			{
 				Assert.Equal((uint)i + 1, entries[i].Index);

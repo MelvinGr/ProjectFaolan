@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 			var equipped = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Equipped);
-			var captured = SnapshotEntryAccessors.EntryBySlot(equipped, Slot);
+			var captured = SnapshotEntryAccessors.EntryBySlot(equipped!, Slot);
 			Assert.NotNull(captured);
 			var expected = captured!.ToProtobuf();
 
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken)]);
-					item = await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken);
+					item = (await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken))!;
 				}
 
 				Assert.NotNull(item);
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken)]);
-					item = await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken);
+					item = (await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken))!;
 				}
 
 				Assert.NotNull(item);
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 
 				var bag = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Bag);
-				var before = FullCharSnapshotCodec.GetContainerEntries(bag).ToList();
+				var before = FullCharSnapshotCodec.GetContainerEntries(bag!).ToList();
 				var original = before[0];
 				var slot = SnapshotEntryAccessors.EntrySlot(original);
 				var itemId = SnapshotEntryAccessors.EntryItemId(original) ?? 0;
@@ -126,16 +126,16 @@ namespace Faolan.Tests
 				var count = SnapshotEntryAccessors.EntryCount(original) ?? 1;
 
 				var built = SnapshotItemBuilder.BuildListEntry(slot, itemId, recordId, count, item, hash);
-				bag.Items[bag.Items.IndexOf(original)] = built;
+				bag!.Items[bag.Items.IndexOf(original)] = built;
 
 				// Re-serialize the whole root and re-parse, as the live path does.
 				using var reparsedStream = new MemoryStream(parts.Root.ToProtobuf(), false);
 				var reparsed = Serializer.Deserialize<ProtoFullCharacterIIR>(reparsedStream);
 				var bag2 = FullCharSnapshotCodec.GetContainer(reparsed, ContainerKind.Bag);
-				var after = FullCharSnapshotCodec.GetContainerEntries(bag2).ToList();
+				var after = FullCharSnapshotCodec.GetContainerEntries(bag2!).ToList();
 
 				Assert.Equal(before.Count, after.Count); // entry count unchanged (in-place replace)
-				var first = SnapshotEntryAccessors.EntryBySlot(bag2, slot);
+				var first = SnapshotEntryAccessors.EntryBySlot(bag2!, slot);
 				Assert.NotNull(first);
 				Assert.Equal(SlaveManaclesId, FullCharSnapshotCodec.GetEntryTemplateId(first!));
 				Assert.Equal(itemId, SnapshotEntryAccessors.EntryItemId(first!));

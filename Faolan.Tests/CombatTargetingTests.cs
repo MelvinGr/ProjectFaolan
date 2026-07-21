@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		{
 			var zone = new Zone(4010);
 			var primary = NpcTemplate(1, 0, 0);
-			var player = new WorldEntity(2, 4010, true, "P", null)
+			var player = new WorldEntity(2, 4010, true, "P", null!)
 			{
 				Position = new Vector3(2, 0, 0)
 			};

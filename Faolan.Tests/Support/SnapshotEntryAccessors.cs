@@ -18,7 +18,7 @@ namespace Faolan.Tests.Support
 	{
 		public static ProtoInventoryGame.InventoryListEntry EntryBySlot(ProtoInventoryGame container, ulong slot)
 		{
-			return Entries(container).FirstOrDefault(e => e.Pos == slot);
+			return Entries(container).FirstOrDefault(e => e.Pos == slot)!;
 		}
 
 		public static uint? EntryCount(ProtoInventoryGame.InventoryListEntry entry)

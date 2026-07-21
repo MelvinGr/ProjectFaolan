@@ -36,7 +36,7 @@ namespace Faolan.Tests
 		public void BuildReactiveList_Necro_MatchesCapture()
 		{
 			// frame#1647: the activate-response element list - all 5 necro weave elements available.
-			var elements = SpellweaveCatalog.ForClass(Class.Necromancer).WeaveElements;
+			var elements = SpellweaveCatalog.ForClass(Class.Necromancer)!.WeaveElements;
 			var bytes = SpellweaveCodec.BuildReactiveList(0x0802E5D4, elements);
 			Assert.Equal("54c020890000c3500802e5d4000000000100396ae9003969d80037e6d900396a2200396a3d", Convert.ToHexStringLower(bytes));
 		}

@@ -153,7 +153,7 @@ namespace Faolan.Tests
 				new QuestGoalDefinition { Sequence = 2, GoalId = 3490, GoalType = QuestGoalType.Kill, TargetName = "Saddur", TrailingRefId = 9500 }
 			};
 			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, "Saddur")?.GoalId); // by STABLE template id
-			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, null)?.GoalId); // id alone, no name needed
+			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, null!)?.GoalId); // id alone, no name needed
 			Assert.Null(QuestProgress.MatchingKillGoal(goals, 12141, "Some Lackey")); // wrong id + unknown name -> no match
 
 			// Fallback: a goal seeded by NAME only (no TrailingRefId - e.g. a "kill N <group>" whose ref is a group id).

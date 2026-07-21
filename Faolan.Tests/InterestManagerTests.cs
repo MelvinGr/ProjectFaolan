@@ -197,7 +197,7 @@ namespace Faolan.Tests
 
 		private static WorldEntity Player(uint handle, float x, float z)
 		{
-			return new WorldEntity(handle, 2040, true, $"P{handle}", null)
+			return new WorldEntity(handle, 2040, true, $"P{handle}", null!)
 			{
 				Position = new Vector3(x, 0, z)
 			};

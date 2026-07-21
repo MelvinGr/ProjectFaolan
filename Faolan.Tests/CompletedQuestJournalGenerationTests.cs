@@ -486,7 +486,7 @@ namespace Faolan.Tests
 				(area, [quest])
 			};
 
-			Assert.Equal(FullCharSnapshotSubClass.BuildEmptyQuestPortion(), FullCharSnapshotSubClass.BuildQuestPortion([], null, 1, groups));
+			Assert.Equal(FullCharSnapshotSubClass.BuildEmptyQuestPortion(), FullCharSnapshotSubClass.BuildQuestPortion([], null!, 1, groups));
 		}
 
 		// The quest INDEX, rebuilt from DB rows and compared byte-for-byte with the capture. This is the gate that

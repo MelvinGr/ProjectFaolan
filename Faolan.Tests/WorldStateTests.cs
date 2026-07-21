@@ -176,7 +176,7 @@ namespace Faolan.Tests
 
 		private static WorldEntity NpcTemplate(uint handle, float x, float z)
 		{
-			return new WorldEntity(handle, 0, false, $"N{handle}", null)
+			return new WorldEntity(handle, 0, false, $"N{handle}", null!)
 			{
 				Position = new Vector3(x, 0, z)
 			};
@@ -184,7 +184,7 @@ namespace Faolan.Tests
 
 		private static WorldEntity Player(uint handle, float x, float z)
 		{
-			return new WorldEntity(handle, 0, true, $"P{handle}", null)
+			return new WorldEntity(handle, 0, true, $"P{handle}", null!)
 			{
 				Position = new Vector3(x, 0, z)
 			};

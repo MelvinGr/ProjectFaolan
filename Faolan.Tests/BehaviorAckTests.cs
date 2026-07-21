@@ -89,7 +89,7 @@ namespace Faolan.Tests
 			var expected = Hex(
 				"642cd3d60000c350021663dd0004000000090000000c089ac80210021802280a300000000006000000000000000000000000000000000000000000000000b290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627ca000000000000000000000000");
 
-			Assert.Equal(expected, BehaviorAckBody.BuildEquipMoveAckBody(request, Instance, 2, null));
+			Assert.Equal(expected, BehaviorAckBody.BuildEquipMoveAckBody(request, Instance, 2, null!));
 		}
 
 		private static byte[] Hex(string s)

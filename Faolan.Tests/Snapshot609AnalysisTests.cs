@@ -76,7 +76,7 @@ namespace Faolan.Tests
 		{
 			var options = TestDb.Options(DbPath);
 			var repo = new DatabaseRepository(new Factory(options));
-			return await repo.GetQuestDefinition(questId);
+			return (await repo.GetQuestDefinition(questId))!;
 		}
 
 		private static byte[] Record(QuestDefinition def, QuestTextSlot slot)

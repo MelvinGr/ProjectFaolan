@@ -35,7 +35,7 @@ namespace Faolan.Tests
 		{
 			Assert.False(CastGroundTarget.TryParse([0x00, 0x01, 0x02], out _));
 			Assert.False(CastGroundTarget.TryParse([], out _));
-			Assert.False(CastGroundTarget.TryParse(null, out _));
+			Assert.False(CastGroundTarget.TryParse(null!, out _));
 		}
 
 		private static float F(uint bits)

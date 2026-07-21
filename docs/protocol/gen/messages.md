@@ -77,8 +77,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `PlayerSpawnScaffoldCodec` | [V3: PlayerSpawnScaffoldCodecTests.Generate_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `WorldDeath` | [V3: WorldDeathTests.BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact] |
-| V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `SimpleDynelMessageCodec` | [V3: CreateEditorSceneDynelTests.InitialBurst_WithDb_IsByteIdenticalToGolden] |
-| V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelMessageCodec`, `WorldLoot` | [V3: CreateEditorSceneDynelTests.InitialBurst_WithDb_IsByteIdenticalToGolden] |
+| V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `SimpleDynelMessageCodec` | [V3: WorldObjectBuilderTests.TryBuild_ReaddressesHandle_OnlyHandleChanges] |
+| V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelMessageCodec`, `WorldLoot` | [V3: WorldObjectBuilderTests.TryBuild_ReaddressesHandle_OnlyHandleChanges] |
 | V3 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` | [V3: V1IirCodecTests.SpellBook_RoundTripsCapturedBody] |
 | V3 | `StatDamageIIR` | `0xE9F24184` | `CombatEffectBuilder`, `SpellweaveCodec`, `StatDamageCodec` | [V3: CombatEffectBuilderTests.DamageResult_IsByteIdentical] |
 | V3 | `StatIIR` | `0xF98E10B3` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |

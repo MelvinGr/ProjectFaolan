@@ -19,7 +19,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var idx = CodecIndex.Build();
 
 			// The golden test method for an IIR type: the one belonging to a golden-backed codec that declares it.
-			string GoldenMethod(string iir)
+			string? GoldenMethod(string iir)
 			{
 				if (!idx.IirToCodecs.TryGetValue(iir, out var codecs))
 					return null;

@@ -227,7 +227,7 @@ namespace Faolan.Tests
 			{
 				Id = 1
 			}, scaffold));
-			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(null, scaffold));
+			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(null!, scaffold));
 		}
 
 		// The frame + EntryTableX are no longer stored - TryApplyFrom reconstructs them from the character's class. So

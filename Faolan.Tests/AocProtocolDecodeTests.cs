@@ -41,7 +41,7 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
 			var equipped = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Equipped);
-			var captured = SnapshotEntryAccessors.EntryBySlot(equipped, Slot);
+			var captured = SnapshotEntryAccessors.EntryBySlot(equipped!, Slot);
 			Assert.NotNull(captured);
 
 			// 2) Decode those bytes with the generated, schema-accurate types.
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken)]);
-					item = await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken);
+					item = (await db.Items.FindAsync([SlaveManaclesId], TestContext.Current.CancellationToken))!;
 				}
 
 				Assert.NotNull(item);
@@ -99,7 +99,7 @@ namespace Faolan.Tests
 
 			// One inventory entry round-trips exactly.
 			var equipped = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Equipped);
-			var entryBytes = SnapshotEntryAccessors.EntryBySlot(equipped, Slot)!.ToProtobuf();
+			var entryBytes = SnapshotEntryAccessors.EntryBySlot(equipped!, Slot)!.ToProtobuf();
 			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(new MemoryStream(entryBytes));
 			using var em = new MemoryStream();
 			Serializer.Serialize(em, entry);

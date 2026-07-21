@@ -36,8 +36,8 @@ namespace Faolan.Tests
 			foreach (var (name, body) in records)
 			{
 				var rebuilt = CreateEditorCharBuilder.Reconstruct(body, CreateEditorCharBuilder.EditorPlayfieldInstance);
-				_o.WriteLine($"{name}: {(Convert.ToHexString(body) == Convert.ToHexString(rebuilt) ? "ok" : "DIFF")}");
-				Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(rebuilt));
+				_o.WriteLine($"{name}: {(Convert.ToHexString(body) == Convert.ToHexString(rebuilt!) ? "ok" : "DIFF")}");
+				Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(rebuilt!));
 			}
 		}
 
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 			var rebuilt = CreateEditorCharBuilder.Reconstruct(body, liveToken);
 
 			// only the 4-byte playfield varint changes (transform `18 <varint>` at body offset 53 for a char)
-			Assert.Equal(body.Length, rebuilt.Length);
+			Assert.Equal(body.Length, rebuilt!.Length);
 			const int varintOffset = 53;
 			for (var i = 0; i < body.Length; i++)
 			{

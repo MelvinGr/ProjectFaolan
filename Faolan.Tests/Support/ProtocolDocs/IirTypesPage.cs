@@ -91,7 +91,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			return sb.ToString();
 		}
 
-		private static string Escape(string note)
+		private static string Escape(string? note)
 		{
 			return string.IsNullOrEmpty(note)
 				? ""
