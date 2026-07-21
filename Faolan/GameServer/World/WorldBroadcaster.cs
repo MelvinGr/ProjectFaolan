@@ -1248,9 +1248,11 @@ namespace Faolan.GameServer.World
 		public async Task<WorldEntity?> SpawnPetForPlayer(INetworkClient client, NpcTemplate npcType)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || npcType?.StatCore?.IirHeader == null)
+			if (player == null)
 				return null;
 
+			// TryBuildFromType is the single stat-core guard (it returns false for a type with no lifted
+			// StatCore.IirHeader) - no redundant pre-check.
 			var handle = NextRuntimeHandle();
 			if (!NpcSpawnBuilder.TryBuildFromType(npcType, handle, player.Position, player.Rotation, out var body))
 			{

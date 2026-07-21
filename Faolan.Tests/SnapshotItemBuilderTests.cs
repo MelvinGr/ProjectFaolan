@@ -74,7 +74,7 @@ namespace Faolan.Tests
 
 				// 4) And via the item's own hash (harvested into Items) - the fully DB-driven path.
 				Assert.Equal(Hash, item.Hash);
-				Assert.True(SnapshotItemBuilder.TryBuildEntry(Slot, ItemId, RecordId, Count, item, out var auto));
+				var auto = SnapshotItemBuilder.BuildListEntry(Slot, ItemId, RecordId, Count, item, item.Hash);
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(auto.ToProtobuf()));
 			}
 			finally

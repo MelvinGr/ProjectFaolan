@@ -64,18 +64,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			};
 		}
 
-		// Convenience overload: an item is buildable iff it has an hash (DB column, harvested from captures).
-		// Returns false otherwise so the caller can fall back to the verbatim capture for that item.
-		public static bool TryBuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, [NotNullWhen(true)] out ProtoInventoryGame.InventoryListEntry? entry, ulong flags = 1, ulong f7 = 1)
-		{
-			entry = null;
-			if (item == null || item.Hash == 0)
-				return false;
-
-			entry = BuildListEntry(slot, itemId, recordId, count, item, item.Hash, flags, f7);
-			return true;
-		}
-
 		// One (stat id, value) record of a ProtoInventoryGameEntry.stat_list. The world-entry snapshot uses a
 		// fixed triple (BuildListEntry below); the incremental DispatchAddItem (0x2020) s2c carries a richer,
 		// per-instance set captured from retail, so BuildInventoryEntry takes the stat list as a parameter.
