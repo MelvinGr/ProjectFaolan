@@ -109,8 +109,9 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Learn spells, abilities & combos** — granted on login and at each level-up, with every rank learned and
   shown (collapsing a family to its top rank is a client-side UI choice)
 - ✅ Combos stick across relogs, not just at level-up
-- 🟡 **Feat trees** — training and resetting feats work against the live protocol (via a GM command for now); the
-  tree structure, feat points, and per-class layouts are still being decoded (#251)
+- 🟡 **Feat trees** — training, resetting, the untrain confirmation, and the feat-point budget all work against the
+  live protocol (driven by a GM command for now); what's missing is the feat *catalog* itself — which feats exist,
+  their tiers and prerequisites, per-feat costs, and each class's tree layout (#251)
 - 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
 - 🟡 Class spell / combo / ability catalogs are still filling in, and a few spellbook entries render nameless
   (#296, #303, #300)
