@@ -77,7 +77,9 @@ namespace Faolan.Importer.Rdb
 				row.Name = (string)combo.Attribute("name") ?? "";
 				row.Level = (byte)ParseUint(combo, "level");
 				var featId = ParseUint(combo, "featid");
-				row.FeatId = featId == 0 ? null : featId;
+				row.FeatId = featId == 0
+					? null
+					: featId;
 				row.ParentId = ParseUint(combo, "parentid");
 				row.GameActionId = ParseUint(combo, "gameactionid");
 				row.Cooldown = (int)ParseUint(combo, "cooldown");

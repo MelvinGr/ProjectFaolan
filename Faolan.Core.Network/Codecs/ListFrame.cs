@@ -26,19 +26,12 @@ namespace Faolan.Core.Network.Codecs
 	// single-element captures.
 	public static class ListFrame
 	{
-		// The framing multiplier. Every count-framed word is a multiple of it.
-		public const uint Unit = 0x3F1;
-
 		// The word for an empty list (count 0). Spelled out because it is easy to write 0 by mistake, which the
 		// client rejects.
 		public const uint Empty = Unit;
 
-		// The word for a list of `count` elements.
-		public static uint ForCount(int count)
-		{
-			ArgumentOutOfRangeException.ThrowIfNegative(count);
-			return (uint)(count + 1) * Unit;
-		}
+		// The framing multiplier. Every count-framed word is a multiple of it.
+		public const uint Unit = 0x3F1;
 
 		// The element count encoded in `word`. Throws if it isn't a valid framing word - the same check the client
 		// makes, so a throw here means we (or the peer) built something the client would reject too.
@@ -48,6 +41,13 @@ namespace Faolan.Core.Network.Codecs
 				throw new FormatException($"0x{word:X} is not a count-framed list word (not a non-zero multiple of 0x{Unit:X})");
 
 			return count;
+		}
+
+		// The word for a list of `count` elements.
+		public static uint ForCount(int count)
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(count);
+			return (uint)(count + 1) * Unit;
 		}
 
 		// True if `word` is a valid count-framed list word, yielding its element count. Use when a word's meaning is

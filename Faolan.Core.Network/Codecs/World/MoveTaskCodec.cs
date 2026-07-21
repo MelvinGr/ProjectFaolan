@@ -1,8 +1,8 @@
-using System.Collections.Generic;
-using Faolan.Core.Database.Tables;
-using System.Linq;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
@@ -18,9 +18,6 @@ namespace Faolan.Core.Network.Codecs.World
 	//   [subop 0x96C46740][0x0000C350][handle][u16 0][from: 3 floats][u8 0x02][to: 3 floats][quat: 4 floats][u16 0]
 	public static class MoveTaskCodec
 	{
-		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
-
 		public const byte ModeApproachTarget = 0x08;
 
 		// The MoveTask "mode" byte (at body offset 26, after the from-position) selects the form (decoded from the
@@ -29,7 +26,21 @@ namespace Faolan.Core.Network.Codecs.World
 		public const byte ModeBarePosition = 0x00;
 		public const byte ModePath = 0x01;
 		public const byte ModeStationary = 0x02;
+
 		public const int BodyLength = 57;
+
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
+
+		// ---- patrol forms (merged from the former MoveTaskBuilder) ---------------------------------------------
+		// Both classes were static builder modules for the SAME opcode, each declaring `Opcode = MoveTaskIIR`, with
+		// overlapping forms (BuildBarePositionBody vs BuildStationary are both the minimal position record). One
+		// opcode, one builder module - and the coverage matrix no longer double-attributes MoveTaskIIR.
+
+		// The MINIMAL stationary record (BuildStationary), distinct from BodyLength=57 above (the
+		// at-position-facing form). The two classes this codec was merged from each had a private `BodyLength`
+		// with a DIFFERENT value - a fair illustration of why one opcode wants one builder module.
+		private const int StationaryBodyLength = 31;
 
 		// mode-08: approach/face a target entity - [u16 0][from 3 floats][0x08][u32 0xC350 type][u32 targetHandle]
 		// [0x01][9 zero bytes] (45-byte body / 49-byte frame). The NPC "turn to / move toward" a dynel. Validated 825/825.
@@ -123,61 +134,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return BuildPathBody(handle, from, waypoints, TotalPathLength(from, waypoints));
 		}
 
-		// One-way WALK from `from` to `to` (#272): a mode-1 PathMoveTask the client interpolates over time (a real walk),
-		// unlike the mode-2 RotateMoveTask (`BuildBody`) which is a rotate/set-position the client SNAPS to. This matches
-		// retail's 2-point movement-segment form exactly (capture-verified over 5763 records): header-flags 0x01 (bit0 SET
-		// -> NO [duration][remaining]; retail does NOT pace a short 2-point segment by duration, it uses the entity's
-		// movement-speed attribute), F-flags 0x00 (waypoint-list branch), a 2-point spline [from, to] (the client asserts
-		// points->size() >= 2, splinepath.cpp:37 - a single point crashes it), and the 29-byte finalizer with
-		// pathLength == the segment distance (capture ratio 1.000 for 2-point records) and its anchor at the DESTINATION
-		// (anchoring at `from` made the NPC walk to the waypoint then BACK - the net-zero jitter that reverted the path
-		// form before). NB the residual chase snap is NOT this packet form (it's retail-exact) but a SPEED mismatch: the
-		// model's emit cadence (NpcMoveSpeed) must equal the speed the client renders the NPC at, else segments mis-chain.
-		public static byte[] BuildWalkBody(uint handle, Vector3 from, Vector3 to)
-		{
-			var pathLength = Vector3.Distance(from, to);
-			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(handle)
-				.WriteUInt16(0)
-				.WriteVector3(from)
-				.WriteByte(ModePath)
-				.WriteByte(0x01) // WaitMoveTask base header flags (bit0 SET -> no duration; retail 2-point form)
-				.WriteByte(0x00) // PathMoveTask F-flags (no optional floats; waypoint-list branch)
-				.WriteUInt32(2) // two control points: the spline needs >= 2 (client assert)
-				.WriteVector3(from)
-				.WriteVector3(to)
-				.WriteByte(0x00) // trailer byte
-				.WriteFloat(pathLength)
-				.WriteUInt64(0)
-				.WriteUInt32(0) // 12 zero bytes
-				.WriteVector3(to) // anchor = DESTINATION (#272)
-				.ToArray();
-		}
-
-		// Sum of the segment distances along from -> waypoints (the real walked length).
-		public static float TotalPathLength(Vector3 from, IReadOnlyList<Vector3> waypoints)
-		{
-			if (waypoints == null || waypoints.Count == 0)
-				return 0f;
-
-			var length = Vector3.Distance(from, waypoints[0]);
-			for (var i = 1; i < waypoints.Count; i++)
-				length += Vector3.Distance(waypoints[i - 1], waypoints[i]);
-			return length;
-		}
-
-		// ---- patrol forms (merged from the former MoveTaskBuilder) ---------------------------------------------
-		// Both classes were static builder modules for the SAME opcode, each declaring `Opcode = MoveTaskIIR`, with
-		// overlapping forms (BuildBarePositionBody vs BuildStationary are both the minimal position record). One
-		// opcode, one builder module - and the coverage matrix no longer double-attributes MoveTaskIIR.
-
-		// The MINIMAL stationary record (BuildStationary), distinct from BodyLength=57 above (the
-		// at-position-facing form). The two classes this codec was merged from each had a private `BodyLength`
-		// with a DIFFERENT value - a fair illustration of why one opcode wants one builder module.
-		private const int StationaryBodyLength = 31;
-
 		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is
 		// what a moving NPC needs: a current position plus a list of waypoints it walks between at `speed`. The
 		// grammar (docs/re/spawn-dissection-plan.md, dissect_movetask.py) for this dominant form is:
@@ -229,8 +185,7 @@ namespace Faolan.Core.Network.Codecs.World
 		public static byte[] BuildPatrol(uint handle, Vector3 from, PatrolPath path)
 		{
 			ArgumentNullException.ThrowIfNull(path);
-			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null)
-				?? throw new InvalidOperationException($"patrol {path.Id} has no root node");
+			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null) ?? throw new InvalidOperationException($"patrol {path.Id} has no root node");
 
 			return new MoveTaskComposite
 			{
@@ -240,6 +195,52 @@ namespace Faolan.Core.Network.Codecs.World
 				FromZ = BitConverter.SingleToUInt32Bits(from.Z),
 				Task = PatrolNodeMapper.ToTask(root)
 			}.Encode();
+		}
+
+		public static byte[] BuildStationary(uint handle, Vector3 position)
+		{
+			return new FaolanStream()
+				.WriteUInt32(StationaryBodyLength - 4)
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteUInt16(0) // prefix 00 00
+				.WriteVector3(position)
+				.WriteByte(0x06) // stationary terminator (vs 0x04 = a movement segment follows)
+				.ToArray();
+		}
+
+		// One-way WALK from `from` to `to` (#272): a mode-1 PathMoveTask the client interpolates over time (a real walk),
+		// unlike the mode-2 RotateMoveTask (`BuildBody`) which is a rotate/set-position the client SNAPS to. This matches
+		// retail's 2-point movement-segment form exactly (capture-verified over 5763 records): header-flags 0x01 (bit0 SET
+		// -> NO [duration][remaining]; retail does NOT pace a short 2-point segment by duration, it uses the entity's
+		// movement-speed attribute), F-flags 0x00 (waypoint-list branch), a 2-point spline [from, to] (the client asserts
+		// points->size() >= 2, splinepath.cpp:37 - a single point crashes it), and the 29-byte finalizer with
+		// pathLength == the segment distance (capture ratio 1.000 for 2-point records) and its anchor at the DESTINATION
+		// (anchoring at `from` made the NPC walk to the waypoint then BACK - the net-zero jitter that reverted the path
+		// form before). NB the residual chase snap is NOT this packet form (it's retail-exact) but a SPEED mismatch: the
+		// model's emit cadence (NpcMoveSpeed) must equal the speed the client renders the NPC at, else segments mis-chain.
+		public static byte[] BuildWalkBody(uint handle, Vector3 from, Vector3 to)
+		{
+			var pathLength = Vector3.Distance(from, to);
+			return new FaolanStream()
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteUInt16(0)
+				.WriteVector3(from)
+				.WriteByte(ModePath)
+				.WriteByte(0x01) // WaitMoveTask base header flags (bit0 SET -> no duration; retail 2-point form)
+				.WriteByte(0x00) // PathMoveTask F-flags (no optional floats; waypoint-list branch)
+				.WriteUInt32(2) // two control points: the spline needs >= 2 (client assert)
+				.WriteVector3(from)
+				.WriteVector3(to)
+				.WriteByte(0x00) // trailer byte
+				.WriteFloat(pathLength)
+				.WriteUInt64(0)
+				.WriteUInt32(0) // 12 zero bytes
+				.WriteVector3(to) // anchor = DESTINATION (#272)
+				.ToArray();
 		}
 
 		// The patrol's ordered waypoints (every PathMoveTask's waypoint list, walked in tree order) - the world
@@ -254,27 +255,28 @@ namespace Faolan.Core.Network.Codecs.World
 			return waypoints;
 		}
 
+		// Sum of the segment distances along from -> waypoints (the real walked length).
+		public static float TotalPathLength(Vector3 from, IReadOnlyList<Vector3> waypoints)
+		{
+			if (waypoints == null || waypoints.Count == 0)
+				return 0f;
+
+			var length = Vector3.Distance(from, waypoints[0]);
+			for (var i = 1; i < waypoints.Count; i++)
+				length += Vector3.Distance(waypoints[i - 1], waypoints[i]);
+			return length;
+		}
+
 		private static void CollectWaypoints(PatrolNode node, List<Vector3> waypoints)
 		{
 			if (node.Mode == 1)
+			{
 				foreach (var w in node.Waypoints.OrderBy(w => w.Ordinal))
 					waypoints.Add(new Vector3(w.PositionX, w.PositionY, w.PositionZ));
+			}
 
 			foreach (var child in node.Children.OrderBy(c => c.Ordinal))
 				CollectWaypoints(child, waypoints);
-		}
-
-		public static byte[] BuildStationary(uint handle, Vector3 position)
-		{
-			return new FaolanStream()
-				.WriteUInt32(StationaryBodyLength - 4)
-				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(handle)
-				.WriteUInt16(0) // prefix 00 00
-				.WriteVector3(position)
-				.WriteByte(0x06) // stationary terminator (vs 0x04 = a movement segment follows)
-				.ToArray();
 		}
 	}
 }

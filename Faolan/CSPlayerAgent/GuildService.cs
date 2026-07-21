@@ -7,6 +7,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
@@ -14,8 +15,6 @@ using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
-
-using Faolan.Core.Network.Codecs;
 
 namespace Faolan.CSPlayerAgent
 {
@@ -27,6 +26,11 @@ namespace Faolan.CSPlayerAgent
 	// in-world guild-tag push rides the existing IGameServerDispatcher.
 	public sealed class GuildService
 	{
+		// The AoC count-framed-list multiplier (ListFrame.Unit): every such list on the wire starts with a u32 word ==
+		// (count+1)*0x3F1 (the client's readers divide by it - 77 such readers in the exe). Shared by the renown
+		// block's stat-lists (GuildRenownBlock), the 0x203F member list, and the 0x2038 rankings lists.
+		internal const uint GuildListMultiplier = ListFrame.Unit;
+
 		// CoreGuild_c::Read (the client deserializer, FUN_00565900) asserts streaming version == 3; the byte after
 		// guildId is the GOVERNMENT FORM, whose value selects the body layout. Form 1 (which falls through into the
 		// form-3 field block in the reader) is the layout GuildRenownBlock encodes, so both are fixed here. The old
@@ -42,18 +46,6 @@ namespace Faolan.CSPlayerAgent
 		// handle, not session data). We stamp a constant so our s2c headers match retail's shape instead of echoing the
 		// client's instance-0 endpoint back as the sender.
 		private const uint GuildServerInstance = 0x04;
-
-		// The AoC count-framed-list multiplier (ListFrame.Unit): every such list on the wire starts with a u32 word ==
-		// (count+1)*0x3F1 (the client's readers divide by it - 77 such readers in the exe). Shared by the renown
-		// block's stat-lists (GuildRenownBlock), the 0x203F member list, and the 0x2038 rankings lists.
-		internal const uint GuildListMultiplier = ListFrame.Unit;
-
-		// The reply SENDER endpoint for a CsPlayerAgent s2c packet: the class the client addressed, stamped with the
-		// guild-server instance (see GuildServerInstance).
-		public static ProtoEndpoint ReplySender(ProtoEndpoint clientTarget)
-		{
-			return new ProtoEndpoint { Type = clientTarget.Type, Instance = GuildServerInstance };
-		}
 
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
@@ -412,18 +404,6 @@ namespace Faolan.CSPlayerAgent
 			await ps.SendAsync(client);
 		}
 
-		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates
-		// the stored MOTD + pops the "message of the day" toast, without re-sending the whole roster (unlike 0x203F).
-		// No capture for it; the body is the single string arg from the client method sig, s16-framed like the other
-		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
-		private async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
-		{
-			await new PacketStream()
-				.WriteHeader(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged)
-				.WriteString(motd)
-				.SendAsync(client);
-		}
-
 		// 0x202F member joined: [member ID32][member record]. Retail fans this out to every online guild member
 		// (including the joiner, right after its 0x203F).
 		private Task SendGuildMemberJoined(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Character member)
@@ -432,6 +412,15 @@ namespace Faolan.CSPlayerAgent
 			ps.WriteHeader(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMemberJoined).WriteUInt32(EntityClass.Character).WriteUInt32(member.Id);
 			WriteGuildMemberRecord(ps, member);
 			return ps.SendAsync(client);
+		}
+
+		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates
+		// the stored MOTD + pops the "message of the day" toast, without re-sending the whole roster (unlike 0x203F).
+		// No capture for it; the body is the single string arg from the client method sig, s16-framed like the other
+		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
+		private async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
+		{
+			await new PacketStream().WriteHeader(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged).WriteString(motd).SendAsync(client);
 		}
 
 		private void WriteGuildMemberRecord(FaolanStream s, Character member)
@@ -444,6 +433,17 @@ namespace Faolan.CSPlayerAgent
 			WriteGuildMemberRecord(s, member, online, online
 				? member.MapId
 				: 0, lastSeen);
+		}
+
+		// The reply SENDER endpoint for a CsPlayerAgent s2c packet: the class the client addressed, stamped with the
+		// guild-server instance (see GuildServerInstance).
+		public static ProtoEndpoint ReplySender(ProtoEndpoint clientTarget)
+		{
+			return new ProtoEndpoint
+			{
+				Type = clientTarget.Type,
+				Instance = GuildServerInstance
+			};
 		}
 
 		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO

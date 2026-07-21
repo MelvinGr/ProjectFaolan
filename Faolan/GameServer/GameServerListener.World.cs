@@ -10,25 +10,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// #348: the sub-area crossing banner the world tick fires - forwards to the Outbound partial's sender.
-		Task IWorldOutbound.SendAreaNameBanner(INetworkClient client, uint areaNameId)
-		{
-			return SendAreaNameBanner(client, areaNameId);
-		}
-
-		// The player's resurrection spots. Lives here rather than in the Combat partial because the list is not a
-		// combat concern: the world tick sends it to a LIVE player to announce a newly-discovered point (#372), and
-		// the death path is only its other caller.
-		Task IWorldOutbound.SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots)
-		{
-			return SendValidResurrectionSpots(client, referencePosition, spots);
-		}
-
-		Task IWorldOutbound.SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
-		{
-			return SendRespawnPointDiscoveredBanner(client, pointId, nameKey);
-		}
-
 		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
 		{
 			return _broadcaster.BroadcastEntityFade(entity);
@@ -66,14 +47,14 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcRespawn(npc);
 		}
 
-		Task IWorldOutbound.MaintainAmbientPools()
-		{
-			return _broadcaster.MaintainAmbientPools();
-		}
-
 		Task IWorldOutbound.BroadcastNpcStop(WorldEntity npc)
 		{
 			return _broadcaster.BroadcastNpcStop(npc);
+		}
+
+		Task IWorldOutbound.MaintainAmbientPools()
+		{
+			return _broadcaster.MaintainAmbientPools();
 		}
 
 		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
@@ -84,6 +65,25 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.ReenterWorld(INetworkClient client)
 		{
 			return SendWorldEntry(client);
+		}
+
+		// #348: the sub-area crossing banner the world tick fires - forwards to the Outbound partial's sender.
+		Task IWorldOutbound.SendAreaNameBanner(INetworkClient client, uint areaNameId)
+		{
+			return SendAreaNameBanner(client, areaNameId);
+		}
+
+		Task IWorldOutbound.SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
+		{
+			return SendRespawnPointDiscoveredBanner(client, pointId, nameKey);
+		}
+
+		// The player's resurrection spots. Lives here rather than in the Combat partial because the list is not a
+		// combat concern: the world tick sends it to a LIVE player to announce a newly-discovered point (#372), and
+		// the death path is only its other caller.
+		Task IWorldOutbound.SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots)
+		{
+			return SendValidResurrectionSpots(client, referencePosition, spots);
 		}
 	}
 }

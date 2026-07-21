@@ -150,36 +150,6 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// Recovers (template -> CapturedItem) from a Claims/Redeem list (0x2000 packet whose payload sub-opcode is the
-		// CoreClaimIIR 0x06EC1255, sub 0x0001). Each 106-byte entry's 16-byte token IS the item's ProtoDecryptionKey
-		// (4×u32 big-endian = the Data quad). Hash is not carried here, so it stays 0 (the item redeems via live add).
-		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
-		{
-			var packet = new ConanPacket(packetBytes);
-			if (packet.Opcode != 0x2000)
-				return;
-
-			var payload = packet.Body.ReadArrayUInt32Length();
-			if (!CoreClaimListCodec.TryParse(payload, out _, out var claims))
-				return;
-
-			foreach (var claim in claims)
-			{
-				var key = claim.DecryptionKey;
-				if (claim.ItemTemplateId == 0 || key.Length < ClaimEntry.KeyLength)
-					continue;
-
-				var d1 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(0));
-				var d2 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(4));
-				var d3 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(8));
-				var d4 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(12));
-				if ((d1 | d2 | d3 | d4) == 0)
-					continue;
-
-				into.TryAdd(claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0));
-			}
-		}
-
 		private static ItemType ClassifyContainer(ContainerKind kind)
 		{
 			return (uint)kind == EquippedContainerKind
@@ -251,6 +221,36 @@ namespace Faolan.Importer.Extractors
 				var hash = FullCharSnapshotCodec.GetEntryArchetype(entry);
 				if (template.HasValue && quad.HasValue)
 					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
+			}
+		}
+
+		// Recovers (template -> CapturedItem) from a Claims/Redeem list (0x2000 packet whose payload sub-opcode is the
+		// CoreClaimIIR 0x06EC1255, sub 0x0001). Each 106-byte entry's 16-byte token IS the item's ProtoDecryptionKey
+		// (4×u32 big-endian = the Data quad). Hash is not carried here, so it stays 0 (the item redeems via live add).
+		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2000)
+				return;
+
+			var payload = packet.Body.ReadArrayUInt32Length();
+			if (!CoreClaimListCodec.TryParse(payload, out _, out var claims))
+				return;
+
+			foreach (var claim in claims)
+			{
+				var key = claim.DecryptionKey;
+				if (claim.ItemTemplateId == 0 || key.Length < ClaimEntry.KeyLength)
+					continue;
+
+				var d1 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(0));
+				var d2 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(4));
+				var d3 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(8));
+				var d4 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(12));
+				if ((d1 | d2 | d3 | d4) == 0)
+					continue;
+
+				into.TryAdd(claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0));
 			}
 		}
 

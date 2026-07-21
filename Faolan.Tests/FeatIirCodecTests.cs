@@ -21,15 +21,6 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Parse_ReadsTheCapturedTrainRequest()
-		{
-			Assert.True(FeatIirCodec.TryParse(Convert.FromHexString(RequestHex), out var handle, out var state, out var ids));
-			Assert.Equal(0x1101B4F5u, handle);
-			Assert.Equal(FeatIirCodec.StateTrainRequest, state);
-			Assert.Equal(new[] { 110000u, 112700u, 410600u }, ids);
-		}
-
-		[Fact]
 		public void BuildParse_RoundTrips_IncludingEmpty()
 		{
 			foreach (var feats in new[] { new uint[] { }, [110004u], [80004u, 82704u, 410604u] })
@@ -40,6 +31,15 @@ namespace Faolan.Tests
 				Assert.Equal(FeatIirCodec.StateTrainRequest, state);
 				Assert.Equal(feats, ids);
 			}
+		}
+
+		[Fact]
+		public void Parse_ReadsTheCapturedTrainRequest()
+		{
+			Assert.True(FeatIirCodec.TryParse(Convert.FromHexString(RequestHex), out var handle, out var state, out var ids));
+			Assert.Equal(0x1101B4F5u, handle);
+			Assert.Equal(FeatIirCodec.StateTrainRequest, state);
+			Assert.Equal(new[] { 110000u, 112700u, 410600u }, ids);
 		}
 
 		[Fact]

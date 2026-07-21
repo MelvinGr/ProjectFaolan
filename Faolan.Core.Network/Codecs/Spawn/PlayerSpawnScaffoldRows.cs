@@ -16,6 +16,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// genuinely fresh scaffold). See docs/re/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
+		// Offset of the u32 feat-list count marker within the PreFrame. The pre-IIR frame carries the character's
+		// UNLOCKED FEAT list here: [u32 (featCount+1)*0x3F1][featCount x u32 featId BE]. Everything up to & including
+		// the marker is the 126-byte HEAD; the feats splice in after it; a constant 113-byte TAIL (zero padding + the
+		// 41 00 00 82 08 closer) follows. So PreFrame length = 126 + 4*featCount + 113. See docs/subsystems/feats.md
+		// + tools/capture/decode_unlocked_feats.py.
+		public const int FeatMarkerOffset = 122;
+
+		// Offset of the vanity SHOWN-slots bitmask within the 239-byte PreFrame (4 bytes, big-endian; bit = base equip
+		// slot id, SET = that slot's vanity piece is shown). 0 = no vanity shown, which is the fresh default. The
+		// FA015807 self-spawn carries it so the setting survives relog - the client renders the show/hide off it
+		// (#336). See CharacterEquipment.VanityShownMask for the polarity, which was modelled backwards.
+		public const int VanityShownMaskOffset = 18;
+		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
+		private const int PreFrameTail = 113;
+
 		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new Dictionary<Class, uint[]>
 		{
 			[Class.Barbarian] = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300],
@@ -149,6 +164,29 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return true;
 		}
 
+		// Reads the unlocked-feat id list out of a captured (or generated) PreFrame - the inverse of FreshPreFrame's
+		// feat splice. Returns an empty list when the frame carries no feat list (fresh char / a non-standard frame
+		// such as the 228-byte create-editor variant). Order is preserved (the wire order is train order, NOT sorted).
+		public static List<uint> ExtractPreFrameFeats(byte[] preFrame)
+		{
+			var feats = new List<uint>();
+			if (preFrame == null || preFrame.Length < PreFrameHead)
+				return feats;
+
+			var marker = BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(FeatMarkerOffset, 4));
+			if (!ListFrame.TryCountOf(marker, out var signedCount))
+				return feats;
+
+			var count = (uint)signedCount;
+			if (PreFrameHead + 4 * (long)count > preFrame.Length)
+				return feats;
+
+			for (var k = 0; k < count; k++)
+				feats.Add(BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(PreFrameHead + 4 * k, 4)));
+
+			return feats;
+		}
+
 		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
 		public static void ExtractTo(Character character, PlayerSpawnScaffold scaffold)
 		{
@@ -187,31 +225,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 		}
 
-		// Offset of the vanity SHOWN-slots bitmask within the 239-byte PreFrame (4 bytes, big-endian; bit = base equip
-		// slot id, SET = that slot's vanity piece is shown). 0 = no vanity shown, which is the fresh default. The
-		// FA015807 self-spawn carries it so the setting survives relog - the client renders the show/hide off it
-		// (#336). See CharacterEquipment.VanityShownMask for the polarity, which was modelled backwards.
-		public const int VanityShownMaskOffset = 18;
-
-		// The vanity shown-mask carried by a captured spawn's PreFrame. The write side is FreshPreFrame; this is the
-		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
-		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
-		{
-			var preFrame = scaffold?.PreFrame;
-			return preFrame is { } f && f.Length >= VanityShownMaskOffset + 4
-				? BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(VanityShownMaskOffset, 4))
-				: 0u;
-		}
-
-		// Offset of the u32 feat-list count marker within the PreFrame. The pre-IIR frame carries the character's
-		// UNLOCKED FEAT list here: [u32 (featCount+1)*0x3F1][featCount x u32 featId BE]. Everything up to & including
-		// the marker is the 126-byte HEAD; the feats splice in after it; a constant 113-byte TAIL (zero padding + the
-		// 41 00 00 82 08 closer) follows. So PreFrame length = 126 + 4*featCount + 113. See docs/subsystems/feats.md
-		// + tools/capture/decode_unlocked_feats.py.
-		public const int FeatMarkerOffset = 122;
-		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
-		private const int PreFrameTail = 113;
-
 		public static byte[] FreshPreFrame(Class @class, uint vanityShownMask = 0, IReadOnlyList<uint> feats = null)
 		{
 			var featCount = feats?.Count ?? 0;
@@ -240,29 +253,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return f;
 		}
 
-		// Reads the unlocked-feat id list out of a captured (or generated) PreFrame - the inverse of FreshPreFrame's
-		// feat splice. Returns an empty list when the frame carries no feat list (fresh char / a non-standard frame
-		// such as the 228-byte create-editor variant). Order is preserved (the wire order is train order, NOT sorted).
-		public static List<uint> ExtractPreFrameFeats(byte[] preFrame)
-		{
-			var feats = new List<uint>();
-			if (preFrame == null || preFrame.Length < PreFrameHead)
-				return feats;
-
-			var marker = BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(FeatMarkerOffset, 4));
-			if (!ListFrame.TryCountOf(marker, out var signedCount))
-				return feats;
-
-			var count = (uint)signedCount;
-			if (PreFrameHead + 4 * (long)count > preFrame.Length)
-				return feats;
-
-			for (var k = 0; k < count; k++)
-				feats.Add(BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(PreFrameHead + 4 * k, 4)));
-
-			return feats;
-		}
-
 		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
 		// (class*100) prepended to the common base feats. Always ascending (the wire/codec require it).
 		public static uint[] FreshSkillIdsFor(Class @class)
@@ -281,6 +271,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return FullSkillIdsByClass.TryGetValue(@class, out var ids)
 				? ids
 				: null;
+		}
+
+		// The vanity shown-mask carried by a captured spawn's PreFrame. The write side is FreshPreFrame; this is the
+		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
+		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
+		{
+			var preFrame = scaffold?.PreFrame;
+			return preFrame is { } f && f.Length >= VanityShownMaskOffset + 4
+				? BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(VanityShownMaskOffset, 4))
+				: 0u;
 		}
 
 		// Rebuilds ONLY the appearance portion of an EXISTING scaffold (the weighted appearance entries + the editor

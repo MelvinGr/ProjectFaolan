@@ -1,11 +1,12 @@
+using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using Faolan.Core.Network.Server.GameServer;
 using ModelContextProtocol.Server;
-using System.Threading.Tasks;
 
 namespace Faolan.Mcp.Tools
 {
@@ -79,11 +80,10 @@ namespace Faolan.Mcp.Tools
 			if (!string.IsNullOrWhiteSpace(filter))
 			{
 				var f = filter.Trim();
-				sessions = sessions.Where(s =>
-					Contains(s.Character?.Name, f) ||
-					Contains(s.Account?.UserName, f) ||
-					Contains(s.Character?.Id.ToString(CultureInfo.InvariantCulture), f) ||
-					Contains(s.Account?.Id.ToString(CultureInfo.InvariantCulture), f)).ToArray();
+				sessions = sessions
+					.Where(s => Contains(s.Character?.Name, f) || Contains(s.Account?.UserName, f) || Contains(s.Character?.Id.ToString(CultureInfo.InvariantCulture), f) ||
+					            Contains(s.Account?.Id.ToString(CultureInfo.InvariantCulture), f))
+					.ToArray();
 			}
 
 			return sessions.Count == 0
@@ -91,11 +91,6 @@ namespace Faolan.Mcp.Tools
 					? "No clients are currently connected to the GameServer."
 					: $"No connected session matches filter '{filter}'."
 				: JsonSerializer.Serialize(sessions, SessionJsonOptions);
-		}
-
-		private static bool Contains(string haystack, string needle)
-		{
-			return haystack != null && haystack.Contains(needle, System.StringComparison.OrdinalIgnoreCase);
 		}
 
 		[McpServerTool(Name = "list_zone_entities"),
@@ -110,8 +105,7 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "run_gm_command"),
-		 Description(
-			 "Run a GM command for a connected character on the server, exactly as if the player typed it in chat (e.g. \"teleport 5\", \"help\" to list the registered commands).")]
+		 Description("Run a GM command for a connected character on the server, exactly as if the player typed it in chat (e.g. \"teleport 5\", \"help\" to list the registered commands).")]
 		public async Task<string> RunGmCommand([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId,
 			[Description("GM command text, with or without the leading '.' (e.g. \"teleport 5\")")] string command)
 		{
@@ -149,6 +143,11 @@ namespace Faolan.Mcp.Tools
 			return ok
 				? success
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
+		}
+
+		private static bool Contains(string haystack, string needle)
+		{
+			return haystack != null && haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
 		}
 	}
 }

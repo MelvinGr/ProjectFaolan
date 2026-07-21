@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
-using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
@@ -12,12 +11,6 @@ namespace Faolan.Importer.Extractors
 	// per-quest - only ever had two rows filled from the beach/Casilda seeds (#389).
 	public static class QuestAreaExtractor
 	{
-		private static CompletedQuestExtractor.TextRef? Parse(string xml)
-		{
-			return CompletedQuestExtractor.ParseRecord(xml);
-		}
-
-
 		public static List<QuestArea> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var byArea = new Dictionary<uint, QuestArea>();
@@ -78,11 +71,20 @@ namespace Faolan.Importer.Extractors
 						continue;
 
 					// Only the 4CC is available here - the area's header records are not part of the index.
-					byArea[quest.AreaId] = new QuestArea { AreaId = quest.AreaId, Magic = block.Magic };
+					byArea[quest.AreaId] = new QuestArea
+					{
+						AreaId = quest.AreaId,
+						Magic = block.Magic
+					};
 				}
 			}
 
 			return [.. byArea.Values];
+		}
+
+		private static CompletedQuestExtractor.TextRef? Parse(string xml)
+		{
+			return CompletedQuestExtractor.ParseRecord(xml);
 		}
 	}
 }

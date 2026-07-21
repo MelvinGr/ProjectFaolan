@@ -1,13 +1,14 @@
-using Faolan.Importer.Extractors;
 using System;
-using Faolan.Core.Network.Constants;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -35,6 +36,8 @@ namespace Faolan.Importer.Captures
 	// Idempotent: updates an existing row, else inserts. Only characters already in the DB are touched.
 	public static class CaptureQuestImporter
 	{
+		private const uint SnapshotSubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
+
 		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> wire state
@@ -80,19 +83,32 @@ namespace Faolan.Importer.Captures
 				// explicit QuestIIR state event wins.
 				var merged = new Dictionary<uint, QuestState>();
 				if (completedByChar.TryGetValue(characterId, out var completedIds))
+				{
 					foreach (var id in completedIds)
 						merged[id] = QuestState.Completed;
+				}
+
 				// The snapshot journal overrides the completed sweep: a quest with a Quest_c record was HELD at login,
 				// and its title record is what the regex above just mis-filed as completed.
 				if (journalByChar.TryGetValue(characterId, out var heldIds))
+				{
 					foreach (var id in heldIds)
 						merged[id] = QuestState.Active;
+				}
+
 				if (logListByChar.TryGetValue(characterId, out var logIds))
+				{
 					foreach (var id in logIds)
 						merged[id] = QuestState.Active;
+				}
+
 				if (stateByChar.TryGetValue(characterId, out var states))
+				{
 					foreach (var (id, wire) in states)
-						merged[id] = wire == WorldQuest.StateCompleted ? QuestState.Completed : QuestState.Active;
+						merged[id] = wire == WorldQuest.StateCompleted
+							? QuestState.Completed
+							: QuestState.Active;
+				}
 
 				var existing = await db.CharacterQuests.Where(q => q.CharacterId == characterId).ToDictionaryAsync(q => q.QuestId);
 				var progress = progressByChar.GetValueOrDefault(characterId) ?? new Dictionary<uint, uint>();
@@ -133,9 +149,8 @@ namespace Faolan.Importer.Captures
 			return (charactersSeeded, questsWritten);
 		}
 
-		private const uint SnapshotSubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
-
-		private static void TryRead(byte[] packetBytes, Dictionary<uint, Dictionary<uint, uint>> stateByChar, Dictionary<uint, Dictionary<uint, uint>> progressByChar, Dictionary<uint, HashSet<uint>> logListByChar, Dictionary<uint, HashSet<uint>> completedByChar)
+		private static void TryRead(byte[] packetBytes, Dictionary<uint, Dictionary<uint, uint>> stateByChar, Dictionary<uint, Dictionary<uint, uint>> progressByChar,
+			Dictionary<uint, HashSet<uint>> logListByChar, Dictionary<uint, HashSet<uint>> completedByChar)
 		{
 			try
 			{
@@ -149,7 +164,7 @@ namespace Faolan.Importer.Captures
 				// SnapshotJournalReader.TryReadCompleted (as CompletedQuestExtractor does) instead of regex-scanning the
 				// whole packet for category-50301 titles: the regex also swept up the ACTIVE journal's titles (the reason
 				// journalByChar had to override them back), whereas the typed region returns ONLY the completed archive.
-				if (inner.Length >= 4 && System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) == SnapshotSubOpcode)
+				if (inner.Length >= 4 && BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) == SnapshotSubOpcode)
 				{
 					var charId = packet.Receiver.Instance;
 					if (charId == 0)
@@ -160,10 +175,13 @@ namespace Faolan.Importer.Captures
 						if (!completedByChar.TryGetValue(charId, out var set))
 							completedByChar[charId] = set = new HashSet<uint>();
 						foreach (var area in completed.Areas)
-							foreach (var q in area.Quests)
-								if (q.QuestId != 0)
-									set.Add(q.QuestId);
+						foreach (var q in area.Quests)
+						{
+							if (q.QuestId != 0)
+								set.Add(q.QuestId);
+						}
 					}
+
 					return;
 				}
 
@@ -172,8 +190,11 @@ namespace Faolan.Importer.Captures
 					if (!logListByChar.TryGetValue(logHandle, out var set))
 						logListByChar[logHandle] = set = new HashSet<uint>();
 					foreach (var id in logIds)
+					{
 						if (id != 0)
 							set.Add(id);
+					}
+
 					return;
 				}
 

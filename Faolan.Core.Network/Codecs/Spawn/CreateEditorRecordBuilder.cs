@@ -23,10 +23,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// listed here (declaring twice would double-attribute in the coverage matrix). #317 convention.
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
-			GameServer0X2000Opcodes.CharacterActionIIR,
-			GameServer0X2000Opcodes.CharInPlayIIR,
-			GameServer0X2000Opcodes.SetMorphValueIIR,
-			GameServer0X2000Opcodes.SetNameIIR
+			GameServer0X2000Opcodes.CharacterActionIIR, GameServer0X2000Opcodes.CharInPlayIIR, GameServer0X2000Opcodes.SetMorphValueIIR, GameServer0X2000Opcodes.SetNameIIR
 		];
 
 		// The entity-class tag every per-character editor record carries (EntityClass.Character = 0xC350).
@@ -248,6 +245,26 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(0x03).WriteByte(0x01).WriteUInt32(0u).WriteStringByteLength(name).ToArray();
 		}
 
+		// StatIIR (0xF98E10B3): a single stat set on an entity. 17 bytes:
+		//   [u32 type][u32 handle][u8 flag][u32 statId][u32 value]
+		// flag is 0 or 1 in every capture (set vs. continue/append - the editor streams runs of flag=1 for one stat
+		// id with stepping values). type is CharacterWireType for the avatar's per-stat stream.
+		public static byte[] BuildStatIir(uint type, uint handle, byte flag, uint statId, uint value)
+		{
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(statId).WriteUInt32(value).ToArray();
+		}
+
+		// StatUpdateIIR (0x96B8DC59): a batch of stat (statId, value) pairs set on an entity:
+		//   [u32 type][u32 handle][u32 0][u8 count][ count x ([u32 statId][u32 value]) ]
+		// The editor/world-prep streams it to seed a character's stat block (max health/mana/... + a few flags).
+		public static byte[] BuildStatUpdateIir(uint handle, (uint StatId, uint Value)[] stats, uint type = EntityClass.Character)
+		{
+			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(stats.Length);
+			foreach (var (statId, value) in stats)
+				s.WriteUInt32(statId).WriteUInt32(value);
+			return s.ToArray();
+		}
+
 		// In-WORLD SetNameIIR (0xADCE0CDA), grammar recovered byte-exact from n3InfoItemRemote::Construct (FUN_005b9d30)
 		// + SetNameIIR_t::ReadSubClass (FUN_007ae1d0), #363 - the live-entity path, DISTINCT from BuildSetNameIir above
 		// (the create-editor's reader). Construct reads the identity + an isToBePassed flag BEFORE the subclass:
@@ -267,26 +284,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (bytes.Length > 31)
 				bytes = bytes[..31];
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(0x00).WriteUInt32(3u).WriteByte(0x01).WriteByte(0x01).WriteUInt32((uint)bytes.Length).WriteArray(bytes).ToArray();
-		}
-
-		// StatIIR (0xF98E10B3): a single stat set on an entity. 17 bytes:
-		//   [u32 type][u32 handle][u8 flag][u32 statId][u32 value]
-		// flag is 0 or 1 in every capture (set vs. continue/append - the editor streams runs of flag=1 for one stat
-		// id with stepping values). type is CharacterWireType for the avatar's per-stat stream.
-		public static byte[] BuildStatIir(uint type, uint handle, byte flag, uint statId, uint value)
-		{
-			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(statId).WriteUInt32(value).ToArray();
-		}
-
-		// StatUpdateIIR (0x96B8DC59): a batch of stat (statId, value) pairs set on an entity:
-		//   [u32 type][u32 handle][u32 0][u8 count][ count x ([u32 statId][u32 value]) ]
-		// The editor/world-prep streams it to seed a character's stat block (max health/mana/... + a few flags).
-		public static byte[] BuildStatUpdateIir(uint handle, (uint StatId, uint Value)[] stats, uint type = EntityClass.Character)
-		{
-			var s = new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(stats.Length);
-			foreach (var (statId, value) in stats)
-				s.WriteUInt32(statId).WriteUInt32(value);
-			return s.ToArray();
 		}
 	}
 }

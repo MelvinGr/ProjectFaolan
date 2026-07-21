@@ -23,13 +23,12 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			{
 				if (!idx.IirToCodecs.TryGetValue(iir, out var codecs))
 					return null;
-				return codecs.Where(c => idx.CodecGolden.GetValueOrDefault(c))
-					.Select(c => idx.CodecGoldenMethod.GetValueOrDefault(c))
-					.FirstOrDefault(m => m != null);
+
+				return codecs.Where(c => idx.CodecGolden.GetValueOrDefault(c)).Select(c => idx.CodecGoldenMethod.GetValueOrDefault(c)).FirstOrDefault(m => m != null);
 			}
 
-			var rows = idx.IirTypes
-				.Select(t => (t.Name, t.Value, Level: idx.Level(t.Name), Golden: GoldenMethod(t.Name)))
+			var rows = idx
+				.IirTypes.Select(t => (t.Name, t.Value, Level: idx.Level(t.Name), Golden: GoldenMethod(t.Name)))
 				.OrderBy(x => CodecIndex.Rank(x.Level))
 				.ThenBy(x => x.Name, StringComparer.Ordinal)
 				.ToList();
@@ -60,10 +59,14 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("|-------|----------|--------|-------|--------------------------|");
 			foreach (var (name, value, level, golden) in rows)
 			{
-				var codec = idx.IirToCodecs.TryGetValue(name, out var cs) ? string.Join(", ", cs.Select(c => $"`{c}`"))
-					: idx.BuiltIn.TryGetValue(name, out var file) ? $"`{file}` *(inline)*"
-					: "—";
-				var proof = golden != null ? $"[V3: {golden}]" : "";
+				var codec = idx.IirToCodecs.TryGetValue(name, out var cs)
+					? string.Join(", ", cs.Select(c => $"`{c}`"))
+					: idx.BuiltIn.TryGetValue(name, out var file)
+						? $"`{file}` *(inline)*"
+						: "—";
+				var proof = golden != null
+					? $"[V3: {golden}]"
+					: "";
 				sb.AppendLine($"| {level} | `{name}` | `0x{value:X8}` | {codec} | {proof} |");
 			}
 

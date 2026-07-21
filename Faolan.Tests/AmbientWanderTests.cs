@@ -13,23 +13,6 @@ namespace Faolan.Tests
 		private static readonly Vector3 B = new(10, 0, 0);
 		private static readonly Vector3 C = new(20, 0, 0);
 
-		private static WorldEntity Croc()
-		{
-			var e = WorldEntity.ForNpc(1, 4010, A, Quaternion.Identity, "Croc", EntityVitals.FromMax(10, 0, 10));
-			e.PatrolWaypoints = [A, B, C];
-			e.Position = A;
-			return e;
-		}
-
-		[Fact]
-		public void PrefersFreeAnchor_NeverPicksOccupiedOrCurrent()
-		{
-			var e = Croc();
-			// B occupied, C free, A is current -> must always pick C, regardless of the random start offset.
-			for (var i = 0; i < 100; i++)
-				Assert.Equal(C, e.NextWanderPoint(pt => pt == B));
-		}
-
 		[Fact]
 		public void FallsBackToAnchor_WhenEveryFreeSpotIsTaken()
 		{
@@ -46,6 +29,23 @@ namespace Faolan.Tests
 			var e = Croc();
 			for (var i = 0; i < 100; i++)
 				Assert.NotEqual(A, e.NextWanderPoint());
+		}
+
+		[Fact]
+		public void PrefersFreeAnchor_NeverPicksOccupiedOrCurrent()
+		{
+			var e = Croc();
+			// B occupied, C free, A is current -> must always pick C, regardless of the random start offset.
+			for (var i = 0; i < 100; i++)
+				Assert.Equal(C, e.NextWanderPoint(pt => pt == B));
+		}
+
+		private static WorldEntity Croc()
+		{
+			var e = WorldEntity.ForNpc(1, 4010, A, Quaternion.Identity, "Croc", EntityVitals.FromMax(10, 0, 10));
+			e.PatrolWaypoints = [A, B, C];
+			e.Position = A;
+			return e;
 		}
 	}
 }

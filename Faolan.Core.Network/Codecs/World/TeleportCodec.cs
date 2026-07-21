@@ -15,13 +15,6 @@ namespace Faolan.Core.Network.Codecs.World
 	// the spawn position inside a length-prefixed blob (FUN_00cbf5d0). Every byte is reader-accounted (TeleportHandoffTests).
 	public static class TeleportCodec
 	{
-		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.IntendedTeleportIIR,
-			GameServer0X2000Opcodes.N3TeleportIIR,
-		];
-
 		private const byte PlayfieldProxyVersion = 0x62; // 'b' - the PlayfieldProxy stream version (FUN_00a6a600)
 		private const uint PlayfieldClassWord = 0x0000C79C; // PlayfieldProxy u32[0] (constant in the captures)
 		private const uint PositionBlobTag = 0x00018704; // first word of the length-prefixed spawn-position blob
@@ -29,6 +22,9 @@ namespace Faolan.Core.Network.Codecs.World
 		private const uint ProxyReadyFlag = 0x00000001; // dest proxy u32[5] - instance valid/ready flag
 
 		private const uint ReceiverClass = 0x0000C350; // Character class tag
+
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.IntendedTeleportIIR, GameServer0X2000Opcodes.N3TeleportIIR];
 
 		// 0x10D27BC0 "begin teleport to map N": carrier + env + a PlayfieldProxy carrying only the class word and the
 		// destination map (instance slots zero) + a trailing bool.

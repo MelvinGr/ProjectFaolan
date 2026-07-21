@@ -17,20 +17,20 @@ namespace Faolan.GameServer.World
 	// known ground positions matches the players' Y to <0.5u.
 	public sealed class TerrainService
 	{
-		private readonly string _terrainDir;
-		private readonly ILogger _logger;
-
-		private readonly ConcurrentDictionary<uint, RdbHeightmap> _heightmaps = [];
-		private readonly ConcurrentDictionary<uint, RdbCollisionMesh> _collision = [];
-
-		// Maps whose terrain file we've already attempted to load (present or not), so a query never re-reads it.
-		private readonly ConcurrentDictionary<uint, byte> _loaded = [];
+		private const float EyeHeight = 1.5f; // lift both endpoints off the ground so you can see over small bumps
+		private const float OcclusionMargin = 1.5f; // terrain must exceed the eye-line by this to occlude
 
 		// LoS sampling: how many intermediate ground samples along the sightline, and how far a hill must rise above
 		// the eye-line to actually block (a little slack so a gentle slope or a 1u bump doesn't read as a wall).
 		private const int LineOfSightSamples = 24;
-		private const float EyeHeight = 1.5f;       // lift both endpoints off the ground so you can see over small bumps
-		private const float OcclusionMargin = 1.5f; // terrain must exceed the eye-line by this to occlude
+
+		// Maps whose terrain file we've already attempted to load (present or not), so a query never re-reads it.
+		private readonly ConcurrentDictionary<uint, byte> _loaded = [];
+		private readonly ConcurrentDictionary<uint, RdbCollisionMesh> _collision = [];
+
+		private readonly ConcurrentDictionary<uint, RdbHeightmap> _heightmaps = [];
+		private readonly ILogger _logger;
+		private readonly string _terrainDir;
 
 		public bool Available { get; }
 
@@ -39,7 +39,8 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 			if (string.IsNullOrWhiteSpace(terrainDir) || !Directory.Exists(terrainDir))
 			{
-				_logger.LogInformation("Terrain: no baked terrain dir at '{Dir}' - ground-snap + line-of-sight disabled. Generate with: dotnet run --project Faolan.Importer -- --report terrain-export.", terrainDir);
+				_logger.LogInformation(
+					"Terrain: no baked terrain dir at '{Dir}' - ground-snap + line-of-sight disabled. Generate with: dotnet run --project Faolan.Importer -- --report terrain-export.", terrainDir);
 				return;
 			}
 
@@ -48,19 +49,14 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Terrain: baked terrain files from '{Dir}' (ground-snap + line-of-sight on).", terrainDir);
 		}
 
-		// Pre-load a map's terrain into the cache. Called fire-and-forget from world entry so the first aggro / loot on
-		// a map doesn't pay the file read + parse + grid build synchronously inside the game tick.
-		public void Warm(uint mapId)
-		{
-			EnsureLoaded(mapId);
-		}
-
 		// The terrain ground height at world (x, z) on `mapId`, or null when unavailable (no terrain, no heightmap for
 		// that map, or the point is off the grid). Callers fall back to their own default when null.
 		public float? GroundHeight(uint mapId, float x, float z)
 		{
 			EnsureLoaded(mapId);
-			return _heightmaps.TryGetValue(mapId, out var hm) ? hm.HeightAt(x, z) : null;
+			return _heightmaps.TryGetValue(mapId, out var hm)
+				? hm.HeightAt(x, z)
+				: null;
 		}
 
 		// True if nothing blocks the straight eye-line from `from` to `to` (an NPC to a player): neither the terrain
@@ -74,38 +70,11 @@ namespace Faolan.GameServer.World
 			return HasTerrainLineOfSight(mapId, from, to) && HasCollisionLineOfSight(mapId, from, to);
 		}
 
-		private bool HasTerrainLineOfSight(uint mapId, Vector3 from, Vector3 to)
+		// Pre-load a map's terrain into the cache. Called fire-and-forget from world entry so the first aggro / loot on
+		// a map doesn't pay the file read + parse + grid build synchronously inside the game tick.
+		public void Warm(uint mapId)
 		{
-			if (!_heightmaps.TryGetValue(mapId, out var hm))
-				return true;
-
-			var eyeFrom = from.Y + EyeHeight;
-			var eyeTo = to.Y + EyeHeight;
-			for (var i = 1; i < LineOfSightSamples; i++)
-			{
-				var t = (float)i / LineOfSightSamples;
-				var x = from.X + (to.X - from.X) * t;
-				var z = from.Z + (to.Z - from.Z) * t;
-				var ground = hm.HeightAt(x, z);
-				if (ground is not { } g)
-					continue; // off-grid sample - don't block on missing data
-
-				var eyeLine = eyeFrom + (eyeTo - eyeFrom) * t;
-				if (g > eyeLine + OcclusionMargin)
-					return false; // terrain rises above the sightline here -> occluded
-			}
-
-			return true;
-		}
-
-		private bool HasCollisionLineOfSight(uint mapId, Vector3 from, Vector3 to)
-		{
-			if (!_collision.TryGetValue(mapId, out var col))
-				return true;
-
-			var eyeFrom = new Vector3(from.X, from.Y + EyeHeight, from.Z);
-			var eyeTo = new Vector3(to.X, to.Y + EyeHeight, to.Z);
-			return !col.SegmentBlocked(eyeFrom, eyeTo);
+			EnsureLoaded(mapId);
 		}
 
 		// Load a map's baked terrain file exactly once (present or not). Parses the heightmap + collision bodies with
@@ -140,12 +109,48 @@ namespace Faolan.GameServer.World
 				}
 
 				// First-touch cost: file read + gunzip + parse + grid build. One-time per map, then cached.
-				_logger.LogInformation("Terrain: loaded map {Map} (heightmap {Heightmap}, collision {Tris} triangles).", mapId, hasHeightmap ? "yes" : "no", tris);
+				_logger.LogInformation("Terrain: loaded map {Map} (heightmap {Heightmap}, collision {Tris} triangles).", mapId, hasHeightmap
+					? "yes"
+					: "no", tris);
 			}
 			catch (Exception ex)
 			{
 				_logger.LogDebug(ex, "Terrain: failed to load baked terrain for map {Map}.", mapId);
 			}
+		}
+
+		private bool HasCollisionLineOfSight(uint mapId, Vector3 from, Vector3 to)
+		{
+			if (!_collision.TryGetValue(mapId, out var col))
+				return true;
+
+			var eyeFrom = new Vector3(from.X, from.Y + EyeHeight, from.Z);
+			var eyeTo = new Vector3(to.X, to.Y + EyeHeight, to.Z);
+			return !col.SegmentBlocked(eyeFrom, eyeTo);
+		}
+
+		private bool HasTerrainLineOfSight(uint mapId, Vector3 from, Vector3 to)
+		{
+			if (!_heightmaps.TryGetValue(mapId, out var hm))
+				return true;
+
+			var eyeFrom = from.Y + EyeHeight;
+			var eyeTo = to.Y + EyeHeight;
+			for (var i = 1; i < LineOfSightSamples; i++)
+			{
+				var t = (float)i / LineOfSightSamples;
+				var x = from.X + (to.X - from.X) * t;
+				var z = from.Z + (to.Z - from.Z) * t;
+				var ground = hm.HeightAt(x, z);
+				if (ground is not { } g)
+					continue; // off-grid sample - don't block on missing data
+
+				var eyeLine = eyeFrom + (eyeTo - eyeFrom) * t;
+				if (g > eyeLine + OcclusionMargin)
+					return false; // terrain rises above the sightline here -> occluded
+			}
+
+			return true;
 		}
 	}
 }

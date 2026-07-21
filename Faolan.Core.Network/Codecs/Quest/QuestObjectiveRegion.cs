@@ -30,6 +30,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public const uint GoalLead = 1; // every goal record opens with this word
 		public const uint IndexTag = ListFrame.Unit; // opens the quest index that terminates this region
 
+		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
+		// so it can't drift from ToArray).
+		public int ByteLength
+		{
+			get
+			{
+				using var w = new FaolanStream();
+				Write(w);
+				return (int)w.Length;
+			}
+		}
+
 		public List<QuestObjectiveGoal> Goals { get; init; } = [];
 
 		public static QuestObjectiveRegion Read(FaolanStream r)
@@ -49,8 +61,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			for (var i = 0; i < count; i++)
 			{
 				if (r.Position + 4 > r.Length || Peek(r) != GoalLead)
-					throw new InvalidOperationException(
-						$"@609 region: lead word 0x{tag:X} promises {count} goals, but goal {i} is absent");
+				{
+					throw new InvalidOperationException($"@609 region: lead word 0x{tag:X} promises {count} goals, but goal {i} is absent");
+				}
 
 				region.Goals.Add(QuestObjectiveGoal.Read(r));
 			}
@@ -70,18 +83,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 			using var w = new FaolanStream();
 			Write(w);
 			return w.ToArray();
-		}
-
-		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
-		// so it can't drift from ToArray).
-		public int ByteLength
-		{
-			get
-			{
-				using var w = new FaolanStream();
-				Write(w);
-				return (int)w.Length;
-			}
 		}
 
 		// GENERATES the objective region from a quest's per-goal definitions (construct, don't replay - #186): each
@@ -104,8 +105,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 					: g.TrailingToken is { Length: > 0 } rt
 						? QuestcRegion.RemoteFormatToken(rt, g.TrailingCategory, g.TrailingKey)
 						: QuestcRegion.RemoteFormat(g.TrailingRefId, g.TrailingCategory, g.TrailingKey);
-				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator, g.SubId, g.MapId ?? 0, g.MarkerX ?? 0, g.MarkerY ?? 0, Encoding.Latin1.GetBytes(objective),
-					Encoding.Latin1.GetBytes(trailing), g.Extra5, g.Extra6, g.RequiredCount == 0
+				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator, g.SubId, g.MapId ?? 0, g.MarkerX ?? 0, g.MarkerY ?? 0,
+					Encoding.Latin1.GetBytes(objective), Encoding.Latin1.GetBytes(trailing), g.Extra5, g.Extra6, g.RequiredCount == 0
 						? 1
 						: g.RequiredCount, g.Extra1, g.Extra2, g.Unknown1, g.Extra0, g.Extra3, g.Extra4, g.GoalIdEcho, g.Unknown2));
 			}

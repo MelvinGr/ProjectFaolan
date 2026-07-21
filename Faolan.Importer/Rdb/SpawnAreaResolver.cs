@@ -20,15 +20,15 @@ namespace Faolan.Importer.Rdb
 	public static class SpawnAreaResolver
 	{
 		private const float ContainPad = 10f; // captured-spawn search: pad the roam AABB by this (world units), X/Z
-		private static readonly Regex TrailingIndex = new(@"[\s_\-]*\d+\s*$", RegexOptions.Compiled);
 		private static readonly Regex FourCharTag = new(@"\s*\([0-9A-Za-z]{4}\)\s*$", RegexOptions.Compiled);
-		private static readonly Regex Word = new(@"[a-z]+", RegexOptions.Compiled);
 
 		// Name families that carry no creature claim - a group so named may take a propagated creature even if its name
 		// doesn't match (it's a location/role label, not a species). Keeps the guard from blocking legitimate propagation.
 		private static readonly Regex TerritoryLabel = new(
-			@"territory|area|mound|burial|captives|boss|library|treasury|infirmary|scout|party|trash|point|patrol|roaming|citizen|spawngroup|zone|region|wave|node|camp",
-			RegexOptions.Compiled);
+			@"territory|area|mound|burial|captives|boss|library|treasury|infirmary|scout|party|trash|point|patrol|roaming|citizen|spawngroup|zone|region|wave|node|camp", RegexOptions.Compiled);
+
+		private static readonly Regex TrailingIndex = new(@"[\s_\-]*\d+\s*$", RegexOptions.Compiled);
+		private static readonly Regex Word = new(@"[a-z]+", RegexOptions.Compiled);
 
 		public static async Task<ResolveStats> ResolveAsync(DatabaseContext db)
 		{
@@ -36,7 +36,14 @@ namespace Faolan.Importer.Rdb
 			var withStatCore = (await db.NpcStatCores.Select(s => s.NpcTemplateId).ToListAsync()).ToHashSet();
 			var templateByName = new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
 			var nameByTemplate = new Dictionary<uint, string>();
-			foreach (var t in await db.NpcTemplates.Where(t => t.Name != null).Select(t => new { t.TemplateId, t.Name }).ToListAsync())
+			foreach (var t in await db
+				         .NpcTemplates.Where(t => t.Name != null)
+				         .Select(t => new
+				         {
+					         t.TemplateId,
+					         t.Name
+				         })
+				         .ToListAsync())
 			{
 				nameByTemplate[t.TemplateId] = t.Name!;
 				if (withStatCore.Contains(t.TemplateId))
@@ -45,10 +52,19 @@ namespace Faolan.Importer.Rdb
 
 			// Captured placements per map (name + X/Z), for the containment tier.
 			var capturedByMap = new Dictionary<uint, List<(uint TemplateId, string Name, float X, float Z)>>();
-			foreach (var s in await db.NpcSpawns.Select(s => new { s.MapId, s.NpcTemplateId, s.PositionX, s.PositionZ }).ToListAsync())
+			foreach (var s in await db
+				         .NpcSpawns.Select(s => new
+				         {
+					         s.MapId,
+					         s.NpcTemplateId,
+					         s.PositionX,
+					         s.PositionZ
+				         })
+				         .ToListAsync())
 			{
 				if (!nameByTemplate.TryGetValue(s.NpcTemplateId, out var nm))
 					continue;
+
 				if (!capturedByMap.TryGetValue(s.MapId, out var list))
 					capturedByMap[s.MapId] = list = [];
 				list.Add((s.NpcTemplateId, nm, s.PositionX, s.PositionZ));
@@ -160,34 +176,6 @@ namespace Faolan.Importer.Rdb
 			return new ResolveStats(name, contain, idprop, name + contain + idprop, areas.Count, linked);
 		}
 
-		// Links captured NpcSpawns to the resolved area whose creature + bounds they match. Resets links on the touched
-		// maps first (idempotent), so a re-resolve reflects the current creature assignments.
-		private static async Task<int> LinkCapturedSpawns(DatabaseContext db, List<NpcSpawnArea> areas)
-		{
-			const float pad = 5f;
-			var resolved = areas.Where(a => a.NpcTemplateId != null).ToList();
-			var maps = resolved.Select(a => a.MapId).ToHashSet();
-			var linked = 0;
-			foreach (var mapId in maps)
-			{
-				var mapAreas = resolved.Where(a => a.MapId == mapId).ToList();
-				foreach (var s in await db.NpcSpawns.Where(s => s.MapId == mapId).ToListAsync())
-				{
-					var area = mapAreas.FirstOrDefault(a => a.NpcTemplateId == s.NpcTemplateId
-															&& s.PositionX >= a.BoundsMinX - pad && s.PositionX <= a.BoundsMaxX + pad
-															&& s.PositionZ >= a.BoundsMinZ - pad && s.PositionZ <= a.BoundsMaxZ + pad);
-					var newLink = area?.Id;
-					if (s.NpcSpawnAreaId != newLink)
-						s.NpcSpawnAreaId = newLink;
-					if (newLink != null)
-						linked++;
-				}
-			}
-
-			await db.SaveChangesAsync();
-			return linked;
-		}
-
 		private static (float X0, float X1, float Z0, float Z1) ContainmentRegion(NpcSpawnArea a)
 		{
 			// The roam AABB, extended to also cover the primary anchor points (which can sit just outside it), padded.
@@ -204,6 +192,65 @@ namespace Faolan.Importer.Rdb
 			}
 
 			return (x0 - ContainPad, x1 + ContainPad, z0 - ContainPad, z1 + ContainPad);
+		}
+
+		// The creature-ish name family of a group: lowercased, trailing index removed, a leading "t_" prefix dropped.
+		private static string Family(string? groupName)
+		{
+			var s = TrailingIndex.Replace(groupName ?? "", "").Trim().ToLowerInvariant();
+			return s.StartsWith("t_", StringComparison.Ordinal)
+				? s[2..]
+				: s;
+		}
+
+		private static bool IsNumericIdCategory(string category)
+		{
+			return category is "Community" or "Race" or "Superfamily";
+		}
+
+		// Links captured NpcSpawns to the resolved area whose creature + bounds they match. Resets links on the touched
+		// maps first (idempotent), so a re-resolve reflects the current creature assignments.
+		private static async Task<int> LinkCapturedSpawns(DatabaseContext db, List<NpcSpawnArea> areas)
+		{
+			const float pad = 5f;
+			var resolved = areas.Where(a => a.NpcTemplateId != null).ToList();
+			var maps = resolved.Select(a => a.MapId).ToHashSet();
+			var linked = 0;
+			foreach (var mapId in maps)
+			{
+				var mapAreas = resolved.Where(a => a.MapId == mapId).ToList();
+				foreach (var s in await db.NpcSpawns.Where(s => s.MapId == mapId).ToListAsync())
+				{
+					var area = mapAreas.FirstOrDefault(a =>
+						a.NpcTemplateId == s.NpcTemplateId && s.PositionX >= a.BoundsMinX - pad && s.PositionX <= a.BoundsMaxX + pad && s.PositionZ >= a.BoundsMinZ - pad &&
+						s.PositionZ <= a.BoundsMaxZ + pad);
+					var newLink = area?.Id;
+					if (s.NpcSpawnAreaId != newLink)
+						s.NpcSpawnAreaId = newLink;
+					if (newLink != null)
+						linked++;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return linked;
+		}
+
+		// The name AGREES with the id's creature if any creature-word (a token of the creature name, or a defining
+		// family, singular forms included) is a substring of the group's name family or vice-versa. So "wildwolf"
+		// agrees with "Wolf", "chickenroam" with "Chicken", but "slaver" does NOT agree with "Poacher".
+		private static bool NameAgrees(string fam, string creatureName, HashSet<string> definingFamilies)
+		{
+			if (fam.Length == 0)
+				return true;
+
+			var words = new HashSet<string>(definingFamilies);
+			foreach (Match m in Word.Matches(creatureName.ToLowerInvariant()))
+				words.Add(m.Value);
+			foreach (var w in words.ToList())
+				words.Add(Singularize(w));
+
+			return words.Any(w => w.Length >= 3 && (fam.Contains(w, StringComparison.Ordinal) || w.Contains(fam, StringComparison.Ordinal)));
 		}
 
 		// Tier 1: the group name (or Name-category id, 4-char tag stripped) -> a spawnable template. Tries the name as
@@ -228,33 +275,11 @@ namespace Faolan.Importer.Rdb
 			return null;
 		}
 
-		// The creature-ish name family of a group: lowercased, trailing index removed, a leading "t_" prefix dropped.
-		private static string Family(string? groupName)
+		private static string Singularize(string s)
 		{
-			var s = TrailingIndex.Replace(groupName ?? "", "").Trim().ToLowerInvariant();
-			return s.StartsWith("t_", StringComparison.Ordinal) ? s[2..] : s;
-		}
-
-		private static string Singularize(string s) => s.EndsWith('s') ? s[..^1] : s;
-
-		private static bool IsNumericIdCategory(string category) =>
-			category is "Community" or "Race" or "Superfamily";
-
-		// The name AGREES with the id's creature if any creature-word (a token of the creature name, or a defining
-		// family, singular forms included) is a substring of the group's name family or vice-versa. So "wildwolf"
-		// agrees with "Wolf", "chickenroam" with "Chicken", but "slaver" does NOT agree with "Poacher".
-		private static bool NameAgrees(string fam, string creatureName, HashSet<string> definingFamilies)
-		{
-			if (fam.Length == 0)
-				return true;
-
-			var words = new HashSet<string>(definingFamilies);
-			foreach (Match m in Word.Matches(creatureName.ToLowerInvariant()))
-				words.Add(m.Value);
-			foreach (var w in words.ToList())
-				words.Add(Singularize(w));
-
-			return words.Any(w => w.Length >= 3 && (fam.Contains(w, StringComparison.Ordinal) || w.Contains(fam, StringComparison.Ordinal)));
+			return s.EndsWith('s')
+				? s[..^1]
+				: s;
 		}
 	}
 

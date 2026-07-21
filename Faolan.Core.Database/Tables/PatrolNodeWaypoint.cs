@@ -15,11 +15,11 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(PatrolNodeId))]
 		public virtual PatrolNode PatrolNode { get; set; } = null!;
 
-		public int Ordinal { get; set; }
-
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }
 		public float PositionZ { get; set; }
+
+		public int Ordinal { get; set; }
 
 		[NotMapped]
 		public Vector3 Position

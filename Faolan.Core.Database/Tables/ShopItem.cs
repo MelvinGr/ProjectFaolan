@@ -9,14 +9,14 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(ShopId), nameof(Pos), IsUnique = true)]
 	public class ShopItem : BaseEntity
 	{
+		[ForeignKey(nameof(ItemTemplateId))]
+		public virtual Item Item { get; set; } = null!;
+
 		// The RDB item template id (= Items.Id). Hard FK to Items (DeleteBehavior.Restrict): every ware carries its
 		// full ProtoAcgItem identity in the same 0x2033 packet, so the items module always harvests it - the `shops`
 		// module depends on `items` to guarantee it ran first. The FK makes an un-harvested ware fail the import LOUDLY
 		// instead of silently rendering an empty shop window.
 		public uint ItemTemplateId { get; set; }
-
-		[ForeignKey(nameof(ItemTemplateId))]
-		public virtual Item Item { get; set; } = null!;
 
 		public uint ShopId { get; set; }
 

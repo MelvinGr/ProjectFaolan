@@ -39,9 +39,79 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// objective interleaving.
 	public sealed class CompletedQuestJournalRegion
 	{
+		public int QuestCount => Areas.Sum(a => a.Quests.Count);
 		public List<AreaGroup> Areas { get; init; } = [];
 
-		public int QuestCount => Areas.Sum(a => a.Quests.Count);
+		public byte[] ToArray()
+		{
+			using var w = new FaolanStream();
+			Write(w);
+			return w.ToArray();
+		}
+
+		public void Write(FaolanStream w)
+		{
+			ArgumentNullException.ThrowIfNull(w);
+
+			w.WriteUInt32(ListFrame.ForCount(Areas.Count));
+			foreach (var area in Areas)
+			{
+				w.WriteUInt32(area.AreaId);
+				w.WriteString(area.AreaTitle);
+				w.WriteString(area.MapName);
+				w.WriteString(area.RegionName);
+				w.WriteUInt32(area.Magic);
+				w.WriteUInt32(area.TableField1);
+				w.WriteUInt32(area.Quests.Count);
+
+				foreach (var quest in area.Quests)
+				{
+					w.WriteUInt32(quest.Sequence);
+					w.WriteUInt32(quest.QuestId);
+					w.WriteUInt32(ListFrame.ForCount(quest.Records.Count));
+					foreach (var record in quest.Records)
+						w.WriteString(record);
+				}
+			}
+		}
+
+		// Builds the region from DB rows. `groups` is ORDERED - both the area sequence and each area's quest sequence -
+		// because the wire order is per-character and not derivable: two characters carry the same two areas in
+		// opposite order (#390). It is not stored either, since the client demonstrably re-sorts for display (retail
+		// renders alphabetically while the wire does not), so callers pass whatever deterministic order they like and
+		// the tests pass a capture's own order to compare byte-for-byte.
+		public static CompletedQuestJournalRegion Build(IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> groups)
+		{
+			ArgumentNullException.ThrowIfNull(groups);
+
+			var region = new CompletedQuestJournalRegion();
+			foreach (var (area, quests) in groups)
+			{
+				var group = new AreaGroup
+				{
+					AreaId = area.AreaId,
+					AreaTitle = QuestcRegion.RemoteFormat(area.AreaTitleRefId, area.AreaTitleCategory, area.AreaTitleKey ?? ""),
+					MapName = QuestcRegion.RemoteFormat(area.MapRefId, area.MapCategory, area.MapKey ?? ""),
+					RegionName = QuestcRegion.RemoteFormat(area.RegionRefId, area.RegionCategory, area.RegionKey ?? ""),
+					Magic = area.Magic,
+					TableField1 = area.TableField1
+				};
+
+				for (var i = 0; i < quests.Count; i++)
+				{
+					group.Quests.Add(new QuestEntry
+					{
+						Sequence = quests[i].JournalSequence,
+						QuestId = quests[i].QuestId,
+						Records = [Text(quests[i], QuestTextSlot.Title), Text(quests[i], QuestTextSlot.ListSubLine)]
+					});
+				}
+
+				region.Areas.Add(group);
+			}
+
+			return region;
+		}
 
 		// Parses the region starting at `offset`. The leading frame counts AREA GROUPS - it is an ordinary ListFrame
 		// word, (areas + 1) * 0x3F1 - and that count is the only terminator; the region ends well before the
@@ -98,69 +168,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			}
 
 			afterRegion = checked((int)r.Position);
-			return new CompletedQuestJournalRegion { Areas = areas };
-		}
-
-		public void Write(FaolanStream w)
-		{
-			ArgumentNullException.ThrowIfNull(w);
-
-			w.WriteUInt32(ListFrame.ForCount(Areas.Count));
-			foreach (var area in Areas)
+			return new CompletedQuestJournalRegion
 			{
-				w.WriteUInt32(area.AreaId);
-				w.WriteString(area.AreaTitle);
-				w.WriteString(area.MapName);
-				w.WriteString(area.RegionName);
-				w.WriteUInt32(area.Magic);
-				w.WriteUInt32(area.TableField1);
-				w.WriteUInt32(area.Quests.Count);
-
-				foreach (var quest in area.Quests)
-				{
-					w.WriteUInt32(quest.Sequence);
-					w.WriteUInt32(quest.QuestId);
-					w.WriteUInt32(ListFrame.ForCount(quest.Records.Count));
-					foreach (var record in quest.Records)
-						w.WriteString(record);
-				}
-			}
-		}
-
-		// Builds the region from DB rows. `groups` is ORDERED - both the area sequence and each area's quest sequence -
-		// because the wire order is per-character and not derivable: two characters carry the same two areas in
-		// opposite order (#390). It is not stored either, since the client demonstrably re-sorts for display (retail
-		// renders alphabetically while the wire does not), so callers pass whatever deterministic order they like and
-		// the tests pass a capture's own order to compare byte-for-byte.
-		public static CompletedQuestJournalRegion Build(IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> groups)
-		{
-			ArgumentNullException.ThrowIfNull(groups);
-
-			var region = new CompletedQuestJournalRegion();
-			foreach (var (area, quests) in groups)
-			{
-				var group = new AreaGroup
-				{
-					AreaId = area.AreaId,
-					AreaTitle = QuestcRegion.RemoteFormat(area.AreaTitleRefId, area.AreaTitleCategory, area.AreaTitleKey ?? ""),
-					MapName = QuestcRegion.RemoteFormat(area.MapRefId, area.MapCategory, area.MapKey ?? ""),
-					RegionName = QuestcRegion.RemoteFormat(area.RegionRefId, area.RegionCategory, area.RegionKey ?? ""),
-					Magic = area.Magic,
-					TableField1 = area.TableField1
-				};
-
-				for (var i = 0; i < quests.Count; i++)
-					group.Quests.Add(new QuestEntry
-					{
-						Sequence = quests[i].JournalSequence,
-						QuestId = quests[i].QuestId,
-						Records = [Text(quests[i], QuestTextSlot.Title), Text(quests[i], QuestTextSlot.ListSubLine)]
-					});
-
-				region.Areas.Add(group);
-			}
-
-			return region;
+				Areas = areas
+			};
 		}
 
 		private static string Text(QuestDefinition? def, QuestTextSlot slot)
@@ -174,17 +185,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 				: QuestcRegion.RemoteFormat(r.RefId, r.Category, r.KeyText ?? "");
 		}
 
-		public byte[] ToArray()
-		{
-			using var w = new FaolanStream();
-			Write(w);
-			return w.ToArray();
-		}
-
 		// One area's completed quests, with the area/region/map header the client's tree groups them under.
 		public sealed class AreaGroup
 		{
 			public uint AreaId { get; init; }
+			public List<QuestEntry> Quests { get; init; } = [];
 			public string AreaTitle { get; init; } = "";
 
 			// MAP comes first on the wire, then REGION. The three tiers, fine to coarse:
@@ -203,14 +208,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 			public string RegionName { get; init; } = "";
 			public uint Magic { get; init; } // the AREA's goal-table name word ('RRL3', 'W6QT', ...)
 			public uint TableField1 { get; init; }
-			public List<QuestEntry> Quests { get; init; } = [];
 		}
 
 		public sealed class QuestEntry
 		{
-			public uint Sequence { get; init; } // 1-based within the area
 			public uint QuestId { get; init; }
 			public List<string> Records { get; init; } = []; // title (50301), summary (50303)
+			public uint Sequence { get; init; } // 1-based within the area
 		}
 	}
 }

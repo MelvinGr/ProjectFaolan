@@ -20,6 +20,11 @@ namespace Faolan.Core.Database.Tables
 	// from Base3DEntity, shared with the player Character and the NPC spawns.
 	public class WorldObject : Base3DEntity
 	{
+		// The teleport destination (map + arrival position), populated for Teleport/ProxyTeleport. Extracted from the
+		// N3Teleport PlayfieldProxy (dest map) + spawn-position blob in the capture where the door was used; the
+		// arrival matches the destination map's reciprocal zone-line. Null when the object isn't a teleporter or its
+		// destination hasn't been captured. Nullable floats mirror Base3DEntity's transform columns.
+		public uint? DestinationMapId { get; set; }
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
@@ -37,6 +42,17 @@ namespace Faolan.Core.Database.Tables
 		// columns; the captured raw `Data` packet has been RETIRED. The transform (pos/rot) is rebuilt from
 		// Base3DEntity's columns and the live playfield token comes from the burst.
 		public byte[]? KdTreeTail { get; set; }
+		public float? DestinationX { get; set; }
+		public float? DestinationY { get; set; }
+		public float? DestinationZ { get; set; }
+
+		// What using this object DOES ([[InteractAction]]). Default None = no column-driven interaction (decor, or a
+		// door handled by the subop-based open/loot path). Teleport/ProxyTeleport carry a Destination* below; the
+		// world-teleports importer sets these from captured UseObject->N3Teleport sequences. A zone-line marked
+		// Teleport/ProxyTeleport with a NULL DestinationMapId is a teleporter we haven't sourced a destination for yet
+		// (the server surfaces a message rather than dropping the player) - distinct from a None object that just
+		// isn't a teleporter.
+		public InteractAction InteractAction { get; set; }
 
 		[MaxLength(128)]
 		public string? DisplayName { get; set; } // proto field 3
@@ -58,26 +74,9 @@ namespace Faolan.Core.Database.Tables
 		public uint? QuestItemEffect { get; set; } // proto field 6 (present on ~23%)
 		public uint? WaypointType { get; set; } // proto field 7 (present on zone-label objects)
 
-		// What using this object DOES ([[InteractAction]]). Default None = no column-driven interaction (decor, or a
-		// door handled by the subop-based open/loot path). Teleport/ProxyTeleport carry a Destination* below; the
-		// world-teleports importer sets these from captured UseObject->N3Teleport sequences. A zone-line marked
-		// Teleport/ProxyTeleport with a NULL DestinationMapId is a teleporter we haven't sourced a destination for yet
-		// (the server surfaces a message rather than dropping the player) - distinct from a None object that just
-		// isn't a teleporter.
-		public InteractAction InteractAction { get; set; }
-
-		// The teleport destination (map + arrival position), populated for Teleport/ProxyTeleport. Extracted from the
-		// N3Teleport PlayfieldProxy (dest map) + spawn-position blob in the capture where the door was used; the
-		// arrival matches the destination map's reciprocal zone-line. Null when the object isn't a teleporter or its
-		// destination hasn't been captured. Nullable floats mirror Base3DEntity's transform columns.
-		public uint? DestinationMapId { get; set; }
-		public float? DestinationX { get; set; }
-		public float? DestinationY { get; set; }
-		public float? DestinationZ { get; set; }
-
 		[NotMapped]
 		public Vector3? DestinationPosition => DestinationMapId == null
-		? null
-		: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
+			? null
+			: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
 	}
 }

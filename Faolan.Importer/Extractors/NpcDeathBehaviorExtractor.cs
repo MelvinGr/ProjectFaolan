@@ -19,10 +19,10 @@ namespace Faolan.Importer.Extractors
 	// NpcTemplate. Only creatures actually killed in a capture are recoverable; the rest default to the humanoid id.
 	public static class NpcDeathBehaviorExtractor
 	{
-		private const uint Opcode2000 = 0x2000;
 		private const uint DeathBccSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR; // 0x642CD3D6
-		private const ushort DeathForm = 0x0004;   // BccIIR form for a slotted behavior record
-		private const uint DeathSlot = 0x0000001F;  // the slot the death behavior lands in
+		private const uint DeathSlot = 0x0000001F; // the slot the death behavior lands in
+		private const uint Opcode2000 = 0x2000;
+		private const ushort DeathForm = 0x0004; // BccIIR form for a slotted behavior record
 
 		public static List<NpcDeathBehavior> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -58,10 +58,24 @@ namespace Faolan.Importer.Extractors
 		// if a name were ever seen with two ids, the MAJORITY wins (defensive - none observed).
 		public static List<NpcDeathBehavior> Merge(IEnumerable<NpcDeathBehavior> all)
 		{
-			return all
-				.GroupBy(d => d.Name)
-				.Select(g => new NpcDeathBehavior(g.Key, g.GroupBy(d => d.BehaviorId).OrderByDescending(x => x.Count()).First().Key))
-				.ToList();
+			return all.GroupBy(d => d.Name).Select(g => new NpcDeathBehavior(g.Key, g.GroupBy(d => d.BehaviorId).OrderByDescending(x => x.Count()).First().Key)).ToList();
+		}
+
+		private static ulong ReadVarint(byte[] b, ref int i)
+		{
+			ulong value = 0;
+			var shift = 0;
+			while (i < b.Length)
+			{
+				var x = b[i++];
+				value |= (ulong)(x & 0x7F) << shift;
+				if ((x & 0x80) == 0)
+					break;
+
+				shift += 7;
+			}
+
+			return value;
 		}
 
 		// The death BccIIR body: [0:4] len [4:8] subop [8:12] class [12:16] handle [16:18] form [18:22] slot
@@ -84,22 +98,6 @@ namespace Faolan.Importer.Extractors
 			var offset = 27;
 			behaviorId = (uint)ReadVarint(body, ref offset);
 			return behaviorId != 0;
-		}
-
-		private static ulong ReadVarint(byte[] b, ref int i)
-		{
-			ulong value = 0;
-			var shift = 0;
-			while (i < b.Length)
-			{
-				var x = b[i++];
-				value |= (ulong)(x & 0x7F) << shift;
-				if ((x & 0x80) == 0)
-					break;
-				shift += 7;
-			}
-
-			return value;
 		}
 	}
 }

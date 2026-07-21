@@ -30,8 +30,6 @@ namespace Faolan.Tests.Support
 			return File.ReadAllBytes(Asset(fileName));
 		}
 
-
-
 		// Any repo-relative path, e.g. Repo("docs", "protocol", "gen", "opcodes.md").
 		public static string Repo(params string[] parts)
 		{

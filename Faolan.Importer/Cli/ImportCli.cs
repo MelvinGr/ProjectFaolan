@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,7 @@ namespace Faolan.Importer.Cli
 	// migrates, and hands a resolved plan to ImportRunner. See docs/tooling/importer-plan.md for the CLI spec.
 	public static class ImportCli
 	{
-		private static readonly string RepoRoot = Core.RepoPaths.Root;
+		private static readonly string RepoRoot = RepoPaths.Root;
 
 		public static async Task<int> RunAsync(string[] args)
 		{

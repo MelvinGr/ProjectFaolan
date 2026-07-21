@@ -17,6 +17,11 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		// The buff ids owned by a dedicated per-entry re-applier - Shield of the Risen (SendShieldOfTheRisen) and the
+		// mount ride buff (RestoreMount). These are re-asserted on EVERY world entry from that flush, so the generic
+		// buff persistence must skip them or the client would render a duplicate icon on relog (#274/#221).
+		private static readonly HashSet<uint> DedicatedRestoreBuffIds = [ShieldOfTheRisenBase1 << 8, ShieldOfTheRisenBase2 << 8, MountCatalog.RideSpell];
+
 		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
 		// payload. Routes the private SendBuffRemoval used by .cancelbuff so the world-tick expiry and the GM cancel
 		// share one builder.
@@ -88,23 +93,43 @@ namespace Faolan.GameServer
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
 		}
 
-		// The buff ids owned by a dedicated per-entry re-applier - Shield of the Risen (SendShieldOfTheRisen) and the
-		// mount ride buff (RestoreMount). These are re-asserted on EVERY world entry from that flush, so the generic
-		// buff persistence must skip them or the client would render a duplicate icon on relog (#274/#221).
-		private static readonly HashSet<uint> DedicatedRestoreBuffIds =
-		[
-			ShieldOfTheRisenBase1 << 8,
-			ShieldOfTheRisenBase2 << 8,
-			MountCatalog.RideSpell
-		];
-
-		// Whether PlayerPersistenceService should persist a live buff for relog (#274): only a SELF-buff (caster is the
-		// entity itself) that no dedicated re-applier already owns. NPC-cast debuffs carry a session-volatile caster
-		// handle plus a DoT and deliberately do not resume across a relog. Pure predicate - the persistence service
-		// (World layer) calls it without otherwise reaching into the listener.
-		public static bool ShouldPersistBuff(WorldEntity entity, ActiveBuff buff)
+		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
+		// 54-byte MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) instead of the shared 50-byte self-buff form -
+		// the client rejects the short shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's
+		// real duration so the client counts it down and SendMagicBuffIir arms the matching expiry. The narrow seam
+		// the SpellweaveService uses for every buff it emits.
+		private async Task ApplySpellweaveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
 		{
-			return buff.CasterHandle == entity.Handle && !DedicatedRestoreBuffIds.Contains(buff.BuffId);
+			var spellBase = spellId >> 8;
+			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
+			var durationCs = (spell?.DurationMs ?? 0) / 10;
+			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+		}
+
+		// Shield of the Risen also drops the instant the player commits an AGGRESSIVE action - an offensive cast, a
+		// ground AoE, or a melee/unarmed swing. Retail's newbie protection breaks on the first attack, not only when
+		// its timer (1h/10h, expired by TickBuffExpiry) runs out. Removes the tracked shield's icon with the rank-1
+		// end twin (the client does NOT self-remove it, same as .cancelbuff), drops it from the live registry, and
+		// forgets the session tracking so the next playfield entry re-applies cleanly. No-op when no shield is active
+		// (so a plain self-buff cast, which never sets ActiveShieldSpellBase, leaves it untouched).
+		private async Task BreakShieldOnAggression(INetworkClient client)
+		{
+			if (client.Session?.ActiveShieldSpellBase is not { } shieldBase)
+				return;
+
+			var self = client.Session.Account.ClientInstance;
+			var appliedId = shieldBase << 8;
+
+			// Retail shows the "lost the grace" on-screen line the instant the shield is LOST to an aggressive action,
+			// sent right BEFORE the buff-removal twin (conans-castle-exit rec#508). Without it the icon vanishes with no
+			// notification. Only fired here (the aggression loss), not on a playfield swap (SendShieldOfTheRisen).
+			await SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildLostGraceEffectXml()), FormatFeedbackCodec.EffectLineTypeFlags);
+			await SendBuffRemoval(client, self, self, appliedId);
+
+			_simulation.PlayerWorldEntity(client)?.ActiveBuffs.TryRemove(appliedId, out _);
+			client.Session.ActiveShieldSpellBase = null;
+			Logger.LogInformation("Shield of the Risen broken by aggressive action for {Name}.", client.Session.Character?.Name);
 		}
 
 		// Re-applies a player's persisted self-buffs at world entry with their REMAINING time (#274). Reads the
@@ -134,7 +159,9 @@ namespace Faolan.GameServer
 				if (buff.ExpiresAt is { } expiresAt)
 				{
 					var remaining = (expiresAt - now).TotalSeconds;
-					remainingCs = remaining > 0 ? (uint)Math.Min(remaining * 100, uint.MaxValue) : 0;
+					remainingCs = remaining > 0
+						? (uint)Math.Min(remaining * 100, uint.MaxValue)
+						: 0;
 					if (remainingCs == 0)
 						continue; // lapsed (or < 1cs left) while logged out - don't re-apply
 				}
@@ -146,86 +173,6 @@ namespace Faolan.GameServer
 
 			if (restored > 0)
 				Logger.LogInformation("Restored {Count} persisted buff(s) for {Name}.", restored, character.Name);
-		}
-
-		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh
-		// login AND on each changemap/teleport re-entry (this runs from FlushPendingPost205FFollowUp, which the teleport
-		// path re-arms). Bases 4061768 (1h) + 3666828 (10h); the client renders these TOP-OF-SCREEN (protection banner)
-		// unlike the regular corner buffs, and auto-generates the "You are protected by Shield of the Risen" chat line
-		// from the ApplySpell itself (no separate server packet - confirmed absent from the capture). Byte-exact against
-		// NecroL80_..._conans-castle-exit rec#165 (wire 0x3dfa4800, dur 0x57e40) + rec#736 (0x37f38c00, 0x36ee80); the
-		// durations resolve from the Spells rows so SendMagicBuffIir arms the matching expiry (#274) and they DO clear.
-		// These use the LONG (54-byte) buff-data form - the client's MagicBuffIIR_c::ReadSubClass rejects the 50-byte
-		// short form for them (runs off the end), same as the spellweave/mount buffs.
-		//
-		// Retail shows exactly ONE shield at a time, picked by playfield type: the 1h base 4061768 on an INSTANCED
-		// playfield (the conans-castle login), the 10h base 3666828 in the SHARED open world - the castle-exit
-		// transition removes the 1h and applies the 10h (NecroL80_..._castle-exit rec#165 -> rec#735 remove -> rec#736
-		// apply). Applying BOTH at once (the first cut) made the client render a second, description-less duplicate.
-		// Our maps are all InstanceMode.Shared for now, so this resolves to the 10h everywhere; it future-proofs the
-		// moment the beach/Tortage maps are modelled Solo. On a playfield change we remove the prior shield's icon
-		// (retail's rank-1 end twin) before applying the new one so only one is ever shown.
-		private async Task SendShieldOfTheRisen(INetworkClient client)
-		{
-			var self = client.Session.Account.ClientInstance;
-			var map = await Database.GetMap(client.Session.Character.MapId);
-			var desired = map?.InstanceMode is null or MapInstanceMode.Shared
-				? ShieldOfTheRisenBase2  // 10h shared/open-world
-				: ShieldOfTheRisenBase1; // 1h instanced
-
-			if (client.Session.ActiveShieldSpellBase is { } prior && prior != desired)
-				await SendBuffRemoval(client, self, self, prior << 8);
-
-			await SendShieldBuff(client, self, desired);
-			client.Session.ActiveShieldSpellBase = desired;
-		}
-
-		// Shield of the Risen also drops the instant the player commits an AGGRESSIVE action - an offensive cast, a
-		// ground AoE, or a melee/unarmed swing. Retail's newbie protection breaks on the first attack, not only when
-		// its timer (1h/10h, expired by TickBuffExpiry) runs out. Removes the tracked shield's icon with the rank-1
-		// end twin (the client does NOT self-remove it, same as .cancelbuff), drops it from the live registry, and
-		// forgets the session tracking so the next playfield entry re-applies cleanly. No-op when no shield is active
-		// (so a plain self-buff cast, which never sets ActiveShieldSpellBase, leaves it untouched).
-		private async Task BreakShieldOnAggression(INetworkClient client)
-		{
-			if (client.Session?.ActiveShieldSpellBase is not { } shieldBase)
-				return;
-
-			var self = client.Session.Account.ClientInstance;
-			var appliedId = shieldBase << 8;
-
-			// Retail shows the "lost the grace" on-screen line the instant the shield is LOST to an aggressive action,
-			// sent right BEFORE the buff-removal twin (conans-castle-exit rec#508). Without it the icon vanishes with no
-			// notification. Only fired here (the aggression loss), not on a playfield swap (SendShieldOfTheRisen).
-			await SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildLostGraceEffectXml()),
-				FormatFeedbackCodec.EffectLineTypeFlags);
-			await SendBuffRemoval(client, self, self, appliedId);
-
-			_simulation.PlayerWorldEntity(client)?.ActiveBuffs.TryRemove(appliedId, out _);
-			client.Session.ActiveShieldSpellBase = null;
-			Logger.LogInformation("Shield of the Risen broken by aggressive action for {Name}.", client.Session.Character?.Name);
-		}
-
-		private async Task SendShieldBuff(INetworkClient client, uint self, uint spellBase)
-		{
-			var spell = await Database.GetSpell(spellBase);
-			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
-			await SendMagicBuffIir(client, self, self, spellBase << 8, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
-		}
-
-		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
-		// 54-byte MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) instead of the shared 50-byte self-buff form -
-		// the client rejects the short shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's
-		// real duration so the client counts it down and SendMagicBuffIir arms the matching expiry. The narrow seam
-		// the SpellweaveService uses for every buff it emits.
-		private async Task ApplySpellweaveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
-		{
-			var spellBase = spellId >> 8;
-			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
-			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
 		}
 
 		// The single per-session energy loop: drains while sprinting, REGENS when idle, and steps aside while weaving
@@ -336,6 +283,46 @@ namespace Faolan.GameServer
 			}
 		}
 
+		private async Task SendShieldBuff(INetworkClient client, uint self, uint spellBase)
+		{
+			var spell = await Database.GetSpell(spellBase);
+			var durationCs = (spell?.DurationMs ?? 0) / 10;
+			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
+			await SendMagicBuffIir(client, self, self, spellBase << 8, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+		}
+
+		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh
+		// login AND on each changemap/teleport re-entry (this runs from FlushPendingPost205FFollowUp, which the teleport
+		// path re-arms). Bases 4061768 (1h) + 3666828 (10h); the client renders these TOP-OF-SCREEN (protection banner)
+		// unlike the regular corner buffs, and auto-generates the "You are protected by Shield of the Risen" chat line
+		// from the ApplySpell itself (no separate server packet - confirmed absent from the capture). Byte-exact against
+		// NecroL80_..._conans-castle-exit rec#165 (wire 0x3dfa4800, dur 0x57e40) + rec#736 (0x37f38c00, 0x36ee80); the
+		// durations resolve from the Spells rows so SendMagicBuffIir arms the matching expiry (#274) and they DO clear.
+		// These use the LONG (54-byte) buff-data form - the client's MagicBuffIIR_c::ReadSubClass rejects the 50-byte
+		// short form for them (runs off the end), same as the spellweave/mount buffs.
+		//
+		// Retail shows exactly ONE shield at a time, picked by playfield type: the 1h base 4061768 on an INSTANCED
+		// playfield (the conans-castle login), the 10h base 3666828 in the SHARED open world - the castle-exit
+		// transition removes the 1h and applies the 10h (NecroL80_..._castle-exit rec#165 -> rec#735 remove -> rec#736
+		// apply). Applying BOTH at once (the first cut) made the client render a second, description-less duplicate.
+		// Our maps are all InstanceMode.Shared for now, so this resolves to the 10h everywhere; it future-proofs the
+		// moment the beach/Tortage maps are modelled Solo. On a playfield change we remove the prior shield's icon
+		// (retail's rank-1 end twin) before applying the new one so only one is ever shown.
+		private async Task SendShieldOfTheRisen(INetworkClient client)
+		{
+			var self = client.Session.Account.ClientInstance;
+			var map = await Database.GetMap(client.Session.Character.MapId);
+			var desired = map?.InstanceMode is null or MapInstanceMode.Shared
+				? ShieldOfTheRisenBase2 // 10h shared/open-world
+				: ShieldOfTheRisenBase1; // 1h instanced
+
+			if (client.Session.ActiveShieldSpellBase is { } prior && prior != desired)
+				await SendBuffRemoval(client, self, self, prior << 8);
+
+			await SendShieldBuff(client, self, desired);
+			client.Session.ActiveShieldSpellBase = desired;
+		}
+
 		// DispatchUpdateSprintbar (0x200E): the ENERGY / sprint bar update - the yellow bar. Body = [u32 energy][u8 01].
 		// This is what actually MOVES the yellow bar (the e9f24184 "Spellweaving Cost" gauge is separate accounting).
 		// Retail streams it while weaving to drain the energy bar (decode_spellweave, sender GameCharAgentProject/0x54
@@ -357,6 +344,15 @@ namespace Faolan.GameServer
 
 			client.Session.IsSprinting = sprinting;
 			EnsureEnergyLoop(client);
+		}
+
+		// Whether PlayerPersistenceService should persist a live buff for relog (#274): only a SELF-buff (caster is the
+		// entity itself) that no dedicated re-applier already owns. NPC-cast debuffs carry a session-volatile caster
+		// handle plus a DoT and deliberately do not resume across a relog. Pure predicate - the persistence service
+		// (World layer) calls it without otherwise reaching into the listener.
+		public static bool ShouldPersistBuff(WorldEntity entity, ActiveBuff buff)
+		{
+			return buff.CasterHandle == entity.Handle && !DedicatedRestoreBuffIds.Contains(buff.BuffId);
 		}
 
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops

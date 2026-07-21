@@ -26,9 +26,17 @@ namespace Faolan.Tests
 			var db = Path.Combine(FindRepoRoot(), "faolan.db");
 			var options = TestDb.ReadOnly(db);
 			using var ctx = new DatabaseContext(options);
-			var rows = ctx.NpcSpawns.Include(s => s.NpcTemplate).ThenInclude(n => n.StatCore).Include(s => s.Morphs).Where(s => s.NpcTemplate != null && s.NpcTemplate.StatCore != null && s.Life > 0).AsNoTracking().ToList();
+			var rows = ctx
+				.NpcSpawns.Include(s => s.NpcTemplate)
+				.ThenInclude(n => n.StatCore)
+				.Include(s => s.Morphs)
+				.Where(s => s.NpcTemplate != null && s.NpcTemplate.StatCore != null && s.Life > 0)
+				.AsNoTracking()
+				.ToList();
 
-			var fallback = rows.Where(s => !(s.NpcTemplate.StatCore.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.NpcTemplate.StatCore.MinimalPostIirRecordCount is not null))).ToList();
+			var fallback = rows
+				.Where(s => !(s.NpcTemplate.StatCore.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.NpcTemplate.StatCore.MinimalPostIirRecordCount is not null)))
+				.ToList();
 
 			_out.WriteLine($"shipped={rows.Count} not-buildable-from-columns={fallback.Count}");
 			foreach (var s in fallback.Take(20))
@@ -45,4 +53,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-

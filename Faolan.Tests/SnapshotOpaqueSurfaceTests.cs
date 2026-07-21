@@ -28,22 +28,9 @@ namespace Faolan.Tests
 
 		private readonly ITestOutputHelper _o;
 
-		public SnapshotOpaqueSurfaceTests(ITestOutputHelper o) => _o = o;
-
-		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass)> SubClasses()
+		public SnapshotOpaqueSurfaceTests(ITestOutputHelper o)
 		{
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
-			{
-				var declared = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
-				if (declared + 4 > body.Length)
-					continue; // truncated capture - the TCP-reassembly gap on compressed downloads
-
-				var stream = new FaolanStream(body[4..]);
-				stream.ReadUInt32();
-				stream.ReadUInt32();
-				stream.ReadUInt32();
-				yield return (source, FullCharSnapshotCodec.ParseInventoryPacketBody(stream).SubClass);
-			}
+			_o = o;
 		}
 
 		// The quest index must be IDENTIFIED (not left opaque) in every snapshot that holds quests. This is the direct
@@ -69,9 +56,7 @@ namespace Faolan.Tests
 
 			_o.WriteLine($"snapshots={total} withActiveQuests={withQuests} indexed={indexed}");
 			Assert.True(withQuests > 0, "corpus carried no snapshot with active quests");
-			Assert.True(missing.Count == 0,
-				$"{missing.Count} snapshot(s) with active quests have NO identified quest index (opaque regression): " +
-				string.Join(", ", missing.Distinct().Take(8)));
+			Assert.True(missing.Count == 0, $"{missing.Count} snapshot(s) with active quests have NO identified quest index (opaque regression): " + string.Join(", ", missing.Distinct().Take(8)));
 		}
 
 		// The opaque byte count before the access-window table must not GROW. It is 0 today (the quest index is fully
@@ -92,11 +77,26 @@ namespace Faolan.Tests
 			}
 
 			_o.WriteLine($"UnknownBeforeAccessWindowTable total={unknownBefore} B of {totalTails} B tails " +
-				$"({(totalTails == 0 ? 0 : 100.0 * unknownBefore / totalTails):F3}%); worst={worst.Item2} B ({worst.Item1})");
+			             $"({(totalTails == 0 ? 0 : 100.0 * unknownBefore / totalTails):F3}%); worst={worst.Item2} B ({worst.Item1})");
 			Assert.True(unknownBefore <= UnknownBeforeCeiling,
 				$"opaque pre-access-window bytes GREW to {unknownBefore} (ceiling {UnknownBeforeCeiling}); " +
 				$"a snapshot shape stopped being modelled - worst offender {worst.Item1} with {worst.Item2} B");
 		}
+
+		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass)> SubClasses()
+		{
+			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
+			{
+				var declared = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
+				if (declared + 4 > body.Length)
+					continue; // truncated capture - the TCP-reassembly gap on compressed downloads
+
+				var stream = new FaolanStream(body[4..]);
+				stream.ReadUInt32();
+				stream.ReadUInt32();
+				stream.ReadUInt32();
+				yield return (source, FullCharSnapshotCodec.ParseInventoryPacketBody(stream).SubClass);
+			}
+		}
 	}
 }
-

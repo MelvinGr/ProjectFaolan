@@ -30,10 +30,9 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// c2s receivers are *Agent classes, s2c receivers *Interface classes.
 		private static readonly (string Enum, string Class)[] EnumToClass =
 		[
-			("UniverseAgentOpcodes", "UniverseAgent"), ("UniverseInterfaceOpcodes", "UniverseInterface"), ("PlayerAgentOpcodes", "PlayerAgent"),
-			("PlayerInterfaceOpcodes", "PlayerInterface"), ("CSPlayerAgentOpcodes", "CSPlayerAgent"), ("CSPlayerInterfaceOpcodes", "CSPlayerInterface"),
-			("GameAgentOpcodes", "GameAgent"), ("GameInterfaceOpcodes", "GameInterface"), ("GameCharAgentOpcodes", "GameCharAgent"),
-			("GameCharInterfaceOpcodes", "GameCharInterface"), ("GameCharAgentProjectOpcodes", "GameCharAgentProject"),
+			("UniverseAgentOpcodes", "UniverseAgent"), ("UniverseInterfaceOpcodes", "UniverseInterface"), ("PlayerAgentOpcodes", "PlayerAgent"), ("PlayerInterfaceOpcodes", "PlayerInterface"),
+			("CSPlayerAgentOpcodes", "CSPlayerAgent"), ("CSPlayerInterfaceOpcodes", "CSPlayerInterface"), ("GameAgentOpcodes", "GameAgent"), ("GameInterfaceOpcodes", "GameInterface"),
+			("GameCharAgentOpcodes", "GameCharAgent"), ("GameCharInterfaceOpcodes", "GameCharInterface"), ("GameCharAgentProjectOpcodes", "GameCharAgentProject"),
 			("GameCharInterfaceProjectOpcodes", "GameCharInterfaceProject"), ("TradepostAgentOpcodes", "TradepostAgent"), ("TradepostInterfaceOpcodes", "TradepostInterface")
 		];
 
@@ -123,8 +122,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 					// PlayerAgent/PlayerInterface carries a 32-bit method id in the header; it lives in
 					// PlayerAgentMethodIds (the single source), not a trailing comment - surface it as the note here.
-					if ((e.Name == "PlayerAgentOpcodes" || e.Name == "PlayerInterfaceOpcodes")
-						&& PlayerAgentMethodIds.ById.TryGetValue((ushort)value, out var methodId))
+					if ((e.Name == "PlayerAgentOpcodes" || e.Name == "PlayerInterfaceOpcodes") && PlayerAgentMethodIds.ById.TryGetValue((ushort)value, out var methodId))
 						note = $"id 0x{methodId:X8}";
 
 					var width = e.GetEnumUnderlyingType() == typeof(uint)

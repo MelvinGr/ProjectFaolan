@@ -75,6 +75,18 @@ namespace Faolan.GameServer.World
 		// token that disagrees across those packets makes the client hide it). Shared so the cross-map teleport
 		// dest-announce can carry the same value the destination's entry will stamp (WorldBroadcaster).
 		public const uint DefaultPlayfieldToken = 0x004FE428;
+		private const double ChatterChancePerCheck = 0.05;
+
+		// Ambient bystander chatter: on each check a friendly/neutral NPC has a small chance to bark, so barks stay
+		// sparse + staggered across NPCs rather than all firing at once. Cosmetic; tune in the in-client pass.
+		private const double ChatterCheckSeconds = 4.0;
+
+		// The idle-heartbeat cadence (#225): every live NPC (re-)asserts its short-form BehaviorControlCenterIIR this
+		// often so the client keeps playing its idle animation instead of freezing. Retail streams it faster (~10/s
+		// aggregate in the mount capture; the per-entity rate isn't pinned from captures), so this is a deliberately
+		// conservative, single-place-tunable interval - dial it in the in-client pass. The broadcast is gated to
+		// Confirmed viewers, so it never fires at a still-loading client (the hang the earlier experiment hit).
+		private const double HeartbeatIntervalSeconds = 1.0;
 
 		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
 		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
@@ -85,27 +97,15 @@ namespace Faolan.GameServer.World
 		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight below (#284). Null = terrain
 		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
 		private readonly TerrainService _terrain;
+		private readonly TickAccumulator _chatter = new(ChatterCheckSeconds);
+		private readonly TickAccumulator _heartbeat = new(HeartbeatIntervalSeconds);
+
+		private uint _nextPlayfieldToken = 0x00A00000;
 
 		public WorldState(TerrainService terrain = null)
 		{
 			_terrain = terrain;
 		}
-
-		private uint _nextPlayfieldToken = 0x00A00000;
-
-		// The idle-heartbeat cadence (#225): every live NPC (re-)asserts its short-form BehaviorControlCenterIIR this
-		// often so the client keeps playing its idle animation instead of freezing. Retail streams it faster (~10/s
-		// aggregate in the mount capture; the per-entity rate isn't pinned from captures), so this is a deliberately
-		// conservative, single-place-tunable interval - dial it in the in-client pass. The broadcast is gated to
-		// Confirmed viewers, so it never fires at a still-loading client (the hang the earlier experiment hit).
-		private const double HeartbeatIntervalSeconds = 1.0;
-		private readonly TickAccumulator _heartbeat = new(HeartbeatIntervalSeconds);
-
-		// Ambient bystander chatter: on each check a friendly/neutral NPC has a small chance to bark, so barks stay
-		// sparse + staggered across NPCs rather than all firing at once. Cosmetic; tune in the in-client pass.
-		private const double ChatterCheckSeconds = 4.0;
-		private const double ChatterChancePerCheck = 0.05;
-		private readonly TickAccumulator _chatter = new(ChatterCheckSeconds);
 
 		// Mints the next playfield-instance token. Thread-safe (zones can be created from any connection).
 		public uint NextPlayfieldToken()
@@ -321,6 +321,7 @@ namespace Faolan.GameServer.World
 									{
 										if (ReferenceEquals(other, entity) || other.IsDead || other.IsLoot)
 											continue;
+
 										var odx = other.Position.X - pt.X;
 										var odz = other.Position.Z - pt.Z;
 										if (odx * odx + odz * odz < 4f)
@@ -475,17 +476,6 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// A deterministic per-pet formation slot offset (X, Z) on a small ring around the leader, so multiple pets
-		// following one player fan out instead of piling on the same spot (#307). Derived from the entity handle so
-		// it is STABLE across ticks (no per-tick jitter that would make the pet jitter in place): the handle picks an
-		// angle around the circle and one of a few radius rings (so more than a ring's worth of pets don't collide).
-		private static (float X, float Z) FollowFormationOffset(uint handle)
-		{
-			var angle = handle % 3600 * (MathF.PI / 1800f); // 0..2π in 0.1° steps, deterministic per handle
-			var radius = 3f + handle % 3; // 3 / 4 / 5u rings
-			return (radius * MathF.Cos(angle), radius * MathF.Sin(angle));
-		}
-
 		// The closest player within `range` of the NPC (its aggro target), or null if none.
 		private WorldEntity NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
 		{
@@ -517,6 +507,17 @@ namespace Faolan.GameServer.World
 			}
 
 			return nearest;
+		}
+
+		// A deterministic per-pet formation slot offset (X, Z) on a small ring around the leader, so multiple pets
+		// following one player fan out instead of piling on the same spot (#307). Derived from the entity handle so
+		// it is STABLE across ticks (no per-tick jitter that would make the pet jitter in place): the handle picks an
+		// angle around the circle and one of a few radius rings (so more than a ring's worth of pets don't collide).
+		private static (float X, float Z) FollowFormationOffset(uint handle)
+		{
+			var angle = handle % 3600 * (MathF.PI / 1800f); // 0..2π in 0.1° steps, deterministic per handle
+			var radius = 3f + handle % 3; // 3 / 4 / 5u rings
+			return (radius * MathF.Cos(angle), radius * MathF.Sin(angle));
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),

@@ -16,10 +16,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class BehaviorHeartbeatCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
-		private const uint IdleBehaviorId = 7;
 
 		// The idle-behavior constant in args field 1 (the capture's `08 c5 c3 02` varint).
 		private const uint IdleBehaviorAction = 41413;
+		private const uint IdleBehaviorId = 7;
 
 		public static byte[] Build(uint actor, uint tick)
 		{

@@ -21,15 +21,22 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(AccountId))]
 		public virtual Account Account { get; set; } = null!;
 
-		// The item template granted on redeem (an Items row, same as ShopItem.ItemTemplateId).
-		public uint ItemTemplateId { get; set; }
-
 		[ForeignKey(nameof(ItemTemplateId))]
 		public virtual Item Item { get; set; } = null!;
 
-		// The item's LEVEL as shown in the window (the u64 after the template on the wire). NOT the stack count: the
-		// capture's redeem delivered ONE item despite Level 5 (see ClaimEntry). Cosmetic server-side; sent verbatim.
-		public ulong Level { get; set; } // TODO: Just use item.level?
+		// The item template granted on redeem (an Items row, same as ShopItem.ItemTemplateId).
+		public uint ItemTemplateId { get; set; }
+
+		[MaxLength(4)]
+		public string Code { get; set; } = "";
+
+		// Wire claim type: 6 = plain item claim; 4 = account-currency / point grant.
+		public uint ClaimType { get; set; } = 6; // TODO: make Enum
+
+		// Max charges - the second tail word [remaining][MAX]. NULL (wire 0) = infinite. For a finite claim it equals
+		// Quantity when fresh (so the initial list has remaining == max) and stays fixed as Quantity decrements, so the
+		// sub-0x05 redeem ack sends [remaining][max].
+		public uint? MaxCharges { get; set; }
 
 		// Remaining charges - the "Amount" column. NULL = INFINITE (shown as ∞; the claim is not consumed on redeem, so
 		// an ordinary item claim can be collected any number of times). A finite value N is a multi-charge claim
@@ -37,15 +44,8 @@ namespace Faolan.Core.Database.Tables
 		// wire (the first of the tail pair [remaining][max]) infinite is 0.
 		public uint? Quantity { get; set; }
 
-		// Max charges - the second tail word [remaining][MAX]. NULL (wire 0) = infinite. For a finite claim it equals
-		// Quantity when fresh (so the initial list has remaining == max) and stays fixed as Quantity decrements, so the
-		// sub-0x05 redeem ack sends [remaining][max].
-		public uint? MaxCharges { get; set; }
-
-		[MaxLength(4)]
-		public string Code { get; set; } = "";
-
-		// Wire claim type: 6 = plain item claim; 4 = account-currency / point grant.
-		public uint ClaimType { get; set; } = 6; // TODO: make Enum
+		// The item's LEVEL as shown in the window (the u64 after the template on the wire). NOT the stack count: the
+		// capture's redeem delivered ONE item despite Level 5 (see ClaimEntry). Cosmetic server-side; sent verbatim.
+		public ulong Level { get; set; } // TODO: Just use item.level?
 	}
 }

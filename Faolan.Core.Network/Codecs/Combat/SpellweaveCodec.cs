@@ -12,14 +12,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// that are genuinely spellweave: the reactive element LIST, the FIRE burst, and the stat GAUGE ticks.
 	public static class SpellweaveCodec
 	{
-		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.CombatReactiveIIR,
-			GameServer0X2000Opcodes.StatDamageIIR,
-			GameServer0X2000Opcodes.StatIIR,
-		];
-
 		public const uint DotGauge = 0x37E690; // "Spellweaving" -> the health DoT when stamina is empty
 		public const uint DotScale = 0x0000001B; // v@33 for the DoT gauge
 
@@ -32,7 +24,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// [0][u32 scale][u32 mode=2][i32 delta][0][0xC350][caster][u32 1][0][u32 gaugeId][u32 magnitude=80][0][0][0].
 		public const uint StaminaGauge = 0x37E68C; // "Spellweaving Cost" -> the yellow stamina bar
 		public const uint StaminaScale = 0x000F425C; // v@33 for the stamina gauge
+
 		private const uint GaugeMagnitude = 80;
+
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.CombatReactiveIIR, GameServer0X2000Opcodes.StatDamageIIR, GameServer0X2000Opcodes.StatIIR];
 
 		// One fire-burst stage (StatIIR 0xF98E10B3) emitted per stage on DEACTIVATE: the accumulated weave firing.
 		// Record: [op][0xC350][caster][u8 0x01][u32 fireId][u32 0x00007BD4]. Necro fire ids: 0x398/0x39B/0x39A/0x39D.

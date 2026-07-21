@@ -1,3 +1,4 @@
+using System.Text;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Text
@@ -27,25 +28,13 @@ namespace Faolan.Core.Network.Codecs.Text
 	//   [u32 footer]       trailing flag (0 or 1 in the captures)
 	public static class FormatFeedbackCodec
 	{
-		// typeFlags value of the GenericDisplayAreaName / FIFO-banner messages (the top-of-screen overlay).
-		public const uint FifoBannerTypeFlags = 0x00000000;
 		// typeFlags of the buff/effect feedback LINES (not the FIFO banner) - e.g. LostGraceEffect, AttributeChanged.
 		public const uint EffectLineTypeFlags = 0x42000020;
+
+		// typeFlags value of the GenericDisplayAreaName / FIFO-banner messages (the top-of-screen overlay).
+		public const uint FifoBannerTypeFlags = 0x00000000;
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
 		private const byte LeadFlag = 0x01;
-
-		// The LostGraceEffect feedback XML - the "you have lost the grace" on-screen line retail shows the instant a
-		// player LOSES the Shield of the Risen protection (an aggressive action), sent right before the buff-removal
-		// twin (NecroL80_..._conans-castle-exit rec#508: LostGraceEffect feedback -> 0x37f38c01 shield remove, while the
-		// aggro-status stream shows the player in combat). NOT sent on a playfield swap of the shield (rec#206/#1750
-		// swap the 1h<->10h with no LostGraceEffect). Byte-exact against that record; send via
-		// Build(instance, EffectLineTypeFlags, 1, xml). The key is the capture-verbatim per-token key (same treatment
-		// as BuildAreaNameXml's fixed key).
-		public static byte[] BuildLostGraceEffectXml()
-		{
-			return System.Text.Encoding.Latin1.GetBytes(
-				"<remoteformat token=\"LostGraceEffect\" category=\"100\" key=\"RO5SQlZn.h/DvvaH&#36;WGu\" knubot=\"0\"  ></remoteformat>");
-		}
 
 		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml)
 		{
@@ -58,10 +47,21 @@ namespace Faolan.Core.Network.Codecs.Text
 		// the result via Build(instance, FifoBannerTypeFlags, 1, xml).
 		public static byte[] BuildAreaNameXml(uint textId)
 		{
-			return System.Text.Encoding.Latin1.GetBytes(
-				"<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
-				"key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
-				$"token=&#39;DisplayedText(3)|GenericDisplayAreaName|{textId}&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>");
+			return Encoding.Latin1.GetBytes("<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
+			                                "key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
+			                                $"token=&#39;DisplayedText(3)|GenericDisplayAreaName|{textId}&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>");
+		}
+
+		// The LostGraceEffect feedback XML - the "you have lost the grace" on-screen line retail shows the instant a
+		// player LOSES the Shield of the Risen protection (an aggressive action), sent right before the buff-removal
+		// twin (NecroL80_..._conans-castle-exit rec#508: LostGraceEffect feedback -> 0x37f38c01 shield remove, while the
+		// aggro-status stream shows the player in combat). NOT sent on a playfield swap of the shield (rec#206/#1750
+		// swap the 1h<->10h with no LostGraceEffect). Byte-exact against that record; send via
+		// Build(instance, EffectLineTypeFlags, 1, xml). The key is the capture-verbatim per-token key (same treatment
+		// as BuildAreaNameXml's fixed key).
+		public static byte[] BuildLostGraceEffectXml()
+		{
+			return Encoding.Latin1.GetBytes("<remoteformat token=\"LostGraceEffect\" category=\"100\" key=\"RO5SQlZn.h/DvvaH&#36;WGu\" knubot=\"0\"  ></remoteformat>");
 		}
 
 		// The "resurrection point discovered" FIFO banner (#372) - retail's toast when a player walks near a point
@@ -81,11 +81,11 @@ namespace Faolan.Core.Network.Codecs.Text
 		// key at all and renders, so it is not obviously required for every string.
 		public static byte[] BuildRespawnPointDiscoveredXml(uint pointId, string? nameKey)
 		{
-			var key = nameKey == null ? "" : $"key=&quot;{nameKey}&quot; ";
-			return System.Text.Encoding.Latin1.GetBytes(
-				"<remoteformat id=\"218327236\" category=\"100\" key=\"KsATGOK`H%9l@@z[1mo,\" knubot=\"0\"  >" +
-				$"<parameter value=\"7;&lt;localized id=&quot;{pointId}&quot; category=&quot;270&quot; " +
-				$"flags=&quot;&quot; {key}&gt;\" /></remoteformat>");
+			var key = nameKey == null
+				? ""
+				: $"key=&quot;{nameKey}&quot; ";
+			return Encoding.Latin1.GetBytes("<remoteformat id=\"218327236\" category=\"100\" key=\"KsATGOK`H%9l@@z[1mo,\" knubot=\"0\"  >" +
+			                                $"<parameter value=\"7;&lt;localized id=&quot;{pointId}&quot; category=&quot;270&quot; " + $"flags=&quot;&quot; {key}&gt;\" /></remoteformat>");
 		}
 
 		public static Message Parse(byte[] body)

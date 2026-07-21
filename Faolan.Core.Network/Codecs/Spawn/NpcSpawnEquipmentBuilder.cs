@@ -31,24 +31,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return BuildEntry(row.Pos, row.Template, row.Level, item.Key, item.Hash);
 		}
 
-		private static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(uint pos, uint template, uint level, ProtoDecryptionKey key, uint hash)
-		{
-			return new ProtoCoreCharacterIIR.InventoryEntry
-			{
-				Pos = pos,
-				Item = new ProtoAcgItem
-				{
-					Key1 = key,
-					Key2 = key,
-					Key3 = key,
-					Template1 = template,
-					Template2 = template,
-					Level = level,
-					Hash = hash
-				}
-			};
-		}
-
 		// Lifts a captured InventoryEntry into a row (per-placement NpcSpawnEquipment or per-type NpcEquipment via the
 		// type param), but ONLY if it matches the reproducible shape (the three keys identical, the two templates
 		// identical, no template3). Returns false for any entry outside that shape, so the importer can decline the whole
@@ -81,6 +63,24 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			};
 
 			return true;
+		}
+
+		private static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(uint pos, uint template, uint level, ProtoDecryptionKey key, uint hash)
+		{
+			return new ProtoCoreCharacterIIR.InventoryEntry
+			{
+				Pos = pos,
+				Item = new ProtoAcgItem
+				{
+					Key1 = key,
+					Key2 = key,
+					Key3 = key,
+					Template1 = template,
+					Template2 = template,
+					Level = level,
+					Hash = hash
+				}
+			};
 		}
 
 		private static bool SameKey(ProtoDecryptionKey a, ProtoDecryptionKey b)

@@ -88,7 +88,11 @@ namespace Faolan.Tests
 					});
 					// CharacterSpell.SpellId FKs Spells - the granted spell must be in the catalog (in production the
 					// scrape/cast modules populate it; uncataloged grants are skipped, not seeded).
-					db.Spells.Add(new Spell { Id = 0x4213cd, Name = "" });
+					db.Spells.Add(new Spell
+					{
+						Id = 0x4213cd,
+						Name = ""
+					});
 					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 					// DemoL80 is the grant's target; the other character must NOT receive the spell.
 					db.Characters.Add(new Character
@@ -162,8 +166,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-
-
-
-
-

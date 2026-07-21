@@ -8,7 +8,6 @@ using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
@@ -40,6 +39,11 @@ namespace Faolan.GameServer
 		internal const ContainerKind InventoryContainerBackpack = ContainerKind.Bag;
 		internal const ContainerKind InventoryContainerQuest = ContainerKind.Quest;
 
+		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
+		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
+		// step, so any genuine step cancels the cast while aiming a ground-target reticle does not.
+		private const float CastMoveCancelEpsilonSq = 0.04f; // (0.2 world units)^2
+
 		private const int EnergyRegenPerTick = 600;
 		private const int EnergyTickMs = 1000;
 
@@ -48,6 +52,11 @@ namespace Faolan.GameServer
 		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
 		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprintource.
 
+		// Default baked-terrain dir (#284) when `TerrainDir` isn't set in faolan.json - the repo-root `Terrain/` folder
+		// the importer writes (`--report terrain-export`). The game server reads these small files, NOT the ~28 GB
+		// client RDB; if the dir is absent TerrainService disables itself (ground-snap/LoS off, no error).
+		private const string DefaultTerrainDir = "Terrain";
+
 		private const uint BankFlagListed = 0x401; // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
 		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
@@ -55,11 +64,6 @@ namespace Faolan.GameServer
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
 		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
-
-		// Default baked-terrain dir (#284) when `TerrainDir` isn't set in faolan.json - the repo-root `Terrain/` folder
-		// the importer writes (`--report terrain-export`). The game server reads these small files, NOT the ~28 GB
-		// client RDB; if the dir is absent TerrainService disables itself (ground-snap/LoS off, no error).
-		private const string DefaultTerrainDir = "Terrain";
 
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
@@ -72,42 +76,20 @@ namespace Faolan.GameServer
 		// blob used; the client does not validate it - #304).
 		private const uint DefaultSelfBuffEffectNonce = 0x14C5C912;
 
-		// Shield of the Risen (#221) base spell ids - the two persistent protection buffs applied on every world entry.
-		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
-		private const uint ShieldOfTheRisenBase2 = 3666828; // 10h (wire (base<<8) = 0x37F38C00)
-
-		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
-		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
-		// step, so any genuine step cancels the cast while aiming a ground-target reticle does not.
-		private const float CastMoveCancelEpsilonSq = 0.04f; // (0.2 world units)^2
-
-		// The 0x205A PerformSpecialAction body word that identifies the necro spellweave activate/deactivate toggle
-		// (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
-		// spellweaves.
-		private const uint SpellweaveToggleParam = 0xFC;
-
 		// The 0x205A (PerformSpecialAction) selector for the "Path of Asura" teleport spell (NecroL80 path-of-azura
 		// capture: PerformSpecialAction 0x4E1 -> retail DispatchRedirectToServer, a long-load teleport). Works like the
 		// Totem of Origin - a recall to the bind point (our single-server DoTeleport is the equivalent of retail's
 		// cross-server redirect).
 		private const uint PathOfAsuraSpecialAction = 0x4E1;
 
-		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
-		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
-		// one. (There is no hand-built login/teleport path anymore.)
-		//private const uint DefaultWorldMapId = Map.TortageBeachId;
+		// Shield of the Risen (#221) base spell ids - the two persistent protection buffs applied on every world entry.
+		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
+		private const uint ShieldOfTheRisenBase2 = 3666828; // 10h (wire (base<<8) = 0x37F38C00)
 
-		// Starter beach gear (StartingData.StartingMaleLegsItem / StartingWristItem / …) lives in
-		// Faolan.Core.Network/Constants/StartingData.cs.
-
-		// Equipped-container slot ids = the CharacterEquipmentSlot enum itself, read through the CharacterEquipment
-		// indexer (the same source PlayerSpawnEquipment.BuildInventoryEntries walks for the spawn). This was a
-		// hand-maintained parallel table of the 18 WORN slots, which silently dropped the 6 VANITY slots (1002+) out of
-		// the snapshot's equipped container: the avatar rendered its vanity off the FA015807 spawn, but the client's
-		// equipment/vanity panel came up empty because the container the panel reads never carried them. Retail DOES
-		// ship vanity here - NecroL80's L80 snapshot's equipped container holds pos 1002/1007/1011/1014/1018 alongside the
-		// worn set. FirstPosBag (17) is NOT an enum member and stays handled separately (bagFirst).
-		private static readonly CharacterEquipmentSlot[] InventoryEquippedSlots = Enum.GetValues<CharacterEquipmentSlot>();
+		// The 0x205A PerformSpecialAction body word that identifies the necro spellweave activate/deactivate toggle
+		// (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
+		// spellweaves.
+		private const uint SpellweaveToggleParam = 0xFC;
 
 		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x58);
 
@@ -129,6 +111,23 @@ namespace Faolan.GameServer
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
 		private static readonly byte[] PlayerDeathSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
+
+		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
+		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
+		// one. (There is no hand-built login/teleport path anymore.)
+		//private const uint DefaultWorldMapId = Map.TortageBeachId;
+
+		// Starter beach gear (StartingData.StartingMaleLegsItem / StartingWristItem / …) lives in
+		// Faolan.Core.Network/Constants/StartingData.cs.
+
+		// Equipped-container slot ids = the CharacterEquipmentSlot enum itself, read through the CharacterEquipment
+		// indexer (the same source PlayerSpawnEquipment.BuildInventoryEntries walks for the spawn). This was a
+		// hand-maintained parallel table of the 18 WORN slots, which silently dropped the 6 VANITY slots (1002+) out of
+		// the snapshot's equipped container: the avatar rendered its vanity off the FA015807 spawn, but the client's
+		// equipment/vanity panel came up empty because the container the panel reads never carried them. Retail DOES
+		// ship vanity here - NecroL80's L80 snapshot's equipped container holds pos 1002/1007/1011/1014/1018 alongside the
+		// worn set. FirstPosBag (17) is NOT an enum member and stays handled separately (bagFirst).
+		private static readonly CharacterEquipmentSlot[] InventoryEquippedSlots = Enum.GetValues<CharacterEquipmentSlot>();
 
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
@@ -183,11 +182,11 @@ namespace Faolan.GameServer
 		// Player-state persistence (autosave loop + logout/teleport/.save flushes), composed off the listener (#200).
 		private readonly PlayerPersistenceService _persistence;
 
-		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
-		private readonly QuestProgressionService _questProgression;
-
 		// Scripted Tortage-intro narrative (Kalanthes create-cutscene walk + Casilda beach rescue), #353.
 		private readonly QuestHandlerService _questHandler;
+
+		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
+		private readonly QuestProgressionService _questProgression;
 
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
@@ -217,8 +216,9 @@ namespace Faolan.GameServer
 		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts;
 
-		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher)
-			: base(realm.Port, logger, configuration, database, new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes)))
+		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
+			IGameServerDispatcher gameServerDispatcher) : base(realm.Port, logger, configuration, database,
+			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes)))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -237,7 +237,7 @@ namespace Faolan.GameServer
 				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
 			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-									 // reactive element list + fire burst (docs/subsystems/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+				// reactive element list + fire burst (docs/subsystems/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
 				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
@@ -418,32 +418,26 @@ namespace Faolan.GameServer
 			};
 		}
 
-		// The complete burst-less 0x737A6DF9 snapshot packet (DB containers + from-scratch tails).
-		// #255: the player's snapshot-eligible held quests + the primary (tracked) quest. The beach starter is the
-		// primary (always held + seeded). A held quest joins only if its definition is snapshot-eligible (Quest_c
-		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw. An ineligible held quest is
-		// simply ABSENT from the journal: there is no live restore path any more (#389/#390), so widening
-		// IsSnapshotEligible is what makes such a quest appear.
-		private async Task<(List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character)
+		// The area rows + area quest catalogs the quest INDEX needs for a set of active quests. The catalog is every
+		// quest of the area ordered by JournalSequence - static area data, not the character's journal: a freshly
+		// created character carries its area's whole list in the captures (#390).
+		private async Task<(Dictionary<uint, QuestArea> Areas, Dictionary<uint, IReadOnlyList<QuestDefinition>> Catalog)> LoadAreaCatalog(IReadOnlyList<QuestDefinition> quests)
 		{
-			var quests = new List<QuestDefinition>();
-			if (character == null)
-				return (quests, null);
+			var areas = new Dictionary<uint, QuestArea>();
+			var catalog = new Dictionary<uint, IReadOnlyList<QuestDefinition>>();
+			if (quests.Count == 0)
+				return (areas, catalog);
 
-			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
-			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
-			var areaRows = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
-			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
+			var allAreas = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
+			foreach (var areaId in quests.Select(q => q.AreaId).Distinct())
 			{
-				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (def != null && areaRows.TryGetValue(def.AreaId, out var area) && FullCharSnapshotSubClass.IsSnapshotEligible(def, area))
-					quests.Add(def);
+				if (allAreas.TryGetValue(areaId, out var area))
+					areas[areaId] = area;
+
+				catalog[areaId] = await Database.GetQuestDefinitionsByArea(areaId);
 			}
 
-			// The tracked (primary) quest owns the snapshot's objective region + index terminal: the beach starter when
-			// held, else the first held quest (null only when the character holds none -> empty region).
-			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
-			return (quests, primary);
+			return (areas, catalog);
 		}
 
 		// The character's COMPLETED-quest journal, grouped by area (#390) - the Completed tab's contents. Retail ships
@@ -472,7 +466,9 @@ namespace Faolan.GameServer
 				if (def == null || def.AreaId == 0 || !areas.ContainsKey(def.AreaId))
 					continue;
 
-				(byArea.TryGetValue(def.AreaId, out var list) ? list : byArea[def.AreaId] = []).Add(def);
+				(byArea.TryGetValue(def.AreaId, out var list)
+					? list
+					: byArea[def.AreaId] = []).Add(def);
 			}
 
 			foreach (var (areaId, defs) in byArea)
@@ -481,27 +477,32 @@ namespace Faolan.GameServer
 			return groups;
 		}
 
-		// The area rows + area quest catalogs the quest INDEX needs for a set of active quests. The catalog is every
-		// quest of the area ordered by JournalSequence - static area data, not the character's journal: a freshly
-		// created character carries its area's whole list in the captures (#390).
-		private async Task<(Dictionary<uint, QuestArea> Areas, Dictionary<uint, IReadOnlyList<QuestDefinition>> Catalog)> LoadAreaCatalog(
-			IReadOnlyList<QuestDefinition> quests)
+		// The complete burst-less 0x737A6DF9 snapshot packet (DB containers + from-scratch tails).
+		// #255: the player's snapshot-eligible held quests + the primary (tracked) quest. The beach starter is the
+		// primary (always held + seeded). A held quest joins only if its definition is snapshot-eligible (Quest_c
+		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw. An ineligible held quest is
+		// simply ABSENT from the journal: there is no live restore path any more (#389/#390), so widening
+		// IsSnapshotEligible is what makes such a quest appear.
+		private async Task<(List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character)
 		{
-			var areas = new Dictionary<uint, QuestArea>();
-			var catalog = new Dictionary<uint, IReadOnlyList<QuestDefinition>>();
-			if (quests.Count == 0)
-				return (areas, catalog);
+			var quests = new List<QuestDefinition>();
+			if (character == null)
+				return (quests, null);
 
-			var allAreas = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
-			foreach (var areaId in quests.Select(q => q.AreaId).Distinct())
+			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
+			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
+			var areaRows = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
+			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
 			{
-				if (allAreas.TryGetValue(areaId, out var area))
-					areas[areaId] = area;
-
-				catalog[areaId] = await Database.GetQuestDefinitionsByArea(areaId);
+				var def = await Database.GetQuestDefinition(cq.QuestId);
+				if (def != null && areaRows.TryGetValue(def.AreaId, out var area) && FullCharSnapshotSubClass.IsSnapshotEligible(def, area))
+					quests.Add(def);
 			}
 
-			return (areas, catalog);
+			// The tracked (primary) quest owns the snapshot's objective region + index terminal: the beach starter when
+			// held, else the first held quest (null only when the character holds none -> empty region).
+			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
+			return (quests, primary);
 		}
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
@@ -525,8 +526,7 @@ namespace Faolan.GameServer
 			}
 
 			var all = await Database.GetMaps();
-			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ??
-				   all.FirstOrDefault(m => m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(m => m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform

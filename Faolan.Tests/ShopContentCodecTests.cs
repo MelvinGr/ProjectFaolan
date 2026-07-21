@@ -36,7 +36,13 @@ namespace Faolan.Tests
 			{
 				Id = e.Template,
 				Hash = e.Hash,
-				Key = new ProtoDecryptionKey { Key1 = e.Data1, Key2 = e.Data2, Key3 = e.Data3, Key4 = e.Data4 }
+				Key = new ProtoDecryptionKey
+				{
+					Key1 = e.Data1,
+					Key2 = e.Data2,
+					Key3 = e.Data3,
+					Key4 = e.Data4
+				}
 			});
 
 			var rebuilt = ShopContentCodec.Build(parsed.ShopInstance, parsed.NpcHandle, parsed.MaxSize, items, t => byTemplate[t]);

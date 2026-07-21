@@ -14,15 +14,6 @@ namespace Faolan.Tests
 	public class WorldSetNameIirTests
 	{
 		[Fact]
-		public void BuildWorldSetNameIir_MatchesRecoveredGrammar()
-		{
-			// [u32 type=C350][u32 handle=0009003C][u8 isToBePassed=00][u32 nameType=00000003][u8 01][u8 01]
-			//   [u32 nameLen=00000005]["Ape2A"]
-			var body = CreateEditorRecordBuilder.BuildWorldSetNameIir(0x0009003C, "Ape2A");
-			Assert.Equal("0000c3500009003c00000000030101000000054170653241", Convert.ToHexString(body).ToLowerInvariant());
-		}
-
-		[Fact]
 		public void BuildWorldSetNameIir_CapsNameAt31Bytes()
 		{
 			// The client rejects nameLen >= 0x20 (32), so a longer label is trimmed to exactly 31 bytes.
@@ -40,6 +31,15 @@ namespace Faolan.Tests
 			var body = CreateEditorRecordBuilder.BuildWorldSetNameIir(0x11223344, "z");
 			var type = (uint)((body[0] << 24) | (body[1] << 16) | (body[2] << 8) | body[3]);
 			Assert.Equal(EntityClass.Character, type);
+		}
+
+		[Fact]
+		public void BuildWorldSetNameIir_MatchesRecoveredGrammar()
+		{
+			// [u32 type=C350][u32 handle=0009003C][u8 isToBePassed=00][u32 nameType=00000003][u8 01][u8 01]
+			//   [u32 nameLen=00000005]["Ape2A"]
+			var body = CreateEditorRecordBuilder.BuildWorldSetNameIir(0x0009003C, "Ape2A");
+			Assert.Equal("0000c3500009003c00000000030101000000054170653241", Convert.ToHexString(body).ToLowerInvariant());
 		}
 	}
 }

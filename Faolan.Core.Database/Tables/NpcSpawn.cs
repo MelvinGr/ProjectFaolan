@@ -22,6 +22,16 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
 
+		// #363 MEMBERSHIP of an RDB ambient spawn AREA: set when this captured spawn is confirmed to belong to a spawn
+		// group the area's pool replaces (by the resolver's auto-link, or by hand via `.setnpcgroup`). `.graduatenpcgroup`
+		// then just deletes the rows linked to an area (a clean FK delete, no bounds re-derivation). Null = an
+		// independent placement (named/quest NPC, or a mob no area owns). SetNull on area delete, so a re-import that
+		// wipes the areas simply un-links these rather than deleting them.
+		public uint? NpcSpawnAreaId { get; set; }
+
+		[ForeignKey(nameof(NpcSpawnAreaId))]
+		public virtual NpcSpawnArea? NpcSpawnArea { get; set; }
+
 		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
 		// on NpcTemplate now, reached via the NpcTemplate navigation. Required - a real spawn always resolves to a type (the phantom
 		// rows that once lacked one were scrubbed).
@@ -35,20 +45,6 @@ namespace Faolan.Core.Database.Tables
 		// captured Data blob's (the NPC counterpart of the player's DB-sourced equipment, PlayerSpawnEquipment).
 		public virtual ICollection<NpcSpawnEquipment> Equipment { get; set; } = new List<NpcSpawnEquipment>();
 
-		// The captured patrol route this spawn walks (#316), or null for a stationary NPC. One-to-one; cascade-deletes
-		// with the spawn.
-		public virtual PatrolPath? PatrolPath { get; set; }
-
-		// #363 MEMBERSHIP of an RDB ambient spawn AREA: set when this captured spawn is confirmed to belong to a spawn
-		// group the area's pool replaces (by the resolver's auto-link, or by hand via `.setnpcgroup`). `.graduatenpcgroup`
-		// then just deletes the rows linked to an area (a clean FK delete, no bounds re-derivation). Null = an
-		// independent placement (named/quest NPC, or a mob no area owns). SetNull on area delete, so a re-import that
-		// wipes the areas simply un-links these rather than deleting them.
-		public uint? NpcSpawnAreaId { get; set; }
-
-		[ForeignKey(nameof(NpcSpawnAreaId))]
-		public virtual NpcSpawnArea? NpcSpawnArea { get; set; }
-
 		// Race/Sex moved to the NpcTemplate TYPE table (#287): they are type-level identity (every placement of a type shares
 		// them), so they live on `NpcTemplate` now and are reached via the `NpcTemplate` navigation.
 
@@ -56,6 +52,10 @@ namespace Faolan.Core.Database.Tables
 		// carry no such table. When present, NpcSpawnBuilder generates the post-IIR from these rows instead of
 		// keeping the captured blob's (the from-DB lift of the bald-fix's verbatim post-IIR, #243).
 		public virtual ICollection<NpcSpawnMorph> Morphs { get; set; } = new List<NpcSpawnMorph>();
+
+		// The captured patrol route this spawn walks (#316), or null for a stationary NPC. One-to-one; cascade-deletes
+		// with the spawn.
+		public virtual PatrolPath? PatrolPath { get; set; }
 
 		public bool HasEquipment { get; set; }
 		public uint ApprenticeLevel { get; set; }

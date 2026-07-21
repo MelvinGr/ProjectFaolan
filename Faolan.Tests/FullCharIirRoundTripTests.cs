@@ -1,10 +1,6 @@
 using System;
-using Faolan.Core.Network.Constants;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text.Json;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -136,4 +132,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-

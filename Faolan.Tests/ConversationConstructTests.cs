@@ -68,21 +68,6 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The codec-construct oracle: rebuild the record straight from the parsed raw record (the path KnubotCodecTests
-		// gates against the captures), for comparison with the from-columns build.
-		private static byte[] ExpectedConstruct(byte[] record)
-		{
-			var sub = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4));
-			if (sub == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
-			{
-				var a = KnubotCodec.ParseAppendText(record);
-				return KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc, a.Xml, a.Field, a.Trailing, a.Env);
-			}
-
-			var s = KnubotCodec.ParseStringList(record);
-			return KnubotCodec.BuildStringList(sub, LiveInstance, ClickedNpc, s.Strings, s.Env);
-		}
-
 		[Fact]
 		public void Construct_AnswerList_IsByteIdenticalToSubstitution()
 		{
@@ -160,6 +145,21 @@ namespace Faolan.Tests
 			var cols = ConversationScreenDecoder.Decode(packet);
 			Assert.NotNull(cols);
 			Assert.Equal(instance, cols.SenderInstance);
+		}
+
+		// The codec-construct oracle: rebuild the record straight from the parsed raw record (the path KnubotCodecTests
+		// gates against the captures), for comparison with the from-columns build.
+		private static byte[] ExpectedConstruct(byte[] record)
+		{
+			var sub = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4));
+			if (sub == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
+			{
+				var a = KnubotCodec.ParseAppendText(record);
+				return KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc, a.Xml, a.Field, a.Trailing, a.Env);
+			}
+
+			var s = KnubotCodec.ParseStringList(record);
+			return KnubotCodec.BuildStringList(sub, LiveInstance, ClickedNpc, s.Strings, s.Env);
 		}
 
 		// Replaces every big-endian u32 occurrence of oldVal with newVal - the record-level handle substitution the

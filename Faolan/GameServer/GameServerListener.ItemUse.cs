@@ -14,6 +14,36 @@ namespace Faolan.GameServer
 		// only special-cased use left - buff consumables are all data-driven via Items.OnUseSpell.
 		private const uint TotemOfOriginsId = 3514741; // TODO: Move to consts
 
+		// Apply a consumable's on-use self-buff (Spell `spellBase`, wire id base<<8) and consume one from the slot. The
+		// buff uses the LONG (54-byte) MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) - the client rejects the
+		// 50-byte short self-buff form for these (runs off the end), same as Shield/spellweave/mount buffs; confirmed
+		// against the …use-consumables / …use-double-xp-potion captures. Retail no-ops (no apply, no consume) when the
+		// same buff is already active - the reason the last consumable in the capture "did nothing".
+		private async Task UseConsumable(INetworkClient client, Item item, int slot, uint spellBase)
+		{
+			var self = client.Session.Account.ClientInstance;
+			var wireSpellId = spellBase << 8;
+
+			if (_simulation.PlayerWorldEntity(client)?.ActiveBuffs.ContainsKey(wireSpellId) == true)
+			{
+				Logger.LogInformation("UseConsumable: '{Item}' buff {Spell} already active - no-op.", item.Name, spellBase);
+				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"You already have the '{item.Name}' effect.");
+				return;
+			}
+
+			var spell = await Database.GetSpell(spellBase);
+			if (spell == null)
+			{
+				Logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
+				return;
+			}
+
+			var durationCs = spell.DurationMs / 10;
+			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
+			await SendMagicBuffIir(client, self, self, wireSpellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+			await RemoveItemFromBackpack(client, slot, 1);
+		}
+
 		// The domain side of a player USING (right-clicking) an item from a bag (#206/#64): the RightClickItem Inbound
 		// handler resolves the item by its inventory location and this routes on the item's on-use effect. Buff
 		// consumables (potions/food/drink/Double XP) are DATA-DRIVEN via Items.OnUseSpell; the Totem recall is the one
@@ -49,36 +79,6 @@ namespace Faolan.GameServer
 			// un-wired consumable says so instead of silently doing nothing.
 			Logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"('{item.Name}' has no on-use effect wired yet - id {item.Id}, no Items.OnUseSpell)");
-		}
-
-		// Apply a consumable's on-use self-buff (Spell `spellBase`, wire id base<<8) and consume one from the slot. The
-		// buff uses the LONG (54-byte) MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) - the client rejects the
-		// 50-byte short self-buff form for these (runs off the end), same as Shield/spellweave/mount buffs; confirmed
-		// against the …use-consumables / …use-double-xp-potion captures. Retail no-ops (no apply, no consume) when the
-		// same buff is already active - the reason the last consumable in the capture "did nothing".
-		private async Task UseConsumable(INetworkClient client, Item item, int slot, uint spellBase)
-		{
-			var self = client.Session.Account.ClientInstance;
-			var wireSpellId = spellBase << 8;
-
-			if (_simulation.PlayerWorldEntity(client)?.ActiveBuffs.ContainsKey(wireSpellId) == true)
-			{
-				Logger.LogInformation("UseConsumable: '{Item}' buff {Spell} already active - no-op.", item.Name, spellBase);
-				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"You already have the '{item.Name}' effect.");
-				return;
-			}
-
-			var spell = await Database.GetSpell(spellBase);
-			if (spell == null)
-			{
-				Logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
-				return;
-			}
-
-			var durationCs = spell.DurationMs / 10;
-			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
-			await SendMagicBuffIir(client, self, self, wireSpellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
-			await RemoveItemFromBackpack(client, slot, 1);
 		}
 	}
 }

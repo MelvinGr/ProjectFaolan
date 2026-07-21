@@ -15,17 +15,14 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// Big-endian; golden-tested byte-exact in KnubotCodecTests.
 	public static class KnubotCodec
 	{
+		private const ushort Version = 1;
+
 		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
-			GameServer0X2000Opcodes.KnubotAnswerIIR,
-			GameServer0X2000Opcodes.KnubotAnswerListIIR,
-			GameServer0X2000Opcodes.KnubotAppendTextIIR,
-			GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
-			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR,
+			GameServer0X2000Opcodes.KnubotAnswerIIR, GameServer0X2000Opcodes.KnubotAnswerListIIR, GameServer0X2000Opcodes.KnubotAppendTextIIR, GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
+			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR
 		];
-
-		private const ushort Version = 1;
 
 		// KnubotAnswerListIIR_c (0xF164A4A5) + KnubotCloseChatWindowIIR_c (0xC4AF39EB) share one grammar (verified
 		// 197/197 + 48/48): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. The

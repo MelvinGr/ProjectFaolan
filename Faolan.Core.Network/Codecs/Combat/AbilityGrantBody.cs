@@ -99,7 +99,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 				Slot = slot,
 				Id = id,
 				Data0 = data0,
-				Key = new ProtoDecryptionKey { Key1 = data1, Key2 = data2, Key3 = data3, Key4 = data4 }
+				Key = new ProtoDecryptionKey
+				{
+					Key1 = data1,
+					Key2 = data2,
+					Key3 = data3,
+					Key4 = data4
+				}
 			};
 			announce = announceByte == 1;
 			return true;

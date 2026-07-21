@@ -26,7 +26,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var builtIn = idx.BuiltIn;
 			var iirTypes = idx.IirTypes;
 
-			string Level(string iir) => idx.Level(iir);
+			string Level(string iir)
+			{
+				return idx.Level(iir);
+			}
 
 			int v3 = 0, v2 = 0, v1 = 0;
 			foreach (var (name, _) in iirTypes)

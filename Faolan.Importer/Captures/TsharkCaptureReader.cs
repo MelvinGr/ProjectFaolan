@@ -87,13 +87,6 @@ namespace Faolan.Importer.Captures
 			return list;
 		}
 
-		private static uint ParseHex(JsonElement p, string key)
-		{
-			return p.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String && TryParseHexUInt(el.GetString(), out var v)
-				? v
-				: 0u;
-		}
-
 		// Rebuilds the exact on-wire packet from the dump's framing fields + body. Returns null if a required field
 		// is missing/malformed (so a partial record is skipped rather than corrupting the stream).
 		// internal so CorpusExtractWriter can store the FULL rebuilt packet, not just the body: the extractors
@@ -134,6 +127,13 @@ namespace Faolan.Importer.Captures
 			BinaryPrimitives.WriteUInt32BigEndian(full.AsSpan(4, 4), crc);
 			payload.CopyTo(full, 8);
 			return full;
+		}
+
+		private static uint ParseHex(JsonElement p, string key)
+		{
+			return p.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String && TryParseHexUInt(el.GetString(), out var v)
+				? v
+				: 0u;
 		}
 
 		// endpoint = 0x0d <class u32 LE> [0x10 <instance varint>]. Instance is omitted when the dump reports "None".

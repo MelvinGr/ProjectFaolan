@@ -38,6 +38,10 @@ namespace Faolan.GameServer.World
 		// client). A kill-switch for the in-client pass in case the cadence needs disabling rather than just tuning.
 		private const bool NpcHeartbeatEnabled = true;
 
+		// #363 ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member
+		// is replaced on the next pass, so ~15s matches the DefaultRespawnDelaySeconds mobs use.
+		private const double AmbientMaintainIntervalSeconds = 15.0;
+
 		// Base game-loop cadence: 10 Hz. Continuous systems run every base tick with the real elapsed dt so they stay
 		// smooth; slower rate-based systems run via a TickAccumulator at their own interval. The loop measures
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
@@ -52,9 +56,13 @@ namespace Faolan.GameServer.World
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
 
-		// #363 ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member
-		// is replaced on the next pass, so ~15s matches the DefaultRespawnDelaySeconds mobs use.
-		private const double AmbientMaintainIntervalSeconds = 15.0;
+		// #348: how far OUTSIDE a captured area hull still counts as inside. The hull is built from the positions
+		// retail was seen firing the banner at, so it can only cover ground a captured player walked - it is always
+		// an under-estimate of the real region. The slack buys back some of that; the vertical one is looser because
+		// a hull from a handful of samples barely captures an area's height range at all (Bridge of Vilerus I spans
+		// 1 unit of Y across six sightings, which is the bridge deck, not the trigger's true band).
+		private const float AreaBannerSlack = 8f;
+		private const float AreaBannerVerticalSlack = 20f;
 
 		// How close a player must get to discover a resurrection point. The captures can only put a FLOOR under this:
 		// at the two discovery moments they carry, the player was 13.7 and 11.6 units out, but that is where the
@@ -67,26 +75,18 @@ namespace Faolan.GameServer.World
 		// IsVisible/BoundingBoxColor/ShowBoundingBox + Export* metadata - see RdbRespawnImporter).
 		private const float RespawnDiscoveryRange = 30f;
 
-		// #348: how far OUTSIDE a captured area hull still counts as inside. The hull is built from the positions
-		// retail was seen firing the banner at, so it can only cover ground a captured player walked - it is always
-		// an under-estimate of the real region. The slack buys back some of that; the vertical one is looser because
-		// a hull from a handful of samples barely captures an area's height range at all (Bridge of Vilerus I spans
-		// 1 unit of Y across six sightings, which is the bridge deck, not the trigger's true band).
-		private const float AreaBannerSlack = 8f;
-		private const float AreaBannerVerticalSlack = 20f;
-
 		// Local-say range in world units. Built-NPC tests showed a +4-unit offset renders "beside" the player, so
 		// units are ~metres; ~50 is a generous "nearby" for /say. Tunable; same-map is the hard filter either way.
 		private const float SayRangeUnits = 50f;
-
-		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
-		private readonly ConcurrentDictionary<uint, MapArea[]> _mapAreas = new(); // #348: per-map sub-areas, read every tick
 		private readonly ConcurrentDictionary<INetworkClient, double> _playerRespawnRemaining = new ConcurrentDictionary<INetworkClient, double>();
 
 		// Cached DoT effect per base spell id (Spell.DotDelta/DotType): looked up once per spell, then reused so the
 		// per-cast NPC path doesn't hit the DB. (delta 0 = not a DoT.)
 		private readonly ConcurrentDictionary<uint, (int Delta, uint Type)> _dotEffects = new ConcurrentDictionary<uint, (int Delta, uint Type)>();
 		private readonly ConcurrentDictionary<uint, HashSet<uint>> _discoveredRespawnByCharacter = new ConcurrentDictionary<uint, HashSet<uint>>();
+
+		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
+		private readonly ConcurrentDictionary<uint, MapArea[]> _mapAreas = new(); // #348: per-map sub-areas, read every tick
 
 		// Per-map resurrection points + per-character discovered sets, cached to keep the discovery tick off the DB.
 		private readonly ConcurrentDictionary<uint, RespawnPoint[]> _respawnPointsByMap = new ConcurrentDictionary<uint, RespawnPoint[]>();
@@ -99,12 +99,12 @@ namespace Faolan.GameServer.World
 		private Task _tickTask = Task.CompletedTask;
 		public ConcurrentDictionary<INetworkClient, WorldEntity> Players { get; } = new ConcurrentDictionary<INetworkClient, WorldEntity>();
 
-		// The live world model + the connected players' authoritative world entities (transform + vitals).
-		public WorldState World { get; }
-
 		// Server-side terrain (RDB heightmap): ground-height snapping + terrain line-of-sight (#284). Reached by the
 		// broadcaster (loot-bag Y) and the WorldState tick (aggro line-of-sight).
 		public TerrainService Terrain { get; }
+
+		// The live world model + the connected players' authoritative world entities (transform + vitals).
+		public WorldState World { get; }
 
 		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, TerrainService terrain = null)
 		{
@@ -157,6 +157,30 @@ namespace Faolan.GameServer.World
 			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();
 			_logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} instance 0x{Instance:X8} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId,
 				instanceId, character.Position, nearby);
+		}
+
+		// A same-MAP (same-playfield) teleport: relocate the player to `destination` on their CURRENT map with NO
+		// loading screen, reusing the death-revive same-map path (IntendedTeleport with the LIVE playfield token +
+		// n3Teleport). This is how a same-playfield zone-line door works - e.g. the Thirsty Dog Inn, whose UseObject
+		// (door handle 0xBEB) resolves to IntendedTeleport destMap == the current map + an N3Teleport, with NO reconnect
+		// (Hoxxling_..._gameplay2: door 0xBEB -> arrival (45, 158.05, 124) on map 4020, the player already on 4020).
+		// Contrast DoTeleport, which cross-maps via a full 0x2002 handoff + reconnect (loading screen). The position is
+		// persisted so it survives relog.
+		public async Task RelocateSameMap(INetworkClient client, Vector3 destination)
+		{
+			var entity = PlayerWorldEntity(client);
+			var character = client?.Session?.Character;
+			if (entity == null || character == null)
+				return;
+
+			entity.Position = destination;
+			character.Position = destination;
+			await _database.SaveCharacterTransform(character.Id, destination, character.Rotation, character.MapId);
+
+			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
+			await _output.SendReviveTeleport(client, entity.Handle, character.MapId, liveToken);
+			await _output.SendReviveDestination(client, entity.Handle, character.MapId, destination, 1f, 0f);
+			_logger.LogInformation("World: {Player} same-map relocated to {Dest} on map {Map} (token 0x{Token:X}).", character.Name, destination, character.MapId, liveToken);
 		}
 
 		// Removes the player from the world model on disconnect. The caller broadcasts the despawn FIRST (while the
@@ -356,77 +380,6 @@ namespace Faolan.GameServer.World
 				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}'s spell.", character.Name, npc.Name);
 		}
 
-		// #348: floats the area banner when a player CROSSES into a named sub-area. A map has many - Old Tarantia
-		// fires six - so this is a per-tick position test against MapArea, not a per-playfield event; entering a
-		// playfield lands you in an area and that is simply the first crossing.
-		//
-		// The regions are CAPTURE-DERIVED (the boundary triggers are server-side - no client record references a
-		// banner id), so the bounds are a hull over the positions retail was seen firing each banner at, widened by
-		// AreaBannerSlack because a hull can only cover ground a captured player actually walked. That makes them
-		// approximate: expect a banner slightly early/late at the edges, and expect areas we have no sighting of to
-		// stay silent. It tightens as more marked dumps land.
-		//
-		// The SMALLEST containing area wins: the captured hulls overlap (Old Tarantia's "The West Gate" box sits
-		// inside "The East Gate" box), and the tighter hull is the more specific claim.
-		private async Task TickAreaBanners()
-		{
-			foreach (var pair in Players)
-			{
-				var client = pair.Key;
-				var entity = pair.Value;
-				if (client.Session?.Character == null)
-					continue;
-
-				var areas = await GetMapAreasCached(entity.MapId);
-				if (areas.Length == 0)
-					continue;
-
-				MapArea? best = null;
-				var bestVolume = double.MaxValue;
-				foreach (var area in areas)
-				{
-					if (!Contains(area, entity.Position))
-						continue;
-
-					var volume = (double)(area.MaxX - area.MinX + 1) * (area.MaxZ - area.MinZ + 1);
-					if (volume >= bestVolume)
-						continue;
-
-					bestVolume = volume;
-					best = area;
-				}
-
-				var now = best?.AreaNameId ?? 0;
-				if (now == entity.CurrentAreaNameId)
-					continue; // still in the same area (or still in none) - a banner per tick would spam
-
-				entity.CurrentAreaNameId = now;
-				if (now == 0)
-					continue; // left an area into unnamed ground - retail shows nothing
-
-				await _output.SendAreaNameBanner(client, now);
-				// Logged by id, not name: MapArea has no name (the client renders the text; decoding one needs a
-				// per-page LDB pin, #291). 3373519 is "Bridge of Vilerus I" if you need to read one by hand.
-				_logger.LogInformation("World: {Player} entered area {Id} on map {Map} ({Samples} captured sighting(s) back it).", client.Session.Character.Name, now, entity.MapId, best!.SampleCount);
-			}
-		}
-
-		private static bool Contains(MapArea area, Vector3 p)
-		{
-			return p.X >= area.MinX - AreaBannerSlack && p.X <= area.MaxX + AreaBannerSlack && p.Z >= area.MinZ - AreaBannerSlack && p.Z <= area.MaxZ + AreaBannerSlack &&
-			       p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
-		}
-
-		private async Task<MapArea[]> GetMapAreasCached(uint mapId)
-		{
-			if (_mapAreas.TryGetValue(mapId, out var cached))
-				return cached;
-
-			var areas = await _database.GetMapAreas(mapId);
-			_mapAreas[mapId] = areas;
-			return areas;
-		}
-
 		// Discovers any resurrection point a living player has walked near (so they can respawn there later). Run at the
 		// regen cadence (1 Hz) to keep it cheap; always-known points need no discovery. Persists + notifies on a new find.
 		private async Task DiscoverNearbyRespawnPoints()
@@ -508,6 +461,16 @@ namespace Faolan.GameServer.World
 			return set;
 		}
 
+		private async Task<MapArea[]> GetMapAreasCached(uint mapId)
+		{
+			if (_mapAreas.TryGetValue(mapId, out var cached))
+				return cached;
+
+			var areas = await _database.GetMapAreas(mapId);
+			_mapAreas[mapId] = areas;
+			return areas;
+		}
+
 		// A map's resurrection points, cached on first use (rarely changes within a run).
 		private async Task<RespawnPoint[]> GetRespawnPointsCached(uint mapId)
 		{
@@ -568,30 +531,6 @@ namespace Faolan.GameServer.World
 				: (1f, 0f);
 			await _output.SendReviveDestination(client, entity.Handle, character.MapId, dest, facingX, facingZ);
 			_logger.LogInformation("Combat: {Player} relocated to '{Spot}' {Dest} (token 0x{Token:X}).", character.Name, point.Name, dest, liveToken);
-		}
-
-		// A same-MAP (same-playfield) teleport: relocate the player to `destination` on their CURRENT map with NO
-		// loading screen, reusing the death-revive same-map path (IntendedTeleport with the LIVE playfield token +
-		// n3Teleport). This is how a same-playfield zone-line door works - e.g. the Thirsty Dog Inn, whose UseObject
-		// (door handle 0xBEB) resolves to IntendedTeleport destMap == the current map + an N3Teleport, with NO reconnect
-		// (Hoxxling_..._gameplay2: door 0xBEB -> arrival (45, 158.05, 124) on map 4020, the player already on 4020).
-		// Contrast DoTeleport, which cross-maps via a full 0x2002 handoff + reconnect (loading screen). The position is
-		// persisted so it survives relog.
-		public async Task RelocateSameMap(INetworkClient client, Vector3 destination)
-		{
-			var entity = PlayerWorldEntity(client);
-			var character = client?.Session?.Character;
-			if (entity == null || character == null)
-				return;
-
-			entity.Position = destination;
-			character.Position = destination;
-			await _database.SaveCharacterTransform(character.Id, destination, character.Rotation, character.MapId);
-
-			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
-			await _output.SendReviveTeleport(client, entity.Handle, character.MapId, liveToken);
-			await _output.SendReviveDestination(client, entity.Handle, character.MapId, destination, 1f, 0f);
-			_logger.LogInformation("World: {Player} same-map relocated to {Dest} on map {Map} (token 0x{Token:X}).", character.Name, destination, character.MapId, liveToken);
 		}
 
 		// On death: show the client the release screen (DispatchValidResurrectionSpots) so the player can pick where to
@@ -897,6 +836,61 @@ namespace Faolan.GameServer.World
 			await _output.SendDeathBcc(client, handle);
 		}
 
+		// #348: floats the area banner when a player CROSSES into a named sub-area. A map has many - Old Tarantia
+		// fires six - so this is a per-tick position test against MapArea, not a per-playfield event; entering a
+		// playfield lands you in an area and that is simply the first crossing.
+		//
+		// The regions are CAPTURE-DERIVED (the boundary triggers are server-side - no client record references a
+		// banner id), so the bounds are a hull over the positions retail was seen firing each banner at, widened by
+		// AreaBannerSlack because a hull can only cover ground a captured player actually walked. That makes them
+		// approximate: expect a banner slightly early/late at the edges, and expect areas we have no sighting of to
+		// stay silent. It tightens as more marked dumps land.
+		//
+		// The SMALLEST containing area wins: the captured hulls overlap (Old Tarantia's "The West Gate" box sits
+		// inside "The East Gate" box), and the tighter hull is the more specific claim.
+		private async Task TickAreaBanners()
+		{
+			foreach (var pair in Players)
+			{
+				var client = pair.Key;
+				var entity = pair.Value;
+				if (client.Session?.Character == null)
+					continue;
+
+				var areas = await GetMapAreasCached(entity.MapId);
+				if (areas.Length == 0)
+					continue;
+
+				MapArea? best = null;
+				var bestVolume = double.MaxValue;
+				foreach (var area in areas)
+				{
+					if (!Contains(area, entity.Position))
+						continue;
+
+					var volume = (double)(area.MaxX - area.MinX + 1) * (area.MaxZ - area.MinZ + 1);
+					if (volume >= bestVolume)
+						continue;
+
+					bestVolume = volume;
+					best = area;
+				}
+
+				var now = best?.AreaNameId ?? 0;
+				if (now == entity.CurrentAreaNameId)
+					continue; // still in the same area (or still in none) - a banner per tick would spam
+
+				entity.CurrentAreaNameId = now;
+				if (now == 0)
+					continue; // left an area into unnamed ground - retail shows nothing
+
+				await _output.SendAreaNameBanner(client, now);
+				// Logged by id, not name: MapArea has no name (the client renders the text; decoding one needs a
+				// per-page LDB pin, #291). 3373519 is "Bridge of Vilerus I" if you need to read one by hand.
+				_logger.LogInformation("World: {Player} entered area {Id} on map {Map} ({Samples} captured sighting(s) back it).", client.Session.Character.Name, now, entity.MapId, best!.SampleCount);
+			}
+		}
+
 		// Advances player death/respawn. A player whose vitals hit 0 starts a respawn countdown; when it elapses they
 		// are revived to full and re-entered at the closest known resurrection point (RespawnPlayer). Living players are
 		// untracked.
@@ -998,6 +992,12 @@ namespace Faolan.GameServer.World
 					await SendDeathScreen(client, character, pair.Value, pair.Value.Position);
 				}
 			}
+		}
+
+		private static bool Contains(MapArea area, Vector3 p)
+		{
+			return p.X >= area.MinX - AreaBannerSlack && p.X <= area.MaxX + AreaBannerSlack && p.Z >= area.MinZ - AreaBannerSlack && p.Z <= area.MaxZ + AreaBannerSlack &&
+			       p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
 		}
 
 		// The per-`elapsedSeconds` regen for one pool: `fraction` of max per second, scaled by elapsed. Rounds up to at

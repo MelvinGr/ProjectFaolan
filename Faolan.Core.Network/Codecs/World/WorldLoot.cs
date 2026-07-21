@@ -8,20 +8,16 @@ namespace Faolan.Core.Network.Codecs.World
 	// the u32 length prefix).
 	public static class WorldLoot
 	{
-		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.LootRemoveItemsIIR,
-			GameServer0X2000Opcodes.N3ToClientFadeIIR,
-			GameServer0X2000Opcodes.NewAllowedLooterIIR,
-			GameServer0X2000Opcodes.NewCurrentLooterIIR,
-			GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR,
-			GameServer0X2000Opcodes.UpdateSimpleDynelIIR,
-		];
-
 		public const float DefaultFadeSeconds = 3.0f;
 
 		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
+
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.LootRemoveItemsIIR, GameServer0X2000Opcodes.N3ToClientFadeIIR, GameServer0X2000Opcodes.NewAllowedLooterIIR, GameServer0X2000Opcodes.NewCurrentLooterIIR,
+			GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR, GameServer0X2000Opcodes.UpdateSimpleDynelIIR
+		];
 
 		// UpdateSimpleDynelIIR (0x30536411): the bag's visual update as it's consumed (sent right before the fade).
 		// 24 B: [subop][lootTypetag][bagHandle][00000000][00000000][01][00 01 01].

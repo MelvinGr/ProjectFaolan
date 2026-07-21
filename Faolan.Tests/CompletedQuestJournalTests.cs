@@ -1,9 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
+using System.Text.RegularExpressions;
 using Faolan.Core;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -55,8 +54,6 @@ namespace Faolan.Tests
 					return;
 				}
 
-
-
 				withRegion++;
 				quests += region.QuestCount;
 				areas += region.Areas.Count;
@@ -67,7 +64,6 @@ namespace Faolan.Tests
 				// regions in between - so the round-trip is measured against exactly what Parse consumed.
 				Assert.InRange(after, start + 4, end);
 				Assert.Equal(tails[start..after], region.ToArray());
-
 			}
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");
@@ -104,11 +100,47 @@ namespace Faolan.Tests
 			Assert.True(withRegion > 0, "no snapshot in the corpus carried a completed-quest journal");
 		}
 
+		// The parsed completed-quest journal of every capture that carries one - shared with the generation gate.
+		public static IEnumerable<(string Source, CompletedQuestJournalRegion Region)> CapturedRegions()
+		{
+			foreach (var (source, subClass, tails) in SubClasses())
+			{
+				if (subClass.CompletedQuests is { Areas.Count: > 0 } region)
+					yield return (source, region);
+			}
+		}
+
+		public static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClassesForProbe()
+		{
+			return SubClasses();
+		}
+
+		// The access-window table starts 15 bytes before the first PFAccessWindow_ name (mirrors
+		// FullCharSnapshotSubClass.Deserialize).
+		private static int AccessWindowStart(byte[] tails, int notBefore)
+		{
+			var needle = "PFAccessWindow_"u8.ToArray();
+			for (var i = notBefore; i + needle.Length <= tails.Length; i++)
+			{
+				var hit = true;
+				for (var k = 0; k < needle.Length && hit; k++)
+					hit = tails[i + k] == needle[k];
+
+				if (hit)
+					return Math.Max(notBefore, i - 15);
+			}
+
+			return -1;
+		}
+
 		// Walks area groups from `start` until the grammar breaks or `end` is reached - how far does the region
 		// actually run, and what stops it?
 		private static string Exhaust(byte[] tails, int start, int end)
 		{
-			var r = new FaolanStream(tails, false) { Position = checked((uint)start) };
+			var r = new FaolanStream(tails, false)
+			{
+				Position = checked((uint)start)
+			};
 			r.ReadUInt32(); // frame
 			int areas = 0, quests = 0;
 			try
@@ -152,41 +184,10 @@ namespace Faolan.Tests
 
 		private static string Id(string xml)
 		{
-			var m = System.Text.RegularExpressions.Regex.Match(xml, "id=\"([0-9]+)\"");
-			return m.Success ? m.Groups[1].Value : "?";
-		}
-
-		// The access-window table starts 15 bytes before the first PFAccessWindow_ name (mirrors
-		// FullCharSnapshotSubClass.Deserialize).
-		private static int AccessWindowStart(byte[] tails, int notBefore)
-		{
-			var needle = "PFAccessWindow_"u8.ToArray();
-			for (var i = notBefore; i + needle.Length <= tails.Length; i++)
-			{
-				var hit = true;
-				for (var k = 0; k < needle.Length && hit; k++)
-					hit = tails[i + k] == needle[k];
-
-				if (hit)
-					return Math.Max(notBefore, i - 15);
-			}
-
-			return -1;
-		}
-
-		// The parsed completed-quest journal of every capture that carries one - shared with the generation gate.
-		public static IEnumerable<(string Source, CompletedQuestJournalRegion Region)> CapturedRegions()
-		{
-			foreach (var (source, subClass, tails) in SubClasses())
-			{
-				if (subClass.CompletedQuests is { Areas.Count: > 0 } region)
-					yield return (source, region);
-			}
-		}
-
-		public static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClassesForProbe()
-		{
-			return SubClasses();
+			var m = Regex.Match(xml, "id=\"([0-9]+)\"");
+			return m.Success
+				? m.Groups[1].Value
+				: "?";
 		}
 
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClasses()
@@ -217,7 +218,5 @@ namespace Faolan.Tests
 				yield return (source, parts.SubClass, parts.SubClass.ToArray());
 			}
 		}
-
 	}
 }
-

@@ -10,6 +10,13 @@ namespace Faolan.Core.Database.Tables
 	// (#1607, 754 B vs the 629 B no-attachment base); MailMessageCodec builds it byte-exact.
 	public class MailAttachment : BaseEntity
 	{
+		// --- the item INSTANCE identity (the entry's ProtoAcgItem)
+		// The item's TEA key is per-TEMPLATE and lives once in Items; this attachment references it by Template (hard
+		// FK to Items) and the codec reads Key1..4 through the Item nav. ItemHash stays a column: on the wire the
+		// mail/AH entry carries the CAPTURED hash (0 for AH-delivered items), which is NOT the template's Items.Hash.
+		[ForeignKey(nameof(Template))]
+		public virtual Item Item { get; set; } = null!;
+
 		// The item INSTANCE id (repeated as the entry's ProtoInventoryGameEntry.ItemId). Kept as ItemInstanceId, not
 		// ItemId: it is the per-instance id, distinct from the Template FK / the Item nav on this same row, so the
 		// longer name is the clearer one.
@@ -21,13 +28,6 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey(nameof(MailId))]
 		public virtual Mail Mail { get; set; } = null!;
-
-		// --- the item INSTANCE identity (the entry's ProtoAcgItem)
-		// The item's TEA key is per-TEMPLATE and lives once in Items; this attachment references it by Template (hard
-		// FK to Items) and the codec reads Key1..4 through the Item nav. ItemHash stays a column: on the wire the
-		// mail/AH entry carries the CAPTURED hash (0 for AH-delivered items), which is NOT the template's Items.Hash.
-		[ForeignKey(nameof(Template))]
-		public virtual Item Item { get; set; } = null!;
 
 		public uint ItemHash { get; set; }
 		public uint ItemLevel { get; set; }

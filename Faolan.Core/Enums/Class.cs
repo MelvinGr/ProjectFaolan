@@ -22,6 +22,7 @@ namespace Faolan.Core.Enums
 	public enum GuildRank : byte
 	{
 		Member = 0,
+
 		// TODO: fill in rest
 		Leader = 4
 	}

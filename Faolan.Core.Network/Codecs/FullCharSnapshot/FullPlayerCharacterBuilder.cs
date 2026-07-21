@@ -20,9 +20,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	//     handle + slot, never on these instance ids).
 	public static class FullPlayerCharacterBuilder
 	{
-		// The FullChar snapshot IIR (0x737A6DF9); the listener assembles [subop][typeTag][instance][prefix][root][tails].
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
-
 		public const ContainerKind BagKind = ContainerKind.Bag;
 		public const ContainerKind BankKind = ContainerKind.Bank;
 		public const ContainerKind EquippedKind = ContainerKind.Equipped;
@@ -34,7 +31,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// state); the captured faolan snapshots carry exactly these, so authoring them reproduces those roots
 		// byte-identically (other captured accounts e.g. Strie carry fewer - presence is per-account).
 		public const uint FullExpansionFlags = 0x000C0001;
+
 		public const uint FullSubscriptionFlags = 0x00018181;
+
+		// The FullChar snapshot IIR (0x737A6DF9); the listener assembles [subop][typeTag][instance][prefix][root][tails].
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
 
 		// The first bag cell of a fresh character's snapshot is pos 1 (Strie's captured starter bag).
 		private const uint BagFirstPos = 1;
@@ -43,15 +44,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// Item.BagExtraSlots (RDB field 104) on top - Burlap Sack +24 (=48), Bag of Holding +20 (=44), Veteran's Bag
 		// +35 (=59). Confirmed against fresh vs. lvl-80 snapshots. #12.
 		private const uint BaseBackpackSlots = 24;
-		private const ulong BagEquipSlot = (ulong)CharacterEquipmentSlot.Bag;
 
 		// Resource-container sizing, the sibling of the backpack: base 48 slots + the resource bag equipped in the
 		// resource-bag slot (equip slot 26) adds its Item.ResourceBagExtraSlots (RDB field 1331) - Max Resource Bag
 		// +102. Mirrors the backpack's BaseBackpackSlots + BagExtraSlots.
 		private const uint BaseResourceSlots = 48;
 		private const uint ResourceDisabledSlots = 12;
-		private const ulong ResourceBagEquipSlot = (ulong)CharacterEquipmentSlot.ResourceBag;
+		private const ulong BagEquipSlot = (ulong)CharacterEquipmentSlot.Bag;
 		private const ulong ItemIdEpoch = 0x20D82B63UL << 32;
+		private const ulong ResourceBagEquipSlot = (ulong)CharacterEquipmentSlot.ResourceBag;
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
 		// used for the on-demand BANK delivery (kind 105), which isn't one of the 4 login-snapshot containers.
@@ -75,13 +76,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			IReadOnlyCollection<CharacterInventory> inventoryRows = null)
 		{
 			// The backpack grows by the bag equipped in the bag slot (slot 3): base 24 + its BagExtraSlots.
-			var backpackSlots = BaseBackpackSlots
-			                    + (equipped.TryGetValue(BagEquipSlot, out var bagItem) ? bagItem.Item.BagExtraSlots ?? 0 : 0);
+			var backpackSlots = BaseBackpackSlots + (equipped.TryGetValue(BagEquipSlot, out var bagItem)
+				? bagItem.Item.BagExtraSlots ?? 0
+				: 0);
 
 			// The resource container grows by the resource bag equipped in the resource-bag slot (slot 26): base 48 +
 			// its ResourceBagExtraSlots - the sibling of the backpack sizing above.
-			var resourceSlots = BaseResourceSlots
-			                    + (equipped.TryGetValue(ResourceBagEquipSlot, out var resItem) ? resItem.Item.ResourceBagExtraSlots ?? 0 : 0);
+			var resourceSlots = BaseResourceSlots + (equipped.TryGetValue(ResourceBagEquipSlot, out var resItem)
+				? resItem.Item.ResourceBagExtraSlots ?? 0
+				: 0);
 
 			var containers = new List<ProtoInventoryGame>
 			{
@@ -105,8 +108,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 					continue;
 
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item,
-					row.Item.Hash));
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item, row.Item.Hash));
 				if ((ContainerKind)container.InventoryId.Type == BagKind)
 					bagSlotsTaken.Add(slot);
 			}

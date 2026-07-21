@@ -30,6 +30,12 @@ namespace Faolan.Importer.Extractors
 	{
 		private const uint CarrierOpcode = 0x2000;
 
+		// True when the packet is a 0x2000 carrier at all - a cheap pre-filter for callers scanning every packet.
+		public static bool IsCarrier(uint opcode)
+		{
+			return opcode == CarrierOpcode;
+		}
+
 		// The journal records a snapshot packet carries, with the character they belong to. Returns false for any
 		// packet that is not a parseable player snapshot.
 		public static bool TryRead(byte[] packet, out uint characterId, out IReadOnlyList<QuestcRecord> records)
@@ -40,8 +46,7 @@ namespace Faolan.Importer.Extractors
 		// As above, but also surfaces the quest INDEX region that follows the journal. The index carries the per-quest
 		// goal-table word and goal-step ids, which the Quest_c record itself does not - both are needed before a quest
 		// can ride the login snapshot (#389).
-		public static bool TryRead(byte[] packet, out uint characterId, out IReadOnlyList<QuestcRecord> records,
-			out QuestIndexRegion? index)
+		public static bool TryRead(byte[] packet, out uint characterId, out IReadOnlyList<QuestcRecord> records, out QuestIndexRegion? index)
 		{
 			characterId = 0;
 			records = [];
@@ -116,12 +121,6 @@ namespace Faolan.Importer.Extractors
 			return start > 0 && start < full.Length
 				? full[start..]
 				: [];
-		}
-
-		// True when the packet is a 0x2000 carrier at all - a cheap pre-filter for callers scanning every packet.
-		public static bool IsCarrier(uint opcode)
-		{
-			return opcode == CarrierOpcode;
 		}
 	}
 }

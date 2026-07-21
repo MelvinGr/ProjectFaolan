@@ -36,13 +36,14 @@ namespace Faolan.Core.Network.Packets.Conan
 					var subOpcodeValue = data.ReadUInt32();
 					var subOpcodeName = FormatSubOpcodeName(_subOpcodeEnumType, subOpcodeValue);
 
-					_logger.LogInformation("<= [{Channel} {OpcodeName}] subOpcode={SubOpcodeName}, payloadLength={PayloadLength}, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", _channelName,
-						opcodeName, subOpcodeName, payloadLength, packet.Body.Length, packet.Bytes.Length, BytesSuffix(packet));
+					_logger.LogInformation("<= [{Channel} {OpcodeName}] subOpcode={SubOpcodeName}, payloadLength={PayloadLength}, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
+						_channelName, opcodeName, subOpcodeName, payloadLength, packet.Body.Length, packet.Bytes.Length, BytesSuffix(packet));
 
 					return;
 				}
 
-				_logger.LogInformation("<= [{Channel} {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", _channelName, opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length, BytesSuffix(packet));
+				_logger.LogInformation("<= [{Channel} {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", _channelName, opcodeName, packet.Body?.Length ?? 0,
+					packet.Bytes.Length, BytesSuffix(packet));
 			}
 			catch (Exception ex)
 			{
@@ -50,8 +51,10 @@ namespace Faolan.Core.Network.Packets.Conan
 			}
 		}
 
-		private string BytesSuffix(ConanPacket packet) =>
-			PacketLogOptions.BytesSuffix(_logger, ("headerData", packet.HeaderData), ("body", packet.Body?.ToArray()));
+		private string BytesSuffix(ConanPacket packet)
+		{
+			return PacketLogOptions.BytesSuffix(_logger, ("headerData", packet.HeaderData), ("body", packet.Body?.ToArray()));
+		}
 
 		private static string FormatOpcodeName(Type enumType, ushort opcode)
 		{

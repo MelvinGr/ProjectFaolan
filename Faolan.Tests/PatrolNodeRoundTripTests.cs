@@ -13,22 +13,7 @@ namespace Faolan.Tests
 	// instead of replaying the captured Body.
 	public class PatrolNodeRoundTripTests
 	{
-		public static IEnumerable<object[]> Bodies()
-		{
-			var blob = Golden.Bytes("PatrolBodies");
-			var count = BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(0, 4));
-			var offset = 4;
-			for (var i = 0; i < count; i++)
-			{
-				var len = (int)BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(offset, 4));
-				offset += 4;
-				yield return [blob[offset..(offset + len)], i];
-				offset += len;
-			}
-		}
-
-		[Theory]
-		[MemberData(nameof(Bodies))]
+		[Theory, MemberData(nameof(Bodies))]
 		public void EveryCommittedPatrol_ColumnarizesAndRebuildsByteExact(byte[] body, int index)
 		{
 			_ = index;
@@ -48,6 +33,21 @@ namespace Faolan.Tests
 			};
 
 			Assert.Equal(body, rebuilt.Encode());
+		}
+
+		public static IEnumerable<object[]> Bodies()
+		{
+			var blob = Golden.Bytes("PatrolBodies");
+			var count = BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(0, 4));
+			var offset = 4;
+			for (var i = 0; i < count; i++)
+			{
+				var len = (int)BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(offset, 4));
+				offset += 4;
+				yield return [blob[offset..(offset + len)], i];
+
+				offset += len;
+			}
 		}
 	}
 }

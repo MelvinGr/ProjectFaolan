@@ -20,9 +20,7 @@ namespace Faolan.GameServer.World
 			var handle = entityHandle ?? client.Session.Account.ClientInstance;
 
 			var ps = new PacketStream();
-			ps
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(StatUpdateCodec.BuildBody(handle, stats));
+			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(StatUpdateCodec.BuildBody(handle, stats));
 			return ps.WriteLengthHash().ToArray();
 		}
 	}

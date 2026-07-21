@@ -107,13 +107,25 @@ namespace Faolan.Tests
 				Head = new Item
 				{
 					Id = 0x00308E19,
-					Key = new ProtoDecryptionKey { Key1 = 0x4C95E6E3, Key2 = 0xDF665726, Key3 = 0x09000E2A, Key4 = 0x892A0B17 },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 0x4C95E6E3,
+						Key2 = 0xDF665726,
+						Key3 = 0x09000E2A,
+						Key4 = 0x892A0B17
+					},
 					Hash = 0x1234
 				},
 				Chest = new Item
 				{
 					Id = 0x000035F9,
-					Key = new ProtoDecryptionKey { Key1 = 0x6B18BD73, Key2 = 0xCCEBE6CF, Key3 = 0xED8B315D, Key4 = 0x1E1E835F },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 0x6B18BD73,
+						Key2 = 0xCCEBE6CF,
+						Key3 = 0xED8B315D,
+						Key4 = 0x1E1E835F
+					},
 					Hash = 0x5678
 				},
 				Belt = new Item
@@ -149,31 +161,46 @@ namespace Faolan.Tests
 				MainHandLeft = new Item
 				{
 					Id = 1,
-					Key = new ProtoDecryptionKey { Key1 = 1 },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 1
+					},
 					Hash = 1
 				},
 				OffHandLeft = new Item
 				{
 					Id = 2,
-					Key = new ProtoDecryptionKey { Key1 = 2 },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 2
+					},
 					Hash = 2
 				},
 				MainHandRight = new Item
 				{
 					Id = 3,
-					Key = new ProtoDecryptionKey { Key1 = 3 },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 3
+					},
 					Hash = 3
 				},
 				OffHandRight = new Item
 				{
 					Id = 4,
-					Key = new ProtoDecryptionKey { Key1 = 4 },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 4
+					},
 					Hash = 4
 				},
 				Bag = new Item
 				{
 					Id = 5,
-					Key = new ProtoDecryptionKey { Key1 = 5 },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 5
+					},
 					Hash = 5
 				}
 			};
@@ -196,9 +223,33 @@ namespace Faolan.Tests
 		{
 			var equipment = new CharacterEquipment
 			{
-				Head = new Item { Id = 0x10, Key = new ProtoDecryptionKey { Key1 = 0x10 }, Hash = 0x10 },
-				VanityHead = new Item { Id = 0x20, Key = new ProtoDecryptionKey { Key1 = 0x20 }, Hash = 0x20 },
-				VanityCape = new Item { Id = 0x30, Key = new ProtoDecryptionKey { Key1 = 0x30 }, Hash = 0x30 }
+				Head = new Item
+				{
+					Id = 0x10,
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 0x10
+					},
+					Hash = 0x10
+				},
+				VanityHead = new Item
+				{
+					Id = 0x20,
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 0x20
+					},
+					Hash = 0x20
+				},
+				VanityCape = new Item
+				{
+					Id = 0x30,
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 0x30
+					},
+					Hash = 0x30
+				}
 			};
 
 			var before = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();

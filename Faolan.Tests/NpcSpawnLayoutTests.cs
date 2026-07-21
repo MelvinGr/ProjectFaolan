@@ -13,6 +13,69 @@ namespace Faolan.Tests
 	// "Community" group with a roam path, plus a "Name" group whose id carries the creature name+tag.
 	public class NpcSpawnLayoutTests
 	{
+		[Fact]
+		public void Empty_Record_Parses_To_Zero_Groups()
+		{
+			// version=1, groupCount=0 - the shape of a scripted/instanced playfield (castle, Tortage interiors).
+			Assert.True(NpcSpawnLayout.TryParse(BuildRecord(1), out var layout));
+			Assert.Empty(layout!.Groups);
+		}
+
+		[Fact]
+		public void Name_Group_Keeps_Raw_Id_And_Has_No_Numeric_CommunityId()
+		{
+			NpcSpawnLayout.TryParse(SampleRecord(), out var layout);
+			var sharks = layout!.Groups[1];
+			Assert.Equal("Name", sharks.Category);
+			Assert.Equal("Shark (H8AV)", sharks.Id); // the creature name+tag, not a number
+			Assert.Null(sharks.CommunityId);
+			Assert.Single(sharks.SpawnPoints);
+			Assert.Empty(sharks.RoamPaths);
+		}
+
+		[Fact]
+		public void Parses_Groups_Points_Bounds_And_Paths()
+		{
+			Assert.True(NpcSpawnLayout.TryParse(SampleRecord(), out var layout));
+			Assert.NotNull(layout);
+			Assert.Equal(2, layout!.Groups.Count);
+
+			var brawlers = layout.Groups[0];
+			Assert.Equal("Brawlers", brawlers.Name);
+			Assert.Equal("Community", brawlers.Category);
+			Assert.Equal("295", brawlers.Id);
+			Assert.Equal(295u, brawlers.CommunityId);
+			Assert.Equal(2, brawlers.SpawnPoints.Count);
+			Assert.Equal(new Vector3(782.692f, 176.560f, 986.754f), brawlers.SpawnPoints[0]);
+			Assert.Equal(new Vector3(791.474f, 186.560f, 987.885f), brawlers.BoundsMax);
+			Assert.Single(brawlers.RoamPaths);
+			Assert.Equal(3, brawlers.RoamPaths[0].Count);
+			Assert.Equal(new Vector3(787.829f, 176.410f, 991.150f), brawlers.RoamPaths[0][2]);
+		}
+
+		[Fact]
+		public void Trailing_Garbage_Fails_The_Eof_Check()
+		{
+			var buf = new List<byte>(SampleRecord())
+			{
+				0x00
+			}; // one extra byte past the record end
+			Assert.False(NpcSpawnLayout.TryParse(buf.ToArray(), out _));
+		}
+
+		[Fact]
+		public void Truncated_Record_Fails()
+		{
+			var full = SampleRecord();
+			Assert.False(NpcSpawnLayout.TryParse(full.AsSpan(0, full.Length - 4), out _));
+		}
+
+		[Fact]
+		public void Wrong_Version_Is_Rejected()
+		{
+			Assert.False(NpcSpawnLayout.TryParse(BuildRecord(2), out _));
+		}
+
 		// Builds a 1010506 record byte-for-byte in the decoded grammar:
 		//   [u32 version][u32 groupCount] then per group [str name][str category][str id][u32 pts][vec3]*
 		//   [vec3 min][vec3 max][u32 paths] paths*([u32 n][vec3]*n).
@@ -44,21 +107,9 @@ namespace Faolan.Tests
 			return b.ToArray();
 		}
 
-		private static void U32(List<byte> b, uint v) => b.AddRange(BitConverter.GetBytes(v));
-		private static void F32(List<byte> b, float v) => b.AddRange(BitConverter.GetBytes(v));
-
-		private static void Str(List<byte> b, string s)
+		private static void F32(List<byte> b, float v)
 		{
-			var bytes = Encoding.Latin1.GetBytes(s);
-			b.AddRange(BitConverter.GetBytes((ushort)bytes.Length));
-			b.AddRange(bytes);
-		}
-
-		private static void Vec3(List<byte> b, Vector3 v)
-		{
-			F32(b, v.X);
-			F32(b, v.Y);
-			F32(b, v.Z);
+			b.AddRange(BitConverter.GetBytes(v));
 		}
 
 		private static byte[] SampleRecord()
@@ -86,74 +137,33 @@ namespace Faolan.Tests
 			return BuildRecord(1, brawlers, sharks);
 		}
 
-		[Fact]
-		public void Parses_Groups_Points_Bounds_And_Paths()
+		private static void Str(List<byte> b, string s)
 		{
-			Assert.True(NpcSpawnLayout.TryParse(SampleRecord(), out var layout));
-			Assert.NotNull(layout);
-			Assert.Equal(2, layout!.Groups.Count);
-
-			var brawlers = layout.Groups[0];
-			Assert.Equal("Brawlers", brawlers.Name);
-			Assert.Equal("Community", brawlers.Category);
-			Assert.Equal("295", brawlers.Id);
-			Assert.Equal(295u, brawlers.CommunityId);
-			Assert.Equal(2, brawlers.SpawnPoints.Count);
-			Assert.Equal(new Vector3(782.692f, 176.560f, 986.754f), brawlers.SpawnPoints[0]);
-			Assert.Equal(new Vector3(791.474f, 186.560f, 987.885f), brawlers.BoundsMax);
-			Assert.Single(brawlers.RoamPaths);
-			Assert.Equal(3, brawlers.RoamPaths[0].Count);
-			Assert.Equal(new Vector3(787.829f, 176.410f, 991.150f), brawlers.RoamPaths[0][2]);
+			var bytes = Encoding.Latin1.GetBytes(s);
+			b.AddRange(BitConverter.GetBytes((ushort)bytes.Length));
+			b.AddRange(bytes);
 		}
 
-		[Fact]
-		public void Name_Group_Keeps_Raw_Id_And_Has_No_Numeric_CommunityId()
+		private static void U32(List<byte> b, uint v)
 		{
-			NpcSpawnLayout.TryParse(SampleRecord(), out var layout);
-			var sharks = layout!.Groups[1];
-			Assert.Equal("Name", sharks.Category);
-			Assert.Equal("Shark (H8AV)", sharks.Id); // the creature name+tag, not a number
-			Assert.Null(sharks.CommunityId);
-			Assert.Single(sharks.SpawnPoints);
-			Assert.Empty(sharks.RoamPaths);
+			b.AddRange(BitConverter.GetBytes(v));
 		}
 
-		[Fact]
-		public void Empty_Record_Parses_To_Zero_Groups()
+		private static void Vec3(List<byte> b, Vector3 v)
 		{
-			// version=1, groupCount=0 - the shape of a scripted/instanced playfield (castle, Tortage interiors).
-			Assert.True(NpcSpawnLayout.TryParse(BuildRecord(1), out var layout));
-			Assert.Empty(layout!.Groups);
-		}
-
-		[Fact]
-		public void Trailing_Garbage_Fails_The_Eof_Check()
-		{
-			var buf = new List<byte>(SampleRecord()) { 0x00 }; // one extra byte past the record end
-			Assert.False(NpcSpawnLayout.TryParse(buf.ToArray(), out _));
-		}
-
-		[Fact]
-		public void Wrong_Version_Is_Rejected()
-		{
-			Assert.False(NpcSpawnLayout.TryParse(BuildRecord(2), out _));
-		}
-
-		[Fact]
-		public void Truncated_Record_Fails()
-		{
-			var full = SampleRecord();
-			Assert.False(NpcSpawnLayout.TryParse(full.AsSpan(0, full.Length - 4), out _));
+			F32(b, v.X);
+			F32(b, v.Y);
+			F32(b, v.Z);
 		}
 
 		private sealed class Group
 		{
-			public string Name = "";
 			public string Category = "";
 			public string Id = "";
-			public Vector3[] Points = [];
-			public Vector3 Min;
+			public string Name = "";
 			public Vector3 Max;
+			public Vector3 Min;
+			public Vector3[] Points = [];
 			public Vector3[][] Paths = [];
 		}
 	}

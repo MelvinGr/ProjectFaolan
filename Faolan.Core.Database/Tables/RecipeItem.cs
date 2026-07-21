@@ -12,10 +12,12 @@ namespace Faolan.Core.Database.Tables
 	public class RecipeItem : BaseEntity
 	{
 		public uint ItemId { get; set; }
+
 		[ForeignKey(nameof(ItemId))]
 		public virtual Item Item { get; set; } = null!;
 
 		public uint RecipeId { get; set; }
+
 		[ForeignKey(nameof(RecipeId))]
 		public virtual Recipe Recipe { get; set; } = null!;
 

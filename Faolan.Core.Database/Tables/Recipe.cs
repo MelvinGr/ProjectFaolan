@@ -20,24 +20,24 @@ namespace Faolan.Core.Database.Tables
 		// the wire element, so those are not duplicated here.
 		public virtual ICollection<RecipeItem> Items { get; set; } = new List<RecipeItem>();
 
+		// The record's trailing flag byte (@0x5c): 0 or 1.
+		public byte TrailingFlag { get; set; }
+
 		// Per-recipe header word 1 (record header is [id][header1][rdbType]; word 0 == Id).
 		public uint Header1 { get; set; }
-
-		// The tradeskill RDB type of the record: 0xf4241 (1000001) or 0xf4242 (1000002).
-		public uint RdbType { get; set; }
 
 		// The mid-header variable word (0 or 1); the surrounding mid words are fixed (0, 0x1F4, _, 0).
 		public uint MidFlag { get; set; }
 
-		// The record's trailing u32 (@0x50) before the flag byte.
-		public uint Tail { get; set; }
-
-		// The record's trailing flag byte (@0x5c): 0 or 1.
-		public byte TrailingFlag { get; set; }
+		// The tradeskill RDB type of the record: 0xf4241 (1000001) or 0xf4242 (1000002).
+		public uint RdbType { get; set; }
 
 		// The record's opaque ref-id list (KEY2), 1 or 2 entries in every captured record: RefId0 is always present,
 		// RefId1 only when the list has two entries.
 		public uint RefId0 { get; set; }
+
+		// The record's trailing u32 (@0x50) before the flag byte.
+		public uint Tail { get; set; }
 		public uint? RefId1 { get; set; }
 	}
 }

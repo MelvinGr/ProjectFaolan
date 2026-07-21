@@ -83,7 +83,8 @@ namespace Faolan.Tests
 
 			var casilda = await LoadDefinition(13479);
 			Assert.NotNull(casilda);
-			var rec = QuestcRecord.BuildSingle(casilda, casilda.Level, casilda.SnapshotUnknown118, casilda.SnapshotUnknownEc, casilda.SnapshotUnknownF0, casilda.SnapshotUnknownF8, casilda.SnapshotUnknown28);
+			var rec = QuestcRecord.BuildSingle(casilda, casilda.Level, casilda.SnapshotUnknown118, casilda.SnapshotUnknownEc, casilda.SnapshotUnknownF0, casilda.SnapshotUnknownF8,
+				casilda.SnapshotUnknown28);
 			using var w = new FaolanStream();
 			rec.Write(w);
 			var built = w.ToArray();

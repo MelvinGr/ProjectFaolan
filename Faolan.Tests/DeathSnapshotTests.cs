@@ -2,8 +2,6 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
@@ -26,6 +24,7 @@ namespace Faolan.Tests
 	{
 		private const uint HealthCurrentStatId = 0x001B;
 		private const uint HealthMaxStatId = 0x0001;
+
 		[Fact]
 		public void AliveLoginSnapshots_AllHaveNonZeroHealthCurrent()
 		{
@@ -95,8 +94,10 @@ namespace Faolan.Tests
 		private static byte[]? SnapshotBody(string captureFileName)
 		{
 			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
+			{
 				if (source.StartsWith(captureFileName + "#", StringComparison.Ordinal))
 					return body;
+			}
 
 			return null;
 		}

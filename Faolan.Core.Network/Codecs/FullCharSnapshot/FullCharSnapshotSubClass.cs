@@ -57,6 +57,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// still opaque (decoded by tools/capture/decode_snapshot_quests.py).
 		public byte[] UnknownBeforeAccessWindowTable { get; init; }
 
+		// The COMPLETED-quest journal, grouped by area - the Completed tab's data, sitting directly after the active
+		// journal (#390). Null for tails without one: the beach template holds no completed quests, which is exactly
+		// why the region went unmodelled and every real journal's bytes fell into UnknownBefore.
+		public CompletedQuestJournalRegion? CompletedQuests { get; init; }
+
 		public int KnownHeaderLength { get; init; }
 
 		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; }
@@ -70,12 +75,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the @609 objective region and
 		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
 		public QuestIndexRegion? QuestIndex { get; init; }
-
-		// The COMPLETED-quest journal, grouped by area - the Completed tab's data, sitting directly after the active
-		// journal (#390). Null for tails without one: the beach template holds no completed quests, which is exactly
-		// why the region went unmodelled and every real journal's bytes fell into UnknownBefore.
-		public CompletedQuestJournalRegion? CompletedQuests { get; init; }
-
 
 		public SubClassPostAccessBlock? PostAccessBlock { get; init; }
 
@@ -165,8 +164,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// the action bar (#74/#71); null/empty leaves the list empty (byte-identical to the captured beach tails).
 		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null,
 			IReadOnlyList<uint> knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null,
-			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null,
-			IReadOnlyDictionary<uint, QuestArea>? areas = null,
+			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null, IReadOnlyDictionary<uint, QuestArea>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
@@ -181,11 +179,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// sheet of the WRONG SIZE is corruption, and silently falling back to baseline stats there would ship a
 			// level-80 character with skeleton vitals and no visible error. Fail loudly instead.
 			if (statSheet is { Count: > 0 } && statSheet.Count != SubClassStatBlock.SheetSize)
-				throw new InvalidOperationException(
-					$"Stat sheet has {statSheet.Count} pairs, expected exactly {SubClassStatBlock.SheetSize} " +
-					$"(StatList#1 {SubClassStatBlock.StatList1Size} + StatList#2 {SubClassStatBlock.StatList2Size}). " +
-					"The snapshot carries TWO 0x3F1-framed StatList_t and both are built from this sheet, so a partial " +
-					"one cannot be written - fix the character's CharacterStats rows rather than padding here.");
+			{
+				throw new InvalidOperationException($"Stat sheet has {statSheet.Count} pairs, expected exactly {SubClassStatBlock.SheetSize} " +
+				                                    $"(StatList#1 {SubClassStatBlock.StatList1Size} + StatList#2 {SubClassStatBlock.StatList2Size}). " +
+				                                    "The snapshot carries TWO 0x3F1-framed StatList_t and both are built from this sheet, so a partial " +
+				                                    "one cannot be written - fix the character's CharacterStats rows rather than padding here.");
+			}
 
 			var imported = statSheet is { Count: > 0 };
 
@@ -252,8 +251,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		}
 
 		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance,
-			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completed = null,
-			IReadOnlyDictionary<uint, QuestArea>? areas = null,
+			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completed = null, IReadOnlyDictionary<uint, QuestArea>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
@@ -320,7 +318,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			record.Objectives = QuestObjectiveRegion.Build(def, instance);
 			var quests = new QuestcRegion
 			{
-				Records = { record }
+				Records =
+				{
+					record
+				}
 			};
 			var index = QuestIndexRegion.Build([def], def);
 

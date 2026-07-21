@@ -26,6 +26,8 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		private const uint MountAllowedFlag = 0x1; // Map.PlayfieldFlags bit 0: the playfield permits mounts
+
 		// Suppress the auto-opening item-shop browser (itemshopbrowser_swf) on world entry. The client runs level/login
 		// milestone Lua from its OWN RDB LuaArchive that calls player:OpenSiteInBrowser("http://aocshop.funcom.com/
 		// showitem?...") - a Funcom-store upsell - which it renders in the itemshopbrowser SWF. Each open is gated on
@@ -95,6 +97,25 @@ namespace Faolan.GameServer
 				Logger.LogWarning(ex, "Failed to load/seed CharacterEquipment for {CharacterId}; sending inventory verbatim.", character.Id);
 				return null;
 			}
+		}
+
+		// Bind the character to the map's default respawn point if it has never bound (BindRespawnPointId == null).
+		// Runs once per character - an established bind is left alone (it moves only via a bindstone/Wayfarer, not every
+		// login). Without this, imported/older characters have no bind and every recall (Totem of Origin, Path of Asura,
+		// .recall, death-resurrect) fails. No-op when the map defines no respawn point (nothing to bind to).
+		private async Task EnsureCharacterBound(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null || character.HasBind)
+				return;
+
+			var spawn = await Database.GetDefaultSpawn(character.MapId);
+			if (spawn == null)
+				return;
+
+			character.BindRespawnPointId = spawn.Id;
+			await Database.SaveCharacterBind(character.Id, spawn.Id);
+			Logger.LogInformation("Bind: {Char} auto-bound to respawn point {Point} on map {Map} (first entry).", character.Name, spawn.Id, character.MapId);
 		}
 
 		// Ensures the character's LOADOUT on EVERY world entry (#74/#71), not just at creation:
@@ -227,80 +248,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		private const uint MountAllowedFlag = 0x1; // Map.PlayfieldFlags bit 0: the playfield permits mounts
-
-		// Re-seat the character's persisted mount (Character.MountId) after world entry, when the map allows mounts.
-		// Sends the ride buff + Mount/MountSpeed StatUpd and marks the live entity mounted - the same seat the
-		// SummonMount channel ends with, minus the cast animation. No-op on foot, on a no-mount map (the client
-		// auto-dismounted on entry), or if the stored id no longer resolves.
-		private async Task RestoreMount(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character?.MountId is not { } mountId)
-				return;
-
-			var map = await Database.GetMap(character.MapId);
-			if (((map?.PlayfieldFlags ?? 0) & MountAllowedFlag) == 0)
-				return;
-
-			var mount = MountCatalog.ForId(mountId);
-			if (mount == null)
-				return;
-
-			var self = client.Session.Account.ClientInstance;
-			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
-			await SendStatUpdate(client, new CharacterStatBlock
-			{
-				[CharacterStatId.Mount] = mount.RideStat,
-				[CharacterStatId.MountSpeed] = 100
-			}, self);
-
-			var entity = PlayerWorldEntity(client);
-			if (entity != null)
-				entity.IsMounted = true;
-
-			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.CreatureName, character.Name, character.MapId);
-		}
-
-		// The client's world-entry spawn-poll, arriving on wire 0x2020 (GameCharAgent method slot 0x20, RPC-catalog
-		// label UpdateQuestMarkerNPC - the login/world flow reuses the opcode). Fires once per spawned entity the
-		// client confirms it built (requestId = that entity's handle). Three jobs, all part of finishing world entry:
-		//  (1) record the confirmed handle so interest only ever despawns handles the client actually built (#245 -
-		//      a despawn for an unbuilt handle crashes a still-loading client: pcDynel == null);
-		//  (2) answer with the 0x2008 SpawnCheck that completes/renders that entity (verified: the dikketest world
-		//      conn polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). Both existing-login and post-creation
-		//      world entry need it - the create flow's old hand-built batch answered the wrong hardcoded capture
-		//      handles, so its entities were never confirmed and the intro cinematic failed;
-		//  (3) drive the ready-trigger: on a normal login retail arms the follow-up off the client's 0x205F and
-		//      expects 0x2024 ReadyForPlayScreen right after this spawn handshake, so the flush lives HERE
-		//      (capture-proven - moving it strands login on the loading screen). FlushPendingPost205FFollowUp no-ops
-		//      unless armed, so a create-editor / post-ready poll just falls through.
-		// Bodies shorter than the 16-byte poll are not spawn-polls (some other same-opcode traffic); just log them.
-		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, ConanPacket packet)
-		{
-			if (packet.Body == null || packet.Body.Length < sizeof(uint) * 4)
-			{
-				LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray());
-				return;
-			}
-
-			var ack0 = packet.Body.ReadUInt32();
-			var requestId = packet.Body.ReadUInt32();
-			var ack1 = packet.Body.ReadUInt32();
-			var characterId = packet.Body.ReadUInt32();
-
-			_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
-
-			if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
-				await SendSpawnCheckResponse(client, requestId);
-
-			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
-			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId,
-				ack1, characterId, client.Session.HasPendingPost205FFollowUp);
-			await FlushPendingPost205FFollowUp(client);
-			packet.Body.Position = 0;
-		}
-
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
 			if (!client.Session.HasPendingPost205FFollowUp)
@@ -404,8 +351,7 @@ namespace Faolan.GameServer
 
 			// record 1: 0x0000200C, 1-byte body
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance),
-					GameInterfaceOpcodes.DispatchReportServerID)
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance), GameInterfaceOpcodes.DispatchReportServerID)
 				.WriteArray(0x01)
 				.SendAsync(client);
 
@@ -500,25 +446,6 @@ namespace Faolan.GameServer
 
 			client.Session.HasPendingPost205FFollowUp = false;
 			Logger.LogInformation("Cleared pending post-0x205F follow-up flag.");
-		}
-
-		// Bind the character to the map's default respawn point if it has never bound (BindRespawnPointId == null).
-		// Runs once per character - an established bind is left alone (it moves only via a bindstone/Wayfarer, not every
-		// login). Without this, imported/older characters have no bind and every recall (Totem of Origin, Path of Asura,
-		// .recall, death-resurrect) fails. No-op when the map defines no respawn point (nothing to bind to).
-		private async Task EnsureCharacterBound(INetworkClient client)
-		{
-			var character = client.Session?.Character;
-			if (character == null || character.HasBind)
-				return;
-
-			var spawn = await Database.GetDefaultSpawn(character.MapId);
-			if (spawn == null)
-				return;
-
-			character.BindRespawnPointId = spawn.Id;
-			await Database.SaveCharacterBind(character.Id, spawn.Id);
-			Logger.LogInformation("Bind: {Char} auto-bound to respawn point {Point} on map {Map} (first entry).", character.Name, spawn.Id, character.MapId);
 		}
 
 		// The abilities to grant a character on login: its authoritative per-character set (CharacterAbility, imported
@@ -619,6 +546,45 @@ namespace Faolan.GameServer
 				Logger.LogInformation("GrantCharacterSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
 		}
 
+		// The client's world-entry spawn-poll, arriving on wire 0x2020 (GameCharAgent method slot 0x20, RPC-catalog
+		// label UpdateQuestMarkerNPC - the login/world flow reuses the opcode). Fires once per spawned entity the
+		// client confirms it built (requestId = that entity's handle). Three jobs, all part of finishing world entry:
+		//  (1) record the confirmed handle so interest only ever despawns handles the client actually built (#245 -
+		//      a despawn for an unbuilt handle crashes a still-loading client: pcDynel == null);
+		//  (2) answer with the 0x2008 SpawnCheck that completes/renders that entity (verified: the dikketest world
+		//      conn polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). Both existing-login and post-creation
+		//      world entry need it - the create flow's old hand-built batch answered the wrong hardcoded capture
+		//      handles, so its entities were never confirmed and the intro cinematic failed;
+		//  (3) drive the ready-trigger: on a normal login retail arms the follow-up off the client's 0x205F and
+		//      expects 0x2024 ReadyForPlayScreen right after this spawn handshake, so the flush lives HERE
+		//      (capture-proven - moving it strands login on the loading screen). FlushPendingPost205FFollowUp no-ops
+		//      unless armed, so a create-editor / post-ready poll just falls through.
+		// Bodies shorter than the 16-byte poll are not spawn-polls (some other same-opcode traffic); just log them.
+		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, ConanPacket packet)
+		{
+			if (packet.Body == null || packet.Body.Length < sizeof(uint) * 4)
+			{
+				LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray());
+				return;
+			}
+
+			var ack0 = packet.Body.ReadUInt32();
+			var requestId = packet.Body.ReadUInt32();
+			var ack1 = packet.Body.ReadUInt32();
+			var characterId = packet.Body.ReadUInt32();
+
+			_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
+
+			if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
+				await SendSpawnCheckResponse(client, requestId);
+
+			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
+			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,
+				characterId, client.Session.HasPendingPost205FFollowUp);
+			await FlushPendingPost205FFollowUp(client);
+			packet.Body.Position = 0;
+		}
+
 		// Re-delivers, via the proven live DispatchAddItem (0x2020) path, the persisted BAG items the world-entry
 		// snapshot DROPPED because they carry no hash (Hash == 0 - e.g. an AH-bought item whose template
 		// we harvested from a listing, which has no hash). The snapshot only renders Hash != 0 rows
@@ -660,6 +626,39 @@ namespace Faolan.GameServer
 
 			var discovered = new HashSet<uint>(await Database.GetDiscoveredRespawnPointIds(character.Id));
 			return RespawnResolver.ClosestKnown(character.Position, points, discovered) ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points[0];
+		}
+
+		// Re-seat the character's persisted mount (Character.MountId) after world entry, when the map allows mounts.
+		// Sends the ride buff + Mount/MountSpeed StatUpd and marks the live entity mounted - the same seat the
+		// SummonMount channel ends with, minus the cast animation. No-op on foot, on a no-mount map (the client
+		// auto-dismounted on entry), or if the stored id no longer resolves.
+		private async Task RestoreMount(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character?.MountId is not { } mountId)
+				return;
+
+			var map = await Database.GetMap(character.MapId);
+			if (((map?.PlayfieldFlags ?? 0) & MountAllowedFlag) == 0)
+				return;
+
+			var mount = MountCatalog.ForId(mountId);
+			if (mount == null)
+				return;
+
+			var self = client.Session.Account.ClientInstance;
+			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
+			await SendStatUpdate(client, new CharacterStatBlock
+			{
+				[CharacterStatId.Mount] = mount.RideStat,
+				[CharacterStatId.MountSpeed] = 100
+			}, self);
+
+			var entity = PlayerWorldEntity(client);
+			if (entity != null)
+				entity.IsMounted = true;
+
+			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.CreatureName, character.Name, character.MapId);
 		}
 
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
@@ -767,8 +766,8 @@ namespace Faolan.GameServer
 			// The quest INDEX needs, per active quest, its AREA's 4CC and that area's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
 			var (indexAreas, areaCatalog) = await LoadAreaCatalog(snapshotQuests);
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken,
-				completedJournal, indexAreas, areaCatalog);
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken, completedJournal, indexAreas,
+				areaCatalog);
 
 			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
 			{
@@ -984,13 +983,13 @@ namespace Faolan.GameServer
 
 		private static byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags,
 			IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet,
-			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal,
-			IReadOnlyDictionary<uint, QuestArea> indexAreas, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>> areaCatalog)
+			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal, IReadOnlyDictionary<uint, QuestArea> indexAreas,
+			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>> areaCatalog)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet,
-				completedJournal, indexAreas, areaCatalog);
+			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
+				indexAreas, areaCatalog);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 

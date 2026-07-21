@@ -83,6 +83,22 @@ namespace Faolan.Importer.Captures
 			return (records.Count, added, updated, harvestedItems);
 		}
 
+		private static void AddItems(Recipe recipe, IReadOnlyList<TradeskillRecipeCodec.RecipeElement> elements, RecipeItemRole role)
+		{
+			for (var i = 0; i < elements.Count; i++)
+			{
+				var e = elements[i];
+				recipe.Items.Add(new RecipeItem
+				{
+					Role = role,
+					Position = i,
+					ItemId = e.ItemId,
+					Flag = e.Flag,
+					Trailing = e.Trailing
+				});
+			}
+		}
+
 		// Map a decoded wire record to its fully-columnized Recipe row: the per-recipe header/mid/tail fields, the
 		// opaque ref-id list (1-2 entries), and the ingredient/result elements as RecipeItem child rows (item id +
 		// flag + trailing; the item's TEA key + hash live once on the referenced Items row).
@@ -100,28 +116,14 @@ namespace Faolan.Importer.Captures
 				Tail = r.Tail,
 				TrailingFlag = r.TrailingFlag,
 				RefId0 = r.RefIds[0],
-				RefId1 = r.RefIds.Count > 1 ? r.RefIds[1] : null
+				RefId1 = r.RefIds.Count > 1
+					? r.RefIds[1]
+					: null
 			};
 
 			AddItems(recipe, r.Ingredients, RecipeItemRole.Ingredient);
 			AddItems(recipe, r.Results, RecipeItemRole.Result);
 			return recipe;
-		}
-
-		private static void AddItems(Recipe recipe, IReadOnlyList<TradeskillRecipeCodec.RecipeElement> elements, RecipeItemRole role)
-		{
-			for (var i = 0; i < elements.Count; i++)
-			{
-				var e = elements[i];
-				recipe.Items.Add(new RecipeItem
-				{
-					Role = role,
-					Position = i,
-					ItemId = e.ItemId,
-					Flag = e.Flag,
-					Trailing = e.Trailing
-				});
-			}
 		}
 
 		// Ensures each item a recipe references (ingredient or result) exists as an Items TEMPLATE so the
@@ -156,7 +158,13 @@ namespace Faolan.Importer.Captures
 					Name = "",
 					Type = ItemType.Normal,
 					Hash = e.Hash,
-					Key = new ProtoDecryptionKey { Key1 = e.Key1, Key2 = e.Key2, Key3 = e.Key3, Key4 = e.Key4 }
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = e.Key1,
+						Key2 = e.Key2,
+						Key3 = e.Key3,
+						Key4 = e.Key4
+					}
 				});
 				harvested++;
 			}

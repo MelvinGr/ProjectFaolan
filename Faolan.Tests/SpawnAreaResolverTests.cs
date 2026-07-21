@@ -15,49 +15,42 @@ namespace Faolan.Tests
 	// 60, so id-propagation would wrongly write "Poacher" onto the slavers; the name-disagreement guard must block it.
 	public class SpawnAreaResolverTests
 	{
-		private static NpcTemplate Spawnable(uint id, string name) => new()
+		[Fact]
+		public async Task Manual_Assignment_Is_Never_Overwritten()
 		{
-			TemplateId = id,
-			Name = name,
-			StatCore = new NpcStatCore { NpcTemplateId = id }
-		};
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-m-{Guid.NewGuid():N}.db");
+			try
+			{
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					db.Maps.Add(new Map
+					{
+						Id = 4010,
+						Name = "Tortage Island"
+					});
+					db.NpcTemplates.AddRange(Spawnable(100, "Poacher"), Spawnable(200, "Hand Picked"));
+					var a = Area(4010, 0, "Poacher1", "Community", 60);
+					a.NpcTemplateId = 200; // a human said this area is "Hand Picked"
+					a.ResolvedBy = SpawnResolutionSource.Manual;
+					db.NpcSpawnAreas.Add(a);
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-		private static NpcSpawnArea Area(uint map, int ord, string groupName, string cat, uint? communityId,
-			float minX = 0, float minZ = 0, float maxX = 0, float maxZ = 0) => new()
-		{
-			MapId = map,
-			GroupOrdinal = ord,
-			GroupName = groupName,
-			Category = cat,
-			GroupKey = communityId?.ToString() ?? groupName,
-			CommunityId = communityId,
-			BoundsMinX = minX,
-			BoundsMinZ = minZ,
-			BoundsMaxX = maxX,
-			BoundsMaxZ = maxZ,
-			MaxCount = 1,
-			ResolvedBy = SpawnResolutionSource.None
-		};
+					await SpawnAreaResolver.ResolveAsync(db);
+				}
 
-		private static async Task Seed(DatabaseContext db)
-		{
-			db.Maps.Add(new Map { Id = 4010, Name = "Tortage Island" });
-			db.NpcTemplates.AddRange(Spawnable(100, "Poacher"), Spawnable(101, "Jungle Ape"), Spawnable(102, "Crocodile"));
-			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-			// Two captured Jungle Apes inside the Ape2 area's bounds -> unanimous containment resolution.
-			db.NpcSpawns.AddRange(
-				new NpcSpawn { MapId = 4010, NpcTemplateId = 101, PositionX = 5, PositionY = 0, PositionZ = 5 },
-				new NpcSpawn { MapId = 4010, NpcTemplateId = 101, PositionX = 6, PositionY = 0, PositionZ = 6 });
-
-			// Bounds are placed so ONLY Ape2's region covers the captured apes at (5,5)/(6,6); the others sit far away so
-			// they fall through to the tier they're meant to test.
-			db.NpcSpawnAreas.AddRange(
-				Area(4010, 0, "Poacher1", "Community", 60, 100, 100, 100, 100), // tier1 name -> Poacher; defines Community 60
-				Area(4010, 1, "Slaver1", "Community", 60, 300, 300, 300, 300),  // shared id 60, no slaver template -> GUARD must block
-				Area(4010, 2, "Ape2", "Race", 31, 0, 0, 10, 10),               // tier2 containment -> Jungle Ape; defines Race 31
-				Area(4010, 3, "Ape5", "Race", 31, 500, 500, 510, 510));        // tier3 id-prop -> Jungle Ape (name agrees)
-			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					var a = await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken);
+					Assert.Equal(200u, a.NpcTemplateId); // NOT overwritten by the name tier's Poacher (100)
+					Assert.Equal(SpawnResolutionSource.Manual, a.ResolvedBy);
+				}
+			}
+			finally
+			{
+				if (File.Exists(path))
+					File.Delete(path);
+			}
 		}
 
 		[Fact]
@@ -101,43 +94,72 @@ namespace Faolan.Tests
 			}
 		}
 
-		[Fact]
-		public async Task Manual_Assignment_Is_Never_Overwritten()
+		private static NpcSpawnArea Area(uint map, int ord, string groupName, string cat, uint? communityId, float minX = 0, float minZ = 0, float maxX = 0, float maxZ = 0)
 		{
-			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-m-{Guid.NewGuid():N}.db");
-			try
+			return new NpcSpawnArea
 			{
-				await using (var db = new DatabaseContext(TestDb.Options(path)))
-				{
-					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					db.Maps.Add(new Map { Id = 4010, Name = "Tortage Island" });
-					db.NpcTemplates.AddRange(Spawnable(100, "Poacher"), Spawnable(200, "Hand Picked"));
-					var a = Area(4010, 0, "Poacher1", "Community", 60);
-					a.NpcTemplateId = 200; // a human said this area is "Hand Picked"
-					a.ResolvedBy = SpawnResolutionSource.Manual;
-					db.NpcSpawnAreas.Add(a);
-					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+				MapId = map,
+				GroupOrdinal = ord,
+				GroupName = groupName,
+				Category = cat,
+				GroupKey = communityId?.ToString() ?? groupName,
+				CommunityId = communityId,
+				BoundsMinX = minX,
+				BoundsMinZ = minZ,
+				BoundsMaxX = maxX,
+				BoundsMaxZ = maxZ,
+				MaxCount = 1,
+				ResolvedBy = SpawnResolutionSource.None
+			};
+		}
 
-					await SpawnAreaResolver.ResolveAsync(db);
-				}
-
-				await using (var db = new DatabaseContext(TestDb.Options(path)))
-				{
-					var a = await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken);
-					Assert.Equal(200u, a.NpcTemplateId); // NOT overwritten by the name tier's Poacher (100)
-					Assert.Equal(SpawnResolutionSource.Manual, a.ResolvedBy);
-				}
-			}
-			finally
+		private static async Task Seed(DatabaseContext db)
+		{
+			db.Maps.Add(new Map
 			{
-				if (File.Exists(path))
-					File.Delete(path);
-			}
+				Id = 4010,
+				Name = "Tortage Island"
+			});
+			db.NpcTemplates.AddRange(Spawnable(100, "Poacher"), Spawnable(101, "Jungle Ape"), Spawnable(102, "Crocodile"));
+			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+			// Two captured Jungle Apes inside the Ape2 area's bounds -> unanimous containment resolution.
+			db.NpcSpawns.AddRange(new NpcSpawn
+			{
+				MapId = 4010,
+				NpcTemplateId = 101,
+				PositionX = 5,
+				PositionY = 0,
+				PositionZ = 5
+			}, new NpcSpawn
+			{
+				MapId = 4010,
+				NpcTemplateId = 101,
+				PositionX = 6,
+				PositionY = 0,
+				PositionZ = 6
+			});
+
+			// Bounds are placed so ONLY Ape2's region covers the captured apes at (5,5)/(6,6); the others sit far away so
+			// they fall through to the tier they're meant to test.
+			db.NpcSpawnAreas.AddRange(Area(4010, 0, "Poacher1", "Community", 60, 100, 100, 100, 100), // tier1 name -> Poacher; defines Community 60
+				Area(4010, 1, "Slaver1", "Community", 60, 300, 300, 300, 300), // shared id 60, no slaver template -> GUARD must block
+				Area(4010, 2, "Ape2", "Race", 31, 0, 0, 10, 10), // tier2 containment -> Jungle Ape; defines Race 31
+				Area(4010, 3, "Ape5", "Race", 31, 500, 500, 510, 510)); // tier3 id-prop -> Jungle Ape (name agrees)
+			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+		}
+
+		private static NpcTemplate Spawnable(uint id, string name)
+		{
+			return new NpcTemplate
+			{
+				TemplateId = id,
+				Name = name,
+				StatCore = new NpcStatCore
+				{
+					NpcTemplateId = id
+				}
+			};
 		}
 	}
 }
-
-
-
-
-

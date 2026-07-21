@@ -90,6 +90,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-
-
-

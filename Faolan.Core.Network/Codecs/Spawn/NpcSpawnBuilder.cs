@@ -46,7 +46,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
 				// already 4 bytes, so SpawnPlayfieldRewriter's splice-free in-place re-address still holds.
 				.WriteByte(0x2C)
-				.WriteArray(new ProtoGameCodeDynelIIR { Position = position, Rotation = rotation, PlayfieldInstance = playfieldToken }.ToProtobuf())
+				.WriteArray(new ProtoGameCodeDynelIIR
+				{
+					Position = position,
+					Rotation = rotation,
+					PlayfieldInstance = playfieldToken
+				}.ToProtobuf())
 				.WriteArray(preIir)
 				.WriteByte(0x41)
 				.WriteUInt32(iirHeader)
@@ -225,7 +230,5 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (core.MovementMode.HasValue)
 				msg.MovementMode = core.MovementMode.Value;
 		}
-
-
 	}
 }

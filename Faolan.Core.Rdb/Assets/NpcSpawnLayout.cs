@@ -34,12 +34,12 @@ namespace Faolan.Core.Rdb.Assets
 	{
 		public const uint ResourceType = 1010506;
 
+		public IReadOnlyList<SpawnGroup> Groups { get; }
+
 		private NpcSpawnLayout(IReadOnlyList<SpawnGroup> groups)
 		{
 			Groups = groups;
 		}
-
-		public IReadOnlyList<SpawnGroup> Groups { get; }
 
 		// Parses a decompressed 1010506 payload (the bytes RdbReader.ReadDecompressed returns for this type). Returns
 		// false on any malformed field or if the parse doesn't consume the record EXACTLY to its end - the trailing
@@ -56,10 +56,8 @@ namespace Faolan.Core.Rdb.Assets
 			var groups = new List<SpawnGroup>((int)groupCount);
 			for (var g = 0; g < groupCount; g++)
 			{
-				if (!ReadStr(data, ref o, out var name) ||
-				    !ReadStr(data, ref o, out var category) ||
-				    !ReadStr(data, ref o, out var id) ||
-				    !ReadU32(data, ref o, out var pointCount) || pointCount > 1000000)
+				if (!ReadStr(data, ref o, out var name) || !ReadStr(data, ref o, out var category) || !ReadStr(data, ref o, out var id) || !ReadU32(data, ref o, out var pointCount) ||
+				    pointCount > 1000000)
 					return false;
 
 				var points = new List<Vector3>((int)pointCount);
@@ -108,6 +106,22 @@ namespace Faolan.Core.Rdb.Assets
 			return true;
 		}
 
+		private static bool ReadStr(ReadOnlySpan<byte> b, ref int o, out string? s)
+		{
+			s = null;
+			if (o + 2 > b.Length)
+				return false;
+
+			int len = BinaryPrimitives.ReadUInt16LittleEndian(b.Slice(o, 2));
+			o += 2;
+			if (o + len > b.Length)
+				return false;
+
+			s = Encoding.Latin1.GetString(b.Slice(o, len));
+			o += len;
+			return true;
+		}
+
 		private static bool ReadU32(ReadOnlySpan<byte> b, ref int o, out uint v)
 		{
 			if (o + 4 > b.Length)
@@ -129,27 +143,9 @@ namespace Faolan.Core.Rdb.Assets
 				return false;
 			}
 
-			v = new Vector3(
-				BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o + 4, 4)),
+			v = new Vector3(BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o, 4)), BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o + 4, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o + 8, 4)));
 			o += 12;
-			return true;
-		}
-
-		private static bool ReadStr(ReadOnlySpan<byte> b, ref int o, out string? s)
-		{
-			s = null;
-			if (o + 2 > b.Length)
-				return false;
-
-			int len = BinaryPrimitives.ReadUInt16LittleEndian(b.Slice(o, 2));
-			o += 2;
-			if (o + len > b.Length)
-				return false;
-
-			s = Encoding.Latin1.GetString(b.Slice(o, len));
-			o += len;
 			return true;
 		}
 

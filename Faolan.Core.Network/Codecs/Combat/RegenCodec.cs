@@ -24,14 +24,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteArrayUInt32Length(body => body
-				.WriteUInt32(Opcode)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(Handle)
-				.WriteByte(Env)
-				.WriteUInt32(FieldA)
-				.WriteUInt32(FieldB)
-				.WriteUInt32(Value));
+			s.WriteArrayUInt32Length(body => body.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(FieldA).WriteUInt32(FieldB).WriteUInt32(Value));
 		}
 
 		public static byte[] Build(uint handle, uint value, uint fieldA = 0, uint fieldB = 0, byte env = 0x00)

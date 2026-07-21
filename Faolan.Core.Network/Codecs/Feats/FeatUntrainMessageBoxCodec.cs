@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 
 namespace Faolan.Core.Network.Codecs.Feats
 {
@@ -17,12 +18,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 
 		public static byte[] Build(uint kind, uint value, uint token)
 		{
-			return new FaolanStream()
-				.WriteUInt32(kind)
-				.WriteUInt32(value)
-				.WriteUInt32(0u)
-				.WriteUInt32(token)
-				.ToArray();
+			return new FaolanStream().WriteUInt32(kind).WriteUInt32(value).WriteUInt32(0u).WriteUInt32(token).ToArray();
 		}
 
 		// Parse a FeatUntrainAnswer body: the leading answer byte + the 16-byte echoed payload. `token` is the 4th
@@ -35,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 				return false;
 
 			answer = body[0];
-			token = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(1 + 12, 4));
+			token = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(1 + 12, 4));
 			return true;
 		}
 	}

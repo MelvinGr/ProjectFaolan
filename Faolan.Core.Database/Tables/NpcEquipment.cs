@@ -9,6 +9,9 @@ namespace Faolan.Core.Database.Tables
 	// Items, the quad + hash live there) + Level; cascade-deletes with its NpcTemplate.
 	public class NpcEquipment : BaseEntity, INpcEquipment
 	{
+		[ForeignKey(nameof(Template))]
+		public virtual Item Item { get; set; } = null!;
+
 		public uint NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))]
@@ -22,8 +25,5 @@ namespace Faolan.Core.Database.Tables
 		// ProtoAcgItem.template1 == template2 (fixed32) = the RDB item template id; hard FK to Items (the quad + hash
 		// live there). The builder reads the identity through the Item navigation, so Include it.
 		public uint Template { get; set; }
-
-		[ForeignKey(nameof(Template))]
-		public virtual Item Item { get; set; } = null!;
 	}
 }

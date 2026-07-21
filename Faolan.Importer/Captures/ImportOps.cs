@@ -1,5 +1,4 @@
 using System;
-using Faolan.Core.Network.Codecs.Quest;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -9,6 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -185,6 +185,72 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
+		// Quest definitions harvested from the COMPLETED-quest journal (#390). ADDITIVE by design: these rows carry
+		// only a title + journal sub-line, so they fill the catalog out for quests no capture session ever touched
+		// without disturbing the far richer definitions the QuestFullUpdate path builds.
+		//
+		// ⚠️ Deliberately NOT routed through ImportQuestDefinitions, which does
+		// `RemoveRange(existing.TextRefs); existing.TextRefs = def.TextRefs` - that would strip a complete quest's
+		// summary/objective refs down to the two the completed journal happens to carry.
+		public static async Task<(int Added, int Filled)> ImportCompletedQuestDefinitions(DatabaseContext db, CompletedQuestExtractor.Harvest harvest)
+		{
+			var existing = await db.QuestDefinitions.Include(q => q.TextRefs).ToDictionaryAsync(q => q.QuestId);
+			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
+			var areas = await db.QuestAreas.Select(a => a.AreaId).ToHashSetAsync();
+			int added = 0, filled = 0;
+
+			foreach (var q in harvest.Quests)
+			{
+				// Maps and areas are FK targets - a placeholder beats dropping the quest (Melvin: "its okay to insert
+				// maps wihtout name").
+				if (q.MapId != 0 && maps.Add(q.MapId))
+					db.Maps.Add(new Map
+					{
+						Id = q.MapId,
+						Name = ""
+					});
+
+				if (q.AreaId != 0 && areas.Add(q.AreaId))
+					db.QuestAreas.Add(new QuestArea
+					{
+						AreaId = q.AreaId
+					});
+
+				if (!existing.TryGetValue(q.QuestId, out var def))
+				{
+					def = new QuestDefinition
+					{
+						QuestId = q.QuestId,
+						AreaId = q.AreaId,
+						MapId = q.MapId,
+						JournalSequence = q.Sequence
+					};
+					db.QuestDefinitions.Add(def);
+					existing[q.QuestId] = def;
+					added++;
+				}
+				else
+				{
+					// Stable per quest across the whole corpus, so refreshing it is safe and fills older rows.
+					def.JournalSequence = q.Sequence;
+					filled++;
+				}
+
+				AddRefIfMissing(def, QuestTextSlot.Title, q.Title);
+				AddRefIfMissing(def, QuestTextSlot.ListSubLine, q.SubLine);
+
+				if (harvest.Areas.TryGetValue(q.AreaId, out var header))
+				{
+					AddRefIfMissing(def, QuestTextSlot.AreaTitle, header.Title);
+					AddRefIfMissing(def, QuestTextSlot.RegionName, header.Region);
+					AddRefIfMissing(def, QuestTextSlot.MapName, header.Map);
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return (added, filled);
+		}
+
 		public static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
 		{
 			var existing = await db.ConversationNodes.Include(n => n.Packets).ToListAsync();
@@ -203,10 +269,14 @@ namespace Faolan.Importer.Captures
 					AnswerPath = e.AnswerPath,
 					CapturedNpcHandle = e.CapturedNpcHandle,
 					NpcName = e.NpcName,
-					NpcTemplateId = e.NpcTemplateId is { } t && knownTemplates.Contains(t) ? t : null,
+					NpcTemplateId = e.NpcTemplateId is { } t && knownTemplates.Contains(t)
+						? t
+						: null,
 					CapturedInstance = e.CapturedInstance,
 					ConditionScript = e.ConditionScript,
-					GrantQuestId = e.GrantQuestId == 0 ? null : e.GrantQuestId,
+					GrantQuestId = e.GrantQuestId == 0
+						? null
+						: e.GrantQuestId,
 					Packets = e.Packets.Select((p, i) => BuildPacket(p, i)).ToList()
 				});
 			}
@@ -312,6 +382,139 @@ namespace Faolan.Importer.Captures
 			return inserted;
 		}
 
+		// @609 objective goals harvested from captured journals. ADDITIVE, and deliberately NOT routed through
+		// ImportQuestDefinitions - that path rebuilds a quest's goal set and would fight the Seed* overlays.
+		//
+		// ⚠️ QuestGoalDefinition.GoalId is a GLOBAL primary key. A goal id already owned by a different quest is
+		// SKIPPED rather than moved: attaching one to a second quest is what made an earlier attempt at this die with
+		// a DbUpdateConcurrencyException mid-import.
+		public static async Task<int> ImportObjectiveGoals(DatabaseContext db, IReadOnlyList<ObjectiveGoalExtractor.Goal> goals)
+		{
+			var tracked = await db.QuestGoalDefinitions.ToDictionaryAsync(g => g.GoalId);
+			var owner = tracked.ToDictionary(k => k.Key, k => k.Value.QuestDefinitionId);
+			var quests = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId, q => q.MapId);
+			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
+			int added = 0, noMap = 0, refreshed = 0;
+
+			foreach (var g in goals)
+			{
+				if (!quests.TryGetValue(g.QuestId, out var questMapId))
+					continue; // no definition to hang it on
+
+				// 0 means the goal has no world marker - stored as NULL, not skipped.
+				uint? mapId = g.MapId != 0
+					? g.MapId
+					: null;
+				if (mapId == null)
+					noMap++;
+
+				if (owner.TryGetValue(g.GoalId, out var existingQuest))
+				{
+					if (existingQuest != g.QuestId)
+					{
+						Console.WriteLine($"  goal {g.GoalId} already belongs to quest {existingQuest}, not {g.QuestId} - skipped.");
+						continue;
+					}
+
+					// Present already - typically from a Seed* overlay. The CAPTURE is the truth source for every wire
+					// field, so refresh them; the server-side-only fields (TargetName/GoalType/QuestItemId) are left
+					// alone. Skipping instead kept hand-written seed values that no capture agrees with, which is what
+					// left the last ~116 regions unreproducible.
+					var row = tracked[g.GoalId];
+					row.Sequence = g.Sequence;
+					row.RegionOrder = g.RegionOrder;
+					row.Separator = g.Separator;
+					row.SubId = g.SubId;
+					row.MapId = mapId;
+					row.MarkerX = mapId == null
+						? null
+						: g.MarkerX;
+					row.MarkerY = mapId == null
+						? null
+						: g.MarkerY;
+					row.RequiredCount = g.RequiredCount;
+					row.Unknown1 = g.Unknown1;
+					row.Unknown2 = g.Unknown2;
+					row.GoalIdEcho = g.GoalIdEcho;
+					row.Extra0 = g.Extra0;
+					row.Extra1 = g.Extra1;
+					row.Extra2 = g.Extra2;
+					row.Extra3 = g.Extra3;
+					row.Extra4 = g.Extra4;
+					row.Extra5 = g.Extra5;
+					row.Extra6 = g.Extra6;
+					row.ObjectiveRefId = g.Objective.RefId;
+					row.ObjectiveCategory = g.Objective.Category;
+					row.ObjectiveKey = g.Objective.Key;
+					row.ObjectiveToken = g.Objective.Token;
+					row.TrailingRefId = g.Trailing?.RefId ?? 0;
+					row.TrailingCategory = g.Trailing?.Category ?? 0;
+					row.TrailingKey = g.Trailing?.Key;
+					row.TrailingFlags = g.Trailing?.Flags;
+					row.TrailingToken = g.Trailing?.Token;
+					row.TrailingLocalized = g.Trailing?.IsLocalized ?? false;
+					refreshed++;
+					continue;
+				}
+
+				if (mapId is { } m && maps.Add(m))
+					db.Maps.Add(new Map
+					{
+						Id = m,
+						Name = ""
+					});
+
+				db.QuestGoalDefinitions.Add(new QuestGoalDefinition
+				{
+					GoalId = g.GoalId,
+					QuestDefinitionId = g.QuestId,
+					Sequence = g.Sequence,
+					RegionOrder = g.RegionOrder,
+					Separator = g.Separator,
+					SubId = g.SubId,
+					MapId = mapId,
+					MarkerX = mapId == null
+						? null
+						: g.MarkerX,
+					MarkerY = mapId == null
+						? null
+						: g.MarkerY,
+					Unknown1 = g.Unknown1,
+					Unknown2 = g.Unknown2,
+					GoalIdEcho = g.GoalIdEcho,
+					Extra0 = g.Extra0,
+					Extra1 = g.Extra1,
+					Extra2 = g.Extra2,
+					Extra3 = g.Extra3,
+					Extra4 = g.Extra4,
+					Extra5 = g.Extra5,
+					Extra6 = g.Extra6,
+					RequiredCount = g.RequiredCount,
+					ObjectiveRefId = g.Objective.RefId,
+					ObjectiveCategory = g.Objective.Category,
+					ObjectiveKey = g.Objective.Key,
+					ObjectiveToken = g.Objective.Token,
+					TrailingToken = g.Trailing?.Token,
+					TrailingRefId = g.Trailing?.RefId ?? 0,
+					TrailingCategory = g.Trailing?.Category ?? 0,
+					TrailingKey = g.Trailing?.Key,
+					TrailingFlags = g.Trailing?.Flags,
+					TrailingLocalized = g.Trailing?.IsLocalized ?? false
+				});
+				owner[g.GoalId] = g.QuestId;
+				added++;
+			}
+
+			await db.SaveChangesAsync();
+			if (noMap > 0)
+				Console.WriteLine($"  {noMap} objective goals carry no world marker (MapId/MarkerX/MarkerY null).");
+
+			if (refreshed > 0)
+				Console.WriteLine($"  {refreshed} existing objective goals refreshed from the captures.");
+
+			return added;
+		}
+
 		// NPC patrol routes, one per NpcSpawn (#316). The route is correlated to its NPC by the shared spawn position
 		// (the spawns were imported + saved just before), then FK'd; the columnarized task tree is replaced wholesale
 		// on re-import.
@@ -319,18 +522,18 @@ namespace Faolan.Importer.Captures
 		{
 			foreach (var e in paths)
 			{
-				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(
-					n => n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z);
+				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z);
 				if (spawn == null)
 					continue; // a route with no matching spawn (should not happen for burst-truth patrols) - skip
 
-				var existing = await db
-					.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints)
-					.FirstOrDefaultAsync(p => p.NpcSpawnId == spawn.Id);
+				var existing = await db.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints).FirstOrDefaultAsync(p => p.NpcSpawnId == spawn.Id);
 
 				if (existing == null)
 				{
-					existing = new PatrolPath { NpcSpawnId = spawn.Id };
+					existing = new PatrolPath
+					{
+						NpcSpawnId = spawn.Id
+					};
 					db.PatrolPaths.Add(existing);
 				}
 				else
@@ -345,61 +548,6 @@ namespace Faolan.Importer.Captures
 			}
 
 			await db.SaveChangesAsync();
-		}
-
-		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
-		// sets ParentId).
-		private static void AddNodeTree(PatrolPath path, PatrolNode node)
-		{
-			path.Nodes.Add(node);
-			foreach (var child in node.Children)
-				AddNodeTree(path, child);
-		}
-
-		private static PatrolNode CloneNode(PatrolNode n)
-		{
-			var clone = new PatrolNode
-			{
-				Ordinal = n.Ordinal,
-				Mode = n.Mode,
-				HeaderFlags = n.HeaderFlags,
-				Duration = n.Duration,
-				Remaining = n.Remaining,
-				ListMin = n.ListMin,
-				PathFlags = n.PathFlags,
-				PathFloat10 = n.PathFloat10,
-				PathFloat20 = n.PathFloat20,
-				PathPacked1 = n.PathPacked1,
-				PathPacked2 = n.PathPacked2,
-				TrailerByte = n.TrailerByte,
-				Speed = n.Speed,
-				AnchorX = n.AnchorX,
-				AnchorY = n.AnchorY,
-				AnchorZ = n.AnchorZ,
-				Flag = n.Flag,
-				RotateTail = n.RotateTail,
-				ApproachType = n.ApproachType,
-				ApproachTarget = n.ApproachTarget,
-				WordsData = n.WordsData?.ToArray()
-			};
-
-			foreach (var w in n.Waypoints)
-				clone.Waypoints.Add(new PatrolNodeWaypoint
-				{
-					Ordinal = w.Ordinal,
-					PositionX = w.PositionX,
-					PositionY = w.PositionY,
-					PositionZ = w.PositionZ
-				});
-
-			foreach (var child in n.Children)
-			{
-				var childClone = CloneNode(child);
-				childClone.Parent = clone;
-				clone.Children.Add(childClone);
-			}
-
-			return clone;
 		}
 
 		// Quest journal-content definitions, refreshed per harvested quest; un-harvested quests untouched.
@@ -462,226 +610,6 @@ namespace Faolan.Importer.Captures
 			return added;
 		}
 
-		// Marks every quest whose @609 objective region, rebuilt from the rows just imported, reproduces the captured
-		// bytes exactly. Only those may ride the login snapshot - the region still has undecoded fields, and shipping
-		// one we cannot reproduce asserts the client (statlist.cpp:134).
-		public static async Task<(int Verified, int Total)> VerifyObjectiveRegions(DatabaseContext db,
-			IReadOnlyDictionary<uint, List<List<QuestObjectiveGoal>>> capturedByQuest)
-		{
-			var defs = await db.QuestDefinitions.Include(q => q.Goals).ToDictionaryAsync(q => q.QuestId);
-			int verified = 0, total = 0;
-
-			foreach (var (questId, captures) in capturedByQuest)
-			{
-				if (!defs.TryGetValue(questId, out var def) || def.Goals.Count == 0)
-					continue;
-
-				total++;
-				def.ObjectiveRegionVerified = captures.All(goals =>
-					QuestObjectiveRegion.Build(def, goals[0].Instance).ToArray()
-						.SequenceEqual(new QuestObjectiveRegion { Goals = goals }.ToArray()));
-
-				if (def.ObjectiveRegionVerified)
-					verified++;
-			}
-
-			await db.SaveChangesAsync();
-			return (verified, total);
-		}
-
-		// Quest definitions harvested from the COMPLETED-quest journal (#390). ADDITIVE by design: these rows carry
-		// only a title + journal sub-line, so they fill the catalog out for quests no capture session ever touched
-		// without disturbing the far richer definitions the QuestFullUpdate path builds.
-		//
-		// ⚠️ Deliberately NOT routed through ImportQuestDefinitions, which does
-		// `RemoveRange(existing.TextRefs); existing.TextRefs = def.TextRefs` - that would strip a complete quest's
-		// summary/objective refs down to the two the completed journal happens to carry.
-		public static async Task<(int Added, int Filled)> ImportCompletedQuestDefinitions(DatabaseContext db,
-			CompletedQuestExtractor.Harvest harvest)
-		{
-			var existing = await db.QuestDefinitions.Include(q => q.TextRefs).ToDictionaryAsync(q => q.QuestId);
-			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
-			var areas = await db.QuestAreas.Select(a => a.AreaId).ToHashSetAsync();
-			int added = 0, filled = 0;
-
-			foreach (var q in harvest.Quests)
-			{
-				// Maps and areas are FK targets - a placeholder beats dropping the quest (Melvin: "its okay to insert
-				// maps wihtout name").
-				if (q.MapId != 0 && maps.Add(q.MapId))
-					db.Maps.Add(new Map { Id = q.MapId, Name = "" });
-
-				if (q.AreaId != 0 && areas.Add(q.AreaId))
-					db.QuestAreas.Add(new QuestArea { AreaId = q.AreaId });
-
-				if (!existing.TryGetValue(q.QuestId, out var def))
-				{
-					def = new QuestDefinition { QuestId = q.QuestId, AreaId = q.AreaId, MapId = q.MapId, JournalSequence = q.Sequence };
-					db.QuestDefinitions.Add(def);
-					existing[q.QuestId] = def;
-					added++;
-				}
-				else
-				{
-					// Stable per quest across the whole corpus, so refreshing it is safe and fills older rows.
-					def.JournalSequence = q.Sequence;
-					filled++;
-				}
-
-				AddRefIfMissing(def, QuestTextSlot.Title, q.Title);
-				AddRefIfMissing(def, QuestTextSlot.ListSubLine, q.SubLine);
-
-				if (harvest.Areas.TryGetValue(q.AreaId, out var header))
-				{
-					AddRefIfMissing(def, QuestTextSlot.AreaTitle, header.Title);
-					AddRefIfMissing(def, QuestTextSlot.RegionName, header.Region);
-					AddRefIfMissing(def, QuestTextSlot.MapName, header.Map);
-				}
-			}
-
-			await db.SaveChangesAsync();
-			return (added, filled);
-		}
-
-		// Only ever ADDS a slot that is absent - an existing ref is authoritative, having come from a full-update.
-		private static void AddRefIfMissing(QuestDefinition def, QuestTextSlot slot, CompletedQuestExtractor.TextRef text)
-		{
-			if (def.TextRefs.Any(r => r.Slot == slot))
-				return;
-
-			def.TextRefs.Add(new QuestTextRef
-			{
-				QuestId = def.QuestId,
-				Slot = slot,
-				RefId = text.RefId,
-				Category = text.Category,
-				KeyText = text.Key,
-				Flags = text.Flags,
-				IsLocalized = text.IsLocalized
-			});
-		}
-
-		// @609 objective goals harvested from captured journals. ADDITIVE, and deliberately NOT routed through
-		// ImportQuestDefinitions - that path rebuilds a quest's goal set and would fight the Seed* overlays.
-		//
-		// ⚠️ QuestGoalDefinition.GoalId is a GLOBAL primary key. A goal id already owned by a different quest is
-		// SKIPPED rather than moved: attaching one to a second quest is what made an earlier attempt at this die with
-		// a DbUpdateConcurrencyException mid-import.
-		public static async Task<int> ImportObjectiveGoals(DatabaseContext db, IReadOnlyList<ObjectiveGoalExtractor.Goal> goals)
-		{
-			var tracked = await db.QuestGoalDefinitions.ToDictionaryAsync(g => g.GoalId);
-			var owner = tracked.ToDictionary(k => k.Key, k => k.Value.QuestDefinitionId);
-			var quests = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId, q => q.MapId);
-			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
-			int added = 0, noMap = 0, refreshed = 0;
-
-			foreach (var g in goals)
-			{
-				if (!quests.TryGetValue(g.QuestId, out var questMapId))
-					continue; // no definition to hang it on
-
-				// 0 means the goal has no world marker - stored as NULL, not skipped.
-				uint? mapId = g.MapId != 0
-					? g.MapId
-					: null;
-				if (mapId == null)
-					noMap++;
-
-				if (owner.TryGetValue(g.GoalId, out var existingQuest))
-				{
-					if (existingQuest != g.QuestId)
-					{
-						Console.WriteLine($"  goal {g.GoalId} already belongs to quest {existingQuest}, not {g.QuestId} - skipped.");
-						continue;
-					}
-
-					// Present already - typically from a Seed* overlay. The CAPTURE is the truth source for every wire
-					// field, so refresh them; the server-side-only fields (TargetName/GoalType/QuestItemId) are left
-					// alone. Skipping instead kept hand-written seed values that no capture agrees with, which is what
-					// left the last ~116 regions unreproducible.
-					var row = tracked[g.GoalId];
-					row.Sequence = g.Sequence;
-					row.RegionOrder = g.RegionOrder;
-					row.Separator = g.Separator;
-					row.SubId = g.SubId;
-					row.MapId = mapId;
-					row.MarkerX = mapId == null ? null : g.MarkerX;
-					row.MarkerY = mapId == null ? null : g.MarkerY;
-					row.RequiredCount = g.RequiredCount;
-					row.Unknown1 = g.Unknown1;
-					row.Unknown2 = g.Unknown2;
-					row.GoalIdEcho = g.GoalIdEcho;
-					row.Extra0 = g.Extra0;
-					row.Extra1 = g.Extra1;
-					row.Extra2 = g.Extra2;
-					row.Extra3 = g.Extra3;
-					row.Extra4 = g.Extra4;
-					row.Extra5 = g.Extra5;
-					row.Extra6 = g.Extra6;
-					row.ObjectiveRefId = g.Objective.RefId;
-					row.ObjectiveCategory = g.Objective.Category;
-					row.ObjectiveKey = g.Objective.Key;
-					row.ObjectiveToken = g.Objective.Token;
-					row.TrailingRefId = g.Trailing?.RefId ?? 0;
-					row.TrailingCategory = g.Trailing?.Category ?? 0;
-					row.TrailingKey = g.Trailing?.Key;
-					row.TrailingFlags = g.Trailing?.Flags;
-					row.TrailingToken = g.Trailing?.Token;
-					row.TrailingLocalized = g.Trailing?.IsLocalized ?? false;
-					refreshed++;
-					continue;
-				}
-
-				if (mapId is { } m && maps.Add(m))
-					db.Maps.Add(new Map { Id = m, Name = "" });
-
-				db.QuestGoalDefinitions.Add(new QuestGoalDefinition
-				{
-					GoalId = g.GoalId,
-					QuestDefinitionId = g.QuestId,
-					Sequence = g.Sequence,
-					RegionOrder = g.RegionOrder,
-					Separator = g.Separator,
-					SubId = g.SubId,
-					MapId = mapId,
-					MarkerX = mapId == null ? null : g.MarkerX,
-					MarkerY = mapId == null ? null : g.MarkerY,
-					Unknown1 = g.Unknown1,
-					Unknown2 = g.Unknown2,
-					GoalIdEcho = g.GoalIdEcho,
-					Extra0 = g.Extra0,
-					Extra1 = g.Extra1,
-					Extra2 = g.Extra2,
-					Extra3 = g.Extra3,
-					Extra4 = g.Extra4,
-					Extra5 = g.Extra5,
-					Extra6 = g.Extra6,
-					RequiredCount = g.RequiredCount,
-					ObjectiveRefId = g.Objective.RefId,
-					ObjectiveCategory = g.Objective.Category,
-					ObjectiveKey = g.Objective.Key,
-					ObjectiveToken = g.Objective.Token,
-					TrailingToken = g.Trailing?.Token,
-					TrailingRefId = g.Trailing?.RefId ?? 0,
-					TrailingCategory = g.Trailing?.Category ?? 0,
-					TrailingKey = g.Trailing?.Key,
-					TrailingFlags = g.Trailing?.Flags,
-					TrailingLocalized = g.Trailing?.IsLocalized ?? false
-				});
-				owner[g.GoalId] = g.QuestId;
-				added++;
-			}
-
-			await db.SaveChangesAsync();
-			if (noMap > 0)
-				Console.WriteLine($"  {noMap} objective goals carry no world marker (MapId/MarkerX/MarkerY null).");
-
-			if (refreshed > 0)
-				Console.WriteLine($"  {refreshed} existing objective goals refreshed from the captures.");
-
-			return added;
-		}
-
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
 		{
 			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a
@@ -693,7 +621,11 @@ namespace Faolan.Importer.Captures
 			var placeholderMaps = 0;
 			foreach (var mapId in definitions.Select(d => d.MapId).Distinct().Where(id => id != 0 && !knownMaps.Contains(id)))
 			{
-				db.Maps.Add(new Map { Id = mapId, Name = string.Empty });
+				db.Maps.Add(new Map
+				{
+					Id = mapId,
+					Name = string.Empty
+				});
 				knownMaps.Add(mapId);
 				placeholderMaps++;
 			}
@@ -740,7 +672,12 @@ namespace Faolan.Importer.Captures
 				{
 					var g = existing.Goals.FirstOrDefault(x => x.GoalId == hg.GoalId);
 					if (g == null)
-						existing.Goals.Add(g = new QuestGoalDefinition { GoalId = hg.GoalId, Sequence = hg.Sequence, RequiredCount = hg.RequiredCount });
+						existing.Goals.Add(g = new QuestGoalDefinition
+						{
+							GoalId = hg.GoalId,
+							Sequence = hg.Sequence,
+							RequiredCount = hg.RequiredCount
+						});
 
 					g.MapId = hg.MapId;
 					g.MarkerX = hg.MarkerX;
@@ -760,8 +697,10 @@ namespace Faolan.Importer.Captures
 			catch (DbUpdateConcurrencyException ex)
 			{
 				foreach (var e in ex.Entries)
+				{
 					Console.WriteLine($"  CONFLICT entity={e.Entity.GetType().Name} state={e.State} keys=" +
-						string.Join(",", e.Properties.Where(pr => pr.Metadata.IsPrimaryKey()).Select(pr => $"{pr.Metadata.Name}={pr.CurrentValue}")));
+					                  string.Join(",", e.Properties.Where(pr => pr.Metadata.IsPrimaryKey()).Select(pr => $"{pr.Metadata.Name}={pr.CurrentValue}")));
+				}
 
 				throw;
 			}
@@ -801,7 +740,13 @@ namespace Faolan.Importer.Captures
 
 				// Populate FIRST: the DisplayName column is DERIVED by TryLiftColumns (from the object message body) and
 				// can differ from e.DisplayName, so the dedup must key on the actual stored value the UNIQUE index sees.
-				var built = PopulateObject(new WorldObject { MapId = e.MapId, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z }, e);
+				var built = PopulateObject(new WorldObject
+				{
+					MapId = e.MapId,
+					PositionX = e.X,
+					PositionY = e.Y,
+					PositionZ = e.Z
+				}, e);
 
 				if (built.DisplayName is { } name)
 				{
@@ -812,8 +757,7 @@ namespace Faolan.Importer.Captures
 						continue;
 					}
 
-					var existing = await db.WorldObjects
-						.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z && o.DisplayName == name);
+					var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z && o.DisplayName == name);
 					if (existing != null)
 					{
 						PopulateObject(existing, e);
@@ -911,6 +855,63 @@ namespace Faolan.Importer.Captures
 			return row;
 		}
 
+		// Marks every quest whose @609 objective region, rebuilt from the rows just imported, reproduces the captured
+		// bytes exactly. Only those may ride the login snapshot - the region still has undecoded fields, and shipping
+		// one we cannot reproduce asserts the client (statlist.cpp:134).
+		public static async Task<(int Verified, int Total)> VerifyObjectiveRegions(DatabaseContext db, IReadOnlyDictionary<uint, List<List<QuestObjectiveGoal>>> capturedByQuest)
+		{
+			var defs = await db.QuestDefinitions.Include(q => q.Goals).ToDictionaryAsync(q => q.QuestId);
+			int verified = 0, total = 0;
+
+			foreach (var (questId, captures) in capturedByQuest)
+			{
+				if (!defs.TryGetValue(questId, out var def) || def.Goals.Count == 0)
+					continue;
+
+				total++;
+				def.ObjectiveRegionVerified = captures.All(goals => QuestObjectiveRegion
+					.Build(def, goals[0].Instance)
+					.ToArray()
+					.SequenceEqual(new QuestObjectiveRegion
+					{
+						Goals = goals
+					}.ToArray()));
+
+				if (def.ObjectiveRegionVerified)
+					verified++;
+			}
+
+			await db.SaveChangesAsync();
+			return (verified, total);
+		}
+
+		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
+		// sets ParentId).
+		private static void AddNodeTree(PatrolPath path, PatrolNode node)
+		{
+			path.Nodes.Add(node);
+			foreach (var child in node.Children)
+				AddNodeTree(path, child);
+		}
+
+		// Only ever ADDS a slot that is absent - an existing ref is authoritative, having come from a full-update.
+		private static void AddRefIfMissing(QuestDefinition def, QuestTextSlot slot, CompletedQuestExtractor.TextRef text)
+		{
+			if (def.TextRefs.Any(r => r.Slot == slot))
+				return;
+
+			def.TextRefs.Add(new QuestTextRef
+			{
+				QuestId = def.QuestId,
+				Slot = slot,
+				RefId = text.RefId,
+				Category = text.Category,
+				KeyText = text.Key,
+				Flags = text.Flags,
+				IsLocalized = text.IsLocalized
+			});
+		}
+
 		// Decodes the captured 54-byte ApplySpell effect payload into the NpcSpell columns (NpcSpellEffectCodec, #304).
 		private static void ApplyEffect(NpcSpell s, byte[] payload)
 		{
@@ -946,10 +947,60 @@ namespace Faolan.Importer.Captures
 				CameraParams = cols.CameraParams
 			};
 			if (cols.Screens != null)
+			{
 				for (var i = 0; i < cols.Screens.Count; i++)
 					pkt.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i)); // throws if a screen isn't byte-exact round-trippable
+			}
 
 			return pkt;
+		}
+
+		private static PatrolNode CloneNode(PatrolNode n)
+		{
+			var clone = new PatrolNode
+			{
+				Ordinal = n.Ordinal,
+				Mode = n.Mode,
+				HeaderFlags = n.HeaderFlags,
+				Duration = n.Duration,
+				Remaining = n.Remaining,
+				ListMin = n.ListMin,
+				PathFlags = n.PathFlags,
+				PathFloat10 = n.PathFloat10,
+				PathFloat20 = n.PathFloat20,
+				PathPacked1 = n.PathPacked1,
+				PathPacked2 = n.PathPacked2,
+				TrailerByte = n.TrailerByte,
+				Speed = n.Speed,
+				AnchorX = n.AnchorX,
+				AnchorY = n.AnchorY,
+				AnchorZ = n.AnchorZ,
+				Flag = n.Flag,
+				RotateTail = n.RotateTail,
+				ApproachType = n.ApproachType,
+				ApproachTarget = n.ApproachTarget,
+				WordsData = n.WordsData?.ToArray()
+			};
+
+			foreach (var w in n.Waypoints)
+			{
+				clone.Waypoints.Add(new PatrolNodeWaypoint
+				{
+					Ordinal = w.Ordinal,
+					PositionX = w.PositionX,
+					PositionY = w.PositionY,
+					PositionZ = w.PositionZ
+				});
+			}
+
+			foreach (var child in n.Children)
+			{
+				var childClone = CloneNode(child);
+				childClone.Parent = clone;
+				clone.Children.Add(childClone);
+			}
+
+			return clone;
 		}
 
 		private static List<NpcSpawnEntry> DistinctByHandle(IEnumerable<NpcSpawnEntry> entries)
@@ -1035,7 +1086,10 @@ namespace Faolan.Importer.Captures
 
 			static QuestGoalDefinition Add(QuestDefinition q, uint goalId)
 			{
-				var g = new QuestGoalDefinition { GoalId = goalId };
+				var g = new QuestGoalDefinition
+				{
+					GoalId = goalId
+				};
 				q.Goals.Add(g);
 				return g;
 			}
@@ -1105,7 +1159,9 @@ namespace Faolan.Importer.Captures
 			if (quest == null)
 				return;
 
-			quest.NextQuestId = nextQuestId == 0 ? null : nextQuestId;
+			quest.NextQuestId = nextQuestId == 0
+				? null
+				: nextQuestId;
 
 			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == goalId) ?? quest.Goals.FirstOrDefault();
 			if (goal == null)
@@ -1121,7 +1177,9 @@ namespace Faolan.Importer.Captures
 			goal.GoalType = goalType;
 			goal.TargetName = target;
 			goal.RequiredCount = required;
-			goal.QuestItemId = questItemId == 0 ? null : questItemId;
+			goal.QuestItemId = questItemId == 0
+				? null
+				: questItemId;
 			if (goal.Sequence == 0)
 				goal.Sequence = 1;
 

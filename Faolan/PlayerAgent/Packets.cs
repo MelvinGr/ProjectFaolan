@@ -1,12 +1,14 @@
 using System;
+using System.Buffers.Binary;
+using System.Net;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
-
-using Faolan.Core.Network.Codecs;
 
 namespace Faolan.PlayerAgent
 {
@@ -18,33 +20,13 @@ namespace Faolan.PlayerAgent
 		// The active character's realm - the routing target for the world/chat/guild handoffs (#324). Every service
 		// the client is about to connect to lives IN that realm's process, so all three handoffs advertise this realm's
 		// address, not the process-global config. Resolved from the selected character (ClientInstance is set at EnterWorld).
-		private async Task<Core.Database.Tables.Realm> ResolveActiveRealm(INetworkClient client)
+		private async Task<Realm> ResolveActiveRealm(INetworkClient client)
 		{
 			var account = client.Session.Account;
 			var activeCharacter = await Database.GetCharacterForAccount(account.Id, account.ClientInstance) ??
-								  throw new Exception($"Unable to resolve active character for account {account.Id:X8} and client instance {account.ClientInstance:X8}");
+			                      throw new Exception($"Unable to resolve active character for account {account.Id:X8} and client instance {account.ClientInstance:X8}");
 
-			return await Database.GetRealm(activeCharacter.RealmId) ??
-				   throw new Exception($"Character {activeCharacter.Id:X8} has no realm to route to.");
-		}
-
-		private static uint IpToLong(string ip)
-		{
-			return System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(System.Net.IPAddress.Parse(ip).GetAddressBytes());
-		}
-
-		private async Task SendChatServer(INetworkClient client)
-		{
-			var realm = await ResolveActiveRealm(client);
-			await new PacketStream()
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
-					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02])
-				.WriteUInt32(IpToLong(realm.IpAddress))
-				.WriteUInt16(realm.ChatServerPort)
-				.WriteUInt32(client.Session.Account.Id)
-				.WriteUInt32(0x0000c350)
-				.WriteUInt32(client.Session.Account.ClientInstance)
-				.SendAsync(client);
+			return await Database.GetRealm(activeCharacter.RealmId) ?? throw new Exception($"Character {activeCharacter.Id:X8} has no realm to route to.");
 		}
 
 		private async Task SendCharacterList(INetworkClient client)
@@ -103,6 +85,20 @@ namespace Faolan.PlayerAgent
 			aBuffer.WriteUInt32(0x00000001);
 
 			await aBuffer.SendAsync(client);
+		}
+
+		private async Task SendChatServer(INetworkClient client)
+		{
+			var realm = await ResolveActiveRealm(client);
+			await new PacketStream()
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
+					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02])
+				.WriteUInt32(IpToLong(realm.IpAddress))
+				.WriteUInt16(realm.ChatServerPort)
+				.WriteUInt32(client.Session.Account.Id)
+				.WriteUInt32(0x0000c350)
+				.WriteUInt32(client.Session.Account.ClientInstance)
+				.SendAsync(client);
 		}
 
 		private async Task SendCsPlayerAgent(INetworkClient client)
@@ -185,6 +181,11 @@ namespace Faolan.PlayerAgent
 			}
 
 			await buffer.SendAsync(client);
+		}
+
+		private static uint IpToLong(string ip)
+		{
+			return BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(ip).GetAddressBytes());
 		}
 
 		private static Task SendOx20B9(INetworkClient client)

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;

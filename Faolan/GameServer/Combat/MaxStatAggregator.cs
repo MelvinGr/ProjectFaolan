@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -21,13 +22,13 @@ namespace Faolan.GameServer.Combat
 	{
 		// The primary-attribute bonus columns and the wire stat id each maps onto (the same id space the stat block
 		// uses). One place so the column set and its wire ids stay together.
-		private static readonly (System.Func<Item, int?> Bonus, uint WireStatId)[] AttributeBonuses =
+		private static readonly (Func<Item, int?> Bonus, uint WireStatId)[] AttributeBonuses =
 		[
-			(i => i.StrengthBonus, (uint)CharacterStatId.Strength),         // 804
+			(i => i.StrengthBonus, (uint)CharacterStatId.Strength), // 804
 			(i => i.ConstitutionBonus, (uint)CharacterStatId.Constitution), // 806
 			(i => i.IntelligenceBonus, (uint)CharacterStatId.Intelligence), // 808
-			(i => i.WisdomBonus, (uint)CharacterStatId.Wisdom),             // 810
-			(i => i.DexterityBonus, (uint)CharacterStatId.Dexterity)        // 814
+			(i => i.WisdomBonus, (uint)CharacterStatId.Wisdom), // 810
+			(i => i.DexterityBonus, (uint)CharacterStatId.Dexterity) // 814
 		];
 
 		// Total gear bonus per wire stat id across the given equipped items' attribute-bonus columns. Absent stats = no

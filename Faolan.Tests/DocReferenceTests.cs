@@ -23,15 +23,6 @@ namespace Faolan.Tests
 	// Genuinely-retired references are allowlisted below WITH the reason.
 	public class DocReferenceTests
 	{
-		// A backtick `XxxSuffix` that is not a defined type is almost always a stale rename, not prose. Kept narrow
-		// on purpose - a suffix here should read as "this is a class", not a common English word.
-		private static readonly string[] TypeSuffixes =
-		[
-			"Tests", "Service", "Builder", "Codec", "Codecs", "Reader", "Catalog", "Listener", "Repository",
-			"Importer", "Handler", "Dispatcher", "Scaffold", "Harvester", "Migrator", "Broadcaster", "Resolver",
-			"Manager", "Simulation", "Extractor", "Framer"
-		];
-
 		// References intentionally kept for the HISTORICAL record, each with its reason. A doc that documents removed
 		// code (a before/after narrative) legitimately names symbols/paths that no longer exist.
 		private static readonly HashSet<string> Allowlist = new(StringComparer.Ordinal)
@@ -47,11 +38,18 @@ namespace Faolan.Tests
 
 			// docs/subsystems/create-editor-bursts.md names the golden this burst used to be proven against, while
 			// explaining that the burst itself was REMOVED as redundant (0683e84d). The path is meant to be dead.
-			"Faolan.Tests/Golden/WorldPrepBurst.bin",
+			"Faolan.Tests/Golden/WorldPrepBurst.bin"
 		};
 
-		private static readonly Regex TypeDef =
-			new(@"\b(?:class|struct|record|interface|enum)\s+([A-Z]\w+)", RegexOptions.Compiled);
+		private static readonly Regex TypeDef = new(@"\b(?:class|struct|record|interface|enum)\s+([A-Z]\w+)", RegexOptions.Compiled);
+
+		// A backtick `XxxSuffix` that is not a defined type is almost always a stale rename, not prose. Kept narrow
+		// on purpose - a suffix here should read as "this is a class", not a common English word.
+		private static readonly string[] TypeSuffixes =
+		[
+			"Tests", "Service", "Builder", "Codec", "Codecs", "Reader", "Catalog", "Listener", "Repository", "Importer", "Handler", "Dispatcher", "Scaffold", "Harvester", "Migrator",
+			"Broadcaster", "Resolver", "Manager", "Simulation", "Extractor", "Framer"
+		];
 
 		[Fact]
 		public void EveryDocSymbolAndPathReference_Resolves()
@@ -100,9 +98,7 @@ namespace Faolan.Tests
 				}
 			}
 
-			Assert.True(failures.Count == 0,
-				$"{failures.Count} stale doc reference(s) - fix the name/path, or add to DocReferenceTests.Allowlist with a reason:\n  " +
-				string.Join("\n  ", failures));
+			Assert.True(failures.Count == 0, $"{failures.Count} stale doc reference(s) - fix the name/path, or add to DocReferenceTests.Allowlist with a reason:\n  " + string.Join("\n  ", failures));
 		}
 
 		// Every type NAME declared anywhere in the (non-build) source - the set a doc symbol must resolve into.
@@ -112,7 +108,7 @@ namespace Faolan.Tests
 			foreach (var cs in Directory.EnumerateFiles(repo, "*.cs", SearchOption.AllDirectories))
 			{
 				if (cs.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal) ||
-					cs.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+				    cs.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
 					continue;
 
 				foreach (Match m in TypeDef.Matches(File.ReadAllText(cs)))

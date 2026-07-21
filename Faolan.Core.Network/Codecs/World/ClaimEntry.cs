@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace Faolan.Core.Network.Codecs.World
 {
@@ -21,26 +22,17 @@ namespace Faolan.Core.Network.Codecs.World
 	// or the client renders the row as "No name". Confirmed against Item 4208485 (Slavemaster's Staff). Key and
 	// BatchGuid (8B, constant per response) are each emitted twice on the wire (mirror pairs). Type is 6 for an
 	// account-bound claim, 4 for a character-bound one (the "Bound To" column).
-	public sealed record ClaimEntry(
-		uint Index,
-		uint ItemTemplateId,
-		ulong Level,
-		string Code,
-		byte[] DecryptionKey,
-		byte[] BatchGuid,
-		uint Type = 6,
-		uint Quantity = 0,
-		uint MaxQuantity = 0)
+	public sealed record ClaimEntry(uint Index, uint ItemTemplateId, ulong Level, string Code, byte[] DecryptionKey, byte[] BatchGuid, uint Type = 6, uint Quantity = 0, uint MaxQuantity = 0)
 	{
+		public const int BatchGuidLength = 8;
 		public const int CodeLength = 4;
 		public const int KeyLength = 16;
-		public const int BatchGuidLength = 8;
 
 		// The 4-char redemption code as its raw ASCII bytes (padded/truncated to CodeLength).
 		public byte[] CodeBytes()
 		{
 			var bytes = new byte[CodeLength];
-			var src = System.Text.Encoding.Latin1.GetBytes(Code ?? "");
+			var src = Encoding.Latin1.GetBytes(Code ?? "");
 			Array.Copy(src, bytes, Math.Min(src.Length, CodeLength));
 			return bytes;
 		}

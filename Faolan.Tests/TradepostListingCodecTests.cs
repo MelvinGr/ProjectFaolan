@@ -91,7 +91,16 @@ namespace Faolan.Tests
 				EntryFlags = 0x421,
 				Timestamp = 0x6a231505,
 				// The per-template key lives in Items; the codec reads it through the TemplateItem nav (FK on Template).
-				TemplateItem = new Item { Key = new ProtoDecryptionKey { Key1 = 0xd61b97e5, Key2 = 0x2678c056, Key3 = 0xe2fd8092, Key4 = 0xf17b5c5a } },
+				TemplateItem = new Item
+				{
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = 0xd61b97e5,
+						Key2 = 0x2678c056,
+						Key3 = 0xe2fd8092,
+						Key4 = 0xf17b5c5a
+					}
+				},
 				Template = 0x3e0a97,
 				ItemLevel = 1,
 				ItemHash = 0

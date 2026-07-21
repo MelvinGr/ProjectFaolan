@@ -47,6 +47,19 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.Kill, npcName);
 		}
 
+		// The player looted `sourceNpcName`'s corpse bag: advance any active loot-from-NPC goal targeting it. The quest
+		// item (the scavenger's key) is RDB content we don't materialise, so the bag's SOURCE NPC name is the match key.
+		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName)
+		{
+			return Advance(client, QuestGoalType.LootFromNpc, sourceNpcName);
+		}
+
+		// The player opened `npcName`'s greeting: advance any active talk goal targeting it (e.g. freeing Casilda).
+		public Task AdvanceTalkGoals(INetworkClient client, string npcName)
+		{
+			return Advance(client, QuestGoalType.TalkToNpc, npcName);
+		}
+
 		// #356: a Lua EFFECT script resolved goal `goalId` (player:SolveGoal(goalId)) - the RDB quest engine's way of
 		// completing an objective. Finds the active quest that OWNS `goalId` (primary or secondary, #357) and jumps that
 		// goal to its required count; the quest completes only once every goal is done (no target-name match: the script
@@ -85,19 +98,6 @@ namespace Faolan.GameServer.Quest
 
 			if (changed)
 				await _outbound.RefreshQuestVisibility(client);
-		}
-
-		// The player looted `sourceNpcName`'s corpse bag: advance any active loot-from-NPC goal targeting it. The quest
-		// item (the scavenger's key) is RDB content we don't materialise, so the bag's SOURCE NPC name is the match key.
-		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName)
-		{
-			return Advance(client, QuestGoalType.LootFromNpc, sourceNpcName);
-		}
-
-		// The player opened `npcName`'s greeting: advance any active talk goal targeting it (e.g. freeing Casilda).
-		public Task AdvanceTalkGoals(INetworkClient client, string npcName)
-		{
-			return Advance(client, QuestGoalType.TalkToNpc, npcName);
 		}
 
 		// Advance the goal of `triggerType`/`targetName` for each of the player's active quests. #357: a quest can have
@@ -153,40 +153,6 @@ namespace Faolan.GameServer.Quest
 				await _outbound.RefreshQuestVisibility(client);
 		}
 
-		// --- Per-goal progress plumbing (#357) --------------------------------------------------------------------
-		// The PRIMARY (lowest-Sequence) goal lives in the scalar CharacterQuest fields (unchanged, single-goal-exact);
-		// SECONDARY goals live in CharacterQuestGoal rows. These helpers route to the right store by goal identity.
-
-		private static bool IsPrimaryGoal(QuestDefinition def, QuestGoalDefinition goal)
-		{
-			var primary = def.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-			return primary != null && primary.GoalId == goal.GoalId;
-		}
-
-		private static uint GoalRequired(CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
-		{
-			return Math.Max(IsPrimaryGoal(def, goal)
-				? quest.GoalRequired
-				: goal.RequiredCount, 1);
-		}
-
-		private async Task<uint> GoalProgressOf(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
-		{
-			if (IsPrimaryGoal(def, goal))
-				return quest.GoalProgress;
-
-			var rows = await _database.GetCharacterQuestGoals(characterId, quest.QuestId);
-			return rows.FirstOrDefault(r => r.GoalId == goal.GoalId)?.Progress ?? 0;
-		}
-
-		private async Task PersistGoalProgress(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint progress)
-		{
-			if (IsPrimaryGoal(def, goal))
-				await _database.SetCharacterQuest(characterId, quest.QuestId, QuestState.Active, progress, quest.GoalRequired, quest.GoalTargetName);
-			else
-				await _database.SetCharacterQuestGoal(characterId, quest.QuestId, goal.GoalId, progress);
-		}
-
 		// Whether every goal of the quest has now reached its required count. `justTicked`/`justProgress` is the goal we
 		// just wrote this pass (read back from the argument rather than the DB, since the write may not be visible yet on
 		// a fresh short-lived context). All other goals are read from their store (primary scalar / secondary rows).
@@ -200,43 +166,9 @@ namespace Faolan.GameServer.Quest
 					return justProgress;
 				if (primary != null && g.GoalId == primary.GoalId)
 					return quest.GoalProgress;
+
 				return rows.FirstOrDefault(r => r.GoalId == g.GoalId)?.Progress ?? 0;
 			});
-		}
-
-		// The HUD update for a goal that advanced but did NOT complete the whole quest: the goal counter + a journal
-		// active-refresh, leaving the quest Active. (Completion sends the 2->4 sequence via CompleteObjective instead.)
-		private async Task SendGoalUpdate(INetworkClient client, uint questId, uint goalId, uint progress)
-		{
-			await _outbound.SendQuestGoal(client, questId, goalId, progress);
-			await _outbound.SendQuestIir(client, questId, WorldQuest.StateActive);
-		}
-
-		// The objective for `quest`'s goal has hit its required count: complete the stage. Shared by the trigger path
-		// (Advance) and the Lua-solve path (SolveGoal) - the completion is identical, only how the objective is REACHED
-		// differs. Supersede to the next stage, hold for turn-in (legacy #47 chainless kill), or complete outright, then
-		// run the goal's completion side-effects. Keyed off the GOAL (its type + target), not the trigger, so both callers
-		// share one code path. Does NOT run RefreshQuestVisibility - the caller does that once after its loop.
-		private async Task CompleteObjective(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint required)
-		{
-			if (def.NextQuestId is not null)
-				await CompleteAndSupersede(client, character, quest, def);
-			else if (goal.GoalType == QuestGoalType.Kill)
-				await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
-			else
-				await CompleteFinal(client, character, quest, def, required); // chainless loot/talk -> just complete
-
-			// #262: talking to Casilda is what FREES her - on that talk-goal completion she becomes the player's
-			// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
-			// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
-			if (goal.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
-			{
-				_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, true);
-				// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
-				// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
-				// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
-				await _questHandler.DropBeachWall(client);
-			}
 		}
 
 		// Complete stage N and supersede it with stage N+1: the captured wire sequence + the state flip (mark N
@@ -276,6 +208,42 @@ namespace Faolan.GameServer.Quest
 			await _agents.SendSystemMessage(character.Id, "Quest complete!");
 		}
 
+		// The objective for `quest`'s goal has hit its required count: complete the stage. Shared by the trigger path
+		// (Advance) and the Lua-solve path (SolveGoal) - the completion is identical, only how the objective is REACHED
+		// differs. Supersede to the next stage, hold for turn-in (legacy #47 chainless kill), or complete outright, then
+		// run the goal's completion side-effects. Keyed off the GOAL (its type + target), not the trigger, so both callers
+		// share one code path. Does NOT run RefreshQuestVisibility - the caller does that once after its loop.
+		private async Task CompleteObjective(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint required)
+		{
+			if (def.NextQuestId is not null)
+				await CompleteAndSupersede(client, character, quest, def);
+			else if (goal.GoalType == QuestGoalType.Kill)
+				await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
+			else
+				await CompleteFinal(client, character, quest, def, required); // chainless loot/talk -> just complete
+
+			// #262: talking to Casilda is what FREES her - on that talk-goal completion she becomes the player's
+			// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
+			// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
+			if (goal.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
+			{
+				_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, true);
+				// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
+				// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
+				// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
+				await _questHandler.DropBeachWall(client);
+			}
+		}
+
+		private async Task<uint> GoalProgressOf(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
+		{
+			if (IsPrimaryGoal(def, goal))
+				return quest.GoalProgress;
+
+			var rows = await _database.GetCharacterQuestGoals(characterId, quest.QuestId);
+			return rows.FirstOrDefault(r => r.GoalId == goal.GoalId)?.Progress ?? 0;
+		}
+
 		// Legacy #47 path for a CHAINLESS kill quest: the kill finishes the objective but the quest stays Active and is
 		// marked Completed when the player turns it in at the giver (ConversationService.TryTurnInQuests). The '?' giver
 		// marker then appears. Preserved so a future standalone kill-and-return quest still works; the Casilda chain
@@ -288,12 +256,45 @@ namespace Faolan.GameServer.Quest
 			await _agents.SendSystemMessage(character.Id, $"Objective complete ({required}/{required}). Return to the quest giver.");
 		}
 
+		private async Task PersistGoalProgress(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint progress)
+		{
+			if (IsPrimaryGoal(def, goal))
+				await _database.SetCharacterQuest(characterId, quest.QuestId, QuestState.Active, progress, quest.GoalRequired, quest.GoalTargetName);
+			else
+				await _database.SetCharacterQuestGoal(characterId, quest.QuestId, goal.GoalId, progress);
+		}
+
+		// The HUD update for a goal that advanced but did NOT complete the whole quest: the goal counter + a journal
+		// active-refresh, leaving the quest Active. (Completion sends the 2->4 sequence via CompleteObjective instead.)
+		private async Task SendGoalUpdate(INetworkClient client, uint questId, uint goalId, uint progress)
+		{
+			await _outbound.SendQuestGoal(client, questId, goalId, progress);
+			await _outbound.SendQuestIir(client, questId, WorldQuest.StateActive);
+		}
+
 		// The shared head of every completion: QuestGoal (counter at required) then QuestIIR active(2) -> completed(4).
 		private async Task SendStageCompletion(INetworkClient client, uint questId, uint goalId, uint required)
 		{
 			await _outbound.SendQuestGoal(client, questId, goalId, required);
 			await _outbound.SendQuestIir(client, questId, WorldQuest.StateActive);
 			await _outbound.SendQuestIir(client, questId, WorldQuest.StateCompleted);
+		}
+
+		private static uint GoalRequired(CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
+		{
+			return Math.Max(IsPrimaryGoal(def, goal)
+				? quest.GoalRequired
+				: goal.RequiredCount, 1);
+		}
+
+		// --- Per-goal progress plumbing (#357) --------------------------------------------------------------------
+		// The PRIMARY (lowest-Sequence) goal lives in the scalar CharacterQuest fields (unchanged, single-goal-exact);
+		// SECONDARY goals live in CharacterQuestGoal rows. These helpers route to the right store by goal identity.
+
+		private static bool IsPrimaryGoal(QuestDefinition def, QuestGoalDefinition goal)
+		{
+			var primary = def.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			return primary != null && primary.GoalId == goal.GoalId;
 		}
 	}
 }

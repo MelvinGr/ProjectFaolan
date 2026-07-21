@@ -26,9 +26,9 @@ namespace Faolan.Core.Enums
 		RangedWeapon = 20, // main_hand_right (bow/crossbow/thrown)
 		Ammo = 21, // off_hand_right (quiver/bolts)
 		ResourceBag = 26, // the equipped RESOURCE bag - sizes the resource container (kind 112), the sibling of Bag (3)
-		                  // for the backpack. Live-confirmed: equipping a Max Resource Bag sent InventoryToEquipped
-		                  // target 26. Its extra slots come from Item.ResourceBagExtraSlots (RDB field 1331), added on
-		                  // top of the 48-slot base.
+		// for the backpack. Live-confirmed: equipping a Max Resource Bag sent InventoryToEquipped
+		// target 26. Its extra slots come from Item.ResourceBagExtraSlots (RDB field 1331), added on
+		// top of the 48-slot base.
 
 		// NOTE: there is apparently also a QUEST bag - the third sibling, growing the quest container (kind 113) the way
 		// Bag grows the backpack and ResourceBag grows the resource container. Its equip slot id is UNKNOWN: no quest

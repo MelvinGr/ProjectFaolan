@@ -48,6 +48,7 @@ namespace Faolan.GameServer.World
 				{
 					if (other.IsLoot)
 						continue; // loot bags have their own open/fade lifecycle, not interest streaming
+
 					if (other.IsDead)
 					{
 						// A dead NPC the mover ALREADY knows is a corpse still in its death-animation linger (pre-conversion):
@@ -60,6 +61,7 @@ namespace Faolan.GameServer.World
 							inRange.Add(other.Handle);
 						continue;
 					}
+
 					if (!other.IsVisibleTo(mover))
 						continue; // #261: a quest-gated NPC the mover doesn't yet qualify for - treat as not in range
 

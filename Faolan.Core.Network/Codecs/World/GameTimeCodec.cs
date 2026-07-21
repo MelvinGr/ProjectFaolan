@@ -13,20 +13,17 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class GameTimeCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameTimeIIR;
+		private const byte ClockFlag = 0x01;
+		private const float ClockRate = 1.0f;
 
 		// The world-entry clock snapshot (captured). WorldDayTime's high word is the game clock; WorldResyncTimestamp
 		// is the resync anchor (NOT read for time-of-day); the client extrapolates from here at ClockRate.
 		private const ulong WorldDayTime = 0x01472BDD_00000000;
-		private const byte ClockFlag = 0x01;
 		private const ulong WorldResyncTimestamp = 0x0001920C_6A024E93;
-		private const float ClockRate = 1.0f;
 
 		public static byte[] Build()
 		{
-			return new FaolanStream()
-				.WriteUInt32(Opcode)
-				.WriteArray(CreateEditorRecordBuilder.BuildGameTimeIir(WorldDayTime, ClockFlag, WorldResyncTimestamp, ClockRate))
-				.ToArray();
+			return new FaolanStream().WriteUInt32(Opcode).WriteArray(CreateEditorRecordBuilder.BuildGameTimeIir(WorldDayTime, ClockFlag, WorldResyncTimestamp)).ToArray();
 		}
 	}
 }

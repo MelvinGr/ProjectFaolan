@@ -19,21 +19,20 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(CharacterId), nameof(BuffId))]
 	public class CharacterBuff
 	{
+		// The applied wire buff id ((base << 8) | rank) - the same key WorldEntity.ActiveBuffs uses. The spell BASE id
+		// the payload carries is BuffId >> 8.
+		public uint BuffId { get; set; } // TODO: Add fk?
 		public uint CharacterId { get; set; }
 
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; } = null!;
 
-		// The applied wire buff id ((base << 8) | rank) - the same key WorldEntity.ActiveBuffs uses. The spell BASE id
-		// the payload carries is BuffId >> 8.
-		public uint BuffId { get; set; } // TODO: Add fk?
+		// Absolute UTC expiry, so the REMAINING time survives the relog (remaining = ExpiresAt - now at restore).
+		// Null = a buff with no server duration (lives until cancelled) - restored with a 0 duration field.
+		public DateTimeOffset? ExpiresAt { get; set; }
 
 		// The per-application effect nonce carried in the ApplySpell payload (last u32), preserved so the rebuilt
 		// packet reproduces the original effect instance.
 		public uint Nonce { get; set; }
-
-		// Absolute UTC expiry, so the REMAINING time survives the relog (remaining = ExpiresAt - now at restore).
-		// Null = a buff with no server duration (lives until cancelled) - restored with a 0 duration field.
-		public DateTimeOffset? ExpiresAt { get; set; }
 	}
 }

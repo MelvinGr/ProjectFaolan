@@ -1,8 +1,8 @@
 using System;
-using Faolan.Core.Network.Constants;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Cli;
@@ -247,6 +247,7 @@ namespace Faolan.Importer.Modules
 	public sealed class ConversationsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
+
 		// NpcsModule (#244): conversation nodes FK-key on NpcTemplateId, so the NPC TYPEs must be imported first.
 		public IReadOnlyList<string> DependsOn => [nameof(NpcsModule)];
 
@@ -404,6 +405,7 @@ namespace Faolan.Importer.Modules
 	public sealed class NpcsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
+
 		// Depends on `items` (NpcSpawnEquipment.Template is an FK to Items - the worn item's quad + hash live there,
 		// harvested by ItemHashHarvester's spawn source over the same FA015807 packets). NOT on `characters`: the old
 		// "characters" dep was spurious - it only dragged the characters module in and added stray captured player
@@ -459,6 +461,7 @@ namespace Faolan.Importer.Modules
 	// attach to must exist).
 	public sealed class NpcDispositionModule : IImportModule
 	{
+		private const long NullCommunity = -1; // sentinel for NPCs with no NpcStats.community
 		public ImportSource Source => ImportSource.Captures;
 
 		// No hard DependsOn: it attaches to whatever NpcStatCores exist, and registration order already sequences it
@@ -474,8 +477,6 @@ namespace Faolan.Importer.Modules
 
 		public string Description => "NPC hostility disposition (cCategory from RequestAggroStatus).";
 		public string Name => "npc-disposition";
-
-		private const long NullCommunity = -1; // sentinel for NPCs with no NpcStats.community
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -499,28 +500,34 @@ namespace Faolan.Importer.Modules
 			var nameById = await ctx.Db.NpcTemplates.ToDictionaryAsync(n => n.TemplateId, n => n.Name);
 			var commByName = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 			foreach (var core in cores)
+			{
 				if (nameById.TryGetValue(core.NpcTemplateId, out var nm) && nm != null)
-					commByName[nm] = core.Community.HasValue ? core.Community.Value : NullCommunity;
+					commByName[nm] = core.Community.HasValue
+						? core.Community.Value
+						: NullCommunity;
+			}
 
 			var commVotes = new Dictionary<long, Dictionary<uint, int>>();
 			foreach (var (name, votes) in nameVotes)
 			{
-				var comm = commByName.TryGetValue(name, out var c) ? c : NullCommunity;
+				var comm = commByName.TryGetValue(name, out var c)
+					? c
+					: NullCommunity;
 				if (!commVotes.TryGetValue(comm, out var byCat))
 					commVotes[comm] = byCat = new Dictionary<uint, int>();
 				foreach (var (cat, n) in votes)
 					byCat[cat] = byCat.GetValueOrDefault(cat) + n;
 			}
 
-			var commDisposition = commVotes.ToDictionary(
-				kv => kv.Key,
-				kv => kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key).First().Key);
+			var commDisposition = commVotes.ToDictionary(kv => kv.Key, kv => kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key).First().Key);
 
 			var updated = 0;
 			var hostile = 0;
 			foreach (var core in cores)
 			{
-				var comm = core.Community.HasValue ? core.Community.Value : NullCommunity;
+				var comm = core.Community.HasValue
+					? core.Community.Value
+					: NullCommunity;
 				if (!commDisposition.TryGetValue(comm, out var disposition))
 					continue; // this faction was never polled -> leave NULL (treated as non-hostile in the sim)
 
@@ -586,7 +593,9 @@ namespace Faolan.Importer.Modules
 
 			await ctx.Db.SaveChangesAsync();
 			var distinct = byName.Values.Distinct().Count();
-			var prefix = cleared > 0 ? $"cleared {cleared}; " : "";
+			var prefix = cleared > 0
+				? $"cleared {cleared}; "
+				: "";
 			return new ImportResult($"{prefix}{byName.Count} creature(s) harvested ({distinct} distinct death anims), {updated} templates set.");
 		}
 	}
@@ -637,7 +646,8 @@ namespace Faolan.Importer.Modules
 
 			await ctx.Db.SaveChangesAsync();
 			var multi = areas.GroupBy(a => a.MapId).Count(g => g.Count() > 1);
-			return new ImportResult($"{added} named sub-areas across {areas.Select(a => a.MapId).Distinct().Count()} maps ({multi} with more than one){(skipped > 0 ? $", {skipped} on unknown maps" : "")}.");
+			return new ImportResult(
+				$"{added} named sub-areas across {areas.Select(a => a.MapId).Distinct().Count()} maps ({multi} with more than one){(skipped > 0 ? $", {skipped} on unknown maps" : "")}.");
 		}
 	}
 
@@ -722,7 +732,9 @@ namespace Faolan.Importer.Modules
 				}
 
 				// Same-playfield reposition vs cross-playfield handoff - the client's Teleport vs ProxyTeleport GameAction.
-				row.InteractAction = link.DestMapId == row.MapId ? InteractAction.Teleport : InteractAction.ProxyTeleport;
+				row.InteractAction = link.DestMapId == row.MapId
+					? InteractAction.Teleport
+					: InteractAction.ProxyTeleport;
 				row.DestinationMapId = link.DestMapId;
 				row.DestinationX = link.DestX;
 				row.DestinationY = link.DestY;
@@ -740,10 +752,9 @@ namespace Faolan.Importer.Modules
 
 		// The stored zone-line row for a harvested link: same map + name, nearest to the captured source position
 		// (a name can repeat across maps; within a map the position disambiguates). Null when none is within tolerance.
-		private static Core.Database.Tables.WorldObject NearestZoneLine(
-			IReadOnlyList<Core.Database.Tables.WorldObject> zoneLines, TeleportLink link)
+		private static WorldObject NearestZoneLine(IReadOnlyList<WorldObject> zoneLines, TeleportLink link)
 		{
-			Core.Database.Tables.WorldObject best = null;
+			WorldObject best = null;
 			var bestSq = PositionTolerance * PositionTolerance;
 			foreach (var o in zoneLines)
 			{
@@ -829,7 +840,7 @@ namespace Faolan.Importer.Modules
 			Console.WriteLine($"  objective regions verified byte-exact: {verified} of {verifiable} quests.");
 
 			return new ImportResult($"{defs.Count} quest definitions (+ seeds), {addedGoals} objective goals, {areaCount} quest areas " +
-				$"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");
+			                        $"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");
 		}
 	}
 
@@ -838,7 +849,9 @@ namespace Faolan.Importer.Modules
 	public sealed class MountsModule : IImportModule
 	{
 		public bool InDefaultSet => false;
+
 		public ImportSource Source => ImportSource.Captures;
+
 		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
@@ -948,7 +961,9 @@ namespace Faolan.Importer.Modules
 	public sealed class PetsModule : IImportModule
 	{
 		public bool InDefaultSet => false;
+
 		public ImportSource Source => ImportSource.Captures;
+
 		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 

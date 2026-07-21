@@ -20,18 +20,45 @@ namespace Faolan.Core.Database.Tables
 	// records the provenance so a machine guess is distinguishable from a human-verified assignment.
 	public class NpcSpawnArea : BaseEntity
 	{
+		// The parsed numeric community/faction/family id when GroupKey is numeric; null for "Name"/"no category" groups.
+		public uint? CommunityId { get; set; }
+
 		// The playfield (the RDB record id == the playfield id == Map.Id).
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
 
+		// The creature TYPE this area spawns, or null when unresolved (WHICH is not in the RDB). FK to the NpcTemplate
+		// catalog; SetNull so removing a type doesn't delete the area (it just reverts to unresolved).
+		public uint? NpcTemplateId { get; set; }
+
+		[ForeignKey(nameof(NpcTemplateId))]
+		public virtual NpcTemplate? NpcTemplate { get; set; }
+
+		// The primary spawn-point anchors of this group (the exact retail spots); cascade-delete with the area.
+		public virtual ICollection<NpcSpawnAreaPoint> Points { get; set; } = new List<NpcSpawnAreaPoint>();
+		public float BoundsMaxX { get; set; }
+		public float BoundsMaxY { get; set; }
+		public float BoundsMaxZ { get; set; }
+
+		// The roam AREA (AABB) the group's creatures wander - the meaningful primitive (the RDB "roam paths" are just
+		// space-filling wander samples of this box; see docs/rdb/npc-spawn-layout-1010506.md).
+		public float BoundsMinX { get; set; }
+		public float BoundsMinY { get; set; }
+		public float BoundsMinZ { get; set; }
+
 		// The group's 0-based ordinal within the playfield record - part of the stable key, since a group NAME can
 		// repeat within a map. (MapId, GroupOrdinal) is stable across re-imports (the client RDB is fixed content).
 		public int GroupOrdinal { get; set; }
 
-		[MaxLength(128)]
-		public string GroupName { get; set; } = null!;
+		// The group's population = the number of primary spawn points (~one creature per point). The count an ambient
+		// spawner should keep alive in the area.
+		public int MaxCount { get; set; }
+
+		// How NpcTemplateId was assigned (provenance): None until resolved; Name/Containment/IdPropagation for the
+		// resolver's confidence tiers; Manual once confirmed by hand.
+		public SpawnResolutionSource ResolvedBy { get; set; }
 
 		// The grouping CATEGORY the id is scoped by: Community / Race / Superfamily / Name / "no category".
 		[MaxLength(32)]
@@ -42,34 +69,7 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string GroupKey { get; set; } = null!;
 
-		// The parsed numeric community/faction/family id when GroupKey is numeric; null for "Name"/"no category" groups.
-		public uint? CommunityId { get; set; }
-
-		// The roam AREA (AABB) the group's creatures wander - the meaningful primitive (the RDB "roam paths" are just
-		// space-filling wander samples of this box; see docs/rdb/npc-spawn-layout-1010506.md).
-		public float BoundsMinX { get; set; }
-		public float BoundsMinY { get; set; }
-		public float BoundsMinZ { get; set; }
-		public float BoundsMaxX { get; set; }
-		public float BoundsMaxY { get; set; }
-		public float BoundsMaxZ { get; set; }
-
-		// The group's population = the number of primary spawn points (~one creature per point). The count an ambient
-		// spawner should keep alive in the area.
-		public int MaxCount { get; set; }
-
-		// The creature TYPE this area spawns, or null when unresolved (WHICH is not in the RDB). FK to the NpcTemplate
-		// catalog; SetNull so removing a type doesn't delete the area (it just reverts to unresolved).
-		public uint? NpcTemplateId { get; set; }
-
-		[ForeignKey(nameof(NpcTemplateId))]
-		public virtual NpcTemplate? NpcTemplate { get; set; }
-
-		// How NpcTemplateId was assigned (provenance): None until resolved; Name/Containment/IdPropagation for the
-		// resolver's confidence tiers; Manual once confirmed by hand.
-		public SpawnResolutionSource ResolvedBy { get; set; }
-
-		// The primary spawn-point anchors of this group (the exact retail spots); cascade-delete with the area.
-		public virtual ICollection<NpcSpawnAreaPoint> Points { get; set; } = new List<NpcSpawnAreaPoint>();
+		[MaxLength(128)]
+		public string GroupName { get; set; } = null!;
 	}
 }

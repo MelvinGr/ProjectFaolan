@@ -1,12 +1,12 @@
 using System;
-using Faolan.Core.Network.Codecs.Quest;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -39,8 +39,10 @@ namespace Faolan.Importer.Extractors
 				else if (p.SubOpcode == JournalSubOpcode)
 					MergeJournal(body, byQuest);
 				else if (SnapshotJournalReader.TryRead(p.Bytes, out _, out var journal))
+				{
 					foreach (var record in journal)
 						MergeSnapshotRecord(record, byQuest);
+				}
 			}
 
 			// Only keep quests whose full-update was seen (it carries the bulk of the slots + the marker).
@@ -110,66 +112,6 @@ namespace Faolan.Importer.Extractors
 				: null;
 		}
 
-		// One Quest_c journal record -> a definition. This is the ONLY source with journal content for a quest the
-		// captures never showed a QuestFullUpdate for: the login snapshot carries a record for every HELD quest, so a
-		// level-80 character's whole J-panel is here (NecroL80: 27 records vs 2 full-updates). It is also the only
-		// source of the record SCALARS, which is what makes a quest snapshot-eligible - i.e. what lets the server
-		// regenerate its journal entry instead of leaving the panel empty.
-		private static void MergeSnapshotRecord(QuestcRecord record, Dictionary<uint, QuestDefinition> byQuest)
-		{
-			var title = TextRef(record.Title);
-			var areaTitle = TextRef(record.Area);
-			if (title == null || areaTitle == null)
-				return; // not a well-formed record
-
-			var def = GetOrAdd(byQuest, record.QuestId);
-			def.AreaId = record.AreaId;
-			def.HasSnapshotRecord = true;
-
-			// The record's state word IS the quest level (see QuestDefinition.Level). Do not clobber a value already
-			// harvested from a QuestFullUpdate - they agree where both exist, and the full-update is the older source.
-			if (def.Level == 0)
-				def.Level = record.State;
-
-			def.SnapshotUnknown14 = record.Unknown14;
-			def.SnapshotUnknown118 = record.Field118;
-			def.SnapshotUnknownEc = record.FieldEc;
-			def.SnapshotUnknownF0 = record.FieldF0;
-			def.SnapshotUnknownF8 = record.FieldF8;
-			def.SnapshotUnknown28 = record.Field28;
-
-			// The record's two category-52000 refs are region and map. They are told apart by id exactly as
-			// MergeFullUpdate does it - smaller = region, larger = the map id - rather than by their position in the
-			// record, so both sources agree. MapId matters beyond the text: it is an FK to Maps, and the quests module
-			// SKIPS any definition whose map is not in the catalog.
-			var r1 = TextRef(record.Region1);
-			var r2 = TextRef(record.Region2);
-			var region = r1 != null && r2 != null ? (r1.Id <= r2.Id ? r1 : r2) : r1 ?? r2;
-			var map = r1 != null && r2 != null ? (r1.Id > r2.Id ? r1 : r2) : null;
-
-			SetRef(def, QuestTextSlot.Title, title);
-			SetRef(def, QuestTextSlot.Summary, TextRef(record.Summary));
-			SetRef(def, QuestTextSlot.AreaTitle, areaTitle);
-			SetRef(def, QuestTextSlot.RegionName, region);
-			SetRef(def, QuestTextSlot.MapName, map);
-			if (map != null && def.MapId == 0)
-				def.MapId = map.Id;
-		}
-
-		// A Quest_c header string is the full <remoteformat .../> XML; the slot is identified by position in the
-		// record, so only the attributes matter here.
-		private static TextRecord TextRef(string xml)
-		{
-			if (string.IsNullOrEmpty(xml))
-				return null;
-
-			var key = Attr(xml, "key");
-			return key == null
-				? null
-				: new TextRecord(0, xml.Length, xml.Contains("<localized", StringComparison.Ordinal) ? "localized" : "remoteformat",
-					AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags"));
-		}
-
 		private static void MergeFullUpdate(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
 		{
 			// content @16: [00000000][01][u32 questId]...
@@ -226,22 +168,6 @@ namespace Faolan.Importer.Extractors
 			UpsertGoal(def, objective.Id, def.MapId, def.MarkerX, def.MarkerY, objective);
 		}
 
-		// Find-or-create the goal by GoalId within the quest and set the WIRE fields (map/marker/objective ref). Leaves
-		// the server-side-only fields untouched so a later Seed* overlay can complete them.
-		private static void UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective)
-		{
-			var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
-			if (goal == null)
-				def.Goals.Add(goal = new QuestGoalDefinition { GoalId = goalId, Sequence = 1, RequiredCount = 1 });
-
-			goal.MapId = mapId;
-			goal.MarkerX = markerX;
-			goal.MarkerY = markerY;
-			goal.ObjectiveRefId = objective.Id;
-			goal.ObjectiveCategory = objective.Category;
-			goal.ObjectiveKey = objective.Key;
-		}
-
 		private static void MergeJournal(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
 		{
 			// ...[RRL3][00000000][u32 count] then per entry [u32 idx][u32 questId][u32 chapter] <title> <subLine>.
@@ -275,6 +201,60 @@ namespace Faolan.Importer.Extractors
 				if (subLine.Category == 50303 && byQuest.TryGetValue(questId, out var def))
 					SetRef(def, QuestTextSlot.ListSubLine, subLine);
 			}
+		}
+
+		// One Quest_c journal record -> a definition. This is the ONLY source with journal content for a quest the
+		// captures never showed a QuestFullUpdate for: the login snapshot carries a record for every HELD quest, so a
+		// level-80 character's whole J-panel is here (NecroL80: 27 records vs 2 full-updates). It is also the only
+		// source of the record SCALARS, which is what makes a quest snapshot-eligible - i.e. what lets the server
+		// regenerate its journal entry instead of leaving the panel empty.
+		private static void MergeSnapshotRecord(QuestcRecord record, Dictionary<uint, QuestDefinition> byQuest)
+		{
+			var title = TextRef(record.Title);
+			var areaTitle = TextRef(record.Area);
+			if (title == null || areaTitle == null)
+				return; // not a well-formed record
+
+			var def = GetOrAdd(byQuest, record.QuestId);
+			def.AreaId = record.AreaId;
+			def.HasSnapshotRecord = true;
+
+			// The record's state word IS the quest level (see QuestDefinition.Level). Do not clobber a value already
+			// harvested from a QuestFullUpdate - they agree where both exist, and the full-update is the older source.
+			if (def.Level == 0)
+				def.Level = record.State;
+
+			def.SnapshotUnknown14 = record.Unknown14;
+			def.SnapshotUnknown118 = record.Field118;
+			def.SnapshotUnknownEc = record.FieldEc;
+			def.SnapshotUnknownF0 = record.FieldF0;
+			def.SnapshotUnknownF8 = record.FieldF8;
+			def.SnapshotUnknown28 = record.Field28;
+
+			// The record's two category-52000 refs are region and map. They are told apart by id exactly as
+			// MergeFullUpdate does it - smaller = region, larger = the map id - rather than by their position in the
+			// record, so both sources agree. MapId matters beyond the text: it is an FK to Maps, and the quests module
+			// SKIPS any definition whose map is not in the catalog.
+			var r1 = TextRef(record.Region1);
+			var r2 = TextRef(record.Region2);
+			var region = r1 != null && r2 != null
+				? r1.Id <= r2.Id
+					? r1
+					: r2
+				: r1 ?? r2;
+			var map = r1 != null && r2 != null
+				? r1.Id > r2.Id
+					? r1
+					: r2
+				: null;
+
+			SetRef(def, QuestTextSlot.Title, title);
+			SetRef(def, QuestTextSlot.Summary, TextRef(record.Summary));
+			SetRef(def, QuestTextSlot.AreaTitle, areaTitle);
+			SetRef(def, QuestTextSlot.RegionName, region);
+			SetRef(def, QuestTextSlot.MapName, map);
+			if (map != null && def.MapId == 0)
+				def.MapId = map.Id;
 		}
 
 		// A <remoteformat>/<localized> slot: 00 <u8 len> <ascii xml>. Returns null if no record starts at off.
@@ -331,6 +311,42 @@ namespace Faolan.Importer.Extractors
 			existing.KeyText = rec.Key;
 			existing.IsLocalized = rec.Tag == "localized";
 			existing.Flags = rec.Flags;
+		}
+
+		// A Quest_c header string is the full <remoteformat .../> XML; the slot is identified by position in the
+		// record, so only the attributes matter here.
+		private static TextRecord TextRef(string xml)
+		{
+			if (string.IsNullOrEmpty(xml))
+				return null;
+
+			var key = Attr(xml, "key");
+			return key == null
+				? null
+				: new TextRecord(0, xml.Length, xml.Contains("<localized", StringComparison.Ordinal)
+					? "localized"
+					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags"));
+		}
+
+		// Find-or-create the goal by GoalId within the quest and set the WIRE fields (map/marker/objective ref). Leaves
+		// the server-side-only fields untouched so a later Seed* overlay can complete them.
+		private static void UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective)
+		{
+			var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
+			if (goal == null)
+				def.Goals.Add(goal = new QuestGoalDefinition
+				{
+					GoalId = goalId,
+					Sequence = 1,
+					RequiredCount = 1
+				});
+
+			goal.MapId = mapId;
+			goal.MarkerX = markerX;
+			goal.MarkerY = markerY;
+			goal.ObjectiveRefId = objective.Id;
+			goal.ObjectiveCategory = objective.Category;
+			goal.ObjectiveKey = objective.Key;
 		}
 
 		private sealed record TextRecord(int Offset, int Length, string Tag, uint Id, uint Category, string Key, string Flags);

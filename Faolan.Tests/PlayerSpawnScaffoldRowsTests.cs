@@ -46,12 +46,15 @@ namespace Faolan.Tests
 		{
 			uint[] expected =
 			[
-				80004, 82704, 410604, 80200, 80104, 81603, 84004, 84104, 410204, 81804, 82801, 410104, 81702, 80401,
-				82904, 83401, 85700, 410901, 80800, 80902, 82202, 83000, 85400, 81001, 82500
+				80004, 82704, 410604, 80200, 80104, 81603, 84004, 84104, 410204, 81804, 82801, 410104, 81702, 80401, 82904, 83401, 85700, 410901, 80800, 80902, 82202, 83000, 85400, 81001, 82500
 			];
 
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroL80KingsCastle"), out var scaffold, out _));
-			var character = new Character { Id = 0x0200000A, Class = Class.Necromancer };
+			var character = new Character
+			{
+				Id = 0x0200000A,
+				Class = Class.Necromancer
+			};
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
 
 			Assert.Equal(expected, character.Feats.OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArray());
@@ -63,24 +66,16 @@ namespace Faolan.Tests
 		[Fact]
 		public void FreshCharacter_HasNoFeats_AndAnEmptyFeatFrame()
 		{
-			var character = new Character { Id = 0x0200000B, Class = Class.Necromancer };
+			var character = new Character
+			{
+				Id = 0x0200000B,
+				Class = Class.Necromancer
+			};
 			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
 			Assert.Empty(character.Feats);
 
 			Assert.Equal(239, PlayerSpawnScaffoldRows.FreshPreFrame(Class.Necromancer).Length);
 			Assert.Empty(PlayerSpawnScaffoldRows.ExtractPreFrameFeats(PlayerSpawnScaffoldRows.FreshPreFrame(Class.Necromancer)));
-		}
-
-		// FreshPreFrame(feats) and ExtractPreFrameFeats are exact inverses, and the frame grows by 4 bytes per feat
-		// (126-byte head incl. the marker + 4*count + 113-byte tail).
-		[Fact]
-		public void FreshPreFrame_And_ExtractPreFrameFeats_RoundTrip()
-		{
-			uint[] feats = [110004, 110100, 111304, 111402, 110300, 112700]; // hakotep (hox) unlocked set
-			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.HeraldOfXotli, 0, feats);
-
-			Assert.Equal(126 + 4 * feats.Length + 113, frame.Length);
-			Assert.Equal(feats, PlayerSpawnScaffoldRows.ExtractPreFrameFeats(frame).ToArray());
 		}
 
 		[Fact]
@@ -116,6 +111,31 @@ namespace Faolan.Tests
 			var closer = character.Attributes.OrderBy(a => a.Sequence).Last();
 			var expectedTag = (ushort)((character.Skills.Count + 2) * 0x3F1);
 			Assert.Equal(expectedTag, closer.Tag);
+		}
+
+		// FreshPreFrame(feats) and ExtractPreFrameFeats are exact inverses, and the frame grows by 4 bytes per feat
+		// (126-byte head incl. the marker + 4*count + 113-byte tail).
+		[Fact]
+		public void FreshPreFrame_And_ExtractPreFrameFeats_RoundTrip()
+		{
+			uint[] feats = [110004, 110100, 111304, 111402, 110300, 112700]; // hakotep (hox) unlocked set
+			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.HeraldOfXotli, 0, feats);
+
+			Assert.Equal(126 + 4 * feats.Length + 113, frame.Length);
+			Assert.Equal(feats, PlayerSpawnScaffoldRows.ExtractPreFrameFeats(frame).ToArray());
+		}
+
+		// The vanity hidden-slots mask rides PreFrame[18..22] big-endian (bit = base equip slot id). Byte-locked to the
+		// vanity login dumps: hiding Head (slot 2) => 00000004, Chest (slot 5) => 00000020, and a fresh frame => 0.
+		[Theory, InlineData(0u, "00000000"), InlineData(1u << 2, "00000004"), InlineData(1u << 5, "00000020"), InlineData((1u << 5) | (1u << 31), "80000020")]
+		// Head (slot 2), from vanity-head-selected
+		// Chest (slot 5), from vanity-chest-selected
+			// chest + global master (slot 31)
+		public void FreshPreFrame_WritesVanityMaskBigEndian(uint mask, string expectedHex)
+		{
+			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.Assassin, mask);
+			var off = PlayerSpawnScaffoldRows.VanityShownMaskOffset;
+			Assert.Equal(expectedHex, Convert.ToHexString(frame.AsSpan(off, 4).ToArray()).ToLowerInvariant());
 		}
 
 		// #239: the AoC client derives the displayed profession from the character's feat tree, whose first
@@ -249,20 +269,6 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out _)); // fresh instance, then rows overwrite
 			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, rebuilt));
 			return PlayerSpawnScaffoldCodec.Generate(rebuilt);
-		}
-
-		// The vanity hidden-slots mask rides PreFrame[18..22] big-endian (bit = base equip slot id). Byte-locked to the
-		// vanity login dumps: hiding Head (slot 2) => 00000004, Chest (slot 5) => 00000020, and a fresh frame => 0.
-		[Theory]
-		[InlineData(0u, "00000000")]
-		[InlineData(1u << 2, "00000004")] // Head (slot 2), from vanity-head-selected
-		[InlineData(1u << 5, "00000020")] // Chest (slot 5), from vanity-chest-selected
-		[InlineData((1u << 5) | (1u << 31), "80000020")] // chest + global master (slot 31)
-		public void FreshPreFrame_WritesVanityMaskBigEndian(uint mask, string expectedHex)
-		{
-			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.Assassin, mask);
-			var off = PlayerSpawnScaffoldRows.VanityShownMaskOffset;
-			Assert.Equal(expectedHex, Convert.ToHexString(frame.AsSpan(off, 4).ToArray()).ToLowerInvariant());
 		}
 	}
 }

@@ -4,6 +4,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 {
 	public sealed class QuestObjectiveGoal : ICodec<QuestObjectiveGoal>
 	{
+		// The wire word for the flag above; the client writes the byte 0x01 followed by three zero bytes.
+		public const uint FlagSet = 0x01000000;
 		private const int ReservedWords = 7;
 		public uint GoalId { get; init; }
 		public uint MapId { get; init; }
@@ -18,7 +20,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint MarkerX { get; init; }
 		public uint MarkerY { get; init; }
 		public uint N { get; init; }
+
 		public uint RequiredCount { get; init; } // the goal's required amount (kills/collects/etc.); 1/3/4/8/12/64 seen on the wire (decode 2026-06-19, #47)
+
 		// NOT always zero, despite the name it carried until 2026-07-20: nonzero on 24 of the 158 goals in the corpus
 		// (quest 12411 goal 3555 holds 60). Stable per goal across every capture, so it is quest data to be stored,
 		// not progress.
@@ -27,13 +31,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// (0,3,10,20,25,40,50,60,80,90,...). The round numbers suggest a percentage or threshold; the client writes a
 		// single byte here in QuestGoal_c::WriteToStream. Meaning still unknown - named for its position.
 		public uint Unknown1 { get; init; }
+
 		// A BOOLEAN, not a number. It takes exactly two values across all 2850 captured goals: 0 and 0x01000000 -
 		// which is the client's own `local_c[0] = 1` byte-swapped to `0x1000000` in QuestGoal_c::WriteToStream, i.e.
 		// the flag byte lands FIRST and the remaining three are padding. Set on 318 goals. Meaning still unknown.
 		public uint Unknown2 { get; init; }
-
-		// The wire word for the flag above; the client writes the byte 0x01 followed by three zero bytes.
-		public const uint FlagSet = 0x01000000;
 		public uint[] Reserved { get; init; } = new uint[ReservedWords]; // 7 words, all 0 in the template
 
 		public static QuestObjectiveGoal Read(FaolanStream r)
@@ -121,8 +123,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// Carried per goal like QuestcRecord's undecoded scalars; the tags being random is why they must be stored
 		// rather than derived (see the WTHD note in questc-region-decode).
 		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, byte[] objective, byte[] textRecord,
-			uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1, uint extra1 = 0, uint extra2 = 0, uint unknown1 = 0,
-			uint extra0 = 0, uint extra3 = 0, uint extra4 = 0, uint goalIdEcho = 0, uint unknown2 = 0)
+			uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1, uint extra1 = 0, uint extra2 = 0, uint unknown1 = 0, uint extra0 = 0, uint extra3 = 0, uint extra4 = 0, uint goalIdEcho = 0,
+			uint unknown2 = 0)
 		{
 			ArgumentNullException.ThrowIfNull(objective);
 			ArgumentNullException.ThrowIfNull(textRecord);

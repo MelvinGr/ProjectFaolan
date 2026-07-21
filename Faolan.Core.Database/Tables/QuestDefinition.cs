@@ -17,16 +17,6 @@ namespace Faolan.Core.Database.Tables
 		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
 		public uint AreaId { get; set; }
 
-		// The quest's sequence word in the completed journal (#390). A property of the QUEST, not of its position:
-		// measured over the corpus, all 1975 completed quests carry the SAME value everywhere they appear, across
-		// characters and areas. It usually equals the 1-based ordinal within the area (73346 of 74392 entries), which
-		// is why generating an ordinal reproduced 33 of 81 regions and failed the rest - 182 areas list every quest
-		// with 0, and 260 more are mixed.
-		//
-		// Probably a chapter index within a quest series ("Letter to the King I / II"), but that is unverified, so the
-		// name says what it is rather than what it likely means.
-		public uint JournalSequence { get; set; }
-
 		// The area this quest is grouped under. Every referenced area has a row: the importer inserts a placeholder
 		// (Magic 0) for any area the captures never showed a completed quest in, the same way it does for Maps.
 		[ForeignKey(nameof(AreaId))]
@@ -34,22 +24,6 @@ namespace Faolan.Core.Database.Tables
 
 		// The primary objective's goal id (e.g. 0x1670 = 5744), echoed in QuestGoal and the full-update.
 		public uint GoalId { get; set; }
-
-		// The quest's LEVEL, carried in the QuestFullUpdate (0x63268258) as the u32 after the second questId - a quest
-		// PROPERTY, constant across its lifecycle. (Earlier read as a "state/category" enum; the harvest across faolan.db
-		// disproved that - the values track level, not state: Tortage starter quests 1/3/4/5, open-world zones 23/24,
-		// endgame 80, and two quests in the SAME zone can be 23 and 80. It is never the QuestIIR StateActive value 2.)
-		// Working interpretation: the quest's OPTIMAL level - what the J-panel colours the title against (red when the
-		// character is under it, green at it, grey when over-levelled). The captured journals fit: Strie L1 -> 1,
-		// AssassinL23 L23 -> 21/22/23/30, Hakotep L24 -> 22/23/24/30, DemoL80 L80 -> 70..80, NecroL80 L80 -> 80 across all 27
-		// (her active set is all endgame). Note both L23 and L24 hold a quest at 30 - above them, so red. Not proven
-		// from captures (the colour mapping is client-side), but nothing contradicts it.
-		//
-		// Harvested from TWO packets for the same quantity: the QuestFullUpdate's level word (QuestDefinitionExtractor,
-		// #352) and the Quest_c journal record's word @+0x10. The latter used to live in a separate SnapshotState
-		// column; they agree exactly where both were present (10238 -> 1/1, 13479 -> 3/3), so they were collapsed here.
-		// 0 = never seen; the sender falls back to WorldQuest.DefaultQuestLevel.
-		public uint Level { get; set; }
 
 		// The objective's world-marker (map id + x/y) shown on the map; 0 when the quest has no map marker.
 		public uint MapId { get; set; }
@@ -74,6 +48,21 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = new List<QuestGoalDefinition>();
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
 
+		// True once this quest's Quest_c record scalars are known (seeded, or harvested from a captured journal), i.e.
+		// the record can be GENERATED. Previously inferred from `SnapshotState != 0` - but that word turned out to be
+		// the quest LEVEL (it collapsed into Level), and plenty of definitions carry a level with no record scalars at
+		// all, so the inference would have made them falsely eligible. An explicit flag says what was actually meant.
+		public bool HasSnapshotRecord { get; set; }
+
+		// True when the quest's @609 objective region, REBUILT from these rows, reproduces the captured bytes exactly.
+		// Set by the importer, which does that comparison per quest at harvest time (ImportOps.VerifyObjectiveRegions).
+		//
+		// This is what gates a quest into the login snapshot. Shipping an objective region we cannot reproduce desyncs
+		// the client and asserts it on statlist.cpp:134, and the region still has undecoded fields - so "we harvested
+		// some goals" is not good enough, only "the bytes come out identical" is. The flag flips itself on as decoding
+		// improves; no code change is needed to widen coverage.
+		public bool ObjectiveRegionVerified { get; set; }
+
 		[MaxLength(128)]
 		public string? IndexGoalSteps { get; set; }
 
@@ -87,11 +76,34 @@ namespace Faolan.Core.Database.Tables
 		public uint IndexTableField2 { get; set; }
 		public uint IndexTableField3 { get; set; }
 		public uint IndexTrailerWord { get; set; }
+
+		// The quest's sequence word in the completed journal (#390). A property of the QUEST, not of its position:
+		// measured over the corpus, all 1975 completed quests carry the SAME value everywhere they appear, across
+		// characters and areas. It usually equals the 1-based ordinal within the area (73346 of 74392 entries), which
+		// is why generating an ordinal reproduced 33 of 81 regions and failed the rest - 182 areas list every quest
+		// with 0, and 260 more are mixed.
+		//
+		// Probably a chapter index within a quest series ("Letter to the King I / II"), but that is unverified, so the
+		// name says what it is rather than what it likely means.
+		public uint JournalSequence { get; set; }
+
+		// The quest's LEVEL, carried in the QuestFullUpdate (0x63268258) as the u32 after the second questId - a quest
+		// PROPERTY, constant across its lifecycle. (Earlier read as a "state/category" enum; the harvest across faolan.db
+		// disproved that - the values track level, not state: Tortage starter quests 1/3/4/5, open-world zones 23/24,
+		// endgame 80, and two quests in the SAME zone can be 23 and 80. It is never the QuestIIR StateActive value 2.)
+		// Working interpretation: the quest's OPTIMAL level - what the J-panel colours the title against (red when the
+		// character is under it, green at it, grey when over-levelled). The captured journals fit: Strie L1 -> 1,
+		// AssassinL23 L23 -> 21/22/23/30, Hakotep L24 -> 22/23/24/30, DemoL80 L80 -> 70..80, NecroL80 L80 -> 80 across all 27
+		// (her active set is all endgame). Note both L23 and L24 hold a quest at 30 - above them, so red. Not proven
+		// from captures (the colour mapping is client-side), but nothing contradicts it.
+		//
+		// Harvested from TWO packets for the same quantity: the QuestFullUpdate's level word (QuestDefinitionExtractor,
+		// #352) and the Quest_c journal record's word @+0x10. The latter used to live in a separate SnapshotState
+		// column; they agree exactly where both were present (10238 -> 1/1, 13479 -> 3/3), so they were collapsed here.
+		// 0 = never seen; the sender falls back to WorldQuest.DefaultQuestLevel.
+		public uint Level { get; set; }
 		public uint MarkerX { get; set; } // TODO: Vector2?
 		public uint MarkerY { get; set; }
-		public uint SnapshotUnknown28 { get; set; }
-		public uint SnapshotUnknownEc { get; set; }
-		public uint SnapshotUnknownF0 { get; set; }
 
 		// --- Snapshot-tails GENERATION data (#186): values that live ONLY in the FullChar snapshot's quest region
 		// (BeachTailsTemplate.bin), not the QuestFullUpdate/Journal packets, so they are seeded (not harvested). They
@@ -108,23 +120,11 @@ namespace Faolan.Core.Database.Tables
 		// the moment a real character's journal is regenerated - so it is stored per quest. Beach 10238 keeps 0x412,
 		// so its golden stays byte-exact.
 		public uint SnapshotUnknown14 { get; set; }
+		public uint SnapshotUnknown28 { get; set; }
+		public uint SnapshotUnknownEc { get; set; }
+		public uint SnapshotUnknownF0 { get; set; }
 
 		public ulong SnapshotUnknownF8 { get; set; }
-
-		// True once this quest's Quest_c record scalars are known (seeded, or harvested from a captured journal), i.e.
-		// the record can be GENERATED. Previously inferred from `SnapshotState != 0` - but that word turned out to be
-		// the quest LEVEL (it collapsed into Level), and plenty of definitions carry a level with no record scalars at
-		// all, so the inference would have made them falsely eligible. An explicit flag says what was actually meant.
-		public bool HasSnapshotRecord { get; set; }
-
-		// True when the quest's @609 objective region, REBUILT from these rows, reproduces the captured bytes exactly.
-		// Set by the importer, which does that comparison per quest at harvest time (ImportOps.VerifyObjectiveRegions).
-		//
-		// This is what gates a quest into the login snapshot. Shipping an objective region we cannot reproduce desyncs
-		// the client and asserts it on statlist.cpp:134, and the region still has undecoded fields - so "we harvested
-		// some goals" is not good enough, only "the bytes come out identical" is. The flag flips itself on as decoding
-		// improves; no code change is needed to widen coverage.
-		public bool ObjectiveRegionVerified { get; set; }
 	}
 
 	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.

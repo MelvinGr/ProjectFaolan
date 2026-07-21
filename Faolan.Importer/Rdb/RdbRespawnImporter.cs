@@ -36,30 +36,14 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint ResurrectionPointsType = 1000090;
 
+		private static readonly Regex AttrRx = new Regex("\\b([A-Za-z_]+)=\"([^\"]*)\"", RegexOptions.Compiled);
+
 		// Group 1 = the element's whole attribute run, 2/3/4 = position. Attributes are pulled out of group 1 by name
 		// (AttrRx) rather than matched in a fixed order: the attribute SET genuinely varies between records - most
 		// carry the full editor block (IsLocked/IsVisible/FollowsHeightmap/BoundingBoxColor/...), others only
 		// Guid/name/RestorationLevel/discoverable/Orientation - so an order-dependent pattern is fragile for no gain.
-		private static readonly Regex PointRx =
-			new Regex(
-				"<resurrectionpoint\\b([^>]*)>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
-				RegexOptions.Compiled | RegexOptions.Singleline);
-
-		private static readonly Regex AttrRx = new Regex("\\b([A-Za-z_]+)=\"([^\"]*)\"", RegexOptions.Compiled);
-
-		private static string Attr(Match m, string name)
-		{
-			foreach (Match a in AttrRx.Matches(m.Groups[1].Value))
-				if (string.Equals(a.Groups[1].Value, name, StringComparison.OrdinalIgnoreCase))
-					return a.Groups[2].Value;
-
-			return null;
-		}
-
-		private static float Num(Match m, string name)
-		{
-			return float.TryParse(Attr(m, name), NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0f;
-		}
+		private static readonly Regex PointRx = new Regex("<resurrectionpoint\\b([^>]*)>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
+			RegexOptions.Compiled | RegexOptions.Singleline);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string proxyBase)
 		{
@@ -117,7 +101,10 @@ namespace Faolan.Importer.Rdb
 
 					if (!existing.TryGetValue(guid, out var point))
 					{
-						point = new RespawnPoint { Id = guid }; // the client RDB Guid - the spawnPointId the release screen needs (#214)
+						point = new RespawnPoint
+						{
+							Id = guid
+						}; // the client RDB Guid - the spawnPointId the release screen needs (#214)
 						existing[guid] = point;
 						db.RespawnPoints.Add(point);
 					}
@@ -158,14 +145,34 @@ namespace Faolan.Importer.Rdb
 			{
 				var staleIds = stale.Select(p => p.Id).ToHashSet();
 				foreach (var c in await db.Characters.Where(c => c.BindRespawnPointId != null).ToListAsync())
+				{
 					if (staleIds.Contains(c.BindRespawnPointId!.Value))
 						c.BindRespawnPointId = null;
+				}
 
 				db.RespawnPoints.RemoveRange(stale); // CharacterRespawnPoints cascades
 			}
 
 			await db.SaveChangesAsync();
 			return new Result(maps, points, empty, fetchFailed);
+		}
+
+		private static string Attr(Match m, string name)
+		{
+			foreach (Match a in AttrRx.Matches(m.Groups[1].Value))
+			{
+				if (string.Equals(a.Groups[1].Value, name, StringComparison.OrdinalIgnoreCase))
+					return a.Groups[2].Value;
+			}
+
+			return null;
+		}
+
+		private static float Num(Match m, string name)
+		{
+			return float.TryParse(Attr(m, name), NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
+				? v
+				: 0f;
 		}
 
 		public readonly record struct Result(int Maps, int Points, int Empty, int FetchFailed);

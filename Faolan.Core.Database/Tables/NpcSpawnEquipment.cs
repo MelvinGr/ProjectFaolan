@@ -11,6 +11,9 @@ namespace Faolan.Core.Database.Tables
 	// Template + Level. Cascade-deletes with its NpcSpawn. Codec/build: NpcSpawnEquipmentBuilder.
 	public class NpcSpawnEquipment : BaseEntity, INpcEquipment
 	{
+		[ForeignKey(nameof(Template))]
+		public virtual Item Item { get; set; } = null!;
+
 		public uint NpcSpawnId { get; set; }
 
 		[ForeignKey(nameof(NpcSpawnId))]
@@ -24,8 +27,5 @@ namespace Faolan.Core.Database.Tables
 		// ProtoAcgItem.template1 == template2 (fixed32) = the RDB item template id; hard FK to Items (the quad + hash
 		// live there). The builder reads the identity through the Item navigation, so Include it.
 		public uint Template { get; set; }
-
-		[ForeignKey(nameof(Template))]
-		public virtual Item Item { get; set; } = null!;
 	}
 }

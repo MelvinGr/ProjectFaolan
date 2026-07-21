@@ -1,11 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using Faolan.Core;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
@@ -53,8 +50,7 @@ namespace Faolan.Tests
 				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
 
 				// The tails as they arrived: everything after [subop][typeTag][instance][prefix][root].
-				Assert.True(parts.SubClass.OriginalData.SequenceEqual(parts.SubClass.ToArray()),
-					$"{source}: tails must survive the typed model byte-identically");
+				Assert.True(parts.SubClass.OriginalData.SequenceEqual(parts.SubClass.ToArray()), $"{source}: tails must survive the typed model byte-identically");
 
 				checkedBodies++;
 				if (parts.SubClass.Quests.Records.Count > 1)
@@ -110,7 +106,5 @@ namespace Faolan.Tests
 				yield return (source, body[4..]);
 			}
 		}
-
 	}
 }
-

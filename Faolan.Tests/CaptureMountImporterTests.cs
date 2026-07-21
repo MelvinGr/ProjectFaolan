@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Importer.Captures;
@@ -22,10 +22,7 @@ namespace Faolan.Tests
 			// From the committed corpus extract - it used to `return` silently when the capture was absent, which
 			// meant this test asserted NOTHING on any checkout without the capture repo.
 			const string capture = "AssassinL23_rogue-assassin_login_randomActions-resurect.tshark.json#";
-			var packets = CorpusExtract.All()
-				.Where(e => e.Source.StartsWith(capture, StringComparison.Ordinal))
-				.Select(e => new CapturedPacket(0, true, e.Opcode, e.Iir, e.Full))
-				.ToList();
+			var packets = CorpusExtract.All().Where(e => e.Source.StartsWith(capture, StringComparison.Ordinal)).Select(e => new CapturedPacket(0, true, e.Opcode, e.Iir, e.Full)).ToList();
 
 			Assert.NotEmpty(packets);
 
@@ -59,6 +56,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-
-
-

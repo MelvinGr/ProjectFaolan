@@ -72,7 +72,8 @@ namespace Faolan.GameServer
 				{
 					// Create-editor (unnamed) avatar stat stream: retail sends no response, we just observe it.
 					if (client.Session.IsUnnamedCreatePhase)
-						Logger.LogInformation("Observed retail create-editor (uint)GameServer0X2000Opcodes.StatIIR while pendingPost205F={PendingPost205F}.", client.Session.HasPendingPost205FFollowUp);
+						Logger.LogInformation("Observed retail create-editor (uint)GameServer0X2000Opcodes.StatIIR while pendingPost205F={PendingPost205F}.",
+							client.Session.HasPendingPost205FFollowUp);
 
 					break;
 				}
@@ -333,8 +334,7 @@ namespace Faolan.GameServer
 								// animation end. Confirmed NOT server-side - retail sends nothing extra during the dismount window (only
 								// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
 								// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
-								var mount = MountCatalog.ForId(from)
-									?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in MountCatalog)");
+								var mount = MountCatalog.ForId(from) ?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in MountCatalog)");
 								var playerEntity = PlayerWorldEntity(client);
 								var dismounting = playerEntity?.IsMounted ?? false;
 								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
@@ -642,8 +642,10 @@ namespace Faolan.GameServer
 										var dest = interaction.Teleport;
 										var currentMap = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
 										if (dest.DestMapId == 0)
+										{
 											await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 												$"<span style=\"color: red;\">Zone-line '{dest.DestinationName}' has no known destination yet.</span>");
+										}
 										else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
 											// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
 											await _simulation.RelocateSameMap(client, samePos);
@@ -671,8 +673,8 @@ namespace Faolan.GameServer
 										var usedMapId = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
 										var usedObj = await Database.GetWorldObject(usedMapId, target);
 
-										await _agentServerDispatcher.CharacterSay(target,
-											$"({usedObj?.Name ?? "object"}: not imported yet)", [client.Session.Character.Id]); // TODO: Why this this also print when looting the item? check InteractAction value
+										await _agentServerDispatcher.CharacterSay(target, $"({usedObj?.Name ?? "object"}: not imported yet)",
+											[client.Session.Character.Id]); // TODO: Why this this also print when looting the item? check InteractAction value
 
 										break;
 									}
@@ -700,7 +702,7 @@ namespace Faolan.GameServer
 								// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
 								// the greeting is swallowed and dialogue never opens.
 								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
-									await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
+								    await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
 								{
 									await _shop.HandleVendorTradeOpen(client, rawPayload, args.CommandqueueClientId, vendorShop, npcHandle);
 									break;
@@ -711,10 +713,8 @@ namespace Faolan.GameServer
 								// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"). The NPC NAME
 								// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
 								// click it, so their own position trivially satisfies the 15-unit client proximity check.
-								if (npcHandle != 0 && args.CommandqueueServerId == 0 &&
-									client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
-									talkedNpcName == AuctioneerNpcName &&
-									PlayerWorldEntity(client) is { } auctioneerPlayer)
+								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
+								    talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
 								{
 									await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 									break;
@@ -741,8 +741,9 @@ namespace Faolan.GameServer
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
 										? rn
 										: "<unmapped handle>";
-									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{NpcTemplate:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.",
-										npcHandle, routedName, args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId);
+									Logger.LogInformation(
+										"TalkToNpc: no conversation node for npcHandle=0x{NpcTemplate:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle,
+										routedName, args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId);
 
 									// Surface the gap instead of silently closing (Melvin: have them say so). A greeting click
 									// that reaches here has NEITHER an imported shop (the vendor branch above didn't match)
@@ -751,8 +752,9 @@ namespace Faolan.GameServer
 									// handle so the client floats it over the NPC; recipient = the clicking player (SayRecipients
 									// excludes the actor, which would drop the clicker here). No-fallbacks rule: say what's missing.
 									if (npcHandle != 0)
-										await _agentServerDispatcher.CharacterSay(npcHandle,
-											$"({routedName}: no dialogue or shop imported yet)", [client.Session.Character.Id]);
+									{
+										await _agentServerDispatcher.CharacterSay(npcHandle, $"({routedName}: no dialogue or shop imported yet)", [client.Session.Character.Id]);
+									}
 
 									await ConversationService.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
 								}
@@ -1461,12 +1463,16 @@ namespace Faolan.GameServer
 					// the APPLIED wire id ((base<<8)|rank). Match by base so the removal twin carries the exact id.
 					var appliedId = buffId << 8;
 					if (entity != null)
+					{
 						foreach (var key in entity.ActiveBuffs.Keys)
+						{
 							if (key >> 8 == buffId)
 							{
 								appliedId = key;
 								break;
 							}
+						}
+					}
 
 					// The client does NOT self-remove the icon on right-click (verified in-client: the icon stayed up
 					// with only the registry drop) - the server has to drive it. Send retail's rank-1 end twin, which
@@ -1733,29 +1739,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// ToggleVanityArmorFilter(int slot, uint32 removeditemOccupySlots, bool toggleState): the appearance panel's
-		// per-slot (and master) "hide this vanity piece" toggle. Fire-and-forget like sprint - retail sends no reply and
-		// the client renders the show/hide itself. Body = [u32 slot][u32 removedItemOccupySlots][u8 toggleState]. We
-		// PERSIST it (CharacterEquipment vanity flags) so it survives relog: a withheld vanity item then drops out of
-		// the character snapshot equipment (PlayerSpawnEquipment), which is how the client restores the toggle on login.
-		private async Task HandleToggleVanityArmorFilter(INetworkClient client, ConanPacket packet)
-		{
-			var character = client.Session.Character;
-			if (character == null || packet.Body == null || packet.Body.Length - packet.Body.Position < 9)
-				return;
-
-			var slot = packet.Body.ReadUInt32();
-			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-									  // Polarity CONFIRMED in-client (Melvin): checkbox ON (the slot's vanity toggle enabled / its vanity item is
-									  // shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
-									  // (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
-			var toggleState = Convert.ToBoolean(packet.Body.ReadByte());
-
-			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);
-			Logger.LogDebug("ToggleVanityArmorFilter(slot={Slot}, toggleState={toggleState}) {Applied}.", slot, toggleState,
-				applied ? "persisted" : "(unmodelled appearance slot, ignored)");
-		}
-
 		private async Task HandleRequestAggroStatus(INetworkClient client, ConanPacket packet)
 		{
 			// RequestAggroStatus(const ID32& charId, const ID32& targetId): each ID32 is [u32 type][u32 instance].
@@ -1814,6 +1797,30 @@ namespace Faolan.GameServer
 
 			await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);
 			Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
+		}
+
+		// ToggleVanityArmorFilter(int slot, uint32 removeditemOccupySlots, bool toggleState): the appearance panel's
+		// per-slot (and master) "hide this vanity piece" toggle. Fire-and-forget like sprint - retail sends no reply and
+		// the client renders the show/hide itself. Body = [u32 slot][u32 removedItemOccupySlots][u8 toggleState]. We
+		// PERSIST it (CharacterEquipment vanity flags) so it survives relog: a withheld vanity item then drops out of
+		// the character snapshot equipment (PlayerSpawnEquipment), which is how the client restores the toggle on login.
+		private async Task HandleToggleVanityArmorFilter(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null || packet.Body == null || packet.Body.Length - packet.Body.Position < 9)
+				return;
+
+			var slot = packet.Body.ReadUInt32();
+			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
+			// Polarity CONFIRMED in-client (Melvin): checkbox ON (the slot's vanity toggle enabled / its vanity item is
+			// shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
+			// (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
+			var toggleState = Convert.ToBoolean(packet.Body.ReadByte());
+
+			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);
+			Logger.LogDebug("ToggleVanityArmorFilter(slot={Slot}, toggleState={toggleState}) {Applied}.", slot, toggleState, applied
+				? "persisted"
+				: "(unmodelled appearance slot, ignored)");
 		}
 	}
 }

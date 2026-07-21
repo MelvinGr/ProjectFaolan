@@ -80,6 +80,43 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return prefix;
 		}
 
+		// ---- root accessors ------------------------------------------------------------------------------------
+
+		public static ProtoInventoryGame GetContainer(ProtoFullCharacterIIR root, ContainerKind kind)
+		{
+			return root.Inventories.FirstOrDefault(c => c.InventoryId.Type == (uint)kind);
+		}
+
+		public static IEnumerable<ProtoInventoryGame.InventoryListEntry> GetContainerEntries(ProtoInventoryGame container)
+		{
+			return container?.Items ?? [];
+		}
+
+		public static uint GetContainerKind(ProtoInventoryGame container)
+		{
+			return container.InventoryId.Type;
+		}
+
+		// The item's hash (ProtoAcgItem field 8) and its stable identity quad (ProtoAcgItem.key1 = a ProtoDecryptionKey
+		// of four fixed32s = the same value as p_items.Data1..4).
+		public static uint? GetEntryArchetype(ProtoInventoryGame.InventoryListEntry entry)
+		{
+			return entry.Item?.ItemData?.Hash;
+		}
+
+		public static (uint Data1, uint Data2, uint Data3, uint Data4)? GetEntryIdentityQuad(ProtoInventoryGame.InventoryListEntry entry)
+		{
+			var key = entry.Item?.ItemData?.Key1;
+			return key == null
+				? null
+				: (key.Key1, key.Key2, key.Key3, key.Key4);
+		}
+
+		public static uint? GetEntryTemplateId(ProtoInventoryGame.InventoryListEntry entry)
+		{
+			return entry.Item?.ItemData?.Template1;
+		}
+
 		// ---- read ----------------------------------------------------------------------------------------------
 
 		// `bodyStream` must be positioned right after the [subOpcode][typeTag][instance] header. The prefix's BE32
@@ -116,43 +153,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			bodyStream.ReadArray(PrefixFlagBytes); // flag
 			return bodyStream.ReadUInt32(); // BE32 blobLen == the root's length
-		}
-
-		// ---- root accessors ------------------------------------------------------------------------------------
-
-		public static ProtoInventoryGame GetContainer(ProtoFullCharacterIIR root, ContainerKind kind)
-		{
-			return root.Inventories.FirstOrDefault(c => c.InventoryId.Type == (uint)kind);
-		}
-
-		public static IEnumerable<ProtoInventoryGame.InventoryListEntry> GetContainerEntries(ProtoInventoryGame container)
-		{
-			return container?.Items ?? [];
-		}
-
-		public static uint GetContainerKind(ProtoInventoryGame container)
-		{
-			return container.InventoryId.Type;
-		}
-
-		// The item's hash (ProtoAcgItem field 8) and its stable identity quad (ProtoAcgItem.key1 = a ProtoDecryptionKey
-		// of four fixed32s = the same value as p_items.Data1..4).
-		public static uint? GetEntryArchetype(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			return entry.Item?.ItemData?.Hash;
-		}
-
-		public static (uint Data1, uint Data2, uint Data3, uint Data4)? GetEntryIdentityQuad(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			var key = entry.Item?.ItemData?.Key1;
-			return key == null
-				? null
-				: (key.Key1, key.Key2, key.Key3, key.Key4);
-		}
-
-		public static uint? GetEntryTemplateId(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			return entry.Item?.ItemData?.Template1;
 		}
 
 		// The three regions of a snapshot body: the exact prefix bytes, the typed inventory root, and the sub-class

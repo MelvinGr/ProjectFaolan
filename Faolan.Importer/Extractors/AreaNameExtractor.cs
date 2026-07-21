@@ -31,30 +31,11 @@ namespace Faolan.Importer.Extractors
 	// West Gate"); MapArea replaces it.
 	public static class AreaNameExtractor
 	{
-		private const uint Opcode2000 = 0x2000;
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;   // 0x5D85BFC7
 		private const uint FeedbackSubOpcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
-		private static readonly Regex AreaId = new("GenericDisplayAreaName[|/](\\d+)", RegexOptions.Compiled);
+		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR; // 0x5D85BFC7
 		private const uint MoveSubOpcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR; // 0x4517AA81
-
-		// CharDCMoveIIR body: [u32 subop][u32 0xC350][u32 handle][u8 env][u8 flag1][float x][float y][float z] -
-		// the position is ALWAYS present and always first (docs/re/chardcmove-grammar.md). Raw-body floats are
-		// big-endian. A C2S move is the client reporting its OWN position, so no handle check is needed.
-		private static bool TryReadMovePosition(byte[] body, out (float X, float Y, float Z) pos)
-		{
-			pos = default;
-			var at = 18; // 4 subop + 4 C350 + 4 handle + 1 env + 1 flag1, after the 4-byte length word
-			if (body.Length < at + 12)
-				return false;
-
-			pos = (ReadFloat(body, at), ReadFloat(body, at + 4), ReadFloat(body, at + 8));
-			return true;
-		}
-
-		private static float ReadFloat(byte[] b, int at)
-		{
-			return BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(b.AsSpan(at, 4)));
-		}
+		private const uint Opcode2000 = 0x2000;
+		private static readonly Regex AreaId = new("GenericDisplayAreaName[|/](\\d+)", RegexOptions.Compiled);
 
 		public static List<MapAreaName> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -125,9 +106,12 @@ namespace Faolan.Importer.Extractors
 					{
 						MapId = s.MapId,
 						AreaNameId = s.AreaNameId,
-						MinX = s.X, MaxX = s.X,
-						MinY = s.Y, MaxY = s.Y,
-						MinZ = s.Z, MaxZ = s.Z,
+						MinX = s.X,
+						MaxX = s.X,
+						MinY = s.Y,
+						MaxY = s.Y,
+						MinZ = s.Z,
+						MaxZ = s.Z,
 						SampleCount = 1
 					};
 					continue;
@@ -143,6 +127,25 @@ namespace Faolan.Importer.Extractors
 			}
 
 			return byArea.Values.ToList();
+		}
+
+		private static float ReadFloat(byte[] b, int at)
+		{
+			return BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(b.AsSpan(at, 4)));
+		}
+
+		// CharDCMoveIIR body: [u32 subop][u32 0xC350][u32 handle][u8 env][u8 flag1][float x][float y][float z] -
+		// the position is ALWAYS present and always first (docs/re/chardcmove-grammar.md). Raw-body floats are
+		// big-endian. A C2S move is the client reporting its OWN position, so no handle check is needed.
+		private static bool TryReadMovePosition(byte[] body, out (float X, float Y, float Z) pos)
+		{
+			pos = default;
+			var at = 18; // 4 subop + 4 C350 + 4 handle + 1 env + 1 flag1, after the 4-byte length word
+			if (body.Length < at + 12)
+				return false;
+
+			pos = (ReadFloat(body, at), ReadFloat(body, at + 4), ReadFloat(body, at + 8));
+			return true;
 		}
 	}
 }

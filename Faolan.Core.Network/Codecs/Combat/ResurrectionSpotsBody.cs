@@ -27,12 +27,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// the correct prefix and a single end-of-body 0x00 lands exactly where the per-record one goes. They break at 2+.
 	public static class ResurrectionSpotsBody
 	{
+		public const uint SpotTypeCreateFlow = 0x0000C79E;
+
 		// The per-record type word. UNDECODED, and per-PACKET rather than per-spot: point 790836 appears under both
 		// 0xC79C and 0xC7A0 in different frames, so it cannot be a property of the point and is not stored on it.
 		// Kept verbatim per call site. 0xC79C is also observed (Hakotep_hox_login_gameplay0 f=5274) in a context we do
 		// not reproduce; what selects the third value is unknown.
 		public const uint SpotTypeLogin = 0x0000C7A0;
-		public const uint SpotTypeCreateFlow = 0x0000C79E;
 
 		// The create-flow variant: one spot at the fresh character's spawn point, spawnPointId 0 (no anchor chosen
 		// yet), restoration 100 (a new character revives at full). Byte-identical in SHAPE to the login body - only

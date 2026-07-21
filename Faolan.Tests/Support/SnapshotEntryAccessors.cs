@@ -16,14 +16,14 @@ namespace Faolan.Tests.Support
 	// server's. It deliberately stays put. See [[self_referential_golden_tests]].
 	public static class SnapshotEntryAccessors
 	{
-		public static uint? EntryCount(ProtoInventoryGame.InventoryListEntry entry)
-		{
-			return Stat(entry, 26); // stat 26 = the stack count
-		}
-
 		public static ProtoInventoryGame.InventoryListEntry EntryBySlot(ProtoInventoryGame container, ulong slot)
 		{
 			return Entries(container).FirstOrDefault(e => e.Pos == slot);
+		}
+
+		public static uint? EntryCount(ProtoInventoryGame.InventoryListEntry entry)
+		{
+			return Stat(entry, 26); // stat 26 = the stack count
 		}
 
 		public static ulong? EntryItemId(ProtoInventoryGame.InventoryListEntry entry)

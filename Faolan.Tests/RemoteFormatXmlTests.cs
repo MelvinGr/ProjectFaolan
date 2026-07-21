@@ -31,6 +31,16 @@ namespace Faolan.Tests
 			Assert.Equal(xml, RemoteFormatXml.Build(RemoteFormatXml.Parse(xml)));
 		}
 
+		// The DB columnization (#188): a captured screen -> ConversationScreen row (+ parameter children) -> back to
+		// the wire XML must be byte-exact, so ScreensJson can be dropped for typed columns. Covers the double-space
+		// "knubot=\"0\"  >" (absent antitag) and the full 10-parameter scaffold.
+		[Theory, InlineData(CloseXml), InlineData(AppendXml)]
+		public void ColumnRow_RoundTrips_ByteExact(string xml)
+		{
+			var row = ConversationScreenColumns.ToRow(xml, 0);
+			Assert.Equal(xml, RemoteFormatXml.Build(ConversationScreenColumns.ToScreen(row)));
+		}
+
 		[Fact]
 		public void Parse_Append_ExtractsStructure()
 		{
@@ -60,16 +70,6 @@ namespace Faolan.Tests
 		{
 			var screen = RemoteFormatXml.Parse(xml);
 			Assert.Equal(xml, RemoteFormatXml.Build(screen));
-		}
-
-		// The DB columnization (#188): a captured screen -> ConversationScreen row (+ parameter children) -> back to
-		// the wire XML must be byte-exact, so ScreensJson can be dropped for typed columns. Covers the double-space
-		// "knubot=\"0\"  >" (absent antitag) and the full 10-parameter scaffold.
-		[Theory, InlineData(CloseXml), InlineData(AppendXml)]
-		public void ColumnRow_RoundTrips_ByteExact(string xml)
-		{
-			var row = ConversationScreenColumns.ToRow(xml, 0);
-			Assert.Equal(xml, RemoteFormatXml.Build(ConversationScreenColumns.ToScreen(row)));
 		}
 
 		[Fact]

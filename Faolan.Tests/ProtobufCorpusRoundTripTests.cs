@@ -1,14 +1,10 @@
 using System;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
 using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
@@ -33,32 +29,6 @@ namespace Faolan.Tests
 		public ProtobufCorpusRoundTripTests(ITestOutputHelper output)
 		{
 			_output = output;
-		}
-
-		// ProtoCoreCharacterIIR (the FA015807 spawn's character message) must re-encode byte-identically.
-		[Fact]
-		public void EveryCapturedSpawnMessage_ReEncodesByteIdentically()
-		{
-			var checkedMessages = 0;
-			var withGenericStats = 0;
-
-			foreach (var (source, body) in CapturedBodies(0xFA015807u))
-			{
-				if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-					continue;
-
-				var original = body.AsSpan(read.Offset, read.Length).ToArray();
-				var reencoded = read.Message.ToProtobuf();
-
-				Assert.True(original.SequenceEqual(reencoded), $"{source}: ProtoCoreCharacterIIR must re-encode byte-identically");
-
-				checkedMessages++;
-				if (read.Message.GenericStats is { Length: > 0 })
-					withGenericStats++;
-			}
-
-			_output.WriteLine($"{checkedMessages} spawn character messages re-encoded ({withGenericStats} carrying generic_stats)");
-			Assert.True(checkedMessages > 0, "no spawn character messages found in the capture corpus");
 		}
 
 		// ProtoFullCharacterIIR (the 0x737A6DF9 snapshot root) must re-encode byte-identically. character_tag
@@ -107,11 +77,36 @@ namespace Faolan.Tests
 					withCharacterTags++;
 			}
 
-			_output.WriteLine($"{checkedRoots} snapshot roots re-encoded ({withCharacterTags} carrying character_tag, "
-				+ $"{singleTagUnpacked} differing only by the single-tag packing quirk)");
+			_output.WriteLine($"{checkedRoots} snapshot roots re-encoded ({withCharacterTags} carrying character_tag, " + $"{singleTagUnpacked} differing only by the single-tag packing quirk)");
 			Assert.True(checkedRoots > 0, "no snapshot roots found in the capture corpus");
 			// The whole point of this gate: without tag-carrying roots it proves nothing the L1 fixtures didn't.
 			Assert.True(withCharacterTags > 0, "corpus has no character_tag-carrying root - this gate would be vacuous");
+		}
+
+		// ProtoCoreCharacterIIR (the FA015807 spawn's character message) must re-encode byte-identically.
+		[Fact]
+		public void EveryCapturedSpawnMessage_ReEncodesByteIdentically()
+		{
+			var checkedMessages = 0;
+			var withGenericStats = 0;
+
+			foreach (var (source, body) in CapturedBodies(0xFA015807u))
+			{
+				if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					continue;
+
+				var original = body.AsSpan(read.Offset, read.Length).ToArray();
+				var reencoded = read.Message.ToProtobuf();
+
+				Assert.True(original.SequenceEqual(reencoded), $"{source}: ProtoCoreCharacterIIR must re-encode byte-identically");
+
+				checkedMessages++;
+				if (read.Message.GenericStats is { Length: > 0 })
+					withGenericStats++;
+			}
+
+			_output.WriteLine($"{checkedMessages} spawn character messages re-encoded ({withGenericStats} carrying generic_stats)");
+			Assert.True(checkedMessages > 0, "no spawn character messages found in the capture corpus");
 		}
 
 		// The only tolerated re-encode difference: a root holding exactly ONE character_tag, where the capture has
@@ -126,10 +121,8 @@ namespace Faolan.Tests
 			Assert.Equal(0x08, reencoded[0]);
 			var payloadLength = original[1];
 			Assert.Equal(original.Length - 1, reencoded.Length);
-			Assert.True(original.AsSpan(2, payloadLength).SequenceEqual(reencoded.AsSpan(1, payloadLength)),
-				$"{source}: the single tag's payload bytes must match");
-			Assert.True(original.AsSpan(2 + payloadLength).SequenceEqual(reencoded.AsSpan(1 + payloadLength)),
-				$"{source}: every byte after character_tag must be identical");
+			Assert.True(original.AsSpan(2, payloadLength).SequenceEqual(reencoded.AsSpan(1, payloadLength)), $"{source}: the single tag's payload bytes must match");
+			Assert.True(original.AsSpan(2 + payloadLength).SequenceEqual(reencoded.AsSpan(1 + payloadLength)), $"{source}: every byte after character_tag must be identical");
 		}
 
 		// Yields the record body (everything after the leading u32 length) of every packet whose IIR type is
@@ -148,7 +141,5 @@ namespace Faolan.Tests
 				yield return (source, body[4..]);
 			}
 		}
-
 	}
 }
-

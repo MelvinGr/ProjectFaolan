@@ -20,14 +20,14 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; } = null!;
 
+		// The goal's id (QuestGoalDefinition.GoalId, now that table's PK) - the wire-visible objective id echoed in QuestGoal.
+		public uint GoalId { get; set; }
+
 		// The RDB quest id this goal belongs to (matches CharacterQuest.QuestId / QuestGoalDefinition.QuestDefinitionId).
 		public uint QuestId { get; set; }
 
 		[ForeignKey(nameof(QuestId))]
 		public virtual QuestDefinition Quest { get; set; } = null!;
-
-		// The goal's id (QuestGoalDefinition.GoalId, now that table's PK) - the wire-visible objective id echoed in QuestGoal.
-		public uint GoalId { get; set; }
 
 		[ForeignKey(nameof(GoalId))]
 		public virtual QuestGoalDefinition QuestGoal { get; set; } = null!;

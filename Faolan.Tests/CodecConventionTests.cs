@@ -28,6 +28,14 @@ namespace Faolan.Tests
 	{
 		private const string CodecsNamespace = "Faolan.Core.Network.Codecs";
 
+		// Files where the word is deliberately still a literal, with the reason. NOT a place to silence the test.
+		// Currently EMPTY, and that is the finding: the client never treats this word as a constant. Of the 136
+		// functions in AgeOfConan.exe that touch 0x3F1/0x7E2, 77 divide by 0x3F1 to read a count and 59 multiply to
+		// write one - ZERO compare it to a constant (tools/ghidra/DumpListFraming.java). Every "0x7E2 constant"
+		// we ever wrote down was a 1-element list. If you are about to add an entry here, that is the prior.
+		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal);
+		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
+
 		// 8-hex-digit literals; IIR opcodes are 32-bit BKDR-31 hashes so they always appear in this form.
 		private static readonly Regex HexLiteral = new(@"0x[0-9A-Fa-f]{8}\b");
 		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
@@ -39,124 +47,7 @@ namespace Faolan.Tests
 		// String literals are prose (exception messages naming the word) - stripped like comments before scanning.
 		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
 
-		// Files where the word is deliberately still a literal, with the reason. NOT a place to silence the test.
-		// Currently EMPTY, and that is the finding: the client never treats this word as a constant. Of the 136
-		// functions in AgeOfConan.exe that touch 0x3F1/0x7E2, 77 divide by 0x3F1 to read a count and 59 multiply to
-		// write one - ZERO compare it to a constant (tools/ghidra/DumpListFraming.java). Every "0x7E2 constant"
-		// we ever wrote down was a 1-element list. If you are about to add an entry here, that is the prior.
-		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal);
-		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
-
-		private static IEnumerable<Type> CodecTypes =>
-			typeof(ICodec<>).Assembly.GetTypes()
-				.Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
-
-		private static IEnumerable<FieldInfo> Fields(Type t) =>
-			t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
-
-		// (1) Every const named *Opcode carries a real GameServer0X2000Opcodes value - never a hand-typed hash.
-		[Fact]
-		public void OpcodeConstants_AreDefinedEnumMembers()
-		{
-			var bad = new List<string>();
-			var checkedCount = 0;
-			foreach (var t in CodecTypes)
-			foreach (var f in Fields(t).Where(f => f.IsLiteral && f.FieldType == typeof(uint) && f.Name.EndsWith("Opcode", StringComparison.Ordinal)))
-			{
-				checkedCount++;
-				var value = (uint)f.GetRawConstantValue()!;
-				if (!Enum.IsDefined((GameServer0X2000Opcodes)value))
-					bad.Add($"{t.Name}.{f.Name} = 0x{value:X8} is not a defined GameServer0X2000Opcodes member");
-			}
-
-			Assert.True(bad.Count == 0,
-				"Opcode constants must be (uint)GameServer0X2000Opcodes.<Type>:\n  " + string.Join("\n  ", bad));
-			Assert.True(checkedCount >= 15, $"only {checkedCount} Opcode constants found - the reflection filter is probably broken");
-		}
-
-		// (1b) HandledTypes is the multi-type form: a non-empty, duplicate-free array of enum members.
-		[Fact]
-		public void HandledTypes_AreNonEmptyAndDistinct()
-		{
-			var declaring = new List<string>();
-			foreach (var t in CodecTypes)
-			{
-				var f = Fields(t).FirstOrDefault(f => f.Name == "HandledTypes");
-				if (f == null)
-					continue;
-
-				declaring.Add(t.Name);
-				Assert.True(f.FieldType == typeof(GameServer0X2000Opcodes[]),
-					$"{t.Name}.HandledTypes must be GameServer0X2000Opcodes[], was {f.FieldType.Name}");
-
-				var values = (GameServer0X2000Opcodes[])f.GetValue(null)!;
-				Assert.True(values.Length > 1, $"{t.Name}.HandledTypes has {values.Length} entries - use `const uint Opcode` for a single type");
-				Assert.True(values.Distinct().Count() == values.Length, $"{t.Name}.HandledTypes contains duplicates");
-				Assert.All(values, v => Assert.True(Enum.IsDefined(v), $"{t.Name}.HandledTypes has an undefined member"));
-			}
-
-			// Guards the test itself: if nothing declares HandledTypes the multi-type case silently stopped being covered.
-			Assert.True(declaring.Count >= 3, $"only {declaring.Count} codecs declare HandledTypes - the reflection filter is probably broken");
-		}
-
-		// (2) The pre-#317 name must not reappear on a static const. (Instance members named SubOpcode - the
-		// WorldObject column, DynelFullUpdateCodec.Parsed.SubOpcode - are a different thing and are allowed.)
-		[Fact]
-		public void NoStaticConstantIsNamedSubOpcode()
-		{
-			var bad = (from t in CodecTypes
-				from f in Fields(t)
-				where f.Name.EndsWith("SubOpcode", StringComparison.Ordinal)
-				select $"{t.Name}.{f.Name}").ToList();
-
-			Assert.True(bad.Count == 0, "Static opcode constants are named `Opcode`, not `SubOpcode`:\n  " + string.Join("\n  ", bad));
-		}
-
-		// (3) The one that actually matters: an IIR opcode never appears as a bare hex literal in codec CODE. If it
-		// did, `grep GameServer0X2000Opcodes.<Type>` would miss that emitter and the coverage matrix could not
-		// attribute it. Comments may still spell the hex for readability - they are stripped before scanning.
-		[Fact]
-		public void NoCodecSourceContainsAMagicIirOpcodeLiteral()
-		{
-			// Scans the CODEC layer AND its consumers. It used to cover Codecs/ only, and the gap showed: the
-			// snapshot opcode 0x737A6DF9 has had an enum member (FullPlayerCharacterIIR) all along, and Codecs/ was
-			// clean, but 12 bare literals had accumulated in the server, the importer and the tests - exactly the
-			// emitters `grep GameServer0X2000Opcodes.<Type>` needs to find. Mirrors the ListFrame rule below, which
-			// already spanned both trees.
-			string[] roots =
-			[
-				TestPaths.Repo("Faolan.Core.Network", "Codecs"),
-				TestPaths.Repo("Faolan"),
-				TestPaths.Repo("Faolan.Importer")
-			];
-			var defined = Enum.GetValues<GameServer0X2000Opcodes>().ToHashSet();
-			var offenders = new List<string>();
-
-			foreach (var file in roots.Where(Directory.Exists)
-				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
-				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-				                     && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
-				                     && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")))
-			{
-				var lines = File.ReadAllLines(file);
-				for (var i = 0; i < lines.Length; i++)
-				{
-					var code = LineComment.Replace(BlockComment.Replace(lines[i], ""), "");
-					if (code.Contains("GameServer0X2000Opcodes", StringComparison.Ordinal))
-						continue; // the value comes from the enum on this line - that IS the convention
-
-					foreach (Match m in HexLiteral.Matches(code))
-					{
-						var value = Convert.ToUInt32(m.Value, 16);
-						if (defined.Contains((GameServer0X2000Opcodes)value))
-							offenders.Add($"{Path.GetFileName(file)}:{i + 1}  {m.Value} == GameServer0X2000Opcodes.{(GameServer0X2000Opcodes)value}");
-					}
-				}
-			}
-
-			Assert.True(offenders.Count == 0,
-				"IIR opcodes must come from GameServer0X2000Opcodes, not a hex literal:\n  " + string.Join("\n  ", offenders));
-		}
+		private static IEnumerable<Type> CodecTypes => typeof(ICodec<>).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
 
 		// (4) The count-framed LIST word comes from ListFrame, never a hand-rolled 0x3F1. This word had ELEVEN local
 		// names and a pile of raw literals, and that scattering is exactly why it kept getting re-mistaken for a magic
@@ -197,9 +88,105 @@ namespace Faolan.Tests
 				}
 			}
 
-			Assert.True(offenders.Count == 0,
-				"the count-framed list word must come from ListFrame (0x3F1 = ListFrame.Unit, 0x7E2 = ListFrame.ForCount(1)):\n  "
-				+ string.Join("\n  ", offenders));
+			Assert.True(offenders.Count == 0, "the count-framed list word must come from ListFrame (0x3F1 = ListFrame.Unit, 0x7E2 = ListFrame.ForCount(1)):\n  " + string.Join("\n  ", offenders));
+		}
+
+		// (1b) HandledTypes is the multi-type form: a non-empty, duplicate-free array of enum members.
+		[Fact]
+		public void HandledTypes_AreNonEmptyAndDistinct()
+		{
+			var declaring = new List<string>();
+			foreach (var t in CodecTypes)
+			{
+				var f = Fields(t).FirstOrDefault(f => f.Name == "HandledTypes");
+				if (f == null)
+					continue;
+
+				declaring.Add(t.Name);
+				Assert.True(f.FieldType == typeof(GameServer0X2000Opcodes[]), $"{t.Name}.HandledTypes must be GameServer0X2000Opcodes[], was {f.FieldType.Name}");
+
+				var values = (GameServer0X2000Opcodes[])f.GetValue(null)!;
+				Assert.True(values.Length > 1, $"{t.Name}.HandledTypes has {values.Length} entries - use `const uint Opcode` for a single type");
+				Assert.True(values.Distinct().Count() == values.Length, $"{t.Name}.HandledTypes contains duplicates");
+				Assert.All(values, v => Assert.True(Enum.IsDefined(v), $"{t.Name}.HandledTypes has an undefined member"));
+			}
+
+			// Guards the test itself: if nothing declares HandledTypes the multi-type case silently stopped being covered.
+			Assert.True(declaring.Count >= 3, $"only {declaring.Count} codecs declare HandledTypes - the reflection filter is probably broken");
+		}
+
+		// (3) The one that actually matters: an IIR opcode never appears as a bare hex literal in codec CODE. If it
+		// did, `grep GameServer0X2000Opcodes.<Type>` would miss that emitter and the coverage matrix could not
+		// attribute it. Comments may still spell the hex for readability - they are stripped before scanning.
+		[Fact]
+		public void NoCodecSourceContainsAMagicIirOpcodeLiteral()
+		{
+			// Scans the CODEC layer AND its consumers. It used to cover Codecs/ only, and the gap showed: the
+			// snapshot opcode 0x737A6DF9 has had an enum member (FullPlayerCharacterIIR) all along, and Codecs/ was
+			// clean, but 12 bare literals had accumulated in the server, the importer and the tests - exactly the
+			// emitters `grep GameServer0X2000Opcodes.<Type>` needs to find. Mirrors the ListFrame rule below, which
+			// already spanned both trees.
+			string[] roots = [TestPaths.Repo("Faolan.Core.Network", "Codecs"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer")];
+			var defined = Enum.GetValues<GameServer0X2000Opcodes>().ToHashSet();
+			var offenders = new List<string>();
+
+			foreach (var file in roots
+				         .Where(Directory.Exists)
+				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
+				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") &&
+				                     !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")))
+			{
+				var lines = File.ReadAllLines(file);
+				for (var i = 0; i < lines.Length; i++)
+				{
+					var code = LineComment.Replace(BlockComment.Replace(lines[i], ""), "");
+					if (code.Contains("GameServer0X2000Opcodes", StringComparison.Ordinal))
+						continue; // the value comes from the enum on this line - that IS the convention
+
+					foreach (Match m in HexLiteral.Matches(code))
+					{
+						var value = Convert.ToUInt32(m.Value, 16);
+						if (defined.Contains((GameServer0X2000Opcodes)value))
+							offenders.Add($"{Path.GetFileName(file)}:{i + 1}  {m.Value} == GameServer0X2000Opcodes.{(GameServer0X2000Opcodes)value}");
+					}
+				}
+			}
+
+			Assert.True(offenders.Count == 0, "IIR opcodes must come from GameServer0X2000Opcodes, not a hex literal:\n  " + string.Join("\n  ", offenders));
+		}
+
+		// (2) The pre-#317 name must not reappear on a static const. (Instance members named SubOpcode - the
+		// WorldObject column, DynelFullUpdateCodec.Parsed.SubOpcode - are a different thing and are allowed.)
+		[Fact]
+		public void NoStaticConstantIsNamedSubOpcode()
+		{
+			var bad = (from t in CodecTypes from f in Fields(t) where f.Name.EndsWith("SubOpcode", StringComparison.Ordinal) select $"{t.Name}.{f.Name}").ToList();
+
+			Assert.True(bad.Count == 0, "Static opcode constants are named `Opcode`, not `SubOpcode`:\n  " + string.Join("\n  ", bad));
+		}
+
+		// (1) Every const named *Opcode carries a real GameServer0X2000Opcodes value - never a hand-typed hash.
+		[Fact]
+		public void OpcodeConstants_AreDefinedEnumMembers()
+		{
+			var bad = new List<string>();
+			var checkedCount = 0;
+			foreach (var t in CodecTypes)
+			foreach (var f in Fields(t).Where(f => f.IsLiteral && f.FieldType == typeof(uint) && f.Name.EndsWith("Opcode", StringComparison.Ordinal)))
+			{
+				checkedCount++;
+				var value = (uint)f.GetRawConstantValue()!;
+				if (!Enum.IsDefined((GameServer0X2000Opcodes)value))
+					bad.Add($"{t.Name}.{f.Name} = 0x{value:X8} is not a defined GameServer0X2000Opcodes member");
+			}
+
+			Assert.True(bad.Count == 0, "Opcode constants must be (uint)GameServer0X2000Opcodes.<Type>:\n  " + string.Join("\n  ", bad));
+			Assert.True(checkedCount >= 15, $"only {checkedCount} Opcode constants found - the reflection filter is probably broken");
+		}
+
+		private static IEnumerable<FieldInfo> Fields(Type t)
+		{
+			return t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
 		}
 	}
 }

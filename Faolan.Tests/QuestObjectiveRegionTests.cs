@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
@@ -19,35 +19,6 @@ namespace Faolan.Tests
 
 		private static byte[] Region => File.ReadAllBytes(TemplatePath)[RegionStart..IndexTag];
 
-		// Corpus invariants for the two byte-shaped goal words, recovered from QuestGoal_c::WriteToStream plus the
-		// captures. Pinned so a future "these look like u32s" refactor has to argue with the data.
-		[Fact]
-		public void ByteShapedGoalWords_HoldTheirCorpusInvariants()
-		{
-			var goals = CapturedGoals().ToList();
-			Assert.NotEmpty(goals);
-
-			// Unknown1: the client writes ONE byte, so the word never exceeds 255.
-			Assert.All(goals, g => Assert.InRange(g.Unknown1, 0u, 255u));
-
-			// Unknown2: a flag, never an arbitrary number - 0 or the byte 0x01 followed by three zero bytes.
-			Assert.All(goals, g => Assert.True(g.Unknown2 is 0 or QuestObjectiveGoal.FlagSet,
-				$"Unknown2 should be a flag but goal {g.GoalId} carries 0x{g.Unknown2:X8}"));
-		}
-
-		private static IEnumerable<QuestObjectiveGoal> CapturedGoals()
-		{
-			foreach (var (_, subClass, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			foreach (var record in subClass.Quests.Records)
-			{
-				if (record.Objectives is not { Goals.Count: > 0 } objectives)
-					continue;
-
-				foreach (var goal in objectives.Goals)
-					yield return goal;
-			}
-		}
-
 		[Fact]
 		public void BuildSingle_RegeneratesTheRegion_ByteExact()
 		{
@@ -60,10 +31,8 @@ namespace Faolan.Tests
 
 			// goalIdEcho is explicit now: it is EITHER the goal id or 0 depending on the goal (1567 of 2850 captured
 			// goals carry 0), so it cannot default to the id.
-			var g1 = QuestObjectiveGoal.BuildSingle(instance, 10238, 1448, 1, 9, 180, 4010, 416, 701, parsed.Goals[0].Objective, parsed.Goals[0].TextRecord,
-				goalIdEcho: 1448);
-			var g2 = QuestObjectiveGoal.BuildSingle(instance, 10238, 3490, 2, 12, 0, 4010, 521, 757, parsed.Goals[1].Objective, parsed.Goals[1].TextRecord, 70099, 0x36314C56,
-				goalIdEcho: 3490);
+			var g1 = QuestObjectiveGoal.BuildSingle(instance, 10238, 1448, 1, 9, 180, 4010, 416, 701, parsed.Goals[0].Objective, parsed.Goals[0].TextRecord, goalIdEcho: 1448);
+			var g2 = QuestObjectiveGoal.BuildSingle(instance, 10238, 3490, 2, 12, 0, 4010, 521, 757, parsed.Goals[1].Objective, parsed.Goals[1].TextRecord, 70099, 0x36314C56, goalIdEcho: 3490);
 
 			var region = new QuestObjectiveRegion
 			{
@@ -75,6 +44,21 @@ namespace Faolan.Tests
 			};
 
 			Assert.Equal(Region, region.ToArray());
+		}
+
+		// Corpus invariants for the two byte-shaped goal words, recovered from QuestGoal_c::WriteToStream plus the
+		// captures. Pinned so a future "these look like u32s" refactor has to argue with the data.
+		[Fact]
+		public void ByteShapedGoalWords_HoldTheirCorpusInvariants()
+		{
+			var goals = CapturedGoals().ToList();
+			Assert.NotEmpty(goals);
+
+			// Unknown1: the client writes ONE byte, so the word never exceeds 255.
+			Assert.All(goals, g => Assert.InRange(g.Unknown1, 0u, 255u));
+
+			// Unknown2: a flag, never an arbitrary number - 0 or the byte 0x01 followed by three zero bytes.
+			Assert.All(goals, g => Assert.True(g.Unknown2 is 0 or QuestObjectiveGoal.FlagSet, $"Unknown2 should be a flag but goal {g.GoalId} carries 0x{g.Unknown2:X8}"));
 		}
 
 		[Fact]
@@ -132,6 +116,19 @@ namespace Faolan.Tests
 			};
 			var reparsed = QuestObjectiveRegion.Parse(region.ToArray(), 0);
 			Assert.Equal(3u, reparsed.Goals[0].RequiredCount);
+		}
+
+		private static IEnumerable<QuestObjectiveGoal> CapturedGoals()
+		{
+			foreach (var (_, subClass, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			foreach (var record in subClass.Quests.Records)
+			{
+				if (record.Objectives is not { Goals.Count: > 0 } objectives)
+					continue;
+
+				foreach (var goal in objectives.Goals)
+					yield return goal;
+			}
 		}
 	}
 }

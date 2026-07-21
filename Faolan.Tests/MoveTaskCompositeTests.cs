@@ -1,9 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
@@ -18,6 +16,7 @@ namespace Faolan.Tests
 	public class MoveTaskCompositeTests
 	{
 		private static readonly byte[] Sub = Convert.FromHexString("96c46740");
+
 		// A recursive ListMoveTask (mode 4) - the cutscene burst's dominant form - nests child factories; assert the
 		// model exposes them and the re-encode is byte-exact.
 		[Fact]

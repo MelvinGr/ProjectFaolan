@@ -15,9 +15,6 @@ namespace Faolan.Core.Rdb.Assets
 
 		private readonly float[] _heights;
 
-		public int Width { get; }
-		public int Height { get; }
-
 		// World units per grid cell. worldX/Z are divided by this to index the grid. tilemapExtent == W for the
 		// full-res playfields (cell = 1); a downsampled map (W < extent) gets cell > 1.
 		public float CellSize { get; }
@@ -26,6 +23,9 @@ namespace Faolan.Core.Rdb.Assets
 		// validated in-play; kept configurable for any map that offsets its world coordinates.
 		public float OriginX { get; }
 		public float OriginZ { get; }
+		public int Height { get; }
+
+		public int Width { get; }
 
 		private RdbHeightmap(int width, int height, float[] heights, float cellSize, float originX, float originZ)
 		{
@@ -35,6 +35,18 @@ namespace Faolan.Core.Rdb.Assets
 			CellSize = cellSize;
 			OriginX = originX;
 			OriginZ = originZ;
+		}
+
+		// The terrain ground height at world (x, z), or null if the point is outside the grid. Nearest-cell sample
+		// (the grid is dense enough - 1 unit/cell on Tortage - that bilinear buys little for a loot-bag / LoS use).
+		public float? HeightAt(float worldX, float worldZ)
+		{
+			var gx = (int)MathF.Round((worldX - OriginX) / CellSize);
+			var gz = (int)MathF.Round((worldZ - OriginZ) / CellSize);
+			if (gx < 0 || gx >= Width || gz < 0 || gz >= Height)
+				return null;
+
+			return _heights[gz * Width + gx];
 		}
 
 		// Parse a decompressed 1066611 resource. `tilemapExtent` is the playfield's world-unit width (from the 1070003
@@ -66,18 +78,6 @@ namespace Faolan.Core.Rdb.Assets
 				: 1f;
 			heightmap = new RdbHeightmap(width, height, heights, cellSize, originX, originZ);
 			return true;
-		}
-
-		// The terrain ground height at world (x, z), or null if the point is outside the grid. Nearest-cell sample
-		// (the grid is dense enough - 1 unit/cell on Tortage - that bilinear buys little for a loot-bag / LoS use).
-		public float? HeightAt(float worldX, float worldZ)
-		{
-			var gx = (int)MathF.Round((worldX - OriginX) / CellSize);
-			var gz = (int)MathF.Round((worldZ - OriginZ) / CellSize);
-			if (gx < 0 || gx >= Width || gz < 0 || gz >= Height)
-				return null;
-
-			return _heights[gz * Width + gx];
 		}
 	}
 }

@@ -51,7 +51,5 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			return PlayerSpawnScaffoldCodec.Generate(scaffold);
 		}
-
-
 	}
 }

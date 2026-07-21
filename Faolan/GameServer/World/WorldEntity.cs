@@ -23,6 +23,15 @@ namespace Faolan.GameServer.World
 		// Default time a killed NPC stays dead before the tick respawns it.
 		public const double DefaultRespawnDelaySeconds = 15.0;
 
+		public const uint DispositionFriendly = 0;
+		public const uint DispositionHostile = 1;
+		public const uint DispositionNeutral = 2;
+
+		// The monotonic per-entity counter carried in field 3 of the continuous idle heartbeat (short-form
+		// BehaviorControlCenterIIR, #225). Incremented once per emitted pulse so the client sees a steadily rising tick,
+		// as retail's stream does.
+		public uint HeartbeatTick;
+
 		// Set once the corpse has been turned into a lootable bag this death, so the conversion fires exactly once.
 		private bool _corpseConverted;
 
@@ -43,6 +52,15 @@ namespace Faolan.GameServer.World
 		// Remaining time (seconds) until respawn while dead; meaningless when alive.
 		private double _respawnRemaining;
 
+		// The MapArea.AreaNameId the player is currently standing in, or 0 for none (#348). Live world state, never
+		// persisted: it exists so the tick can tell a CROSSING (banner) from merely still being inside the area.
+		public uint CurrentAreaNameId { get; set; }
+
+		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
+		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
+		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.
+		public uint DeathBehaviorId { get; set; } = WorldDeath.HumanoidDeathBehaviorId;
+
 		// Which instance (copy) of MapId this entity lives in (#268). Equals its Zone's PlayfieldToken - the retail
 		// playfield-instance id. 0 until placed; WorldState.Place sets it from the resolved/created instance so every
 		// later ZoneFor(entity) lands in the same copy. Two entities only see each other if MapId AND InstanceId match.
@@ -51,9 +69,16 @@ namespace Faolan.GameServer.World
 		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
 		public uint MapId { get; set; }
 
-		// The MapArea.AreaNameId the player is currently standing in, or 0 for none (#348). Live world state, never
-		// persisted: it exists so the tick can tell a CROSSING (banner) from merely still being inside the area.
-		public uint CurrentAreaNameId { get; set; }
+		// The NPC's TYPE id (NpcTemplateId), or 0 for players/loot. The stable per-type key used to look up shops and
+		// conversations without the shared-placeholder-name collision (many NPCs share an internal name, e.g. 25 share
+		// "Halen van Dummy"). 0 for players (they aren't shop/conversation NPCs).
+		public uint NpcTemplateId { get; init; }
+
+		// #363 ambient spawner: the NpcSpawnArea this NPC is a member of (its spawn-group pool), or null for a
+		// capture-placed / named / summoned NPC. When set, the area POOL maintains this creature's population (respawns
+		// a replacement at a free area point when it dies) instead of the per-entity respawn - and its wander waypoints
+		// are the area's points, so it roams the group's area.
+		public uint? SpawnAreaId { get; set; }
 		public bool Following => FollowTargetHandle != null;
 
 		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.
@@ -65,16 +90,6 @@ namespace Faolan.GameServer.World
 		// friendly/neutral NPCs (Citizens, vendors, guards, wildlife) never aggro. Set at zone load. Players are
 		// never hostile here.
 		public bool Hostile { get; set; }
-
-		// The retail overhead-name disposition toward the player: 0 = friendly (green), 1 = hostile (red),
-		// 2 = neutral (yellow). Sourced from NpcStatCore.Disposition (captured cCategory, #256/aggro) at zone load.
-		// Drives BOTH the RequestAggroStatus name-colour reply AND Hostile (Hostile == Disposition == 1). NULL in the
-		// DB -> DispositionFriendly here (matching the client's green default for an NPC it was never told about).
-		public uint Disposition { get; set; } = DispositionFriendly;
-
-		public const uint DispositionFriendly = 0;
-		public const uint DispositionHostile = 1;
-		public const uint DispositionNeutral = 2;
 
 		// True while this NPC is engaged in combat (a target in aggro range, not leashing home). Drives the combat-mode
 		// stat broadcast that makes the client DRAW the NPC's weapon - without it the NPC swings empty-handed (#218).
@@ -163,11 +178,6 @@ namespace Faolan.GameServer.World
 		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
 		public HashSet<uint> Known { get; } = [];
 
-		// The monotonic per-entity counter carried in field 3 of the continuous idle heartbeat (short-form
-		// BehaviorControlCenterIIR, #225). Incremented once per emitted pulse so the client sees a steadily rising tick,
-		// as retail's stream does.
-		public uint HeartbeatTick;
-
 		// The owning connection for a player (so the broadcaster can send packets to it); null for NPCs.
 		public INetworkClient Client { get; }
 
@@ -186,13 +196,14 @@ namespace Faolan.GameServer.World
 		// Empty for non-caster NPCs and players; IsCaster gates the sim's cast branch.
 		public List<NpcSpellCast> Spells { get; } = [];
 
-		// Ambient bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
-		// zone load. Null/empty = this NPC has no captured chatter group and stays silent.
-		public string[] ChatterLines { get; set; }
-
 		// Item template ids carried by a loot bag, rolled when it drops; granted to the looter's backpack via
 		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
 		public List<uint> LootItems { get; } = [];
+
+		// The loot CONTAINER this creature drops on death (from its NpcTemplate.LootContainerTemplateId): a plain Bag
+		// by default, a bigger chest for bosses/elites. Read by the kill-drop path (OnNpcKilled -> SpawnLootBagAt) to
+		// pick the LootContainerTemplate variant. Stamped at spawn from the type; harmless (unused) on players.
+		public LootContainerTemplateId LootContainer { get; set; } = LootContainerTemplateId.Bag;
 		public Quaternion Rotation { get; set; }
 		public Quaternion SpawnRotation { get; set; }
 
@@ -203,32 +214,15 @@ namespace Faolan.GameServer.World
 		public string LootSourceName { get; set; }
 		public string Name { get; }
 
-		// The NPC's TYPE id (NpcTemplateId), or 0 for players/loot. The stable per-type key used to look up shops and
-		// conversations without the shared-placeholder-name collision (many NPCs share an internal name, e.g. 25 share
-		// "Halen van Dummy"). 0 for players (they aren't shop/conversation NPCs).
-		public uint NpcTemplateId { get; init; }
-
-		// #363 ambient spawner: the NpcSpawnArea this NPC is a member of (its spawn-group pool), or null for a
-		// capture-placed / named / summoned NPC. When set, the area POOL maintains this creature's population (respawns
-		// a replacement at a free area point when it dies) instead of the per-entity respawn - and its wander waypoints
-		// are the area's points, so it roams the group's area.
-		public uint? SpawnAreaId { get; set; }
-
 		// #363 dev nameplate override: the FULL labelled overhead name ("Crocodile [Ape2 | id-prop x8]") to push via a
 		// SetNameIIR right after this NPC's spawn, when DebugAreaLabels is on. The client resolves an NPC's floating
 		// nameplate from its template_id LDB name and IGNORES the free spawn-body `Name` string, so the label can only
 		// be shown by a SetNameIIR (0xADCE0CDA) - the same per-entity name-commit the create flow uses. Null = no label.
 		public string OverheadNameOverride { get; set; }
 
-		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
-		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
-		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.
-		public uint DeathBehaviorId { get; set; } = WorldDeath.HumanoidDeathBehaviorId;
-
-		// The loot CONTAINER this creature drops on death (from its NpcTemplate.LootContainerTemplateId): a plain Bag
-		// by default, a bigger chest for bosses/elites. Read by the kill-drop path (OnNpcKilled -> SpawnLootBagAt) to
-		// pick the LootContainerTemplate variant. Stamped at spawn from the type; harmless (unused) on players.
-		public LootContainerTemplateId LootContainer { get; set; } = LootContainerTemplateId.Bag;
+		// Ambient bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
+		// zone load. Null/empty = this NPC has no captured chatter group and stays silent.
+		public string[] ChatterLines { get; set; }
 
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the .spawnbag player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever
@@ -244,6 +238,18 @@ namespace Faolan.GameServer.World
 		// (TryLootCash is granted exactly once per bag).
 		public uint CashTin { get; set; }
 
+		// The retail overhead-name disposition toward the player: 0 = friendly (green), 1 = hostile (red),
+		// 2 = neutral (yellow). Sourced from NpcStatCore.Disposition (captured cCategory, #256/aggro) at zone load.
+		// Drives BOTH the RequestAggroStatus name-colour reply AND Hostile (Hostile == Disposition == 1). NULL in the
+		// DB -> DispositionFriendly here (matching the client's green default for an NPC it was never told about).
+		public uint Disposition { get; set; } = DispositionFriendly;
+
+		// The wire handle other entities address this one by (the player's client instance / an NPC's spawn handle).
+		public uint Handle { get; }
+
+		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
+		public uint Level { get; set; }
+
 		// #262 companion-follow: the handle of the PLAYER this NPC follows (0 = not following). Set when the player
 		// "releases" the NPC (e.g. Casilda after her rescue stage); the world tick steps the NPC toward that player and
 		// broadcasts a MoveTask each step - the same server-driven incremental-step follow retail uses (decoded from the
@@ -252,16 +258,10 @@ namespace Faolan.GameServer.World
 		// the move when she catches up (avoids spamming a stop every idle tick).
 		public uint? FollowTargetHandle { get; set; }
 
-		// The wire handle other entities address this one by (the player's client instance / an NPC's spawn handle).
-		public uint Handle { get; }
-
 		// For a PLAYER: the handle of the NPC that last damaged them - used as the killer in the death's
 		// SimpleCharKilledBy record. The resurrect window goes WAVE iff the killer resolves to the LOCAL player; a
 		// real mob killer makes it INSTANT like retail (#214). Set by ApplyNpcAttack/ApplyNpcCast when a hit lands.
 		public uint? LastAttackerHandle { get; set; }
-
-		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
-		public uint Level { get; set; }
 
 		// If this entity is a PET, the handle of the owner (the summoner's client instance); null = not a pet (#307).
 		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.
@@ -447,7 +447,7 @@ namespace Faolan.GameServer.World
 			MoveOrigin = SpawnPosition;
 			MoveFrom = SpawnPosition;
 			Moving = false; // a fresh NPC starts stationary (#272); the next chase/return re-seeds the move anchor
-							// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
+			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
 			CashTin = 0;
 			LootItems.Clear();
 			_corpseConverted = false;

@@ -63,6 +63,61 @@ namespace Faolan.Importer.Captures
 			[269272] = "Rest"
 		};
 
+		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
+		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
+		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only
+		// abilities land at their high char levels -> naturally gated out of a fresh char). The data-driven replacement
+		// for IsStartingAbility + the single Ability.Class - true multi-class (Spellweaving lands under every captured
+		// caster class, not a wrong "generic"). The ability RDB template carries no class/level, so this is the source.
+		public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger? logger = null)
+		{
+			var grants = await db
+				.CharacterAbilities.Join(db.Characters, ca => ca.CharacterId, c => c.Id, (ca, c) => new
+				{
+					ca.AbilityId,
+					c.Level,
+					c.Class
+				})
+				.ToListAsync();
+
+			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
+
+			// Skip characters with an invalid class (0/1): create-flow chars captured BEFORE class selection carry an
+			// unset class the importer records as-is - real classes are the 12 defined Class enum values. Without this
+			// guard those pollute the access map with a phantom "class 1" holding the universal kit.
+			var inserted = 0;
+			var updated = 0;
+			foreach (var g in grants.Where(x => abilityIds.Contains(x.AbilityId) && Enum.IsDefined(x.Class)).GroupBy(x => (x.Class, x.AbilityId)))
+			{
+				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
+				if (existing.TryGetValue(g.Key, out var row))
+				{
+					if (row.Level != minLevel)
+					{
+						row.Level = minLevel;
+						updated++;
+					}
+				}
+				else
+				{
+					db.ClassAbilities.Add(new ClassAbility
+					{
+						Class = g.Key.Class,
+						AbilityId = g.Key.AbilityId,
+						Level = minLevel
+					});
+					inserted++;
+				}
+			}
+
+			if (inserted > 0 || updated > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassAbility rows ({Updated} levels updated) from per-character grants.", inserted, updated);
+			return (inserted, updated);
+		}
+
 		// Seeds the UNIVERSAL level-1 ability kit onto every class (ClassAbility), from the create captures: the
 		// 0x2052 grants that follow a create. Melvin: "Rest needs to be granted to all classes, same with the
 		// directional attacks etc" - these are basic combat/movement/UI abilities, not class kit (#296).
@@ -119,82 +174,28 @@ namespace Faolan.Importer.Captures
 			var inserted = 0;
 
 			foreach (var cls in Enum.GetValues<Class>())
-				foreach (var abilityId in kit)
-				{
-					if (!abilityIds.Contains(abilityId))
-						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
-
-					if (existing.ContainsKey((cls, abilityId)))
-						continue; // already known; DeriveClassAbilitiesAsync owns the level for those
-
-					db.ClassAbilities.Add(new ClassAbility
-					{
-						Class = cls,
-						AbilityId = abilityId,
-						Level = 1 // the universal kit is level 1 by definition
-					});
-					existing[(cls, abilityId)] = null!;
-					inserted++;
-				}
-
-			await db.SaveChangesAsync();
-			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} abilities (from {Dumps} create dumps) -> {Inserted} new class-ability rows across {Classes} classes.", kit.Count, dumps, inserted, Enum.GetValues<Class>().Length);
-			return (inserted, kit.Count);
-		}
-
-		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
-		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
-		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only
-		// abilities land at their high char levels -> naturally gated out of a fresh char). The data-driven replacement
-		// for IsStartingAbility + the single Ability.Class - true multi-class (Spellweaving lands under every captured
-		// caster class, not a wrong "generic"). The ability RDB template carries no class/level, so this is the source.
-		public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger? logger = null)
-		{
-			var grants = await db
-				.CharacterAbilities.Join(db.Characters, ca => ca.CharacterId, c => c.Id, (ca, c) => new
-				{
-					ca.AbilityId,
-					c.Level,
-					c.Class
-				})
-				.ToListAsync();
-
-			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
-			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
-
-			// Skip characters with an invalid class (0/1): create-flow chars captured BEFORE class selection carry an
-			// unset class the importer records as-is - real classes are the 12 defined Class enum values. Without this
-			// guard those pollute the access map with a phantom "class 1" holding the universal kit.
-			var inserted = 0;
-			var updated = 0;
-			foreach (var g in grants.Where(x => abilityIds.Contains(x.AbilityId) && Enum.IsDefined(x.Class)).GroupBy(x => (x.Class, x.AbilityId)))
+			foreach (var abilityId in kit)
 			{
-				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
-				if (existing.TryGetValue(g.Key, out var row))
+				if (!abilityIds.Contains(abilityId))
+					continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
+
+				if (existing.ContainsKey((cls, abilityId)))
+					continue; // already known; DeriveClassAbilitiesAsync owns the level for those
+
+				db.ClassAbilities.Add(new ClassAbility
 				{
-					if (row.Level != minLevel)
-					{
-						row.Level = minLevel;
-						updated++;
-					}
-				}
-				else
-				{
-					db.ClassAbilities.Add(new ClassAbility
-					{
-						Class = g.Key.Class,
-						AbilityId = g.Key.AbilityId,
-						Level = minLevel
-					});
-					inserted++;
-				}
+					Class = cls,
+					AbilityId = abilityId,
+					Level = 1 // the universal kit is level 1 by definition
+				});
+				existing[(cls, abilityId)] = null!;
+				inserted++;
 			}
 
-			if (inserted > 0 || updated > 0)
-				await db.SaveChangesAsync();
-
-			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassAbility rows ({Updated} levels updated) from per-character grants.", inserted, updated);
-			return (inserted, updated);
+			await db.SaveChangesAsync();
+			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} abilities (from {Dumps} create dumps) -> {Inserted} new class-ability rows across {Classes} classes.", kit.Count,
+				dumps, inserted, Enum.GetValues<Class>().Length);
+			return (inserted, kit.Count);
 		}
 
 		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's class-name prefixes - the combo

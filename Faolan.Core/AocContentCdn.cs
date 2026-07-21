@@ -9,13 +9,13 @@ namespace Faolan.Core
 	// change had to be made twice. Faolan.Core is the BASE layer both sides already reference.
 	public static class AocContentCdn
 	{
+		// The control/config host.
+		public const string Control = "http://aoc-eu-control.live.ageofconan.com";
+
 		// The game-content host: RDB resources (resurrection points, maps, ...) live here under /upm/rdb/res/...
 		public const string GameUpdate = "http://aoc-eu-gameupdate.live.ageofconan.com";
 
 		// The patcher/manifest host.
 		public const string Update = "http://aoc-eu-update.live.ageofconan.com";
-
-		// The control/config host.
-		public const string Control = "http://aoc-eu-control.live.ageofconan.com";
 	}
 }

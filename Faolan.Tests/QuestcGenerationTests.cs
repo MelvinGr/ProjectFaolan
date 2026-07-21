@@ -102,7 +102,7 @@ namespace Faolan.Tests
 
 			// The empty completed-journal frame (0x3F1) always sits between the objective region and the index (#391);
 			// it is the word the index USED to swallow as a phantom "IndexTag".
-			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. Faolan.Core.Network.Codecs.Quest.CompletedQuestJournalRegion.Build([]).ToArray(), .. index.ToArray()];
+			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. CompletedQuestJournalRegion.Build([]).ToArray(), .. index.ToArray()];
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.Equal(template[..1292], built);

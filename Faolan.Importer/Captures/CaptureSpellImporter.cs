@@ -1,5 +1,4 @@
 using System;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,9 +6,10 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -22,9 +22,14 @@ namespace Faolan.Importer.Captures
 	// derived and not in the pcaps (see docs/tooling/importer-plan.md). Takes raw on-wire packet bytes.
 	public static class CaptureSpellImporter
 	{
+		// How many packets after its ding a grant may still be attributed to that level (#376). Real ones land in the
+		// SAME packet or ~3-4 later; the window keeps an unrelated later grant (a quest/claim reward) off the last ding.
+		private const int GrantWindow = 40;
 		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
 		private const uint GameCharAgentType = 0xA9ECB95D;
 		private const uint GameCharInterfaceType = 0x8B87F791;
+		private const uint MaxLevel = 80;
+		private const uint WorldOpcode = 0x2000;
 
 		// MoveItemToBar / AddShortcut. The client's first one ends the create starting-kit phase (its bar drags
 		// follow the grants); any DispatchLearnSpell after it is in-session leveling, not a starter.
@@ -34,78 +39,6 @@ namespace Faolan.Importer.Captures
 		// character), body = [u32 spellId] (#73). The class pair disambiguates the 0x200A opcode collisions on other
 		// conversations (CharacterSearch etc.); the receiver-instance == character-id is the s2c-direction filter.
 		private const ushort LearnSpellOpcode = 0x200A;
-
-		// How many packets after its ding a grant may still be attributed to that level (#376). Real ones land in the
-		// SAME packet or ~3-4 later; the window keeps an unrelated later grant (a quest/claim reward) off the last ding.
-		private const int GrantWindow = 40;
-		private const uint WorldOpcode = 0x2000;
-		private const uint MaxLevel = 80;
-
-		// Marks each captured class's create-granted spells as its STARTER KIT (ClassSpell.IsStarter), from the 0x200A
-		// grants a create capture actually shows. So a level-1 create yields EXACTLY the capture's grant
-		// (necro = Ice Strike R1 + Frozen Hatred).
-		//
-		// This used to write LEVELS instead: it pinned every granted spell to Level 1 and pushed every other level-1
-		// access row of that class to 2, so that the level-gated "Level <= charLevel" starter query happened to return
-		// the captured set. That conflated two independent facts and corrupted a correct one - retail grants the necro
-		// Ice Strike (Rank 1) at create even though its requirement really is level 7 (the RDB and ellatha AGREE on 7;
-		// the old comment here blamed an ellatha mis-tag, but the client says the same). The starter kit is a fixed
-		// LIST, not a level query, so it is now stated outright and Spells.Level is left to the RDB, which leads on
-		// level data (Melvin, 2026-07-16). Idempotent; only classes whose create capture actually reached a grant are
-		// touched, and it no longer has to run after the level modules.
-		public static async Task<(int Starters, int Cleared)> MarkStarterSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
-		{
-			var startersByClass = new Dictionary<uint, HashSet<uint>>();
-			foreach (var capture in createCaptures)
-			{
-				if (CaptureAbilityImporter.DetectClass(capture) is not { } cls)
-					continue;
-
-				var ids = new HashSet<uint>();
-				foreach (var packet in capture)
-				{
-					if (IsBarDrag(packet))
-						break; // create starters are granted BEFORE the client's first bar drag; later 0x200A = leveling
-
-					TryReadLearnSpellId(packet, ids);
-				}
-
-				if (ids.Count == 0)
-					continue; // no grant reached in this capture - leave the class's levels untouched
-
-				if (!startersByClass.TryGetValue(cls, out var set))
-					startersByClass[cls] = set = [];
-				set.UnionWith(ids);
-			}
-
-			if (startersByClass.Count == 0)
-				return (0, 0);
-
-			// Replace-all per captured class: a spell this class's create capture granted IS a starter, anything else
-			// on that class is not (so a re-import after a better capture can retract a stale flag).
-			var starters = 0;
-			var cleared = 0;
-			foreach (var (cls, ids) in startersByClass)
-			{
-				var rows = await db.ClassSpells.Where(cs => (uint)cs.Class == cls).ToListAsync();
-				foreach (var row in rows)
-				{
-					var isStarter = ids.Contains(row.SpellId);
-					if (row.IsStarter == isStarter)
-						continue;
-
-					row.IsStarter = isStarter;
-					if (isStarter)
-						starters++;
-					else
-						cleared++;
-				}
-			}
-
-			await db.SaveChangesAsync();
-			logger?.LogInformation("CaptureSpellImporter: marked {Starters} create-granted starter spells ({Cleared} stale flags cleared) across {Classes} captured classes.", starters, cleared, startersByClass.Count);
-			return (starters, cleared);
-		}
 
 		public static async Task<(int Seen, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
@@ -249,7 +182,8 @@ namespace Faolan.Importer.Captures
 			var cataloged = (await db.Spells.Where(s => learnedIds.Contains(s.Id)).Select(s => s.Id).ToListAsync()).ToHashSet();
 			var uncataloged = learnedIds.Where(id => !cataloged.Contains(id)).ToList();
 			if (uncataloged.Count > 0)
-				logger?.LogWarning("CaptureSpellImporter: {Count} learned spell ids not in the Spell catalog, skipped: {Ids}. (complete the Spell catalog to seed them)", uncataloged.Count, string.Join(", ", uncataloged));
+				logger?.LogWarning("CaptureSpellImporter: {Count} learned spell ids not in the Spell catalog, skipped: {Ids}. (complete the Spell catalog to seed them)", uncataloged.Count,
+					string.Join(", ", uncataloged));
 
 			var charactersSeeded = 0;
 			var inserted = 0;
@@ -287,48 +221,6 @@ namespace Faolan.Importer.Captures
 
 			logger?.LogInformation("CaptureSpellImporter: learned-spell sets for {Characters} characters, {Inserted} new CharacterSpell rows.", charactersSeeded, inserted);
 			return (charactersSeeded, inserted);
-		}
-
-		// True if the packet is the client's MoveItemToBar (0x206E) - the create starting-kit boundary.
-		private static bool IsBarDrag(byte[] packetBytes)
-		{
-			try
-			{
-				return new ConanPacket(packetBytes).Opcode == AddShortcutOpcode;
-			}
-			catch
-			{
-				return false;
-			}
-		}
-
-		// A DispatchLearnSpell grant: opcode 0x200A, GameCharAgent -> GameCharInterface, 4-byte [u32 spellId] body.
-		// The c2s direction has the classes swapped, so the sender/receiver class pair selects only the s2c grant.
-		private static void TryReadLearnSpell(byte[] packetBytes, IDictionary<uint, HashSet<uint>> byCharacter)
-		{
-			try
-			{
-				var packet = new ConanPacket(packetBytes);
-				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
-					return;
-
-				var body = packet.Body.ReadRemainingArray();
-				if (body.Length != 4)
-					return;
-
-				var spellId = BinaryPrimitives.ReadUInt32BigEndian(body);
-				if (spellId == 0)
-					return;
-
-				var characterId = packet.Receiver.Instance;
-				(byCharacter.TryGetValue(characterId, out var set)
-					? set
-					: byCharacter[characterId] = []).Add(spellId);
-			}
-			catch
-			{
-				// not a parseable DispatchLearnSpell grant
-			}
 		}
 
 		// A create-capture DispatchLearnSpell grant id (s2c 0x200A, GameCharAgent -> GameCharInterface, [u32 spellId]).
@@ -372,7 +264,11 @@ namespace Faolan.Importer.Captures
 
 				if (!existing.TryGetValue((cls, spellId), out var row))
 				{
-					row = new ClassSpell { Class = (Class)cls, SpellId = spellId };
+					row = new ClassSpell
+					{
+						Class = (Class)cls,
+						SpellId = spellId
+					};
 					db.ClassSpells.Add(row);
 					existing[(cls, spellId)] = row;
 					access++;
@@ -390,6 +286,73 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 			logger?.LogInformation("CaptureSpellImporter: {Levels} capture-proven grant levels across {Pairs} (class, spell) pairs, {Access} new access rows.", levels, proven.Count, access);
 			return (access, levels);
+		}
+
+		// Marks each captured class's create-granted spells as its STARTER KIT (ClassSpell.IsStarter), from the 0x200A
+		// grants a create capture actually shows. So a level-1 create yields EXACTLY the capture's grant
+		// (necro = Ice Strike R1 + Frozen Hatred).
+		//
+		// This used to write LEVELS instead: it pinned every granted spell to Level 1 and pushed every other level-1
+		// access row of that class to 2, so that the level-gated "Level <= charLevel" starter query happened to return
+		// the captured set. That conflated two independent facts and corrupted a correct one - retail grants the necro
+		// Ice Strike (Rank 1) at create even though its requirement really is level 7 (the RDB and ellatha AGREE on 7;
+		// the old comment here blamed an ellatha mis-tag, but the client says the same). The starter kit is a fixed
+		// LIST, not a level query, so it is now stated outright and Spells.Level is left to the RDB, which leads on
+		// level data (Melvin, 2026-07-16). Idempotent; only classes whose create capture actually reached a grant are
+		// touched, and it no longer has to run after the level modules.
+		public static async Task<(int Starters, int Cleared)> MarkStarterSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
+		{
+			var startersByClass = new Dictionary<uint, HashSet<uint>>();
+			foreach (var capture in createCaptures)
+			{
+				if (CaptureAbilityImporter.DetectClass(capture) is not { } cls)
+					continue;
+
+				var ids = new HashSet<uint>();
+				foreach (var packet in capture)
+				{
+					if (IsBarDrag(packet))
+						break; // create starters are granted BEFORE the client's first bar drag; later 0x200A = leveling
+
+					TryReadLearnSpellId(packet, ids);
+				}
+
+				if (ids.Count == 0)
+					continue; // no grant reached in this capture - leave the class's levels untouched
+
+				if (!startersByClass.TryGetValue(cls, out var set))
+					startersByClass[cls] = set = [];
+				set.UnionWith(ids);
+			}
+
+			if (startersByClass.Count == 0)
+				return (0, 0);
+
+			// Replace-all per captured class: a spell this class's create capture granted IS a starter, anything else
+			// on that class is not (so a re-import after a better capture can retract a stale flag).
+			var starters = 0;
+			var cleared = 0;
+			foreach (var (cls, ids) in startersByClass)
+			{
+				var rows = await db.ClassSpells.Where(cs => (uint)cs.Class == cls).ToListAsync();
+				foreach (var row in rows)
+				{
+					var isStarter = ids.Contains(row.SpellId);
+					if (row.IsStarter == isStarter)
+						continue;
+
+					row.IsStarter = isStarter;
+					if (isStarter)
+						starters++;
+					else
+						cleared++;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("CaptureSpellImporter: marked {Starters} create-granted starter spells ({Cleared} stale flags cleared) across {Classes} captured classes.", starters, cleared,
+				startersByClass.Count);
+			return (starters, cleared);
 		}
 
 		// Walks ONE capture in packet order, tracking each character's level from its NewLevelIIR dings and
@@ -442,8 +405,86 @@ namespace Faolan.Importer.Captures
 					continue; // never saw this character's own spawn, so its class is unknown
 
 				foreach (var spellId in ids)
+				{
 					if (!proven.TryGetValue((cls, spellId), out var have) || ding.Level < have)
 						proven[(cls, spellId)] = ding.Level;
+				}
+			}
+		}
+
+		// True if the packet is the client's MoveItemToBar (0x206E) - the create starting-kit boundary.
+		private static bool IsBarDrag(byte[] packetBytes)
+		{
+			try
+			{
+				return new ConanPacket(packetBytes).Opcode == AddShortcutOpcode;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		private static byte[] PacketBody(byte[] packet)
+		{
+			if (packet.Length < 16)
+				return [];
+
+			var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + (int)headerLen;
+			return bodyStart >= packet.Length
+				? []
+				: packet[bodyStart..];
+		}
+
+		// A DispatchLearnSpell grant: opcode 0x200A, GameCharAgent -> GameCharInterface, 4-byte [u32 spellId] body.
+		// The c2s direction has the classes swapped, so the sender/receiver class pair selects only the s2c grant.
+		private static void TryReadLearnSpell(byte[] packetBytes, IDictionary<uint, HashSet<uint>> byCharacter)
+		{
+			try
+			{
+				var packet = new ConanPacket(packetBytes);
+				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
+					return;
+
+				var body = packet.Body.ReadRemainingArray();
+				if (body.Length != 4)
+					return;
+
+				var spellId = BinaryPrimitives.ReadUInt32BigEndian(body);
+				if (spellId == 0)
+					return;
+
+				var characterId = packet.Receiver.Instance;
+				(byCharacter.TryGetValue(characterId, out var set)
+					? set
+					: byCharacter[characterId] = []).Add(spellId);
+			}
+			catch
+			{
+				// not a parseable DispatchLearnSpell grant
+			}
+		}
+
+		private static void TryReadLearnSpellId(byte[] packetBytes, ISet<uint> ids)
+		{
+			try
+			{
+				var packet = new ConanPacket(packetBytes);
+				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
+					return;
+
+				var body = packet.Body.ReadRemainingArray();
+				if (body.Length != 4)
+					return;
+
+				var spellId = BinaryPrimitives.ReadUInt32BigEndian(body);
+				if (spellId != 0)
+					ids.Add(spellId);
+			}
+			catch
+			{
+				// not a parseable DispatchLearnSpell grant
 			}
 		}
 
@@ -483,38 +524,6 @@ namespace Faolan.Importer.Captures
 			catch
 			{
 				return false;
-			}
-		}
-
-		private static byte[] PacketBody(byte[] packet)
-		{
-			if (packet.Length < 16)
-				return [];
-
-			var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			var bodyStart = 12 + (int)headerLen;
-			return bodyStart >= packet.Length ? [] : packet[bodyStart..];
-		}
-
-		private static void TryReadLearnSpellId(byte[] packetBytes, ISet<uint> ids)
-		{
-			try
-			{
-				var packet = new ConanPacket(packetBytes);
-				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
-					return;
-
-				var body = packet.Body.ReadRemainingArray();
-				if (body.Length != 4)
-					return;
-
-				var spellId = BinaryPrimitives.ReadUInt32BigEndian(body);
-				if (spellId != 0)
-					ids.Add(spellId);
-			}
-			catch
-			{
-				// not a parseable DispatchLearnSpell grant
 			}
 		}
 

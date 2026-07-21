@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -629,8 +628,7 @@ namespace Faolan.GameServer
 				: a.Quantity;
 
 			return SnapshotItemBuilder.BuildInventoryEntry(itemId, a.Item, a.ItemHash,
-				[new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, recordId), new SnapshotItemBuilder.ItemStat(26, qty)],
-				a.ItemLevel);
+				[new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, recordId), new SnapshotItemBuilder.ItemStat(26, qty)], a.ItemLevel);
 		}
 	}
 }

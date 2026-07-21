@@ -687,7 +687,7 @@ namespace Faolan.Core.Network.Constants
 		UpdateSimpleDynelIIR = 0x30536411, // UpdateSimpleDynelIIR_c  (x30)
 		N3TeleportIIR = 0x5A32F0D7, // n3TeleportIIR_t  (x27) - teleport
 		N3ToClientFadeIIR = 0x66180B20, // n3ToClientFadeIIR_t  (x87) - screen fade
-		N3ToClientQuitIIR = 0x04B82B2D, // n3ToClientQuitIIR_t  (x3249)
+		N3ToClientQuitIIR = 0x04B82B2D // n3ToClientQuitIIR_t  (x3249)
 
 		// FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization carve-out (nested 101/104/112/113
 		// container blocks, 83-byte item tails): the RE notes live in docs/re/fullplayer-snapshot-reader.md.

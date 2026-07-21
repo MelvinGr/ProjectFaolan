@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -28,7 +29,7 @@ namespace Faolan.Web
 		{
 			var builder = WebApplication.CreateBuilder(args);
 
-			builder.Configuration.AddJsonFile(Core.RepoPaths.Combine("faolan.json"));
+			builder.Configuration.AddJsonFile(RepoPaths.Combine("faolan.json"));
 			// The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD repo root.
 			builder.Configuration.AddJsonFile("appsettings.json");
 

@@ -10,16 +10,12 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class MapChangeCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
+		private const int FlagsBodyOffset = 99;
 
 		// Field offsets WITHIN the PlayfieldFiir body (the inverse of the CreateEditorRecordBuilder.BuildPlayfieldFiir
 		// writes): mapId is the 7th word (after the 8-byte zero prefix, the 0x00 byte, the 3 reference floats, the 0x62
 		// byte and the 0xC79C word); PlayfieldFlags is the final word.
 		private const int MapIdBodyOffset = 26;
-		private const int FlagsBodyOffset = 99;
-
-		// What the importer harvests from a MapChange. Flags is null when the body is too short to carry it (a shorter
-		// mid-session PlayfieldF that only re-announces the map).
-		public sealed record Parsed(uint MapId, uint? Flags);
 
 		// Prepend the IIR subop to a PlayfieldFiir body (from CreateEditorRecordBuilder.BuildPlayfieldFiir).
 		public static byte[] BuildIir(byte[] playfieldFiirBody)
@@ -46,5 +42,9 @@ namespace Faolan.Core.Network.Codecs.World
 			parsed = new Parsed(mapId, flags);
 			return true;
 		}
+
+		// What the importer harvests from a MapChange. Flags is null when the body is too short to carry it (a shorter
+		// mid-session PlayfieldF that only re-announces the map).
+		public sealed record Parsed(uint MapId, uint? Flags);
 	}
 }

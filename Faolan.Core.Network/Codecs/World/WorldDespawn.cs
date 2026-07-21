@@ -17,10 +17,10 @@ namespace Faolan.Core.Network.Codecs.World
 	// actually send (TryExtractPlayfieldToken), so the despawn token matches what the client learned, by construction.
 	public static class WorldDespawn
 	{
+		public const int BodyLength = 17; // [subop][typeTag][handle][marker][token] = 4+4+4+1+4
+
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR;
-
-		public const int BodyLength = 17; // [subop][typeTag][handle][marker][token] = 4+4+4+1+4
 		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
 
 		// The markers that bracket the playfield token inside the 0x737A6DF9 snapshot tail: ...000000BF <token> 0000040B
@@ -33,13 +33,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// pass its own class (WorldObjectBuilder.TypeTagForClass) or the client won't remove it (#366).
 		public static byte[] BuildBody(uint handle, uint token, uint classWord = EntityClass.Character)
 		{
-			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000Opcodes.N3ToClientQuitIIR)
-				.WriteUInt32(classWord)
-				.WriteUInt32(handle)
-				.WriteByte(RecordMarker)
-				.WriteUInt32(token)
-				.ToArray();
+			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.N3ToClientQuitIIR).WriteUInt32(classWord).WriteUInt32(handle).WriteByte(RecordMarker).WriteUInt32(token).ToArray();
 		}
 
 		// Finds the playfield token in a 0x737A6DF9 snapshot body: the 4 bytes framed by 000000BF ... 0000040B
@@ -65,6 +59,7 @@ namespace Faolan.Core.Network.Codecs.World
 			var r = new FaolanStream(body);
 			if (r.ReadUInt32() != (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR)
 				return false;
+
 			r.ReadUInt32(); // class - a field (Character / SimpleDynel / LootBag / ...), NOT a constant (#366)
 
 			var parsedHandle = r.ReadUInt32();

@@ -77,7 +77,10 @@ namespace Faolan.CSPlayerAgent
 					// pushed to it later without an incoming packet to echo.
 					_guild.RememberReplyEndpoints(client, packet.Receiver, packet.Sender);
 
-					await new PacketStream().WriteHeader(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck).WriteUInt32(authReply).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck)
+						.WriteUInt32(authReply)
+						.SendAsync(client);
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.

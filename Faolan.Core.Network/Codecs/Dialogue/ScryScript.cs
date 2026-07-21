@@ -37,7 +37,11 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				Version = 5,
 				type = ProtoScryScriptIIR.Type.StartScriptGroupOnClient,
 				IntParameter = ZigZagDecode(scriptGroupId),
-				IdParameter = new ProtoID32 { Type = 0, Instance = 0 }
+				IdParameter = new ProtoID32
+				{
+					Type = 0,
+					Instance = 0
+				}
 			}.ToProtobuf();
 
 			return new FaolanStream()
@@ -62,7 +66,11 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				IntParameter = ZigZagDecode(flag),
 				StringParameterOne = stepToken ?? "",
 				StringParameterTwo = resources ?? "",
-				IdParameter = new ProtoID32 { Type = (uint)f6Field1, Instance = (uint)f6Field2 }
+				IdParameter = new ProtoID32
+				{
+					Type = (uint)f6Field1,
+					Instance = (uint)f6Field2
+				}
 			}.ToProtobuf();
 
 			return new FaolanStream()
@@ -73,8 +81,6 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				.WriteArrayUInt32Length(pb) // u32 BE protobuf length + body
 				.ToArray();
 		}
-
-
 
 		// The raw wire varint -> the sint32 protobuf-net will zigzag-RE-encode back to that exact varint.
 		private static int ZigZagDecode(ulong raw)

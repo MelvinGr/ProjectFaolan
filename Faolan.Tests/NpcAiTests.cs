@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Faolan.GameServer.Combat;
@@ -113,6 +114,21 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void DeadNpc_EmitsNoHeartbeat()
+		{
+			// #225: a dead NPC awaiting respawn must NOT heartbeat - its handle is being torn down, and a pulse for a
+			// corpse the client is despawning would reference a handle in flux. The emit sits past the IsDead gate.
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = NpcTemplate(1, 0, 0, hostile: false);
+			npc.Vitals.ApplyHealthDelta(-100); // killing blow
+			npc.MarkDead();
+			zone.Add(npc);
+
+			Assert.DoesNotContain(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcHeartbeat);
+		}
+
+		[Fact]
 		public void EnterCombat_EffectCarriesAggroTarget()
 		{
 			var world = new WorldState();
@@ -159,6 +175,20 @@ namespace Faolan.Tests
 				world.Tick(0.5);
 			Assert.False(npc.Returning);
 			Assert.True(npc.Position.X < WorldState.NpcMeleeRange + 0.001f, "NPC returned home, not parked by the player");
+		}
+
+		[Fact]
+		public void LiveNpc_EmitsHeartbeat_OncePerInterval()
+		{
+			// #225: a live NPC pulses its idle heartbeat on its own cadence (HeartbeatIntervalSeconds), not every base
+			// tick and not before the interval elapses. Non-hostile so no aggro/move effects muddy the assertion.
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = NpcTemplate(1, 0, 0, hostile: false);
+			zone.Add(npc);
+
+			Assert.DoesNotContain(world.Tick(0.2), e => e.Type == WorldTickEffectType.NpcHeartbeat); // before the interval
+			Assert.Single(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcHeartbeat && e.Entity == npc); // after
 		}
 
 		[Fact]
@@ -290,38 +320,9 @@ namespace Faolan.Tests
 			Assert.Equal(npc.SpawnPosition, npc.MoveFrom);
 		}
 
-		[Fact]
-		public void LiveNpc_EmitsHeartbeat_OncePerInterval()
-		{
-			// #225: a live NPC pulses its idle heartbeat on its own cadence (HeartbeatIntervalSeconds), not every base
-			// tick and not before the interval elapses. Non-hostile so no aggro/move effects muddy the assertion.
-			var world = new WorldState();
-			var zone = world.ZoneFor(4010);
-			var npc = NpcTemplate(1, 0, 0, hostile: false);
-			zone.Add(npc);
-
-			Assert.DoesNotContain(world.Tick(0.2), e => e.Type == WorldTickEffectType.NpcHeartbeat); // before the interval
-			Assert.Single(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcHeartbeat && e.Entity == npc); // after
-		}
-
-		[Fact]
-		public void DeadNpc_EmitsNoHeartbeat()
-		{
-			// #225: a dead NPC awaiting respawn must NOT heartbeat - its handle is being torn down, and a pulse for a
-			// corpse the client is despawning would reference a handle in flux. The emit sits past the IsDead gate.
-			var world = new WorldState();
-			var zone = world.ZoneFor(4010);
-			var npc = NpcTemplate(1, 0, 0, hostile: false);
-			npc.Vitals.ApplyHealthDelta(-100); // killing blow
-			npc.MarkDead();
-			zone.Add(npc);
-
-			Assert.DoesNotContain(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcHeartbeat);
-		}
-
 		// The idle heartbeat (#225) fires for every live NPC on its own cadence, so the "no aggro/attack happened"
 		// assertions filter it out - they care that no COMBAT effect was produced, not that the tick was silent.
-		private static System.Collections.Generic.IEnumerable<WorldTickEffect> NonHeartbeat(System.Collections.Generic.IReadOnlyList<WorldTickEffect> effects)
+		private static IEnumerable<WorldTickEffect> NonHeartbeat(IReadOnlyList<WorldTickEffect> effects)
 		{
 			return effects.Where(e => e.Type != WorldTickEffectType.NpcHeartbeat);
 		}

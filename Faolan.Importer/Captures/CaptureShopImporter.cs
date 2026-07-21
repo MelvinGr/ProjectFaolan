@@ -26,10 +26,7 @@ namespace Faolan.Importer.Captures
 			// handle -> vendor TEMPLATE id (#244): the shop is keyed by the vendor's NPC TYPE, not its (non-unique)
 			// internal name, so distinct same-named vendors don't merge and a shop never leaks onto a same-named
 			// non-vendor (e.g. the conversation NPC Atraxus vs the "Halen van Dummy" vendors).
-			var templates = NpcSpawnExtractor.Extract(packets)
-				.Where(e => e.Handle != 0 && e.TemplateId != 0)
-				.GroupBy(e => e.Handle)
-				.ToDictionary(g => g.Key, g => g.First().TemplateId);
+			var templates = NpcSpawnExtractor.Extract(packets).Where(e => e.Handle != 0 && e.TemplateId != 0).GroupBy(e => e.Handle).ToDictionary(g => g.Key, g => g.First().TemplateId);
 			var shops = new List<ShopEntry>();
 			foreach (var p in packets)
 			{

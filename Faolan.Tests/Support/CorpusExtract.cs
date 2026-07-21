@@ -23,54 +23,28 @@ namespace Faolan.Tests.Support
 	// per-IIR counts and Load() asserts them. A short extract throws instead of narrowing coverage.
 	public static class CorpusExtract
 	{
-		// Pinned at the counts of the full 349 MB corpus (104 tshark.json). Regenerating against a SMALLER corpus
-		// fails here rather than passing with fewer packets.
-		private static readonly (uint Iir, int Count)[] ExpectedCounts =
-		[
-			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, 141),
-			((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, 10975),
-			((uint)GameServer0X2000Opcodes.MoveTaskIIR, 10241),
-			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, 60),
-			((uint)GameServer0X2000Opcodes.QuestJournalIIR, 26),
-			((uint)GameServer0X2000Opcodes.QuestLogListIIR, 40),
-			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 141),
-			((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1)
-		];
-
-		private static readonly Lazy<List<Entry>> Entries = new(Load);
-
-		// One extracted packet: the FULL rebuilt wire packet, plus the provenance and frame the gates report.
-		public sealed record Entry(string Source, uint Iir, int Frame, uint Opcode, byte[] Full)
-		{
-			// The 0x2000 body within the full packet: [len4][crc4][headerLen4][header][body]. This is what BodyHex
-			// held, so every gate that used to read BodyHex gets identical bytes.
-			public byte[] Body
-			{
-				get
-				{
-					var headerLength = (int)BinaryPrimitives.ReadUInt32BigEndian(Full.AsSpan(8, 4));
-					return Full[(12 + headerLength)..];
-				}
-			}
-		}
-		private static readonly Lazy<HashSet<string>> Files = new(LoadFileNames);
-
 		// Every file name in the capture corpus - including the .pcapng the tests never read. The doc linters verify
 		// that [V2:] citations and Captures/... paths name something REAL, which needs the names but not the data.
 		public static IReadOnlySet<string> CaptureFileNames => Files.Value;
 
 		public static string Path => TestPaths.Asset("corpus-extract.bin");
 
+		// Pinned at the counts of the full 349 MB corpus (104 tshark.json). Regenerating against a SMALLER corpus
+		// fails here rather than passing with fewer packets.
+		private static readonly (uint Iir, int Count)[] ExpectedCounts =
+		[
+			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, 141), ((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, 10975), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, 10241),
+			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, 60), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, 26), ((uint)GameServer0X2000Opcodes.QuestLogListIIR, 40),
+			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 141), ((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1)
+		];
+
+		private static readonly Lazy<List<Entry>> Entries = new(Load);
+		private static readonly Lazy<HashSet<string>> Files = new(LoadFileNames);
+
 		// Every extracted packet, in capture order.
 		public static IEnumerable<Entry> All()
 		{
 			return Entries.Value;
-		}
-
-		// The FULL packets of one IIR, for the extractors that take CapturedPacket and strip framing themselves.
-		public static IEnumerable<Entry> PacketsOfType(uint iir)
-		{
-			return Entries.Value.Where(e => e.Iir == iir);
 		}
 
 		// The bodies of one IIR type. `Body` is the raw wire body INCLUDING its leading u32 length, exactly as
@@ -80,38 +54,35 @@ namespace Faolan.Tests.Support
 			return Entries.Value.Where(e => e.Iir == iir).Select(e => (e.Source, e.Body));
 		}
 
-		private static HashSet<string> LoadFileNames()
+		// The FULL packets of one IIR, for the extractors that take CapturedPacket and strip framing themselves.
+		public static IEnumerable<Entry> PacketsOfType(uint iir)
 		{
-			using var doc = JsonDocument.Parse(ReadManifest());
-			return doc.RootElement.TryGetProperty("files", out var files)
-				? files.EnumerateArray().Select(f => f.GetString()!).ToHashSet(StringComparer.Ordinal)
-				: [];
+			return Entries.Value.Where(e => e.Iir == iir);
 		}
 
-		private static byte[] ReadManifest()
+		// The ratchet: a regeneration may only ADD packets. Fewer means the extract was built against a partial
+		// corpus, and every gate reading it would silently cover less.
+		private static void AssertCoverage(List<Entry> entries)
 		{
-			if (!File.Exists(Path))
-				throw new FileNotFoundException(
-					$"Corpus extract not found at {Path}. Regenerate it with the capture repo present: " +
-					"dotnet run --project Faolan.Importer -- --report corpus-extract", Path);
-
-			using var file = File.OpenRead(Path);
-			Span<byte> head = stackalloc byte[8];
-			file.ReadExactly(head);
-			if (Encoding.ASCII.GetString(head[..4]) != "FCX1")
-				throw new InvalidDataException($"{Path} is not a corpus extract (bad magic).");
-
-			var manifest = new byte[BinaryPrimitives.ReadUInt32LittleEndian(head[4..])];
-			file.ReadExactly(manifest);
-			return manifest;
+			foreach (var (iir, expected) in ExpectedCounts)
+			{
+				var actual = entries.Count(e => e.Iir == iir);
+				if (actual < expected)
+				{
+					throw new InvalidDataException($"Corpus extract covers only {actual} packets of IIR 0x{iir:X8}, expected at least {expected}. " +
+					                               "It was probably regenerated against a partial capture corpus - the whole-corpus gates would " +
+					                               "still pass while testing less. Regenerate with the full corpus, or update ExpectedCounts if " + "the corpus itself legitimately changed.");
+				}
+			}
 		}
 
 		private static List<Entry> Load()
 		{
 			if (!File.Exists(Path))
+			{
 				throw new FileNotFoundException(
-					$"Corpus extract not found at {Path}. Regenerate it with the capture repo present: " +
-					"dotnet run --project Faolan.Importer -- --report corpus-extract", Path);
+					$"Corpus extract not found at {Path}. Regenerate it with the capture repo present: " + "dotnet run --project Faolan.Importer -- --report corpus-extract", Path);
+			}
 
 			using var file = File.OpenRead(Path);
 			Span<byte> head = stackalloc byte[8];
@@ -141,31 +112,57 @@ namespace Faolan.Tests.Support
 
 				var headerLength = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
 				var iir = BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(12 + headerLength + 4, 4));
-				result.Add(new Entry($"{e.GetProperty("s").GetString()}#{e.GetProperty("i").GetInt32()}", iir,
-					e.GetProperty("f").GetInt32(), e.GetProperty("o").GetUInt32(), full));
+				result.Add(new Entry($"{e.GetProperty("s").GetString()}#{e.GetProperty("i").GetInt32()}", iir, e.GetProperty("f").GetInt32(), e.GetProperty("o").GetUInt32(), full));
 			}
 
 			if (offset != inflated.Length)
-				throw new InvalidDataException(
-					$"Corpus extract is inconsistent: manifest describes {offset} bytes but the payload holds {inflated.Length}.");
+			{
+				throw new InvalidDataException($"Corpus extract is inconsistent: manifest describes {offset} bytes but the payload holds {inflated.Length}.");
+			}
 
 			AssertCoverage(result);
 			return result;
 		}
 
-		// The ratchet: a regeneration may only ADD packets. Fewer means the extract was built against a partial
-		// corpus, and every gate reading it would silently cover less.
-		private static void AssertCoverage(List<Entry> entries)
+		private static HashSet<string> LoadFileNames()
 		{
-			foreach (var (iir, expected) in ExpectedCounts)
+			using var doc = JsonDocument.Parse(ReadManifest());
+			return doc.RootElement.TryGetProperty("files", out var files)
+				? files.EnumerateArray().Select(f => f.GetString()!).ToHashSet(StringComparer.Ordinal)
+				: [];
+		}
+
+		private static byte[] ReadManifest()
+		{
+			if (!File.Exists(Path))
 			{
-				var actual = entries.Count(e => e.Iir == iir);
-				if (actual < expected)
-					throw new InvalidDataException(
-						$"Corpus extract covers only {actual} packets of IIR 0x{iir:X8}, expected at least {expected}. " +
-						"It was probably regenerated against a partial capture corpus - the whole-corpus gates would " +
-						"still pass while testing less. Regenerate with the full corpus, or update ExpectedCounts if " +
-						"the corpus itself legitimately changed.");
+				throw new FileNotFoundException(
+					$"Corpus extract not found at {Path}. Regenerate it with the capture repo present: " + "dotnet run --project Faolan.Importer -- --report corpus-extract", Path);
+			}
+
+			using var file = File.OpenRead(Path);
+			Span<byte> head = stackalloc byte[8];
+			file.ReadExactly(head);
+			if (Encoding.ASCII.GetString(head[..4]) != "FCX1")
+				throw new InvalidDataException($"{Path} is not a corpus extract (bad magic).");
+
+			var manifest = new byte[BinaryPrimitives.ReadUInt32LittleEndian(head[4..])];
+			file.ReadExactly(manifest);
+			return manifest;
+		}
+
+		// One extracted packet: the FULL rebuilt wire packet, plus the provenance and frame the gates report.
+		public sealed record Entry(string Source, uint Iir, int Frame, uint Opcode, byte[] Full)
+		{
+			// The 0x2000 body within the full packet: [len4][crc4][headerLen4][header][body]. This is what BodyHex
+			// held, so every gate that used to read BodyHex gets identical bytes.
+			public byte[] Body
+			{
+				get
+				{
+					var headerLength = (int)BinaryPrimitives.ReadUInt32BigEndian(Full.AsSpan(8, 4));
+					return Full[(12 + headerLength)..];
+				}
 			}
 		}
 	}

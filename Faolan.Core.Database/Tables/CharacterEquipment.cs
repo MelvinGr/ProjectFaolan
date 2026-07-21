@@ -16,6 +16,12 @@ namespace Faolan.Core.Database.Tables
 		// capture-confirmed (the "toggle vanity global" toggle carries slot 31).
 		public const int VanityFilterMainSlot = 31;
 
+		// The equipped BAG (equip slot 3, was mislabeled "Tokens"): its Item.BagExtraSlots sizes the backpack.
+		public uint? BagId { get; set; }
+
+		[ForeignKey(nameof(BagId))]
+		public virtual Item? Bag { get; set; }
+
 		public uint? BeltId { get; set; }
 
 		[ForeignKey(nameof(BeltId))]
@@ -86,6 +92,13 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(OffHandRightId))]
 		public virtual Item? OffHandRight { get; set; }
 
+		// The equipped RESOURCE bag (equip slot 26): its Item.ResourceBagExtraSlots sizes the resource container, the
+		// sibling of Bag for the backpack.
+		public uint? ResourceBagId { get; set; }
+
+		[ForeignKey(nameof(ResourceBagId))]
+		public virtual Item? ResourceBag { get; set; }
+
 		public uint? RingLeftId { get; set; }
 
 		[ForeignKey(nameof(RingLeftId))]
@@ -100,19 +113,6 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey(nameof(ShoulderId))]
 		public virtual Item? Shoulder { get; set; }
-
-		// The equipped BAG (equip slot 3, was mislabeled "Tokens"): its Item.BagExtraSlots sizes the backpack.
-		public uint? BagId { get; set; }
-
-		[ForeignKey(nameof(BagId))]
-		public virtual Item? Bag { get; set; }
-
-		// The equipped RESOURCE bag (equip slot 26): its Item.ResourceBagExtraSlots sizes the resource container, the
-		// sibling of Bag for the backpack.
-		public uint? ResourceBagId { get; set; }
-
-		[ForeignKey(nameof(ResourceBagId))]
-		public virtual Item? ResourceBag { get; set; }
 
 		public uint? VanityBeltId { get; set; }
 

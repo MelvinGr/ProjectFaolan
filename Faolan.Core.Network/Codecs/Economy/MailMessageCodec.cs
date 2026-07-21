@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
@@ -79,8 +78,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// decoded attachment round-trips without a DB). The Template/Level/ItemHash tail still comes off the row.
 		public static ProtoInventoryGameEntry BuildEntry(MailAttachment a)
 		{
-			var key = (a.Item ?? throw new InvalidOperationException(
-				$"MailAttachment (template {a.Template}): the Item navigation is not loaded - Include it before building the entry.")).Key;
+			var key = (a.Item ?? throw new InvalidOperationException($"MailAttachment (template {a.Template}): the Item navigation is not loaded - Include it before building the entry.")).Key;
 			var entry = new ProtoInventoryGameEntry
 			{
 				ItemId = a.ItemInstanceId,
@@ -147,7 +145,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 					// the Item nav. Decoding here has no DB, so attach a TRANSIENT Item carrying just the key so the
 					// decoded attachment round-trips (Build -> bytes). This Item is never tracked/saved - callers that
 					// persist a mail set only the Template FK column (the row resolves its real Items row on reload).
-					Item = new Item { Key = key },
+					Item = new Item
+					{
+						Key = key
+					},
 					Template = item.Template1,
 					ItemLevel = item.Level,
 					ItemHash = item.Hash,

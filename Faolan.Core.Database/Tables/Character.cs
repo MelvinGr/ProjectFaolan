@@ -34,14 +34,18 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(GuildId))]
 		public virtual Guild? Guild { get; set; }
 
-		[ConstrainToEnumValues]
-		public GuildRank? GuildRank { get; set; }
-
 		// Required: a character always lives on a map; Tortage Beach is the universal fallback world.
 		public uint MapId { get; set; } = Map.TortageBeachId;
 
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
+
+		// The mount the character is currently riding (a MountCatalog mount id; null = on foot). Persisted so the mount
+		// survives a relog and a trip through a no-mount area: it is set when the player summons a mount and cleared
+		// on a voluntary dismount, but NOT on the auto-dismount the client does when entering a no-mount playfield -
+		// so re-entering a mount-allowed area (or logging back in there) re-seats the same mount. Re-applied on world
+		// entry only when the destination map allows mounts (Map.PlayfieldFlags mount bit).
+		public uint? MountId { get; set; }
 
 		// Required: set on creation (CreateCharacter) and by the capture importer.
 		public uint RealmId { get; set; }
@@ -65,6 +69,11 @@ namespace Faolan.Core.Database.Tables
 		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,
 		// scars), in editor send order. Resolved via MorphTarget into the spawn scaffold's weighted entries.
 		public virtual ICollection<CharacterBodyResource> BodyResources { get; set; } = [];
+		public virtual ICollection<CharacterBuff> Buffs { get; set; } = [];
+
+		// The unlocked FEAT (talent-tree) ids - the spawn's pre-IIR feat list, distinct from Skills (the post-IIR
+		// ability scaffold). See CharacterFeat + docs/subsystems/feats.md.
+		public virtual ICollection<CharacterFeat> Feats { get; set; } = [];
 
 		// Non-worn carried items (bag/backpack/quest/resources); worn items are in Equipment. Drives the FullChar
 		// inventory snapshot. See [[CharacterInventory]] / docs/re/player-spawn-generation-plan.md.
@@ -78,12 +87,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterScaffoldPair> ScaffoldPairs { get; set; } = [];
 		public virtual ICollection<CharacterShortcut> Shortcuts { get; set; } = [];
 		public virtual ICollection<CharacterSkill> Skills { get; set; } = [];
-
-		// The unlocked FEAT (talent-tree) ids - the spawn's pre-IIR feat list, distinct from Skills (the post-IIR
-		// ability scaffold). See CharacterFeat + docs/subsystems/feats.md.
-		public virtual ICollection<CharacterFeat> Feats { get; set; } = [];
 		public virtual ICollection<CharacterSpell> Spells { get; set; } = [];
-		public virtual ICollection<CharacterBuff> Buffs { get; set; } = [];
 		public virtual ICollection<CharacterTag> Tags { get; set; } = [];
 
 		// True once a bind point has been set (an unbound character recalls to / reports its current map).
@@ -97,12 +101,14 @@ namespace Faolan.Core.Database.Tables
 		// (WorldSimulation.TickPlayerDeaths), cleared on respawn (RespawnPlayer).
 		public bool IsDead { get; set; }
 
-
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }
 
 		public DateTimeOffset CreationDate { get; set; }
 		public DateTimeOffset? LastConnection { get; set; }
+
+		[ConstrainToEnumValues]
+		public GuildRank? GuildRank { get; set; }
 
 		[ConstrainToEnumValues]
 		public Race Race { get; set; }
@@ -131,13 +137,6 @@ namespace Faolan.Core.Database.Tables
 		// it changes; see SendUpdateCash.
 		public ulong Money { get; set; }
 		public ushort Level { get; set; }
-
-		// The mount the character is currently riding (a MountCatalog mount id; null = on foot). Persisted so the mount
-		// survives a relog and a trip through a no-mount area: it is set when the player summons a mount and cleared
-		// on a voluntary dismount, but NOT on the auto-dismount the client does when entering a no-mount playfield -
-		// so re-entering a mount-allowed area (or logging back in there) re-seats the same mount. Re-applied on world
-		// entry only when the destination map allows mounts (Map.PlayfieldFlags mount bit).
-		public uint? MountId { get; set; }
 
 		public override string ToString()
 		{

@@ -17,17 +17,18 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(ConversationPacketId))]
 		public virtual ConversationPacket Packet { get; set; } = null!;
 
-		public int Sequence { get; set; } // order within the packet's screen list
-
 		public uint ScreenId { get; set; } // remoteformat @id (0 for the close screen)
-		public uint Category { get; set; } // @category
+
+		public virtual ICollection<ConversationScreenParameter> Parameters { get; set; } = new List<ConversationScreenParameter>();
+
+		public int Sequence { get; set; } // order within the packet's screen list
 
 		[MaxLength(128)]
 		public string Key { get; set; } = ""; // @key - the harvested, client-validated content hash (carried as-escaped)
 
+		public uint Category { get; set; } // @category
+
 		public uint Knubot { get; set; } // @knubot
 		public uint? Antitag { get; set; } // @antitag (null = attribute absent -> the "knubot=\"0\"  >" double-space slot)
-
-		public virtual ICollection<ConversationScreenParameter> Parameters { get; set; } = new List<ConversationScreenParameter>();
 	}
 }

@@ -15,6 +15,14 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(Class), nameof(SpellId))]
 	public class ClassSpell
 	{
+		// FK into the Spell catalog. The importer ensures a catalog row exists for every harvested spell, so this
+		// navigation always resolves (load it with .Include(s => s.Spell) when the spell's params/level are needed).
+		// virtual so the lazy-loading-proxy DbContext used in tests can build its model.
+		public uint SpellId { get; set; }
+
+		[ForeignKey(nameof(SpellId))]
+		public virtual Spell Spell { get; set; } = null!;
+
 		// True = a create capture SHOWS this class being granted this spell at creation (0x200A), so it is part of the
 		// starter kit regardless of the spell's level requirement. These are two INDEPENDENT facts and conflating them
 		// was a real bug: retail grants the necro Ice Strike (Rank 1) at create even though the spell's requirement is
@@ -35,14 +43,6 @@ namespace Faolan.Core.Database.Tables
 		// full-power level, a DIFFERENT fact, not a worse measurement of this one. Where a capture has spoken, this
 		// wins; everywhere else `Spells.Level` is still the only gate we have.
 		public byte? GrantLevel { get; set; }
-
-		// FK into the Spell catalog. The importer ensures a catalog row exists for every harvested spell, so this
-		// navigation always resolves (load it with .Include(s => s.Spell) when the spell's params/level are needed).
-		// virtual so the lazy-loading-proxy DbContext used in tests can build its model.
-		public uint SpellId { get; set; }
-
-		[ForeignKey(nameof(SpellId))]
-		public virtual Spell Spell { get; set; } = null!;
 
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }

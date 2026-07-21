@@ -32,7 +32,11 @@ namespace Faolan.Importer.Extractors
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2000 = 0x2000;
 
-		private static readonly HashSet<uint> ObjectSubOpcodes = [(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR, (uint)GameServer0X2000Opcodes.DoorFullUpdateIIR, (uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR, (uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR];
+		private static readonly HashSet<uint> ObjectSubOpcodes =
+		[
+			(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR, (uint)GameServer0X2000Opcodes.DoorFullUpdateIIR,
+			(uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR, (uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR
+		];
 
 		public static List<WorldObjectEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -66,8 +70,7 @@ namespace Faolan.Importer.Extractors
 				// the SAME message ReadIdentity below reads for DisplayName - so take the id (kdtree) + name from it
 				// instead of the hand-rolled protobuf walker. LootBag and the Door/Destructible/Climbing trio keep
 				// ReadMessage (LootBag's name and the trio's geometry-tail name are not exposed by that codec).
-				var (objectId, name) = subop == SimpleDynelMessageCodec.Opcode
-					&& SimpleDynelMessageCodec.TryParse(body.AsSpan(8), out var dynel, out _, out _)
+				var (objectId, name) = subop == SimpleDynelMessageCodec.Opcode && SimpleDynelMessageCodec.TryParse(body.AsSpan(8), out var dynel, out _, out _)
 					? (dynel.Kdtree, dynel.Name ?? string.Empty)
 					: ReadMessage(body);
 				var displayName = WorldObjectBuilder.ReadIdentity(body);
@@ -98,16 +101,6 @@ namespace Faolan.Importer.Extractors
 			return entries;
 		}
 
-		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container DROP (skip it) unless it was PLACED by the world
-		// builder, which every placed/scripted container in the corpus signals with a bracketed [script-tag] in its
-		// NAME ([N7FU], [QRON], ...). The container NAME alone is NOT the signal: a boss-drop chest is named exactly
-		// like a placed one ("Chest", "Large Chest"), so keying on "chest" wrongly baked the Large Chest drops (#363);
-		// only the [script-tag] distinguishes a placement from a drop.
-		internal static bool IsTransientLootContainer(string name)
-		{
-			return !(name ?? "").Contains('[');
-		}
-
 		// Dedup by (map, spawn point, identity); keep the first seen. Identity (the display_name) is part of the key
 		// because two distinct props can occupy the EXACT same coordinates (#222) - position alone would drop one.
 		public static List<WorldObjectEntry> Merge(IEnumerable<WorldObjectEntry> all)
@@ -131,6 +124,16 @@ namespace Faolan.Importer.Extractors
 			return bodyStart <= full.Length
 				? full[bodyStart..]
 				: [];
+		}
+
+		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container DROP (skip it) unless it was PLACED by the world
+		// builder, which every placed/scripted container in the corpus signals with a bracketed [script-tag] in its
+		// NAME ([N7FU], [QRON], ...). The container NAME alone is NOT the signal: a boss-drop chest is named exactly
+		// like a placed one ("Chest", "Large Chest"), so keying on "chest" wrongly baked the Large Chest drops (#363);
+		// only the [script-tag] distinguishes a placement from a drop.
+		internal static bool IsTransientLootContainer(string name)
+		{
+			return !(name ?? "").Contains('[');
 		}
 
 		internal static float ReadLE(byte[] body, int offset)

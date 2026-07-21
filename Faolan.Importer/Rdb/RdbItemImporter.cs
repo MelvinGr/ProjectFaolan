@@ -21,7 +21,20 @@ namespace Faolan.Importer.Rdb
 	// dumps the templates for analysis.
 	public static class RdbItemImporter
 	{
+		private const uint BagPropertyField = 104; // = ContainerKind.Bag (0x68)
 		private const uint MarkerItem = 1000000;
+
+		// Bag capacity = property field 104 (= the Bag container kind, 0x68) for the normal backpack bag, or field 1331
+		// for a RESOURCE bag. Unlike Value/attributes these sit in the property table's non-monotonic tail, so
+		// TryReadPropertyField (strictly-decreasing) can't reach them. Scan for the first [fieldId][value] u32 LE pair
+		// whose value is a plausible slot count (1..512). Validated: the normal bags (Burlap 24 / Bag of Holding 20 /
+		// Veteran's Bag 35 / Max Inventory 216) via 104, and the Max Resource Bag (102) via 1331. Non-bag templates
+		// virtually never carry these fields, and the value is only ever used for an item in the matching bag slot, so
+		// a stray match is inert.
+		// The highest field-499 value: it is 0-indexed (0=Mundane .. 5=Legendary), so the max is the number of tiers
+		// above Mundane = Legendary - Mundane = 5.
+		private const uint MaxQualityFieldValue = (uint)ItemQuality.Legendary - (uint)ItemQuality.Mundane;
+		private const uint ResourceBagPropertyField = 1331; // the resource-bag capacity field (no ContainerKind analogue)
 
 		// String fields inside a template are encoded `tag 0x21 (u32) + length (u16) + flags (u16) + <length> ASCII
 		// bytes`. The length is a u16, NOT a u32 - the next u16 is a flags word that is nonzero whenever the string
@@ -32,11 +45,11 @@ namespace Faolan.Importer.Rdb
 		// first underscore-free string. NPC/TEST/internal items carry only an asset name and have no display name - we
 		// leave their captured (empty) name untouched.
 		private const uint StringTag = 0x21;
-		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
 		// The 5 primary-attribute wire stat ids field 972 is validated to hold (Str/Con/Int/Wis/Dex) - the guard that
 		// keeps the attribute-bonus import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
 		private static readonly HashSet<uint> AttributeStatIds = [804u, 806u, 808u, 810u, 814u];
+		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
 		public static string ExtractName(ReadOnlySpan<byte> template)
 		{
@@ -175,9 +188,8 @@ namespace Faolan.Importer.Rdb
 				// the MaxStatAggregator sums over equipped gear. Same property-table parse as field 74. (The
 				// secondary-modifier list + the vital/HP bonus need a reference tooltip to decode, so they are NOT
 				// imported here.)
-				if (TryReadPropertyField(template.AsSpan(12), 972, out var statId) && AttributeStatIds.Contains(statId)
-				    && TryReadPropertyField(template.AsSpan(12), 971, out var amount) && amount is > 0 and <= 100
-				    && SetAttributeBonus(item, statId, (int)amount))
+				if (TryReadPropertyField(template.AsSpan(12), 972, out var statId) && AttributeStatIds.Contains(statId) && TryReadPropertyField(template.AsSpan(12), 971, out var amount) &&
+				    amount is > 0 and <= 100 && SetAttributeBonus(item, statId, (int)amount))
 					statsAdded++;
 
 				// BAG capacity: property field 104 (= the Bag container kind 0x68) holds the extra backpack slots a bag
@@ -233,34 +245,6 @@ namespace Faolan.Importer.Rdb
 			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, qualitiesAdded, statsAdded);
 		}
 
-		// Sets the item's primary-attribute bonus for wire stat id `statId` (804/806/808/810/814) to `amount`, and
-		// clears the other four (a template carries at most one primary attribute, so a modifier that MOVED to a
-		// different attribute leaves no stale column). Returns whether anything actually changed (drives the counter +
-		// the save). Mirrors how Value/Quality are written onto the tracked Item.
-		private static bool SetAttributeBonus(Item item, uint statId, int amount)
-		{
-			int? str = null, con = null, @int = null, wis = null, dex = null;
-			switch (statId)
-			{
-				case 804: str = amount; break;
-				case 806: con = amount; break;
-				case 808: @int = amount; break;
-				case 810: wis = amount; break;
-				case 814: dex = amount; break;
-			}
-
-			if (item.StrengthBonus == str && item.ConstitutionBonus == con && item.IntelligenceBonus == @int
-			    && item.WisdomBonus == wis && item.DexterityBonus == dex)
-				return false;
-
-			item.StrengthBonus = str;
-			item.ConstitutionBonus = con;
-			item.IntelligenceBonus = @int;
-			item.WisdomBonus = wis;
-			item.DexterityBonus = dex;
-			return true;
-		}
-
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
 		{
 			foreach (var c in s)
@@ -272,37 +256,41 @@ namespace Faolan.Importer.Rdb
 			return true;
 		}
 
-		// Bag capacity = property field 104 (= the Bag container kind, 0x68) for the normal backpack bag, or field 1331
-		// for a RESOURCE bag. Unlike Value/attributes these sit in the property table's non-monotonic tail, so
-		// TryReadPropertyField (strictly-decreasing) can't reach them. Scan for the first [fieldId][value] u32 LE pair
-		// whose value is a plausible slot count (1..512). Validated: the normal bags (Burlap 24 / Bag of Holding 20 /
-		// Veteran's Bag 35 / Max Inventory 216) via 104, and the Max Resource Bag (102) via 1331. Non-bag templates
-		// virtually never carry these fields, and the value is only ever used for an item in the matching bag slot, so
-		// a stray match is inert.
-		// The highest field-499 value: it is 0-indexed (0=Mundane .. 5=Legendary), so the max is the number of tiers
-		// above Mundane = Legendary - Mundane = 5.
-		private const uint MaxQualityFieldValue = (uint)ItemQuality.Legendary - (uint)ItemQuality.Mundane;
-
-		// Direct scan for field 499 (item quality, 0-indexed) at any 4-byte-aligned position, taking the following word
-		// as the value and accepting only the 0..5 field range. Mirrors TryReadBagSlots: the fallback for templates
-		// whose 499 is outside the strict-decreasing property run (#397).
-		private static bool TryReadQualityAnywhere(ReadOnlySpan<byte> body, out uint value)
+		// Sets the item's primary-attribute bonus for wire stat id `statId` (804/806/808/810/814) to `amount`, and
+		// clears the other four (a template carries at most one primary attribute, so a modifier that MOVED to a
+		// different attribute leaves no stale column). Returns whether anything actually changed (drives the counter +
+		// the save). Mirrors how Value/Quality are written onto the tracked Item.
+		private static bool SetAttributeBonus(Item item, uint statId, int amount)
 		{
-			value = 0;
-			for (var i = 0; i + 8 <= body.Length; i += 4)
+			int? str = null, con = null, @int = null, wis = null, dex = null;
+			switch (statId)
 			{
-				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) != 499)
-					continue;
-
-				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
-				if (v <= MaxQualityFieldValue)
-				{
-					value = v;
-					return true;
-				}
+				case 804:
+					str = amount;
+					break;
+				case 806:
+					con = amount;
+					break;
+				case 808:
+					@int = amount;
+					break;
+				case 810:
+					wis = amount;
+					break;
+				case 814:
+					dex = amount;
+					break;
 			}
 
-			return false;
+			if (item.StrengthBonus == str && item.ConstitutionBonus == con && item.IntelligenceBonus == @int && item.WisdomBonus == wis && item.DexterityBonus == dex)
+				return false;
+
+			item.StrengthBonus = str;
+			item.ConstitutionBonus = con;
+			item.IntelligenceBonus = @int;
+			item.WisdomBonus = wis;
+			item.DexterityBonus = dex;
+			return true;
 		}
 
 		private static bool TryReadBagSlots(ReadOnlySpan<byte> body, uint fieldId, out uint slots)
@@ -323,9 +311,6 @@ namespace Faolan.Importer.Rdb
 
 			return false;
 		}
-
-		private const uint BagPropertyField = 104; // = ContainerKind.Bag (0x68)
-		private const uint ResourceBagPropertyField = 1331; // the resource-bag capacity field (no ContainerKind analogue)
 
 		// Reads the value of property-table field `fieldId` from a decrypted template body (the span AFTER the
 		// 12-byte RDB-Id header). The property table is the longest run of [fieldId u32][value u32] LE pairs with
@@ -377,6 +362,28 @@ namespace Faolan.Importer.Rdb
 			return bestFound;
 		}
 
+		// Direct scan for field 499 (item quality, 0-indexed) at any 4-byte-aligned position, taking the following word
+		// as the value and accepting only the 0..5 field range. Mirrors TryReadBagSlots: the fallback for templates
+		// whose 499 is outside the strict-decreasing property run (#397).
+		private static bool TryReadQualityAnywhere(ReadOnlySpan<byte> body, out uint value)
+		{
+			value = 0;
+			for (var i = 0; i + 8 <= body.Length; i += 4)
+			{
+				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) != 499)
+					continue;
+
+				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
+				if (v <= MaxQualityFieldValue)
+				{
+					value = v;
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		// Template strings backslash-escape apostrophes/quotes (e.g. "Aspirant\'s Cap"); undo that for the stored name.
 		private static string Unescape(string s)
 		{
@@ -385,6 +392,16 @@ namespace Faolan.Importer.Rdb
 				: s;
 		}
 
-		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded, int QualitiesAdded, int StatsAdded);
+		public readonly record struct Result(
+			int Keyed,
+			int Decrypted,
+			int NoEntry,
+			int HeaderMismatch,
+			int DecryptFailed,
+			int NamesAdded,
+			int CategoriesAdded,
+			int ValuesAdded,
+			int QualitiesAdded,
+			int StatsAdded);
 	}
 }

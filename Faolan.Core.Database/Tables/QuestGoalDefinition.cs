@@ -15,8 +15,7 @@ namespace Faolan.Core.Database.Tables
 		// store-generated, so adding a goal that already carries its wire id is taken to be an EXISTING row: EF marks
 		// it Modified and emits an UPDATE, which affects 0 rows and throws DbUpdateConcurrencyException mid-import.
 		// The id comes from the wire and is never generated here.
-		[Key]
-		[DatabaseGenerated(DatabaseGeneratedOption.None)]
+		[Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
 		public uint GoalId { get; set; }
 
 		// The map the goal's objective/marker sits on (all goal maps are in the Maps catalog).
@@ -32,10 +31,10 @@ namespace Faolan.Core.Database.Tables
 		// The objective text (always a <remoteformat category=50304>).
 		public uint ObjectiveRefId { get; set; }
 
-		public uint QuestDefinitionId { get; set; }
-
 		[ForeignKey(nameof(QuestDefinitionId))]
 		public virtual QuestDefinition Quest { get; set; } = null!;
+
+		public uint QuestDefinitionId { get; set; }
 
 		// For a LootFromNpc goal: the quest item (the "key") the TargetName NPC's corpse bag must contain, as an
 		// Items.Id (#261). NULL = no specific item (the goal still completes on looting the bag - it matches on the
@@ -72,9 +71,6 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? ObjectiveToken { get; set; }
 
-		[MaxLength(128)]
-		public string? TrailingToken { get; set; }
-
 		// The NPC this goal is ABOUT, interpreted per GoalType: the NPC to kill (Kill), whose corpse bag to loot
 		// (LootFromNpc), or to talk to (TalkToNpc / Escort). SERVER-SIDE ONLY - NOT on the wire: the goal record carries
 		// the count but not the target (it's in the RDB-resolved objective text). Sourced per quest by capture
@@ -90,13 +86,8 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? TrailingKey { get; set; }
 
-		// Two of the "reserved" header words: 0 for most goals; the beach goal 2 carries a number + a 4-char tag
-		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.
-		// The reserved words' two (70099, random-4CC-token) pairs, at Reserved[1..2] and Reserved[5..6]. Stored, not
-		// derived: the tags are random per entry.
-		// The word after the marker block - "Zero1" in the codec until it turned out to be nonzero on 24 of the 158
-		// captured goals. Stable per goal across every capture, so it is quest data.
-		public uint Unknown1 { get; set; }
+		[MaxLength(128)]
+		public string? TrailingToken { get; set; }
 
 		public uint Extra0 { get; set; }
 		public uint Extra1 { get; set; }
@@ -109,13 +100,12 @@ namespace Faolan.Core.Database.Tables
 		// The word echoing the goal id - EITHER the goal id or 0, stable per goal but not derivable from it (1567 of
 		// the 2850 captured goals carry 0, 1283 carry the id).
 		public uint GoalIdEcho { get; set; }
-
-		// The second word after the marker block; "Zero2" in the codec, but nonzero on 318 captured goals.
-		public uint Unknown2 { get; set; }
-		// The marker coordinates, null exactly when MapId is - the three travel as one block on the wire.
-		public uint? MarkerX { get; set; }
-		public uint? MarkerY { get; set; }
 		public uint ObjectiveCategory { get; set; }
+
+		// The goal's position in the @609 objective region. NOT derivable from Sequence: several quests carry two
+		// goals both with N=1 (12068, 12057), so ordering by Sequence is ambiguous and produced the goals in the
+		// wrong order - quest 12057's wire order is [3542,2949] while Sequence gives [2949,3542].
+		public uint RegionOrder { get; set; }
 
 		// The goal's required amount - how many kills/collects/etc. complete it. Decoded from the QuestFullUpdate /
 		// snapshot @609 goal record (the word after goalIdRepeat; values 1/3/4/8/12/64 seen on the wire, #47). 0 = not
@@ -124,11 +114,21 @@ namespace Faolan.Core.Database.Tables
 
 		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
-
-		// The goal's position in the @609 objective region. NOT derivable from Sequence: several quests carry two
-		// goals both with N=1 (12068, 12057), so ordering by Sequence is ambiguous and produced the goals in the
-		// wrong order - quest 12057's wire order is [3542,2949] while Sequence gives [2949,3542].
-		public uint RegionOrder { get; set; }
 		public uint TrailingCategory { get; set; }
+
+		// Two of the "reserved" header words: 0 for most goals; the beach goal 2 carries a number + a 4-char tag
+		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.
+		// The reserved words' two (70099, random-4CC-token) pairs, at Reserved[1..2] and Reserved[5..6]. Stored, not
+		// derived: the tags are random per entry.
+		// The word after the marker block - "Zero1" in the codec until it turned out to be nonzero on 24 of the 158
+		// captured goals. Stable per goal across every capture, so it is quest data.
+		public uint Unknown1 { get; set; }
+
+		// The second word after the marker block; "Zero2" in the codec, but nonzero on 318 captured goals.
+		public uint Unknown2 { get; set; }
+
+		// The marker coordinates, null exactly when MapId is - the three travel as one block on the wire.
+		public uint? MarkerX { get; set; }
+		public uint? MarkerY { get; set; }
 	}
 }

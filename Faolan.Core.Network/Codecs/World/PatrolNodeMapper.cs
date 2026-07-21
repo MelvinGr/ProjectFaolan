@@ -12,30 +12,14 @@ namespace Faolan.Core.Network.Codecs.World
 	// packed) or ride in WordsData (the fixed numeric arrays that don't columnize).
 	public static class PatrolNodeMapper
 	{
-		private static float ToFloat(uint bits) => BitConverter.UInt32BitsToSingle(bits);
-		private static uint ToBits(float? value) => BitConverter.SingleToUInt32Bits(value ?? 0f);
-
-		private static byte[] PackWords(params uint[] words)
-		{
-			var bytes = new byte[words.Length * 4];
-			for (var i = 0; i < words.Length; i++)
-				BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(i * 4, 4), words[i]);
-			return bytes;
-		}
-
-		private static uint[] UnpackWords(byte[] data, int count)
-		{
-			var words = new uint[count];
-			for (var i = 0; i < count; i++)
-				words[i] = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(i * 4, 4));
-			return words;
-		}
-
 		// Decodes a wire task node into a PatrolNode row (with Children/Waypoints nav populated recursively). The
 		// caller sets PatrolPathId + persists; EF cascades the tree.
 		public static PatrolNode ToNode(MoveTaskNode m)
 		{
-			var n = new PatrolNode { Mode = m.Mode };
+			var n = new PatrolNode
+			{
+				Mode = m.Mode
+			};
 
 			switch (m.Mode)
 			{
@@ -58,6 +42,7 @@ namespace Faolan.Core.Network.Codecs.World
 					else
 					{
 						for (var i = 0; i + 2 < m.Waypoints.Count; i += 3)
+						{
 							n.Waypoints.Add(new PatrolNodeWaypoint
 							{
 								Ordinal = i / 3,
@@ -65,6 +50,7 @@ namespace Faolan.Core.Network.Codecs.World
 								PositionY = ToFloat(m.Waypoints[i + 1]),
 								PositionZ = ToFloat(m.Waypoints[i + 2])
 							});
+						}
 					}
 
 					n.TrailerByte = m.TrailerByte;
@@ -130,7 +116,10 @@ namespace Faolan.Core.Network.Codecs.World
 		// Rebuilds the wire task node from a PatrolNode row (recursing into Children ordered by Ordinal).
 		public static MoveTaskNode ToTask(PatrolNode n)
 		{
-			var m = new MoveTaskNode { Mode = n.Mode };
+			var m = new MoveTaskNode
+			{
+				Mode = n.Mode
+			};
 
 			switch (n.Mode)
 			{
@@ -232,6 +221,32 @@ namespace Faolan.Core.Network.Codecs.World
 				m.HeaderDuration = ToBits(n.Duration);
 				m.HeaderRemaining = ToBits(n.Remaining);
 			}
+		}
+
+		private static byte[] PackWords(params uint[] words)
+		{
+			var bytes = new byte[words.Length * 4];
+			for (var i = 0; i < words.Length; i++)
+				BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(i * 4, 4), words[i]);
+			return bytes;
+		}
+
+		private static uint ToBits(float? value)
+		{
+			return BitConverter.SingleToUInt32Bits(value ?? 0f);
+		}
+
+		private static float ToFloat(uint bits)
+		{
+			return BitConverter.UInt32BitsToSingle(bits);
+		}
+
+		private static uint[] UnpackWords(byte[] data, int count)
+		{
+			var words = new uint[count];
+			for (var i = 0; i < count; i++)
+				words[i] = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(i * 4, 4));
+			return words;
 		}
 	}
 }

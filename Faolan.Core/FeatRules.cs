@@ -14,7 +14,9 @@ namespace Faolan.Core
 		// the captured chars - each one's spent points fit within this budget with headroom.
 		public static int PointBudget(uint level)
 		{
-			return level > 9 ? (int)(level - 9) : 0;
+			return level > 9
+				? (int)(level - 9)
+				: 0;
 		}
 
 		// A feat's point cost = max(1, encoded rank). The composite feat id bakes the rank into its low two digits

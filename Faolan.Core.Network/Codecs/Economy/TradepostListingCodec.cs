@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Protobuf;
 using ProtoBuf;

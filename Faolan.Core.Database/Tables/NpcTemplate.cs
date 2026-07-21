@@ -17,9 +17,20 @@ namespace Faolan.Core.Database.Tables
 	// `NpcTemplate` (#350) to name it for what it is. The capture-derived spawn rows are `NpcSpawn` (table `NpcSpawns`).
 	public class NpcTemplate
 	{
+		// The creature's death-animation behaviorId (the death BccIIR field-1, #362) - harvested per type from captured
+		// NPC deaths (Faolan.Importer NpcDeathBehaviorExtractor): 41877 = humanoid biped, 17036 = demon/large caster,
+		// 215333 = quadruped/beast. NULL = un-harvested type; the runtime falls back to the humanoid 41877.
+		public uint? DeathBehaviorId { get; set; }
+
+		[ConstrainToEnumValues]
+		public LootContainerTemplateId LootContainerTemplateId { get; set; } = LootContainerTemplateId.Bag;
+
 		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId) - the PRIMARY KEY (set from the RDB by the
 		// importer, never DB-generated; see DatabaseContext). One NpcTemplate row per template.
 		public uint TemplateId { get; set; }
+
+		// Ambient chatter bark lines this NPC type periodically says (per-NPC; see NpcChatter).
+		public virtual ICollection<NpcChatter> Chatter { get; set; } = new List<NpcChatter>();
 
 		// The type-level worn equipment + appearance/morph table (#307), for a summon-only creature that has no NpcSpawn
 		// placement to carry them - the per-TYPE counterpart of NpcSpawnEquipment/NpcSpawnMorph. Empty for a plain map
@@ -34,9 +45,6 @@ namespace Faolan.Core.Database.Tables
 		// The spells this NPC type casts (#232) - now FK'd to the type instead of joined by name string.
 		public virtual ICollection<NpcSpell> Spells { get; set; } = new List<NpcSpell>();
 
-		// Ambient chatter bark lines this NPC type periodically says (per-NPC; see NpcChatter).
-		public virtual ICollection<NpcChatter> Chatter { get; set; } = new List<NpcChatter>();
-
 		// The type-level CharacterIIR stat core (#244), lifted off the captured body into a 1:1 NpcStatCore side table
 		// (keyed by NpcTemplateId, like Character <-> CharacterMaxStats). Null until lifted; see NpcStatCore + the three-tier doc.
 		// This is what lets a SUMMON-ONLY creature (pet/mount, #307) build its spawn body from the type ALONE, with a
@@ -48,13 +56,5 @@ namespace Faolan.Core.Database.Tables
 		// The creature's display name (the stable join key conversations/shops/spells use).
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
-
-		// The creature's death-animation behaviorId (the death BccIIR field-1, #362) - harvested per type from captured
-		// NPC deaths (Faolan.Importer NpcDeathBehaviorExtractor): 41877 = humanoid biped, 17036 = demon/large caster,
-		// 215333 = quadruped/beast. NULL = un-harvested type; the runtime falls back to the humanoid 41877.
-		public uint? DeathBehaviorId { get; set; }
-
-		[ConstrainToEnumValues]
-		public LootContainerTemplateId LootContainerTemplateId { get; set; } = LootContainerTemplateId.Bag;
 	}
 }

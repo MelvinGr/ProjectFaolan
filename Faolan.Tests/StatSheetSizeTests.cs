@@ -19,25 +19,8 @@ namespace Faolan.Tests
 	// quiet on the legitimate create path.
 	public class StatSheetSizeTests
 	{
-		private const uint TemplateInstance = 0x0802E5D4;
 		private const uint BeachStarterQuestId = 10238;
-
-		[Fact]
-		public async Task WrongSizedStatSheet_Throws_RatherThanSilentlyUsingBaseline()
-		{
-			var def = await LoadDefinition();
-			Assert.NotNull(def);
-
-			// One pair short of a full sheet - the shape a partial CharacterStats import produces.
-			var partial = new List<(CharacterStatId Id, uint Value)>();
-			for (var i = 0; i < SubClassStatBlock.SheetSize - 1; i++)
-				partial.Add((CharacterStatId.Level, 1));
-
-			var ex = Assert.Throws<InvalidOperationException>(() =>
-				FullCharSnapshotSubClass.BuildFromScratch(def, new Character(), TemplateInstance, null, [], partial));
-
-			Assert.Contains($"{SubClassStatBlock.SheetSize}", ex.Message);
-		}
+		private const uint TemplateInstance = 0x0802E5D4;
 
 		// A character with NO stored sheet is the create path, not corruption: it must still build the skeleton.
 		[Fact]
@@ -58,13 +41,26 @@ namespace Faolan.Tests
 			Assert.Equal(SubClassStatBlock.SheetSize, SubClassStatBlock.StatList1Size + SubClassStatBlock.StatList2Size);
 		}
 
+		[Fact]
+		public async Task WrongSizedStatSheet_Throws_RatherThanSilentlyUsingBaseline()
+		{
+			var def = await LoadDefinition();
+			Assert.NotNull(def);
+
+			// One pair short of a full sheet - the shape a partial CharacterStats import produces.
+			var partial = new List<(CharacterStatId Id, uint Value)>();
+			for (var i = 0; i < SubClassStatBlock.SheetSize - 1; i++)
+				partial.Add((CharacterStatId.Level, 1));
+
+			var ex = Assert.Throws<InvalidOperationException>(() => FullCharSnapshotSubClass.BuildFromScratch(def, new Character(), TemplateInstance, null, [], partial));
+
+			Assert.Contains($"{SubClassStatBlock.SheetSize}", ex.Message);
+		}
+
 		private static async Task<QuestDefinition?> LoadDefinition()
 		{
 			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
-			return await db.QuestDefinitions
-				.Include(q => q.TextRefs)
-				.Include(q => q.Goals)
-				.FirstOrDefaultAsync(q => q.QuestId == BeachStarterQuestId);
+			return await db.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == BeachStarterQuestId);
 		}
 	}
 }

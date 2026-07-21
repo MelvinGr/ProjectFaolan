@@ -18,13 +18,13 @@ namespace Faolan.Core.Database.Tables
 		// The shop ID32 type word on the wire (0x0000C75B).
 		public const uint WireType = 0x0000C75B;
 
-		public virtual ICollection<ShopItem> Items { get; set; } = [];
-
 		// The vendor NPC TYPE this shop belongs to (the stable per-type key).
 		public uint NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))] // Maybe to NpcSpawn?
 		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
+
+		public virtual ICollection<ShopItem> Items { get; set; } = [];
 
 		// The vendor's internal name at capture time - display/logging only (NOT unique; see the class note).
 		[MaxLength(64)]

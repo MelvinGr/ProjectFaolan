@@ -7,26 +7,6 @@ namespace Faolan.Tests
 	// captured retail chars: each one's trained feats fit within its level budget with headroom.
 	public class FeatRulesTests
 	{
-		[Theory]
-		[InlineData(1u, 0)]
-		[InlineData(9u, 0)]
-		[InlineData(10u, 1)]
-		[InlineData(24u, 15)]
-		[InlineData(80u, 71)] // AoC: 1 feat point per level from 10 -> 71 at 80
-		public void PointBudget_IsOnePerLevelFromTen(uint level, int expected)
-		{
-			Assert.Equal(expected, FeatRules.PointBudget(level));
-		}
-
-		[Theory]
-		[InlineData(112700u, 1)] // rank 0 (id % 100 == 0) still costs 1 (the unlock)
-		[InlineData(110004u, 4)] // rank 4
-		[InlineData(111402u, 2)] // rank 2
-		public void PointCost_IsMaxOneAndRank(uint featId, int expected)
-		{
-			Assert.Equal(expected, FeatRules.PointCost(featId));
-		}
-
 		[Fact]
 		public void CapturedChars_FitWithinTheirBudget()
 		{
@@ -34,8 +14,7 @@ namespace Faolan.Tests
 			uint[] hakotep = [110004, 110100, 111304, 111402, 110300, 112700];
 			uint[] necrol80 =
 			[
-				80004, 82704, 410604, 80200, 80104, 81603, 84004, 84104, 410204, 81804, 82801, 410104, 81702, 80401,
-				82904, 83401, 85700, 410901, 80800, 80902, 82202, 83000, 85400, 81001, 82500
+				80004, 82704, 410604, 80200, 80104, 81603, 84004, 84104, 410204, 81804, 82801, 410104, 81702, 80401, 82904, 83401, 85700, 410901, 80800, 80902, 82202, 83000, 85400, 81001, 82500
 			];
 
 			Assert.True(FeatRules.WithinBudget(24, hakotep)); // 13 <= 15
@@ -49,6 +28,22 @@ namespace Faolan.Tests
 			Assert.False(FeatRules.WithinBudget(10, [800001u, 800101u]));
 			// The same feats are fine once the level (budget) is high enough.
 			Assert.True(FeatRules.WithinBudget(80, [800001u, 800101u]));
+		}
+
+		[Theory, InlineData(1u, 0), InlineData(9u, 0), InlineData(10u, 1), InlineData(24u, 15), InlineData(80u, 71)]
+			// AoC: 1 feat point per level from 10 -> 71 at 80
+		public void PointBudget_IsOnePerLevelFromTen(uint level, int expected)
+		{
+			Assert.Equal(expected, FeatRules.PointBudget(level));
+		}
+
+		[Theory, InlineData(112700u, 1), InlineData(110004u, 4), InlineData(111402u, 2)]
+		// rank 0 (id % 100 == 0) still costs 1 (the unlock)
+		// rank 4
+			// rank 2
+		public void PointCost_IsMaxOneAndRank(uint featId, int expected)
+		{
+			Assert.Equal(expected, FeatRules.PointCost(featId));
 		}
 	}
 }

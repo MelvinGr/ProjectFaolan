@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Rdb;
@@ -229,9 +228,8 @@ namespace Faolan.Importer.Modules
 		{
 			var r = await RdbNpcSpawnImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
 			var res = r.Resolved;
-			return new ImportResult(
-				$"{r.Areas} spawn areas ({r.Points} points) across {r.Maps} playfields ({r.EmptyMaps} empty, {r.Unreadable} unreadable); " +
-				$"resolved {res.Total}/{res.Areas} areas (name {res.Name}, containment {res.Containment}, id-prop {res.IdProp}); linked {res.Linked} captured spawns.");
+			return new ImportResult($"{r.Areas} spawn areas ({r.Points} points) across {r.Maps} playfields ({r.EmptyMaps} empty, {r.Unreadable} unreadable); " +
+			                        $"resolved {res.Total}/{res.Areas} areas (name {res.Name}, containment {res.Containment}, id-prop {res.IdProp}); linked {res.Linked} captured spawns.");
 		}
 	}
 
@@ -256,7 +254,8 @@ namespace Faolan.Importer.Modules
 				? null
 				: ctx.DumpTemplatesDir;
 			var r = await RdbItemImporter.ImportAsync(ctx.Db, ctx.RdbDir!, dump, ctx.RdbProxyBase);
-			return new ImportResult($"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.CategoriesAdded} categories, {r.ValuesAdded} values, {r.QualitiesAdded} qualities, {r.StatsAdded} stat mods.");
+			return new ImportResult(
+				$"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.CategoriesAdded} categories, {r.ValuesAdded} values, {r.QualitiesAdded} qualities, {r.StatsAdded} stat mods.");
 		}
 	}
 }

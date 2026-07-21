@@ -12,6 +12,9 @@ namespace Faolan.Importer.Modules
 	// TODO(importer step 2a): Upsert support; Overwrite only behind --force (cascades to 12 child tables).
 	public sealed class CharactersModule : IImportModule
 	{
+		// Fresh/tutorial captures (level <= 5) are skipped: they carry no trained feats and only a base ability
+		// scaffold, so they add nothing to the reference set. The kept chars are the leveled retail captures.
+		private const uint MinLevel = 5;
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
@@ -22,10 +25,6 @@ namespace Faolan.Importer.Modules
 
 		public string Description => "Captured characters (incl. other players) and their bodies/gear.";
 		public string Name => "characters";
-
-		// Fresh/tutorial captures (level <= 5) are skipped: they carry no trained feats and only a base ability
-		// scaffold, so they add nothing to the reference set. The kept chars are the leveled retail captures.
-		private const uint MinLevel = 5;
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{

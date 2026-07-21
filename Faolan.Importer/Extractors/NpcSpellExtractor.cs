@@ -1,10 +1,10 @@
 using System;
-using Faolan.Core;
-using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core;
+using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -53,6 +53,7 @@ namespace Faolan.Importer.Extractors
 				var end = Math.Min(body.Length, 4 + len);
 				if (end < PayloadOffset) // a length shorter than the fixed header: the old code yielded an empty payload -> skip
 					continue;
+
 				var cast = NpcSpellCastBuilder.NpcSpellCast.Read(new FaolanStream(body[4..end]));
 
 				if (cast.ApplyFrom == cast.ApplyTo) // a self-buff, not an offensive cast

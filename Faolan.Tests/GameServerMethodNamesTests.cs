@@ -11,8 +11,10 @@ namespace Faolan.Tests
 		// Same opcode 0x2002, three different classes -> three different recovered names (the (ushort) casts keep the
 		// enum-named value in the parameter's underlying type; opcodes live on different enums, so there's no single
 		// enum parameter type).
-		[Theory, InlineData(Endpoints.GameAgentType, (ushort)GameAgentOpcodes.ChatVicinity, "ChatVicinity"), InlineData(Endpoints.GameCharAgentType, (ushort)GameCharAgentOpcodes.RequestBindLocation, "RequestBindLocation"),
-		 InlineData(Endpoints.GameCharAgentProjectType, (ushort)GameCharAgentProjectOpcodes.AcceptApprenticeTeacher, "AcceptApprenticeTeacher"), InlineData(Endpoints.GameCharAgentType, (ushort)GameCharAgentOpcodes.RequestAggroStatus, "RequestAggroStatus"),
+		[Theory, InlineData(Endpoints.GameAgentType, (ushort)GameAgentOpcodes.ChatVicinity, "ChatVicinity"),
+		 InlineData(Endpoints.GameCharAgentType, (ushort)GameCharAgentOpcodes.RequestBindLocation, "RequestBindLocation"),
+		 InlineData(Endpoints.GameCharAgentProjectType, (ushort)GameCharAgentProjectOpcodes.AcceptApprenticeTeacher, "AcceptApprenticeTeacher"),
+		 InlineData(Endpoints.GameCharAgentType, (ushort)GameCharAgentOpcodes.RequestAggroStatus, "RequestAggroStatus"),
 		 InlineData(Endpoints.GameAgentType, (ushort)GameAgentOpcodes.Authenticate2, "Authenticate2")]
 		public void Resolve_NamesTheMethodPerClass(uint receiverClass, ushort opcode, string expected)
 		{

@@ -1,15 +1,13 @@
 using System;
 using System.Buffers.Binary;
-using System.IO;
+using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
-using Faolan.Importer.Captures;
-using Faolan.Tests.Support;
 using Faolan.Importer.Extractors;
+using Faolan.Tests.Support;
 using Xunit;
 using Xunit.Sdk;
 
@@ -19,30 +17,6 @@ namespace Faolan.Tests
 	// (quest 0x34A7 = 13479, player 0x01316E71).
 	public class QuestTests
 	{
-		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------
-
-		[Fact]
-		public void MatchingGoal_PicksByTypeAndTarget_NotAlwaysFirst()
-		{
-			// A two-goal quest: the trigger fires the goal it matches, not goal[0].
-			var goals = new[] { GoalSeq(1, 100, QuestGoalType.Kill, "Wolf"), GoalSeq(2, 200, QuestGoalType.TalkToNpc, "Casilda") };
-			Assert.Equal(200u, QuestProgress.MatchingGoal(goals, QuestGoalType.TalkToNpc, "casilda")?.GoalId); // second goal, case-insensitive
-			Assert.Equal(100u, QuestProgress.MatchingGoal(goals, QuestGoalType.Kill, "Wolf")?.GoalId);
-			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.LootFromNpc, "Wolf")); // right target, wrong type
-			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.Kill, "")); // empty target
-			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.TalkToNpc, "Nobody")); // no such target
-		}
-
-		[Fact]
-		public void AllGoalsComplete_RequiresEveryGoalAtRequired()
-		{
-			var goals = new[] { GoalReq(100, 1), GoalReq(200, 3) };
-			var progress = new System.Collections.Generic.Dictionary<uint, uint> { [100] = 1, [200] = 2 };
-			Assert.False(QuestProgress.AllGoalsComplete(goals, g => progress[g.GoalId])); // goal 200 still 2/3
-			progress[200] = 3;
-			Assert.True(QuestProgress.AllGoalsComplete(goals, g => progress[g.GoalId])); // now every goal met
-		}
-
 		[Fact]
 		public void AllGoalsComplete_EmptyIsComplete_ZeroRequiredClampsToOne()
 		{
@@ -50,6 +24,20 @@ namespace Faolan.Tests
 			var goals = new[] { GoalReq(100, 0) };
 			Assert.False(QuestProgress.AllGoalsComplete(goals, _ => 0)); // RequiredCount 0 treated as 1
 			Assert.True(QuestProgress.AllGoalsComplete(goals, _ => 1));
+		}
+
+		[Fact]
+		public void AllGoalsComplete_RequiresEveryGoalAtRequired()
+		{
+			var goals = new[] { GoalReq(100, 1), GoalReq(200, 3) };
+			var progress = new Dictionary<uint, uint>
+			{
+				[100] = 1,
+				[200] = 2
+			};
+			Assert.False(QuestProgress.AllGoalsComplete(goals, g => progress[g.GoalId])); // goal 200 still 2/3
+			progress[200] = 3;
+			Assert.True(QuestProgress.AllGoalsComplete(goals, g => progress[g.GoalId])); // now every goal met
 		}
 
 		[Fact]
@@ -140,6 +128,19 @@ namespace Faolan.Tests
 			Assert.Equal("a36d3b740000c35001316d8a000000001f080510021800220f57656c636f6d655475746f7269616c2a00320408001000",
 				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "WelcomeTutorial")).ToLowerInvariant());
 		}
+		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------
+
+		[Fact]
+		public void MatchingGoal_PicksByTypeAndTarget_NotAlwaysFirst()
+		{
+			// A two-goal quest: the trigger fires the goal it matches, not goal[0].
+			var goals = new[] { GoalSeq(1, 100, QuestGoalType.Kill, "Wolf"), GoalSeq(2, 200, QuestGoalType.TalkToNpc, "Casilda") };
+			Assert.Equal(200u, QuestProgress.MatchingGoal(goals, QuestGoalType.TalkToNpc, "casilda")?.GoalId); // second goal, case-insensitive
+			Assert.Equal(100u, QuestProgress.MatchingGoal(goals, QuestGoalType.Kill, "Wolf")?.GoalId);
+			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.LootFromNpc, "Wolf")); // right target, wrong type
+			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.Kill, "")); // empty target
+			Assert.Null(QuestProgress.MatchingGoal(goals, QuestGoalType.TalkToNpc, "Nobody")); // no such target
+		}
 
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back
 		// through the builders reproduces the captured packets byte-for-byte (proves QuestDefinitionExtractor's
@@ -150,10 +151,7 @@ namespace Faolan.Tests
 			// Full packets from the committed corpus extract: QuestDefinitionExtractor takes CapturedPacket and strips
 			// the framing itself, so bodies alone would not do.
 			const string casildaCapture = "Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json#";
-			var packets = CorpusExtract.All()
-				.Where(e => e.Source.StartsWith(casildaCapture, StringComparison.Ordinal))
-				.Select(e => new CapturedPacket(0, true, e.Opcode, e.Iir, e.Full))
-				.ToList();
+			var packets = CorpusExtract.All().Where(e => e.Source.StartsWith(casildaCapture, StringComparison.Ordinal)).Select(e => new CapturedPacket(0, true, e.Opcode, e.Iir, e.Full)).ToList();
 			var def = QuestDefinitionExtractor.Extract(packets).Single(d => d.QuestId == 0x34A7);
 
 			Assert.Equal(1054u, def.AreaId);
@@ -270,7 +268,14 @@ namespace Faolan.Tests
 			throw new XunitException($"no captured packet for sub-op {subOpHex}");
 		}
 
-
+		private static QuestGoalDefinition GoalReq(uint goalId, uint required)
+		{
+			return new QuestGoalDefinition
+			{
+				GoalId = goalId,
+				RequiredCount = required
+			};
+		}
 
 		private static QuestGoalDefinition GoalSeq(uint sequence, uint goalId, QuestGoalType type, string target)
 		{
@@ -280,15 +285,6 @@ namespace Faolan.Tests
 				GoalId = goalId,
 				GoalType = type,
 				TargetName = target
-			};
-		}
-
-		private static QuestGoalDefinition GoalReq(uint goalId, uint required)
-		{
-			return new QuestGoalDefinition
-			{
-				GoalId = goalId,
-				RequiredCount = required
 			};
 		}
 
@@ -316,4 +312,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-

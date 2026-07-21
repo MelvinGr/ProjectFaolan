@@ -1,5 +1,3 @@
-using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network.Constants;
 
@@ -13,10 +11,10 @@ namespace Faolan.Core.Network.Codecs.Feats
 	// composite base*100+rank). Decoded from the hakotep feat captures; see docs/subsystems/feats.md + #251.
 	public static class FeatIirCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.FeatIIR;
+		public const byte StateAck = 0x05;
 
 		public const byte StateTrainRequest = 0x04;
-		public const byte StateAck = 0x05;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.FeatIIR;
 
 		// [sub 4][C350 4][handle 4][00 1][state 1][zero 4][marker 4]
 		private const int FeatsOffset = 22;

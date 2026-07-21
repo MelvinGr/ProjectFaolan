@@ -21,25 +21,25 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(MapId), nameof(AreaNameId))]
 	public class MapArea
 	{
+		// The client's localized-string id for this area - the value the banner's XML carries. The stable key: a
+		// playfield's areas are identified by it, and it is what actually goes on the wire.
+		public uint AreaNameId { get; set; }
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
 
-		// The client's localized-string id for this area - the value the banner's XML carries. The stable key: a
-		// playfield's areas are identified by it, and it is what actually goes on the wire.
-		public uint AreaNameId { get; set; }
+		public float MaxX { get; set; }
+		public float MaxY { get; set; }
+		public float MaxZ { get; set; }
 
 		// The axis-aligned bounds of the captured sightings - the interim region shape. A HULL OVER SAMPLES, not the
 		// retail trigger volume: it can only cover ground a captured player actually walked, so it UNDER-covers by
 		// construction and WorldSimulation widens it with AreaBannerSlack rather than treating it as a hard polygon.
 		// It tightens with every new dump; no chat marker needed - a plain dump carries the banner and the position.
 		public float MinX { get; set; }
-		public float MaxX { get; set; }
 		public float MinY { get; set; }
-		public float MaxY { get; set; }
 		public float MinZ { get; set; }
-		public float MaxZ { get; set; }
 
 		// How many captured banners back this area. 1 = a single sighting, so the bounds are a point and only the
 		// radius does any work; more samples = a real strip (Bridge of Vilerus I has five, spanning z 711..848 -

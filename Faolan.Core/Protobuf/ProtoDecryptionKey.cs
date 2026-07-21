@@ -6,7 +6,13 @@ namespace Faolan.Core.Protobuf
 	{
 		public object Clone()
 		{
-			return new ProtoDecryptionKey { Key1 = Key1, Key2 = Key2, Key3 = Key3, Key4 = Key4 };
+			return new ProtoDecryptionKey
+			{
+				Key1 = Key1,
+				Key2 = Key2,
+				Key3 = Key3,
+				Key4 = Key4
+			};
 		}
 	}
 }

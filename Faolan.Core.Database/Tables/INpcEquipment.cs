@@ -7,9 +7,9 @@ namespace Faolan.Core.Database.Tables
 	// is resolved through the Item navigation, so the builder needs it Include-loaded (see NpcSpawnEquipment).
 	public interface INpcEquipment
 	{
+		Item Item { get; }
 		uint Level { get; set; }
 		uint Pos { get; set; }
 		uint Template { get; set; }
-		Item Item { get; }
 	}
 }

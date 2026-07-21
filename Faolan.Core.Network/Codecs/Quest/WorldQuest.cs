@@ -1,5 +1,3 @@
-using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Network.Constants;
@@ -12,16 +10,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// is the pinned RDB Lua quest VM.
 	public static class WorldQuest
 	{
-		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.QuestFullUpdateIIR,
-			GameServer0X2000Opcodes.QuestGoalIIR,
-			GameServer0X2000Opcodes.QuestIIR,
-			GameServer0X2000Opcodes.QuestJournalIIR,
-			GameServer0X2000Opcodes.QuestLogListIIR,
-		];
-
 		// BuildQuestFullUpdate emits [subop 4][ack 4][player 4][u32 0 = 4][0x01 = 1] = 17 bytes before `questId`; the
 		// per-quest snapshot-tails content is that output from `questId` onward (used by the snapshot-shape tests).
 		public const int QuestFullUpdateContentOffset = 17;
@@ -67,8 +55,20 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// timestamp - it is the same constant in the live grant packet and the in-progress login snapshot; decoded as
 		// a structural header field).
 		public const ulong SnapshotQuestAcceptTime = 0x000111D354375554UL;
+		private const int EntrySize = 8;
+
+		// QuestLogList: the fixed head before the entries, and one [u32 ordinal][u32 questId] entry.
+		private const int HeaderLength = 29;
 		private const string RrlMagic = "RRL3"; // record-list magic that precedes the per-quest entries
+
 		private const uint ChapterTag = 0x00000BD3; // per-quest grouping word, constant across Tortage quests
+
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.QuestFullUpdateIIR, GameServer0X2000Opcodes.QuestGoalIIR, GameServer0X2000Opcodes.QuestIIR, GameServer0X2000Opcodes.QuestJournalIIR,
+			GameServer0X2000Opcodes.QuestLogListIIR
+		];
 
 		// QuestFullUpdate: one quest's full record (description, summary, objective + world marker).
 		//   header: [00000000][01][questId][00000001][questId][level][00000000][00000003][0x412]
@@ -380,10 +380,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 			questIds = ids;
 			return true;
 		}
-
-		// QuestLogList: the fixed head before the entries, and one [u32 ordinal][u32 questId] entry.
-		private const int HeaderLength = 29;
-		private const int EntrySize = 8;
 
 		private static void WriteHeader(FaolanStream w, uint subOpcode, uint playerHandle)
 		{

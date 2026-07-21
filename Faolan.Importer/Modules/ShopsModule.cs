@@ -11,6 +11,7 @@ namespace Faolan.Importer.Modules
 	public sealed class ShopsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Captures;
+
 		// Depends on `items`: every ware's ProtoAcgItem identity (quad + template + hash) is harvested into Items by
 		// the items module (ItemHashHarvester's shop source reads the same 0x2033 packets). Shops must run AFTER that
 		// so the ShopItem -> Items FK resolves; otherwise a `--only shops` run leaves the wares orphaned and the shop

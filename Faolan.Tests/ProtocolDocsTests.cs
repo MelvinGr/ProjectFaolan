@@ -23,15 +23,15 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void MessagesPage_IsUpToDate()
-		{
-			AssertGenerated(MessagesPage.RelativePath, MessagesPage.Render());
-		}
-
-		[Fact]
 		public void IirTypesPage_IsUpToDate()
 		{
 			AssertGenerated(IirTypesPage.RelativePath, IirTypesPage.Render());
+		}
+
+		[Fact]
+		public void MessagesPage_IsUpToDate()
+		{
+			AssertGenerated(MessagesPage.RelativePath, MessagesPage.Render());
 		}
 
 		[Fact]

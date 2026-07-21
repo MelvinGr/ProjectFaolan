@@ -16,24 +16,24 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(ConversationNodeId))]
 		public virtual ConversationNode Node { get; set; } = null!;
 
+		// The decoded remoteformat dialogue screen(s), STRUCTURED (#188) - the runtime builds the wire XML from these
+		// rows (ConversationScreenColumns.ToScreen -> RemoteFormatXml.Build). Empty for OpenChatWindow / non-Knubot.
+		public virtual ICollection<ConversationScreen> Screens { get; set; } = new List<ConversationScreen>();
+
 		public byte? Env { get; set; } // KnubotBaseIIR env byte
 		public byte? Flag { get; set; } // OpenChatWindow/AppendText trailing flag (null otherwise)
 		public byte[]? CameraParams { get; set; }
+
+		public int Sequence { get; set; }
+
+		// SetDialogueCamera (0x2015): the 10 camera param bytes after the two endpoint handles. Body =
+		// [0xC350][npc][0xC350][player][CameraParams]. The sender instance is SenderInstance (shared with Knubot).
+		public uint? Field { get; set; } // AppendText/CloseChatWindow scalar (null for Open/AnswerList)
 
 		// The rpcHeader caller endpoint instance the packet was sent from - retail VARIES the GameAgent instance per
 		// conversation (0x07..0x5a; 0x08 most common) and the client addresses its KnubotAnswer back to it, so it's
 		// stored and re-framed at send time (was read from the raw Data blob, now retired).
 		public uint? SenderInstance { get; set; }
-
-		public int Sequence { get; set; }
-
-		// The decoded remoteformat dialogue screen(s), STRUCTURED (#188) - the runtime builds the wire XML from these
-		// rows (ConversationScreenColumns.ToScreen -> RemoteFormatXml.Build). Empty for OpenChatWindow / non-Knubot.
-		public virtual ICollection<ConversationScreen> Screens { get; set; } = new List<ConversationScreen>();
-
-		// SetDialogueCamera (0x2015): the 10 camera param bytes after the two endpoint handles. Body =
-		// [0xC350][npc][0xC350][player][CameraParams]. The sender instance is SenderInstance (shared with Knubot).
-		public uint? Field { get; set; } // AppendText/CloseChatWindow scalar (null for Open/AnswerList)
 
 		// --- structured screen (#188) ----------------------------------------------------------------------------
 		// SubOpcode is the Knubot dialogue IIR (0x045B0B0F / 0x4A3D899A / 0xF164A4A5 / 0xC4AF39EB) OR the dialogue

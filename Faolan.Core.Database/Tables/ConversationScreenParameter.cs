@@ -16,10 +16,10 @@ namespace Faolan.Core.Database.Tables
 
 		public int Sequence { get; set; } // order within the screen's parameter list
 
-		[MaxLength(64)]
-		public string Name { get; set; } = "";
-
 		[MaxLength(512)]
 		public string InnerRaw { get; set; } = "";
+
+		[MaxLength(64)]
+		public string Name { get; set; } = "";
 	}
 }

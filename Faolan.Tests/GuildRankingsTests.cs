@@ -9,14 +9,6 @@ namespace Faolan.Tests
 	// captured retail packet, and checks the DB builder produces a well-formed body the same decoder round-trips.
 	public class GuildRankingsTests
 	{
-		// The 4773-byte guild-rankings download from the hoxxling guild_invite_accepted capture (48 guilds, 4 tabs).
-		[Fact]
-		public void Decode_ReEncode_IsByteIdentical()
-		{
-			var golden = Golden.Bytes("GuildRankings");
-			Assert.Equal(golden, GuildRankings.Decode(golden).Encode());
-		}
-
 		[Fact]
 		public void Decode_ParsesRecordsAndSections()
 		{
@@ -33,15 +25,20 @@ namespace Faolan.Tests
 				Assert.Equal(section.Select(e => e.Renown).OrderByDescending(x => x), section.Select(e => e.Renown));
 		}
 
+		// The 4773-byte guild-rankings download from the hoxxling guild_invite_accepted capture (48 guilds, 4 tabs).
+		[Fact]
+		public void Decode_ReEncode_IsByteIdentical()
+		{
+			var golden = Golden.Bytes("GuildRankings");
+			Assert.Equal(golden, GuildRankings.Decode(golden).Encode());
+		}
+
 		[Fact]
 		public void FromGuilds_RanksByCategoryAndRoundTrips()
 		{
 			// Total = V+G+A: Alpha 30, Bravo 60, Charlie 0 (fresh guild - absent from every tab).
-			var built = GuildRankings.FromGuilds(
-			[
-				new GuildRankings.Row(1, "Alpha", Valor: 5, Glory: 10, Artistry: 15, Members: 3, Level: 4),
-				new GuildRankings.Row(2, "Bravo", Valor: 40, Glory: 20, Artistry: 0, Members: 9, Level: 7),
-				new GuildRankings.Row(3, "Charlie", Valor: 0, Glory: 0, Artistry: 0, Members: 1, Level: 1)
+			var built = GuildRankings.FromGuilds([
+				new GuildRankings.Row(1, "Alpha", 5, 10, 15, 3, 4), new GuildRankings.Row(2, "Bravo", 40, 20, 0, 9, 7), new GuildRankings.Row(3, "Charlie", 0, 0, 0, 1, 1)
 			]);
 
 			// Records are sorted by total desc: Bravo(60), Alpha(30), Charlie(0).

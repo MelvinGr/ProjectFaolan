@@ -8,8 +8,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// trailing u32 are constructed. Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
 	public record TemplateActionCodec(uint Handle, byte Env, byte[] Template, uint F1, uint F2, uint F3, uint F4, uint F5, uint F6) : ICodec<TemplateActionCodec>
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.TemplateActionIIR;
 		public const int TemplateBytes = 68;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.TemplateActionIIR;
 
 		public static TemplateActionCodec Read(FaolanStream s)
 		{
@@ -19,8 +19,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var template = s.ReadArray(TemplateBytes);
-			return new TemplateActionCodec(handle, env, template,
-				s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32());
+			return new TemplateActionCodec(handle, env, template, s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32());
 		}
 
 		public void Write(FaolanStream s)
@@ -31,7 +30,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(Handle)
 				.WriteByte(Env)
 				.WriteArray(Template)
-				.WriteUInt32(F1).WriteUInt32(F2).WriteUInt32(F3).WriteUInt32(F4).WriteUInt32(F5).WriteUInt32(F6));
+				.WriteUInt32(F1)
+				.WriteUInt32(F2)
+				.WriteUInt32(F3)
+				.WriteUInt32(F4)
+				.WriteUInt32(F5)
+				.WriteUInt32(F6));
 		}
 
 		public static TemplateActionCodec Parse(byte[] body)

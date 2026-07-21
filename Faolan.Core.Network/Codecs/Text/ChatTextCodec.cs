@@ -27,14 +27,13 @@ namespace Faolan.Core.Network.Codecs.Text
 	//                      exact bit meanings still loose, but it is a real field, not padding.
 	public static class ChatTextCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.ChatTextIIR; // 0xE0B51102
-		private const byte LeadFlag = 0x00;
-
 		// The two fields after the XML, decoded from the client (de)serializer (#321), no longer an opaque "trailer":
 		// the chat-text TYPE selector (NPCChatTextType_e, one byte) then a big-endian flags/format word. Defaults are
 		// the values in our sole capture (type 0, flags 0x40000001).
 		public const byte DefaultChatTextType = 0x00;
 		public const uint DefaultTypeFlags = 0x40000001;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.ChatTextIIR; // 0xE0B51102
+		private const byte LeadFlag = 0x00;
 
 		public static byte[] Build(uint instance, byte[] xml)
 		{
@@ -59,8 +58,8 @@ namespace Faolan.Core.Network.Codecs.Text
 				s.ReadArray(1); // lead flag 0x00
 				var xmlLen = s.ReadUInt16();
 				var xml = s.ReadArray(xmlLen);
-				var chatTextType = s.ReadByte();  // NPCChatTextType_e
-				var typeFlags = s.ReadUInt32();   // flags/format word (big-endian)
+				var chatTextType = s.ReadByte(); // NPCChatTextType_e
+				var typeFlags = s.ReadUInt32(); // flags/format word (big-endian)
 				return new Message(instance, xml, chatTextType, typeFlags);
 			}
 

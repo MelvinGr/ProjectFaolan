@@ -1,5 +1,4 @@
 using System;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
@@ -7,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
@@ -70,7 +70,12 @@ namespace Faolan.Tests
 
 				Assert.Equal((1, 1, 0), result);
 
-				var character = await db.Characters.Include(c => c.MaxStats).Include(c => c.Body).Include(c => c.Attributes).Include(c => c.Skills).SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
+				var character = await db
+					.Characters.Include(c => c.MaxStats)
+					.Include(c => c.Body)
+					.Include(c => c.Attributes)
+					.Include(c => c.Skills)
+					.SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
 				Assert.Equal(0x01316D2Bu, character.Id); // the ORIGINAL retail id (the spawn handle)
 				Assert.Equal(7u, character.AccountId);
 				Assert.Equal(Sex.Female, character.Sex); // dikketest: editor ChangeSex 6 -> wire 3 = female
@@ -135,9 +140,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-
-
-
-
-
-

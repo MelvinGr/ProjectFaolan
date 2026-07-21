@@ -1,7 +1,6 @@
+using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using Faolan.Core.Database.Tables;
-using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
@@ -18,14 +17,6 @@ namespace Faolan.Importer.Extractors
 	// wholesale and would strip the richer rows the full-update path built.
 	public static class CompletedQuestExtractor
 	{
-		public sealed record CompletedQuest(uint QuestId, uint AreaId, uint MapId, uint Sequence, TextRef Title, TextRef SubLine);
-
-		public sealed record TextRef(uint RefId, uint Category, string Key, string? Flags, bool IsLocalized, string? Token);
-
-		public sealed record Harvest(List<CompletedQuest> Quests, Dictionary<uint, AreaHeader> Areas);
-
-		public sealed record AreaHeader(uint AreaId, uint MapId, TextRef Title, TextRef Region, TextRef Map);
-
 		public static Harvest Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var quests = new Dictionary<uint, CompletedQuest>();
@@ -72,20 +63,6 @@ namespace Faolan.Importer.Extractors
 			return Parse(xml);
 		}
 
-		private static TextRef? Parse(string xml)
-		{
-			if (string.IsNullOrEmpty(xml))
-				return null;
-
-			var key = Attr(xml, "key");
-			if (key == null)
-				return null;
-
-			// Either id= or token= addresses the string; token wins when present.
-			return new TextRef(AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags"),
-				xml.Contains("<localized", System.StringComparison.Ordinal), Attr(xml, "token"));
-		}
-
 		private static string? Attr(string xml, string name)
 		{
 			var m = Regex.Match(xml, name + "=\"([^\"]*)\"");
@@ -101,5 +78,26 @@ namespace Faolan.Importer.Extractors
 				? n
 				: 0u;
 		}
+
+		private static TextRef? Parse(string xml)
+		{
+			if (string.IsNullOrEmpty(xml))
+				return null;
+
+			var key = Attr(xml, "key");
+			if (key == null)
+				return null;
+
+			// Either id= or token= addresses the string; token wins when present.
+			return new TextRef(AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags"), xml.Contains("<localized", StringComparison.Ordinal), Attr(xml, "token"));
+		}
+
+		public sealed record CompletedQuest(uint QuestId, uint AreaId, uint MapId, uint Sequence, TextRef Title, TextRef SubLine);
+
+		public sealed record TextRef(uint RefId, uint Category, string Key, string? Flags, bool IsLocalized, string? Token);
+
+		public sealed record Harvest(List<CompletedQuest> Quests, Dictionary<uint, AreaHeader> Areas);
+
+		public sealed record AreaHeader(uint AreaId, uint MapId, TextRef Title, TextRef Region, TextRef Map);
 	}
 }

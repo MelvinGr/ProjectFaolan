@@ -37,13 +37,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint Field2c { get; init; } // @+0x2c - equals questId on the beach template, but NOT in general
 		public uint FieldEc { get; init; } // @+0xec (=1 in template)
 		public uint FieldF0 { get; init; } // @+0xf0 (=0x96)
+
+		public uint State { get; set; } // settable: world entry historically patches the lead quest's @20 word
+
 		// @+0x14. NOT a goal count, despite carrying that name until 2026-07-20: the beach template holds 0x412
 		// (1042) for a TWO-goal quest, and NecroL80's first record holds 2. Emitting it as a goal count - telling the
 		// client "N objectives follow" and then writing none - desynced the client's cursor and crashed it in
 		// StatList_t (see QuestObjectiveRegion.Read). Its meaning is still open; treat it as opaque and carry it
 		// through from the capture rather than deriving it.
 		public uint Unknown14 { get; init; }
-		public uint State { get; set; } // settable: world entry historically patches the lead quest's @20 word
 		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
 		public ulong FieldF8 { get; init; } // @+0xf8 u64 (=15)
 

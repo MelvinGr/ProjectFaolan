@@ -39,19 +39,28 @@ namespace Faolan.GameServer.World
 
 		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry).
 		private const double LootBagExpirySeconds = 120.0;
+		private const double PatrolDwellSeconds = 2.0;
 
 		// How far a loot bag may be ground-snapped from the NPC's death Y. The snap fixes death-moment Y drift (tall /
 		// flying creatures, MoveTask Z-drift #190) - a few metres. Beyond that the heightmap is describing the OUTDOOR
 		// SURFACE above an interior/cave kill, not the floor the creature stood on, so the snap is refused and the
 		// death Y wins. Outdoor kills sit ~1m off; the cave kill that exposed this was 28m.
 		private const float MaxLootGroundSnap = 5f;
-		private const double PatrolDwellSeconds = 2.0;
 
 		// #266 patrol cycle: estimated client WALK speed (world units/sec) used to time how long a patrol route takes to
 		// traverse, plus a dwell pause at the end, before the route is re-issued so the NPC keeps looping. These are the
 		// re-issue cadence only (the client drives the actual walk); tune against in-client pacing if a patrol pauses or
 		// restarts mid-walk. NpcMoveSpeed (12) is the RUN speed; a walk is roughly half.
 		private const float PatrolWalkSpeed = 6f;
+
+		// How far a seated player must move from their seat before they stand up. While seated the client keeps
+		// streaming position syncs at (roughly) the seat position - plus a one-time seat-snap of up to ~1 unit - and
+		// those must NOT be read as "left the bench" (that stood the player straight back up). Only a real walk exceeds
+		// this. Capture: the seated position syncs drift < 1 unit; the player is well past this by the time standup fires.
+		private const float SeatLeaveDistance = 2.0f;
+
+		// The object class the sit remoteformat names (capture: startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel).
+		private const string BenchObjectClass = "TavernBenchSimpleDynel";
 
 		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
 
@@ -82,6 +91,10 @@ namespace Faolan.GameServer.World
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
+		// _questHandler is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
+		// call into it (Casilda's captive pose on stream-in) without a construction cycle.
+		private readonly QuestHandlerService _questHandler;
+
 		private readonly WorldSimulation _sim;
 
 		// Quest-gated NPC name -> the quest ids that reveal it (#261). Cached once; an NPC in this map is streamed only
@@ -101,10 +114,6 @@ namespace Faolan.GameServer.World
 		// silently never renders. 0x00090000 sits just above the burst NPCs (0x000818xx) and well below the char-id
 		// range (0x02000000+) - small, valid, collision-free. (Matches the RetailLoginReplay built-NPC test handle.)
 		private int _nextRuntimeHandle = 0x00090000;
-
-		// _questHandler is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
-		// call into it (Casilda's captive pose on stream-in) without a construction cycle.
-		private readonly QuestHandlerService _questHandler;
 
 		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, QuestHandlerService questHandler)
 		{
@@ -149,12 +158,14 @@ namespace Faolan.GameServer.World
 		{
 			// The per-quest level is a constant harvested into the definition (#352); fall back to the captured default
 			// only when this quest had no full-update in the captures (Level == 0).
-			var levelValue = level ?? (def.Level != 0 ? def.Level : WorldQuest.DefaultQuestLevel);
+			var levelValue = level ?? (def.Level != 0
+				? def.Level
+				: WorldQuest.DefaultQuestLevel);
 			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
 				.Select(s => WorldBroadcastBodies.Record(def, s))
 				.ToArray();
-			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), def.MapId, def.MarkerX,
-				def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
+			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+				def.MapId, def.MarkerX, def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
@@ -281,37 +292,6 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// Relays a player's ApplySpell (the MagicBuffIIR spell EFFECT - a buff applied, or an offensive cast) to every
-		// other player who can already see the caster, so the effect renders on their clients too. This is the EFFECT
-		// analogue of BroadcastBehaviorToViewers, which relays only the cast GESTURE (the BCC animation): retail streams
-		// BOTH to nearby observers. `body` is the same ApplySpell carrier the caster's own client receives - it already
-		// carries the acting player's handle as applyFrom (and, for a self-buff, applyTo); retail relays that exact body
-		// to nearby players, only the frame receiver differs. Ground truth: the other-players-visible capture
-		// (Hoxxling ...other_playersvisible) shows s2c ApplySpell (0x6B87E316) for other-player handles 0x1316xxx framed
-		// to our endpoint - both self-buffs (e.g. player 0x01316e68 at frame 3809) and offensive casts (player
-		// 0x01316cee on NPC targets). Gated on the viewer's Known set (#245: never relay for a handle the viewer's
-		// client hasn't built). No-op solo / when the caster is unseen.
-		public async Task BroadcastSpellToViewers(INetworkClient caster, byte[] body)
-		{
-			var entity = _sim.PlayerWorldEntity(caster);
-			if (entity == null || body == null)
-				return;
-
-			var zone = _sim.World.ZoneForEntity(entity);
-			if (zone == null)
-				return;
-
-			foreach (var viewer in zone.Entities)
-			{
-				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
-					continue;
-				if (!viewer.Known.Contains(entity.Handle))
-					continue; // only players who already see the caster (their client has the handle)
-
-				await SendWorldIir(viewer.Client, body);
-			}
-		}
-
 		// Despawn a world-owned entity (a killed NPC, an expired loot bag) for every nearby player THAT ACTUALLY HAS IT
 		// in their Known set. The Known guard is the #245 invariant: an n3ToClientQuit for a handle the recipient was
 		// never sent crashes the client (`pcDynel == null`) - a still-loading player in range of an entity it never
@@ -386,6 +366,23 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// An NPC arrived home and stopped moving: send a StopIIR (final position + facing) to every viewer that sees it,
+		// closing the MoveTask stream it was emitting while it chased/returned (#190). Faces the direction it travelled.
+		public async Task BroadcastNpcHeartbeat(WorldEntity npc)
+		{
+			// The short-form BehaviorControlCenterIIR idle pulse (#225), carrying the NPC's monotonic per-entity tick. The
+			// codec output is the bare IIR record (no length prefix), so it rides SendWorldIir - the same framing as the
+			// MoveTask above - which adds the carrier's [u32 length]. Gated on CONFIRMED (not Known) so a still-loading
+			// viewer - which has the handle in Known but not Confirmed - is never sent a pulse for an unbuilt dynel.
+			var record = BehaviorHeartbeatCodec.Build(npc.Handle, ++npc.HeartbeatTick);
+
+			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
+					await SendWorldIir(viewer.Client, record);
+			}
+		}
+
 		// An NPC moved a retail-sized segment (chasing a target, or returning home): send its MoveTask to every player in
 		// range that already sees it. The body is the 61-byte transform form for the SEGMENT (MoveFrom -> Position, facing
 		// the travel direction); the throttle in WorldState.Tick (#272) only queues this once the NPC has covered
@@ -435,23 +432,6 @@ namespace Faolan.GameServer.World
 				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
 				if (viewer.Client != null && viewer.Known.Add(npc.Handle))
 					await SendWorldSpawn(viewer.Client, npc); // #266: no route replay - the tick drives a server-side wander
-			}
-		}
-
-		// An NPC arrived home and stopped moving: send a StopIIR (final position + facing) to every viewer that sees it,
-		// closing the MoveTask stream it was emitting while it chased/returned (#190). Faces the direction it travelled.
-		public async Task BroadcastNpcHeartbeat(WorldEntity npc)
-		{
-			// The short-form BehaviorControlCenterIIR idle pulse (#225), carrying the NPC's monotonic per-entity tick. The
-			// codec output is the bare IIR record (no length prefix), so it rides SendWorldIir - the same framing as the
-			// MoveTask above - which adds the carrier's [u32 length]. Gated on CONFIRMED (not Known) so a still-loading
-			// viewer - which has the handle in Known but not Confirmed - is never sent a pulse for an unbuilt dynel.
-			var record = BehaviorHeartbeatCodec.Build(npc.Handle, ++npc.HeartbeatTick);
-
-			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
-			{
-				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
-					await SendWorldIir(viewer.Client, record);
 			}
 		}
 
@@ -519,7 +499,7 @@ namespace Faolan.GameServer.World
 			// NPC here at entry (includeNonPlayers), each as its own FA015807 + name registration via DispatchInterest.
 			// No burst NPCs means no Known-seeding and no double-spawn. KNOWN: streams the cross-session model union
 			// (~4x retail density) - cross-session mob dedup / interest tuning is a follow-up.
-			var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, true, isEntry: true);
+			var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, true, true);
 			await DispatchInterest(npcEvents, null);
 		}
 
@@ -556,6 +536,37 @@ namespace Faolan.GameServer.World
 			}
 
 			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail));
+		}
+
+		// Relays a player's ApplySpell (the MagicBuffIIR spell EFFECT - a buff applied, or an offensive cast) to every
+		// other player who can already see the caster, so the effect renders on their clients too. This is the EFFECT
+		// analogue of BroadcastBehaviorToViewers, which relays only the cast GESTURE (the BCC animation): retail streams
+		// BOTH to nearby observers. `body` is the same ApplySpell carrier the caster's own client receives - it already
+		// carries the acting player's handle as applyFrom (and, for a self-buff, applyTo); retail relays that exact body
+		// to nearby players, only the frame receiver differs. Ground truth: the other-players-visible capture
+		// (Hoxxling ...other_playersvisible) shows s2c ApplySpell (0x6B87E316) for other-player handles 0x1316xxx framed
+		// to our endpoint - both self-buffs (e.g. player 0x01316e68 at frame 3809) and offensive casts (player
+		// 0x01316cee on NPC targets). Gated on the viewer's Known set (#245: never relay for a handle the viewer's
+		// client hasn't built). No-op solo / when the caster is unseen.
+		public async Task BroadcastSpellToViewers(INetworkClient caster, byte[] body)
+		{
+			var entity = _sim.PlayerWorldEntity(caster);
+			if (entity == null || body == null)
+				return;
+
+			var zone = _sim.World.ZoneForEntity(entity);
+			if (zone == null)
+				return;
+
+			foreach (var viewer in zone.Entities)
+			{
+				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
+					continue;
+				if (!viewer.Known.Contains(entity.Handle))
+					continue; // only players who already see the caster (their client has the handle)
+
+				await SendWorldIir(viewer.Client, body);
+			}
 		}
 
 		// Stashes the player's own FA015807 body (the bytes after the RPC header) on their world entity, so the
@@ -645,8 +656,7 @@ namespace Faolan.GameServer.World
 				// ~1m, which is why this only ever showed up on interior kills. Past the tolerance the death Y is the
 				// better answer: the creature was demonstrably standing there.
 				var dropPos = deadNpc.Position;
-				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY
-					&& MathF.Abs(groundY - deadNpc.Position.Y) <= MaxLootGroundSnap)
+				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY && MathF.Abs(groundY - deadNpc.Position.Y) <= MaxLootGroundSnap)
 					dropPos = new Vector3(deadNpc.Position.X, groundY, deadNpc.Position.Z);
 
 				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle ?? 0, deadNpc.Name, deadNpc.LootContainer);
@@ -656,28 +666,6 @@ namespace Faolan.GameServer.World
 			}
 
 			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
-		}
-
-		// Despawns a non-player entity by handle in the calling player's zone: the decoded n3ToClientQuit removal
-		// to every player in range + drop from the model (the cleanup complement to SpawnNpcForPlayer; also works
-		// on burst NPCs and loot bags). Returns the removed entity, or null when the handle is unknown or a player.
-		public async Task<WorldEntity> DespawnEntityForPlayer(INetworkClient client, uint entityHandle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(entityHandle, out var entity) || entity.IsPlayer)
-				return null;
-
-			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
-			{
-				// #245 invariant: only despawn for a viewer that actually has this handle (a despawn for a handle the
-				// recipient was never sent crashes it). Removes it from Known as it goes.
-				if (viewer.Client != null && viewer.Known.Remove(entityHandle))
-					await SendWorldDespawn(viewer.Client, _sim.World.ZoneForEntity(viewer).PlayfieldToken, entityHandle);
-			}
-
-			_sim.World.Remove(entity);
-			_logger.LogInformation("Despawn: removed {Name} 0x{Handle:X8} (by {Player}).", entity.Name, entityHandle, player.Name);
-			return entity;
 		}
 
 		// GM .delete of a static WORLD OBJECT (chest/door/dynel): these aren't in the live entity model (they stream
@@ -701,12 +689,36 @@ namespace Faolan.GameServer.World
 			var classWord = WorldObjectBuilder.TypeTagForClass(obj.SubOpcode);
 			var zone = _sim.World.ZoneForEntity(player);
 			foreach (var viewer in zone.PlayersInRange(obj.Position, WorldSimulation.PlayerInterestRange))
+			{
 				if (viewer.Client?.Session?.WorldEntered == true)
 					await SendWorldDespawn(viewer.Client, zone.PlayfieldToken, handle, classWord);
+			}
 
 			var deleted = await _database.DeleteWorldObject(player.MapId, handle);
 			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", obj.DisplayName ?? obj.Name, handle, deleted, player.Name);
 			return obj;
+		}
+
+		// Despawns a non-player entity by handle in the calling player's zone: the decoded n3ToClientQuit removal
+		// to every player in range + drop from the model (the cleanup complement to SpawnNpcForPlayer; also works
+		// on burst NPCs and loot bags). Returns the removed entity, or null when the handle is unknown or a player.
+		public async Task<WorldEntity> DespawnEntityForPlayer(INetworkClient client, uint entityHandle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(entityHandle, out var entity) || entity.IsPlayer)
+				return null;
+
+			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
+			{
+				// #245 invariant: only despawn for a viewer that actually has this handle (a despawn for a handle the
+				// recipient was never sent crashes it). Removes it from Known as it goes.
+				if (viewer.Client != null && viewer.Known.Remove(entityHandle))
+					await SendWorldDespawn(viewer.Client, _sim.World.ZoneForEntity(viewer).PlayfieldToken, entityHandle);
+			}
+
+			_sim.World.Remove(entity);
+			_logger.LogInformation("Despawn: removed {Name} 0x{Handle:X8} (by {Player}).", entity.Name, entityHandle, player.Name);
+			return entity;
 		}
 
 		// Loads a map's NPCs from NpcSpawns into the world model ONCE (on first entry), so the server has an
@@ -740,7 +752,9 @@ namespace Faolan.GameServer.World
 			// different captures); since the zone is handle-keyed, a colliding row would silently overwrite another, so
 			// a collision gets a fresh handle below - the last real dedup this loop still needs, for wire correctness.
 			var usedHandles = new HashSet<uint>();
-			var nextFreeHandle = npcs.Length == 0 ? 1u : npcs.Max(n => n.CapturedHandle) + 1u;
+			var nextFreeHandle = npcs.Length == 0
+				? 1u
+				: npcs.Max(n => n.CapturedHandle) + 1u;
 			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
 			string labelSample = null;
 			foreach (var npc in npcs)
@@ -767,6 +781,7 @@ namespace Faolan.GameServer.World
 						nextFreeHandle++;
 					handle = nextFreeHandle;
 				}
+
 				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals, npc.NpcTemplateId);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
 				entity.Level = npc.Level;
@@ -831,6 +846,7 @@ namespace Faolan.GameServer.World
 					labelledCount++;
 					labelSample ??= areaLabel;
 				}
+
 				if (NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var spawnBody))
 					entity.SpawnBody = spawnBody;
 
@@ -862,84 +878,8 @@ namespace Faolan.GameServer.World
 			await LoadAmbientSpawns(mapId, instanceId, zone);
 
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
-			_logger.LogDebug("World: #363 {Labelled}/{Total} captured spawns have a spawn-area label on map {Map} (.togglenpcgroup to show; sample: {Sample}).",
-				labelledCount, npcs.Length, mapId, labelSample ?? "<none>");
-		}
-
-		// #363 live ambient spawner: the capture-INDEPENDENT open-world
-		// population, managed as spawn-group POOLS. Each RESOLVED NpcSpawnArea becomes an AmbientPool that keeps ~MaxCount
-		// of its creature alive within the group's area: the initial fill spawns one per RDB point, each member roams the
-		// group's points (its PatrolWaypoints -> the #266 wander) and fades on death (NoRespawn); MaintainAmbientPools
-		// then respawns the deficit at a free point. Built WHOLE from the creature TYPE (TryBuildFromType, the pet path).
-		// Worked example - Tortage beach (4010): the four T_Crocodile-* areas become four Crocodile pools (8/7/8/11)
-		// that each hold that many crocs roaming their stretch of shore, refilled as the player kills them.
-		private async Task LoadAmbientSpawns(uint mapId, uint instanceId, Zone zone)
-		{
-			var areas = await _database.GetResolvedSpawnAreas(mapId);
-			var pools = new List<AmbientPool>();
-			var spawned = 0;
-			foreach (var area in areas)
-			{
-				var type = area.NpcTemplate;
-				if (type?.StatCore?.IirHeader == null)
-					continue; // the resolved creature has no buildable stat core - skip (can't construct its body)
-
-				var points = area.Points.Select(p => p.Position).ToArray();
-				if (points.Length == 0)
-					continue;
-
-				var level = type.StatCore.Level ?? 0;
-				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, level,
-					level > 0 ? CombatResolver.NpcMaxHealthForLevel(level) : 1u,
-					type.StatCore.Disposition ?? WorldEntity.DispositionFriendly, FormatAreaLabel(area));
-				pools.Add(pool);
-
-				// The captured spawns LINKED to this area (tagged in the load loop above) are already in the zone as pool
-				// members - the "obsolete npcspawns" that fill the pool first; only spawn the DEFICIT up to MaxCount, at
-				// points not already occupied. So a resolved area with captured members doesn't double-populate.
-				var members = zone.Entities.Where(e => e.SpawnAreaId == area.Id).ToList();
-				for (var i = members.Count; i < pool.MaxCount; i++)
-				{
-					var member = SpawnAmbientMember(pool, FreeAmbientPoint(pool, members), zone);
-					if (member == null)
-						break;
-
-					members.Add(member);
-					spawned++;
-				}
-			}
-
-			_ambientPools[(mapId, instanceId)] = pools;
-			if (spawned > 0)
-				_logger.LogInformation("World: +{Count} ambient NPC(s) across {Pools} spawn-area pool(s) on map {Map}.", spawned, pools.Count, mapId);
-		}
-
-		// Builds one member of an ambient pool at `pos` and adds it to the zone (no wire send - the interest stream, or
-		// the maintenance caller, does that). The member roams the pool's points and fades-not-revives on death so the
-		// POOL owns its respawn. Returns the entity, or null if the type won't build.
-		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
-		{
-			var handle = NextRuntimeHandle();
-			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
-				return null;
-
-			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
-			entity.InstanceId = zone.InstanceId;
-			entity.Level = pool.Level;
-			entity.Disposition = pool.Disposition;
-			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
-			entity.LootContainer = pool.Type.LootContainerTemplateId; // drop this type's container on death
-			entity.SpawnBody = body;
-			entity.SpawnAreaId = pool.AreaId;
-			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on
-			entity.NoRespawn = true;              // corpse fades on death; the POOL respawns a replacement (below)
-			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
-			entity.ArmPatrolCycle();              // stagger the first wander so they don't all step at once
-			foreach (var s in pool.Type.Spells)
-				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
-
-			zone.Add(entity);
-			return entity;
+			_logger.LogDebug("World: #363 {Labelled}/{Total} captured spawns have a spawn-area label on map {Map} (.togglenpcgroup to show; sample: {Sample}).", labelledCount, npcs.Length, mapId,
+				labelSample ?? "<none>");
 		}
 
 		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
@@ -963,97 +903,13 @@ namespace Faolan.GameServer.World
 						continue;
 
 					foreach (var viewer in zone.PlayersInRange(pos, WorldSimulation.PlayerInterestRange))
+					{
 						if (viewer.Client != null && viewer.Known.Add(entity.Handle))
 							await SendWorldSpawn(viewer.Client, entity);
-				}
-			}
-		}
-
-		// A pool point with no live member sitting on it (so a refill lands on an empty spot, not on top of a survivor);
-		// falls back to a random point when they're all occupied.
-		private static Vector3 FreeAmbientPoint(AmbientPool pool, IReadOnlyList<WorldEntity> live)
-		{
-			foreach (var pt in pool.Points)
-			{
-				var occupied = false;
-				foreach (var e in live)
-				{
-					var dx = e.Position.X - pt.X;
-					var dz = e.Position.Z - pt.Z;
-					if (dx * dx + dz * dz < 4f)
-					{
-						occupied = true;
-						break;
 					}
 				}
-
-				if (!occupied)
-					return pt;
 			}
-
-			return pool.Points[Random.Shared.Next(pool.Points.Length)];
 		}
-
-		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
-		// Label is the dev nameplate tag (FormatAreaLabel), applied to members when DebugAreaLabels is on.
-		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
-
-		// #363 dev label for a captured spawn's nameplate: LINK-first - the area it's a confirmed MEMBER of
-		// (NpcSpawnAreaId), even if it sits outside the bounds (a hand-linked stray); else the area its POSITION lands in
-		// (so an unlinked NPC still previews which area it's in). Null when neither. See FormatAreaLabel.
-		private static string AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, NpcSpawn npc)
-		{
-			NpcSpawnArea area = null;
-			if (npc.NpcSpawnAreaId is { } id)
-				area = areas.FirstOrDefault(a => a.Id == id);
-
-			area ??= AreaContaining(areas, npc.Position);
-			return area == null
-				? null
-				: FormatAreaLabel(area);
-		}
-
-		// The nameplate label for an area: "<group> | <tier> x<count>" (e.g. "Ape2 | id-prop x8"). ASCII-only on
-		// purpose (#363): the client's nameplate font doesn't render the "·"/"×" glyphs, and our own PlayerSpawnReader
-		// rejects a non-ASCII overhead name - both broke the dev label silently, so keep it 7-bit.
-		private static string FormatAreaLabel(NpcSpawnArea a)
-		{
-			return $"{a.GroupName} | {ResolvedTag(a.ResolvedBy)} x{a.MaxCount}";
-		}
-
-		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
-		private static NpcSpawnArea AreaContaining(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
-		{
-			const float pad = 5f;
-			NpcSpawnArea best = null;
-			var bestDistSq = float.MaxValue;
-			foreach (var a in areas)
-			{
-				if (pos.X < a.BoundsMinX - pad || pos.X > a.BoundsMaxX + pad || pos.Z < a.BoundsMinZ - pad || pos.Z > a.BoundsMaxZ + pad)
-					continue;
-
-				var cx = (a.BoundsMinX + a.BoundsMaxX) * 0.5f;
-				var cz = (a.BoundsMinZ + a.BoundsMaxZ) * 0.5f;
-				var distSq = (pos.X - cx) * (pos.X - cx) + (pos.Z - cz) * (pos.Z - cz);
-				if (distSq < bestDistSq)
-				{
-					bestDistSq = distSq;
-					best = a;
-				}
-			}
-
-			return best;
-		}
-
-		// Short nameplate-friendly tag for a spawn area's creature-resolution provenance (#363).
-		private static string ResolvedTag(SpawnResolutionSource resolvedBy) => resolvedBy switch
-		{
-			SpawnResolutionSource.Name => "name",
-			SpawnResolutionSource.Containment => "contain",
-			SpawnResolutionSource.IdPropagation => "id-prop",
-			SpawnResolutionSource.Manual => "manual",
-			_ => "unresolved"
-		};
 
 		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW
 		// per the decoded flow (protocol_loot_interaction): assign the player as the current looter and send the
@@ -1110,126 +966,6 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// The object class the sit remoteformat names (capture: startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel).
-		private const string BenchObjectClass = "TavernBenchSimpleDynel";
-
-		// Seat the player on a BENCH (the sit interaction - tools/capture/decode_sit.py). Interacting with a bench
-		// plays the actor's "chair_sit_calm" animation (a server-originated BehaviorControlCenterIIR) and marks the
-		// session seated; standing back up is triggered by the next move (StandUpIfSeated). Recognized by the object
-		// NAME ("Bench"), the same stable key as shop vendors / the auctioneer. Returns false when the used object is
-		// NOT a bench, so the caller falls through to the normal open-object / loot path. Renders for the actor and
-		// every nearby player who already sees them.
-		public async Task<bool> TrySitOnObject(INetworkClient client, uint handle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return false;
-
-			var obj = await _database.GetWorldObject(player.MapId, handle);
-			if (obj == null || !string.Equals(obj.Name, "Bench", StringComparison.OrdinalIgnoreCase))
-				return false;
-
-			// The sit is a TWO-phase handshake (#355, capture sit-bench frames 6805-6813). The client sends the bench
-			// UseObject TWICE: request #1 BEFORE it has the pose, request #2 AFTER it receives the animation. Retail
-			// answers EACH - request #1 with the hold-echo (0x12 seq 0x0004) + the sit animation (0x2A), request #2 with
-			// the hold-assert (0x12 seq 0x000F) that COMMITS the pose. Answering only request #1 (our old behavior: send
-			// all three up-front, then silently absorb the duplicate) leaves the client's second confirm unanswered, so
-			// the sit-down plays and then reverts after the ~2.6s chair_sit_calm blend. Split it: seat + echo + animate
-			// on the first, assert once on the second, absorb any further duplicates.
-			if (client.Session.SeatedOnHandle == handle)
-			{
-				// Phase 2 - the client's confirming re-send. Commit the pose with the hold-assert, exactly once.
-				if (!client.Session.SeatedHoldConfirmed)
-				{
-					var assert = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqObjectHold, handle);
-					await SendWorldIir(client, assert);
-					await BroadcastBehaviorToViewers(client, assert);
-					client.Session.SeatedHoldConfirmed = true;
-					_logger.LogInformation("Sit: {Player} hold-confirmed on 0x{Handle:X8}.", player.Name, handle);
-				}
-
-				return true;
-			}
-
-			// Phase 1 - the initial UseObject. Retail brackets the sit ANIMATION with the object-action hold STATE
-			// (behaviorId 0x12): the hold-echo BEFORE the animation, then the animation itself. The hold-assert is NOT
-			// sent yet - it answers the client's phase-2 re-send above.
-			var sit = BehaviorAnimationCodec.PlayerSitOnObject(player.Handle, handle, BehaviorAnimationCodec.SitRemoteformat(BenchObjectClass));
-			var holdEcho = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqBegin, handle);
-
-			foreach (var body in new[] { holdEcho, sit })
-			{
-				await SendWorldIir(client, body);
-				await BroadcastBehaviorToViewers(client, body);
-			}
-
-			client.Session.SeatedOnHandle = handle;
-			client.Session.SeatedPosition = player.Position;
-			client.Session.SeatedHoldConfirmed = false;
-			_logger.LogInformation("Sit: {Player} sat on '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name, handle);
-			return true;
-		}
-
-		// How far a seated player must move from their seat before they stand up. While seated the client keeps
-		// streaming position syncs at (roughly) the seat position - plus a one-time seat-snap of up to ~1 unit - and
-		// those must NOT be read as "left the bench" (that stood the player straight back up). Only a real walk exceeds
-		// this. Capture: the seated position syncs drift < 1 unit; the player is well past this by the time standup fires.
-		private const float SeatLeaveDistance = 2.0f;
-
-		// Stand the player back up when they've MOVED away from their seat (called from the move handler: standup is
-		// triggered by movement, per the capture - not a second click). No-op when not seated or still within
-		// SeatLeaveDistance of the seat. Broadcasts the "standup" animation to the actor + nearby viewers and clears
-		// the seated state.
-		public async Task StandUpIfMoved(INetworkClient client, Vector3 newPosition)
-		{
-			var handle = client.Session.SeatedOnHandle;
-			if (handle == 0 || Vector3.Distance(newPosition, client.Session.SeatedPosition) < SeatLeaveDistance)
-				return;
-
-			client.Session.SeatedOnHandle = 0;
-			client.Session.SeatedHoldConfirmed = false;
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return;
-
-			var body = BehaviorAnimationCodec.PlayerStandUp(player.Handle, handle, BehaviorAnimationCodec.StandRemoteformat());
-			await SendWorldIir(client, body);
-			await BroadcastBehaviorToViewers(client, body);
-			_logger.LogInformation("Sit: {Player} stood up from 0x{Handle:X8}.", player.Name, handle);
-		}
-
-		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place
-		// them on it. DestMapId == 0 means the object IS a teleporter but its destination hasn't been captured yet -
-		// the caller surfaces a message instead of silently dropping the player somewhere (no fallbacks).
-		public readonly record struct ZoneLineDestination(uint DestMapId, Vector3? ArrivalPosition, string DestinationName);
-
-		// The column-driven interaction of a USED world object: its InteractAction (what the object does) plus, for a
-		// teleporter, the resolved Teleport destination. Action is None when the handle isn't a DB world object at all
-		// (e.g. a loot bag, a zone entity) - the caller falls through to the open-animation / loot path. Lets the
-		// UseObject handler switch on the action rather than special-casing one kind.
-		public readonly record struct UsedObjectInteraction(InteractAction Action, ZoneLineDestination Teleport);
-
-		// Resolve a used world object's interaction, DATA-DRIVEN from its InteractAction + Destination* columns
-		// (populated by the world-teleports importer from captured UseObject->N3Teleport sequences). A teleporter
-		// WITHOUT a captured destination yields Teleport.DestMapId == 0 so the caller can surface a message. (Whether
-		// it's a same-playfield Teleport or a cross-playfield ProxyTeleport, the handoff path is the same - DoTeleport
-		// change-maps only when the destination map differs.)
-		public async Task<UsedObjectInteraction> ResolveUseObject(INetworkClient client, uint handle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			var obj = player == null
-				? null
-				: await _database.GetWorldObject(player.MapId, handle);
-			if (obj == null)
-				return new UsedObjectInteraction(InteractAction.None, default);
-
-			var name = obj.Name ?? obj.DisplayName ?? "?";
-			var teleport = obj.DestinationMapId is { } destMap
-				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
-				: new ZoneLineDestination(0, null, name);
-			return new UsedObjectInteraction(obj.InteractAction, teleport);
-		}
-
 		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
 		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
 		// correct, state-driven marker instead of a hardcoded value.
@@ -1265,11 +1001,31 @@ namespace Faolan.GameServer.World
 		// a fallback masking a missing thing.
 		public async Task<uint> ResolveMapPlayfieldToken(uint mapId)
 		{
-			var map = await _database.GetMap(mapId)
-				?? throw new InvalidOperationException($"ResolveMapPlayfieldToken: map {mapId} not found");
+			var map = await _database.GetMap(mapId) ?? throw new InvalidOperationException($"ResolveMapPlayfieldToken: map {mapId} not found");
 			return map.PlayfieldToken != 0
 				? map.PlayfieldToken
 				: WorldState.DefaultPlayfieldToken;
+		}
+
+		// Resolve a used world object's interaction, DATA-DRIVEN from its InteractAction + Destination* columns
+		// (populated by the world-teleports importer from captured UseObject->N3Teleport sequences). A teleporter
+		// WITHOUT a captured destination yields Teleport.DestMapId == 0 so the caller can surface a message. (Whether
+		// it's a same-playfield Teleport or a cross-playfield ProxyTeleport, the handoff path is the same - DoTeleport
+		// change-maps only when the destination map differs.)
+		public async Task<UsedObjectInteraction> ResolveUseObject(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			var obj = player == null
+				? null
+				: await _database.GetWorldObject(player.MapId, handle);
+			if (obj == null)
+				return new UsedObjectInteraction(InteractAction.None, default);
+
+			var name = obj.Name ?? obj.DisplayName ?? "?";
+			var teleport = obj.DestinationMapId is { } destMap
+				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
+				: new ZoneLineDestination(0, null, name);
+			return new UsedObjectInteraction(obj.InteractAction, teleport);
 		}
 
 		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
@@ -1304,8 +1060,8 @@ namespace Faolan.GameServer.World
 
 			var npc = await _database.GetNpcSpawnByName(npcName);
 			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-											  // Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
-											  // baked ones are just placeholders (the player's zone token here).
+			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
+			// baked ones are just placeholders (the player's zone token here).
 			if (npc == null || !NpcSpawnBuilder.TryBuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken, out var body))
 			{
 				_logger.LogInformation("Spawn: no spawnable '{NpcTemplate}' template found.", npcName);
@@ -1378,9 +1134,9 @@ namespace Faolan.GameServer.World
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
-												   // (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
-												   // than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
-												   // client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
+			// (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
+			// than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
+			// client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
 			entity.Level = level;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true;
@@ -1401,6 +1157,28 @@ namespace Faolan.GameServer.World
 
 			_logger.LogInformation("Pet: spawned creature type {Type} 0x{Handle:X8} for {Player}.", npcType.Name, handle, player.Name);
 			return entity;
+		}
+
+		// Stand the player back up when they've MOVED away from their seat (called from the move handler: standup is
+		// triggered by movement, per the capture - not a second click). No-op when not seated or still within
+		// SeatLeaveDistance of the seat. Broadcasts the "standup" animation to the actor + nearby viewers and clears
+		// the seated state.
+		public async Task StandUpIfMoved(INetworkClient client, Vector3 newPosition)
+		{
+			var handle = client.Session.SeatedOnHandle;
+			if (handle == 0 || Vector3.Distance(newPosition, client.Session.SeatedPosition) < SeatLeaveDistance)
+				return;
+
+			client.Session.SeatedOnHandle = 0;
+			client.Session.SeatedHoldConfirmed = false;
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var body = BehaviorAnimationCodec.PlayerStandUp(player.Handle, handle, BehaviorAnimationCodec.StandRemoteformat());
+			await SendWorldIir(client, body);
+			await BroadcastBehaviorToViewers(client, body);
+			_logger.LogInformation("Sit: {Player} stood up from 0x{Handle:X8}.", player.Name, handle);
 		}
 
 		// Take ONE item from a bag by its display POSITION - TryLootItem (0x2046), the single drag-out. The client does
@@ -1452,6 +1230,32 @@ namespace Faolan.GameServer.World
 			return cash;
 		}
 
+		// #363 `.togglenpcgroup`: flip the dev spawn-area nameplate labels for the WHOLE server, then immediately
+		// re-apply to every labelled NPC the caller already knows in their zone - pushing the area label when turning ON,
+		// or restoring the plain creature name (which matches the client's LDB name) when turning OFF - so the toggle is
+		// visible without a re-stream. NPCs that stream in later pick it up in SendWorldSpawn. Returns (nowOn, affected).
+		public async Task<(bool On, int Affected)> ToggleAreaLabels(INetworkClient client)
+		{
+			DebugAreaLabels = !DebugAreaLabels;
+			var player = _sim.PlayerWorldEntity(client);
+			var affected = 0;
+			if (player != null)
+			{
+				foreach (var npc in _sim.World.ZoneForEntity(player).Entities)
+				{
+					if (npc.OverheadNameOverride is not { } label || !player.Known.Contains(npc.Handle))
+						continue;
+
+					await SendSetName(client, npc.Handle, DebugAreaLabels
+						? label
+						: npc.Name ?? "");
+					affected++;
+				}
+			}
+
+			return (DebugAreaLabels, affected);
+		}
+
 		// #259 toggle-combat: flip the player's manual combat stance and return the new state. The player entity's
 		// InCombat flag is unused by the sim tick (players are skipped there), so it's the natural place to hold the
 		// toggle. No-op-safe: returns false if the player isn't in the world yet.
@@ -1463,6 +1267,63 @@ namespace Faolan.GameServer.World
 
 			player.InCombat = !player.InCombat;
 			return player.InCombat;
+		}
+
+		// Seat the player on a BENCH (the sit interaction - tools/capture/decode_sit.py). Interacting with a bench
+		// plays the actor's "chair_sit_calm" animation (a server-originated BehaviorControlCenterIIR) and marks the
+		// session seated; standing back up is triggered by the next move (StandUpIfSeated). Recognized by the object
+		// NAME ("Bench"), the same stable key as shop vendors / the auctioneer. Returns false when the used object is
+		// NOT a bench, so the caller falls through to the normal open-object / loot path. Renders for the actor and
+		// every nearby player who already sees them.
+		public async Task<bool> TrySitOnObject(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return false;
+
+			var obj = await _database.GetWorldObject(player.MapId, handle);
+			if (obj == null || !string.Equals(obj.Name, "Bench", StringComparison.OrdinalIgnoreCase))
+				return false;
+
+			// The sit is a TWO-phase handshake (#355, capture sit-bench frames 6805-6813). The client sends the bench
+			// UseObject TWICE: request #1 BEFORE it has the pose, request #2 AFTER it receives the animation. Retail
+			// answers EACH - request #1 with the hold-echo (0x12 seq 0x0004) + the sit animation (0x2A), request #2 with
+			// the hold-assert (0x12 seq 0x000F) that COMMITS the pose. Answering only request #1 (our old behavior: send
+			// all three up-front, then silently absorb the duplicate) leaves the client's second confirm unanswered, so
+			// the sit-down plays and then reverts after the ~2.6s chair_sit_calm blend. Split it: seat + echo + animate
+			// on the first, assert once on the second, absorb any further duplicates.
+			if (client.Session.SeatedOnHandle == handle)
+			{
+				// Phase 2 - the client's confirming re-send. Commit the pose with the hold-assert, exactly once.
+				if (!client.Session.SeatedHoldConfirmed)
+				{
+					var assert = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqObjectHold, handle);
+					await SendWorldIir(client, assert);
+					await BroadcastBehaviorToViewers(client, assert);
+					client.Session.SeatedHoldConfirmed = true;
+					_logger.LogInformation("Sit: {Player} hold-confirmed on 0x{Handle:X8}.", player.Name, handle);
+				}
+
+				return true;
+			}
+
+			// Phase 1 - the initial UseObject. Retail brackets the sit ANIMATION with the object-action hold STATE
+			// (behaviorId 0x12): the hold-echo BEFORE the animation, then the animation itself. The hold-assert is NOT
+			// sent yet - it answers the client's phase-2 re-send above.
+			var sit = BehaviorAnimationCodec.PlayerSitOnObject(player.Handle, handle, BehaviorAnimationCodec.SitRemoteformat(BenchObjectClass));
+			var holdEcho = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqBegin, handle);
+
+			foreach (var body in new[] { holdEcho, sit })
+			{
+				await SendWorldIir(client, body);
+				await BroadcastBehaviorToViewers(client, body);
+			}
+
+			client.Session.SeatedOnHandle = handle;
+			client.Session.SeatedPosition = player.Position;
+			client.Session.SeatedHoldConfirmed = false;
+			_logger.LogInformation("Sit: {Player} sat on '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name, handle);
+			return true;
 		}
 
 		// True if the character (by handle == character id) has an ACTIVE LootFromNpc quest goal targeting `npcName` -
@@ -1562,6 +1423,7 @@ namespace Faolan.GameServer.World
 							recipient.Session.SpawnedNpcNamesByHandle[ev.Subject.Handle] = ev.Subject.Name;
 							recipient.Session.SpawnedNpcTemplatesByHandle[ev.Subject.Handle] = ev.Subject.NpcTemplateId;
 						}
+
 						await SendWorldSpawn(recipient, ev.Subject);
 						// #241: when a quest-giver NPC enters view, set its marker from THIS viewer's quest state
 						// (! available / ? ready-to-turn-in / none active). Recomputed per entry, so it transitions as
@@ -1610,6 +1472,54 @@ namespace Faolan.GameServer.World
 				if (quest.State == QuestState.Active)
 					entity.ActiveQuestIds.Add(quest.QuestId);
 			}
+		}
+
+		// #363 live ambient spawner: the capture-INDEPENDENT open-world
+		// population, managed as spawn-group POOLS. Each RESOLVED NpcSpawnArea becomes an AmbientPool that keeps ~MaxCount
+		// of its creature alive within the group's area: the initial fill spawns one per RDB point, each member roams the
+		// group's points (its PatrolWaypoints -> the #266 wander) and fades on death (NoRespawn); MaintainAmbientPools
+		// then respawns the deficit at a free point. Built WHOLE from the creature TYPE (TryBuildFromType, the pet path).
+		// Worked example - Tortage beach (4010): the four T_Crocodile-* areas become four Crocodile pools (8/7/8/11)
+		// that each hold that many crocs roaming their stretch of shore, refilled as the player kills them.
+		private async Task LoadAmbientSpawns(uint mapId, uint instanceId, Zone zone)
+		{
+			var areas = await _database.GetResolvedSpawnAreas(mapId);
+			var pools = new List<AmbientPool>();
+			var spawned = 0;
+			foreach (var area in areas)
+			{
+				var type = area.NpcTemplate;
+				if (type?.StatCore?.IirHeader == null)
+					continue; // the resolved creature has no buildable stat core - skip (can't construct its body)
+
+				var points = area.Points.Select(p => p.Position).ToArray();
+				if (points.Length == 0)
+					continue;
+
+				var level = type.StatCore.Level ?? 0;
+				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, level, level > 0
+					? CombatResolver.NpcMaxHealthForLevel(level)
+					: 1u, type.StatCore.Disposition ?? WorldEntity.DispositionFriendly, FormatAreaLabel(area));
+				pools.Add(pool);
+
+				// The captured spawns LINKED to this area (tagged in the load loop above) are already in the zone as pool
+				// members - the "obsolete npcspawns" that fill the pool first; only spawn the DEFICIT up to MaxCount, at
+				// points not already occupied. So a resolved area with captured members doesn't double-populate.
+				var members = zone.Entities.Where(e => e.SpawnAreaId == area.Id).ToList();
+				for (var i = members.Count; i < pool.MaxCount; i++)
+				{
+					var member = SpawnAmbientMember(pool, FreeAmbientPoint(pool, members), zone);
+					if (member == null)
+						break;
+
+					members.Add(member);
+					spawned++;
+				}
+			}
+
+			_ambientPools[(mapId, instanceId)] = pools;
+			if (spawned > 0)
+				_logger.LogInformation("World: +{Count} ambient NPC(s) across {Pools} spawn-area pool(s) on map {Map}.", spawned, pools.Count, mapId);
 		}
 
 		private uint NextRuntimeHandle()
@@ -1686,10 +1596,7 @@ namespace Faolan.GameServer.World
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
 
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(body)
-				.SendAsync(recipient);
+			await new PacketStream().WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
 
 			// #363 dev nameplate: the client draws an NPC's floating name from its template_id LDB name and ignores the
 			// spawn-body `Name`, so overriding the visible name needs a SetNameIIR (0xADCE0CDA). Sent right AFTER the
@@ -1699,37 +1606,32 @@ namespace Faolan.GameServer.World
 				await SendSetName(recipient, subject.Handle, overrideName);
 		}
 
-		// #363 pushes a SetNameIIR (0xADCE0CDA) to `recipient` overriding entity `handle`'s floating nameplate with
-		// `name` - the in-world grammar recovered in CreateEditorRecordBuilder.BuildWorldSetNameIir (nameType 3 applies
-		// the name AND refreshes the already-built OverheadText). Used by the spawn path and the .togglenpcgroup toggle.
-		private static Task SendSetName(INetworkClient recipient, uint handle, string name)
+		// Builds one member of an ambient pool at `pos` and adds it to the zone (no wire send - the interest stream, or
+		// the maintenance caller, does that). The member roams the pool's points and fades-not-revives on death so the
+		// POOL owns its respawn. Returns the entity, or null if the type won't build.
+		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.SetNameIIR).WriteArray(CreateEditorRecordBuilder.BuildWorldSetNameIir(handle, name)))
-				.SendAsync(recipient);
-		}
+			var handle = NextRuntimeHandle();
+			if (!NpcSpawnBuilder.TryBuildFromType(pool.Type, handle, pos, Quaternion.Identity, out var body))
+				return null;
 
-		// #363 `.togglenpcgroup`: flip the dev spawn-area nameplate labels for the WHOLE server, then immediately
-		// re-apply to every labelled NPC the caller already knows in their zone - pushing the area label when turning ON,
-		// or restoring the plain creature name (which matches the client's LDB name) when turning OFF - so the toggle is
-		// visible without a re-stream. NPCs that stream in later pick it up in SendWorldSpawn. Returns (nowOn, affected).
-		public async Task<(bool On, int Affected)> ToggleAreaLabels(INetworkClient client)
-		{
-			DebugAreaLabels = !DebugAreaLabels;
-			var player = _sim.PlayerWorldEntity(client);
-			var affected = 0;
-			if (player != null)
-				foreach (var npc in _sim.World.ZoneForEntity(player).Entities)
-				{
-					if (npc.OverheadNameOverride is not { } label || !player.Known.Contains(npc.Handle))
-						continue;
+			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
+			entity.InstanceId = zone.InstanceId;
+			entity.Level = pool.Level;
+			entity.Disposition = pool.Disposition;
+			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
+			entity.LootContainer = pool.Type.LootContainerTemplateId; // drop this type's container on death
+			entity.SpawnBody = body;
+			entity.SpawnAreaId = pool.AreaId;
+			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on
+			entity.NoRespawn = true; // corpse fades on death; the POOL respawns a replacement (below)
+			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
+			entity.ArmPatrolCycle(); // stagger the first wander so they don't all step at once
+			foreach (var s in pool.Type.Spells)
+				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
 
-					await SendSetName(client, npc.Handle, DebugAreaLabels ? label : npc.Name ?? "");
-					affected++;
-				}
-
-			return (DebugAreaLabels, affected);
+			zone.Add(entity);
+			return entity;
 		}
 
 		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled
@@ -1839,6 +1741,78 @@ namespace Faolan.GameServer.World
 				.SendAsync(client);
 		}
 
+		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
+		private static NpcSpawnArea AreaContaining(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
+		{
+			const float pad = 5f;
+			NpcSpawnArea best = null;
+			var bestDistSq = float.MaxValue;
+			foreach (var a in areas)
+			{
+				if (pos.X < a.BoundsMinX - pad || pos.X > a.BoundsMaxX + pad || pos.Z < a.BoundsMinZ - pad || pos.Z > a.BoundsMaxZ + pad)
+					continue;
+
+				var cx = (a.BoundsMinX + a.BoundsMaxX) * 0.5f;
+				var cz = (a.BoundsMinZ + a.BoundsMaxZ) * 0.5f;
+				var distSq = (pos.X - cx) * (pos.X - cx) + (pos.Z - cz) * (pos.Z - cz);
+				if (distSq < bestDistSq)
+				{
+					bestDistSq = distSq;
+					best = a;
+				}
+			}
+
+			return best;
+		}
+
+		// #363 dev label for a captured spawn's nameplate: LINK-first - the area it's a confirmed MEMBER of
+		// (NpcSpawnAreaId), even if it sits outside the bounds (a hand-linked stray); else the area its POSITION lands in
+		// (so an unlinked NPC still previews which area it's in). Null when neither. See FormatAreaLabel.
+		private static string AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, NpcSpawn npc)
+		{
+			NpcSpawnArea area = null;
+			if (npc.NpcSpawnAreaId is { } id)
+				area = areas.FirstOrDefault(a => a.Id == id);
+
+			area ??= AreaContaining(areas, npc.Position);
+			return area == null
+				? null
+				: FormatAreaLabel(area);
+		}
+
+		// The nameplate label for an area: "<group> | <tier> x<count>" (e.g. "Ape2 | id-prop x8"). ASCII-only on
+		// purpose (#363): the client's nameplate font doesn't render the "·"/"×" glyphs, and our own PlayerSpawnReader
+		// rejects a non-ASCII overhead name - both broke the dev label silently, so keep it 7-bit.
+		private static string FormatAreaLabel(NpcSpawnArea a)
+		{
+			return $"{a.GroupName} | {ResolvedTag(a.ResolvedBy)} x{a.MaxCount}";
+		}
+
+		// A pool point with no live member sitting on it (so a refill lands on an empty spot, not on top of a survivor);
+		// falls back to a random point when they're all occupied.
+		private static Vector3 FreeAmbientPoint(AmbientPool pool, IReadOnlyList<WorldEntity> live)
+		{
+			foreach (var pt in pool.Points)
+			{
+				var occupied = false;
+				foreach (var e in live)
+				{
+					var dx = e.Position.X - pt.X;
+					var dz = e.Position.Z - pt.Z;
+					if (dx * dx + dz * dz < 4f)
+					{
+						occupied = true;
+						break;
+					}
+				}
+
+				if (!occupied)
+					return pt;
+			}
+
+			return pool.Points[Random.Shared.Next(pool.Points.Length)];
+		}
+
 		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
 		// SCRATCH by WorldObjectBuilder.BuildBody - map-independent, needs NO captured loot-bag WorldObject in
 		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
@@ -1847,15 +1821,25 @@ namespace Faolan.GameServer.World
 			return LootContainerTemplate.Create(variant);
 		}
 
+		// Short nameplate-friendly tag for a spawn area's creature-resolution provenance (#363).
+		private static string ResolvedTag(SpawnResolutionSource resolvedBy)
+		{
+			return resolvedBy switch
+			{
+				SpawnResolutionSource.Name          => "name",
+				SpawnResolutionSource.Containment   => "contain",
+				SpawnResolutionSource.IdPropagation => "id-prop",
+				SpawnResolutionSource.Manual        => "manual",
+				_                                   => "unresolved"
+			};
+		}
+
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
 		// the world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the body is already
 		// placed at the corpse's spot.
 		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(body)
-				.SendAsync(recipient);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
 		}
 
 		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
@@ -1883,6 +1867,17 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(npcHandle)
 				.WriteByte(state)
 				.SendAsync(client);
+		}
+
+		// #363 pushes a SetNameIIR (0xADCE0CDA) to `recipient` overriding entity `handle`'s floating nameplate with
+		// `name` - the in-world grammar recovered in CreateEditorRecordBuilder.BuildWorldSetNameIir (nameType 3 applies
+		// the name AND refreshes the already-built OverheadText). Used by the spawn path and the .togglenpcgroup toggle.
+		private static Task SendSetName(INetworkClient recipient, uint handle, string name)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.SetNameIIR).WriteArray(CreateEditorRecordBuilder.BuildWorldSetNameIir(handle, name)))
+				.SendAsync(recipient);
 		}
 
 		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the
@@ -1917,11 +1912,23 @@ namespace Faolan.GameServer.World
 		// double-prefix it). Mirrors ChatTextSender. Use SendWorldIir for bare bodies (MoveTask/loot/vitals).
 		private static Task SendWorldRecord(INetworkClient recipient, byte[] record)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(record)
-				.SendAsync(recipient);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(record).SendAsync(recipient);
 		}
+
+		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
+		// Label is the dev nameplate tag (FormatAreaLabel), applied to members when DebugAreaLabels is on.
+		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
+
+		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place
+		// them on it. DestMapId == 0 means the object IS a teleporter but its destination hasn't been captured yet -
+		// the caller surfaces a message instead of silently dropping the player somewhere (no fallbacks).
+		public readonly record struct ZoneLineDestination(uint DestMapId, Vector3? ArrivalPosition, string DestinationName);
+
+		// The column-driven interaction of a USED world object: its InteractAction (what the object does) plus, for a
+		// teleporter, the resolved Teleport destination. Action is None when the handle isn't a DB world object at all
+		// (e.g. a loot bag, a zone entity) - the caller falls through to the open-animation / loot path. Lets the
+		// UseObject handler switch on the action rather than special-casing one kind.
+		public readonly record struct UsedObjectInteraction(InteractAction Action, ZoneLineDestination Teleport);
 
 		// The components of a player's Move, forwarded verbatim to other viewers (only the receiver differs).
 		private readonly record struct MoveForward(uint Subop, uint DataObject, uint DataClientInstance, ushort MovingType, Vector3 Position, Vector3 Rotation, byte[] Tail);

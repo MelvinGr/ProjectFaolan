@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.GameServer.World;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
@@ -146,7 +145,8 @@ namespace Faolan.GameServer
 				var obj = await _broadcaster.DeleteWorldObjectForPlayer(client, handle);
 				if (obj != null)
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted world object {obj.DisplayName ?? obj.Name ?? "(unnamed)"} (0x{handle:X8}) - removed live + DB row (gone on relog too).");
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						$"Deleted world object {obj.DisplayName ?? obj.Name ?? "(unnamed)"} (0x{handle:X8}) - removed live + DB row (gone on relog too).");
 					return;
 				}
 
@@ -162,206 +162,6 @@ namespace Faolan.GameServer
 				? entity.SpawnPosition.Z
 				: null, 10f);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
-		}
-
-		// .setnpcgroup [<group name>] [clear]  - manual creature assignment for an RDB spawn AREA (#363). Target/select
-		// an NPC standing in the area (its type IS what the area spawns), then run this:
-		//   .setnpcgroup                 -> assign the SELECTED NPC's creature to the area the NPC stands in
-		//   .setnpcgroup <group>         -> assign it to the named area on that map
-		//   .setnpcgroup clear           -> CLEAR the area the NPC stands in (back to unresolved)
-		//   .setnpcgroup <group> clear   -> clear the named area
-		// A set marks the area Manual (never re-guessed); a clear reverts NpcTemplateId to null so the resolver may
-		// re-guess it. The dev nameplate labels (.togglenpcgroup) show each NPC's area so you know what to type.
-		private async Task SetNpcGroupCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var player = _simulation.PlayerWorldEntity(client);
-			var handle = client.Session.SelectedTargetHandle;
-			if (player == null || handle == 0 || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;] [clear]  (no arg = the area the NPC stands in).");
-				return;
-			}
-
-			var areas = await Database.GetNpcSpawnAreas(npc.MapId);
-			if (areas.Length == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Map {npc.MapId} has no RDB spawn areas (scripted/instanced playfield).");
-				return;
-			}
-
-			// A trailing "clear"/"none"/"-" makes this a CLEAR; the rest (if any) is the target group name.
-			var tokens = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-			var clearing = tokens.Length > 0 && tokens[^1] is "clear" or "none" or "-";
-			var groupName = string.Join(' ', clearing ? tokens[..^1] : tokens);
-
-			var area = groupName.Length > 0
-				? areas.Where(a => string.Equals(a.GroupName, groupName, StringComparison.OrdinalIgnoreCase)).OrderBy(a => AreaDistanceSq(a, npc.Position)).FirstOrDefault()
-				: NearestContainingArea(areas, npc.Position);
-			if (area == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, groupName.Length > 0
-					? $"No spawn area named '{groupName}' on map {npc.MapId}."
-					: $"'{StripAreaLabel(npc.Name)}' isn't inside any spawn area on map {npc.MapId} - pass the group name explicitly.");
-				return;
-			}
-
-			if (clearing)
-			{
-				await Database.SetNpcSpawnAreaCreature(area.Id, null);
-				var unlinked = await Database.UnlinkNpcSpawnsFromArea(area.Id);
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) cleared - creature unassigned, {unlinked} captured spawn(s) un-linked.");
-				return;
-			}
-
-			await Database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
-			var linked = await Database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
-		}
-
-		// .target  - print info about the player's currently SELECTED target (last in-game LookAt/SelectDeselect):
-		// name, wire handle, kind, template id, level, vitals, hostility, position, and the spawn area/group it belongs
-		// to (the #363 labeling aid - read the group without the nameplate toggle). Reported in-game via system message.
-		private async Task TargetInfoCommand(INetworkClient client)
-		{
-			var characterId = client.Session.Character.Id;
-			var handle = client.Session.SelectedTargetHandle;
-			if (handle == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "No target selected - click an NPC/object in-world first, then .target.");
-				return;
-			}
-
-			var player = _simulation.PlayerWorldEntity(client);
-			if (player == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world.");
-				return;
-			}
-
-			// A live ENTITY (player / NPC / loot bag) in the zone entity model.
-			if (_simulation.World.ZoneForEntity(player).TryGet(handle, out var t))
-			{
-				var kind = t.IsPlayer ? "player" : t.IsLoot ? "loot" : "npc";
-				var vitals = t.Vitals != null ? $"{t.Vitals.Health}/{t.Vitals.MaxHealth} hp" : "no vitals";
-				var group = t.OverheadNameOverride ?? (t.SpawnAreaId is { } id ? $"area #{id} (unlabeled)" : "none");
-				await _agentServerDispatcher.SendSystemMessage(characterId, string.Join("<br>",
-				[
-					$"<b>{t.Name}</b>  (handle 0x{handle:X8}, {kind})",
-					$"template {t.NpcTemplateId} · level {t.Level} · {vitals} · {(t.Hostile ? "hostile" : "friendly")} (disp {t.Disposition})",
-					$"pos ({t.Position.X:F1}, {t.Position.Y:F1}, {t.Position.Z:F1}) · map {t.MapId} / instance 0x{t.InstanceId:X8}",
-					$"spawn group: {group}"
-				]));
-				return;
-			}
-
-			// Not a live entity - a static WORLD OBJECT (chest/door/dynel) isn't in the entity model; it lives in the DB
-			// keyed by its captured handle. Resolve it there so a selected chest/door still reports.
-			var obj = await Database.GetWorldObject(player.MapId, handle);
-			if (obj != null)
-			{
-				var oname = obj.DisplayName ?? obj.Name ?? "(unnamed object)";
-				var dest = obj.DestinationPosition is { } dp ? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})" : "";
-				await _agentServerDispatcher.SendSystemMessage(characterId, string.Join("<br>",
-				[
-					$"<b>{oname}</b>  (handle 0x{handle:X8}, world-object)",
-					$"objectId {obj.ObjectId} · item template {obj.TemplateItemId?.ToString() ?? "none"} · subop 0x{obj.SubOpcode:X8} · {(obj.IsClosed ? "closed" : "open")}",
-					$"interact {obj.InteractAction} · carsGroup {obj.CarsGroup}{dest}",
-					$"pos ({obj.Position.X:F1}, {obj.Position.Y:F1}, {obj.Position.Z:F1}) · map {obj.MapId}"
-				]));
-				return;
-			}
-
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Selected handle 0x{handle:X8} isn't a live entity or a known world object in your zone (it may have despawned).");
-		}
-
-		// .togglenpcgroup  - toggle the dev spawn-area nameplate labels (#363) live for this session: each NPC that
-		// resolves to an RDB spawn AREA shows that area's "group | tier xN" over its head (pushed via SetNameIIR, since
-		// the client draws NPC names from the template LDB and ignores the spawn name). Pairs with .setnpcgroup: read
-		// the area off the nameplate, assign with .setnpcgroup. Off by default; the toggle re-applies to nearby NPCs now.
-		private async Task ToggleNpcGroupCommand(INetworkClient client)
-		{
-			var (on, affected) = await _broadcaster.ToggleAreaLabels(client);
-			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
-				$"Spawn-area nameplate labels {(on ? "ON" : "OFF")} - {affected} nearby NPC(s) updated. Walk to re-stream the rest.");
-		}
-
-		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows
-		// LINKED to it (materialized by the resolver's auto-link + `.setnpcgroup`) so the ambient POOL becomes the sole
-		// source of that population - removing the captured/ambient density overlap. A clean FK delete on the membership
-		// link, so a named/quest NPC in the area (never linked) is safe. Durable; takes effect on the next zone reload.
-		// NB re-running the `npcs` importer resurrects the captured rows.
-		private async Task GraduateNpcGroupCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var name = (arguments ?? "").Trim();
-			if (name.Length == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .graduatenpcgroup &lt;group name&gt;  (removes the captured spawns the area's ambient pool replaces).");
-				return;
-			}
-
-			var mapId = _simulation.PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
-			var matches = (await Database.GetNpcSpawnAreas(mapId)).Where(a => string.Equals(a.GroupName, name, StringComparison.OrdinalIgnoreCase)).ToList();
-			if (matches.Count == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"No spawn area named '{name}' on map {mapId}.");
-				return;
-			}
-
-			var resolved = matches.Where(a => a.NpcTemplateId != null).ToList();
-			if (resolved.Count == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Area '{name}' has no creature assigned yet - resolve it with .setnpcgroup first (nothing to graduate).");
-				return;
-			}
-
-			var removed = 0;
-			foreach (var area in resolved)
-			{
-				var n = await Database.GraduateSpawnArea(area.Id);
-				if (n > 0)
-					removed += n;
-			}
-
-			var creature = resolved[0].NpcTemplate?.Name ?? "?";
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Graduated '{name}' ({creature}) on map {mapId}: removed {removed} captured spawn row(s); the ambient pool now owns this population. Takes effect on zone reload (relog).");
-		}
-
-		// The RDB spawn area a position sits in (nearest centroid; bounds padded), or null when outside every area.
-		private static NpcSpawnArea NearestContainingArea(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
-		{
-			const float pad = 5f;
-			NpcSpawnArea best = null;
-			var bestDistSq = float.MaxValue;
-			foreach (var a in areas)
-			{
-				if (pos.X < a.BoundsMinX - pad || pos.X > a.BoundsMaxX + pad || pos.Z < a.BoundsMinZ - pad || pos.Z > a.BoundsMaxZ + pad)
-					continue;
-
-				var d = AreaDistanceSq(a, pos);
-				if (d < bestDistSq)
-				{
-					bestDistSq = d;
-					best = a;
-				}
-			}
-
-			return best;
-		}
-
-		private static float AreaDistanceSq(NpcSpawnArea a, Vector3 pos)
-		{
-			var cx = (a.BoundsMinX + a.BoundsMaxX) * 0.5f;
-			var cz = (a.BoundsMinZ + a.BoundsMaxZ) * 0.5f;
-			return (pos.X - cx) * (pos.X - cx) + (pos.Z - cz) * (pos.Z - cz);
-		}
-
-		// Strips the " [Area]" dev-label suffix (DebugSpawnAreaLabels) from a nameplate so feedback shows the creature.
-		private static string StripAreaLabel(string name)
-		{
-			var i = name?.LastIndexOf(" [", StringComparison.Ordinal) ?? -1;
-			return i >= 0 ? name[..i] : name;
 		}
 
 		// toPosition: an explicit destination within the map (e.g. a bind/recall point); null = the map's spawn point.
@@ -429,6 +229,49 @@ namespace Faolan.GameServer
 
 			await SendChangeMapPrep(client, map.Id, position);
 			await SendWorldHandoff(client);
+		}
+
+		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows
+		// LINKED to it (materialized by the resolver's auto-link + `.setnpcgroup`) so the ambient POOL becomes the sole
+		// source of that population - removing the captured/ambient density overlap. A clean FK delete on the membership
+		// link, so a named/quest NPC in the area (never linked) is safe. Durable; takes effect on the next zone reload.
+		// NB re-running the `npcs` importer resurrects the captured rows.
+		private async Task GraduateNpcGroupCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var name = (arguments ?? "").Trim();
+			if (name.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .graduatenpcgroup &lt;group name&gt;  (removes the captured spawns the area's ambient pool replaces).");
+				return;
+			}
+
+			var mapId = _simulation.PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
+			var matches = (await Database.GetNpcSpawnAreas(mapId)).Where(a => string.Equals(a.GroupName, name, StringComparison.OrdinalIgnoreCase)).ToList();
+			if (matches.Count == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"No spawn area named '{name}' on map {mapId}.");
+				return;
+			}
+
+			var resolved = matches.Where(a => a.NpcTemplateId != null).ToList();
+			if (resolved.Count == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Area '{name}' has no creature assigned yet - resolve it with .setnpcgroup first (nothing to graduate).");
+				return;
+			}
+
+			var removed = 0;
+			foreach (var area in resolved)
+			{
+				var n = await Database.GraduateSpawnArea(area.Id);
+				if (n > 0)
+					removed += n;
+			}
+
+			var creature = resolved[0].NpcTemplate?.Name ?? "?";
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Graduated '{name}' ({creature}) on map {mapId}: removed {removed} captured spawn row(s); the ambient pool now owns this population. Takes effect on zone reload (relog).");
 		}
 
 		private async Task HandleGmCommand(INetworkClient client, string commandText)
@@ -572,27 +415,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bankCount} item(s).");
 		}
 
-		// Bootstrap the AH window at accessPosition (must be within the 15-unit client proximity check). Shared by the
-		// `.ah` GM command and the real trigger - talking to the "Trader" auctioneer NPC (GameServerListener.Inbound
-		// TalkToNpc). The window's first/default tab is the BANK (personal storage), a separate channel: container kind
-		// 105 delivered via a BankIIR (decoded, protocol_bank_storage), populated from the character's Container=105 rows.
-		// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content (the 0x201c
-		// slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already populated -
-		// account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR][DispOpenTradepost].
-		// Sending the open FIRST landed the BankIIR before the window existed and the first open rendered empty. So:
-		// bank first, open last. Returns the bank item count for the caller's feedback.
-		private async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
-		{
-			var characterId = client.Session.Character.Id;
-			var rows = await Database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BankKind).ToList();
-			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, 50, 30, characterId, bankRows);
-
-			await _bank.SendBank(client, bank);
-			await TradepostResponses.SendOpenTradepost(client, accessPosition);
-			return bank.Items.Count;
-		}
-
 		// .position  - print the caller's current map + live position (the in-world entity transform when
 		// connected, else the persisted Character position). Formatted so the x y z can be pasted into .teleport.
 		private Task PositionCommand(INetworkClient client)
@@ -645,6 +467,27 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, removed
 				? $"Removed the item in bag slot {slot} (live DispatchRemoveItem)."
 				: $"No item in bag slot {slot}.");
+		}
+
+		// Bootstrap the AH window at accessPosition (must be within the 15-unit client proximity check). Shared by the
+		// `.ah` GM command and the real trigger - talking to the "Trader" auctioneer NPC (GameServerListener.Inbound
+		// TalkToNpc). The window's first/default tab is the BANK (personal storage), a separate channel: container kind
+		// 105 delivered via a BankIIR (decoded, protocol_bank_storage), populated from the character's Container=105 rows.
+		// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content (the 0x201c
+		// slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already populated -
+		// account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR][DispOpenTradepost].
+		// Sending the open FIRST landed the BankIIR before the window existed and the first open rendered empty. So:
+		// bank first, open last. Returns the bank item count for the caller's feedback.
+		private async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
+		{
+			var characterId = client.Session.Character.Id;
+			var rows = await Database.GetCharacterInventory(characterId);
+			var bankRows = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BankKind).ToList();
+			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, 50, 30, characterId, bankRows);
+
+			await _bank.SendBank(client, bank);
+			await TradepostResponses.SendOpenTradepost(client, accessPosition);
+			return bank.Items.Count;
 		}
 
 		private Task SendGmHelpText(uint characterId)
@@ -712,6 +555,64 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
 		}
 
+		// .setnpcgroup [<group name>] [clear]  - manual creature assignment for an RDB spawn AREA (#363). Target/select
+		// an NPC standing in the area (its type IS what the area spawns), then run this:
+		//   .setnpcgroup                 -> assign the SELECTED NPC's creature to the area the NPC stands in
+		//   .setnpcgroup <group>         -> assign it to the named area on that map
+		//   .setnpcgroup clear           -> CLEAR the area the NPC stands in (back to unresolved)
+		//   .setnpcgroup <group> clear   -> clear the named area
+		// A set marks the area Manual (never re-guessed); a clear reverts NpcTemplateId to null so the resolver may
+		// re-guess it. The dev nameplate labels (.togglenpcgroup) show each NPC's area so you know what to type.
+		private async Task SetNpcGroupCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var player = _simulation.PlayerWorldEntity(client);
+			var handle = client.Session.SelectedTargetHandle;
+			if (player == null || handle == 0 || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;] [clear]  (no arg = the area the NPC stands in).");
+				return;
+			}
+
+			var areas = await Database.GetNpcSpawnAreas(npc.MapId);
+			if (areas.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Map {npc.MapId} has no RDB spawn areas (scripted/instanced playfield).");
+				return;
+			}
+
+			// A trailing "clear"/"none"/"-" makes this a CLEAR; the rest (if any) is the target group name.
+			var tokens = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+			var clearing = tokens.Length > 0 && tokens[^1] is "clear" or "none" or "-";
+			var groupName = string.Join(' ', clearing
+				? tokens[..^1]
+				: tokens);
+
+			var area = groupName.Length > 0
+				? areas.Where(a => string.Equals(a.GroupName, groupName, StringComparison.OrdinalIgnoreCase)).OrderBy(a => AreaDistanceSq(a, npc.Position)).FirstOrDefault()
+				: NearestContainingArea(areas, npc.Position);
+			if (area == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, groupName.Length > 0
+					? $"No spawn area named '{groupName}' on map {npc.MapId}."
+					: $"'{StripAreaLabel(npc.Name)}' isn't inside any spawn area on map {npc.MapId} - pass the group name explicitly.");
+				return;
+			}
+
+			if (clearing)
+			{
+				await Database.SetNpcSpawnAreaCreature(area.Id, null);
+				var unlinked = await Database.UnlinkNpcSpawnsFromArea(area.Id);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) cleared - creature unassigned, {unlinked} captured spawn(s) un-linked.");
+				return;
+			}
+
+			await Database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
+			var linked = await Database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
+		}
+
 		// .syschat - push a world/system chat line into the chat window via ChatTextIIR (#103). Sends the captured
 		// localized CriteriaYou line (arbitrary literal text needs a literal-text remoteformat template, like the
 		// FIFO banner). The test bootstrap for the ChatTextIIR path.
@@ -719,6 +620,66 @@ namespace Faolan.GameServer
 		{
 			// await SendWorldChat(client, CriteriaSystemLineXml);
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent a world/system chat line (ChatTextIIR (uint)GameServer0X2000Opcodes.ChatTextIIR).");
+		}
+
+		// .target  - print info about the player's currently SELECTED target (last in-game LookAt/SelectDeselect):
+		// name, wire handle, kind, template id, level, vitals, hostility, position, and the spawn area/group it belongs
+		// to (the #363 labeling aid - read the group without the nameplate toggle). Reported in-game via system message.
+		private async Task TargetInfoCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var handle = client.Session.SelectedTargetHandle;
+			if (handle == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "No target selected - click an NPC/object in-world first, then .target.");
+				return;
+			}
+
+			var player = _simulation.PlayerWorldEntity(client);
+			if (player == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world.");
+				return;
+			}
+
+			// A live ENTITY (player / NPC / loot bag) in the zone entity model.
+			if (_simulation.World.ZoneForEntity(player).TryGet(handle, out var t))
+			{
+				var kind = t.IsPlayer
+					? "player"
+					: t.IsLoot
+						? "loot"
+						: "npc";
+				var vitals = t.Vitals != null
+					? $"{t.Vitals.Health}/{t.Vitals.MaxHealth} hp"
+					: "no vitals";
+				var group = t.OverheadNameOverride ?? (t.SpawnAreaId is { } id
+					? $"area #{id} (unlabeled)"
+					: "none");
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					string.Join("<br>", $"<b>{t.Name}</b>  (handle 0x{handle:X8}, {kind})",
+						$"template {t.NpcTemplateId} · level {t.Level} · {vitals} · {(t.Hostile ? "hostile" : "friendly")} (disp {t.Disposition})",
+						$"pos ({t.Position.X:F1}, {t.Position.Y:F1}, {t.Position.Z:F1}) · map {t.MapId} / instance 0x{t.InstanceId:X8}", $"spawn group: {group}"));
+				return;
+			}
+
+			// Not a live entity - a static WORLD OBJECT (chest/door/dynel) isn't in the entity model; it lives in the DB
+			// keyed by its captured handle. Resolve it there so a selected chest/door still reports.
+			var obj = await Database.GetWorldObject(player.MapId, handle);
+			if (obj != null)
+			{
+				var oname = obj.DisplayName ?? obj.Name ?? "(unnamed object)";
+				var dest = obj.DestinationPosition is { } dp
+					? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})"
+					: "";
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					string.Join("<br>", $"<b>{oname}</b>  (handle 0x{handle:X8}, world-object)",
+						$"objectId {obj.ObjectId} · item template {obj.TemplateItemId?.ToString() ?? "none"} · subop 0x{obj.SubOpcode:X8} · {(obj.IsClosed ? "closed" : "open")}",
+						$"interact {obj.InteractAction} · carsGroup {obj.CarsGroup}{dest}", $"pos ({obj.Position.X:F1}, {obj.Position.Y:F1}, {obj.Position.Z:F1}) · map {obj.MapId}"));
+				return;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Selected handle 0x{handle:X8} isn't a live entity or a known world object in your zone (it may have despawned).");
 		}
 
 		// .teleport <mapId>  - move the character to another playfield via the retail HANDOFF + RECONNECT.
@@ -834,6 +795,55 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
 				? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
 				: "Invisible <span style=\"color: red;\">OFF</span>.");
+		}
+
+		// .togglenpcgroup  - toggle the dev spawn-area nameplate labels (#363) live for this session: each NPC that
+		// resolves to an RDB spawn AREA shows that area's "group | tier xN" over its head (pushed via SetNameIIR, since
+		// the client draws NPC names from the template LDB and ignores the spawn name). Pairs with .setnpcgroup: read
+		// the area off the nameplate, assign with .setnpcgroup. Off by default; the toggle re-applies to nearby NPCs now.
+		private async Task ToggleNpcGroupCommand(INetworkClient client)
+		{
+			var (on, affected) = await _broadcaster.ToggleAreaLabels(client);
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+				$"Spawn-area nameplate labels {(on ? "ON" : "OFF")} - {affected} nearby NPC(s) updated. Walk to re-stream the rest.");
+		}
+
+		private static float AreaDistanceSq(NpcSpawnArea a, Vector3 pos)
+		{
+			var cx = (a.BoundsMinX + a.BoundsMaxX) * 0.5f;
+			var cz = (a.BoundsMinZ + a.BoundsMaxZ) * 0.5f;
+			return (pos.X - cx) * (pos.X - cx) + (pos.Z - cz) * (pos.Z - cz);
+		}
+
+		// The RDB spawn area a position sits in (nearest centroid; bounds padded), or null when outside every area.
+		private static NpcSpawnArea NearestContainingArea(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
+		{
+			const float pad = 5f;
+			NpcSpawnArea best = null;
+			var bestDistSq = float.MaxValue;
+			foreach (var a in areas)
+			{
+				if (pos.X < a.BoundsMinX - pad || pos.X > a.BoundsMaxX + pad || pos.Z < a.BoundsMinZ - pad || pos.Z > a.BoundsMaxZ + pad)
+					continue;
+
+				var d = AreaDistanceSq(a, pos);
+				if (d < bestDistSq)
+				{
+					bestDistSq = d;
+					best = a;
+				}
+			}
+
+			return best;
+		}
+
+		// Strips the " [Area]" dev-label suffix (DebugSpawnAreaLabels) from a nameplate so feedback shows the creature.
+		private static string StripAreaLabel(string name)
+		{
+			var i = name?.LastIndexOf(" [", StringComparison.Ordinal) ?? -1;
+			return i >= 0
+				? name[..i]
+				: name;
 		}
 
 		private delegate Task GmCommandDelegate(INetworkClient client, string arguments);

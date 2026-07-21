@@ -186,7 +186,10 @@ namespace Faolan.Importer.Captures
 				// The listed instance's TEA key lives once in Items (harvested by template). Carry it on a TRANSIENT
 				// TemplateItem so HarvestItems can seed Items from it; ImportAsync nulls this nav before saving the
 				// listing (only the Template FK column persists - the row resolves its real Items row on reload).
-				TemplateItem = new Item { Key = key },
+				TemplateItem = new Item
+				{
+					Key = key
+				},
 				Template = item.Template1,
 				ItemLevel = item.Level,
 				ItemHash = item.Hash

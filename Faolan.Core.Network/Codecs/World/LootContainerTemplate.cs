@@ -37,17 +37,12 @@ namespace Faolan.Core.Network.Codecs.World
 		// Container variants keyed by template id: the per-variant fields that differ (everything else - wire
 		// type/typetag/bounds geometry/scaffold/IsClosed/CarsGroup - is shared). DisplayName is the client's LDB
 		// remoteformat (id = TemplateItemId, category 50200); the key is the LDB lookup key, lifted from a capture.
-		public static readonly ImmutableDictionary<LootContainerTemplateId, (string Name, string DisplayName, uint NodeTag)> Variants = new Dictionary<LootContainerTemplateId, (string Name, string DisplayName, uint NodeTag)>
-		{
-			[LootContainerTemplateId.Bag] = (
-				"Bag of loot",
-				"<remoteformat id=\"13782\" category=\"50200\" key=\"!,1%VZc#)*ctk-zNFNxI\" knubot=\"0\"  ></remoteformat>",
-				0x0000475C),
-			[LootContainerTemplateId.LargeChest] = (
-				"Large Chest",
-				"<remoteformat id=\"13781\" category=\"50200\" key=\"]uYN6#x&#39;&quot;XEXwPlC#M,o\" knubot=\"0\"  ></remoteformat>",
-				0x0000475D)
-		}.ToImmutableDictionary();
+		public static readonly ImmutableDictionary<LootContainerTemplateId, (string Name, string DisplayName, uint NodeTag)> Variants =
+			new Dictionary<LootContainerTemplateId, (string Name, string DisplayName, uint NodeTag)>
+			{
+				[LootContainerTemplateId.Bag] = ("Bag of loot", "<remoteformat id=\"13782\" category=\"50200\" key=\"!,1%VZc#)*ctk-zNFNxI\" knubot=\"0\"  ></remoteformat>", 0x0000475C),
+				[LootContainerTemplateId.LargeChest] = ("Large Chest", "<remoteformat id=\"13781\" category=\"50200\" key=\"]uYN6#x&#39;&quot;XEXwPlC#M,o\" knubot=\"0\"  ></remoteformat>", 0x0000475D)
+			}.ToImmutableDictionary();
 
 		// The 49-byte kd-tree bounds node for the default (Bag) variant, byte-exact vs the captured loot-bag geometry
 		// (LootBagTemplateTests). See the NodeTag overload for other variants.

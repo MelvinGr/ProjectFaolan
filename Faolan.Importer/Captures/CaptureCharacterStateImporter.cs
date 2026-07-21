@@ -1,4 +1,3 @@
-using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,12 +69,11 @@ namespace Faolan.Importer.Captures
 
 				// The codec reads all `count` records unconditionally, so only hand it a body that carries them (a
 				// truncated reply is skipped rather than seeding a partial bar over a good one).
-				var count = (int)ListFrame.CountOf(framing);
+				var count = ListFrame.CountOf(framing);
 				if (4 + count * ShortcutEntrySize > body.Length)
 					continue;
 
-				var bar = ShortcutBarBuilder.ShortcutBar.Read(new FaolanStream(body))
-					.Entries.ToDictionary(e => e.Slot, e => (e.Type, e.Id));
+				var bar = ShortcutBarBuilder.ShortcutBar.Read(new FaolanStream(body)).Entries.ToDictionary(e => e.Slot, e => (e.Type, e.Id));
 
 				shortcuts[character] = bar; // the full saved bar is authoritative (replaces any earlier one)
 			}

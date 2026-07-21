@@ -24,10 +24,17 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				Category = uint.Parse(s.Category, CultureInfo.InvariantCulture),
 				Key = s.Key,
 				Knubot = uint.Parse(s.Knubot, CultureInfo.InvariantCulture),
-				Antitag = s.Antitag == null ? null : uint.Parse(s.Antitag, CultureInfo.InvariantCulture)
+				Antitag = s.Antitag == null
+					? null
+					: uint.Parse(s.Antitag, CultureInfo.InvariantCulture)
 			};
 			for (var i = 0; i < s.Parameters.Count; i++)
-				row.Parameters.Add(new ConversationScreenParameter { Sequence = i, Name = s.Parameters[i].Name, InnerRaw = s.Parameters[i].InnerRaw });
+				row.Parameters.Add(new ConversationScreenParameter
+				{
+					Sequence = i,
+					Name = s.Parameters[i].Name,
+					InnerRaw = s.Parameters[i].InnerRaw
+				});
 
 			// Verify the TYPED round-trip reproduces the captured screen byte-for-byte - so any lossy field (a
 			// non-numeric / leading-zero id, a value that doesn't survive the uint round-trip) surfaces at import
@@ -41,18 +48,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// Project a stored ConversationScreen row back to the RemoteFormatXml.Screen the builder serialises.
 		public static RemoteFormatXml.Screen ToScreen(ConversationScreen row)
 		{
-			var pars = row.Parameters
-				.OrderBy(p => p.Sequence)
-				.Select(p => new RemoteFormatXml.Parameter(p.Name, p.InnerRaw))
-				.ToList();
+			var pars = row.Parameters.OrderBy(p => p.Sequence).Select(p => new RemoteFormatXml.Parameter(p.Name, p.InnerRaw)).ToList();
 
-			return new RemoteFormatXml.Screen(
-				row.ScreenId.ToString(CultureInfo.InvariantCulture),
-				row.Category.ToString(CultureInfo.InvariantCulture),
-				row.Key,
-				row.Knubot.ToString(CultureInfo.InvariantCulture),
-				row.Antitag?.ToString(CultureInfo.InvariantCulture),
-				pars);
+			return new RemoteFormatXml.Screen(row.ScreenId.ToString(CultureInfo.InvariantCulture), row.Category.ToString(CultureInfo.InvariantCulture), row.Key,
+				row.Knubot.ToString(CultureInfo.InvariantCulture), row.Antitag?.ToString(CultureInfo.InvariantCulture), pars);
 		}
 
 		// The wire screen bytes (Latin1) for a stored row - the runtime's build-from-columns entry point.

@@ -1,17 +1,15 @@
 using System;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
-using Faolan.GameServer;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -25,6 +23,23 @@ namespace Faolan.Tests
 	// The old varint model (AdjustSnapshotPrefixRootLength) was byte-misaligned and corrupted this length on resize.
 	public class SnapshotBlobLengthTests
 	{
+		// BuildSnapshotPrefix writes the correct BE32 length for ANY root length, keeping the flag byte, and at the
+		// captured root's own length reproduces the captured prefix byte-for-byte.
+		[Fact]
+		public void BuildSnapshotPrefix_WritesBe32_ForAnyRootLength()
+		{
+			var (prefix, rootLen, _) = Split("strie-login-inventory.bin");
+
+			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
+			{
+				var p = FullCharSnapshotCodec.BuildPrefix(newRoot);
+				Assert.Equal((uint)newRoot, BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));
+				Assert.Equal(prefix[0], p[0]); // flag
+			}
+
+			Assert.Equal(prefix, FullCharSnapshotCodec.BuildPrefix(rootLen));
+		}
+
 		// The captured prefix's BE32 at offset 1 already equals rootLen (the client's blob length), and the byte
 		// immediately after that many blob bytes is the 0x18 version — proven across both beach captures.
 		[Theory, InlineData("strie-login-inventory.bin", 686), InlineData("account-stricken997-character-Strie-login-randomActions-bigboy.bin", 681)]
@@ -107,27 +122,16 @@ namespace Faolan.Tests
 				return new Item
 				{
 					Id = id,
-					Key = new ProtoDecryptionKey { Key1 = d1, Key2 = d2, Key3 = d3, Key4 = d4 },
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = d1,
+						Key2 = d2,
+						Key3 = d3,
+						Key4 = d4
+					},
 					Hash = arch
 				};
 			}
-		}
-
-		// BuildSnapshotPrefix writes the correct BE32 length for ANY root length, keeping the flag byte, and at the
-		// captured root's own length reproduces the captured prefix byte-for-byte.
-		[Fact]
-		public void BuildSnapshotPrefix_WritesBe32_ForAnyRootLength()
-		{
-			var (prefix, rootLen, _) = Split("strie-login-inventory.bin");
-
-			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
-			{
-				var p = FullCharSnapshotCodec.BuildPrefix(newRoot);
-				Assert.Equal((uint)newRoot, BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));
-				Assert.Equal(prefix[0], p[0]); // flag
-			}
-
-			Assert.Equal(prefix, FullCharSnapshotCodec.BuildPrefix(rootLen));
 		}
 
 		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)

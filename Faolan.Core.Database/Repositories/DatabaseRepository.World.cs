@@ -11,13 +11,13 @@ namespace Faolan.Core.Database.Repositories
 		Task<int> DeleteWorldObject(uint mapId, uint capturedHandle);
 		Task<RespawnPoint?> GetDefaultSpawn(uint mapId);
 		Task<Map?> GetMap(uint id);
+		Task<MapArea[]> GetMapAreas(uint mapId);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
-		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<QuestArea[]> GetQuestAreas();
+		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<QuestDefinition[]> GetQuestDefinitionsByArea(uint areaId);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
-		Task<MapArea[]> GetMapAreas(uint mapId);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<WorldObject?> GetWorldObject(uint mapId, uint captureId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
@@ -31,13 +31,6 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.CapturedHandle == capturedHandle).ExecuteDeleteAsync();
 		}
 
-		// The named sub-areas of a playfield - the regions that float the area banner when a player walks in (#348).
-		public async Task<MapArea[]> GetMapAreas(uint mapId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.MapAreas.Where(a => a.MapId == mapId).ToArrayAsync();
-		}
-
 		public async Task<RespawnPoint?> GetDefaultSpawn(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -49,6 +42,13 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Maps.FirstOrDefaultAsync(m => m.Id == id);
+		}
+
+		// The named sub-areas of a playfield - the regions that float the area banner when a player walks in (#348).
+		public async Task<MapArea[]> GetMapAreas(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.MapAreas.Where(a => a.MapId == mapId).ToArrayAsync();
 		}
 
 		public async Task<Item[]> GetMapLootSample(uint mapId, int count)
@@ -72,16 +72,16 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Maps.OrderBy(m => m.Id).ToArrayAsync();
 		}
 
-		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
-		}
-
 		public async Task<QuestArea[]> GetQuestAreas()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.QuestAreas.OrderBy(a => a.AreaId).ToArrayAsync();
+		}
+
+		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 
 		// Every quest of an area, ordered by its position within that area (JournalSequence) - the quest index's

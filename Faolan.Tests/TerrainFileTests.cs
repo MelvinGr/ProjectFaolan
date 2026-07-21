@@ -10,30 +10,29 @@ namespace Faolan.Tests
 	// regenerated file always decodes back to the exact resource bodies the parsers expect.
 	public class TerrainFileTests
 	{
-		private static byte[] RoundTrip(uint extent, byte[] heightmap, byte[] collision, out TerrainFile.Data data)
+		[Fact]
+		public void Read_RejectsGarbage()
 		{
-			using var ms = new MemoryStream();
-			TerrainFile.Write(ms, extent, heightmap, collision);
-			var bytes = ms.ToArray();
-
-			using var read = new MemoryStream(bytes);
-			data = TerrainFile.Read(read);
-			return bytes;
+			using var junk = new MemoryStream([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]);
+			Assert.Null(TerrainFile.Read(junk));
 		}
 
 		[Fact]
-		public void Write_Read_RoundTripsBothBodies()
+		public void Read_RejectsTooShort()
 		{
-			var heightmap = new byte[512];
-			var collision = new byte[777];
-			for (var i = 0; i < heightmap.Length; i++) heightmap[i] = (byte)(i * 7);
-			for (var i = 0; i < collision.Length; i++) collision[i] = (byte)(i * 13 + 1);
+			using var tiny = new MemoryStream([0x46, 0x54]);
+			Assert.Null(TerrainFile.Read(tiny));
+		}
 
-			RoundTrip(0x0202u, heightmap, collision, out var data);
+		[Fact]
+		public void Write_Read_CollisionOnly()
+		{
+			var collision = new byte[] { 9, 8, 7, 6 };
+
+			RoundTrip(0u, [], collision, out var data);
 
 			Assert.NotNull(data);
-			Assert.Equal(0x0202u, data.TilemapExtent);
-			Assert.Equal(heightmap, data.Heightmap);
+			Assert.Empty(data.Heightmap);
 			Assert.Equal(collision, data.Collision);
 		}
 
@@ -51,29 +50,32 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Write_Read_CollisionOnly()
+		public void Write_Read_RoundTripsBothBodies()
 		{
-			var collision = new byte[] { 9, 8, 7, 6 };
+			var heightmap = new byte[512];
+			var collision = new byte[777];
+			for (var i = 0; i < heightmap.Length; i++)
+				heightmap[i] = (byte)(i * 7);
+			for (var i = 0; i < collision.Length; i++)
+				collision[i] = (byte)(i * 13 + 1);
 
-			RoundTrip(0u, [], collision, out var data);
+			RoundTrip(0x0202u, heightmap, collision, out var data);
 
 			Assert.NotNull(data);
-			Assert.Empty(data.Heightmap);
+			Assert.Equal(0x0202u, data.TilemapExtent);
+			Assert.Equal(heightmap, data.Heightmap);
 			Assert.Equal(collision, data.Collision);
 		}
 
-		[Fact]
-		public void Read_RejectsGarbage()
+		private static byte[] RoundTrip(uint extent, byte[] heightmap, byte[] collision, out TerrainFile.Data data)
 		{
-			using var junk = new MemoryStream([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]);
-			Assert.Null(TerrainFile.Read(junk));
-		}
+			using var ms = new MemoryStream();
+			TerrainFile.Write(ms, extent, heightmap, collision);
+			var bytes = ms.ToArray();
 
-		[Fact]
-		public void Read_RejectsTooShort()
-		{
-			using var tiny = new MemoryStream([0x46, 0x54]);
-			Assert.Null(TerrainFile.Read(tiny));
+			using var read = new MemoryStream(bytes);
+			data = TerrainFile.Read(read);
+			return bytes;
 		}
 	}
 }

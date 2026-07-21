@@ -12,6 +12,12 @@ namespace Faolan.GameServer.World
 	{
 		public DateTimeOffset LastDotTick { get; set; }
 
+		// The absolute instant this buff expires, so its remaining time can be persisted across a relog. Null = it has
+		// no server duration (lives until cancelled).
+		public DateTimeOffset? ExpiresAt => DurationSeconds is { } d
+			? AppliedAt.AddSeconds(d)
+			: null;
+
 		// Damage-over-time per tick on the target's HealthCurrent (from Spell.DotDelta, captured StatDamageIIR):
 		// negative = a bleed/poison debuff, positive = a heal-over-time, 0 = no DoT. DotType is the +45 damage-school
 		// flag carried into the rebuilt packet. LastDotTick is mutable tick bookkeeping (the world tick stamps it). #274
@@ -23,21 +29,9 @@ namespace Faolan.GameServer.World
 		// self-buff. Default 0 for the NPC-cast debuffs (which are never persisted).
 		public uint Nonce { get; init; }
 
-		// The absolute instant this buff expires, so its remaining time can be persisted across a relog. Null = it has
-		// no server duration (lives until cancelled).
-		public DateTimeOffset? ExpiresAt => DurationSeconds is { } d ? AppliedAt.AddSeconds(d) : null;
-
 		public bool Expired(DateTimeOffset now)
 		{
 			return DurationSeconds is { } d && (now - AppliedAt).TotalSeconds >= d;
-		}
-
-		// The per-application effect nonce carried at the END of an ApplySpell payload (the last big-endian u32 -
-		// offset 50 in the 54-byte buff-data form). Returns 0 for a payload too short to carry one (e.g. the empty
-		// removal twin). (#274)
-		public static uint NonceFromPayload(byte[] payload)
-		{
-			return payload is { Length: >= 4 } ? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(payload.Length - 4, 4)) : 0;
 		}
 
 		// The buff duration encoded in an ApplySpell (0x6B87E316) effect payload: a u32 big-endian at offset +8, in
@@ -48,6 +42,16 @@ namespace Faolan.GameServer.World
 		{
 			return payload is { Length: >= 12 }
 				? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(8, 4)) * 10
+				: 0;
+		}
+
+		// The per-application effect nonce carried at the END of an ApplySpell payload (the last big-endian u32 -
+		// offset 50 in the 54-byte buff-data form). Returns 0 for a payload too short to carry one (e.g. the empty
+		// removal twin). (#274)
+		public static uint NonceFromPayload(byte[] payload)
+		{
+			return payload is { Length: >= 4 }
+				? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(payload.Length - 4, 4))
 				: 0;
 		}
 	}

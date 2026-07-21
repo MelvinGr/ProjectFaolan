@@ -39,16 +39,29 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The word the LAST block's trailer carries, terminating the chain. Constant across every captured index and
 		// identical to the terminal of the empty quest portion.
 		public const uint IndexTerminalWord = 0x000156E7;
+
+		// The first block's quest AreaId (the head of the block chain). Only present when count > 0; for a beach char
+		// this is 241 == 0xF1, which is why it read as a constant "sentinel" until the corpus-wide decode (#391).
+		public uint LeadAreaId { get; init; }
+
+		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
+		// so it can't drift from ToArray).
+		public int ByteLength
+		{
+			get
+			{
+				using var w = new FaolanStream();
+				Write(w);
+				return (int)w.Length;
+			}
+		}
+
 		public List<Block> Blocks { get; init; } = [];
 		public List<uint> QuestIds { get; init; } = [];
 
 		// The id-list count framing, (QuestIds.Count + 1) * 0x3F1 - Build derives it. The default is the 1-quest
 		// word; it is NOT a constant (0x7E2 just IS ListFrame.ForCount(1), which is what makes it look like one).
 		public uint Marker { get; init; } = ListFrame.ForCount(1);
-
-		// The first block's quest AreaId (the head of the block chain). Only present when count > 0; for a beach char
-		// this is 241 == 0xF1, which is why it read as a constant "sentinel" until the corpus-wide decode (#391).
-		public uint LeadAreaId { get; init; }
 
 		public static QuestIndexRegion Read(FaolanStream r)
 		{
@@ -75,7 +88,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 				if (terminal != IndexTerminalWord)
 					throw new InvalidOperationException($"Empty quest index: terminator 0x{terminal:X} != 0x{IndexTerminalWord:X}");
 
-				return new QuestIndexRegion { Marker = marker };
+				return new QuestIndexRegion
+				{
+					Marker = marker
+				};
 			}
 
 			var leadAreaId = r.ReadUInt32();
@@ -154,7 +170,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 					w.WriteUInt32(b.AreaQuestIds[i]);
 					// Round-trip carries the captured sequence; generation (Build) has none and falls back to i+1
 					// (the beach catalog is monotonic, so byte-identical there).
-					w.WriteUInt32(i < b.AreaQuestSequences.Count ? b.AreaQuestSequences[i] : (uint)(i + 1));
+					w.WriteUInt32(i < b.AreaQuestSequences.Count
+						? b.AreaQuestSequences[i]
+						: (uint)(i + 1));
 				}
 
 				w.WriteUInt32(b.TrailerQuestId);
@@ -165,25 +183,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 			}
 		}
 
-		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
-		// so it can't drift from ToArray).
-		public int ByteLength
-		{
-			get
-			{
-				using var w = new FaolanStream();
-				Write(w);
-				return (int)w.Length;
-			}
-		}
-
 		// Generates the index region for the held quests (already ordered - primary first). Each quest contributes a
 		// goal-id block from its seeded index fields; the block trailers chain to the next quest's AreaId, terminating
 		// on the primary's IndexTrailerWord. The marker/count/sentinel follow from the quest count. #186/#255/#304.
 		// `areas` maps areaId -> that area's QuestArea row; `areaCatalog` maps areaId -> every quest in the area,
 		// ordered by JournalSequence. Both are needed because a block is NOT self-contained (see Block.AreaQuestIds).
-		public static QuestIndexRegion Build(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary,
-			IReadOnlyDictionary<uint, QuestArea>? areas = null, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
+		public static QuestIndexRegion Build(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary, IReadOnlyDictionary<uint, QuestArea>? areas = null,
+			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
 			ArgumentNullException.ThrowIfNull(ordered);
 			ArgumentNullException.ThrowIfNull(primary);
@@ -192,8 +198,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 			for (var i = 0; i < ordered.Count; i++)
 			{
 				var q = ordered[i];
-				var magic = areas != null && areas.TryGetValue(q.AreaId, out var a) ? a.Magic : q.IndexMagic;
-				var catalog = areaCatalog != null && areaCatalog.TryGetValue(q.AreaId, out var c) ? c : null;
+				var magic = areas != null && areas.TryGetValue(q.AreaId, out var a)
+					? a.Magic
+					: q.IndexMagic;
+				var catalog = areaCatalog != null && areaCatalog.TryGetValue(q.AreaId, out var c)
+					? c
+					: null;
 
 				// tf1 is the quest's position in its area and tf2 the number of area quests AFTER it, so the pair is
 				// (sequence, remaining). Captured: quest 10238 seq 1 of 8 -> (1, 7); quest 13479 seq 1 of 4 -> (1, 3).
@@ -204,9 +214,17 @@ namespace Faolan.Core.Network.Codecs.Quest
 				blocks.Add(new Block
 				{
 					Magic = magic,
-					TableField1 = catalog != null ? sequence : q.IndexTableField1,
-					TableField2 = catalog != null ? (areaCount > sequence ? (uint)areaCount - sequence : 0) : q.IndexTableField2,
-					TableField3 = catalog != null ? 0 : q.IndexTableField3,
+					TableField1 = catalog != null
+						? sequence
+						: q.IndexTableField1,
+					TableField2 = catalog != null
+						? areaCount > sequence
+							? (uint)areaCount - sequence
+							: 0
+						: q.IndexTableField2,
+					TableField3 = catalog != null
+						? 0
+						: q.IndexTableField3,
 					AreaQuestIds = catalog != null
 						? [.. catalog.Select(d => d.QuestId)]
 						: ParseGoalSteps(q.IndexGoalSteps),
@@ -216,7 +234,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 					// coincide only when the held quest is the area's first (#391). Beach: held 12371 (seq 5) but the
 					// block trailer is 10238 (seq 1). Falls back to the held quest when no catalog is supplied (the
 					// beach/2-quest golden path, where they are the same quest anyway).
-					TrailerQuestId = catalog is { Count: > 0 } ? catalog[0].QuestId : q.QuestId,
+					TrailerQuestId = catalog is { Count: > 0 }
+						? catalog[0].QuestId
+						: q.QuestId,
 					// The beach block's trailer is (1,0,0); the fields vary per quest on the wire but generation is
 					// beach-only today (IsSnapshotEligible is gated off), so the beach values keep it byte-exact.
 					TrailerA = 1,
@@ -235,7 +255,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Marker = ListFrame.ForCount(ordered.Count),
 				QuestIds = ordered.Select(q => q.QuestId).ToList(),
 				// The head of the block chain is the first (primary) quest's area; for a beach char this is 241 (0xF1).
-				LeadAreaId = ordered.Count > 0 ? ordered[0].AreaId : 0,
+				LeadAreaId = ordered.Count > 0
+					? ordered[0].AreaId
+					: 0,
 				Blocks = blocks
 			};
 		}
@@ -265,6 +287,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public sealed class Block
 		{
 			public uint TrailerQuestId { get; init; }
+
 			// The AREA's full quest catalog, ordered by each quest's JournalSequence - NOT this quest's goal ids, which
 			// is what "GoalSteps" claimed until 2026-07-20. Proven: quest 10238's list is
 			// [10238,12369,12373,10320,12371,10286,10287,10915], exactly area 241's 8 quests, while its own goals are

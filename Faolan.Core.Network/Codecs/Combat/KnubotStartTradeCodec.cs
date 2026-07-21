@@ -23,12 +23,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteArrayUInt32Length(body => body
-				.WriteUInt32(Opcode)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(Handle)
-				.WriteByte(Env)
-				.WriteArray(Payload));
+			s.WriteArrayUInt32Length(body => body.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteArray(Payload));
 		}
 
 		public static KnubotStartTradeCodec Parse(byte[] body)

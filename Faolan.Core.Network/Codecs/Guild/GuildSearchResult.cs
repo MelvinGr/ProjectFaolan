@@ -12,16 +12,12 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// guilds.
 	public sealed class GuildSearchResult
 	{
+		public const byte Trailer = 0x01;
+
 		// The CSPlayerInterface opcode this body is the payload of (0x205C).
 		public const CSPlayerInterfaceOpcodes Opcode = CSPlayerInterfaceOpcodes.DispatchGuildSearchResult;
 
-		public const byte Trailer = 0x01;
-
 		public List<Entry> Guilds { get; set; } = [];
-
-		// One guild row. Renown is the guild's total renown; flag is an unclassified per-guild byte (0/1 in the
-		// capture - likely a recruiting flag), emitted as 0 for our guilds.
-		public readonly record struct Entry(uint Id, string Name, string LeaderName, ushort MemberCount, uint Renown, byte Flag);
 
 		public byte[] Encode()
 		{
@@ -45,17 +41,15 @@ namespace Faolan.Core.Network.Codecs.Guild
 			var count = GuildRankings.ListCount(s.ReadUInt32());
 			for (var i = 0; i < count; i++)
 			{
-				result.Guilds.Add(new Entry(
-					s.ReadUInt32(),
-					s.ReadString(),
-					s.ReadString(),
-					s.ReadUInt16(),
-					s.ReadUInt32(),
-					s.ReadByte()));
+				result.Guilds.Add(new Entry(s.ReadUInt32(), s.ReadString(), s.ReadString(), s.ReadUInt16(), s.ReadUInt32(), s.ReadByte()));
 			}
 
 			s.ReadByte(); // trailer
 			return result;
 		}
+
+		// One guild row. Renown is the guild's total renown; flag is an unclassified per-guild byte (0/1 in the
+		// capture - likely a recruiting flag), emitted as 0 for our guilds.
+		public readonly record struct Entry(uint Id, string Name, string LeaderName, ushort MemberCount, uint Renown, byte Flag);
 	}
 }

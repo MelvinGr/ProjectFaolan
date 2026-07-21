@@ -1,11 +1,11 @@
 using System;
-using Faolan.Core.Network.Constants;
+using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.GameServer;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			// used to be read as a trailing "field5" (28 81 06) are the ROOT's own subscription_flags varint.
 			Assert.Equal(5, prefix.Length);
 			Assert.Equal((byte)0x00, prefix[0]); // flag
-			Assert.Equal(root.Length, (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(1, 4)));
+			Assert.Equal(root.Length, (int)BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(1, 4)));
 			Assert.Equal(0x28, root[0]); // root leads with field 5 (subscription_flags) on this beach capture
 		}
 
@@ -130,4 +130,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
@@ -82,8 +81,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			{
 				// A malformed query used to become an EMPTY search with a fabricated category, so the player silently
 				// got wrong results and nothing anywhere recorded that we failed to read their request.
-				throw new InvalidOperationException(
-					$"Auction-house search query is malformed ({body.Length} bytes): {ex.Message}", ex);
+				throw new InvalidOperationException($"Auction-house search query is malformed ({body.Length} bytes): {ex.Message}", ex);
 			}
 		}
 

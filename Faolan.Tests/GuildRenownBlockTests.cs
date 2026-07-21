@@ -66,6 +66,20 @@ namespace Faolan.Tests
 			Assert.Equal(975000000ul, fresh.Counters64D);
 		}
 
+		// The create-time block (0x2044 tail) is the same codec, Flag=0 + empty StatIds -> 225 bytes. This reproduces
+		// the create-guild capture's tail byte-for-byte, so GuildService.WriteGuildCreatedBody constructs it via the
+		// typed codec instead of the old verbatim hex blob (#306).
+		[Fact]
+		public void ForGuildCreate_EncodesToTheCapturedCreateTail()
+		{
+			var block = GuildRenownBlock.ForGuildCreate();
+
+			Assert.Equal(Golden.Bytes("GuildCreateRenownBlock"), block.Encode());
+			Assert.Equal(225, block.Encode().Length);
+			Assert.Equal((byte)0x00, block.Flag);
+			Assert.Empty(block.StatIds);
+		}
+
 		// The live path builds the block from Guild.Renown: the total lands in RenownCounters[1] (the proven slot),
 		// everything else stays the zeroed fresh-guild scaffold, and the block stays 277 bytes so the roster aligns.
 		[Fact]
@@ -84,20 +98,6 @@ namespace Faolan.Tests
 		public void ForRenown_ZeroEqualsFreshGuild()
 		{
 			Assert.Equal(GuildRenownBlock.ForFreshGuild().Encode(), GuildRenownBlock.ForRenown(0).Encode());
-		}
-
-		// The create-time block (0x2044 tail) is the same codec, Flag=0 + empty StatIds -> 225 bytes. This reproduces
-		// the create-guild capture's tail byte-for-byte, so GuildService.WriteGuildCreatedBody constructs it via the
-		// typed codec instead of the old verbatim hex blob (#306).
-		[Fact]
-		public void ForGuildCreate_EncodesToTheCapturedCreateTail()
-		{
-			var block = GuildRenownBlock.ForGuildCreate();
-
-			Assert.Equal(Golden.Bytes("GuildCreateRenownBlock"), block.Encode());
-			Assert.Equal(225, block.Encode().Length);
-			Assert.Equal((byte)0x00, block.Flag);
-			Assert.Empty(block.StatIds);
 		}
 	}
 }

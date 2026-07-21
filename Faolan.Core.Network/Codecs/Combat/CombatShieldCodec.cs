@@ -21,22 +21,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// builder claimed "every captured instance carries value 0"; not one does.)
 	public static class CombatShieldCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
-
 		// The retail default the client's own overflow clamp resets stat 0xA5 to: one shield per arc. The most
 		// common captured value (17 of 86).
 		public const uint DefaultDistribution = 111;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
+
+		public static byte[] Build(uint handle, uint value, byte env = 0x00)
+		{
+			return new Message(handle, env, value).ToArray();
+		}
 
 		// Packs a per-direction guard distribution into the wire value. The digit sum must not exceed 3 or the
 		// client clamps the whole thing back to DefaultDistribution.
 		public static uint Pack(uint left, uint mid, uint right)
 		{
 			return left * 100 + mid * 10 + right;
-		}
-
-		public static byte[] Build(uint handle, uint value, byte env = 0x00)
-		{
-			return new Message(handle, env, value).ToArray();
 		}
 
 		public static Message Parse(byte[] body)

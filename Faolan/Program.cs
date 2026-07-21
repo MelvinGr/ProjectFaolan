@@ -40,22 +40,6 @@ namespace Faolan
 			return buffer.ToArray();
 		}
 
-		// All --role values from argv (the option is repeatable: `--role login --role realm=2`). The config binder keeps
-		// only the LAST value for a repeated key, so the roles are parsed straight from argv. Handles `--role X` and `--role=X`.
-		private static List<string> CollectRoleArgs(string[] args)
-		{
-			var roles = new List<string>();
-			for (var i = 0; i < args.Length; i++)
-			{
-				if (args[i].Equals("--role", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-					roles.Add(args[++i]);
-				else if (args[i].StartsWith("--role=", StringComparison.OrdinalIgnoreCase))
-					roles.Add(args[i]["--role=".Length..]);
-			}
-
-			return roles;
-		}
-
 		[STAThread]
 		public static async Task Main(string[] args)
 		{
@@ -93,7 +77,7 @@ namespace Faolan
 			// container); default is logs/<epoch>.log (epoch = process start, unix seconds) so each run is a
 			// distinct, retained file instead of overwriting one logs.txt every start (#282).
 			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ??
-															   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
+			                                                   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
 
 			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
 			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
@@ -108,30 +92,25 @@ namespace Faolan
 			uint? selectedRealmId = null;
 			bool runLogin = false, runRealm = false;
 			if (roles.Count == 0)
-			{
 				runLogin = runRealm = true; // default: all-in-one (dev)
-			}
 			else
 			{
 				foreach (var role in roles)
 				{
 					if (role.Equals("login", StringComparison.OrdinalIgnoreCase))
-					{
 						runLogin = true;
-					}
 					else if (role.Equals("realm", StringComparison.OrdinalIgnoreCase) || role.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
 					{
 						if (runRealm)
 							throw new Exception("at most one 'realm' role per process - co-hosting realms would leak chat/session state across them; run one process per realm.");
+
 						runRealm = true;
 						var eq = role.IndexOf('=');
 						if (eq >= 0)
 							selectedRealmId = uint.Parse(role[(eq + 1)..], CultureInfo.InvariantCulture);
 					}
 					else
-					{
 						throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{role}'.");
-					}
 				}
 			}
 
@@ -146,13 +125,16 @@ namespace Faolan
 					? probe.Realms.FirstOrDefault(r => r.Id == selectedRealmId.Value)
 					: probe.Realms.OrderBy(r => r.Id).FirstOrDefault();
 				if (hostRealm == null)
+				{
 					throw new Exception(selectedRealmId.HasValue
 						? $"--role realm={selectedRealmId}: no such realm in the DB (migrate + seed a Realm row first)."
 						: "--role realm: no realm seeded in the DB.");
+				}
 			}
 
-			Console.WriteLine($"[role] login={runLogin} realm={runRealm}" +
-							  (hostRealm != null ? $" — hosting '{hostRealm.Name}' (id {hostRealm.Id}): world {hostRealm.Port} / chat {hostRealm.ChatServerPort} / cs {hostRealm.CsPlayerAgentPort}" : ""));
+			Console.WriteLine($"[role] login={runLogin} realm={runRealm}" + (hostRealm != null
+				? $" — hosting '{hostRealm.Name}' (id {hostRealm.Id}): world {hostRealm.Port} / chat {hostRealm.ChatServerPort} / cs {hostRealm.CsPlayerAgentPort}"
+				: ""));
 
 			builder.Services.AddLogging();
 
@@ -195,8 +177,8 @@ namespace Faolan
 					var agentServerDispatcher = provider.GetRequiredService<IChatServerDispatcher>();
 					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
-					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm.Id}"),
-						configuration, dataRepository, hostRealm, agentServerDispatcher, gameServerDispatcher);
+					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm.Id}"), configuration, dataRepository, hostRealm, agentServerDispatcher,
+						gameServerDispatcher);
 				});
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
@@ -207,6 +189,22 @@ namespace Faolan
 
 			var host = builder.Build();
 			await host.RunAsync();
+		}
+
+		// All --role values from argv (the option is repeatable: `--role login --role realm=2`). The config binder keeps
+		// only the LAST value for a repeated key, so the roles are parsed straight from argv. Handles `--role X` and `--role=X`.
+		private static List<string> CollectRoleArgs(string[] args)
+		{
+			var roles = new List<string>();
+			for (var i = 0; i < args.Length; i++)
+			{
+				if (args[i].Equals("--role", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+					roles.Add(args[++i]);
+				else if (args[i].StartsWith("--role=", StringComparison.OrdinalIgnoreCase))
+					roles.Add(args[i]["--role=".Length..]);
+			}
+
+			return roles;
 		}
 	}
 }

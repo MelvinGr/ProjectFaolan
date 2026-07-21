@@ -29,6 +29,11 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string Category { get; set; } = null!;
 
+		// The stored value: a "*hairmesh_N"/"*texscript_N" ref, a head monsterdataid, or (for a morph row) the morph
+		// name. Empty for the height row.
+		[MaxLength(128)]
+		public string Value { get; set; } = null!;
+
 		// Swatch hex for the colour categories (else null).
 		[MaxLength(64)]
 		public string? Color { get; set; }
@@ -36,10 +41,5 @@ namespace Faolan.Core.Database.Tables
 		// Friendly name from the referenced resource's name= (else null - the UI falls back to an ordinal label).
 		[MaxLength(128)]
 		public string? Name { get; set; }
-
-		// The stored value: a "*hairmesh_N"/"*texscript_N" ref, a head monsterdataid, or (for a morph row) the morph
-		// name. Empty for the height row.
-		[MaxLength(128)]
-		public string Value { get; set; } = null!;
 	}
 }

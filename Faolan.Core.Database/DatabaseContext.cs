@@ -21,9 +21,9 @@ namespace Faolan.Core.Database
 		DbSet<Character> Characters { get; }
 		DbSet<CharacterAbility> CharacterAbilities { get; }
 		DbSet<CharacterAttribute> CharacterAttributes { get; }
-		DbSet<CharacterBuff> CharacterBuffs { get; }
 		DbSet<CharacterBody> CharacterBodies { get; }
 		DbSet<CharacterBodyResource> CharacterBodyResources { get; }
+		DbSet<CharacterBuff> CharacterBuffs { get; }
 		DbSet<CharacterCombo> CharacterCombos { get; }
 		DbSet<CharacterEquipment> CharacterEquipment { get; }
 		DbSet<CharacterFeat> CharacterFeats { get; }
@@ -55,25 +55,25 @@ namespace Faolan.Core.Database
 		DbSet<MapArea> MapAreas { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
-		DbSet<NpcTemplate> NpcTemplates { get; }
+		DbSet<NpcChatter> NpcChatter { get; }
 		DbSet<NpcEquipment> NpcEquipment { get; }
 		DbSet<NpcMorph> NpcMorphs { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
+		DbSet<NpcSpawnArea> NpcSpawnAreas { get; }
+		DbSet<NpcSpawnAreaPoint> NpcSpawnAreaPoints { get; }
 		DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; }
 		DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; }
 		DbSet<NpcSpell> NpcSpells { get; }
-		DbSet<NpcChatter> NpcChatter { get; }
 		DbSet<NpcStatCore> NpcStatCores { get; }
-		DbSet<PatrolPath> PatrolPaths { get; }
+		DbSet<NpcTemplate> NpcTemplates { get; }
 		DbSet<PatrolNode> PatrolNodes { get; }
 		DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; }
+		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<QuestArea> QuestAreas { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
 		DbSet<Realm> Realms { get; }
-		DbSet<NpcSpawnArea> NpcSpawnAreas { get; }
-		DbSet<NpcSpawnAreaPoint> NpcSpawnAreaPoints { get; }
 		DbSet<Recipe> Recipes { get; }
 		DbSet<RecipeItem> RecipeItems { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
@@ -96,9 +96,9 @@ namespace Faolan.Core.Database
 		public DbSet<Character> Characters { get; set; }
 		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
 		public DbSet<CharacterAttribute> CharacterAttributes { get; set; }
-		public DbSet<CharacterBuff> CharacterBuffs { get; set; }
 		public DbSet<CharacterBody> CharacterBodies { get; set; }
 		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
+		public DbSet<CharacterBuff> CharacterBuffs { get; set; }
 		public DbSet<CharacterCombo> CharacterCombos { get; set; }
 		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
 		public DbSet<CharacterFeat> CharacterFeats { get; set; }
@@ -130,25 +130,25 @@ namespace Faolan.Core.Database
 		public DbSet<MapArea> MapAreas { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
-		public DbSet<NpcTemplate> NpcTemplates { get; set; }
+		public DbSet<NpcChatter> NpcChatter { get; set; }
 		public DbSet<NpcEquipment> NpcEquipment { get; set; }
 		public DbSet<NpcMorph> NpcMorphs { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
+		public DbSet<NpcSpawnArea> NpcSpawnAreas { get; set; }
+		public DbSet<NpcSpawnAreaPoint> NpcSpawnAreaPoints { get; set; }
 		public DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; set; }
 		public DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; set; }
 		public DbSet<NpcSpell> NpcSpells { get; set; }
-		public DbSet<NpcChatter> NpcChatter { get; set; }
 		public DbSet<NpcStatCore> NpcStatCores { get; set; }
-		public DbSet<PatrolPath> PatrolPaths { get; set; }
+		public DbSet<NpcTemplate> NpcTemplates { get; set; }
 		public DbSet<PatrolNode> PatrolNodes { get; set; }
 		public DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; set; }
+		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<QuestArea> QuestAreas { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
 		public DbSet<Realm> Realms { get; set; }
-		public DbSet<NpcSpawnArea> NpcSpawnAreas { get; set; }
-		public DbSet<NpcSpawnAreaPoint> NpcSpawnAreaPoints { get; set; }
 		public DbSet<Recipe> Recipes { get; set; }
 		public DbSet<RecipeItem> RecipeItems { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
@@ -384,7 +384,13 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).HasForeignKey(n => n.ParentId).OnDelete(DeleteBehavior.NoAction);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
 			// A waypoint is identified by its node + walk position, not a surrogate id (its FK is half the key).
-			modelBuilder.Entity<PatrolNodeWaypoint>().HasKey(w => new { w.PatrolNodeId, w.Ordinal });
+			modelBuilder
+				.Entity<PatrolNodeWaypoint>()
+				.HasKey(w => new
+				{
+					w.PatrolNodeId,
+					w.Ordinal
+				});
 
 			// A captured world object is deduped by its (map, spawn point, identity): two distinct props can occupy the
 			// EXACT same coordinates (#222), so the display_name identity is part of the key - position alone would

@@ -10,15 +10,15 @@ namespace Faolan.Core.Database.Tables
 	// (the ability template carries no class/level requirement). Replaces the old IsStartingAbility + Class/Level columns.
 	public class Ability : BaseEntity
 	{
+		// The ability template's 128-bit TEA DecryptionKey (owned -> flat columns Key1..Key4). virtual for the
+		// lazy-loading-proxy test context (owned types are eager; virtual only satisfies the all-navigations-virtual rule).
+		public virtual ProtoDecryptionKey Key { get; set; } = new();
+
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
 
 		// The leading identity word of the 0x2052 grant (written before the key). Distinct from Key; meaning not fully decoded.
 		public uint Data0 { get; set; }
-
-		// The ability template's 128-bit TEA DecryptionKey (owned -> flat columns Key1..Key4). virtual for the
-		// lazy-loading-proxy test context (owned types are eager; virtual only satisfies the all-navigations-virtual rule).
-		public virtual ProtoDecryptionKey Key { get; set; } = new();
 
 		// The ability's wire "slot"/template word: the leading u32 of the 0x2052 ability-grant packet (verified against
 		// the strickenbla combat capture: 769094->108, 769099->112). Despite the "slot" name it is ability-intrinsic

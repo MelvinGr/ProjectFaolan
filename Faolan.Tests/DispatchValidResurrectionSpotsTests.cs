@@ -27,7 +27,8 @@ namespace Faolan.Tests
 		// mid-walk, and the list now holds two spots, the newly-found 784237 ahead of the always-known 784236. Count
 		// prefix 0xBD3 = 3 * 0x3F1, and 784236's record here is byte-identical to its record in f=138's one-spot frame
 		// - which is what proves the 0x00 is per-record rather than end-of-body.
-		private const string CapturedTwoSpots = "43e0ac82431dd43b443aad9900000bd343d9f979431feccd443b38f60000c7a000000faa000000000000000000000000000bf76d0000000a0043a8278d4314f78d44253df40000c7a000000faa000000000000000000000000000bf76c0000000a00";
+		private const string CapturedTwoSpots =
+			"43e0ac82431dd43b443aad9900000bd343d9f979431feccd443b38f60000c7a000000faa000000000000000000000000000bf76d0000000a0043a8278d4314f78d44253df40000c7a000000faa000000000000000000000000000bf76c0000000a00";
 
 		[Fact]
 		public void CreateFlowBody_MatchesCapture()

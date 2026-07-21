@@ -44,26 +44,26 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string Name { get; set; } = null!;
 
-		public uint Renown { get; set; }
-
 		// Guild level (0x2038 rankings column; 20 is retail max). Cosmetic until guild XP is a real feature.
 		public uint Level { get; set; } = 1;
 
-		// The three renown categories the guild-rankings window (0x2038 DispatchGuildRankingsUpdate) ranks by; the
-		// window's "Total" tab is their sum (RenownTotal), verified across every guild in the hoxxling rankings
-		// capture. Stored as u64 (the wire width). Zeroed for a fresh guild.
-		public ulong RenownValor { get; set; }
+		public uint Renown { get; set; }
 
-		public ulong RenownGlory { get; set; }
+		// Guild bank, in tin (u64 on the wire; the wallet wire unit).
+		public ulong Cash { get; set; }
 
 		public ulong RenownArtistry { get; set; }
+
+		public ulong RenownGlory { get; set; }
 
 		// The rankings "Total" column: the sum of the three categories (NOT the separate `Renown` accumulator that
 		// feeds the 0x203F renown block). Not persisted - derived on read.
 		[NotMapped]
 		public ulong RenownTotal => RenownValor + RenownGlory + RenownArtistry;
 
-		// Guild bank, in tin (u64 on the wire; the wallet wire unit).
-		public ulong Cash { get; set; }
+		// The three renown categories the guild-rankings window (0x2038 DispatchGuildRankingsUpdate) ranks by; the
+		// window's "Total" tab is their sum (RenownTotal), verified across every guild in the hoxxling rankings
+		// capture. Stored as u64 (the wire width). Zeroed for a fresh guild.
+		public ulong RenownValor { get; set; }
 	}
 }

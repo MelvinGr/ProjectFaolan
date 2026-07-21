@@ -75,7 +75,6 @@ namespace Faolan.Core.Database.Tables
 		// mountable zone read as no-mount). Sourced from the map's capture (the despawn/snapshot token, e.g. Old
 		// Tarantia = 0x00507927). 0 = unknown → the world-entry falls back to WorldState.DefaultPlayfieldToken (beach).
 		public uint PlayfieldToken { get; set; }
-
 	}
 
 	// How the live world creates copies (instances) of a map (#268). Retail's playfield-instance token is the

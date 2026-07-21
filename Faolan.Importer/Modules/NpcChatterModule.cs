@@ -46,8 +46,10 @@ namespace Faolan.Importer.Modules
 				// handle -> TemplateId from the Conan FA015807 spawns (last spawn for a reused handle wins).
 				var handleToTemplate = new Dictionary<uint, uint>();
 				foreach (var spawn in NpcSpawnExtractor.Extract(cap.Packets))
+				{
 					if (spawn.TemplateId != 0)
 						handleToTemplate[spawn.Handle] = spawn.TemplateId;
+				}
 
 				var file = Path.Combine(ctx.CapturesDir, cap.Name + ".tshark.json");
 				if (!File.Exists(file))
@@ -72,13 +74,16 @@ namespace Faolan.Importer.Modules
 					{
 						if (Str(p, "Protocol") != "ChatServer" || Str(p, "Opcode") != "0x0022" || Body(p) is not { } body || body.Length < 6)
 							continue;
+
 						var sender = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
 						var len = BinaryPrimitives.ReadUInt16BigEndian(body.AsSpan(4, 2));
 						if (6 + len > body.Length)
 							continue;
+
 						var text = Encoding.Latin1.GetString(body.AsSpan(6, len));
 						if (!text.Contains("sayinchat(", StringComparison.Ordinal) || !handleToTemplate.TryGetValue(sender, out var template))
 							continue;
+
 						if (!byTemplate.TryGetValue(template, out var set))
 							byTemplate[template] = set = new HashSet<string>();
 						set.Add(text);
@@ -99,7 +104,11 @@ namespace Faolan.Importer.Modules
 				var existing = await ctx.Db.NpcChatter.Where(c => c.NpcTemplateId == npc.TemplateId).ToListAsync();
 				ctx.Db.NpcChatter.RemoveRange(existing);
 				foreach (var text in texts)
-					ctx.Db.NpcChatter.Add(new NpcChatter { NpcTemplateId = npc.TemplateId, RemoteFormat = text });
+					ctx.Db.NpcChatter.Add(new NpcChatter
+					{
+						NpcTemplateId = npc.TemplateId,
+						RemoteFormat = text
+					});
 
 				npcs++;
 				lines += texts.Count;
@@ -109,15 +118,15 @@ namespace Faolan.Importer.Modules
 			return new ImportResult($"{npcs} NPC templates with chatter, {lines} bark lines.");
 		}
 
-		private static string Str(JsonElement p, string name) => p.TryGetProperty(name, out var v) ? v.GetString() : null;
-
 		private static byte[] Body(JsonElement p)
 		{
 			if (!p.TryGetProperty("BodyHex", out var bh) || bh.ValueKind != JsonValueKind.String)
 				return null;
+
 			var s = bh.GetString();
 			if (string.IsNullOrEmpty(s) || (s.Length & 1) != 0)
 				return null;
+
 			try
 			{
 				return Convert.FromHexString(s);
@@ -126,6 +135,13 @@ namespace Faolan.Importer.Modules
 			{
 				return null;
 			}
+		}
+
+		private static string Str(JsonElement p, string name)
+		{
+			return p.TryGetProperty(name, out var v)
+				? v.GetString()
+				: null;
 		}
 	}
 }

@@ -1,5 +1,3 @@
-using System;
-using System.Buffers.Binary;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
@@ -15,14 +13,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   EnergyIIR       0x40749B8A: [subop][0000C350][actor:4][01][stamina:4]                                     (17 b)
 	public static class CombatPacketCodec
 	{
-		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.BehaviorControlCenterIIR,
-			GameServer0X2000Opcodes.DamageResultIIR,
-			GameServer0X2000Opcodes.EnergyIIR,
-		];
-
 		public const int DamageResultBodyLength = 37;
 		public const int EnergyBodyLength = 17;
 
@@ -34,6 +24,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// NPC animation acks are server-initiated, so the echoed sequence is the constant 0x0004 (not a client seq).
 		private const ushort NpcAttackAckSeq = 0x0004;
+
+		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.BehaviorControlCenterIIR, GameServer0X2000Opcodes.DamageResultIIR, GameServer0X2000Opcodes.EnergyIIR];
 
 		// The DamageResultIIR hit body - the floating number / health-bar move on `target` for `damage` from `attacker`.
 		public static byte[] BuildDamageResultBody(uint attackerInstance, uint targetHandle, uint damage)
@@ -81,7 +74,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 				CommandqueueServerId = swingCounter,
 				Flags = f5,
 				ExecutionStatus = 0,
-				Target = new ProtoID32 { Type = SpellTargetTypeWord, Instance = playerHandle },
+				Target = new ProtoID32
+				{
+					Type = SpellTargetTypeWord,
+					Instance = playerHandle
+				},
 				RechargeTime = f11,
 				ActivationTime = f12
 			}.ToProtobuf();

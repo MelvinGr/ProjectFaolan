@@ -36,14 +36,15 @@ namespace Faolan.Core.Network.Codecs.World
 	// the same bytes we have always sent, now for the right reason and derived rather than asserted.
 	public static class GameActionListCodec
 	{
-		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
-
-		public const uint ConstFour = 4;
 		// How many GameActionData elements this codec emits/expects. The wire word is ListFrame.ForCount(ActionCount)
 		// - the client divides it by 0x3F1 and reads that many blobs (see the class comment). One, because BuildBody
 		// carries exactly one `actionTail` blob; a multi-action body would need the tail split per element first.
 		public const int ActionCount = 1;
+
+		public const uint ConstFour = 4;
+
+		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
 		public const ulong ConstOne = 1;
 
 		// Builds the GameActionList body for `dynelHandle`, delivered to `frameHandle`, carrying `actionTail` verbatim.

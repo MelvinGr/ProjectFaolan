@@ -27,7 +27,13 @@ namespace Faolan.Tests
 				Id = id,
 				Slot = slot,
 				Data0 = data0,
-				Key = new ProtoDecryptionKey { Key1 = data1, Key2 = data2, Key3 = data3, Key4 = data4 }
+				Key = new ProtoDecryptionKey
+				{
+					Key1 = data1,
+					Key2 = data2,
+					Key3 = data3,
+					Key4 = data4
+				}
 			};
 
 			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(ability);
@@ -46,7 +52,13 @@ namespace Faolan.Tests
 				Id = 769094u,
 				Slot = 108u,
 				Data0 = 1263352118u,
-				Key = new ProtoDecryptionKey { Key1 = 3236668225u, Key2 = 2153842419u, Key3 = 314062142u, Key4 = 3015939650u }
+				Key = new ProtoDecryptionKey
+				{
+					Key1 = 3236668225u,
+					Key2 = 2153842419u,
+					Key3 = 314062142u,
+					Key4 = 3015939650u
+				}
 			};
 
 			var announced = ToHex(AbilityGrantBody.BuildAddSpecialAbilityBody(ability));
@@ -66,7 +78,13 @@ namespace Faolan.Tests
 				Id = 769094u,
 				Slot = 108u,
 				Data0 = 1u,
-				Key = new ProtoDecryptionKey { Key1 = 2u, Key2 = 3u, Key3 = 4u, Key4 = 5u }
+				Key = new ProtoDecryptionKey
+				{
+					Key1 = 2u,
+					Key2 = 3u,
+					Key3 = 4u,
+					Key4 = 5u
+				}
 			};
 			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(ability);
 
@@ -90,7 +108,13 @@ namespace Faolan.Tests
 				Id = id,
 				Slot = slot,
 				Data0 = data0,
-				Key = new ProtoDecryptionKey { Key1 = data1, Key2 = data2, Key3 = data3, Key4 = data4 }
+				Key = new ProtoDecryptionKey
+				{
+					Key1 = data1,
+					Key2 = data2,
+					Key3 = data3,
+					Key4 = data4
+				}
 			};
 			var body = AbilityGrantBody.BuildAddSpecialAbilityBody(original, announce);
 

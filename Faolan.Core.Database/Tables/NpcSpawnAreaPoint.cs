@@ -13,17 +13,17 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(NpcSpawnAreaId), nameof(PointIndex))]
 	public class NpcSpawnAreaPoint
 	{
-		public uint NpcSpawnAreaId { get; set; }
-
 		[ForeignKey(nameof(NpcSpawnAreaId))]
 		public virtual NpcSpawnArea Area { get; set; } = null!;
 
-		// The 0-based index of this point within its group - stable across re-imports.
-		public int PointIndex { get; set; }
+		public uint NpcSpawnAreaId { get; set; }
 
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }
 		public float PositionZ { get; set; }
+
+		// The 0-based index of this point within its group - stable across re-imports.
+		public int PointIndex { get; set; }
 
 		[NotMapped]
 		public Vector3 Position

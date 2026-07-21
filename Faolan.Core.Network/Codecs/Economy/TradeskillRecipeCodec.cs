@@ -35,41 +35,27 @@ namespace Faolan.Core.Network.Codecs.Economy
 	//   [0]=[1]=itemId, [2]=0, [3]=flag, [4]=hash, [5..8]=[9..12]=item TEA key, [13..16]=const, ([17]=trailing, ing only)
 	public static class TradeskillRecipeCodec
 	{
-		// This codec covers BOTH halves of the recipe-book exchange: the c2s TradeskillRequestIIR (0x06B9CD94, the
-		// client opening the book - a trigger with no body of interest) and the s2c TradeskillReplyIIR (0x9062D559,
-		// the catalog this codec builds). Opcode below is the reply (what BuildReplyIir emits).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.TradeskillReplyIIR,
-			GameServer0X2000Opcodes.TradeskillRequestIIR
-		];
-
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.TradeskillReplyIIR;
-
 		public const byte ListType = 3; // full recipe-book list (vs 1 = single RecipeLearnt)
 
 		public const byte RoleIngredient = 0;
 		public const byte RoleResult = 1;
 		public const uint ListFrame = Codecs.ListFrame.Unit;
+
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.TradeskillReplyIIR;
 		public const uint Version = 1;
+		private const uint HeaderTypeA = 0xF4241; // rdbType value A (1000001)
+		private const uint HeaderTypeB = 0xF4242; // rdbType value B (1000002)
 
 		// Fixed record/element constants (invariant across all 603 captured records; validated on parse so a capture
 		// that breaks the assumption throws rather than silently mis-building).
 		private const uint MidWord1 = 0x1F4; // mid[1]
-		private const uint HeaderTypeA = 0xF4241; // rdbType value A (1000001)
-		private const uint HeaderTypeB = 0xF4242; // rdbType value B (1000002)
-		private static readonly uint[] ElementConst = [0xB290805Cu, 0x29E627CAu, 0xB290805Cu, 0x29E627CAu]; // element [13..16]
 
-		// The full TradeskillReplyIIR carrier: [subop][0xC350][handle][reply body] (the create/craft window's recipe list).
-		public static byte[] BuildReplyIir(uint handle, IReadOnlyCollection<RecipeRecord> recipes)
-		{
-			return new FaolanStream()
-				.WriteUInt32(Opcode)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(handle)
-				.WriteArray(BuildReplyBody(recipes))
-				.ToArray();
-		}
+		// This codec covers BOTH halves of the recipe-book exchange: the c2s TradeskillRequestIIR (0x06B9CD94, the
+		// client opening the book - a trigger with no body of interest) and the s2c TradeskillReplyIIR (0x9062D559,
+		// the catalog this codec builds). Opcode below is the reply (what BuildReplyIir emits).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.TradeskillReplyIIR, GameServer0X2000Opcodes.TradeskillRequestIIR];
+
+		private static readonly uint[] ElementConst = [0xB290805Cu, 0x29E627CAu, 0xB290805Cu, 0x29E627CAu]; // element [13..16]
 
 		// Build the reply IIR body [env][version][type=3][count][records] from typed recipe records.
 		public static byte[] BuildReplyBody(IReadOnlyCollection<RecipeRecord> recipes)
@@ -86,36 +72,11 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return body.ToArray();
 		}
 
-		private static void WriteRecord(FaolanStream body, RecipeRecord r)
+		// The full TradeskillReplyIIR carrier: [subop][0xC350][handle][reply body] (the create/craft window's recipe list).
+		public static byte[] BuildReplyIir(uint handle, IReadOnlyCollection<RecipeRecord> recipes)
 		{
-			body.WriteUInt32(r.Id) //           list-key
-				.WriteUInt32(r.Id) //           header[0] == list-key
-				.WriteUInt32(r.Header1)
-				.WriteUInt32(r.RdbType);
-			WriteFramedCount(body, r.Ingredients.Count);
-			foreach (var e in r.Ingredients)
-				WriteElement(body, e, hasTrailing: true);
-			body.WriteUInt32(0).WriteUInt32(MidWord1).WriteUInt32(r.MidFlag).WriteUInt32(0); // mid x4
-			WriteFramedCount(body, r.RefIds.Count);
-			foreach (var id in r.RefIds)
-				body.WriteUInt32(id);
-			WriteFramedCount(body, r.Results.Count);
-			foreach (var e in r.Results)
-				WriteElement(body, e, hasTrailing: false);
-			body.WriteUInt32(r.Tail).WriteByte(r.TrailingFlag);
+			return new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteArray(BuildReplyBody(recipes)).ToArray();
 		}
-
-		private static void WriteElement(FaolanStream body, RecipeElement e, bool hasTrailing)
-		{
-			body.WriteUInt32(e.ItemId).WriteUInt32(e.ItemId).WriteUInt32(0).WriteUInt32(e.Flag).WriteUInt32(e.Hash)
-				.WriteUInt32(e.Key1).WriteUInt32(e.Key2).WriteUInt32(e.Key3).WriteUInt32(e.Key4) // key
-				.WriteUInt32(e.Key1).WriteUInt32(e.Key2).WriteUInt32(e.Key3).WriteUInt32(e.Key4) // key (dup)
-				.WriteUInt32(ElementConst[0]).WriteUInt32(ElementConst[1]).WriteUInt32(ElementConst[2]).WriteUInt32(ElementConst[3]);
-			if (hasTrailing)
-				body.WriteUInt32(e.Trailing);
-		}
-
-		private static void WriteFramedCount(FaolanStream body, int n) => body.WriteUInt32(((uint)n + 1) * ListFrame);
 
 		// Parse the reply IIR body (starting at the [u8 env] byte, i.e. just past [subop][0xC350][handle]) into typed
 		// recipe records. Throws on a malformed stream or a broken layout invariant so a bad decode surfaces rather
@@ -144,12 +105,84 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return recipes;
 		}
 
+		// Project a stored Recipe row (with its Items and their Item templates loaded) back into the wire record. The
+		// per-element TEA key + hash live once on the referenced Items row (RecipeItem carries only id/flag/trailing).
+		public static RecipeRecord ToRecord(Recipe row)
+		{
+			ArgumentNullException.ThrowIfNull(row);
+			var refIds = new List<uint>
+			{
+				row.RefId0
+			};
+			if (row.RefId1.HasValue)
+				refIds.Add(row.RefId1.Value);
+
+			return new RecipeRecord(row.Id, row.Header1, row.RdbType, row.MidFlag, row.Tail, row.TrailingFlag, refIds, ElementsFor(row, RecipeItemRole.Ingredient),
+				ElementsFor(row, RecipeItemRole.Result));
+		}
+
+		private static List<RecipeElement> ElementsFor(Recipe row, RecipeItemRole role)
+		{
+			return row
+				.Items.Where(i => i.Role == role)
+				.OrderBy(i => i.Position)
+				.Select(i => new RecipeElement(i.ItemId, i.Flag, i.Item.Hash, i.Item.Key.Key1, i.Item.Key.Key2, i.Item.Key.Key3, i.Item.Key.Key4, i.Trailing))
+				.ToList();
+		}
+
+		private static uint Read(ReadOnlySpan<byte> data, ref int p)
+		{
+			var v = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(p, 4));
+			p += 4;
+			return v;
+		}
+
+		private static RecipeElement ReadElement(ReadOnlySpan<byte> data, ref int p, bool hasTrailing)
+		{
+			var itemId = Read(data, ref p); //   [0] item id
+			if (Read(data, ref p) != itemId) // [1] item id (dup)
+				throw new InvalidOperationException($"TradeskillReply: element item-id words differ for {itemId:x}");
+			if (Read(data, ref p) != 0) //       [2] = 0
+				throw new InvalidOperationException($"TradeskillReply: element word[2] != 0 for {itemId:x}");
+
+			var flag = Read(data, ref p); //     [3]
+			var hash = Read(data, ref p); //     [4]
+			var k1 = Read(data, ref p);
+			var k2 = Read(data, ref p);
+			var k3 = Read(data, ref p);
+			var k4 = Read(data, ref p); //       [5..8] item TEA key
+			if (Read(data, ref p) != k1 || Read(data, ref p) != k2 || Read(data, ref p) != k3 || Read(data, ref p) != k4)
+				throw new InvalidOperationException($"TradeskillReply: element key-dup differs for {itemId:x}"); // [9..12]
+
+			for (var c = 0; c < 4; c++)
+			{
+				if (Read(data, ref p) != ElementConst[c])
+					throw new InvalidOperationException($"TradeskillReply: element const word differs for {itemId:x}"); // [13..16]
+			}
+
+			var trailing = hasTrailing
+				? Read(data, ref p)
+				: 0u; // [17] (ingredients only)
+
+			return new RecipeElement(itemId, flag, hash, k1, k2, k3, k4, trailing);
+		}
+
+		private static int ReadFramed(ReadOnlySpan<byte> body, ref int p)
+		{
+			var c = Read(body, ref p);
+			if (c == 0 || c % ListFrame != 0)
+				throw new InvalidOperationException($"TradeskillReply: list count 0x{c:X} is not a positive multiple of 0x{ListFrame:X}");
+
+			return (int)(c / ListFrame) - 1;
+		}
+
 		private static RecipeRecord ReadRecord(ReadOnlySpan<byte> body, ref int p)
 		{
 			var listKey = Read(body, ref p);
 			var head0 = Read(body, ref p);
 			if (head0 != listKey)
 				throw new InvalidOperationException($"TradeskillReply: recipe {listKey:x} header word0 {head0:x} != list-key");
+
 			var header1 = Read(body, ref p);
 			var rdbType = Read(body, ref p);
 			if (rdbType != HeaderTypeA && rdbType != HeaderTypeB)
@@ -158,10 +191,11 @@ namespace Faolan.Core.Network.Codecs.Economy
 			var nIng = ReadFramed(body, ref p);
 			var ingredients = new List<RecipeElement>(nIng);
 			for (var e = 0; e < nIng; e++)
-				ingredients.Add(ReadElement(body, ref p, hasTrailing: true));
+				ingredients.Add(ReadElement(body, ref p, true));
 
 			if (Read(body, ref p) != 0 || Read(body, ref p) != MidWord1)
 				throw new InvalidOperationException($"TradeskillReply: recipe {listKey:x} unexpected mid header");
+
 			var midFlag = Read(body, ref p);
 			if (Read(body, ref p) != 0)
 				throw new InvalidOperationException($"TradeskillReply: recipe {listKey:x} unexpected mid trailer");
@@ -174,7 +208,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			var nRes = ReadFramed(body, ref p);
 			var results = new List<RecipeElement>(nRes);
 			for (var e = 0; e < nRes; e++)
-				results.Add(ReadElement(body, ref p, hasTrailing: false));
+				results.Add(ReadElement(body, ref p, false));
 
 			var tail = Read(body, ref p);
 			var trailingFlag = body[p];
@@ -183,70 +217,53 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return new RecipeRecord(listKey, header1, rdbType, midFlag, tail, trailingFlag, refIds, ingredients, results);
 		}
 
-		private static RecipeElement ReadElement(ReadOnlySpan<byte> data, ref int p, bool hasTrailing)
+		private static void WriteElement(FaolanStream body, RecipeElement e, bool hasTrailing)
 		{
-			var itemId = Read(data, ref p); //   [0] item id
-			if (Read(data, ref p) != itemId) // [1] item id (dup)
-				throw new InvalidOperationException($"TradeskillReply: element item-id words differ for {itemId:x}");
-			if (Read(data, ref p) != 0) //       [2] = 0
-				throw new InvalidOperationException($"TradeskillReply: element word[2] != 0 for {itemId:x}");
-			var flag = Read(data, ref p); //     [3]
-			var hash = Read(data, ref p); //     [4]
-			var k1 = Read(data, ref p);
-			var k2 = Read(data, ref p);
-			var k3 = Read(data, ref p);
-			var k4 = Read(data, ref p); //       [5..8] item TEA key
-			if (Read(data, ref p) != k1 || Read(data, ref p) != k2 || Read(data, ref p) != k3 || Read(data, ref p) != k4)
-				throw new InvalidOperationException($"TradeskillReply: element key-dup differs for {itemId:x}"); // [9..12]
-			for (var c = 0; c < 4; c++)
-				if (Read(data, ref p) != ElementConst[c])
-					throw new InvalidOperationException($"TradeskillReply: element const word differs for {itemId:x}"); // [13..16]
-			var trailing = hasTrailing ? Read(data, ref p) : 0u; // [17] (ingredients only)
-
-			return new RecipeElement(itemId, flag, hash, k1, k2, k3, k4, trailing);
+			body
+				.WriteUInt32(e.ItemId)
+				.WriteUInt32(e.ItemId)
+				.WriteUInt32(0)
+				.WriteUInt32(e.Flag)
+				.WriteUInt32(e.Hash)
+				.WriteUInt32(e.Key1)
+				.WriteUInt32(e.Key2)
+				.WriteUInt32(e.Key3)
+				.WriteUInt32(e.Key4) // key
+				.WriteUInt32(e.Key1)
+				.WriteUInt32(e.Key2)
+				.WriteUInt32(e.Key3)
+				.WriteUInt32(e.Key4) // key (dup)
+				.WriteUInt32(ElementConst[0])
+				.WriteUInt32(ElementConst[1])
+				.WriteUInt32(ElementConst[2])
+				.WriteUInt32(ElementConst[3]);
+			if (hasTrailing)
+				body.WriteUInt32(e.Trailing);
 		}
 
-		// Project a stored Recipe row (with its Items and their Item templates loaded) back into the wire record. The
-		// per-element TEA key + hash live once on the referenced Items row (RecipeItem carries only id/flag/trailing).
-		public static RecipeRecord ToRecord(Recipe row)
+		private static void WriteFramedCount(FaolanStream body, int n)
 		{
-			ArgumentNullException.ThrowIfNull(row);
-			var refIds = new List<uint> { row.RefId0 };
-			if (row.RefId1.HasValue)
-				refIds.Add(row.RefId1.Value);
-
-			return new RecipeRecord(
-				row.Id, row.Header1, row.RdbType, row.MidFlag, row.Tail, row.TrailingFlag, refIds,
-				ElementsFor(row, RecipeItemRole.Ingredient),
-				ElementsFor(row, RecipeItemRole.Result));
+			body.WriteUInt32(((uint)n + 1) * ListFrame);
 		}
 
-		private static List<RecipeElement> ElementsFor(Recipe row, RecipeItemRole role)
+		private static void WriteRecord(FaolanStream body, RecipeRecord r)
 		{
-			return row.Items
-				.Where(i => i.Role == role)
-				.OrderBy(i => i.Position)
-				.Select(i => new RecipeElement(
-					i.ItemId, i.Flag, i.Item.Hash,
-					i.Item.Key.Key1, i.Item.Key.Key2, i.Item.Key.Key3, i.Item.Key.Key4,
-					i.Trailing))
-				.ToList();
-		}
-
-		private static uint Read(ReadOnlySpan<byte> data, ref int p)
-		{
-			var v = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(p, 4));
-			p += 4;
-			return v;
-		}
-
-		private static int ReadFramed(ReadOnlySpan<byte> body, ref int p)
-		{
-			var c = Read(body, ref p);
-			if (c == 0 || c % ListFrame != 0)
-				throw new InvalidOperationException($"TradeskillReply: list count 0x{c:X} is not a positive multiple of 0x{ListFrame:X}");
-
-			return (int)(c / ListFrame) - 1;
+			body
+				.WriteUInt32(r.Id) //           list-key
+				.WriteUInt32(r.Id) //           header[0] == list-key
+				.WriteUInt32(r.Header1)
+				.WriteUInt32(r.RdbType);
+			WriteFramedCount(body, r.Ingredients.Count);
+			foreach (var e in r.Ingredients)
+				WriteElement(body, e, true);
+			body.WriteUInt32(0).WriteUInt32(MidWord1).WriteUInt32(r.MidFlag).WriteUInt32(0); // mid x4
+			WriteFramedCount(body, r.RefIds.Count);
+			foreach (var id in r.RefIds)
+				body.WriteUInt32(id);
+			WriteFramedCount(body, r.Results.Count);
+			foreach (var e in r.Results)
+				WriteElement(body, e, false);
+			body.WriteUInt32(r.Tail).WriteByte(r.TrailingFlag);
 		}
 
 		// A fully-decoded recipe: the per-recipe header/mid/tail fields, the opaque ref-id list, and the typed

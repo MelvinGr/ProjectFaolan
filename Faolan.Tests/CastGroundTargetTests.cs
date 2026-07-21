@@ -10,8 +10,6 @@ namespace Faolan.Tests
 	// vs the entity-targeted Ice Strike cast (Stickienecro, frame 377). Locks CastGroundTarget's parse + detection.
 	public class CastGroundTargetTests
 	{
-		private static float F(uint bits) => BitConverter.Int32BitsToSingle(unchecked((int)bits));
-
 		[Fact]
 		public void ParsesGroundTargetFromDeathlyBlizzardTrailer()
 		{
@@ -38,6 +36,11 @@ namespace Faolan.Tests
 			Assert.False(CastGroundTarget.TryParse([0x00, 0x01, 0x02], out _));
 			Assert.False(CastGroundTarget.TryParse([], out _));
 			Assert.False(CastGroundTarget.TryParse(null, out _));
+		}
+
+		private static float F(uint bits)
+		{
+			return BitConverter.Int32BitsToSingle(unchecked((int)bits));
 		}
 	}
 }

@@ -1,10 +1,10 @@
 using System;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
@@ -12,6 +12,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Captures;
@@ -189,77 +190,6 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// #284: bake a compact per-map terrain file (heightmap 1066611 + collision mesh 1000012, gzipped) for every map
-		// in the DB that has terrain, so the GAME SERVER can serve ground-snap + line-of-sight from these small files
-		// instead of shipping the ~28 GB client RDB. Output: <out>/<mapId>.terrain (TerrainFile format). Run:
-		//   dotnet run --project Faolan.Importer -- --report terrain-export [--rdb <dir>] [--terrain-out <dir>]
-		private static async Task TerrainExport(string dbPath, string rdbDir, string outDir)
-		{
-			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
-			Directory.CreateDirectory(outDir);
-
-			var mapIds = await db.Maps.Select(m => m.Id).OrderBy(id => id).ToListAsync();
-			int written = 0, skipped = 0;
-			long totalBytes = 0;
-			foreach (var mapId in mapIds)
-			{
-				var heightmap = ReadResource(rdb, RdbHeightmap.ResourceType, mapId);
-				var collision = ReadResource(rdb, RdbCollisionMesh.ResourceType, mapId);
-				if (heightmap.Length == 0 && collision.Length == 0)
-				{
-					skipped++;
-					continue;
-				}
-
-				var extent = TilemapExtent(rdb, mapId);
-				var path = Path.Combine(outDir, $"{mapId}{TerrainFile.Extension}");
-				await using (var fs = File.Create(path))
-					TerrainFile.Write(fs, extent, heightmap, collision);
-
-				var size = new FileInfo(path).Length;
-				totalBytes += size;
-				written++;
-				Console.WriteLine($"  map {mapId}: heightmap {heightmap.Length / 1024} KB + collision {collision.Length / 1024} KB -> {size / 1024} KB");
-			}
-
-			Console.WriteLine($"terrain-export: {written} maps written ({totalBytes / 1024 / 1024} MB total), {skipped} maps with no terrain, into {outDir}.");
-		}
-
-		// The decompressed body of a per-map RDB resource, or empty when the map has no local entry of that type.
-		private static byte[] ReadResource(RdbReader rdb, uint type, uint mapId)
-		{
-			if (!rdb.TryGet(type, mapId, out var e) || !e.IsLocal)
-				return [];
-
-			try
-			{
-				return rdb.ReadDecompressed(e);
-			}
-			catch
-			{
-				return [];
-			}
-		}
-
-		// The playfield's world-unit width (1070003 <tilemap Width>), for the heightmap cell size. 0 if unavailable.
-		private static uint TilemapExtent(RdbReader rdb, uint mapId)
-		{
-			if (!rdb.TryGet(1070003, mapId, out var e) || !e.IsLocal)
-				return 0;
-
-			try
-			{
-				var xml = Encoding.Latin1.GetString(rdb.ReadDecompressed(e));
-				var m = System.Text.RegularExpressions.Regex.Match(xml, "<tilemap[^>]*Width=\"(\\d+)\"");
-				return m.Success ? uint.Parse(m.Groups[1].Value) : 0;
-			}
-			catch
-			{
-				return 0;
-			}
-		}
-
 		// Decrypts each Ability's RDB 1000020 entry with its stored Data1..4 TEA key (same scheme as item templates, #137)
 		// and dumps the printable strings - the ability NAME lives in that (encrypted-but-key-available) template.
 		private static void AbilityNames(string rdbDir, string dbPath)
@@ -309,6 +239,16 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
+		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)
+		{
+			foreach (var c in captures)
+			foreach (var g in ConversationExtractor.Extract(c.Packets).Where(e => !string.IsNullOrEmpty(e.NpcName)).GroupBy(e => e.NpcName).OrderBy(g => g.Key))
+			{
+				var grants = g.Where(e => e.GrantQuestId != 0).OrderBy(e => e.AnswerPath).Select(e => $"'{e.AnswerPath}'->{e.GrantQuestId}");
+				Console.WriteLine($"{c.Name} | {g.Key} | screens={g.Count()} | grants=[{string.Join(", ", grants)}]");
+			}
+		}
+
 		// Per-NPC dialogue screens + mid-conversation quest grants per (capture, NPC) (#37).
 		// Content coverage: of the NPCs/vendors we've actually INTERACTED with across the capture corpus, how many did
 		// we import. Capture-relative by necessity (there is no authoritative game-wide vendor/dialogue list - retail
@@ -319,18 +259,17 @@ namespace Faolan.Importer.Cli
 			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
 			var greeted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var c in captures)
-				foreach (var n in ConversationExtractor.GreetedNpcNames(c.Packets))
-					greeted.Add(n);
+			foreach (var n in ConversationExtractor.GreetedNpcNames(c.Packets))
+				greeted.Add(n);
 
 			// Shops: vendors whose 0x2033 window appears in a dump (denominator) vs imported Shop rows (numerator).
 			var vendorsSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var c in captures)
-				foreach (var e in CaptureShopImporter.Extract(c.Packets))
-					vendorsSeen.Add(e.VendorName);
+			foreach (var e in CaptureShopImporter.Extract(c.Packets))
+				vendorsSeen.Add(e.VendorName);
 
 			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
-			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync())
-				.ToHashSet(StringComparer.OrdinalIgnoreCase);
+			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var shopImported = (await db.Shops.Select(s => s.VendorName).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
 			// A greeted VENDOR opens its shop, not a conversation - exclude vendors (imported shops) from the dialogue
@@ -342,7 +281,13 @@ namespace Faolan.Importer.Cli
 			var convHave = greetedTalkers.Count - convGaps.Count;
 			var shopHave = vendorsSeen.Count - shopGaps.Count;
 
-			static string Pct(int have, int total) => total == 0 ? "n/a" : $"{100.0 * have / total:0.0}%";
+			static string Pct(int have, int total)
+			{
+				return total == 0
+					? "n/a"
+					: $"{100.0 * have / total:0.0}%";
+			}
+
 			var block = new StringBuilder();
 			block.AppendLine($"- **NPC conversations** — {convHave}/{greetedTalkers.Count} greeted dialogue NPCs imported ({Pct(convHave, greetedTalkers.Count)})");
 			block.AppendLine($"- **Vendor shops** — {shopHave}/{vendorsSeen.Count} captured vendors imported ({Pct(shopHave, vendorsSeen.Count)})");
@@ -352,7 +297,9 @@ namespace Faolan.Importer.Cli
 			// quads via ItemHashHarvester, ability keys via the 0x2052 grants). There is NO plaintext category tag in
 			// the encrypted RDBH header, so a per-category %-of-total is impossible (we can't tell an undecrypted
 			// entry's category) - we report the overall decrypted share + the absolute per-category decrypted counts.
-			var rdb = string.IsNullOrEmpty(rdbDir) ? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB" : rdbDir;
+			var rdb = string.IsNullOrEmpty(rdbDir)
+				? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB"
+				: rdbDir;
 			if (Directory.Exists(rdb))
 			{
 				var itemIds = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
@@ -390,7 +337,8 @@ namespace Faolan.Importer.Cli
 						plaintext++;
 				}
 
-				block.AppendLine($"- **RDB template catalog** (type 1000020, TEA-encrypted) — {decrypted:N0}/{encrypted:N0} decrypted, **{Pct(decrypted, encrypted)} of the total encrypted**. Keys held per category: {itemsDec:N0} items, {abilitiesDec:N0} abilities, 0 feats (feat keys absent from captures). (+{plaintext:N0} plaintext catalog entries, no key needed.)");
+				block.AppendLine(
+					$"- **RDB template catalog** (type 1000020, TEA-encrypted) — {decrypted:N0}/{encrypted:N0} decrypted, **{Pct(decrypted, encrypted)} of the total encrypted**. Keys held per category: {itemsDec:N0} items, {abilitiesDec:N0} abilities, 0 feats (feat keys absent from captures). (+{plaintext:N0} plaintext catalog entries, no key needed.)");
 			}
 
 			Console.WriteLine("Content coverage (capture-relative: of the NPCs/vendors seen in dumps, how many are imported)\n");
@@ -401,11 +349,11 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"\nshop gaps ({shopGaps.Count}) - a vendor window is in a dump, no Shop row:\n  {string.Join(", ", shopGaps)}");
 
 			// Imported-content stats: the scale of the DB (the server's source of truth). One `·`-separated line.
-			var stats = $"**Imported content** (the DB is the server's source of truth): "
-				+ $"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · "
-				+ $"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · "
-				+ $"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · "
-				+ $"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";
+			var stats = $"**Imported content** (the DB is the server's source of truth): " +
+			            $"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · " +
+			            $"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · " +
+			            $"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · " +
+			            $"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";
 			Console.WriteLine("\n" + stats);
 
 			if (string.Equals(arg, "readme", StringComparison.OrdinalIgnoreCase))
@@ -413,35 +361,6 @@ namespace Faolan.Importer.Cli
 				UpdateReadmeSection("coverage", block.ToString().TrimEnd());
 				UpdateReadmeSection("stats", stats);
 				Console.WriteLine("\nREADME.md coverage + stats sections regenerated.");
-			}
-		}
-
-		// Rewrites the content between the named markers (<!-- MARKER:start -->/<!-- MARKER:end -->) in README.md,
-		// leaving the rest untouched.
-		private static void UpdateReadmeSection(string marker, string block)
-		{
-			var path = Path.Combine(RepoRoot, "README.md");
-			var text = File.ReadAllText(path);
-			var start = $"<!-- {marker}:start -->";
-			var end = $"<!-- {marker}:end -->";
-			var s = text.IndexOf(start, StringComparison.Ordinal);
-			var e = text.IndexOf(end, StringComparison.Ordinal);
-			if (s < 0 || e < 0 || e < s)
-			{
-				Console.WriteLine($"README.md has no {start}/{end} markers; skipping.");
-				return;
-			}
-
-			File.WriteAllText(path, text[..(s + start.Length)] + "\n" + block + "\n" + text[e..]);
-		}
-
-		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)
-		{
-			foreach (var c in captures)
-			foreach (var g in ConversationExtractor.Extract(c.Packets).Where(e => !string.IsNullOrEmpty(e.NpcName)).GroupBy(e => e.NpcName).OrderBy(g => g.Key))
-			{
-				var grants = g.Where(e => e.GrantQuestId != 0).OrderBy(e => e.AnswerPath).Select(e => $"'{e.AnswerPath}'->{e.GrantQuestId}");
-				Console.WriteLine($"{c.Name} | {g.Key} | screens={g.Count()} | grants=[{string.Join(", ", grants)}]");
 			}
 		}
 
@@ -895,6 +814,7 @@ namespace Faolan.Importer.Cli
 				var body = rdb.ReadDecompressed(e);
 				if (body.Length == 0) // CDN miss
 					continue;
+
 				Console.WriteLine($"type={type} id={e.Id} decompressed={body.Length} B");
 				if (outDir != null)
 					File.WriteAllBytes(Path.Combine(outDir, $"{type}_{e.Id}.bin"), body);
@@ -1056,6 +976,22 @@ namespace Faolan.Importer.Cli
 			return best;
 		}
 
+		// The decompressed body of a per-map RDB resource, or empty when the map has no local entry of that type.
+		private static byte[] ReadResource(RdbReader rdb, uint type, uint mapId)
+		{
+			if (!rdb.TryGet(type, mapId, out var e) || !e.IsLocal)
+				return [];
+
+			try
+			{
+				return rdb.ReadDecompressed(e);
+			}
+			catch
+			{
+				return [];
+			}
+		}
+
 		// The biggest 0x737A6DF9 FullChar snapshots across the captures: size, instance, and the byte offsets where
 		// the 0x737A6DF9 subop recurs in the body (>1 => the "snapshot" is several records concatenated, not one).
 		private static void SnapshotScan(IReadOnlyList<NamedCapture> captures)
@@ -1084,7 +1020,8 @@ namespace Faolan.Importer.Cli
 				}
 
 				var instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-				Console.WriteLine($"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x{(uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR:X8}@[{string.Join(",", positions)}]");
+				Console.WriteLine(
+					$"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x{(uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR:X8}@[{string.Join(",", positions)}]");
 				Console.WriteLine($"    first48: {Convert.ToHexString(body.AsSpan(0, Math.Min(48, body.Length)))}");
 
 				try
@@ -1211,6 +1148,82 @@ namespace Faolan.Importer.Cli
 					? n
 					: 0)));
 			}
+		}
+
+		// #284: bake a compact per-map terrain file (heightmap 1066611 + collision mesh 1000012, gzipped) for every map
+		// in the DB that has terrain, so the GAME SERVER can serve ground-snap + line-of-sight from these small files
+		// instead of shipping the ~28 GB client RDB. Output: <out>/<mapId>.terrain (TerrainFile format). Run:
+		//   dotnet run --project Faolan.Importer -- --report terrain-export [--rdb <dir>] [--terrain-out <dir>]
+		private static async Task TerrainExport(string dbPath, string rdbDir, string outDir)
+		{
+			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			Directory.CreateDirectory(outDir);
+
+			var mapIds = await db.Maps.Select(m => m.Id).OrderBy(id => id).ToListAsync();
+			int written = 0, skipped = 0;
+			long totalBytes = 0;
+			foreach (var mapId in mapIds)
+			{
+				var heightmap = ReadResource(rdb, RdbHeightmap.ResourceType, mapId);
+				var collision = ReadResource(rdb, RdbCollisionMesh.ResourceType, mapId);
+				if (heightmap.Length == 0 && collision.Length == 0)
+				{
+					skipped++;
+					continue;
+				}
+
+				var extent = TilemapExtent(rdb, mapId);
+				var path = Path.Combine(outDir, $"{mapId}{TerrainFile.Extension}");
+				await using (var fs = File.Create(path))
+					TerrainFile.Write(fs, extent, heightmap, collision);
+
+				var size = new FileInfo(path).Length;
+				totalBytes += size;
+				written++;
+				Console.WriteLine($"  map {mapId}: heightmap {heightmap.Length / 1024} KB + collision {collision.Length / 1024} KB -> {size / 1024} KB");
+			}
+
+			Console.WriteLine($"terrain-export: {written} maps written ({totalBytes / 1024 / 1024} MB total), {skipped} maps with no terrain, into {outDir}.");
+		}
+
+		// The playfield's world-unit width (1070003 <tilemap Width>), for the heightmap cell size. 0 if unavailable.
+		private static uint TilemapExtent(RdbReader rdb, uint mapId)
+		{
+			if (!rdb.TryGet(1070003, mapId, out var e) || !e.IsLocal)
+				return 0;
+
+			try
+			{
+				var xml = Encoding.Latin1.GetString(rdb.ReadDecompressed(e));
+				var m = Regex.Match(xml, "<tilemap[^>]*Width=\"(\\d+)\"");
+				return m.Success
+					? uint.Parse(m.Groups[1].Value)
+					: 0;
+			}
+			catch
+			{
+				return 0;
+			}
+		}
+
+		// Rewrites the content between the named markers (<!-- MARKER:start -->/<!-- MARKER:end -->) in README.md,
+		// leaving the rest untouched.
+		private static void UpdateReadmeSection(string marker, string block)
+		{
+			var path = Path.Combine(RepoRoot, "README.md");
+			var text = File.ReadAllText(path);
+			var start = $"<!-- {marker}:start -->";
+			var end = $"<!-- {marker}:end -->";
+			var s = text.IndexOf(start, StringComparison.Ordinal);
+			var e = text.IndexOf(end, StringComparison.Ordinal);
+			if (s < 0 || e < 0 || e < s)
+			{
+				Console.WriteLine($"README.md has no {start}/{end} markers; skipping.");
+				return;
+			}
+
+			File.WriteAllText(path, text[..(s + start.Length)] + "\n" + block + "\n" + text[e..]);
 		}
 
 		// Build a named world object via the burstless world-entry path and print its hex (render diffing).

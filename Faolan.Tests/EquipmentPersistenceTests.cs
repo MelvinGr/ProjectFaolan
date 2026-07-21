@@ -85,7 +85,10 @@ namespace Faolan.Tests
 				// Assert: a fresh context sees RingLeft set and FirstPosBag cleared.
 				await using (var db = NewContext(dbPath))
 				{
-					var equipment = await db.CharacterEquipment.Include(e => e.RingLeft).Include(e => e.FirstPosBag).FirstAsync(e => e.CharacterId == characterId, TestContext.Current.CancellationToken);
+					var equipment = await db
+						.CharacterEquipment.Include(e => e.RingLeft)
+						.Include(e => e.FirstPosBag)
+						.FirstAsync(e => e.CharacterId == characterId, TestContext.Current.CancellationToken);
 					Assert.NotNull(equipment.RingLeft);
 					Assert.Equal(royalSignet, equipment.RingLeft!.Id);
 					Assert.Null(equipment.FirstPosBag);
@@ -100,12 +103,8 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = TestDb.Options(path, lazyLoadingProxies: true);
+			var options = TestDb.Options(path, true);
 			return new DatabaseContext(options);
 		}
 	}
 }
-
-
-
-

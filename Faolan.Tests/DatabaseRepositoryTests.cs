@@ -60,7 +60,13 @@ namespace Faolan.Tests
 						Id = itemId,
 						Name = "Ape King's Treasure",
 						Hash = 1497905484,
-						Key = new ProtoDecryptionKey { Key1 = 1, Key2 = 2, Key3 = 3, Key4 = 4 }
+						Key = new ProtoDecryptionKey
+						{
+							Key1 = 1,
+							Key2 = 2,
+							Key3 = 3,
+							Key4 = 4
+						}
 					});
 					ctx.Maps.Add(new Map
 					{
@@ -112,9 +118,25 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
 					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
-					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Accounts.Add(new Account
+					{
+						Id = accountId,
+						UserName = "t",
+						Password = "t",
+						AuthChallenge = "",
+						LastIpAddress = ""
+					});
+					ctx.Realms.Add(new Realm
+					{
+						Id = realmId,
+						Name = "Test",
+						IpAddress = "127.0.0.1"
+					});
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
@@ -122,10 +144,19 @@ namespace Faolan.Tests
 				var expiry = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
 				// First snapshot: a timed buff + a permanent buff (null expiry).
-				await repo.SaveCharacterBuffs(character.Id,
-				[
-					new CharacterBuff { BuffId = 0x02387E03, Nonce = 0x14C5C912, ExpiresAt = expiry },
-					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, ExpiresAt = null }
+				await repo.SaveCharacterBuffs(character.Id, [
+					new CharacterBuff
+					{
+						BuffId = 0x02387E03,
+						Nonce = 0x14C5C912,
+						ExpiresAt = expiry
+					},
+					new CharacterBuff
+					{
+						BuffId = 0x0037F298,
+						Nonce = 0x195DA1FE,
+						ExpiresAt = null
+					}
 				]);
 
 				var loaded = await repo.GetCharacterBuffs(character.Id);
@@ -138,9 +169,13 @@ namespace Faolan.Tests
 				Assert.Null(permanent.ExpiresAt);
 
 				// Re-save with only the permanent buff (the timed one expired): replace-all drops the missing row.
-				await repo.SaveCharacterBuffs(character.Id,
-				[
-					new CharacterBuff { BuffId = 0x0037F298, Nonce = 0x195DA1FE, ExpiresAt = null }
+				await repo.SaveCharacterBuffs(character.Id, [
+					new CharacterBuff
+					{
+						BuffId = 0x0037F298,
+						Nonce = 0x195DA1FE,
+						ExpiresAt = null
+					}
 				]);
 
 				var after = await repo.GetCharacterBuffs(character.Id);
@@ -366,7 +401,13 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
 					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					ctx.Realms.Add(new Realm { Id = 1, Name = "R", IpAddress = "127.0.0.1", Port = 1 }); // #324: RealmId FK
+					ctx.Realms.Add(new Realm
+					{
+						Id = 1,
+						Name = "R",
+						IpAddress = "127.0.0.1",
+						Port = 1
+					}); // #324: RealmId FK
 					// ItemId is FK-restricted to Items.Id (#212), so seed the referenced catalog items first.
 					ctx.Items.Add(new Item
 					{
@@ -475,8 +516,8 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
-				await repo.SetCharacterInventorySlot(5,(ContainerKind)104, 2, 100);
-				await repo.SetCharacterInventorySlot(5,(ContainerKind)104, 7, 200, 3); // a second cell coexists
+				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 2, 100);
+				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 7, 200, 3); // a second cell coexists
 
 				var rows = await repo.GetCharacterInventory(5);
 				Assert.Equal(2, rows.Length);
@@ -724,7 +765,13 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
 					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					ctx.Realms.Add(new Realm { Id = 1, Name = "R", IpAddress = "127.0.0.1", Port = 1 }); // #324: RealmId FK
+					ctx.Realms.Add(new Realm
+					{
+						Id = 1,
+						Name = "R",
+						IpAddress = "127.0.0.1",
+						Port = 1
+					}); // #324: RealmId FK
 					// The listing's ItemId (search key) AND Template (instance, where the key lives) are both FK-restricted
 					// to Items.Id, so seed both referenced catalog items.
 					ctx.Items.Add(new Item
@@ -832,7 +879,3 @@ namespace Faolan.Tests
 		}
 	}
 }
-
-
-
-

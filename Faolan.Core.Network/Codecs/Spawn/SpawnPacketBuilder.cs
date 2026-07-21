@@ -74,7 +74,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteByte(0x2C) // IIR group frame for the transform component
 				// ProtoGameCodeDynelIIR fields 1-2 only: the playfield varint (field 3) and everything after it come
 				// from the template tail below, so this writes the head of the message rather than a whole one.
-				.WriteArray(new ProtoGameCodeDynelIIR { Position = position, Rotation = rotation }.ToProtobuf())
+				.WriteArray(new ProtoGameCodeDynelIIR
+				{
+					Position = position,
+					Rotation = rotation
+				}.ToProtobuf())
 				.WriteArray(template.AsSpan(TransformEndOffset))
 				.ToArray();
 		}

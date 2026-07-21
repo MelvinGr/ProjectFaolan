@@ -25,15 +25,6 @@ namespace Faolan.Tests
 		private const uint CasterHandle = 0x01316e68; // the acting player (applyFrom/applyTo in the captured body)
 		private const uint MapId = 4010; // Tortage Beach
 
-		private static RecordingNetworkClient Place(WorldSimulation sim, uint handle)
-		{
-			var client = new RecordingNetworkClient(handle);
-			var entity = new WorldEntity(handle, MapId, true, $"P{handle:x8}", client);
-			sim.Players[client] = entity;
-			sim.World.Place(entity, MapId, Vector3.Zero, Quaternion.Identity);
-			return client;
-		}
-
 		[Fact]
 		public async Task BroadcastSpellToViewers_ForwardsTheApplySpellVerbatim_ToViewersWhoKnowTheCaster_AndNooneElse()
 		{
@@ -76,6 +67,15 @@ namespace Faolan.Tests
 
 			Assert.Empty(caster.Sent);
 			Assert.Empty(bystander.Sent);
+		}
+
+		private static RecordingNetworkClient Place(WorldSimulation sim, uint handle)
+		{
+			var client = new RecordingNetworkClient(handle);
+			var entity = new WorldEntity(handle, MapId, true, $"P{handle:x8}", client);
+			sim.Players[client] = entity;
+			sim.World.Place(entity, MapId, Vector3.Zero, Quaternion.Identity);
+			return client;
 		}
 	}
 }

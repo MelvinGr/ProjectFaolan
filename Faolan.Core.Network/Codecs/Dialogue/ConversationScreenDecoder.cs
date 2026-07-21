@@ -29,10 +29,8 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// The four Knubot screen IIR types this decoder recognizes (SetDialogueCamera is an RPC opcode, not an IIR).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
-			GameServer0X2000Opcodes.KnubotAnswerListIIR,
-			GameServer0X2000Opcodes.KnubotAppendTextIIR,
-			GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
-			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR,
+			GameServer0X2000Opcodes.KnubotAnswerListIIR, GameServer0X2000Opcodes.KnubotAppendTextIIR, GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
+			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR
 		];
 
 		public static Columns Decode(byte[] data)

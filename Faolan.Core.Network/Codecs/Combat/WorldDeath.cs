@@ -15,19 +15,25 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// 0 when unknown/self.
 	public static class WorldDeath
 	{
+		public const byte NpcDeathVariant = 0x05;
+
+		// The death-behavior BccIIR (0x642CD3D6) that transitions a dying SimpleChar - PLAYER or NPC - into the dead
+		// state and plays its death animation. A form-0x0004 record on the dying handle, slot 0x1F, protobuf
+		// [field1 = behaviorId][field3 = variant][field5 = 8][field6 = 0][field12 = 240], no tail. Retail sends it to:
+		//   * the dying PLAYER (Stihetfv beach #1292, right after the death-effect ApplySpell) - drives the dead state
+		//     (bcc_state 29). A login-while-dead char gets bcc_state=29 from its spawn, but an IN-SESSION death has no
+		//     spawn re-send, so this is how the live SimpleChar transitions; behaviorId 41877, variant 0x03.
+		//   * every dying NPC (NecroL80_..._casting-combat: EVERY kill = death-pose MoveTask(0x06) + this BccIIR, and NO
+		//     SimpleCharKilledBy). The **behaviorId (field1) IS the creature's death animation** and is CREATURE-TYPE
+		//     specific - decoded across the corpus (Faolan.Importer NpcDeathBehaviorExtractor, #362): 41877 = humanoid
+		//     biped, 17036 = demon/large caster, 215333 = quadruped/beast. It's harvested per NpcTemplate
+		//     (DeathBehaviorId) and passed in; un-harvested types default to the humanoid 41877. field3 (variant) and
+		//     field12 vary per-kill (hit-direction / ragdoll-impulse / timing), NOT the anim identity, so they're fixed.
+		public const byte PlayerDeathVariant = 0x03;
 		public const uint DeathEffectSpellId = 0x0009F000;
+		public const uint HumanoidDeathBehaviorId = 41877; // the default biped death; field1 varint 0x08 0x95 0xC7 0x02
 		public const uint SimpleCharKilledByOpcode = (uint)GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR; // 0xB066AFC2
 		private const byte DeadMovementType = 0x06;
-
-		// The death sequence is four distinct IIR records, so this builder declares the SET it emits rather than a
-		// single Opcode (same contract as DynelFullUpdateCodec/SimpleDynelMessageCodec).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR,
-			GameServer0X2000Opcodes.BehaviorControlCenterIIR,
-			GameServer0X2000Opcodes.MagicBuffIIR,
-			GameServer0X2000Opcodes.MoveTaskIIR,
-		];
 
 		// The revive action retail sends on RespawnMe — a BehaviorControlCenterIIR (0x642CD3D6) on the player that
 		// transitions bcc_state 29→1 (alive), which CLOSES the release window and revives in place. Decoded from the
@@ -53,21 +59,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// SimpleCharKilledBy + 0x2024 + death effect alone left the avatar standing and the release UI closed (#214).
 		private const uint MoveTaskOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
 
-		// The death-behavior BccIIR (0x642CD3D6) that transitions a dying SimpleChar - PLAYER or NPC - into the dead
-		// state and plays its death animation. A form-0x0004 record on the dying handle, slot 0x1F, protobuf
-		// [field1 = behaviorId][field3 = variant][field5 = 8][field6 = 0][field12 = 240], no tail. Retail sends it to:
-		//   * the dying PLAYER (Stihetfv beach #1292, right after the death-effect ApplySpell) - drives the dead state
-		//     (bcc_state 29). A login-while-dead char gets bcc_state=29 from its spawn, but an IN-SESSION death has no
-		//     spawn re-send, so this is how the live SimpleChar transitions; behaviorId 41877, variant 0x03.
-		//   * every dying NPC (NecroL80_..._casting-combat: EVERY kill = death-pose MoveTask(0x06) + this BccIIR, and NO
-		//     SimpleCharKilledBy). The **behaviorId (field1) IS the creature's death animation** and is CREATURE-TYPE
-		//     specific - decoded across the corpus (Faolan.Importer NpcDeathBehaviorExtractor, #362): 41877 = humanoid
-		//     biped, 17036 = demon/large caster, 215333 = quadruped/beast. It's harvested per NpcTemplate
-		//     (DeathBehaviorId) and passed in; un-harvested types default to the humanoid 41877. field3 (variant) and
-		//     field12 vary per-kill (hit-direction / ragdoll-impulse / timing), NOT the anim identity, so they're fixed.
-		public const byte PlayerDeathVariant = 0x03;
-		public const byte NpcDeathVariant = 0x05;
-		public const uint HumanoidDeathBehaviorId = 41877; // the default biped death; field1 varint 0x08 0x95 0xC7 0x02
+		// The death sequence is four distinct IIR records, so this builder declares the SET it emits rather than a
+		// single Opcode (same contract as DynelFullUpdateCodec/SimpleDynelMessageCodec).
+		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		[
+			GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR, GameServer0X2000Opcodes.BehaviorControlCenterIIR, GameServer0X2000Opcodes.MagicBuffIIR, GameServer0X2000Opcodes.MoveTaskIIR
+		];
 
 		private static readonly byte[] DeathEffectPayload =
 		[
@@ -124,7 +121,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] BuildDeathPose(uint dyingHandle, Vector3 position)
 		{
-			return new FaolanStream().WriteUInt32(MoveTaskOpcode).WriteUInt32(EntityClass.Character).WriteUInt32(dyingHandle).WriteUInt16(0x0000).WriteVector3(position).WriteByte(DeadMovementType).ToArray();
+			return new FaolanStream()
+				.WriteUInt32(MoveTaskOpcode)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(dyingHandle)
+				.WriteUInt16(0x0000)
+				.WriteVector3(position)
+				.WriteByte(DeadMovementType)
+				.ToArray();
 		}
 
 		public static byte[] BuildKilledBy(uint dyingHandle, uint killerEndpoint)

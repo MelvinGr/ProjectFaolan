@@ -1489,18 +1489,15 @@ namespace Faolan.Tests.Support
 			await StatUpdateIir(client, id, 0x00017E2Fu, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]);
 			await StatUpdateIir(client, id, 0x00017E29u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x53, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x54, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3F, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
@@ -4414,125 +4411,101 @@ namespace Faolan.Tests.Support
 				.WriteArray(0x42, 0x91, 0x7B, 0xCE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x32, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3D, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3E, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x5A, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x5B, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x4D, 0x00)
 				.SendAsync(client);
 			await StatIir(client, id, id, 0x01, 0x13, 0x00);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00)
 				.SendAsync(client);
 			await StatIir(client, id, id, 0x01, 0x13, 0x00);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x4E, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x4F, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x57, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x58, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2B, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2A, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2E, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3C, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x29, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x59, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x40, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
-					[0x01])
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong, [0x01])
 				.WriteArray(0x00, 0x00, 0x00, 0x2D, 0x00, 0x00, 0x00, 0x12, 0xA1, 0xD4, 0xA1, 0x30)
 				.SendAsync(client);
 			await new PacketStream()
@@ -4546,23 +4519,19 @@ namespace Faolan.Tests.Support
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x29, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2B, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3F, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchSetQuestMarker)
+				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x40, 0x00)
 				.SendAsync(client);
 			await new PacketStream()
@@ -5012,13 +4981,12 @@ namespace Faolan.Tests.Support
 						.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.RegenIIR).WriteArray(CreateEditorRecordBuilder.BuildRegenIir(id, 0x0u, 0x81Cu, 0x415u)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x8E, 0xBE, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x12, 0xA2, 0x20, 0x50, 0x30)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5214,13 +5182,12 @@ namespace Faolan.Tests.Support
 						.WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000Opcodes.RegenIIR).WriteArray(CreateEditorRecordBuilder.BuildRegenIir(id, 0x0u, 0x81Cu, 0x415u)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x12, 0xA2, 0x6B, 0x3F, 0xC8)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x8F, 0x5E, 0xE1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5297,13 +5264,12 @@ namespace Faolan.Tests.Support
 							0xB2, 0x4E, 0xD9, 0x43, 0x19, 0x76, 0x87, 0x44, 0x39, 0xDA, 0xC1)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00, 0x12, 0xA2, 0xB6, 0x4A, 0xB8)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x6C, 0x3A, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5476,13 +5442,12 @@ namespace Faolan.Tests.Support
 						.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x29, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x12, 0xA3, 0x01, 0x61, 0x60)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x98, 0x8E, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5506,13 +5471,12 @@ namespace Faolan.Tests.Support
 							0x00, 0x40, 0xA0, 0x00, 0x00, 0x40, 0xA0, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00, 0x12, 0xA3, 0x51, 0x0F, 0xD0)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x84, 0x0E, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5529,13 +5493,12 @@ namespace Faolan.Tests.Support
 							0x1A, 0x0C, 0x64, 0x44, 0x29, 0x01, 0x63, 0x00, 0x00, 0x41, 0x20, 0x00, 0x00, 0x41, 0x20, 0x00, 0x00, 0x03, 0x01)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x33, 0x00, 0x00, 0x00, 0x12, 0xA3, 0x9B, 0xE0, 0x28)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x81, 0xB0, 0x51, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5614,13 +5577,12 @@ namespace Faolan.Tests.Support
 						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x34, 0x00, 0x00, 0x00, 0x12, 0xA3, 0xE7, 0x0E, 0x40)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x88, 0xDF, 0x1B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5643,13 +5605,12 @@ namespace Faolan.Tests.Support
 							0xB8, 0xA1, 0xCB, 0x43, 0x1A, 0x7C, 0xAC, 0x44, 0x37, 0xC5, 0x3F)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x35, 0x00, 0x00, 0x00, 0x12, 0xA4, 0x36, 0xA5, 0x40)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x60, 0x57, 0xFB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5755,13 +5716,12 @@ namespace Faolan.Tests.Support
 							0x00, 0x40, 0xA0, 0x00, 0x00, 0x40, 0xA0, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00, 0x12, 0xA4, 0x81, 0x9C, 0xA8)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x96, 0x8F, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -5937,13 +5897,12 @@ namespace Faolan.Tests.Support
 						.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x29, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x12, 0xA4, 0xC9, 0xFF, 0xE8)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x8D, 0xA1, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6022,13 +5981,12 @@ namespace Faolan.Tests.Support
 								.WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42172, 9, 24, 0, field12: 3080)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x38, 0x00, 0x00, 0x00, 0x12, 0xA5, 0x17, 0xB6, 0x70)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x48, 0x70, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6039,13 +5997,12 @@ namespace Faolan.Tests.Support
 								.WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42172, 9, 24, 0, field12: 3420)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x39, 0x00, 0x00, 0x00, 0x12, 0xA5, 0x67, 0x5D, 0x10)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x7A, 0x8C, 0x6F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6120,13 +6077,12 @@ namespace Faolan.Tests.Support
 							0x3B, 0x86, 0x57, 0x00, 0x00, 0x40, 0xE0, 0x00, 0x00, 0x40, 0xE0, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x3A, 0x00, 0x00, 0x00, 0x12, 0xA5, 0xB0, 0xC2, 0x20)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x96, 0x9E, 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6154,13 +6110,12 @@ namespace Faolan.Tests.Support
 							0x00, 0x40, 0x80, 0x00, 0x00, 0x40, 0x80, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x3B, 0x00, 0x00, 0x00, 0x12, 0xA5, 0xFC, 0xEE, 0x20)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x89, 0x53, 0x4A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6183,13 +6138,12 @@ namespace Faolan.Tests.Support
 								.WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42170, 9, 24, 0, field12: 400)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x3C, 0x00, 0x00, 0x00, 0x12, 0xA6, 0x4C, 0x2B, 0x48)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x51, 0x4E, 0x96, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6351,8 +6305,8 @@ namespace Faolan.Tests.Support
 							0x00, 0x00, 0x00, 0x00, 0x03, 0xF1)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x3D, 0x00, 0x00, 0x00, 0x12, 0xA6, 0x97, 0xBE, 0xF0)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6361,8 +6315,7 @@ namespace Faolan.Tests.Support
 						.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x29, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x6A, 0xD3, 0xD3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6506,8 +6459,8 @@ namespace Faolan.Tests.Support
 							0x38, 0x7E, 0xC4, 0x00, 0x00, 0x41, 0x30, 0x00, 0x00, 0x41, 0x30, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x12, 0xA6, 0xE1, 0x89, 0x90)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6520,8 +6473,7 @@ namespace Faolan.Tests.Support
 							0x3B, 0xAC, 0xFD, 0x00, 0x00, 0x41, 0x30, 0x00, 0x00, 0x41, 0x30, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x59, 0x61, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6575,13 +6527,12 @@ namespace Faolan.Tests.Support
 							0x39, 0x2E, 0x88, 0x00, 0x00, 0x41, 0x70, 0x00, 0x00, 0x41, 0x70, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x3F, 0x00, 0x00, 0x00, 0x12, 0xA7, 0x2E, 0x26, 0xD8)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x78, 0x8D, 0x2B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6679,13 +6630,12 @@ namespace Faolan.Tests.Support
 							0x3F, 0x13, 0x62, 0x52, 0x00, 0x00, 0x00, 0x00, 0x3F, 0x51, 0x51, 0x61, 0x00, 0x01)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x12, 0xA7, 0x7A, 0x37, 0x80)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x77, 0x00, 0x9D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6703,13 +6653,12 @@ namespace Faolan.Tests.Support
 								.WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42106, 20, 24, 0, field12: 959)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x41, 0x00, 0x00, 0x00, 0x12, 0xA7, 0xC8, 0xD8, 0x68)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x90, 0x48, 0xDA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6788,13 +6737,12 @@ namespace Faolan.Tests.Support
 							0x00, 0x40, 0xA0, 0x00, 0x00, 0x40, 0xA0, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x42, 0x00, 0x00, 0x00, 0x12, 0xA8, 0x13, 0xD7, 0xA0)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x8B, 0x84, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6865,13 +6813,12 @@ namespace Faolan.Tests.Support
 						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x43, 0x00, 0x00, 0x00, 0x12, 0xA8, 0x5F, 0x57, 0xC0)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x97, 0x0C, 0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6972,8 +6919,8 @@ namespace Faolan.Tests.Support
 						.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x29, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x44, 0x00, 0x00, 0x00, 0x12, 0xA8, 0xAE, 0x46, 0xC8)
 						.SendAsync(client);
 					await new PacketStream()
@@ -6986,8 +6933,7 @@ namespace Faolan.Tests.Support
 							0x3A, 0x85, 0xAB, 0x00, 0x00, 0x40, 0xE0, 0x00, 0x00, 0x40, 0xE0, 0x00, 0x00, 0x03, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x9D, 0x79, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -7126,13 +7072,12 @@ namespace Faolan.Tests.Support
 						.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2B, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x45, 0x00, 0x00, 0x00, 0x12, 0xA8, 0xF9, 0x78, 0xC8)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x96, 0x78, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -7224,8 +7169,7 @@ namespace Faolan.Tests.Support
 						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17, 0x00, 0x0B, 0x7C, 0xD0)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchAddItem)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchAddItem)
 						.WriteArray(0x00, 0x00, 0x00, 0x68)
 						.WriteUInt32(id)
 						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79, 0x08, 0xE8, 0xEE, 0xD2, 0xE0, 0xB1, 0xEC, 0x8A, 0xEC, 0x20, 0x12, 0x04, 0x08, 0x00, 0x10, 0x01, 0x12, 0x04, 0x08,
@@ -7269,13 +7213,12 @@ namespace Faolan.Tests.Support
 								.WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42141, 25, 24, 0, field12: 783)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x46, 0x00, 0x00, 0x00, 0x12, 0xA9, 0x44, 0x78, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x97, 0x8B, 0x9D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -7329,13 +7272,12 @@ namespace Faolan.Tests.Support
 						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStartScriptGroup(id, 7727158)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x47, 0x00, 0x00, 0x00, 0x12, 0xA9, 0x94, 0x2E, 0x40)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x9E, 0x56, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -7381,13 +7323,12 @@ namespace Faolan.Tests.Support
 							0x34, 0x9F, 0x61, 0x00, 0x00, 0x41, 0x40, 0x00, 0x00, 0x41, 0x40, 0x00, 0x00, 0x03, 0x01)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x12, 0xA9, 0xDD, 0x8B, 0x80)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0xA2, 0x81, 0xEB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -7539,13 +7480,12 @@ namespace Faolan.Tests.Support
 								.WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(id, 1, 42025, 2, 10, 0, field2: 1, field12: 340, boundA: 9, boundB: 1)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x49, 0x00, 0x00, 0x00, 0x12, 0xAA, 0x2A, 0x34, 0x80)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0xA1, 0xE7, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -7616,13 +7556,12 @@ namespace Faolan.Tests.Support
 							0xB2, 0x4E, 0xD9, 0x43, 0x19, 0x76, 0x87, 0x44, 0x39, 0xDA, 0xC1)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x4A, 0x00, 0x00, 0x00, 0x12, 0xAA, 0x75, 0x43, 0x58)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x9B, 0x13, 0x71, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()
@@ -7665,13 +7604,12 @@ namespace Faolan.Tests.Support
 						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-							GameCharInterfaceOpcodes.DispatchPong, [0x01])
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
+							[0x01])
 						.WriteArray(0x00, 0x00, 0x00, 0x4B, 0x00, 0x00, 0x00, 0x12, 0xAA, 0xC4, 0xF1, 0xC8)
 						.SendAsync(client);
 					await new PacketStream()
-						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id),
-							GameInterfaceOpcodes.DispatchGameServerStats)
+						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchGameServerStats)
 						.WriteArray(0x42, 0x9E, 0x3D, 0xE4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 						.SendAsync(client);
 					await new PacketStream()

@@ -23,6 +23,9 @@ namespace Faolan.GameServer.Dialogue
 	// collaborator; quest-journal pushes go through the WorldBroadcaster, branch conditions through the Lua VM.
 	public sealed class ConversationService
 	{
+		// The GameAgent sender instance to use when a packet has none stored (retail's most common value); the real
+		// per-conversation instance comes from ConversationPacket.SenderInstance.
+		private const uint DefaultSenderInstance = 0x08;
 		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
 
 		// The Knubot packets we CONSTRUCT from the typed codec (KnubotCodec) instead of replaying+substituting (#188):
@@ -43,10 +46,6 @@ namespace Faolan.GameServer.Dialogue
 			0x5A, 0x59, 0x5A, 0x4D, 0x6F, 0x71, 0x31, 0x2D, 0x22, 0x20, 0x6B, 0x6E, 0x75, 0x62, 0x6F, 0x74, 0x3D, 0x22, 0x30, 0x22, 0x20, 0x20, 0x3E, 0x3C, 0x2F, 0x72, 0x65, 0x6D, 0x6F, 0x74,
 			0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x3E
 		];
-
-		// The GameAgent sender instance to use when a packet has none stored (retail's most common value); the real
-		// per-conversation instance comes from ConversationPacket.SenderInstance.
-		private const uint DefaultSenderInstance = 0x08;
 
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
@@ -150,6 +149,54 @@ namespace Faolan.GameServer.Dialogue
 			return true;
 		}
 
+		// #356: runs the screen's EffectScript (the RDB quest engine's state mutation) and PERSISTS what it recorded:
+		// AddTag -> CharacterTag, SolveGoal -> QuestProgressionService.SolveGoal (advances/supersedes the owning quest).
+		// SpawnItem/CastSpell are recorded but deferred (no resource resolver yet). No-op when the screen has no effect.
+		// This is the conversation half of closing the Lua effect->quest-state loop; the .lua run GM command shares the
+		// same apply shape for out-of-dialogue testing.
+		private async Task ApplyScreenEffect(INetworkClient client, ConversationNode node)
+		{
+			if (string.IsNullOrEmpty(node.EffectScript))
+				return;
+
+			var character = client.Session?.Character;
+			if (character == null)
+				return;
+
+			var player = await BuildLuaPlayer(character);
+			if (!LuaScriptVm.RunEffect(node.EffectScript, player))
+			{
+				_logger.LogWarning("Conversation: effect script failed for npc={Name} path='{Path}'.", node.NpcName, node.AnswerPath);
+				return;
+			}
+
+			foreach (var tag in player.AddedTags)
+				await _database.AddCharacterTag(character.Id, (uint)tag);
+			foreach (var goalId in player.SolvedGoals)
+				await _questProgression.SolveGoal(client, (uint)goalId);
+
+			if (player.AddedTags.Count > 0 || player.SolvedGoals.Count > 0)
+			{
+				_logger.LogInformation("Conversation: effect (npc={Name} path='{Path}') +tags [{Tags}], solved goals [{Goals}] for {Char}.", node.NpcName, node.AnswerPath,
+					string.Join(",", player.AddedTags), string.Join(",", player.SolvedGoals), character.Name);
+			}
+		}
+
+		// Builds the GameLuaPlayer for the live character (preloaded tags + completed/active quests - script calls are
+		// sync, so state is read up front). Shared by the condition gate (PickConversationScreen) and the effect run
+		// (ApplyScreenEffect). Returns an empty-state player when there's no character (pre-login create flow).
+		private async Task<GameLuaPlayer> BuildLuaPlayer(Character character)
+		{
+			if (character == null)
+				return new GameLuaPlayer([], []);
+
+			var tags = await _database.GetCharacterTags(character.Id);
+			var quests = await _database.GetCharacterQuests(character.Id);
+			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
+			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
+			return new GameLuaPlayer(tags, completed, active);
+		}
+
 		// Picks the conversation-screen variant whose Lua CONDITION passes for the live player (quest/tag-gated
 		// dialogue, issue #37). Most screens have a single unconditional variant - fast path. When conditioned
 		// variants exist, evaluate each (conditioned-first) against the character's tags + completed quests via the
@@ -182,52 +229,6 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			return fallback;
-		}
-
-		// Builds the GameLuaPlayer for the live character (preloaded tags + completed/active quests - script calls are
-		// sync, so state is read up front). Shared by the condition gate (PickConversationScreen) and the effect run
-		// (ApplyScreenEffect). Returns an empty-state player when there's no character (pre-login create flow).
-		private async Task<GameLuaPlayer> BuildLuaPlayer(Character character)
-		{
-			if (character == null)
-				return new GameLuaPlayer([], []);
-
-			var tags = await _database.GetCharacterTags(character.Id);
-			var quests = await _database.GetCharacterQuests(character.Id);
-			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
-			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
-			return new GameLuaPlayer(tags, completed, active);
-		}
-
-		// #356: runs the screen's EffectScript (the RDB quest engine's state mutation) and PERSISTS what it recorded:
-		// AddTag -> CharacterTag, SolveGoal -> QuestProgressionService.SolveGoal (advances/supersedes the owning quest).
-		// SpawnItem/CastSpell are recorded but deferred (no resource resolver yet). No-op when the screen has no effect.
-		// This is the conversation half of closing the Lua effect->quest-state loop; the .lua run GM command shares the
-		// same apply shape for out-of-dialogue testing.
-		private async Task ApplyScreenEffect(INetworkClient client, ConversationNode node)
-		{
-			if (string.IsNullOrEmpty(node.EffectScript))
-				return;
-
-			var character = client.Session?.Character;
-			if (character == null)
-				return;
-
-			var player = await BuildLuaPlayer(character);
-			if (!LuaScriptVm.RunEffect(node.EffectScript, player))
-			{
-				_logger.LogWarning("Conversation: effect script failed for npc={Name} path='{Path}'.", node.NpcName, node.AnswerPath);
-				return;
-			}
-
-			foreach (var tag in player.AddedTags)
-				await _database.AddCharacterTag(character.Id, (uint)tag);
-			foreach (var goalId in player.SolvedGoals)
-				await _questProgression.SolveGoal(client, (uint)goalId);
-
-			if (player.AddedTags.Count > 0 || player.SolvedGoals.Count > 0)
-				_logger.LogInformation("Conversation: effect (npc={Name} path='{Path}') +tags [{Tags}], solved goals [{Goals}] for {Char}.", node.NpcName, node.AnswerPath,
-					string.Join(",", player.AddedTags), string.Join(",", player.SolvedGoals), character.Name);
 		}
 
 		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
@@ -411,7 +412,8 @@ namespace Faolan.GameServer.Dialogue
 			await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
 			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateActive);
 			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateCompleted);
-			_logger.LogInformation("Quest {Quest} turned in to {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress, held.GoalRequired);
+			_logger.LogInformation("Quest {Quest} turned in to {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress,
+				held.GoalRequired);
 		}
 
 		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the
@@ -514,6 +516,5 @@ namespace Faolan.GameServer.Dialogue
 		{
 			return client.SendAsync(DialogueCameraBody.BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
 		}
-
 	}
 }

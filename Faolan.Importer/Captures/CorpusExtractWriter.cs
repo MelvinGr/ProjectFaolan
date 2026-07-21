@@ -1,5 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -34,12 +36,9 @@ namespace Faolan.Importer.Captures
 		public static readonly (uint Iir, string Name)[] WantedIirs =
 		[
 			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, "snapshot tails, protobuf root, death vitals, quest regions"),
-			((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, "spawn - the protobuf round-trip corpus"),
-			((uint)GameServer0X2000Opcodes.MoveTaskIIR, "MoveTask"),
-			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, "QuestFullUpdate"),
-			((uint)GameServer0X2000Opcodes.QuestJournalIIR, "QuestJournal"),
-			((uint)GameServer0X2000Opcodes.QuestLogListIIR, "QuestLogList"),
-			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
+			((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, "spawn - the protobuf round-trip corpus"), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, "MoveTask"),
+			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, "QuestFullUpdate"), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, "QuestJournal"),
+			((uint)GameServer0X2000Opcodes.QuestLogListIIR, "QuestLogList"), ((uint)GameServer0X2000Opcodes.PlayfieldFIIR, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
 			((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, "the one captured recipe catalog")
 		];
 
@@ -77,7 +76,7 @@ namespace Faolan.Importer.Captures
 					if (hex.Length < 16)
 						continue;
 
-					var iir = uint.Parse(hex.AsSpan(8, 8), System.Globalization.NumberStyles.HexNumber);
+					var iir = uint.Parse(hex.AsSpan(8, 8), NumberStyles.HexNumber);
 					if (!wanted.Contains(iir))
 						continue;
 
@@ -98,14 +97,23 @@ namespace Faolan.Importer.Captures
 					// every frame silently becomes 0 and frame-keyed lookups quietly find nothing.
 					var frame = 0;
 					if (p.TryGetProperty("Frame", out var fEl))
+					{
 						frame = fEl.ValueKind switch
 						{
-							JsonValueKind.Number => fEl.GetInt32(),
+							JsonValueKind.Number                                                    => fEl.GetInt32(),
 							JsonValueKind.String when int.TryParse(fEl.GetString(), out var parsed) => parsed,
-							_ => 0
+							_                                                                       => 0
 						};
+					}
 
-					entries.Add(new { s = name, i, n = full.Length, f = frame, o = opcode });
+					entries.Add(new
+					{
+						s = name,
+						i,
+						n = full.Length,
+						f = frame,
+						o = opcode
+					});
 					var key = $"0x{iir:x8}";
 					counts[key] = counts.GetValueOrDefault(key) + 1;
 					bodies.Write(full, 0, full.Length);
@@ -115,17 +123,19 @@ namespace Faolan.Importer.Captures
 			// Every file in the corpus, not just the ones we extracted bodies from. The doc linters only need NAMES -
 			// ProtocolCitationTests checks a [V2:] citation names a real capture, DocReferenceTests resolves
 			// Captures/... paths - so carrying the list lets them run without the capture repo too.
-			var files = Directory.EnumerateFiles(capturesDir, "*", SearchOption.AllDirectories)
-				.Select(System.IO.Path.GetFileName)
-				.OrderBy(f => f, StringComparer.Ordinal)
-				.ToList();
+			var files = Directory.EnumerateFiles(capturesDir, "*", SearchOption.AllDirectories).Select(Path.GetFileName).OrderBy(f => f, StringComparer.Ordinal).ToList();
 
-			var manifest = JsonSerializer.SerializeToUtf8Bytes(new { counts, files, entries });
+			var manifest = JsonSerializer.SerializeToUtf8Bytes(new
+			{
+				counts,
+				files,
+				entries
+			});
 
 			using var output = File.Create(outputPath);
 			output.Write(Encoding.ASCII.GetBytes(Magic));
 			Span<byte> len = stackalloc byte[4];
-			System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(len, (uint)manifest.Length);
+			BinaryPrimitives.WriteUInt32LittleEndian(len, (uint)manifest.Length);
 			output.Write(len);
 			output.Write(manifest);
 
@@ -135,8 +145,7 @@ namespace Faolan.Importer.Captures
 
 			Console.WriteLine($"Corpus extract -> {outputPath}");
 			Console.WriteLine($"  {files.Count} capture file names recorded (for the doc linters)");
-			Console.WriteLine($"  {entries.Count} packet bodies from {sources} captures, " +
-				$"{bodies.Length / 1048576.0:F1} MB raw -> {new FileInfo(outputPath).Length / 1048576.0:F1} MB on disk");
+			Console.WriteLine($"  {entries.Count} packet bodies from {sources} captures, " + $"{bodies.Length / 1048576.0:F1} MB raw -> {new FileInfo(outputPath).Length / 1048576.0:F1} MB on disk");
 			foreach (var (iir, name) in WantedIirs)
 				Console.WriteLine($"    {counts.GetValueOrDefault($"0x{iir:x8}"),6}  0x{iir:X8}  {name}");
 		}

@@ -16,13 +16,13 @@ namespace Faolan.Core.Rdb.Assets
 	public sealed class RdbCollisionMesh
 	{
 		public const uint ResourceType = 1000012;
-
-		private static readonly byte[] MeshMagic = [0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]; // NXS\x01 + MESH
 		private const float CellSize = 16f; // world units per spatial-grid cell (X/Z); ~a few tris per short segment
 
-		private readonly float[] _verts; // flat x,y,z
-		private readonly int[] _tris;    // flat vertex indices (3 per triangle)
+		private static readonly byte[] MeshMagic = [0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]; // NXS\x01 + MESH
 		private readonly Dictionary<long, List<int>> _grid; // (cellX,cellZ) packed -> triangle numbers overlapping it
+
+		private readonly float[] _verts; // flat x,y,z
+		private readonly int[] _tris; // flat vertex indices (3 per triangle)
 
 		public int TriangleCount => _tris.Length / 3;
 
@@ -31,116 +31,6 @@ namespace Faolan.Core.Rdb.Assets
 			_verts = verts;
 			_tris = tris;
 			_grid = grid;
-		}
-
-		// Parse an NXUSTREAM (type 1000012) body into world triangles + a 2D X/Z grid index. Returns false only on an
-		// empty/garbage stream (a map with no collision).
-		public static bool TryParse(ReadOnlySpan<byte> body, out RdbCollisionMesh mesh)
-		{
-			mesh = null;
-			var verts = new List<float>();
-			var tris = new List<int>();
-
-			var pos = 0;
-			while (true)
-			{
-				var at = IndexOf(body, MeshMagic, pos);
-				if (at < 0)
-					break;
-
-				pos = at + MeshMagic.Length;
-				if (!TryReadMesh(body, at, verts, tris))
-					continue; // a spurious magic in the BVH bytes - skip, the next real header still parses
-			}
-
-			if (tris.Count == 0)
-				return false;
-
-			var vertArr = verts.ToArray();
-			var triArr = tris.ToArray();
-			mesh = new RdbCollisionMesh(vertArr, triArr, BuildGrid(vertArr, triArr));
-			return true;
-		}
-
-		private static bool TryReadMesh(ReadOnlySpan<byte> body, int magicAt, List<float> verts, List<int> tris)
-		{
-			// nVerts / nTris sit 28 / 32 bytes past the NXS magic (ver, flags, and three header words in between).
-			var vCountOff = magicAt + 28;
-			if (vCountOff + 8 > body.Length)
-				return false;
-
-			var nVerts = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[vCountOff..]);
-			var nTris = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[(vCountOff + 4)..]);
-			if (nVerts <= 0 || nTris <= 0 || nVerts > 5_000_000 || nTris > 10_000_000)
-				return false;
-
-			var vStart = vCountOff + 8;
-			var vBytes = (long)nVerts * 12;
-			if (vStart + vBytes > body.Length)
-				return false;
-
-			var baseVert = verts.Count / 3;
-			var vSpan = body.Slice(vStart, (int)vBytes);
-			for (var i = 0; i < nVerts * 3; i++)
-				verts.Add(BinaryPrimitives.ReadSingleLittleEndian(vSpan[(i * 4)..]));
-
-			// Index width = the smallest that indexes nVerts (matches the PhysX cooker).
-			var width = nVerts <= 256 ? 1 : nVerts <= 65536 ? 2 : 4;
-			var tStart = (int)(vStart + vBytes);
-			var tBytes = (long)nTris * 3 * width;
-			if (tStart + tBytes > body.Length)
-			{
-				verts.RemoveRange(baseVert * 3, nVerts * 3); // roll back the verts we added for this bad mesh
-				return false;
-			}
-
-			for (var i = 0; i < nTris * 3; i++)
-			{
-				var o = tStart + i * width;
-				var idx = width switch
-				{
-					1 => body[o],
-					2 => BinaryPrimitives.ReadUInt16LittleEndian(body[o..]),
-					_ => (int)BinaryPrimitives.ReadUInt32LittleEndian(body[o..])
-				};
-
-				if (idx >= nVerts)
-				{
-					// wrong width guess for this mesh - roll back and skip it
-					verts.RemoveRange(baseVert * 3, nVerts * 3);
-					tris.RemoveRange(tris.Count - i, i);
-					return false;
-				}
-
-				tris.Add(baseVert + idx);
-			}
-
-			return true;
-		}
-
-		private static Dictionary<long, List<int>> BuildGrid(float[] verts, int[] tris)
-		{
-			var grid = new Dictionary<long, List<int>>();
-			for (var t = 0; t < tris.Length / 3; t++)
-			{
-				var (aX, _, aZ) = V(verts, tris[t * 3]);
-				var (bX, _, bZ) = V(verts, tris[t * 3 + 1]);
-				var (cX, _, cZ) = V(verts, tris[t * 3 + 2]);
-				var minGx = Cell(MathF.Min(aX, MathF.Min(bX, cX)));
-				var maxGx = Cell(MathF.Max(aX, MathF.Max(bX, cX)));
-				var minGz = Cell(MathF.Min(aZ, MathF.Min(bZ, cZ)));
-				var maxGz = Cell(MathF.Max(aZ, MathF.Max(bZ, cZ)));
-				for (var gx = minGx; gx <= maxGx; gx++)
-				for (var gz = minGz; gz <= maxGz; gz++)
-				{
-					var key = Key(gx, gz);
-					if (!grid.TryGetValue(key, out var list))
-						grid[key] = list = [];
-					list.Add(t);
-				}
-			}
-
-			return grid;
 		}
 
 		// True if collision geometry blocks the straight segment a->b (an NPC's eye to a player). Tests the triangles in
@@ -176,6 +66,80 @@ namespace Faolan.Core.Rdb.Assets
 			return false;
 		}
 
+		// Parse an NXUSTREAM (type 1000012) body into world triangles + a 2D X/Z grid index. Returns false only on an
+		// empty/garbage stream (a map with no collision).
+		public static bool TryParse(ReadOnlySpan<byte> body, out RdbCollisionMesh mesh)
+		{
+			mesh = null;
+			var verts = new List<float>();
+			var tris = new List<int>();
+
+			var pos = 0;
+			while (true)
+			{
+				var at = IndexOf(body, MeshMagic, pos);
+				if (at < 0)
+					break;
+
+				pos = at + MeshMagic.Length;
+				if (!TryReadMesh(body, at, verts, tris))
+					continue; // a spurious magic in the BVH bytes - skip, the next real header still parses
+			}
+
+			if (tris.Count == 0)
+				return false;
+
+			var vertArr = verts.ToArray();
+			var triArr = tris.ToArray();
+			mesh = new RdbCollisionMesh(vertArr, triArr, BuildGrid(vertArr, triArr));
+			return true;
+		}
+
+		private static Dictionary<long, List<int>> BuildGrid(float[] verts, int[] tris)
+		{
+			var grid = new Dictionary<long, List<int>>();
+			for (var t = 0; t < tris.Length / 3; t++)
+			{
+				var (aX, _, aZ) = V(verts, tris[t * 3]);
+				var (bX, _, bZ) = V(verts, tris[t * 3 + 1]);
+				var (cX, _, cZ) = V(verts, tris[t * 3 + 2]);
+				var minGx = Cell(MathF.Min(aX, MathF.Min(bX, cX)));
+				var maxGx = Cell(MathF.Max(aX, MathF.Max(bX, cX)));
+				var minGz = Cell(MathF.Min(aZ, MathF.Min(bZ, cZ)));
+				var maxGz = Cell(MathF.Max(aZ, MathF.Max(bZ, cZ)));
+				for (var gx = minGx; gx <= maxGx; gx++)
+				for (var gz = minGz; gz <= maxGz; gz++)
+				{
+					var key = Key(gx, gz);
+					if (!grid.TryGetValue(key, out var list))
+						grid[key] = list = [];
+					list.Add(t);
+				}
+			}
+
+			return grid;
+		}
+
+		private static int Cell(float world)
+		{
+			return (int)MathF.Floor(world / CellSize);
+		}
+
+		private static int IndexOf(ReadOnlySpan<byte> haystack, ReadOnlySpan<byte> needle, int start)
+		{
+			if (start < 0)
+				start = 0;
+			var idx = haystack[start..].IndexOf(needle);
+			return idx < 0
+				? -1
+				: start + idx;
+		}
+
+		private static long Key(int gx, int gz)
+		{
+			return ((long)gx << 32) ^ (uint)gz;
+		}
+
 		// Möller-Trumbore, clamped to the segment (0 <= t <= 1 along `dir` = b - a).
 		private static bool SegmentHitsTriangle(Vector3 origin, Vector3 dir, Vector3 v0, Vector3 v1, Vector3 v2)
 		{
@@ -202,27 +166,69 @@ namespace Faolan.Core.Rdb.Assets
 			return t is >= 0f and <= 1f; // within the segment
 		}
 
+		private static bool TryReadMesh(ReadOnlySpan<byte> body, int magicAt, List<float> verts, List<int> tris)
+		{
+			// nVerts / nTris sit 28 / 32 bytes past the NXS magic (ver, flags, and three header words in between).
+			var vCountOff = magicAt + 28;
+			if (vCountOff + 8 > body.Length)
+				return false;
+
+			var nVerts = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[vCountOff..]);
+			var nTris = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[(vCountOff + 4)..]);
+			if (nVerts <= 0 || nTris <= 0 || nVerts > 5_000_000 || nTris > 10_000_000)
+				return false;
+
+			var vStart = vCountOff + 8;
+			var vBytes = (long)nVerts * 12;
+			if (vStart + vBytes > body.Length)
+				return false;
+
+			var baseVert = verts.Count / 3;
+			var vSpan = body.Slice(vStart, (int)vBytes);
+			for (var i = 0; i < nVerts * 3; i++)
+				verts.Add(BinaryPrimitives.ReadSingleLittleEndian(vSpan[(i * 4)..]));
+
+			// Index width = the smallest that indexes nVerts (matches the PhysX cooker).
+			var width = nVerts <= 256
+				? 1
+				: nVerts <= 65536
+					? 2
+					: 4;
+			var tStart = (int)(vStart + vBytes);
+			var tBytes = (long)nTris * 3 * width;
+			if (tStart + tBytes > body.Length)
+			{
+				verts.RemoveRange(baseVert * 3, nVerts * 3); // roll back the verts we added for this bad mesh
+				return false;
+			}
+
+			for (var i = 0; i < nTris * 3; i++)
+			{
+				var o = tStart + i * width;
+				var idx = width switch
+				{
+					1 => body[o],
+					2 => BinaryPrimitives.ReadUInt16LittleEndian(body[o..]),
+					_ => (int)BinaryPrimitives.ReadUInt32LittleEndian(body[o..])
+				};
+
+				if (idx >= nVerts)
+				{
+					// wrong width guess for this mesh - roll back and skip it
+					verts.RemoveRange(baseVert * 3, nVerts * 3);
+					tris.RemoveRange(tris.Count - i, i);
+					return false;
+				}
+
+				tris.Add(baseVert + idx);
+			}
+
+			return true;
+		}
+
 		private static (float X, float Y, float Z) V(float[] verts, int i)
 		{
 			return (verts[i * 3], verts[i * 3 + 1], verts[i * 3 + 2]);
-		}
-
-		private static int Cell(float world)
-		{
-			return (int)MathF.Floor(world / CellSize);
-		}
-
-		private static long Key(int gx, int gz)
-		{
-			return ((long)gx << 32) ^ (uint)gz;
-		}
-
-		private static int IndexOf(ReadOnlySpan<byte> haystack, ReadOnlySpan<byte> needle, int start)
-		{
-			if (start < 0)
-				start = 0;
-			var idx = haystack[start..].IndexOf(needle);
-			return idx < 0 ? -1 : start + idx;
 		}
 	}
 }

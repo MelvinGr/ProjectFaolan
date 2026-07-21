@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -29,6 +28,10 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		// The backpack's slot count: base 24 + the equipped bag's Item.BagExtraSlots (equip slot 3 / Bag) - the same
+		// sizing the snapshot uses (FullPlayerCharacterBuilder), so a grown bag can actually be filled. #12.
+		private const uint BaseBackpackSlots = 24;
+
 		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count)
 		{
 			return GrantItemToBackpack(client, itemTemplateId, count);
@@ -60,6 +63,12 @@ namespace Faolan.GameServer
 			return true;
 		}
 
+		private async Task<int> BackpackCapacity(uint characterId)
+		{
+			var equipment = await Database.GetCharacterEquipment(characterId);
+			return (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
+		}
+
 		// The first free backpack cell, skipping persisted rows + the legacy starter-bag cell while it renders. The
 		// backpack size is 24 base + the equipped bag's extra slots (#12), so a grown bag can be filled. Null = full.
 		// Read-only DB helper (mirrors AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
@@ -80,16 +89,6 @@ namespace Faolan.GameServer
 			var rows = await Database.GetCharacterInventory(characterId);
 			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
-		}
-
-		// The backpack's slot count: base 24 + the equipped bag's Item.BagExtraSlots (equip slot 3 / Bag) - the same
-		// sizing the snapshot uses (FullPlayerCharacterBuilder), so a grown bag can actually be filled. #12.
-		private const uint BaseBackpackSlots = 24;
-
-		private async Task<int> BackpackCapacity(uint characterId)
-		{
-			var equipment = await Database.GetCharacterEquipment(characterId);
-			return (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
 		}
 
 		// Grants an item to the player's backpack: persists it to a free CharacterInventory bag cell (so it
@@ -167,6 +166,18 @@ namespace Faolan.GameServer
 			return true;
 		}
 
+		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on
+		// every sub-area crossing, not once per playfield - Old Tarantia alone has six (Bridge of Vilerus I, The East
+		// Gate, The West Gate, ...) - so the world tick drives this off MapArea, and the entry banner is simply the
+		// first crossing. `areaNameId` is the client's localized-string id; the client renders the text itself.
+		//
+		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
+		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
+		private Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
+		{
+			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
+		}
+
 		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
 		// from the Recipe catalog, so the Crafting -> Recipes window populates. The carrier is the standard world IIR
 		// framing (GameAgent 0x58 -> GameInterface <instance>), body = [subop][0xC350][handle][reply], byte-exact vs
@@ -204,6 +215,14 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, matches.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
 		}
 
+		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
+		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
+		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
+		private Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
+		{
+			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
+		}
+
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
 		// record stream (the retail money updates ride that conversation).
 		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
@@ -228,9 +247,7 @@ namespace Faolan.GameServer
 		internal static byte[] BuildGameTime(INetworkClient client)
 		{
 			var ps = new PacketStream();
-			ps
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(GameTimeCodec.Build());
+			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(GameTimeCodec.Build());
 			return ps.WriteLengthHash().ToArray();
 		}
 
@@ -266,13 +283,10 @@ namespace Faolan.GameServer
 			var ps = new PacketStream();
 			ps
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(MapChangeCodec.BuildIir(
-					CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId, charInstance, count, playfieldToken,
-						15.0f,
-						BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB)));
+				.WriteArrayUInt32Length(MapChangeCodec.BuildIir(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId,
+					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB)));
 			return ps.WriteLengthHash().ToArray();
 		}
-
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared
 		// with the CombatService); this delegates so the existing SendStatUpdate/SendVitals/BuildVitals callers
@@ -342,7 +356,6 @@ namespace Faolan.GameServer
 			return ps.WriteLengthHash().ToArray();
 		}
 
-
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
 		// updates (0x2005) ride.
 		private static async Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
@@ -376,26 +389,6 @@ namespace Faolan.GameServer
 			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
-		}
-
-		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on
-		// every sub-area crossing, not once per playfield - Old Tarantia alone has six (Bridge of Vilerus I, The East
-		// Gate, The West Gate, ...) - so the world tick drives this off MapArea, and the entry banner is simply the
-		// first crossing. `areaNameId` is the client's localized-string id; the client renders the text itself.
-		//
-		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
-		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
-		private Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
-		{
-			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
-		}
-
-		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
-		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
-		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
-		private Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
-		{
-			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).

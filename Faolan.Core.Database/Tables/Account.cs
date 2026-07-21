@@ -14,20 +14,20 @@ namespace Faolan.Core.Database.Tables
 		[NotMapped]
 		public ulong LongId => 0x0000271200000000u + Id; // As used by the client
 
-		public virtual ICollection<Character> Characters { get; set; } = [];
-
-		// Whether the account has UNSEEN claims - drives the "new claims available" glow on the client's claims button
-		// (CoreClaimIIR sub 0x0009). Set true when a claim is added; cleared when the player opens the Claims window
-		// (the list request). One flag per account, not per-claim. See GameServerListener.Claims.cs / #359.
-		public bool ClaimsAvailable { get; set; }
-
 		public virtual ICollection<AccountClaim> Claims { get; set; } = [];
+
+		public virtual ICollection<Character> Characters { get; set; } = [];
 
 		[ConstrainToEnumValues]
 		public AccountState State { get; set; }
 
 		[ConstrainToEnumValues]
 		public AccountType Type { get; set; }
+
+		// Whether the account has UNSEEN claims - drives the "new claims available" glow on the client's claims button
+		// (CoreClaimIIR sub 0x0009). Set true when a claim is added; cleared when the player opens the Claims window
+		// (the list request). One flag per account, not per-claim. See GameServerListener.Claims.cs / #359.
+		public bool ClaimsAvailable { get; set; }
 
 		// Persisted GM toggles (#279). Unlike the live WorldEntity flags (which clear on relog AND on every map
 		// change, since a playfield change is a fresh world connection), these survive on the account and are
@@ -42,17 +42,17 @@ namespace Faolan.Core.Database.Tables
 		public int CreateCounter { get; set; } // TODO: delete, not used
 		public int CreateState { get; set; } // TODO: delete, not used
 
-		[MaxLength(32)]
-		public string? AuthChallenge { get; set; }
-
-		[MaxLength(64)] // INET6_ADDRSTRLEN 46
-		public string? LastIpAddress { get; set; }
-
 		[MaxLength(128)]
 		public string Password { get; set; } = null!;
 
 		[MaxLength(128)]
 		public string UserName { get; set; } = null!;
+
+		[MaxLength(32)]
+		public string? AuthChallenge { get; set; }
+
+		[MaxLength(64)] // INET6_ADDRSTRLEN 46
+		public string? LastIpAddress { get; set; }
 
 		public uint AuthStatus { get; set; }
 

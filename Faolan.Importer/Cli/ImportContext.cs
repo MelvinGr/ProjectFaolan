@@ -10,6 +10,12 @@ namespace Faolan.Importer.Cli
 	// single tracked context the runner wraps in a transaction.
 	public sealed class ImportContext
 	{
+		// The Faolan.Web.Content mirror-proxy base for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
+		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).
+		// Passed to every importer RdbReader so CDN-only records import instead of being skipped. Override with
+		// --rdb-proxy (e.g. to point at a remote mirror); defaults to the local mirror. See [[aoc_content_cdn_mirror]].
+		public const string DefaultProxyBase = "http://127.0.0.1:7081/gameupdate/upm/rdb";
+
 		// Informational - the runner's transaction rollback is what actually makes a dry run write nothing -
 		// but a module with an OUT-OF-DB side effect (e.g. rdb-respawns writing CDN blobs to --store) must
 		// check this and skip that side effect.
@@ -29,18 +35,12 @@ namespace Faolan.Importer.Cli
 		public required IReadOnlyList<IReadOnlyList<byte[]>> CreateCaptures { get; init; }
 		public required IReadOnlyList<NamedCapture> Captures { get; init; }
 		public required string CapturesDir { get; init; }
+		public string RdbProxyBase { get; init; } = DefaultProxyBase;
 		public string? DumpTemplatesDir { get; init; }
 
 		// rdb-* module sub-options (from --rdb / --dump-templates). Out-of-DB write paths (dump) must be suppressed
 		// under DryRun by the module.
 		public string? RdbDir { get; init; }
-
-		// The Faolan.Web.Content mirror-proxy base for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
-		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).
-		// Passed to every importer RdbReader so CDN-only records import instead of being skipped. Override with
-		// --rdb-proxy (e.g. to point at a remote mirror); defaults to the local mirror. See [[aoc_content_cdn_mirror]].
-		public const string DefaultProxyBase = "http://127.0.0.1:7081/gameupdate/upm/rdb";
-		public string RdbProxyBase { get; init; } = DefaultProxyBase;
 
 		public TextWriter Out { get; init; } = Console.Out;
 

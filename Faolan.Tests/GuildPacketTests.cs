@@ -21,8 +21,8 @@ namespace Faolan.Tests
 		// Hoxxling's member record from the 0x202F member-joined that followed the accept: rank 0, online,
 		// playfield 0xFAA, level 4, class 0x2B (Herald of Xotli), zeroed counters.
 		private const string CapturedMemberRecord = "030301316e710008486f78786c696e67000100000faa040000002b" + // head..class
-													"0000000000000000" + // unknown0 + lastSeen (online)
-													"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"; // 48-byte counters
+		                                            "0000000000000000" + // unknown0 + lastSeen (online)
+		                                            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"; // 48-byte counters
 
 		// #306: the 0x2044 DispatchGuildCreated body for a freshly created guild, byte-exact against the capture
 		// (DemoL80 creating "Faolan"): [creator member record][guild header (form byte = request's 0x06)][225-byte

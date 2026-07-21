@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace Faolan.Core
@@ -19,11 +20,13 @@ namespace Faolan.Core
 
 		private static string FindRoot()
 		{
-			foreach (var start in new[] { Directory.GetCurrentDirectory(), System.AppContext.BaseDirectory })
+			foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
 			{
 				for (var dir = new DirectoryInfo(start); dir != null; dir = dir.Parent)
+				{
 					if (File.Exists(Path.Combine(dir.FullName, RootMarker)))
 						return dir.FullName;
+				}
 			}
 
 			return Directory.GetCurrentDirectory();

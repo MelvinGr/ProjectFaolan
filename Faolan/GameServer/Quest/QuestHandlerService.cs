@@ -26,17 +26,6 @@ namespace Faolan.GameServer.Quest
 	// back on the broadcaster.
 	public sealed class QuestHandlerService
 	{
-		private readonly IDatabaseRepository _database;
-		private readonly WorldSimulation _sim;
-		private readonly ILogger _logger;
-
-		public QuestHandlerService(IDatabaseRepository database, WorldSimulation sim, ILogger logger)
-		{
-			_database = database;
-			_sim = sim;
-			_logger = logger;
-		}
-
 		// ---- Kalanthes intro cutscene (create flow) --------------------------------------------------------------
 		// #234/#193 Kalanthes walk-up, CONSTRUCTED from typed MoveTask data (no replayed hex blob). Decoded from the
 		// captured MoveTasks (96C46740) Blablabla_* f657 (intro) + f890 (walk): the intro is a mode-2 Rotate that SNAPS
@@ -47,6 +36,96 @@ namespace Faolan.GameServer.Quest
 		private static readonly Quaternion KalanthesIntroFacing = new Quaternion(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
 		private static readonly Vector3 KalanthesIntroPos = new Vector3(333.20001220703125f, 146.29666137695312f, 706.0260009765625f);
 		private static readonly Vector3 KalanthesWalkTarget = new Vector3(324.7233581542969f, 145.43357849121094f, 705.1339721679688f);
+		private readonly IDatabaseRepository _database;
+		private readonly ILogger _logger;
+		private readonly WorldSimulation _sim;
+
+		public QuestHandlerService(IDatabaseRepository database, WorldSimulation sim, ILogger logger)
+		{
+			_database = database;
+			_sim = sim;
+			_logger = logger;
+		}
+
+		// ---- Casilda beach rescue --------------------------------------------------------------------------------
+		// #267: drop the beach "invisible wall". The wall is the Casilda chain decor's COLLISION (the
+		// `004709_Global__decor_chain_hangingwoman` SimpleDynel sent at world entry; its mesh doesn't render for us, so
+		// it reads as an invisible barrier). Retail flips it off with a SimpleDynel visual-change (state 5) to that dynel
+		// the instant Casilda is freed on the beach (Hoxxling gameplay idx 2053). Looked up by the chain world-object's
+		// identity so the handle matches what the client was sent at entry (its CapturedHandle). No-op off-beach / if the
+		// map has no such chain.
+		public async Task DropBeachWall(INetworkClient client)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var chain = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o =>
+				o.SubOpcode == SimpleDynelMessageCodec.Opcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
+			if (chain == null)
+				return;
+
+			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(chain.CapturedHandle, 0x05));
+			_logger.LogInformation("#267: dropped beach chain-wall collision (handle 0x{Handle:X8}) for {Player}.", chain.CapturedHandle, player.Name);
+
+			// She's freed now: clear the captive (chained) struggle pose so she stands/walks normally as she follows
+			// (the live counterpart to the captive pose the interest stream sends while she's a prisoner).
+			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == "Casilda");
+			if (casilda != null)
+				await SendCasildaPose(client, casilda.Handle, false);
+		}
+
+		// Whether the character has freed Casilda - data-driven (no hard-coded quest ids): any COMPLETED quest whose
+		// first goal is a TalkToNpc goal targeting Casilda (the freeing stage of the intro chain, #261).
+		public async Task<bool> IsCasildaFreed(uint characterId)
+		{
+			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			{
+				if (quest.State != QuestState.Completed)
+					continue;
+
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				if (goal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
+					return true;
+			}
+
+			return false;
+		}
+
+		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
+		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
+		// off the beach or before she's freed.
+		public async Task SendBeachGateOnEntry(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null || character.MapId != Map.TortageBeachId)
+				return;
+
+			if (await IsCasildaFreed(character.Id))
+				await DropBeachWall(client);
+		}
+
+		// #267/#266: Casilda's captive (chained) vs freed pose, as a BehaviorControlCenterIIR. Both decoded byte-exact
+		// from the Hoxxling beach gameplay capture's BCC (0x642CD3D6) records targeting her handle 0x00017ED0:
+		//  - CAPTIVE = the prisoner struggle the destiny scene loops (slot 5, behaviorId 159428, field5 24, no tail;
+		//    retail alternates 159428/159427 each phase but a single registration loops it).
+		//  - FREED = her slot-9 locomotion behavior 42010 (field5 24) WITH the 20-byte bound tail (boundA 0x12), the
+		//    record retail sends at the rescue (capture idx 2106) so she stops struggling and walks when following.
+		public Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
+		{
+			// BuildBehaviorControlCenterIir returns the record BODY ([type][handle][form][slot][protobuf]) WITHOUT the
+			// 0x642CD3D6 sub-opcode (the create-burst Iir helper prepends it), so prepend it here - SendWorldIir only adds
+			// the carrier + length, not the sub-op, and the client drops a BCC record that doesn't start with it.
+			var record = captive
+				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
+				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
+			var body = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
+			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
+				? "CAPTIVE"
+				: "freed", casildaHandle, client.Session?.Character?.Name);
+			return SendWorldIir(client, body);
+		}
 
 		// The intro TRANSFORM: a stationary (from==to) mode-2 MoveTask placing Kalanthes at his cutscene start.
 		public static byte[] BuildKalanthesIntroMove(uint handle)
@@ -95,85 +174,8 @@ namespace Faolan.GameServer.Quest
 
 		// Sends a constructed Kalanthes MoveTask on the world conversation (WorldFraming + IirCarrier - the same framing
 		// every rendered NPC move goes out on).
-		public static Task SendKalanthesMoveTask(INetworkClient client, byte[] body) => SendWorldIir(client, body);
-
-		// ---- Casilda beach rescue --------------------------------------------------------------------------------
-		// #267: drop the beach "invisible wall". The wall is the Casilda chain decor's COLLISION (the
-		// `004709_Global__decor_chain_hangingwoman` SimpleDynel sent at world entry; its mesh doesn't render for us, so
-		// it reads as an invisible barrier). Retail flips it off with a SimpleDynel visual-change (state 5) to that dynel
-		// the instant Casilda is freed on the beach (Hoxxling gameplay idx 2053). Looked up by the chain world-object's
-		// identity so the handle matches what the client was sent at entry (its CapturedHandle). No-op off-beach / if the
-		// map has no such chain.
-		public async Task DropBeachWall(INetworkClient client)
+		public static Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
 		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return;
-
-			var chain = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o =>
-				o.SubOpcode == SimpleDynelMessageCodec.Opcode && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
-			if (chain == null)
-				return;
-
-			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(chain.CapturedHandle, 0x05));
-			_logger.LogInformation("#267: dropped beach chain-wall collision (handle 0x{Handle:X8}) for {Player}.", chain.CapturedHandle, player.Name);
-
-			// She's freed now: clear the captive (chained) struggle pose so she stands/walks normally as she follows
-			// (the live counterpart to the captive pose the interest stream sends while she's a prisoner).
-			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == "Casilda");
-			if (casilda != null)
-				await SendCasildaPose(client, casilda.Handle, false);
-		}
-
-		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
-		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
-		// off the beach or before she's freed.
-		public async Task SendBeachGateOnEntry(INetworkClient client)
-		{
-			var character = client.Session?.Character;
-			if (character == null || character.MapId != Map.TortageBeachId)
-				return;
-
-			if (await IsCasildaFreed(character.Id))
-				await DropBeachWall(client);
-		}
-
-		// Whether the character has freed Casilda - data-driven (no hard-coded quest ids): any COMPLETED quest whose
-		// first goal is a TalkToNpc goal targeting Casilda (the freeing stage of the intro chain, #261).
-		public async Task<bool> IsCasildaFreed(uint characterId)
-		{
-			foreach (var quest in await _database.GetCharacterQuests(characterId))
-			{
-				if (quest.State != QuestState.Completed)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-				if (goal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
-					return true;
-			}
-
-			return false;
-		}
-
-		// #267/#266: Casilda's captive (chained) vs freed pose, as a BehaviorControlCenterIIR. Both decoded byte-exact
-		// from the Hoxxling beach gameplay capture's BCC (0x642CD3D6) records targeting her handle 0x00017ED0:
-		//  - CAPTIVE = the prisoner struggle the destiny scene loops (slot 5, behaviorId 159428, field5 24, no tail;
-		//    retail alternates 159428/159427 each phase but a single registration loops it).
-		//  - FREED = her slot-9 locomotion behavior 42010 (field5 24) WITH the 20-byte bound tail (boundA 0x12), the
-		//    record retail sends at the rescue (capture idx 2106) so she stops struggling and walks when following.
-		public Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
-		{
-			// BuildBehaviorControlCenterIir returns the record BODY ([type][handle][form][slot][protobuf]) WITHOUT the
-			// 0x642CD3D6 sub-opcode (the create-burst Iir helper prepends it), so prepend it here - SendWorldIir only adds
-			// the carrier + length, not the sub-op, and the client drops a BCC record that doesn't start with it.
-			var record = captive
-				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
-				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
-			var body = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
-			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
-				? "CAPTIVE"
-				: "freed", casildaHandle, client.Session?.Character?.Name);
 			return SendWorldIir(client, body);
 		}
 

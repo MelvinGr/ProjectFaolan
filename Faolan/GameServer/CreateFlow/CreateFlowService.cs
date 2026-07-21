@@ -68,7 +68,6 @@ namespace Faolan.GameServer.CreateFlow
 			0x0002A7FC, 0x0002A7FD, 0x0002A7FE
 		];
 
-
 		// The listener's burst-less world entry (GameServerListener.WorldEntry.cs) - the constructed live-char world the
 		// create-flow enters before the destiny cutscene overlay. Injected as a seam (shared with the login replay).
 		private readonly Func<INetworkClient, uint, Task> _sendBurstlessWorldEntry;
@@ -622,7 +621,7 @@ namespace Faolan.GameServer.CreateFlow
 			foreach (var handle in EditorSceneDynelHandles)
 			{
 				if (dynelRows != null && dynelRows.TryGetValue(handle, out var dynelRow) &&
-					WorldObjectBuilder.TryBuild(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance, out var dynel))
+				    WorldObjectBuilder.TryBuild(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance, out var dynel))
 					await Iir(GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, dynel[8..]);
 			}
 
@@ -1058,7 +1057,11 @@ namespace Faolan.GameServer.CreateFlow
 						IntParameter = 0, // sint32 - zigzag(0) is 0, so this is the same `18 00` as before
 						StringParameterOne = token,
 						StringParameterTwo = value,
-						IdParameter = new ProtoID32 { Type = 0, Instance = 0 }
+						IdParameter = new ProtoID32
+						{
+							Type = 0,
+							Instance = 0
+						}
 					});
 				})
 				.SendAsync(client);

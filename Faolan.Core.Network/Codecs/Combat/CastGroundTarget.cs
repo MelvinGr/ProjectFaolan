@@ -15,10 +15,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class CastGroundTarget
 	{
 		private const byte GroundTargetKind = 0; // trailer[0]; 1 = entity-targeted (no reticle)
+		private const int MinLength = PositionOffset + 3 * sizeof(float);
 
 		// The three floats start one byte into the trailer (after the kind byte).
 		private const int PositionOffset = 1;
-		private const int MinLength = PositionOffset + 3 * sizeof(float);
 
 		// True (with the reticle position) when the trailer carries a ground target (kind byte 0 + a non-zero
 		// position); false for an entity-targeted / self cast (short trailer, kind 1, or a zeroed position).
@@ -29,9 +29,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				return false;
 
 			var span = trailer.AsSpan(PositionOffset);
-			position = new Vector3(
-				BinaryPrimitives.ReadSingleBigEndian(span),
-				BinaryPrimitives.ReadSingleBigEndian(span[sizeof(float)..]),
+			position = new Vector3(BinaryPrimitives.ReadSingleBigEndian(span), BinaryPrimitives.ReadSingleBigEndian(span[sizeof(float)..]),
 				BinaryPrimitives.ReadSingleBigEndian(span[(2 * sizeof(float))..]));
 
 			return position != Vector3.Zero;

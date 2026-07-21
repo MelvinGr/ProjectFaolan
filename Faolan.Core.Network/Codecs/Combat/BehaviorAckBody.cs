@@ -46,6 +46,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return s.ToArray();
 		}
 
+		// Decoupled relay: acks the raw behaviour request for `instance` (was BehaviorAckBody.BuildBehaviorRelayBody
+		// taking the live client). Null when the payload is too short. The phase is the request's own mode (or 1).
+		public static byte[] BuildBehaviorRelayBody(uint instance, byte[] rawPayload, uint mode)
+		{
+			if (rawPayload.Length < 26)
+				return null;
+
+			return BuildBehaviorEchoAckBody(rawPayload, instance, mode != 0
+				? mode
+				: 1u);
+		}
+
 		// The cast-INTERRUPT abort BccAck (#347). When the client cancels an in-flight cast (CastSpell state=2, sent
 		// when the player moves mid-cast - the ground-target AoE included), retail answers with a single state=0x0007
 		// BCC that drops the cast bar, cancels the animation and pops the client's "Interrupted" floating text (no
@@ -76,18 +88,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteArray(echoedArgs)
 				.WriteArray(tail);
 			return s.ToArray();
-		}
-
-		// Decoupled relay: acks the raw behaviour request for `instance` (was BehaviorAckBody.BuildBehaviorRelayBody
-		// taking the live client). Null when the payload is too short. The phase is the request's own mode (or 1).
-		public static byte[] BuildBehaviorRelayBody(uint instance, byte[] rawPayload, uint mode)
-		{
-			if (rawPayload.Length < 26)
-				return null;
-
-			return BuildBehaviorEchoAckBody(rawPayload, instance, mode != 0
-				? mode
-				: 1u);
 		}
 
 		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity

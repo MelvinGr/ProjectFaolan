@@ -66,8 +66,8 @@ namespace Faolan.GameServer.World
 				// already expired; RestoreBuffs re-sends them at world entry. Replace-all, like the transform above -
 				// the row set always mirrors what's currently active.
 				var now = DateTimeOffset.UtcNow;
-				var buffs = entity.ActiveBuffs.Values
-					.Where(b => GameServerListener.ShouldPersistBuff(entity, b) && !b.Expired(now))
+				var buffs = entity
+					.ActiveBuffs.Values.Where(b => GameServerListener.ShouldPersistBuff(entity, b) && !b.Expired(now))
 					.Select(b => new CharacterBuff
 					{
 						BuffId = b.BuffId,

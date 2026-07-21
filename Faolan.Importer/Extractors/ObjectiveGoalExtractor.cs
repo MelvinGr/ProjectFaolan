@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
-using Faolan.Importer.Captures;
+using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Importer.Extractors
 {
@@ -11,36 +11,12 @@ namespace Faolan.Importer.Extractors
 	// Every one of the 1686 Quest_c records in the corpus carries its goals, so this is pure harvest, no inference.
 	public static class ObjectiveGoalExtractor
 	{
-		public sealed record Goal(
-			uint QuestId,
-			uint GoalId,
-			uint Sequence,
-			uint RegionOrder,
-			uint Separator,
-			uint SubId,
-			uint MapId,
-			uint MarkerX,
-			uint MarkerY,
-			uint Unknown1,
-			uint Unknown2,
-			uint GoalIdEcho,
-			uint Extra0,
-			uint Extra1,
-			uint Extra2,
-			uint Extra3,
-			uint Extra4,
-			uint Extra5,
-			uint Extra6,
-			uint RequiredCount,
-			CompletedQuestExtractor.TextRef Objective,
-			CompletedQuestExtractor.TextRef? Trailing);
-
 		// The captured objective goals per quest, exactly as the wire carried them - the oracle the importer compares
 		// a rebuilt region against (ImportOps.VerifyObjectiveRegions). First capture of a quest wins, matching how
 		// Extract harvests the rows themselves.
-		public static Dictionary<uint, List<List<Faolan.Core.Network.Codecs.Quest.QuestObjectiveGoal>>> CapturedRegions(IReadOnlyList<CapturedPacket> packets)
+		public static Dictionary<uint, List<List<QuestObjectiveGoal>>> CapturedRegions(IReadOnlyList<CapturedPacket> packets)
 		{
-			var byQuest = new Dictionary<uint, List<List<Faolan.Core.Network.Codecs.Quest.QuestObjectiveGoal>>>();
+			var byQuest = new Dictionary<uint, List<List<QuestObjectiveGoal>>>();
 			if (packets == null)
 				return byQuest;
 
@@ -54,7 +30,9 @@ namespace Faolan.Importer.Extractors
 					// EVERY capture of the quest, not just the first: a region that reproduces one capture but not
 					// another is not safe to ship (goal 1448's trailing record is spelled differently across captures).
 					if (record.Objectives is { Goals.Count: > 0 } objectives)
-						(byQuest.TryGetValue(record.QuestId, out var all) ? all : byQuest[record.QuestId] = []).Add(objectives.Goals);
+						(byQuest.TryGetValue(record.QuestId, out var all)
+							? all
+							: byQuest[record.QuestId] = []).Add(objectives.Goals);
 				}
 			}
 
@@ -89,34 +67,50 @@ namespace Faolan.Importer.Extractors
 						if (objective == null)
 							continue;
 
-						byGoal[g.GoalId] = new Goal(
-							record.QuestId,
-							g.GoalId,
-							g.N,
-							(uint)gi,
-							g.K,
-							g.SubId,
-							g.MapId,
-							g.MarkerX,
-							g.MarkerY,
-							g.Unknown1,
-							g.Unknown2,
-							g.GoalIdRepeat,
-							g.Reserved.Length > 0 ? g.Reserved[0] : 0,
-							g.Reserved.Length > 1 ? g.Reserved[1] : 0,
-							g.Reserved.Length > 2 ? g.Reserved[2] : 0,
-							g.Reserved.Length > 3 ? g.Reserved[3] : 0,
-							g.Reserved.Length > 4 ? g.Reserved[4] : 0,
-							g.Reserved.Length > 5 ? g.Reserved[5] : 0,
-							g.Reserved.Length > 6 ? g.Reserved[6] : 0,
-							g.RequiredCount,
-							objective,
-							CompletedQuestExtractor.ParseRecord(Encoding.Latin1.GetString(g.TextRecord)));
+						byGoal[g.GoalId] = new Goal(record.QuestId, g.GoalId, g.N, (uint)gi, g.K, g.SubId, g.MapId, g.MarkerX, g.MarkerY, g.Unknown1, g.Unknown2, g.GoalIdRepeat, g.Reserved.Length > 0
+							? g.Reserved[0]
+							: 0, g.Reserved.Length > 1
+							? g.Reserved[1]
+							: 0, g.Reserved.Length > 2
+							? g.Reserved[2]
+							: 0, g.Reserved.Length > 3
+							? g.Reserved[3]
+							: 0, g.Reserved.Length > 4
+							? g.Reserved[4]
+							: 0, g.Reserved.Length > 5
+							? g.Reserved[5]
+							: 0, g.Reserved.Length > 6
+							? g.Reserved[6]
+							: 0, g.RequiredCount, objective, CompletedQuestExtractor.ParseRecord(Encoding.Latin1.GetString(g.TextRecord)));
 					}
 				}
 			}
 
 			return [.. byGoal.Values];
 		}
+
+		public sealed record Goal(
+			uint QuestId,
+			uint GoalId,
+			uint Sequence,
+			uint RegionOrder,
+			uint Separator,
+			uint SubId,
+			uint MapId,
+			uint MarkerX,
+			uint MarkerY,
+			uint Unknown1,
+			uint Unknown2,
+			uint GoalIdEcho,
+			uint Extra0,
+			uint Extra1,
+			uint Extra2,
+			uint Extra3,
+			uint Extra4,
+			uint Extra5,
+			uint Extra6,
+			uint RequiredCount,
+			CompletedQuestExtractor.TextRef Objective,
+			CompletedQuestExtractor.TextRef? Trailing);
 	}
 }

@@ -13,11 +13,12 @@ namespace Faolan.Tests
 	// We rebuild the body from those fields and assert it matches the capture byte for byte.
 	public class DispatchRemoveItemTests
 	{
+		private const ContainerKind EquippedContainer = ContainerKind.Quest;
+
 		// Captured DispatchRemoveItem body (strickenbla questcomplete frame 3680; identical shape in the hoxxling
 		// gameplay captures): container 0x71 (equipped), charId 0x01316D8A, pos 0, amount 0.
 		private const string CapturedBody = "0000007101316d8a0000000000000000";
 		private const uint CharId = 0x01316d8a;
-		private const ContainerKind EquippedContainer = ContainerKind.Quest;
 
 		[Fact]
 		public void RemoveItemBody_EncodesFields()

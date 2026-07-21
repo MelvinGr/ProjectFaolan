@@ -114,6 +114,5 @@ namespace Faolan.GameServer.Economy
 				await _outbound.SendAddItem(client, ContainerKind.Bag, (uint)dPos, entry);
 			}
 		}
-
 	}
 }

@@ -30,16 +30,12 @@ namespace Faolan.Core.Network.Codecs.World
 
 		public const uint VisualChangeTypeTag = 0x0000C878;
 
-		// Every IIR type this codec constructs or parses (Opcode is the primary). Declared for the same reason
-		// DynelFullUpdateCodec does: a grep for the opcode member finds its emitter, and the coverage matrix reads it.
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR,
-			GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR,
-		];
-
 		// The record header before the transform: [u32 type][u32 handle][u32 0].
 		private const int HeaderLength = 12;
+
+		// Every IIR type this codec constructs or parses (Opcode is the primary). Declared for the same reason
+		// DynelFullUpdateCodec does: a grep for the opcode member finds its emitter, and the coverage matrix reads it.
+		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR];
 
 		// Copies a parsed identity message into a WorldObject row's columns (the importer path). The nullable columns
 		// stay null when the field is absent, so ToMessage round-trips back to the same wire bytes.

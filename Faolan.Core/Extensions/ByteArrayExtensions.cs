@@ -34,14 +34,14 @@ namespace Faolan.Core.Extensions
 				var hexChars = new[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
 				const int firstHexColumn = 8 // 8 characters for the address
-										   + 3; // 3 spaces
+				                           + 3; // 3 spaces
 
 				var firstCharColumn = firstHexColumn + bytesPerLine * 3 // - 2 digit for the hexadecimal value and 1 space
-													 + (bytesPerLine - 1) / 8 // - 1 extra space every 8 characters from the 9th
-													 + 2; // 2 spaces
+				                                     + (bytesPerLine - 1) / 8 // - 1 extra space every 8 characters from the 9th
+				                                     + 2; // 2 spaces
 
 				var lineLength = firstCharColumn + bytesPerLine // - characters to show the ascii value
-												 + Environment.NewLine.Length; // Carriage return and line feed (should normally be 2)
+				                                 + Environment.NewLine.Length; // Carriage return and line feed (should normally be 2)
 
 				var line = (new string(' ', lineLength - Environment.NewLine.Length) + Environment.NewLine).ToCharArray();
 				var expectedLines = (bytesLength + bytesPerLine - 1) / bytesPerLine;

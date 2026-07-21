@@ -49,20 +49,6 @@ namespace Faolan.Tests
 			Assert.Equal(1u, gained);
 		}
 
-		[Theory]
-		// The captured retail anchors (MaxExp stat paired with the character's Level) — these MUST be exact.
-		[InlineData(1u, 100u)]
-		[InlineData(2u, 340u)]
-		[InlineData(4u, 1440u)]
-		[InlineData(5u, 3940u)]
-		[InlineData(23u, 263640u)]
-		[InlineData(24u, 298040u)]
-		[InlineData(80u, 47907140u)]
-		public void XpForNextLevel_MatchesTheCapturedRetailAnchors(uint level, uint expected)
-		{
-			Assert.Equal(expected, LevelingResolver.XpForNextLevel(level));
-		}
-
 		[Fact]
 		public void XpForNextLevel_InterpolatesMonotonicallyBetweenAnchors()
 		{
@@ -73,6 +59,13 @@ namespace Faolan.Tests
 			// strictly increasing across the whole 1..80 range.
 			for (uint l = 1; l < 80; l++)
 				Assert.True(LevelingResolver.XpForNextLevel(l) <= LevelingResolver.XpForNextLevel(l + 1));
+		}
+
+		[Theory, InlineData(1u, 100u), InlineData(2u, 340u), InlineData(4u, 1440u), InlineData(5u, 3940u), InlineData(23u, 263640u), InlineData(24u, 298040u), InlineData(80u, 47907140u)]
+		// The captured retail anchors (MaxExp stat paired with the character's Level) — these MUST be exact.
+		public void XpForNextLevel_MatchesTheCapturedRetailAnchors(uint level, uint expected)
+		{
+			Assert.Equal(expected, LevelingResolver.XpForNextLevel(level));
 		}
 	}
 }

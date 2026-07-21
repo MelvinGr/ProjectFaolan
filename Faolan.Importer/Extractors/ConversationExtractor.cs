@@ -1,10 +1,10 @@
 using System;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Importer.Extractors
@@ -60,17 +60,18 @@ namespace Faolan.Importer.Extractors
 
 		// The Knubot conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack):
 		// OpenChatWindow (045B0B0F), AppendText (4A3D899A), AnswerList (F164A4A5), CloseChatWindow (C4AF39EB).
-		private static readonly HashSet<uint> ResponseSubOpcodes = [(uint)GameServer0X2000Opcodes.KnubotAppendTextIIR, (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR, (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR, (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR];
+		private static readonly HashSet<uint> ResponseSubOpcodes =
+		[
+			(uint)GameServer0X2000Opcodes.KnubotAppendTextIIR, (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR, (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR,
+			(uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR
+		];
 
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var namesByHandle = BuildSpawnNameMap(packets);
 			// handle -> NPC TEMPLATE id (#244): the runtime gates the conversation on the clicked NPC's template so a
 			// same-named NPC (25 share "Halen van Dummy") can't open another's dialogue.
-			var templatesByHandle = NpcSpawnExtractor.Extract(packets)
-				.Where(e => e.Handle != 0 && e.TemplateId != 0)
-				.GroupBy(e => e.Handle)
-				.ToDictionary(g => g.Key, g => g.First().TemplateId);
+			var templatesByHandle = NpcSpawnExtractor.Extract(packets).Where(e => e.Handle != 0 && e.TemplateId != 0).GroupBy(e => e.Handle).ToDictionary(g => g.Key, g => g.First().TemplateId);
 			var entries = new List<ConversationEntry>();
 
 			// Per-conversation-instance state, reset at each greeting (TalkToNpc f3=0).
@@ -154,8 +155,11 @@ namespace Faolan.Importer.Extractors
 			void Flush()
 			{
 				if (active && screen.Count > 0)
-					entries.Add(new ConversationEntry(typeId, path, npc, instance, [.. screen], namesByHandle.GetValueOrDefault(npc),
-						templatesByHandle.TryGetValue(npc, out var tpl) ? tpl : null, GrantQuestId: grant, QuestContextId: instanceContext));
+				{
+					entries.Add(new ConversationEntry(typeId, path, npc, instance, [.. screen], namesByHandle.GetValueOrDefault(npc), templatesByHandle.TryGetValue(npc, out var tpl)
+						? tpl
+						: null, GrantQuestId: grant, QuestContextId: instanceContext));
+				}
 			}
 		}
 

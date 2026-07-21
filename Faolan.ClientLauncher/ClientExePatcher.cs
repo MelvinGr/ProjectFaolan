@@ -95,8 +95,8 @@ namespace Faolan.ClientLauncher
 		{
 			if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
 			{
-				error = "must be an http:// URL - the client's built-in libcurl 7.19.7 has no SSL, so https (or any "
-					+ "other scheme) fails in-client with cURL error 1; proxy https content through a plain-http endpoint instead";
+				error = "must be an http:// URL - the client's built-in libcurl 7.19.7 has no SSL, so https (or any " +
+				        "other scheme) fails in-client with cURL error 1; proxy https content through a plain-http endpoint instead";
 				return false;
 			}
 

@@ -19,14 +19,14 @@ namespace Faolan.Core.Database.Tables
 
 		public QuestTextSlot Slot { get; set; }
 
-		// <localized flags="...">; null/empty for remoteformat slots.
-		[MaxLength(64)]
-		public string? Flags { get; set; }
-
 		// The deterministic content hash from the capture (pre-escaped, e.g. contains &#36;). Render-critical:
 		// the client validates it, a wrong key yields blank text.
 		[MaxLength(256)]
 		public string KeyText { get; set; } = null!;
+
+		// <localized flags="...">; null/empty for remoteformat slots.
+		[MaxLength(64)]
+		public string? Flags { get; set; }
 
 		public uint Category { get; set; }
 	}

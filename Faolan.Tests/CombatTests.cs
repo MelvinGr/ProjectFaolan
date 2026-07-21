@@ -133,16 +133,25 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void ReviveToFull_RestoresAllPools()
+		public void ReviveTo_NeverRevivesDead_EvenWhenThePercentTruncatesToZero()
 		{
-			var v = EntityVitals.FromMax(100, 50, 80);
-			v.ApplyHealthDelta(-100); // dead
-			v.ApplyManaDelta(-50);
-			Assert.True(v.IsDead);
+			var v = EntityVitals.FromMax(5, 5, 5); // 7% of 5 truncates to 0
+			v.ApplyHealthDelta(-5);
 
-			v.ReviveToFull();
+			v.ReviveTo(7f);
 
 			Assert.False(v.IsDead);
+			Assert.Equal(1u, v.Health);
+		}
+
+		[Fact]
+		public void ReviveTo_NonPositivePercentMeansNoData_AndRestoresFull()
+		{
+			var v = EntityVitals.FromMax(100, 50, 80);
+			v.ApplyHealthDelta(-100);
+
+			v.ReviveTo(0f);
+
 			Assert.Equal(v.MaxHealth, v.Health);
 			Assert.Equal(v.MaxStamina, v.Stamina);
 			Assert.Equal(v.MaxMana, v.Mana);
@@ -168,28 +177,19 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void ReviveTo_NonPositivePercentMeansNoData_AndRestoresFull()
+		public void ReviveToFull_RestoresAllPools()
 		{
 			var v = EntityVitals.FromMax(100, 50, 80);
-			v.ApplyHealthDelta(-100);
+			v.ApplyHealthDelta(-100); // dead
+			v.ApplyManaDelta(-50);
+			Assert.True(v.IsDead);
 
-			v.ReviveTo(0f);
+			v.ReviveToFull();
 
+			Assert.False(v.IsDead);
 			Assert.Equal(v.MaxHealth, v.Health);
 			Assert.Equal(v.MaxStamina, v.Stamina);
 			Assert.Equal(v.MaxMana, v.Mana);
-		}
-
-		[Fact]
-		public void ReviveTo_NeverRevivesDead_EvenWhenThePercentTruncatesToZero()
-		{
-			var v = EntityVitals.FromMax(5, 5, 5); // 7% of 5 truncates to 0
-			v.ApplyHealthDelta(-5);
-
-			v.ReviveTo(7f);
-
-			Assert.False(v.IsDead);
-			Assert.Equal(1u, v.Health);
 		}
 
 		[Fact]

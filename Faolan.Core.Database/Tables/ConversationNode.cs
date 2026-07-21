@@ -20,6 +20,18 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(GrantQuestId))]
 		public virtual QuestDefinition? GrantQuest { get; set; }
 
+		// The NPC's TYPE id (NpcStats.template_id from the same spawn) - the STABLE per-type key the runtime gates the
+		// conversation on (#244). Needed now that same-named conversational NPCs exist: "Halen van Dummy" is the internal
+		// name of 25 templates (the quest-giver Atraxus 12236 + children/dummies), so a name match ALONE would open
+		// Atraxus's dialogue on any of them. Null when the conversation NPC's spawn (its template) wasn't in the capture -
+		// then the runtime falls back to name-only matching (create-flow scripted intros, etc.).
+		// Nullable BY DESIGN: the world is pruned, so a conversation NPC's TYPE may not be imported (e.g. the Conarch
+		// Village Guard's 42008 tree) - null there means "gate off, match by name only" rather than dropping the dialogue.
+		public uint? NpcTemplateId { get; set; }
+
+		[ForeignKey(nameof(NpcTemplateId))]
+		public virtual NpcTemplate? NpcTemplate { get; set; }
+
 		public uint TypeId { get; set; }
 		public virtual ICollection<ConversationPacket> Packets { get; set; } = [];
 
@@ -49,18 +61,6 @@ namespace Faolan.Core.Database.Tables
 		// the runtime now gates on NpcTemplateId (below), not the name alone.
 		[MaxLength(128)]
 		public string? NpcName { get; set; }
-
-		// The NPC's TYPE id (NpcStats.template_id from the same spawn) - the STABLE per-type key the runtime gates the
-		// conversation on (#244). Needed now that same-named conversational NPCs exist: "Halen van Dummy" is the internal
-		// name of 25 templates (the quest-giver Atraxus 12236 + children/dummies), so a name match ALONE would open
-		// Atraxus's dialogue on any of them. Null when the conversation NPC's spawn (its template) wasn't in the capture -
-		// then the runtime falls back to name-only matching (create-flow scripted intros, etc.).
-		// Nullable BY DESIGN: the world is pruned, so a conversation NPC's TYPE may not be imported (e.g. the Conarch
-		// Village Guard's 42008 tree) - null there means "gate off, match by name only" rather than dropping the dialogue.
-		public uint? NpcTemplateId { get; set; }
-
-		[ForeignKey(nameof(NpcTemplateId))]
-		public virtual NpcTemplate? NpcTemplate { get; set; }
 
 		public uint CapturedInstance { get; set; }
 		public uint CapturedNpcHandle { get; set; }

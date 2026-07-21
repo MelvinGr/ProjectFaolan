@@ -14,10 +14,7 @@ namespace Faolan.GameServer.Combat
 
 		// (level -> xp to advance FROM `level` to level+1), captured from retail: the MaxExp stat paired with the
 		// character's Level. L1/2/4/5 (beach/early logins), L23/24 (lvl23/24 account captures), L80 (max-level logins).
-		private static readonly (uint Level, uint Xp)[] Anchors =
-		[
-			(1, 100), (2, 340), (4, 1440), (5, 3940), (23, 263640), (24, 298040), (80, 47907140)
-		];
+		private static readonly (uint Level, uint Xp)[] Anchors = [(1, 100), (2, 340), (4, 1440), (5, 3940), (23, 263640), (24, 298040), (80, 47907140)];
 
 		// Spends accumulated `experience` against the curve from `level`: returns how many levels were gained and the
 		// leftover within-level experience. Stops at MaxLevel (no overflow - leftover is zeroed at the cap).

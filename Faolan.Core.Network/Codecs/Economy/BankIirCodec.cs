@@ -17,13 +17,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// The BankIIR record (everything after the 0x2000 packet's u32 length prefix).
 		public static byte[] BuildBankIirRecord(uint charInstance, ProtoInventoryGame containerBlob)
 		{
-			return new FaolanStream()
-				.WriteUInt32(Opcode)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(charInstance)
-				.WriteByte(0x01)
-				.WriteArrayUInt32Length(containerBlob.ToProtobuf())
-				.ToArray();
+			return new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(charInstance).WriteByte(0x01).WriteArrayUInt32Length(containerBlob.ToProtobuf()).ToArray();
 		}
 
 		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]

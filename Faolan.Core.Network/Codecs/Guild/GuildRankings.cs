@@ -29,59 +29,17 @@ namespace Faolan.Core.Network.Codecs.Guild
 	{
 		// The CSPlayerInterface opcode this body is the payload of (0x2038).
 		public const CSPlayerInterfaceOpcodes Opcode = CSPlayerInterfaceOpcodes.DispatchGuildRankingsUpdate;
-
-		public const uint GuildClass = 0x0000DEB7; // the guild ID32 type word (Guild.WireType)
-		public const uint ListMultiplier = ListFrame.Unit; // count-framed-list word == (count + 1) * 0x3F1
 		public const int CategoryCount = 4; // Total(0), Valor(1), Glory(2), Artistry(3)
 		public const int MaxRanked = 20; // retail lists the top 20 guilds per tab
 
-		public uint NextUpdateUnix { get; set; }
-		public List<Row> Records { get; set; } = [];
+		public const uint GuildClass = 0x0000DEB7; // the guild ID32 type word (Guild.WireType)
+		public const uint ListMultiplier = ListFrame.Unit; // count-framed-list word == (count + 1) * 0x3F1
 
 		// Sections[category] = the ranked entries for that tab (index 0..3 == Total/Valor/Glory/Artistry).
 		public List<Ranked>[] Sections { get; set; } = [[], [], [], []];
+		public List<Row> Records { get; set; } = [];
 
-		// One guild's catalog row. Total is derived (valor + glory + artistry) - the wire carries it explicitly but it
-		// is always the sum, so we recompute rather than store a fourth field that could drift.
-		public readonly record struct Row(uint Id, string Name, ulong Valor, ulong Glory, ulong Artistry, uint Members, uint Level)
-		{
-			public ulong Total => Valor + Glory + Artistry;
-		}
-
-		public readonly record struct Ranked(uint Id, ulong Renown, uint PrevRank);
-
-		// The renown value a given category ranks by, for a record row.
-		public static ulong CategoryRenown(Row row, int category) => category switch
-		{
-			0 => row.Total,
-			1 => row.Valor,
-			2 => row.Glory,
-			3 => row.Artistry,
-			_ => throw new ArgumentOutOfRangeException(nameof(category))
-		};
-
-		// Builds the rankings from the server's guilds. Records are sorted by total desc; each category section is the
-		// top MaxRanked guilds with renown > 0 in that category (desc, 0-based rank). nextUpdateUnix drives the
-		// window's "NEXT RANKINGS UPDATE" countdown (0 = an already-elapsed timer, which is what a stale retail
-		// capture shows too).
-		public static GuildRankings FromGuilds(IEnumerable<Row> guilds, uint nextUpdateUnix = 0)
-		{
-			var rows = guilds.OrderByDescending(g => g.Total).ThenBy(g => g.Id).ToList();
-			var rankings = new GuildRankings { NextUpdateUnix = nextUpdateUnix, Records = rows };
-
-			for (var category = 0; category < CategoryCount; category++)
-			{
-				rankings.Sections[category] = rows
-					.Where(r => CategoryRenown(r, category) > 0)
-					.OrderByDescending(r => CategoryRenown(r, category))
-					.ThenBy(r => r.Id)
-					.Take(MaxRanked)
-					.Select((r, i) => new Ranked(r.Id, CategoryRenown(r, category), (uint)i))
-					.ToList();
-			}
-
-			return rankings;
-		}
+		public uint NextUpdateUnix { get; set; }
 
 		public byte[] Encode()
 		{
@@ -107,6 +65,19 @@ namespace Faolan.Core.Network.Codecs.Guild
 			return s.ToArray();
 		}
 
+		// The renown value a given category ranks by, for a record row.
+		public static ulong CategoryRenown(Row row, int category)
+		{
+			return category switch
+			{
+				0 => row.Total,
+				1 => row.Valor,
+				2 => row.Glory,
+				3 => row.Artistry,
+				_ => throw new ArgumentOutOfRangeException(nameof(category))
+			};
+		}
+
 		public static GuildRankings Decode(byte[] body)
 		{
 			var s = new FaolanStream(body);
@@ -126,6 +97,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 				var level = s.ReadUInt32();
 				if (valor + glory + artistry != total)
 					throw new InvalidOperationException($"guild {id:X} total {total} != valor+glory+artistry {valor + glory + artistry}");
+
 				rankings.Records.Add(new Row(id, name, valor, glory, artistry, members, level));
 			}
 
@@ -157,18 +129,60 @@ namespace Faolan.Core.Network.Codecs.Guild
 			return rankings;
 		}
 
-		// The count-framed-list word for a given element count. The framing is protocol-wide, not a guild thing -
-		// these stay as the guild codec's local spelling but delegate, so there is ONE implementation (ListFrame).
-		public static uint ListWord(int count) => ListFrame.ForCount(count);
+		// Builds the rankings from the server's guilds. Records are sorted by total desc; each category section is the
+		// top MaxRanked guilds with renown > 0 in that category (desc, 0-based rank). nextUpdateUnix drives the
+		// window's "NEXT RANKINGS UPDATE" countdown (0 = an already-elapsed timer, which is what a stale retail
+		// capture shows too).
+		public static GuildRankings FromGuilds(IEnumerable<Row> guilds, uint nextUpdateUnix = 0)
+		{
+			var rows = guilds.OrderByDescending(g => g.Total).ThenBy(g => g.Id).ToList();
+			var rankings = new GuildRankings
+			{
+				NextUpdateUnix = nextUpdateUnix,
+				Records = rows
+			};
+
+			for (var category = 0; category < CategoryCount; category++)
+			{
+				rankings.Sections[category] = rows
+					.Where(r => CategoryRenown(r, category) > 0)
+					.OrderByDescending(r => CategoryRenown(r, category))
+					.ThenBy(r => r.Id)
+					.Take(MaxRanked)
+					.Select((r, i) => new Ranked(r.Id, CategoryRenown(r, category), (uint)i))
+					.ToList();
+			}
+
+			return rankings;
+		}
 
 		// The element count encoded in a count-framed-list word (throws if the word isn't a 0x3F1 multiple - the same
 		// check the client's readers make before aborting the dispatch).
-		public static int ListCount(uint word) => ListFrame.CountOf(word);
+		public static int ListCount(uint word)
+		{
+			return ListFrame.CountOf(word);
+		}
+
+		// The count-framed-list word for a given element count. The framing is protocol-wide, not a guild thing -
+		// these stay as the guild codec's local spelling but delegate, so there is ONE implementation (ListFrame).
+		public static uint ListWord(int count)
+		{
+			return ListFrame.ForCount(count);
+		}
 
 		private static void RequireGuildClass(uint word)
 		{
 			if (word != GuildClass)
 				throw new InvalidOperationException($"expected guild class {GuildClass:X8}, got {word:X8}");
 		}
+
+		// One guild's catalog row. Total is derived (valor + glory + artistry) - the wire carries it explicitly but it
+		// is always the sum, so we recompute rather than store a fourth field that could drift.
+		public readonly record struct Row(uint Id, string Name, ulong Valor, ulong Glory, ulong Artistry, uint Members, uint Level)
+		{
+			public ulong Total => Valor + Glory + Artistry;
+		}
+
+		public readonly record struct Ranked(uint Id, ulong Renown, uint PrevRank);
 	}
 }

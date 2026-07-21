@@ -28,6 +28,19 @@ namespace Faolan.GameServer.Combat
 	// a per-session CombatState backs NPCs not in the model (e.g. the built-NPC test). See protocol_stats_and_combat.
 	public sealed class CombatService
 	{
+		// The blast radius (world units) a ground-targeted AoE damages around its reticle position.
+		// [V0: a single interim radius - the real per-spell AoE radius is not in the RDB spell record or any bulk
+		// source we import (Spell has only Range = cast distance). Source it per spell - see Gitea follow-up.]
+		public const float GroundAoeRadiusUnits = 5f;
+
+		// The channel tick interval (ms) for a channeled ground AoE. [V0: a gameplay approximation - the exact retail
+		// cadence is muddied in the mixed casting-combat capture; each tick's DamageResult packet is byte-exact.]
+		private const int GroundAoeTickIntervalMs = 1500;
+
+		// The stat a spell-damage StatDamageIIR reports against (retail's outgoing spell hits use statId 0x0a in the
+		// casting-combat capture). Distinct from the melee DamageResult path - the client renders a spell hit's number
+		// from StatDamage (the same IIR that renders incoming DoT numbers on the player), NOT DamageResult.
+		private const uint SpellDamageStatId = 0x0A;
 		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
 		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
 
@@ -62,104 +75,6 @@ namespace Faolan.GameServer.Combat
 			_learnSpell = learnSpell;
 		}
 
-		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
-		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
-		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
-		// regen happens then, so this is just defensive).
-		public EntityVitals GetOrAddPlayerVitals(INetworkClient client)
-		{
-			var entity = _sim.PlayerWorldEntity(client);
-			if (entity == null)
-				return EntityVitals.FromCharacter(client.Session.Character);
-
-			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
-		}
-
-		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
-		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
-		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
-		// and spell paths.
-		// .kill GM command: kill an NPC target outright by applying its full remaining health as damage, so it runs
-		// the normal death lifecycle (vitals push, despawn/corpse-loot, XP, kill-quest advance). No-op if the target
-		// isn't a live NPC in the killer's zone.
-		public Task KillNpc(INetworkClient client, uint targetHandle)
-		{
-			var target = ResolveNpcVitals(client, targetHandle, out _);
-			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
-		}
-
-		// The stat a spell-damage StatDamageIIR reports against (retail's outgoing spell hits use statId 0x0a in the
-		// casting-combat capture). Distinct from the melee DamageResult path - the client renders a spell hit's number
-		// from StatDamage (the same IIR that renders incoming DoT numbers on the player), NOT DamageResult.
-		private const uint SpellDamageStatId = 0x0A;
-
-		// The floating number + combat-log line for a SPELL hit on an NPC. Retail carries spell damage on
-		// StatDamageIIR (0xE9F24184) - the LockedToChanged -> StatDamage -> ApplySpell bundle, with NO DamageResult
-		// (casting-combat capture) - so a spell hit must use StatDamage, not the melee DamageResult (which the client
-		// only floats after a BCC attack behavior arms the target). Mirrors the incoming DoT-tick StatDamage that
-		// already renders on the player: statValue = the target's resulting health, delta = -damage, caster = the
-		// player, spellBase = the wire id >> 8. Call AFTER ApplyNpcDamage so the health is the post-hit value.
-		private Task SendSpellDamageNumber(INetworkClient client, uint npcHandle, uint casterHandle, int damage, uint spellId)
-		{
-			var vitals = ResolveNpcVitals(client, npcHandle, out _);
-			return SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, spellId >> 8);
-		}
-
-		// Resolves an offensive cast: applies the damage to the target's live vitals (a 0x96B8DC59 update moves the
-		// health bar) and shows the spell hit's floating number via StatDamage (see SendSpellDamageNumber). The
-		// ApplySpell VFX is broadcast by the caller.
-		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
-		{
-			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
-			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
-			await SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId);
-		}
-
-		// The blast radius (world units) a ground-targeted AoE damages around its reticle position.
-		// [V0: a single interim radius - the real per-spell AoE radius is not in the RDB spell record or any bulk
-		// source we import (Spell has only Range = cast distance). Source it per spell - see Gitea follow-up.]
-		public const float GroundAoeRadiusUnits = 5f;
-
-		// The channel tick interval (ms) for a channeled ground AoE. [V0: a gameplay approximation - the exact retail
-		// cadence is muddied in the mixed casting-combat capture; each tick's DamageResult packet is byte-exact.]
-		private const int GroundAoeTickIntervalMs = 1500;
-
-		// Damages every attackable NPC within GroundAoeRadiusUnits of `target` for one tick: shows the floating
-		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Friendly NPCs (civilians /
-		// quest-givers, Disposition == Friendly) are spared; hostile + neutral are hit; players never (no PvP model).
-		// Re-evaluated each call so NPCs that wander in/out of the blast are picked up per tick. Returns the count hit.
-		private async Task<int> ApplyAoeTick(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int tickDamage)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return 0;
-
-			var victims = _sim.World.ZoneForEntity(player)
-				.EntitiesInRange(target, GroundAoeRadiusUnits, casterHandle)
-				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
-				.Select(e => e.Handle)
-				.ToList();
-
-			foreach (var handle in victims)
-			{
-				await ApplyNpcDamage(client, handle, tickDamage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
-				await SendSpellDamageNumber(client, handle, casterHandle, tickDamage, spellId);
-			}
-
-			return victims.Count;
-		}
-
-		// Resolves an INSTANT ground-targeted AoE (#236) - a single blast on completion. Empty ground is a no-op like
-		// retail. Channeled AoEs (a cast time) go through ChannelGroundAoe instead so they tick.
-		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
-		{
-			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
-			var count = await ApplyAoeTick(client, casterHandle, target, spellId, damage);
-			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, count, damage);
-		}
-
 		// Channeled ground AoE (#349): ticks damage over the cast/channel duration so the client sees a floating number
 		// each tick - retail's Deathly Blizzard ticks each NPC repeatedly over its ~10.5s channel (casting-combat
 		// capture: DamageResultIIR 0xFEC4158A per target, ~1-2s apart), where we used to apply one silent hit at the
@@ -192,6 +107,53 @@ namespace Faolan.GameServer.Combat
 			{
 				_logger.LogWarning(ex, "Ground AoE channel failed.");
 			}
+		}
+
+		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
+		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
+		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
+		// regen happens then, so this is just defensive).
+		public EntityVitals GetOrAddPlayerVitals(INetworkClient client)
+		{
+			var entity = _sim.PlayerWorldEntity(client);
+			if (entity == null)
+				return EntityVitals.FromCharacter(client.Session.Character);
+
+			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
+		}
+
+		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
+		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
+		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
+		// and spell paths.
+		// .kill GM command: kill an NPC target outright by applying its full remaining health as damage, so it runs
+		// the normal death lifecycle (vitals push, despawn/corpse-loot, XP, kill-quest advance). No-op if the target
+		// isn't a live NPC in the killer's zone.
+		public Task KillNpc(INetworkClient client, uint targetHandle)
+		{
+			var target = ResolveNpcVitals(client, targetHandle, out _);
+			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
+		}
+
+		// Resolves an INSTANT ground-targeted AoE (#236) - a single blast on completion. Empty ground is a no-op like
+		// retail. Channeled AoEs (a cast time) go through ChannelGroundAoe instead so they tick.
+		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
+		{
+			var casterLevel = client.Session.Character.Level;
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			var count = await ApplyAoeTick(client, casterHandle, target, spellId, damage);
+			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, count, damage);
+		}
+
+		// Resolves an offensive cast: applies the damage to the target's live vitals (a 0x96B8DC59 update moves the
+		// health bar) and shows the spell hit's floating number via StatDamage (see SendSpellDamageNumber). The
+		// ApplySpell VFX is broadcast by the caller.
+		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
+		{
+			var casterLevel = client.Session.Character.Level;
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
+			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
+			await SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId);
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -274,8 +236,8 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(targetHandle)
 					.WriteUInt32(0) // result: count, c350, VICTIM=target, 0 - the entity that plays the hit-react/blood.
-									// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
-									// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
+					// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
+					// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
 					.WriteByte(0x06)
 					.WriteUInt32(0x000000CBu) // result constant (was 0xCD; the capture's BccAck result block uses 0xCB)
 					.WriteUInt32(0)
@@ -338,6 +300,32 @@ namespace Faolan.GameServer.Combat
 			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character.Level);
 			player.ApplyManaDelta(-(int)cost);
 			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
+		}
+
+		// Damages every attackable NPC within GroundAoeRadiusUnits of `target` for one tick: shows the floating
+		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Friendly NPCs (civilians /
+		// quest-givers, Disposition == Friendly) are spared; hostile + neutral are hit; players never (no PvP model).
+		// Re-evaluated each call so NPCs that wander in/out of the blast are picked up per tick. Returns the count hit.
+		private async Task<int> ApplyAoeTick(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int tickDamage)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return 0;
+
+			var victims = _sim
+				.World.ZoneForEntity(player)
+				.EntitiesInRange(target, GroundAoeRadiusUnits, casterHandle)
+				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
+				.Select(e => e.Handle)
+				.ToList();
+
+			foreach (var handle in victims)
+			{
+				await ApplyNpcDamage(client, handle, tickDamage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
+				await SendSpellDamageNumber(client, handle, casterHandle, tickDamage, spellId);
+			}
+
+			return victims.Count;
 		}
 
 		// Melee cleave (#18): an AoC swing hits an arc, not just the selected target. After the primary hit, splash the
@@ -551,6 +539,18 @@ namespace Faolan.GameServer.Combat
 			return GetOrAddNpcVitals(client, targetHandle);
 		}
 
+		// The floating number + combat-log line for a SPELL hit on an NPC. Retail carries spell damage on
+		// StatDamageIIR (0xE9F24184) - the LockedToChanged -> StatDamage -> ApplySpell bundle, with NO DamageResult
+		// (casting-combat capture) - so a spell hit must use StatDamage, not the melee DamageResult (which the client
+		// only floats after a BCC attack behavior arms the target). Mirrors the incoming DoT-tick StatDamage that
+		// already renders on the player: statValue = the target's resulting health, delta = -damage, caster = the
+		// player, spellBase = the wire id >> 8. Call AFTER ApplyNpcDamage so the health is the post-hit value.
+		private Task SendSpellDamageNumber(INetworkClient client, uint npcHandle, uint casterHandle, int damage, uint spellId)
+		{
+			var vitals = ResolveNpcVitals(client, npcHandle, out _);
+			return SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, spellId >> 8);
+		}
+
 		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR
 		// stamina update (the retail post-ack trio of the armed swing path).
 		private async Task SendSwingDamage(INetworkClient client, uint instance, uint targetHandle, uint damage)
@@ -655,10 +655,7 @@ namespace Faolan.GameServer.Combat
 		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
 		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(feedbackBody)
-				.SendAsync(client);
+			return new PacketStream().WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(feedbackBody).SendAsync(client);
 		}
 
 		// Frames a raw 0x2000 body on the world conversation.
@@ -669,6 +666,5 @@ namespace Faolan.GameServer.Combat
 				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
-
 	}
 }

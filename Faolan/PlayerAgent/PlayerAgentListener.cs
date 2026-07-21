@@ -3,13 +3,12 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-
-using Faolan.Core.Network.Codecs;
 
 namespace Faolan.PlayerAgent
 {
@@ -44,10 +43,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.AuthStatus = packet.Body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
-					await new PacketStream()
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.InitAuth)
-						.WriteUInt32(client.Session.Account.AuthStatus)
-						.SendAsync(client);
+					await new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.InitAuth).WriteUInt32(client.Session.Account.AuthStatus).SendAsync(client);
 
 					break;
 				}
@@ -83,10 +79,7 @@ namespace Faolan.PlayerAgent
 					await SendCharacterList(client);
 					await SendRealmList(client);
 
-					await new PacketStream()
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterRealmData)
-						.WriteUInt32(1)
-						.SendAsync(client);
+					await new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterRealmData).WriteUInt32(1).SendAsync(client);
 
 					break;
 				}

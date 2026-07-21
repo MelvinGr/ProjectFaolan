@@ -15,19 +15,6 @@ namespace Faolan.Core.Rdb.Assets
 		public const string Extension = ".terrain";
 		private const uint Magic = 0x46545231; // 'FTR1'
 
-		public sealed record Data(uint TilemapExtent, byte[] Heightmap, byte[] Collision);
-
-		public static void Write(Stream stream, uint tilemapExtent, byte[] heightmapBody, byte[] collisionBody)
-		{
-			using var fs = new FaolanStream();
-			fs.WriteUInt32(Magic);
-			fs.WriteUInt32(tilemapExtent);
-			fs.WriteArrayUInt32Length(Pack(heightmapBody));
-			fs.WriteArrayUInt32Length(Pack(collisionBody));
-			fs.Position = 0;
-			fs.CopyTo(stream);
-		}
-
 		// Reads a terrain file. Returns null if the stream isn't a valid FTR1 file. The Heightmap/Collision bodies are
 		// the DECOMPRESSED resource payloads (ready for RdbHeightmap.TryParse / RdbCollisionMesh.TryParse); either may
 		// be empty.
@@ -45,13 +32,24 @@ namespace Faolan.Core.Rdb.Assets
 			return new Data(extent, heightmap, collision);
 		}
 
+		public static void Write(Stream stream, uint tilemapExtent, byte[] heightmapBody, byte[] collisionBody)
+		{
+			using var fs = new FaolanStream();
+			fs.WriteUInt32(Magic);
+			fs.WriteUInt32(tilemapExtent);
+			fs.WriteArrayUInt32Length(Pack(heightmapBody));
+			fs.WriteArrayUInt32Length(Pack(collisionBody));
+			fs.Position = 0;
+			fs.CopyTo(stream);
+		}
+
 		private static byte[] Pack(byte[] body)
 		{
 			if (body is not { Length: > 0 })
 				return [];
 
 			using var output = new MemoryStream();
-			using (var gz = new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true))
+			using (var gz = new GZipStream(output, CompressionLevel.Optimal, true))
 				gz.Write(body);
 			return output.ToArray();
 		}
@@ -67,5 +65,7 @@ namespace Faolan.Core.Rdb.Assets
 			gzs.CopyTo(output);
 			return output.ToArray();
 		}
+
+		public sealed record Data(uint TilemapExtent, byte[] Heightmap, byte[] Collision);
 	}
 }

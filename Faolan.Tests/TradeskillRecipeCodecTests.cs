@@ -1,11 +1,10 @@
 using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
-using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
@@ -19,13 +18,6 @@ namespace Faolan.Tests
 	public class TradeskillRecipeCodecTests
 	{
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59];
-		// The one captured recipe catalog, from the committed corpus extract. Both tests below used to `return`
-		// silently when the capture was absent, so they asserted NOTHING on a checkout without the capture repo.
-		private static CapturedPacket Reply()
-		{
-			var entry = CorpusExtract.PacketsOfType((uint)GameServer0X2000Opcodes.TradeskillReplyIIR).Single();
-			return new CapturedPacket(0, true, entry.Opcode, entry.Iir, entry.Full);
-		}
 
 		[Fact]
 		public void BuildReplyBody_EmptyCatalog_IsAValidEmptyList()
@@ -33,6 +25,24 @@ namespace Faolan.Tests
 			// The correct reply for a character with no learned recipes: env=0, version=1, type=3, count=0x3F1.
 			var body = TradeskillRecipeCodec.BuildReplyBody([]);
 			Assert.Equal("00" + "00000001" + "03" + "000003f1", Convert.ToHexStringLower(body));
+		}
+
+		[Fact]
+		public void DbProjection_ThroughColumnsAndBack_ReproducesTheBook_ByteExact()
+		{
+			// The end-to-end DB-path guard: project each decoded record into its Recipe row + RecipeItem children (as
+			// the importer does) with each element's key+hash on the referenced Items row, then ToRecord it back (as
+			// the live server does) and rebuild. Proves the column schema loses nothing through the DB representation.
+			var reply = Reply();
+			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
+			var capturedBody = reply.Bytes.AsSpan(sub + 12).ToArray();
+			var records = TradeskillRecipeCodec.ParseReplyBody(capturedBody);
+
+			var rows = records.Select(ToRowLikeImporter).ToList();
+			var roundTripped = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
+			var rebuilt = TradeskillRecipeCodec.BuildReplyBody(roundTripped);
+
+			Assert.Equal(Convert.ToHexStringLower(capturedBody), Convert.ToHexStringLower(rebuilt));
 		}
 
 		[Fact]
@@ -76,66 +86,6 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(capturedBody), Convert.ToHexStringLower(rebuilt));
 		}
 
-		[Fact]
-		public void DbProjection_ThroughColumnsAndBack_ReproducesTheBook_ByteExact()
-		{
-			// The end-to-end DB-path guard: project each decoded record into its Recipe row + RecipeItem children (as
-			// the importer does) with each element's key+hash on the referenced Items row, then ToRecord it back (as
-			// the live server does) and rebuild. Proves the column schema loses nothing through the DB representation.
-			var reply = Reply();
-			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
-			var capturedBody = reply.Bytes.AsSpan(sub + 12).ToArray();
-			var records = TradeskillRecipeCodec.ParseReplyBody(capturedBody);
-
-			var rows = records.Select(ToRowLikeImporter).ToList();
-			var roundTripped = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
-			var rebuilt = TradeskillRecipeCodec.BuildReplyBody(roundTripped);
-
-			Assert.Equal(Convert.ToHexStringLower(capturedBody), Convert.ToHexStringLower(rebuilt));
-		}
-
-		// Mirrors CaptureRecipeImporter.BuildRow + item harvest, in-memory: a Recipe row whose RecipeItems each carry
-		// the referenced Item template (with the element's TEA key + hash), so ToRecord can read them back.
-		private static Recipe ToRowLikeImporter(TradeskillRecipeCodec.RecipeRecord r)
-		{
-			var row = new Recipe
-			{
-				Id = r.Id,
-				Header1 = r.Header1,
-				RdbType = r.RdbType,
-				MidFlag = r.MidFlag,
-				Tail = r.Tail,
-				TrailingFlag = r.TrailingFlag,
-				RefId0 = r.RefIds[0],
-				RefId1 = r.RefIds.Count > 1 ? r.RefIds[1] : null
-			};
-			Add(row, r.Ingredients, RecipeItemRole.Ingredient);
-			Add(row, r.Results, RecipeItemRole.Result);
-			return row;
-
-			static void Add(Recipe row, System.Collections.Generic.IReadOnlyList<TradeskillRecipeCodec.RecipeElement> els, RecipeItemRole role)
-			{
-				for (var i = 0; i < els.Count; i++)
-				{
-					var e = els[i];
-					row.Items.Add(new RecipeItem
-					{
-						Role = role,
-						Position = i,
-						ItemId = e.ItemId,
-						Flag = e.Flag,
-						Trailing = e.Trailing,
-						Item = new Item
-						{
-							Id = e.ItemId,
-							Hash = e.Hash,
-							Key = new ProtoDecryptionKey { Key1 = e.Key1, Key2 = e.Key2, Key3 = e.Key3, Key4 = e.Key4 }
-						}
-					});
-				}
-			}
-		}
-
 		private static int IndexOf(byte[] haystack, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= haystack.Length; i++)
@@ -155,6 +105,64 @@ namespace Faolan.Tests
 			}
 
 			return -1;
+		}
+
+		// The one captured recipe catalog, from the committed corpus extract. Both tests below used to `return`
+		// silently when the capture was absent, so they asserted NOTHING on a checkout without the capture repo.
+		private static CapturedPacket Reply()
+		{
+			var entry = CorpusExtract.PacketsOfType((uint)GameServer0X2000Opcodes.TradeskillReplyIIR).Single();
+			return new CapturedPacket(0, true, entry.Opcode, entry.Iir, entry.Full);
+		}
+
+		// Mirrors CaptureRecipeImporter.BuildRow + item harvest, in-memory: a Recipe row whose RecipeItems each carry
+		// the referenced Item template (with the element's TEA key + hash), so ToRecord can read them back.
+		private static Recipe ToRowLikeImporter(TradeskillRecipeCodec.RecipeRecord r)
+		{
+			var row = new Recipe
+			{
+				Id = r.Id,
+				Header1 = r.Header1,
+				RdbType = r.RdbType,
+				MidFlag = r.MidFlag,
+				Tail = r.Tail,
+				TrailingFlag = r.TrailingFlag,
+				RefId0 = r.RefIds[0],
+				RefId1 = r.RefIds.Count > 1
+					? r.RefIds[1]
+					: null
+			};
+			Add(row, r.Ingredients, RecipeItemRole.Ingredient);
+			Add(row, r.Results, RecipeItemRole.Result);
+			return row;
+
+			static void Add(Recipe row, IReadOnlyList<TradeskillRecipeCodec.RecipeElement> els, RecipeItemRole role)
+			{
+				for (var i = 0; i < els.Count; i++)
+				{
+					var e = els[i];
+					row.Items.Add(new RecipeItem
+					{
+						Role = role,
+						Position = i,
+						ItemId = e.ItemId,
+						Flag = e.Flag,
+						Trailing = e.Trailing,
+						Item = new Item
+						{
+							Id = e.ItemId,
+							Hash = e.Hash,
+							Key = new ProtoDecryptionKey
+							{
+								Key1 = e.Key1,
+								Key2 = e.Key2,
+								Key3 = e.Key3,
+								Key4 = e.Key4
+							}
+						}
+					});
+				}
+			}
 		}
 	}
 }

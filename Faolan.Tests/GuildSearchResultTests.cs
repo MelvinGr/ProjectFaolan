@@ -9,10 +9,18 @@ namespace Faolan.Tests
 	public class GuildSearchResultTests
 	{
 		[Fact]
-		public void Decode_ReEncode_IsByteIdentical()
+		public void Build_RoundTrips()
 		{
-			var golden = Golden.Bytes("GuildSearchResult");
-			Assert.Equal(golden, GuildSearchResult.Decode(golden).Encode());
+			var built = new GuildSearchResult
+			{
+				Guilds = [new GuildSearchResult.Entry(1, "Faolan", "NecroL80", 3, 0, 0), new GuildSearchResult.Entry(2, "Second", "Leader", 12, 4500, 1)]
+			};
+
+			var round = GuildSearchResult.Decode(built.Encode());
+			Assert.Equal(2, round.Guilds.Count);
+			Assert.Equal("Faolan", round.Guilds[0].Name);
+			Assert.Equal("NecroL80", round.Guilds[0].LeaderName);
+			Assert.Equal(4500u, round.Guilds[1].Renown);
 		}
 
 		[Fact]
@@ -27,22 +35,10 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Build_RoundTrips()
+		public void Decode_ReEncode_IsByteIdentical()
 		{
-			var built = new GuildSearchResult
-			{
-				Guilds =
-				[
-					new GuildSearchResult.Entry(1, "Faolan", "NecroL80", 3, 0, 0),
-					new GuildSearchResult.Entry(2, "Second", "Leader", 12, 4500, 1)
-				]
-			};
-
-			var round = GuildSearchResult.Decode(built.Encode());
-			Assert.Equal(2, round.Guilds.Count);
-			Assert.Equal("Faolan", round.Guilds[0].Name);
-			Assert.Equal("NecroL80", round.Guilds[0].LeaderName);
-			Assert.Equal(4500u, round.Guilds[1].Renown);
+			var golden = Golden.Bytes("GuildSearchResult");
+			Assert.Equal(golden, GuildSearchResult.Decode(golden).Encode());
 		}
 	}
 }

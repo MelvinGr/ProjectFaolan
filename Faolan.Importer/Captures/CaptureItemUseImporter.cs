@@ -1,12 +1,12 @@
 using System;
-using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Constants;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -44,6 +44,7 @@ namespace Faolan.Importer.Captures
 					// twin) is a consumable effect.
 					if (body.Length < 22)
 						continue;
+
 					var content = new FaolanStream().WriteUInt32(sub).WriteArray(body).ToArray();
 					var cast = NpcSpellCastBuilder.NpcSpellCast.Read(new FaolanStream(content));
 					if (cast.ApplyTo == cast.ApplyFrom && body.Length > 30)

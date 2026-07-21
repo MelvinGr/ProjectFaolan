@@ -74,14 +74,6 @@ namespace Faolan.GameServer.Combat
 			return changed;
 		}
 
-		/// <summary>Restores all three pools to their max (a full revive - an NPC leashing home, or a fallback).</summary>
-		public void ReviveToFull()
-		{
-			Health = MaxHealth;
-			Stamina = MaxStamina;
-			Mana = MaxMana;
-		}
-
 		/// <summary>
 		///     Restores all three pools to <paramref name="percentOfMax" />% of their max - a resurrection point's
 		///     <c>RestorationLevel</c> (#375). Real, designed data: of the 538 imported points 344 restore 10%, 157
@@ -105,6 +97,14 @@ namespace Faolan.GameServer.Combat
 			Health = Math.Max(1, (uint)(MaxHealth * fraction));
 			Stamina = Math.Max(1, (uint)(MaxStamina * fraction));
 			Mana = Math.Max(1, (uint)(MaxMana * fraction));
+		}
+
+		/// <summary>Restores all three pools to their max (a full revive - an NPC leashing home, or a fallback).</summary>
+		public void ReviveToFull()
+		{
+			Health = MaxHealth;
+			Stamina = MaxStamina;
+			Mana = MaxMana;
 		}
 
 		/// <summary>

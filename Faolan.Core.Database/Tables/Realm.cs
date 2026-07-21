@@ -29,14 +29,14 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
 
-		// The realm's GameServer (world) port - advertised to the client in the EnterWorld handoff (SendGameServer).
-		public ushort Port { get; set; }
-
 		// Multi-realm (process-per-realm, #324): chat + guild/team run IN the realm process, so their ports are
 		// per-realm too. The login/router tier advertises these (with IpAddress) in the ChatServer/CsPlayerAgent
 		// handoffs. Seeded to the historical single-process config ports so a one-realm deploy is byte-identical.
 		public ushort ChatServerPort { get; set; }
 
 		public ushort CsPlayerAgentPort { get; set; }
+
+		// The realm's GameServer (world) port - advertised to the client in the EnterWorld handoff (SendGameServer).
+		public ushort Port { get; set; }
 	}
 }
