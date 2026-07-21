@@ -799,19 +799,31 @@ namespace Faolan.GameServer
 
 			toSend.Add(snapshot);
 
+			// #398: the in-range NPCs ride the ENTRY BURST (before the client's first move), matching retail's shape
+			// (fr64-75 in the Hoxxling beach login capture) instead of a post-load interest volley. BuildEntryNpcBurst
+			// seeds them into the player's Known set, so the interest layer (BroadcastPlayerMove) then streams only the
+			// DELTA as the player walks - and the initial set is never culled mid-load (subsumes #245). The markers /
+			// captive pose for these NPCs are separate IIRs and ride SendEntryNpcFollowups after the flush.
+			var (entryNpcRecords, entryBurstNpcs) = await _broadcaster.BuildEntryNpcBurst(client);
+			toSend.AddRange(entryNpcRecords);
+
 			toSend.Add(BuildVitals(client));
 			toSend.Add(BuildGameTime(client));
 
 			foreach (var bytes in toSend)
 				await client.SendAsync(bytes);
 
-			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets (no burst).", mapId, character?.Name, toSend.Count);
+			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs in the burst).", mapId, character?.Name, toSend.Count,
+				entryBurstNpcs.Count);
 
-			// Interest spawns the NPCs + this player to nearby players. The quest journal is NOT re-sent here: retail
-			// ships both tabs in the login snapshot and sends no quest packet at all until the first in-session
-			// accept (#389/#390), so a live "restore" burst is a fabrication - and the one that used to live here
-			// delivered every quest under a single area header, which is what filled the Completed tab with one
-			// bogus group and left Active empty.
+			// The per-NPC quest markers / captive pose for the burst NPCs (separate IIRs, after the spawn records).
+			await _broadcaster.SendEntryNpcFollowups(client, entryBurstNpcs);
+
+			// Spawn this player to nearby OTHER players (its NPC set already rode the burst above). The quest journal is
+			// NOT re-sent here: retail ships both tabs in the login snapshot and sends no quest packet at all until the
+			// first in-session accept (#389/#390), so a live "restore" burst is a fabrication - and the one that used to
+			// live here delivered every quest under a single area header, which filled the Completed tab with one bogus
+			// group and left Active empty.
 			await _broadcaster.BroadcastPlayerEntry(client);
 
 			// On a CREATE-world entry the snapshot carried no quests (empty region above), so deliver the starter quest

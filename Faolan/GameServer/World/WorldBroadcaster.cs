@@ -497,9 +497,75 @@ namespace Faolan.GameServer.World
 			return DispatchInterest(events, null);
 		}
 
-		// After world entry (spawn body now captured): stream the in-range NPCs to the player via interest (the burst
-		// no longer carries NPCs) and spawn the player to nearby players. Interest is the sole NPC spawn path now that
-		// #23 made mid-session/interest spawns render in-client.
+		// #398: builds the in-range NPC spawns for the world-ENTRY BURST - the close NPCs retail ships in the burst
+		// BEFORE the client's first move (fr64-75 in the Hoxxling beach login capture), instead of dribbling them out
+		// as a post-load interest volley. Each is SEEDED into the entering player's Known set so the interest layer
+		// (BroadcastPlayerMove) streams only the DELTA as the player walks and never re-spawns or culls the initial
+		// set - which subsumes the #245 despawn-during-load root cause. Registers each handle -> name/template for
+		// click routing exactly as DispatchInterest does for a streamed spawn. Returns the framed FA015807 records to
+		// append to the entry burst (`toSend`) plus the NPCs themselves, whose quest markers / captive pose ride
+		// SendEntryNpcFollowups after the burst flush (those are separate IIRs, not spawn records). The entering
+		// player is spawned to OTHER viewers separately (BroadcastPlayerEntry, section 2).
+		public async Task<(List<byte[]> Records, List<WorldEntity> Npcs)> BuildEntryNpcBurst(INetworkClient client)
+		{
+			var records = new List<byte[]>();
+			var npcs = new List<WorldEntity>();
+
+			var entity = _sim.PlayerWorldEntity(client);
+			if (entity?.SpawnBody == null)
+				return (records, npcs);
+
+			// Seed the player's active/completed quest set first so quest-gated NPCs (#261 Scavenger Tuut, #262 hide-
+			// once-done) are correctly included/excluded in the burst from the very start.
+			await LoadActiveQuestIds(entity);
+
+			var zone = _sim.World.ZoneForEntity(entity);
+			var token = zone.PlayfieldToken;
+			foreach (var npc in zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle))
+			{
+				if (npc.IsPlayer || npc.IsLoot || npc.IsDead || npc.SpawnBody == null)
+					continue;
+				if (!npc.IsVisibleTo(entity))
+					continue; // #261: a quest-gated NPC the player doesn't qualify for yet - treat as not in range
+				if (!entity.Known.Add(npc.Handle))
+					continue; // already seeded (idempotent guard)
+
+				if (npc.Name != null)
+				{
+					client.Session.SpawnedNpcNamesByHandle[npc.Handle] = npc.Name;
+					client.Session.SpawnedNpcTemplatesByHandle[npc.Handle] = npc.NpcTemplateId;
+				}
+
+				records.Add(BuildWorldSpawnRecord(client, npc, token));
+				npcs.Add(npc);
+			}
+
+			return (records, npcs);
+		}
+
+		// #398: the per-NPC follow-ups for the entry-burst NPCs (BuildEntryNpcBurst) - the quest markers and the
+		// Casilda captive pose that DispatchInterest sends right after a streamed spawn. Sent AFTER the burst flush
+		// (these are separate IIRs, not FA015807 spawn records) but still before the player starts moving.
+		public async Task SendEntryNpcFollowups(INetworkClient client, List<WorldEntity> burstNpcs)
+		{
+			foreach (var npc in burstNpcs)
+			{
+				// #241: quest-giver marker from THIS viewer's quest state (! available / ? ready-to-turn-in / none).
+				await SendQuestMarkerIfGiver(client, npc);
+
+				// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose).
+				if (npc.NpcTemplateId == QuestHandlerService.CasildaTemplateId && client.Session?.Character != null && !await _questHandler.IsCasildaFreed(client.Session.Character.Id))
+					await _questHandler.SendCasildaPose(client, npc.Handle, true);
+
+				// #363 dev nameplate override (dev-only, gated on .togglenpcgroup).
+				if (DebugAreaLabels && npc.OverheadNameOverride is { } overrideName)
+					await SendSetName(client, npc.Handle, overrideName);
+			}
+		}
+
+		// After world entry: spawn the entering player to nearby OTHER players (its NPC set now rides the entry burst,
+		// #398 BuildEntryNpcBurst, and is already in Known - so the interest pass streams no NPCs, only section 2's
+		// spawn-me-to-viewers fires). Interest remains the sole path for the STREAMED delta as the player then walks.
 		public async Task BroadcastPlayerEntry(INetworkClient client)
 		{
 			var entity = _sim.PlayerWorldEntity(client);
@@ -508,17 +574,10 @@ namespace Faolan.GameServer.World
 
 			var zone = _sim.World.ZoneForEntity(entity);
 
-			// #261: seed the player's active-quest set before the first interest pass so quest-gated NPCs (e.g. Scavenger
-			// Tuut) are correctly included/excluded from the very start, not only after a quest change.
-			await LoadActiveQuestIds(entity);
-
-			// Interest is the SOLE NPC spawn path (since #23 made mid-session/interest spawns render; in-client verified
-			// 2026-06-16): NPCs are dropped from the world-entry burst (ReplayMapWorldBurst), so stream every in-range
-			// NPC here at entry (includeNonPlayers), each as its own FA015807 + name registration via DispatchInterest.
-			// No burst NPCs means no Known-seeding and no double-spawn. KNOWN: streams the cross-session model union
-			// (~4x retail density) - cross-session mob dedup / interest tuning is a follow-up.
-			var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, true, true);
-			await DispatchInterest(npcEvents, null);
+			// The burst NPCs are already in Known (BuildEntryNpcBurst), so includeNonPlayers here re-confirms them in
+			// range without re-spawning; its real job at entry is section 2 - spawning this player to nearby viewers.
+			var events = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, true, true);
+			await DispatchInterest(events, null);
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
@@ -1653,7 +1712,11 @@ namespace Faolan.GameServer.World
 
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
 		// CURRENT position (its captured spawn body holds its entry position, which may be stale).
-		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
+		// Builds one entity's FA015807 spawn record, framed for `recipient`: the stored SpawnBody with the LIVE position
+		// patched in and the playfield-instance token re-stamped to `playfieldToken`. Shared by the interest send
+		// (SendWorldSpawn) and the world-entry burst (#398, BuildEntryNpcBurst) so both produce byte-identical spawn
+		// records - the burst is retail's shape (close NPCs on map enter) with our DB-constructed bodies.
+		private static byte[] BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
 		{
 			var body = (byte[])subject.SpawnBody.Clone();
 			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
@@ -1669,9 +1732,16 @@ namespace Faolan.GameServer.World
 			// isn't known until the player actually enters (docs/subsystems/mid-session-spawn-blocker.md part 3). Baking the
 			// load-time token shipped every NPC with a stale playfield, so the client silently dropped them all and
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
-			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
+			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
 
-			await new PacketStream().WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
+			var ps = new PacketStream();
+			ps.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(body);
+			return ps.WriteLengthHash().ToArray();
+		}
+
+		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
+		{
+			await recipient.SendAsync(BuildWorldSpawnRecord(recipient, subject, _sim.World.ZoneForEntity(subject).PlayfieldToken));
 
 			// #363 dev nameplate: the client draws an NPC's floating name from its template_id LDB name and ignores the
 			// spawn-body `Name`, so overriding the visible name needs a SetNameIIR (0xADCE0CDA). Sent right AFTER the
