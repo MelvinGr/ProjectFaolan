@@ -65,6 +65,36 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.TalkToNpc, npcName);
 		}
 
+		// #262: the player interacted with a quest-pickup world object (a QuestItemEffect dynel, e.g. a quarry stone
+		// brick). Advance the first active, still-incomplete CollectItem goal and return the item it grants (its
+		// TrailingRefId) so the caller can add it to the bag; null when no collect quest is active (the pickup is then
+		// inert - that's what makes the brick nodes only respond while Shipwrecked V is active). One item per call.
+		public async Task<uint?> TryAdvanceCollectPickup(INetworkClient client)
+		{
+			var character = client?.Session?.Character;
+			if (character == null)
+				return null;
+
+			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			{
+				if (quest.State != QuestState.Active)
+					continue;
+
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.CollectItem);
+				if (goal == null || goal.TrailingRefId == 0)
+					continue;
+
+				if (await GoalProgressOf(character.Id, quest, def, goal) >= GoalRequired(quest, def, goal))
+					continue; // this collect goal is already full
+
+				await Advance(client, QuestGoalType.CollectItem, null, goal.TrailingRefId);
+				return goal.TrailingRefId;
+			}
+
+			return null;
+		}
+
 		// How close (world units, horizontal) the player must get to a ReachArea goal's marker to solve it (#262). The
 		// markers are approximate (Shipwrecked's "Enter the jungle" is at 416/701, ~28u off the spawn->Saddur path), so
 		// this is generous enough to fire while walking past yet far enough (94u) not to trip at the spawn.
@@ -162,18 +192,29 @@ namespace Faolan.GameServer.Quest
 				if (def == null)
 					continue;
 
-				// A kill matches by the STABLE target template id (TrailingRefId), name as fallback (#262); other triggers
-				// (loot/talk/escort) are inherently name-keyed - the corpse bag's source name, the NPC greeting's name.
-				var goal = triggerType == QuestGoalType.Kill
-					? QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName)
-					: QuestProgress.MatchingGoal(def.Goals, triggerType, targetName);
+				// Match the goal to advance: a kill by the STABLE target template id (TrailingRefId), name as fallback; a
+				// collect by its item id (TrailingRefId); loot/talk/escort by name (the corpse bag's source name, the NPC
+				// greeting's name) - #262.
+				var goal = triggerType switch
+				{
+					QuestGoalType.Kill => QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName),
+					QuestGoalType.CollectItem => QuestProgress.MatchingCollectGoal(def.Goals, targetTemplateId ?? 0),
+					_ => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName)
+				};
 				if (goal == null)
 					continue;
 
 				var required = GoalRequired(quest, def, goal);
-				var progress = await GoalProgressOf(character.Id, quest, def, goal) + 1;
-				if (progress > required)
-					continue; // this goal is already complete (a re-fired trigger on a satisfied objective)
+				// A talk goal is binary - talking to the NPC SOLVES it (jumps to required), regardless of the display
+				// count. This lets a "deliver N to X" hand-in (e.g. Shipwrecked V's "deliver 3 bricks to Turach",
+				// RequiredCount 3 for the captured objective text) complete in one talk. Every other trigger is +1.
+				var current = await GoalProgressOf(character.Id, quest, def, goal);
+				if (current >= required)
+					continue; // already complete (a re-fired trigger on a satisfied objective)
+
+				var progress = triggerType == QuestGoalType.TalkToNpc
+					? required
+					: current + 1;
 
 				changed = true;
 				await PersistGoalProgress(character.Id, quest, def, goal, progress);

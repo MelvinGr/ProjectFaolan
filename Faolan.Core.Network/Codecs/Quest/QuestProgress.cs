@@ -50,5 +50,19 @@ namespace Faolan.Core.Network.Codecs.Quest
 				? null
 				: kills.FirstOrDefault(g => !string.IsNullOrEmpty(g.TargetName) && g.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase));
 		}
+
+		// The CollectItem goal for `itemId` (#262): the lowest-Sequence CollectItem goal whose TrailingRefId is that item
+		// (the item a quest-pickup grants, e.g. Shipwrecked V's stone brick 193400). Null if none - the pickup is inert
+		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.
+		public static QuestGoalDefinition MatchingCollectGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
+		{
+			if (goals == null || itemId == 0)
+				return null;
+
+			return goals
+				.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId)
+				.OrderBy(g => g.Sequence)
+				.FirstOrDefault();
+		}
 	}
 }

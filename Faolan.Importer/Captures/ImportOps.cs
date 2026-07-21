@@ -722,26 +722,30 @@ namespace Faolan.Importer.Captures
 		// later"). Idempotent.
 		private static async Task SeedShipwreckedCityChain(DatabaseContext db)
 		{
-			await SeedReachStage(db, 12369, 12373, 3492); // II: reach the gate/ruins -> III
-			await SeedReachStage(db, 12373, 0, 3498);     // III: enter the City of Tortage (chain end for now)
+			// II "The Acheronian Gate" -> III "The City of Tortage": reach the gate/ruins (goal 3492 @4010/524,755) then
+			// enter the city (goal 3498 @4020/913,718 - completes on arrival). III is chain-final for now.
+			await Chain(db, 12369, 12373);
+			await SeedGoal(db, 12369, 3492, QuestGoalType.ReachArea);
+			await SeedGoal(db, 12373, 3498, QuestGoalType.ReachArea);
+
+			// V "The Quarry" (12371) - granted by Turach's dialogue (ConversationNodes.GrantQuestId 12371), so NOT chained
+			// here. goal 3495 "get 3 stone bricks" = CollectItem of item 193400 (its TrailingRefId), picked up from the 12
+			// "Stone Brick" QuestItemEffect dynels at the quarry (4020). goal 3497 "deliver 3 to Turach" = TalkToNpc Turach
+			// (his spawn 824/722 == the marker); the captured count 3 is kept (byte-exact @609) and the talk SOLVES it.
+			// Decoded from Hoxxling gameplay2 (pickups fr4310/4367/4447 = DispatchAddItem+SimpleDynelPickup; deliver fr5102).
+			await SeedGoal(db, 12371, 3495, QuestGoalType.CollectItem);
+			await SeedGoal(db, 12371, 3497, QuestGoalType.TalkToNpc, "Turach");
 		}
 
-		// A single ReachArea stage (#262): set the stage's successor + retype the given goal to ReachArea (solved by
-		// walking to its MarkerX/MarkerY). The goal's map/marker are left as harvested (they ARE the objective's world
-		// location). nextQuestId 0 = chain end.
-		private static async Task SeedReachStage(DatabaseContext db, uint questId, uint nextQuestId, uint goalId)
+		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
+		private static async Task Chain(DatabaseContext db, uint questId, uint? nextQuestId)
 		{
-			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
-			var goal = quest?.Goals.FirstOrDefault(g => g.GoalId == goalId);
-			if (quest == null || goal == null)
+			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == questId);
+			if (quest == null)
 				return;
 
-			quest.NextQuestId = nextQuestId == 0
-				? null
-				: nextQuestId;
-			goal.GoalType = QuestGoalType.ReachArea;
+			quest.NextQuestId = nextQuestId;
 			await db.SaveChangesAsync();
-			Console.WriteLine($"Seeded Shipwrecked reach stage: quest {questId} goal {goalId} = ReachArea -> {nextQuestId}.");
 		}
 
 		// Static world objects (decor/containers/zones), deduped by (map, position). Transient loot bags skipped.
@@ -1144,12 +1148,16 @@ namespace Faolan.Importer.Captures
 		// The Tortage intro quest CHAIN (#261): 13479 is a four-stage supersession chain. Idempotent.
 		private static async Task SeedCasildaChain(DatabaseContext db)
 		{
-			await SeedChainStage(db, 13479, 13563, QuestGoalType.Kill, "Scavenger Tuut", 5744);
+			await Chain(db, 13479, 13563);
+			await SeedGoal(db, 13479, 5744, QuestGoalType.Kill, "Scavenger Tuut", required: 1);
 			// The loot stage's key item: Scavenger Tuut's bag drops 319224 "Scavenger's Key" (#261), so the player sees
 			// and takes the actual key, not just an empty source-matched bag.
-			await SeedChainStage(db, 13563, 13480, QuestGoalType.LootFromNpc, "Scavenger Tuut", 5867, questItemId: 319224);
-			await SeedChainStage(db, 13480, 12407, QuestGoalType.TalkToNpc, "Casilda", 5745);
-			await SeedChainStage(db, 12407, 0, QuestGoalType.Escort, "Casilda", 3544);
+			await Chain(db, 13563, 13480);
+			await SeedGoal(db, 13563, 5867, QuestGoalType.LootFromNpc, "Scavenger Tuut", questItemId: 319224, required: 1);
+			await Chain(db, 13480, 12407);
+			await SeedGoal(db, 13480, 5745, QuestGoalType.TalkToNpc, "Casilda", required: 1);
+			await Chain(db, 12407, null); // escort is the chain end
+			await SeedGoal(db, 12407, 3544, QuestGoalType.Escort, "Casilda", required: 1);
 		}
 
 		// Casilda's quest 13479 snapshot Quest_c scalars (#255): journal-record fields that live ONLY in the
@@ -1199,17 +1207,18 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine("Seeded Casilda quest 13479 snapshot Quest_c scalars + @609 objective goal (#255).");
 		}
 
-		private static async Task SeedChainStage(DatabaseContext db, uint questId, uint nextQuestId, QuestGoalType goalType, string target, uint goalId, uint required = 1, uint questItemId = 0)
+		// Configure one goal's SERVER-trigger fields (find-or-create by GoalId): the type + how it's matched at runtime
+		// (Kill/LootFromNpc/TalkToNpc by NAME, Kill also by TrailingRefId template id, CollectItem by TrailingRefId item,
+		// ReachArea by marker). All the WIRE/@609 display fields (markers, keys, counts) are left as harvested. `required`
+		// is set ONLY when given - pass it for a hand-authored chain goal, omit it to PRESERVE the captured RequiredCount
+		// (which is in the byte-exact objective region). Chain the quest separately with Chain(). Idempotent.
+		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string target = null, uint? questItemId = null, uint? required = null)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 			if (quest == null)
 				return;
 
-			quest.NextQuestId = nextQuestId == 0
-				? null
-				: nextQuestId;
-
-			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == goalId) ?? quest.Goals.FirstOrDefault();
+			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == goalId);
 			if (goal == null)
 			{
 				goal = new QuestGoalDefinition
@@ -1220,12 +1229,11 @@ namespace Faolan.Importer.Captures
 				quest.Goals.Add(goal);
 			}
 
-			goal.GoalType = goalType;
+			goal.GoalType = type;
 			goal.TargetName = target;
-			goal.RequiredCount = required;
-			goal.QuestItemId = questItemId == 0
-				? null
-				: questItemId;
+			goal.QuestItemId = questItemId;
+			if (required is { } r)
+				goal.RequiredCount = r;
 			if (goal.Sequence == 0)
 				goal.Sequence = 1;
 
@@ -1234,7 +1242,7 @@ namespace Faolan.Importer.Captures
 			// ItemHashHarvester.ExtractFromAddItem reads as ItemType.Quest. Run the `items` module to (re)type it.
 
 			await db.SaveChangesAsync();
-			Console.WriteLine($"Seeded chain stage: quest {questId} = {goalType} '{target}' (goal {goalId}, required {required}, keyItem {questItemId}) -> {nextQuestId}.");
+			Console.WriteLine($"Seeded goal: quest {questId} goal {goalId} = {type}{(target != null ? $" '{target}'" : "")}.");
 		}
 
 		// Upserts the NpcTemplate TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.

@@ -134,7 +134,8 @@ namespace Faolan.Core.Database.Tables
 		LootFromNpc = 1, // loot the TargetName NPC's corpse bag (the quest item is RDB content; the bag source is the key)
 		TalkToNpc = 2, // talk to (open the greeting of) the TargetName NPC
 		Escort = 3, // escort the TargetName NPC to a destination (not yet wired)
-		ReachArea = 4 // reach a map location - solved when the player moves within range of the goal's (MapId, MarkerX, MarkerY) point (no TargetName; e.g. Shipwrecked's "Enter the jungle", #262)
+		ReachArea = 4, // reach a map location - solved when the player moves within range of the goal's (MapId, MarkerX, MarkerY) point (no TargetName; e.g. Shipwrecked's "Enter the jungle", #262)
+		CollectItem = 5 // collect N of the item in TrailingRefId, one per interaction with a quest-pickup world object (QuestItemEffect); e.g. Shipwrecked V's "get 3 stone bricks" (item 193400), #262
 	}
 
 	public enum QuestTextSlot

@@ -663,6 +663,21 @@ namespace Faolan.GameServer
 									case InteractAction.None:
 									default:
 									{
+										// #262: a quest-item PICKUP (QuestItemEffect dynel, e.g. a quarry Stone Brick) - grant the
+										// collect goal's item + advance it + vanish the node, but ONLY while a matching collect quest
+										// is active (TryAdvanceCollectPickup returns null otherwise, so the brick is inert for a player
+										// without Shipwrecked V). Handled here before the generic open path.
+										if (await _broadcaster.IsQuestPickup(client, target))
+										{
+											if (await _questProgression.TryAdvanceCollectPickup(client) is { } pickedItem)
+											{
+												await GrantItemToBackpack(client, pickedItem, 1);
+												await _broadcaster.HidePickupObject(client, target);
+											}
+
+											break; // inert (no active collect quest) still swallows the use - don't open a window on a brick
+										}
+
 										// Not a column-driven teleporter: a BENCH seats the player (the sit animation), else the
 										// animated-door open path (DB world object by CapturedHandle), else the loot-bag window.
 										if (await _broadcaster.TrySitOnObject(client, target))

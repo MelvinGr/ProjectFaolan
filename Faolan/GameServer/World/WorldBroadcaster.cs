@@ -975,6 +975,28 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
+		// #262: whether the used world object is a quest-item PICKUP (a QuestItemEffect dynel - e.g. a quarry Stone
+		// Brick), as opposed to a door/container. Only reports the object KIND; the pickup's EFFECT (grant item +
+		// advance the CollectItem goal) is quest-driven, so the caller no-ops it when no collect quest is active - which
+		// is what gates the brick nodes to Shipwrecked-V holders.
+		public async Task<bool> IsQuestPickup(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return false;
+
+			var obj = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o => o.CapturedHandle == handle);
+			return obj?.QuestItemEffect is > 0;
+		}
+
+		// #262: remove a picked-up quest dynel from the player's view (SimpleDynel visual change, state 0x09 = the
+		// GenericSimpleDynelPickup vanish retail sends, Hoxxling gameplay2 @4310) so the brick disappears when taken.
+		// Live-only: the static DB object re-streams on the next zone load (it respawns, retail-style).
+		public Task HidePickupObject(INetworkClient client, uint handle)
+		{
+			return SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
+		}
+
 		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
 		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
 		// correct, state-driven marker instead of a hardcoded value.

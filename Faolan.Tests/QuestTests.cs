@@ -163,6 +163,21 @@ namespace Faolan.Tests
 			Assert.Null(QuestProgress.MatchingKillGoal(byName, null, "Nobody")); // no id, wrong name
 		}
 
+		[Fact]
+		public void MatchingCollectGoal_ByItemId_CollectTypeOnly()
+		{
+			// Shipwrecked V (12371): goal 3495 = CollectItem brick 193400; goal 3497 = deliver (TalkToNpc Turach) also
+			// carries item 193400 in TrailingRefId, but the collect matcher must ignore it (wrong type).
+			var goals = new[]
+			{
+				new QuestGoalDefinition { Sequence = 1, GoalId = 3495, GoalType = QuestGoalType.CollectItem, TrailingRefId = 193400 },
+				new QuestGoalDefinition { Sequence = 2, GoalId = 3497, GoalType = QuestGoalType.TalkToNpc, TargetName = "Turach", TrailingRefId = 193400 }
+			};
+			Assert.Equal(3495u, QuestProgress.MatchingCollectGoal(goals, 193400)?.GoalId); // CollectItem by item id
+			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 999)); // no collect goal for that item
+			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 0)); // no item -> no match (never the TalkToNpc goal)
+		}
+
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back
 		// through the builders reproduces the captured packets byte-for-byte (proves QuestDefinitionExtractor's
 		// refs + objective marker, and the QuestTextRef -> record mapping).
