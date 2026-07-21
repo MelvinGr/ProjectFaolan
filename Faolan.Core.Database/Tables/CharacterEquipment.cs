@@ -158,60 +158,42 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(WristId))]
 		public virtual Item? Wrist { get; set; }
 
-		// The template ids of the STAT-BEARING worn items - the 16 combat slots (armour + jewellery + weapons), reading
-		// the *Id columns directly so no navigation load is needed. Excludes the cosmetic Vanity* slots (appearance
-		// only) and the Bag / ResourceBag / FirstPosBag containers (their capacity is a bag stat, not a combat stat). A
-		// slot occupied by the same template as another (e.g. two identical rings) yields the id twice, so each worn
-		// copy counts once when its stat modifiers are aggregated (#3). 0/null slots are skipped.
-		public IEnumerable<uint> StatBearingItemIds()
-		{
-			uint?[] slots =
-			[
-				NeckId, HeadId, ChestId, MainHandLeftId, BeltId, OffHandLeftId, RingLeftId, RingRightId,
-				CloakId, ShoulderId, BootsId, HandsId, LegsId, WristId, MainHandRightId, OffHandRightId
-			];
-			foreach (var id in slots)
-			{
-				if (id is > 0)
-					yield return id.Value;
-			}
-		}
-
 		// Indexed access by wire slot id (equipment[CharacterEquipmentSlot.Head]). Every CharacterEquipmentSlot maps to
 		// a column - the 17 worn slots plus the 5 vanity slots - so a defined enum value always resolves; the default
 		// only guards a raw cast of an out-of-range wire Pos (the bag id, or the enum's gaps), which callers filter with
 		// Enum.IsDefined. Get returns the slot's item (null when empty).
 		public Item? this[CharacterEquipmentSlot slot]
 		{
-			get => slot switch
-			{
-				CharacterEquipmentSlot.Neck          => Neck,
-				CharacterEquipmentSlot.Head          => Head,
-				CharacterEquipmentSlot.Bag           => Bag,
-				CharacterEquipmentSlot.ResourceBag   => ResourceBag,
-				CharacterEquipmentSlot.Chest         => Chest,
-				CharacterEquipmentSlot.MainWeapon    => MainHandLeft,
-				CharacterEquipmentSlot.Belt          => Belt,
-				CharacterEquipmentSlot.OffHandWeapon => OffHandLeft,
-				CharacterEquipmentSlot.LeftRing      => RingLeft,
-				CharacterEquipmentSlot.RightRing     => RingRight,
-				CharacterEquipmentSlot.Cape          => Cloak,
-				CharacterEquipmentSlot.Shoulder      => Shoulder,
-				CharacterEquipmentSlot.Boots         => Boots,
-				CharacterEquipmentSlot.Hands         => Hands,
-				CharacterEquipmentSlot.Legs          => Legs,
-				CharacterEquipmentSlot.Wrist         => Wrist,
-				CharacterEquipmentSlot.RangedWeapon  => MainHandRight,
-				CharacterEquipmentSlot.Ammo          => OffHandRight,
-				CharacterEquipmentSlot.VanityHead    => VanityHead,
-				CharacterEquipmentSlot.VanityChest   => VanityChest,
-				CharacterEquipmentSlot.VanityBelt    => VanityBelt,
-				CharacterEquipmentSlot.VanityCape    => VanityCape,
-				CharacterEquipmentSlot.VanityBoots   => VanityBoots,
-				CharacterEquipmentSlot.VanityLegs    => VanityLegs,
-				CharacterEquipmentSlot.VanityWrist   => VanityWrist,
-				_                                    => throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot")
-			};
+			get =>
+				slot switch
+				{
+					CharacterEquipmentSlot.Neck          => Neck,
+					CharacterEquipmentSlot.Head          => Head,
+					CharacterEquipmentSlot.Bag           => Bag,
+					CharacterEquipmentSlot.ResourceBag   => ResourceBag,
+					CharacterEquipmentSlot.Chest         => Chest,
+					CharacterEquipmentSlot.MainWeapon    => MainHandLeft,
+					CharacterEquipmentSlot.Belt          => Belt,
+					CharacterEquipmentSlot.OffHandWeapon => OffHandLeft,
+					CharacterEquipmentSlot.LeftRing      => RingLeft,
+					CharacterEquipmentSlot.RightRing     => RingRight,
+					CharacterEquipmentSlot.Cape          => Cloak,
+					CharacterEquipmentSlot.Shoulder      => Shoulder,
+					CharacterEquipmentSlot.Boots         => Boots,
+					CharacterEquipmentSlot.Hands         => Hands,
+					CharacterEquipmentSlot.Legs          => Legs,
+					CharacterEquipmentSlot.Wrist         => Wrist,
+					CharacterEquipmentSlot.RangedWeapon  => MainHandRight,
+					CharacterEquipmentSlot.Ammo          => OffHandRight,
+					CharacterEquipmentSlot.VanityHead    => VanityHead,
+					CharacterEquipmentSlot.VanityChest   => VanityChest,
+					CharacterEquipmentSlot.VanityBelt    => VanityBelt,
+					CharacterEquipmentSlot.VanityCape    => VanityCape,
+					CharacterEquipmentSlot.VanityBoots   => VanityBoots,
+					CharacterEquipmentSlot.VanityLegs    => VanityLegs,
+					CharacterEquipmentSlot.VanityWrist   => VanityWrist,
+					_                                    => throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot")
+				};
 			set
 			{
 				switch (slot)
@@ -392,6 +374,39 @@ namespace Faolan.Core.Database.Tables
 		// (Chest); the "global" master toggle is slot 31 -> bit 31. See PlayerSpawnScaffoldRows (#336).
 		public uint VanityShownMask { get; set; }
 
+		public uint? GetSlotId(CharacterEquipmentSlot slot)
+		{
+			return slot switch
+			{
+				CharacterEquipmentSlot.Neck          => NeckId,
+				CharacterEquipmentSlot.Head          => HeadId,
+				CharacterEquipmentSlot.Bag           => BagId,
+				CharacterEquipmentSlot.ResourceBag   => ResourceBagId,
+				CharacterEquipmentSlot.Chest         => ChestId,
+				CharacterEquipmentSlot.MainWeapon    => MainHandLeftId,
+				CharacterEquipmentSlot.Belt          => BeltId,
+				CharacterEquipmentSlot.OffHandWeapon => OffHandLeftId,
+				CharacterEquipmentSlot.LeftRing      => RingLeftId,
+				CharacterEquipmentSlot.RightRing     => RingRightId,
+				CharacterEquipmentSlot.Cape          => CloakId,
+				CharacterEquipmentSlot.Shoulder      => ShoulderId,
+				CharacterEquipmentSlot.Boots         => BootsId,
+				CharacterEquipmentSlot.Hands         => HandsId,
+				CharacterEquipmentSlot.Legs          => LegsId,
+				CharacterEquipmentSlot.Wrist         => WristId,
+				CharacterEquipmentSlot.RangedWeapon  => MainHandRightId,
+				CharacterEquipmentSlot.Ammo          => OffHandRightId,
+				CharacterEquipmentSlot.VanityHead    => VanityHeadId,
+				CharacterEquipmentSlot.VanityChest   => VanityChestId,
+				CharacterEquipmentSlot.VanityBelt    => VanityBeltId,
+				CharacterEquipmentSlot.VanityCape    => VanityCapeId,
+				CharacterEquipmentSlot.VanityBoots   => VanityBootsId,
+				CharacterEquipmentSlot.VanityLegs    => VanityLegsId,
+				CharacterEquipmentSlot.VanityWrist   => VanityWristId,
+				_                                    => throw new ArgumentOutOfRangeException(nameof(slot), slot, "Not a valid equipment slot")
+			};
+		}
+
 		// Apply one ToggleVanityArmorFilter(slot, toggleState): set/clear the slot's bit. toggleState 1 = enabled =
 		// SHOWN, so it sets the bit. The wire `slot` is the bit index directly (0..31) - no per-slot mapping needed.
 		// Returns false for an out-of-range slot.
@@ -407,6 +422,26 @@ namespace Faolan.Core.Database.Tables
 				VanityShownMask &= ~bit;
 
 			return true;
+		}
+
+		// The template ids of the STAT-BEARING worn items whose stats ALWAYS apply - the armour + jewellery slots -
+		// reading the *Id columns directly so no navigation load is needed. A slot occupied by the same template as
+		// another (e.g. two identical rings) yields the id twice, so each worn copy counts once when its stat modifiers
+		// are aggregated (#3). 0/null slots are skipped.
+		//
+		// The four WEAPON slots (melee MainHandLeft/OffHandLeft, ranged MainHandRight/OffHandRight) are deliberately
+		// EXCLUDED: only the actively WIELDED weapon set's stats apply, and we don't track which set is drawn yet (the
+		// combat stance we track is only drawn/sheathed, not melee-vs-ranged) - counting both would double-count. Fold
+		// the active weapon back in once weapon-set tracking lands (#400). Excludes the cosmetic Vanity* slots (appearance
+		// only) and the Bag / ResourceBag / FirstPosBag containers (their capacity is a bag stat, not a combat stat).
+		public IEnumerable<uint> StatBearingItemIds()
+		{
+			uint?[] slots = [NeckId, HeadId, ChestId, BeltId, RingLeftId, RingRightId, CloakId, ShoulderId, BootsId, HandsId, LegsId, WristId];
+			foreach (var id in slots)
+			{
+				if (id is > 0)
+					yield return id.Value;
+			}
 		}
 	}
 }
