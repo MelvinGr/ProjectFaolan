@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using System;
 using Faolan.Core;
 using Faolan.Core.Network.Codecs;
@@ -11,19 +12,21 @@ namespace Faolan.Tests
 	// the live sender adds via WriteArrayUInt32Length) must be reproduced from their typed fields.
 	public class CombatEffectBuilderTests
 	{
-		// DamageResultIIR (0xFEC4158A), frame 6514: NPC 0x00002C56 hits player 0x01316D8A for 83 (type 2).
+		// DamageResultIIR (0xFEC4158A), frame 6514: NPC 0x00002C56 hits player 0x01316D8A for 83; that NPC's damage
+		// school is Piercing (wire type 2).
 		[Fact]
 		public void DamageResult_IsByteIdentical()
 		{
 			var captured = Convert.FromHexString("fec4158a0000c35001316d8a000000c35000002c5600000053000000020000000000000000");
 
-			var built = CombatEffectBuilder.BuildDamageResult(0x01316D8A, 0x00002C56, 83, 2);
+			var built = CombatEffectBuilder.BuildDamageResult(0x01316D8A, 0x00002C56, 83, DamageSchool.Piercing);
 
 			Assert.Equal(captured, built);
 
 			// ICodec round-trip.
 			var rt = DamageResult.Read(new FaolanStream(built));
 			Assert.Equal(83u, rt.Damage);
+			Assert.Equal(DamageSchool.Piercing, rt.School);
 			Assert.Equal(built, rt.ToArray());
 		}
 

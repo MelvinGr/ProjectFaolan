@@ -216,13 +216,14 @@ namespace Faolan.GameServer.Combat
 			// Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
 			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101), attackerEntity?.CombatRating ?? 0);
 			// #399: roll a critical hit off the player's Critical Rating; a crit scales the damage by the base 1.5x plus
-			// their Critical Damage Rating, and rides the wire as DamageResult type 3 (the client renders it larger).
+			// their Critical Damage Rating. A crit is NOT a distinct wire flag - RE of all captured DamageResults
+			// (2026-07-22) showed the `type` field is the ATTACKER's damage school (constant per attacker; the player's
+			// physical melee is always type 3), the two trailing fields are always 0, and there is no crit indicator.
+			// So retail conveys a crit purely by the larger number; we send the player's melee type (3) either way.
 			var crit = CombatResolver.IsCriticalHit(attackerEntity?.CriticalRating ?? 0, Random.Shared.Next(100));
 			if (crit)
 				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attackerEntity?.CriticalDamageRating ?? 0);
-			var hitType = crit
-				? 3u
-				: 2u;
+			const DamageSchool school = DamageSchool.Crushing; // the player's physical-melee damage school (capture-derived)
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
@@ -261,8 +262,8 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(0))
 				.SendAsync(client);
 
-			// 2) DamageResultIIR - the hit / floating number (type 3 on a crit).
-			await SendDamageNumber(client, targetHandle, instance, damage, hitType);
+			// 2) DamageResultIIR - the hit / floating number (crits are just a bigger number, same school).
+			await SendDamageNumber(client, targetHandle, instance, damage, school);
 
 			// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
 			// lifecycle (despawn + scheduled respawn) on death.
@@ -354,7 +355,7 @@ namespace Faolan.GameServer.Combat
 
 			foreach (var secondary in CombatTargeting.CleaveTargets(zone, primary, CombatTargeting.DefaultCleaveRadius, CombatTargeting.DefaultMaxCleaveTargets))
 			{
-				await SendDamageNumber(client, secondary.Handle, instance, damage);
+				await SendDamageNumber(client, secondary.Handle, instance, damage, DamageSchool.Crushing);
 				await ApplyNpcDamage(client, secondary.Handle, (int)damage, $"melee cleave from 0x{instance:X8}");
 			}
 		}
@@ -569,7 +570,7 @@ namespace Faolan.GameServer.Combat
 		// stamina update (the retail post-ack trio of the armed swing path).
 		private async Task SendSwingDamage(INetworkClient client, uint instance, uint targetHandle, uint damage)
 		{
-			await SendDamageNumber(client, targetHandle, instance, damage);
+			await SendDamageNumber(client, targetHandle, instance, damage, DamageSchool.Crushing); // player physical melee
 
 			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
@@ -609,10 +610,12 @@ namespace Faolan.GameServer.Combat
 		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
 		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
 		// bar move. Byte-exact builder (CombatEffectBuilder), golden-tested vs the captured NPC->player hit. #274.
-		// hitType is the DamageResult category: 2 = normal, 3 = critical / big hit (the client renders type 3 larger).
-		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage, uint hitType = 2)
+		// `school` is the attacker's DamageResult damage school (DamageSchool; NOT a hit result - see CombatEffectBuilder).
+		// Defaults to Piercing, the school of the captured NPC melee hit (fr 6514) - a reasonable stand-in until we model
+		// per-NPC/per-weapon schools; player-melee callers pass Crushing.
+		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage, DamageSchool school = DamageSchool.Piercing)
 		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, hitType));
+			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, school));
 		}
 
 		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:

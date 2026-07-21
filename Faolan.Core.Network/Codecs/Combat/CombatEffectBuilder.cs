@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
@@ -13,9 +14,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.DamageResultIIR, GameServer0X2000Opcodes.StatDamageIIR];
 
-		public static byte[] BuildDamageResult(uint target, uint attacker, uint damage, uint type)
+		public static byte[] BuildDamageResult(uint target, uint attacker, uint damage, DamageSchool school)
 		{
-			return new DamageResult(target, attacker, damage, type).ToArray();
+			return new DamageResult(target, attacker, damage, school).ToArray();
 		}
 
 		public static byte[] BuildStatDamage(uint target, uint statValue, int delta, uint statId, uint caster, uint idx, uint spellBaseId)
@@ -26,9 +27,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 	// DamageResultIIR (0xFEC4158A): the floating combat-damage number shown over the target. Decoded fields:
 	//   [subop][class][target][env=0][class][attacker][u32 damage][u32 type][0][0]
-	// type is the hit category (2 = normal, 3 = the bigger hits in the capture - crit/special). Sent both ways
-	// (NPC->player and player->NPC). Golden: fr 6514 = an NPC hitting the player for 83 (type 2).
-	public sealed record DamageResult(uint Target, uint Attacker, uint Damage, uint Type) : ICodec<DamageResult>
+	// `Type` is the ATTACKER's damage school (DamageSchool), NOT a hit result - RE of all 1485 captured DamageResults
+	// (2026-07-22) showed it is CONSTANT per attacker (the player's physical melee is Crushing/3; different NPCs use
+	// 1/2/8=Slashing/Piercing/Unholy) and the two trailing u32 are always 0, so there is no crit/miss flag: a crit is
+	// just a bigger number, and misses aren't sent as DamageResult at all. Sent both ways. Golden: fr 6514 = NPC
+	// 0x2c56 hitting the player for 83 (that NPC's school = Piercing/2).
+	public sealed record DamageResult(uint Target, uint Attacker, uint Damage, DamageSchool School) : ICodec<DamageResult>
 	{
 		public static DamageResult Read(FaolanStream s)
 		{
@@ -39,10 +43,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 			s.ReadUInt32(); // class
 			var attacker = s.ReadUInt32();
 			var damage = s.ReadUInt32();
-			var type = s.ReadUInt32();
+			var school = (DamageSchool)s.ReadUInt32();
 			s.ReadUInt32(); // 0
 			s.ReadUInt32(); // 0
-			return new DamageResult(target, attacker, damage, type);
+			return new DamageResult(target, attacker, damage, school);
 		}
 
 		public void Write(FaolanStream s)
@@ -55,7 +59,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(Attacker)
 				.WriteUInt32(Damage)
-				.WriteUInt32(Type)
+				.WriteUInt32((uint)School)
 				.WriteUInt32(0)
 				.WriteUInt32(0);
 		}

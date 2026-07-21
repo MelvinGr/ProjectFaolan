@@ -182,9 +182,39 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "ldb-strings":
+				{
+					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					var needle = (arg ?? "damage").ToLowerInvariant();
+					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
+					{
+						byte[] dec;
+						try { dec = rdb.ReadDecompressed(e); }
+						catch { continue; }
+						var sb = new System.Text.StringBuilder();
+						var runs = new List<string>();
+						foreach (var b in dec)
+						{
+							if (b >= 32 && b < 127)
+								sb.Append((char)b);
+							else
+							{
+								if (sb.Length >= 3) runs.Add(sb.ToString());
+								sb.Clear();
+							}
+						}
+						if (sb.Length >= 3) runs.Add(sb.ToString());
+						for (var i = 0; i < runs.Count; i++)
+							if (runs[i].ToLowerInvariant().Contains(needle))
+								Console.WriteLine($"  {e.Id}[{i}]: {runs[i]}");
+					}
+					return 0;
+				}
+
 				default:
 				{
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings.");
 					return 1;
 				}
 			}

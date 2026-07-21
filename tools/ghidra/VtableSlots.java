@@ -1,27 +1,21 @@
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
-import ghidra.program.model.listing.*;
 import ghidra.program.model.symbol.*;
 import ghidra.program.model.mem.*;
-// ADDR=<reader fn>: find the vtable slot(s) holding it, then print the surrounding vtable pointers + the fn each points to.
+// SYM=DamageResultIIR_c::vftable : print the first 16 vtable slot function addresses.
 public class VtableSlots extends GhidraScript {
   public void run() throws Exception {
-    long a=Long.parseLong(System.getenv("ADDR"),16);
-    Address t=toAddr(a);
-    ReferenceManager rm=currentProgram.getReferenceManager();
+    String want=System.getenv("SYM");
+    SymbolTable st=currentProgram.getSymbolTable();
+    SymbolIterator it=st.getSymbolIterator(want,true);
+    if(!it.hasNext()){ println("no symbol "+want); return; }
+    Symbol s=it.next(); Address a=s.getAddress();
+    println("vftable "+want+" @ "+a);
     Memory mem=currentProgram.getMemory();
-    for (Reference r: rm.getReferencesTo(t)){
-      Address slot=r.getFromAddress();
-      println("=== vtable slot @"+slot+" holds reader; dumping slots -8..+16 ===");
-      for(int i=-8;i<=16;i++){
-        Address s=slot.add((long)i*4);
-        try{
-          long p=mem.getInt(s)&0xFFFFFFFFL;
-          Address fp=toAddr(p);
-          Function f=getFunctionContaining(fp);
-          println(String.format("  [%+3d] @%s -> %08x %s", i, s, p, f!=null?f.getName():"?"));
-        }catch(Exception e){ println("  ["+i+"] (unreadable)"); }
-      }
+    for(int i=0;i<16;i++){
+      Address slot=a.add(i*4L);
+      long fn=mem.getInt(slot)&0xFFFFFFFFL;
+      println("  slot "+i+" -> "+Long.toHexString(fn));
     }
   }
 }
