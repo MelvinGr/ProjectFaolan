@@ -14,7 +14,7 @@ namespace Faolan.Core.Extensions
 			///     swallowing + logging any exception (a detached continuation must never crash the caller, and an
 			///     unobserved faulted task is a silent leak).
 			/// </summary>
-			public static void RunAfter(TimeSpan delay, Func<Task> action, ILogger logger = null, [CallerMemberName] string caller = null)
+			public static void RunAfter(TimeSpan delay, Func<Task> action, ILogger? logger = null, [CallerMemberName] string? caller = null)
 			{
 				_ = Task.Run(async () =>
 				{
@@ -31,7 +31,7 @@ namespace Faolan.Core.Extensions
 			}
 
 			/// <summary>Millisecond overload of <see cref="RunAfter(TimeSpan,Func{Task},ILogger,string)" />.</summary>
-			public static void RunAfter(int delayMs, Func<Task> action, ILogger logger = null, [CallerMemberName] string caller = null)
+			public static void RunAfter(int delayMs, Func<Task> action, ILogger? logger = null, [CallerMemberName] string? caller = null)
 			{
 				Task.RunAfter(TimeSpan.FromMilliseconds(delayMs), action, logger, caller);
 			}

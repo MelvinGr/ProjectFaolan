@@ -5,7 +5,7 @@ namespace Faolan.Core.Extensions
 {
 	public static class ObjectExtensions
 	{
-		public static T FromJson<T>(this string json)
+		public static T? FromJson<T>(this string json)
 		{
 			if (string.IsNullOrEmpty(json))
 				return default;
@@ -13,7 +13,7 @@ namespace Faolan.Core.Extensions
 			return JsonSerializer.Deserialize<T>(json);
 		}
 
-		public static string ToJson(this object source, bool indented = false)
+		public static string? ToJson(this object? source, bool indented = false)
 		{
 			if (source == null)
 				return null;

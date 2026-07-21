@@ -15,11 +15,11 @@ namespace Faolan.Core.Extensions
 			// bridges. Defaults to enabled when unset; set "McpEnabled": false in faolan.json to disable both.
 			public bool McpEnabled => !bool.TryParse(config["McpEnabled"], out var enabled) || enabled;
 
-			public string DatabasePath => Path.GetFullPath(config["DatabasePath"]);
+			public string DatabasePath => Path.GetFullPath(Required(config, "DatabasePath"));
 
-			public string ServerIpAddress => config["ServerIpAddress"];
+			public string ServerIpAddress => Required(config, "ServerIpAddress");
 
-			public string WelcomeString => config["WelcomeString"];
+			public string WelcomeString => Required(config, "WelcomeString");
 
 			public uint ServerIpAddressLong => BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(config.ServerIpAddress).GetAddressBytes());
 
@@ -29,6 +29,12 @@ namespace Faolan.Core.Extensions
 
 			public ushort PlayerAgentPort => Convert.ToUInt16(config["PlayerAgentPort"]);
 			public ushort UniverseAgentPort => Convert.ToUInt16(config["UniverseAgentPort"]);
+		}
+
+		// A required config value: surface a clear error if it is missing rather than passing a null downstream.
+		private static string Required(IConfiguration config, string key)
+		{
+			return config[key] ?? throw new InvalidOperationException($"Missing required configuration value '{key}'.");
 		}
 	}
 }
