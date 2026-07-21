@@ -511,7 +511,6 @@ namespace Faolan.GameServer
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false),
 				["setnpcgroup"] = SetNpcGroupCommand,
 				["target"] = (client, _) => TargetInfoCommand(client),
-				["info"] = (client, _) => TargetInfoCommand(client), // alias: stats about the selected npc/object
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand
 			};
