@@ -1,12 +1,13 @@
 using System;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
 {
+	// The Conan-tier (GameServer / login) DL logger. Every Conan send goes out as a structured Rpc, so this logs
+	// straight from the message model (phase 6) and carries NO byte[] re-parse - it does not override LogPacket(byte[]).
 	public sealed class ConanOutgoingPacketLogger : OutgoingPacketLogger
 	{
 		private readonly Type _opcodeEnumType;
@@ -18,24 +19,16 @@ namespace Faolan.Core.Network.Logging
 			_subOpcodeEnumType = subOpcodeEnumType;
 		}
 
-		protected override void LogPacket(byte[] bytes)
-		{
-			var packet = new ConanPacket(bytes);
-			Render(packet.Opcode, packet.Receiver, packet.HeaderData, packet.Body?.ToArray(), packet.Bytes.Length);
-		}
-
-		// Phase 6: log a sent Rpc from its own fields - the model already carries the Opcode, Receiver (which names the
-		// opcode's interface) and the HeaderData/Body the trace needs, so there is no reason to serialize-then-re-parse.
-		// `frameByteLength` is the serialized frame length the byte[] path read off ConanPacket.Bytes.Length.
+		// Log a sent Rpc from its own fields - the model already carries the Opcode, Receiver (which names the opcode's
+		// interface) and the HeaderData/Body the trace needs. `frameByteLength` is the serialized frame's length.
 		protected override void LogPacket(in Rpc rpc, int frameByteLength)
 		{
 			Render(rpc.Opcode, rpc.Receiver, rpc.HeaderData.ToArray(), rpc.Body.ToArray(), frameByteLength);
 		}
 
-		// The shared render used by both paths (re-parsed bytes and the structured Rpc). Names the opcode from the
-		// receiver's interface enum when the catalog resolves it; else falls back to the listener's default enum
-		// (single-interface listeners, or an opcode the mapped interface doesn't carry). A PassBlob carrier additionally
-		// names its inner IIR sub-opcode.
+		// Names the opcode from the receiver's interface enum when the catalog resolves it; else falls back to the
+		// listener's default enum (single-interface listeners, or an opcode the mapped interface doesn't carry). A
+		// PassBlob carrier additionally names its inner IIR sub-opcode.
 		private void Render(ushort opcode, ProtoEndpoint? receiver, byte[] headerData, byte[]? body, int wireLength)
 		{
 			var opcodeEnumType = (receiver is { } r ? ProtocolCatalog.OpcodeEnumFor(r.Type, opcode) : null) ?? _opcodeEnumType;

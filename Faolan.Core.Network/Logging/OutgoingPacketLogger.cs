@@ -48,10 +48,13 @@ namespace Faolan.Core.Network.Logging
 			}
 		}
 
-		protected abstract void LogPacket(byte[] bytes);
+		// The two renders. Each concrete logger overrides ONLY the path its protocol uses - the chat server frames raw
+		// bytes (LogPacket(byte[])), the Conan tiers send the structured Rpc (LogPacket(in Rpc, ...)) - so the other is
+		// a no-op. This is what lets the Conan logger carry no byte[] re-parse at all.
+		protected virtual void LogPacket(byte[] bytes)
+		{
+		}
 
-		// The Rpc render. Default is a no-op (protocols that don't model the Conan RPC header - the chat server - never
-		// send an Rpc); ConanOutgoingPacketLogger overrides it to render from the Rpc fields.
 		protected virtual void LogPacket(in Rpc rpc, int frameByteLength)
 		{
 		}

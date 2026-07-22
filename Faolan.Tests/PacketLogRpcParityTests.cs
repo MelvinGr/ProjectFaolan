@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
@@ -10,10 +12,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Gitea #406 phase 6 oracle: the structured DL log path (ConanOutgoingPacketLogger.Log(in Rpc), which renders straight
-	// from the Rpc model) must produce the EXACT same trace line as the historical byte[] path (Log, which re-parses
-	// the serialized frame back into a ConanPacket). If the two ever drift, "no re-parse" would silently change what
-	// operators see in the log - so we pin them equal for the representative frame shapes.
+	// Gitea #406 phase 6: the Conan DL logger renders its trace straight from the sent Rpc (ConanOutgoingPacketLogger
+	// carries NO byte[] re-parse anymore). This pins that the rendered line reflects the frame's REAL fields, checked
+	// against an INDEPENDENT parse of the serialized bytes (ConanPacket) - so a wrong field extraction from the Rpc
+	// would fail even though the byte-parse path it used to be compared against is gone.
 	public class PacketLogRpcParityTests
 	{
 		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
@@ -48,25 +50,31 @@ namespace Faolan.Tests
 
 		[Theory]
 		[MemberData(nameof(Cases))]
-		public void LogRpc_RendersIdenticallyToTheReParsedBytePath(Rpc rpc)
+		public void LogRpc_RendersTheFramesRealFields(Rpc rpc)
 		{
 			var previousIncludeBytes = PacketLogOptions.IncludeBytes;
-			PacketLogOptions.IncludeBytes = true; // render the headerData/body hex too, so the whole line is compared
+			PacketLogOptions.IncludeBytes = true; // render the headerData/body hex too, so the whole line is checked
 			try
 			{
 				var capture = new CapturingLogger();
 				var packetLogger = new ConanOutgoingPacketLogger(capture, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes));
+
 				var wire = PacketSerializer.Serialize(rpc);
+				var parsed = new ConanPacket(wire); // the independent oracle: parse the serialized frame back
 
 				capture.Messages.Clear();
-				packetLogger.Log(wire); // the historical path: re-parse the bytes
-				var reParsed = Assert.Single(capture.Messages);
+				packetLogger.Log(in rpc, wire.Length);
+				var line = Assert.Single(capture.Messages);
 
-				capture.Messages.Clear();
-				packetLogger.Log(in rpc, wire.Length); // phase 6: render from the Rpc model
-				var structured = Assert.Single(capture.Messages);
-
-				Assert.Equal(reParsed, structured);
+				// The rendered line must carry the frame's real fields (opcode, lengths, the header/body hex), each read
+				// from the independently-parsed packet - never from the Rpc the render used.
+				Assert.Contains(parsed.Opcode.ToHex(), line);
+				Assert.Contains($"bodyLength={parsed.Body?.Length ?? 0}", line);
+				Assert.Contains($"packetLength={wire.Length}", line);
+				if (parsed.Body?.Length > 0)
+					Assert.Contains(parsed.Body.ToArray().ToHex(), line);
+				if (parsed.HeaderData.Length > 0)
+					Assert.Contains(parsed.HeaderData.ToHex(), line);
 			}
 			finally
 			{
