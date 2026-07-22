@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Network.Interfaces;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
@@ -33,6 +34,28 @@ namespace Faolan.Core.Network.Logging
 			}
 		}
 
+		// The structured send-path log (Gitea #406 phase 6). Default renders the SAME way as Log(byte[]) - by
+		// serializing-and-re-parsing - for loggers that don't model the Conan RPC header (the chat logger). The Conan
+		// logger overrides LogPacket(in Rpc, ...) to skip the re-parse and render from the Rpc fields directly; the
+		// try/catch lives here so a render failure can never crash the send path just to trace it.
+		public void LogRpc(in Rpc rpc, byte[] wireBytes)
+		{
+			try
+			{
+				LogPacket(in rpc, wireBytes);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogDebug(ex, "Failed to render outgoing {Channel} Rpc for logging.", ChannelName);
+			}
+		}
+
 		protected abstract void LogPacket(byte[] bytes);
+
+		// Default: fall back to the byte[] decode path. ConanOutgoingPacketLogger overrides this to render from the Rpc.
+		protected virtual void LogPacket(in Rpc rpc, byte[] wireBytes)
+		{
+			LogPacket(wireBytes);
+		}
 	}
 }

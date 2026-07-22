@@ -21,10 +21,11 @@ namespace Faolan.Core.Network
 		void Send(byte[] value);
 		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
 
-		// The structured send boundary (Gitea #406, phase 4): a handler builds an Rpc and hands it here instead of a
-		// hand-framed PacketStream. Serializes to the wire frame (byte-identical to the PacketStream builder, locked by
-		// PacketFrameRoundTripTests) and sends. Logging still runs off the serialized bytes for now; moving it onto the
-		// Rpc model (no re-parse) is phase 6.
+		// The structured send boundary (Gitea #406): a handler builds an Rpc and hands it here instead of a hand-framed
+		// PacketStream. The real client (NetworkClient) implements this to serialize ONCE and trace the send directly
+		// from the Rpc model - no re-parse (phase 6). This default only serves lightweight INetworkClient test doubles
+		// that don't derive from NetworkClient; it serializes (byte-identical to the PacketStream builder, locked by
+		// PacketFrameRoundTripTests) and routes through the byte[] send.
 		Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
 			return SendAsync(PacketSerializer.Serialize(rpc), cancellationToken);
@@ -57,8 +58,44 @@ namespace Faolan.Core.Network
 			Logger = logger;
 		}
 
-		public abstract void Send(byte[] value);
-		public abstract Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
+		// The byte[] send path: trace the frame (the logger re-parses it), then put it on the wire.
+		public void Send(byte[] value)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			LogOutgoing(value);
+			SendRaw(value);
+		}
+
+		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			LogOutgoing(value);
+			return SendRawAsync(value, cancellationToken);
+		}
+
+		// The structured send path (Gitea #406 phase 6): serialize ONCE, trace directly from the Rpc model (no
+		// re-parse), then put it on the wire. This class member implements the interface's SendAsync(Rpc) for the real
+		// client hierarchy; the interface's default (serialize + SendAsync(byte[])) still serves lightweight
+		// INetworkClient test doubles that don't derive from NetworkClient.
+		public virtual Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
+		{
+			var bytes = PacketSerializer.Serialize(rpc);
+			LogOutgoing(in rpc, bytes);
+			return SendRawAsync(bytes, cancellationToken);
+		}
+
+		// The raw socket writes (no logging), supplied by the concrete client.
+		protected abstract void SendRaw(byte[] value);
+		protected abstract Task SendRawAsync(byte[] value, CancellationToken cancellationToken);
+
+		// Send-path trace hooks the concrete client routes to its IPacketLogger. No-op by default.
+		protected virtual void LogOutgoing(byte[] value)
+		{
+		}
+
+		protected virtual void LogOutgoing(in Rpc rpc, byte[] wireBytes)
+		{
+		}
 
 		public abstract void Start();
 		public abstract void Stop();
@@ -84,17 +121,24 @@ namespace Faolan.Core.Network
 			_outgoingPacketLogger = outgoingPacketLogger ?? throw new ArgumentNullException(nameof(outgoingPacketLogger));
 		}
 
-		public override void Send(byte[] value)
+		// The IPacketLogger trace hooks the base send paths call before the raw socket write.
+		protected override void LogOutgoing(byte[] value)
 		{
-			ArgumentNullException.ThrowIfNull(value);
-
 			_outgoingPacketLogger.Log(value);
+		}
 
+		protected override void LogOutgoing(in Rpc rpc, byte[] wireBytes)
+		{
+			_outgoingPacketLogger.LogRpc(in rpc, wireBytes);
+		}
+
+		protected override void SendRaw(byte[] value)
+		{
 			_sendLock.Wait();
 			try
 			{
 				// Socket.Send can write FEWER bytes than requested when the send buffer is full; loop until the
-				// whole frame is on the wire (see SendAsync for the bug this fixes).
+				// whole frame is on the wire (see SendRawAsync for the bug this fixes).
 				var sent = 0;
 				while (sent < value.Length)
 				{
@@ -111,12 +155,8 @@ namespace Faolan.Core.Network
 			}
 		}
 
-		public override async Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
+		protected override async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
 		{
-			ArgumentNullException.ThrowIfNull(value);
-
-			_outgoingPacketLogger.Log(value);
-
 			await _sendLock.WaitAsync(cancellationToken);
 			try
 			{
