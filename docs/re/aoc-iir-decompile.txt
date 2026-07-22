@@ -1,5 +1,5 @@
 # AoC client IIR decompiles (Ghidra, AgeOfConan.exe 2026-06-13)
-# Recovered the 0x737A6DF9 FullPlayerCharacterIIR framing — see docs/db-container-handoff.md.
+# Recovered the 0x737A6DF9 FullPlayerCharacterIIR framing — see docs/re/fullplayer-snapshot-reader.md.
 # Stripped binary; FUN_xxxx auto-named. Key map: Construct=005b9d30, ReadSubClass=00797440,
 #   ReadU32(BE)=0048f900, ReadBytes=00cba1b0, ReadByte=004e0340, parse-blob=00cbfb80.
 

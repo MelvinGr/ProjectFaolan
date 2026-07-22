@@ -32,7 +32,7 @@ namespace Faolan.Importer.Rdb
 	// 347/129/349=splash radius/percent/max-targets, 348=damage rating, 551=a rank-scaling MAGNITUDE, 79=icon (an id
 	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only). The record carries NO
 	// stat IDs: 551 says "400" but never "400 of WHAT", so a buff's stat identity is server-GDB-only, same as
-	// mana/damage/recast (docs/stat-engine.md). Don't hunt stat deltas in here again.
+	// mana/damage/recast (docs/subsystems/stat-engine.md). Don't hunt stat deltas in here again.
 	public static class RdbSpellImporter
 	{
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)

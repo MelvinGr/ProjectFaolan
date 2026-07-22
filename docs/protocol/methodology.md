@@ -123,23 +123,18 @@ one-line pointer. The tree then reflects what has actually been verified.
 > A doc that describes **the wire** lives in `protocol/` and carries verification tags.
 > A doc that describes **our implementation** or **workflow** lives elsewhere.
 
-**The archive rule** (mechanical, checkable):
+**The confirmed-info rule:** docs carry confirmed information only. Progress, TODOs, next-steps, and
+issue-scoped writeups live on the Gitea issue, not in `docs/` — there are no `*-plan.md`/`handoff-*.md` docs.
 
-> Archive a `handoff-*.md` / issue-scoped writeup when its Gitea issue closes. Fix its referrers.
-
-Converged shape:
+Shape:
 
 ```
 docs/
-  protocol/      the verified wire reference (this plan)
+  protocol/      the verified wire reference (this methodology)
     gen/         GENERATED - never hand-edit
   subsystems/    how OUR server implements a domain (combat, chat, guilds, inventory, ...)
   rdb/           client asset formats (rdb-type-catalog, gear-rendering, body morphs, CDN)
   tooling/       launcher, importer, capture workflow
   re/            Ghidra / RE methodology + raw decompile artifacts
-  archive/       resolved plans + handoffs whose issue has closed
 ```
-
-Grouping the leftovers happens **last**, once migration shrinks them and the natural grouping is obvious
-rather than guessed.
 

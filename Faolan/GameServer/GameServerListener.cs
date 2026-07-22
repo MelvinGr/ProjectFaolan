@@ -152,7 +152,7 @@ namespace Faolan.GameServer
 		private readonly CombatService _combat;
 
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
-		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
+		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its

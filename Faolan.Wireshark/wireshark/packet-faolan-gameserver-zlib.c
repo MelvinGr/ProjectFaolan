@@ -9,7 +9,7 @@
  *          RpcHeader = 0x0A-tagged sender ProtoEndpoint + 0x12-tagged receiver ProtoEndpoint
  *          + u16 BE method opcode + optional trailing header bytes. A ProtoEndpoint is
  *          [0x0D <class id fixed32 LE>][0x10 <instance varint>]; the class ids are BKDR-31
- *          hashes of the client's agent/interface class names (docs/aoc-opcode-ids.md).
+ *          hashes of the client's agent/interface class names (docs/re/aoc-opcode-ids.md).
  *
  * Applies to UniverseAgent, PlayerAgent, CSPlayerAgent and GameServer connections. The
  * ChatServer chat protocol ([u16 opcode][u16 bodyLen][body] framing) is auto-detected per
@@ -466,7 +466,7 @@ static void dissect_conan_packet(
 
     /* IIR carrier: GameAgent/GameInterface 0x2000 (PassBlob) bodies are
        [u32 len][u32 IIR type id][record] with len covering everything after itself; the id
-       is the BKDR-31 hash of the client's IIR C++ type name (docs/aoc-opcode-ids.md). */
+       is the BKDR-31 hash of the client's IIR C++ type name (docs/re/aoc-opcode-ids.md). */
     const char *iir_name = NULL;
     if (opcode == FAOLAN_OPCODE_PASSBLOB &&
         (receiver_class == FAOLAN_CLASS_GAMEAGENT || receiver_class == FAOLAN_CLASS_GAMEINTERFACE) &&
