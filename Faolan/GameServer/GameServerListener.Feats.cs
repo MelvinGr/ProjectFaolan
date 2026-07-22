@@ -128,13 +128,13 @@ namespace Faolan.GameServer
 
 		// c2s FeatUntrainAnswer (0x203E): the confirm-dialog reply. Reset ALL feats only when the player CONFIRMED and
 		// the echoed token matches the outstanding request (guards against a stray/replayed answer).
-		private async Task HandleFeatUntrainAnswer(INetworkClient client, ConanPacket packet)
+		private async Task HandleFeatUntrainAnswer(INetworkClient client, Rpc packet)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return;
 
-			var body = packet.Body.ReadRemainingArray();
+			var body = packet.BodyReader().ReadRemainingArray();
 			if (!FeatUntrainMessageBoxCodec.TryParseAnswer(body, out var answer, out var token))
 				return;
 

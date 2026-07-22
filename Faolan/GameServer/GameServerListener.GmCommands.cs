@@ -313,11 +313,12 @@ namespace Faolan.GameServer
 		// [u32 command]. Decoded commands (#307, docs/subsystems/summon-pet-decode.md): 0x1F8 = dismiss, 0x1F6 = defend.
 		// Dismiss = retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. Other commands are logged for now
 		// (attack/follow/stay AI is a follow-up; a .pet-summoned minion already follows via SetNpcFollow).
-		private async Task HandlePetCommand(INetworkClient client, ConanPacket packet)
+		private async Task HandlePetCommand(INetworkClient client, Rpc packet)
 		{
-			packet.Body.ReadUInt32(); // type 0xC350
-			var petHandle = packet.Body.ReadUInt32();
-			var command = packet.Body.ReadUInt32<PetCommand>();
+			var body = packet.BodyReader();
+			body.ReadUInt32(); // type 0xC350
+			var petHandle = body.ReadUInt32();
+			var command = body.ReadUInt32<PetCommand>();
 			var owner = client.Session.Character.Id;
 			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, command);
 

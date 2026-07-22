@@ -3,6 +3,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Quest;
 using Microsoft.Extensions.Logging;
@@ -38,19 +39,21 @@ namespace Faolan.GameServer.World
 		}
 
 		// CloseLootBag: the client closed the loot window without taking everything.
-		public async Task HandleCloseLootBag(INetworkClient client, ConanPacket packet)
+		public async Task HandleCloseLootBag(INetworkClient client, Rpc packet)
 		{
-			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-			var bagHandle = packet.Body.ReadUInt32();
+			var body = packet.BodyReader();
+			body.ReadUInt32(); // loot typetag (0xC87A)
+			var bagHandle = body.ReadUInt32();
 			await _broadcaster.CloseLootBag(client, bagHandle);
 		}
 
 		// 0x2043 TryLootAll: the loot-all click. Grant every item the bag carries into the backpack (persist + live
 		// DispatchAddItem); the bag hands them over once (TakeBagItems clears them), and coins ride TryLootCash.
-		public async Task HandleLootAll(INetworkClient client, ConanPacket packet)
+		public async Task HandleLootAll(INetworkClient client, Rpc packet)
 		{
-			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-			var bagHandle = packet.Body.ReadUInt32();
+			var body = packet.BodyReader();
+			body.ReadUInt32(); // loot typetag (0xC87A)
+			var bagHandle = body.ReadUInt32();
 
 			// Capture the bag's source NPC name BEFORE taking (loot-all empties + consumes it) for the loot-quest goal.
 			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
@@ -70,10 +73,11 @@ namespace Faolan.GameServer.World
 		}
 
 		// 0x2045 TryLootCash: loot the bag's coins; fires on every loot alongside TryLootAll.
-		public async Task HandleLootCash(INetworkClient client, ConanPacket packet)
+		public async Task HandleLootCash(INetworkClient client, Rpc packet)
 		{
-			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-			var bagHandle = packet.Body.ReadUInt32();
+			var body = packet.BodyReader();
+			body.ReadUInt32(); // loot typetag (0xC87A)
+			var bagHandle = body.ReadUInt32();
 
 			var character = client.Session.Character;
 			var cash = _broadcaster.TakeLootCash(client, bagHandle);
@@ -89,11 +93,12 @@ namespace Faolan.GameServer.World
 		}
 
 		// 0x2046 TryLootItem: a single drag of one item out of the loot window.
-		public async Task HandleLootItem(INetworkClient client, ConanPacket packet)
+		public async Task HandleLootItem(INetworkClient client, Rpc packet)
 		{
-			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-			var bagHandle = packet.Body.ReadUInt32();
-			var itemIndex = packet.Body.ReadUInt32(); // which item (display index) the player dragged
+			var body = packet.BodyReader();
+			body.ReadUInt32(); // loot typetag (0xC87A)
+			var bagHandle = body.ReadUInt32();
+			var itemIndex = body.ReadUInt32(); // which item (display index) the player dragged
 
 			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
 			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);

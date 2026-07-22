@@ -105,13 +105,14 @@ namespace Faolan.GameServer.Economy
 		// UL 0x2034 SellItem: validate the bag slot, price the item, remove it, credit the wallet, and confirm
 		// with DispatchItemSoldToShop + the 0x2005 balance update (retail's exact reply trio minus the 0x201C
 		// record-stream entry, which is bookkeeping we don't model).
-		public async Task HandleSellItemToShop(INetworkClient client, ConanPacket packet)
+		public async Task HandleSellItemToShop(INetworkClient client, Rpc packet)
 		{
-			packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
-			var shopId = packet.Body.ReadUInt32();
-			var container = packet.Body.ReadUInt32();
-			var sellerId = packet.Body.ReadUInt32();
-			var slot = packet.Body.ReadUInt32();
+			var body = packet.BodyReader();
+			body.ReadUInt32(); // shop ID32 type (0xC75B)
+			var shopId = body.ReadUInt32();
+			var container = body.ReadUInt32();
+			var sellerId = body.ReadUInt32();
+			var slot = body.ReadUInt32();
 
 			var character = client.Session.Character;
 			if (character == null)

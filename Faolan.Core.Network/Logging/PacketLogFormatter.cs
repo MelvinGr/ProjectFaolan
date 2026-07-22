@@ -1,6 +1,7 @@
 using System;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
@@ -76,6 +77,18 @@ namespace Faolan.Core.Network.Logging
 			public void LogUnhandled(string channel, Packet packet, ushort opcode, string opcodeName)
 			{
 				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
+			}
+
+			// Rpc-model UL variants (Gitea #407): the listener dispatches on the parsed Rpc, so it passes the Rpc + the
+			// serialized frame length (the total wire size the Rpc doesn't itself carry).
+			public void LogReceived(string channel, in Rpc packet, Enum opcode, int frameLength)
+			{
+				logger.LogPacket(Uplink, channel, OpcodeName(opcode), packet.Body.Length, frameLength, ("body", packet.Body.ToArray()));
+			}
+
+			public void LogUnhandled(string channel, in Rpc packet, ushort opcode, string opcodeName, int frameLength)
+			{
+				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body.Length, frameLength, ("body", packet.Body.ToArray()));
 			}
 
 			// An extra opcode-specific body dump some inbound handlers emit on their own line, gated on the byte-dump

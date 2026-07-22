@@ -549,18 +549,19 @@ namespace Faolan.GameServer
 		//      (capture-proven - moving it strands login on the loading screen). FlushPendingPost205FFollowUp no-ops
 		//      unless armed, so a create-editor / post-ready poll just falls through.
 		// Bodies shorter than the 16-byte poll are not spawn-polls (some other same-opcode traffic); just log them.
-		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, ConanPacket packet)
+		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, Rpc packet)
 		{
-			if (packet.Body == null || packet.Body.Length < sizeof(uint) * 4)
+			var body = packet.BodyReader();
+			if (body.Length < sizeof(uint) * 4)
 			{
-				LogPacketBodyDebug("GameServer 0x2020 short body", packet.Body?.ToArray()!);
+				LogPacketBodyDebug("GameServer 0x2020 short body", body.ToArray());
 				return;
 			}
 
-			var ack0 = packet.Body.ReadUInt32();
-			var requestId = packet.Body.ReadUInt32();
-			var ack1 = packet.Body.ReadUInt32();
-			var characterId = packet.Body.ReadUInt32();
+			var ack0 = body.ReadUInt32();
+			var requestId = body.ReadUInt32();
+			var ack1 = body.ReadUInt32();
+			var characterId = body.ReadUInt32();
 
 			_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
 
@@ -571,7 +572,6 @@ namespace Faolan.GameServer
 			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,
 				characterId, client.Session.HasPendingPost205FFollowUp);
 			await FlushPendingPost205FFollowUp(client);
-			packet.Body.Position = 0;
 		}
 
 		// Re-delivers, via the proven live DispatchAddItem (0x2020) path, the persisted BAG items the world-entry

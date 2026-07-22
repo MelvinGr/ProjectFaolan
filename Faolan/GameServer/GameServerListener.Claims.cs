@@ -86,11 +86,12 @@ namespace Faolan.GameServer
 		}
 
 		// Dispatch an inbound CoreClaimIIR. Body (after the 0x2000 sub-header) = [receiverClass][receiverInstance][u16 sub][args].
-		private async Task HandleCoreClaim(INetworkClient client, ConanPacket packet)
+		private async Task HandleCoreClaim(INetworkClient client, Rpc packet)
 		{
-			_ = packet.Body.ReadUInt32(); // receiver class (0xC350 Character)
-			_ = packet.Body.ReadUInt32(); // receiver instance (the player's handle)
-			var sub = packet.Body.ReadUInt16();
+			var body = packet.BodyReader();
+			_ = body.ReadUInt32(); // receiver class (0xC350 Character)
+			_ = body.ReadUInt32(); // receiver instance (the player's handle)
+			var sub = body.ReadUInt16();
 
 			switch (sub)
 			{
@@ -99,12 +100,12 @@ namespace Faolan.GameServer
 					break;
 
 				case CoreClaimListCodec.SubRedeem: // 0x0003 - redeem the 1-based claim index
-					var index = packet.Body.ReadUInt32();
+					var index = body.ReadUInt32();
 					await RedeemClaim(client, index);
 					break;
 
 				default:
-					Logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, packet.Body.Length);
+					Logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
 					break;
 			}
 		}

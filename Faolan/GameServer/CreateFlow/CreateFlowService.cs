@@ -117,12 +117,13 @@ namespace Faolan.GameServer.CreateFlow
 		//
 		// TheNameIs commits the chosen name straight to the character row (CommitCharacterName); the
 		// create-editor gating keys on Character.Name so the commit is what promotes it out of the editor.
-		internal async Task HandleCommandPacket(INetworkClient client, ConanPacket packet)
+		internal async Task HandleCommandPacket(INetworkClient client, Rpc packet)
 		{
-			var ack = packet.Body.ReadUInt32();
-			var clientInstance = packet.Body.ReadUInt32();
-			var reserved = packet.Body.ReadByte();
-			var msg = packet.Body.ReadProtobufUInt32Length<ProtoScryScriptIIR>();
+			var body = packet.BodyReader();
+			var ack = body.ReadUInt32();
+			var clientInstance = body.ReadUInt32();
+			var reserved = body.ReadByte();
+			var msg = body.ReadProtobufUInt32Length<ProtoScryScriptIIR>();
 
 			var value = msg.IntParameter; // decoded signed value (identity ids, morph slider, ...)
 			var rawValue = (uint)((value << 1) ^ (value >> 31)); // the raw wire varint (zigzag re-encode) for script echoes

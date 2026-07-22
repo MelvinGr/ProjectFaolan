@@ -10,6 +10,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -177,6 +178,18 @@ namespace Faolan.Core.Network
 		protected void LogUnknownPacket(Packet packet, ushort opcode, string opcodeName = "Unknown")
 		{
 			Logger.LogUnhandled(ChannelName, packet, opcode, opcodeName);
+		}
+
+		// Rpc-model UL trace (Gitea #407): the listener dispatches on the parsed Rpc, which doesn't carry the total
+		// frame length, so the caller threads it (the serialized ConanPacket's Bytes.Length) alongside.
+		protected void LogPacketReceived(in Rpc packet, Enum opcode, int frameLength)
+		{
+			Logger.LogReceived(ChannelName, packet, opcode, frameLength);
+		}
+
+		protected void LogUnknownPacket(in Rpc packet, ushort opcode, string opcodeName, int frameLength)
+		{
+			Logger.LogUnhandled(ChannelName, packet, opcode, opcodeName, frameLength);
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, TPacket packet);

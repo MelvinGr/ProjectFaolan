@@ -25,15 +25,22 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private async Task Handle0X2000(INetworkClient client, ConanPacket packet)
+		private async Task Handle0X2000(INetworkClient client, Rpc packet)
 		{
+			var body = packet.BodyReader();
+
 			// Snapshot the entire 0x2000 sub-payload before consuming it, so every
 			// case below can dump the raw bytes for offline reverse-engineering.
 			// This is the data starting at the 4-byte pbLength header.
-			var rawPayload = packet.Body.ToArray();
+			var rawPayload = body.ToArray();
 
-			var pbLength = packet.Body.ReadUInt32();
-			var pbOpcode = packet.Body.ReadUInt32<GameServer0X2000Opcodes>();
+			var pbLength = body.ReadUInt32();
+			var pbOpcode = body.ReadUInt32<GameServer0X2000Opcodes>();
+
+			// The two sub-handlers that CONTINUE reading from the shared cursor (ScryScriptIIR -> HandleCommandPacket
+			// and the create-editor instance echo) get the body sliced past the [pbLength][pbOpcode] prefix, so they
+			// can read from their own position 0 - preserving the old ConanPacket.Body shared-cursor behaviour (#407).
+			var subPacket = packet with { Body = packet.Body.Slice((int)body.Position) };
 
 			Logger.LogInformation("GameServer 0x2000 subopcode {SubOpcodeName} ({SubOpcodeHex}), payloadLength={PayloadLength}, rawLength={RawLength}", pbOpcode, pbOpcode.ToHex(), pbLength,
 				rawPayload.Length);
@@ -48,7 +55,7 @@ namespace Faolan.GameServer
 			// the subopcode is dynamic - match it against the session instance and route it to the echo handler.
 			if (client.Session.IsUnnamedCreatePhase && client.Session.Account?.ClientInstance == (uint)pbOpcode)
 			{
-				await HandleCreateEditorInstanceEcho(client, packet);
+				await HandleCreateEditorInstanceEcho(client, subPacket);
 				return;
 			}
 
@@ -80,15 +87,15 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.ScryScriptIIR:
 				{
-					await _createFlow.HandleCommandPacket(client, packet);
+					await _createFlow.HandleCommandPacket(client, subPacket);
 					break;
 				}
 
 				case GameServer0X2000Opcodes.CharDCMoveIIR:
 				{
-					var dataobjdec = packet.Body.ReadUInt32();
-					var dataclientinst = packet.Body.ReadUInt32();
-					var movingType = packet.Body.ReadUInt16<MovingType>();
+					var dataobjdec = body.ReadUInt32();
+					var dataclientinst = body.ReadUInt32();
+					var movingType = body.ReadUInt16<MovingType>();
 
 					switch (movingType)
 					{
@@ -113,9 +120,9 @@ namespace Faolan.GameServer
 								break;
 							}
 
-							var movePosition = packet.Body.ReadVector3();
-							var moveRotation = packet.Body.ReadVector3(); // not sure if this is correct
-							var datadat = packet.Body.ReadRemainingArray();
+							var movePosition = body.ReadVector3();
+							var moveRotation = body.ReadVector3(); // not sure if this is correct
+							var datadat = body.ReadRemainingArray();
 
 							// The WorldEntity owns the live transform (Gitea #404); the
 							// persisted Character is only the spawn seed (movement is never persisted live). Update the
@@ -280,19 +287,19 @@ namespace Faolan.GameServer
 					// Representative samples split into a small object/position block, a 125-byte metadata block, 					// and a variable nested entry block that currently decodes as 2, 3, or 4 repeated entries.
 					// New random-actions evidence suggests the player bag is more likely part of the giant 0x737A6DF9
 					// initial-state dump, while 0xF096251E still looks like remote chest/container data.
-					var unk0 = packet.Body.ReadUInt32();
-					var clientInst = packet.Body.ReadUInt32();
-					var unk1 = packet.Body.ReadUInt16();
+					var unk0 = body.ReadUInt32();
+					var clientInst = body.ReadUInt32();
+					var unk1 = body.ReadUInt16();
 					// Some Interact variants are short and carry NO actionType/args (observed: a 10-byte trailer ending
 					// `00 08` the client sends around loot/kill). Reading actionType unconditionally threw EndOfStreamException, 					// which ReceivedPacket turns into a hard client.Stop() (disconnect). Bail gracefully on a short body.
-					if (packet.Body.Length - packet.Body.Position < sizeof(uint))
+					if (body.Length - body.Position < sizeof(uint))
 					{
 						Logger.LogDebug("Interact: short body (unk1=0x{Unk1:X4}), no actionType - ignoring.", unk1);
 						break;
 					}
 
-					var actionType = packet.Body.ReadUInt32<ActionType>();
-					var args = packet.Body.ReadProtobufUInt32Length<CommandMessage>();
+					var actionType = body.ReadUInt32<ActionType>();
+					var args = body.ReadProtobufUInt32Length<CommandMessage>();
 
 					if (actionType == ActionType.SwitchWeaponsButton)
 					{
@@ -315,13 +322,13 @@ namespace Faolan.GameServer
 					{
 						// Not every action carries from/target after the args (e.g. TalkToNpc only has a short
 						// trailer - the NPC handle lives in args.Target.Instance). Read defensively to avoid overrunning.
-						var from = packet.Body.Length - packet.Body.Position >= sizeof(uint)
-							? packet.Body.ReadUInt32()
+						var from = body.Length - body.Position >= sizeof(uint)
+							? body.ReadUInt32()
 							: 0; // fromid or slotid depending on actionType, see below
-						var target = packet.Body.Length - packet.Body.Position >= sizeof(uint)
-							? packet.Body.ReadUInt32()
+						var target = body.Length - body.Position >= sizeof(uint)
+							? body.ReadUInt32()
 							: 0;
-						var unk2 = packet.Body.ReadRemainingArray();
+						var unk2 = body.ReadRemainingArray();
 
 						switch (actionType)
 						{
@@ -886,8 +893,8 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.CharacterActionIIR: // Also received when Activating feat point ??
 				{
-					var unk0 = packet.Body.ReadUInt32();
-					var clientInst = packet.Body.ReadUInt32();
+					var unk0 = body.ReadUInt32();
+					var clientInst = body.ReadUInt32();
 
 					Logger.LogInformation("GameServer close request for character {CharacterId}", clientInst.ToHex());
 
@@ -903,7 +910,7 @@ namespace Faolan.GameServer
 					//   [u16 0xC350 targetTag][u32 targetHandle] [trailing counters]
 					// On deselect the target tag+handle are zeroed. Decoded from
 					// Hoxxling_mage-heraldofxotli_login_gameplay (frames 259 select / 362 deselect).
-					var data = packet.Body.ReadRemainingArray();
+					var data = body.ReadRemainingArray();
 
 					uint targetHandle = 0;
 					if (data.Length >= 17)
@@ -923,7 +930,7 @@ namespace Faolan.GameServer
 					// ProtoDeleteItemIIR, NOT the sibling move message: { container_id, item_pos, template_id }. The
 					// two alias on the wire for fields 1-3, so this parsed as a move for a long time and quietly read
 					// the item TEMPLATE id as a destination container - see InventoryDeleteCodec.
-					var (_, drop) = InventoryDeleteCodec.Parse(packet.Body);
+					var (_, drop) = InventoryDeleteCodec.Parse(body);
 
 					Logger.LogInformation($"DropItem: {drop}");
 
@@ -948,7 +955,7 @@ namespace Faolan.GameServer
 					// the 0x737A6DF9 field-6 chain) "behaves like a container-owner handle" - it is the container's
 					// ProtoID32.instance, not a per-item id. No server->client packet follows these moves.
 
-					var (_, move) = InventoryMoveCodec.Parse(packet.Body);
+					var (_, move) = InventoryMoveCodec.Parse(body);
 
 					Logger.LogInformation($"MoveItemInInventory: {move}");
 
@@ -965,13 +972,13 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.QuestIIR:
 				{
-					var unk0 = packet.Body.ReadUInt32();
-					var clientInst = packet.Body.ReadUInt32();
-					var unk1 = packet.Body.ReadByte();
-					var unk2 = packet.Body.ReadUInt32();
-					var unk3 = packet.Body.ReadUInt32();
-					var questId = packet.Body.ReadUInt32(); // probably
-					var unk4 = packet.Body.ReadUInt32();
+					var unk0 = body.ReadUInt32();
+					var clientInst = body.ReadUInt32();
+					var unk1 = body.ReadByte();
+					var unk2 = body.ReadUInt32();
+					var unk3 = body.ReadUInt32();
+					var questId = body.ReadUInt32(); // probably
+					var unk4 = body.ReadUInt32();
 
 					/*
 						// Shadows of the past
@@ -1016,7 +1023,7 @@ namespace Faolan.GameServer
 					// The client opened the Crafting -> Recipes book and is asking for its recipe list. Answer with
 					// the TradeskillReplyIIR (0x9062D559) catalog from the DB so the book populates. See
 					// TradeskillRecipeCodec / docs/subsystems/tradeskill-recipes.md.
-					_ = packet.Body.ReadRemainingArray();
+					_ = body.ReadRemainingArray();
 					await SendCraftingRecipeBook(client);
 
 					break;
@@ -1035,7 +1042,7 @@ namespace Faolan.GameServer
 					// Visible gear already arrives with the spawn snapshot, so drop it quietly like the teleport acks
 					// below; answering would diverge from capture. The s2c push itself is unimplemented (see
 					// UpdateInventoryCodec, currently emitted nowhere).
-					//var probe = packet.Body.ReadRemainingArray();
+					//var probe = body.ReadRemainingArray();
 
 					Logger.LogDebug("GameServer 0x2000 inventory probe"); //" {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), probe.Length);
 
@@ -1044,7 +1051,7 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					var data = packet.Body.ReadRemainingArray();
+					var data = body.ReadRemainingArray();
 
 					// In-world the client streams 0x2000 packets whose sub-opcode is its OWN instance id
 					// (the client-instance ack/keepalive stream). With the create flow now using the real
@@ -1077,12 +1084,13 @@ namespace Faolan.GameServer
 		// Handles the create-editor "instance echo": the client repeats its own client instance id as a 0x2000
 		// subopcode while the editor is loading. We count these to time the post-0x205F and post-ready bursts, 		// exactly as retail does, and ack standalone ones. (Retail used a fixed instance; we hand out the
 		// character's real id, so the matching is done dynamically by the caller.)
-		private async Task HandleCreateEditorInstanceEcho(INetworkClient client, ConanPacket packet)
+		private async Task HandleCreateEditorInstanceEcho(INetworkClient client, Rpc packet)
 		{
+			var body = packet.BodyReader();
 			// The instance-echo carries [ack0][requestId]; read them directly (a short body throws, surfacing the
 			// unexpected shape, rather than being silently swallowed).
-			var ack0 = packet.Body.ReadUInt32();
-			var requestId = packet.Body.ReadUInt32();
+			var ack0 = body.ReadUInt32();
+			var requestId = body.ReadUInt32();
 			Logger.LogInformation("Create-editor instance-echo decoded: ack0={Ack0:X}, requestId={RequestId:X}.", ack0, requestId);
 
 			if (!client.Session.CreateEditorObservedRequestIds.Contains(requestId))
@@ -1095,11 +1103,12 @@ namespace Faolan.GameServer
 		}
 
 		// GameAgent (connection-class) dispatch: auth / chat / ping / server-stats. Routed here by receiver class.
-		private async Task HandleGameAgentPacket(INetworkClient client, ConanPacket packet)
+		private async Task HandleGameAgentPacket(INetworkClient client, Rpc packet, int frameLength)
 		{
+			var body = packet.BodyReader();
 			var gaOp = (GameAgentOpcodes)packet.Opcode;
 			if (gaOp is not GameAgentOpcodes.UpdateGameServerStats)
-				LogPacketReceived(packet, gaOp);
+				LogPacketReceived(packet, gaOp, frameLength);
 
 			switch (gaOp)
 			{
@@ -1109,15 +1118,15 @@ namespace Faolan.GameServer
 					// The GameCharAgent.SetTutorialStats collision on this opcode is resolved by the class-first route
 					// above, so here the body is always the >= 12-byte Authenticate2. Guard defensively anyway: a short
 					// body would over-read and drop the client.
-					if (packet.Body.Length - packet.Body.Position < 12)
+					if (body.Length - body.Position < 12)
 					{
-						Logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", packet.Body.Length - packet.Body.Position);
+						Logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", body.Length - body.Position);
 						break;
 					}
 
-					var clientInstance = packet.Body.ReadUInt32(); // 0x0802e5d4 0x1101b4f5
-					var accountId = packet.Body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
-					var clientVersion = packet.Body.ReadString();
+					var clientInstance = body.ReadUInt32(); // 0x0802e5d4 0x1101b4f5
+					var accountId = body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
+					var clientVersion = body.ReadString();
 
 					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
@@ -1258,13 +1267,13 @@ namespace Faolan.GameServer
 				{
 					// 0x2002 = GameAgent.ChatVicinity (typed chat, carries GM commands). The GameCharAgent.RequestBindLocation
 					// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
-					LogPacketBodyDebug("GameServer ChatCommand body", packet.Body?.ToArray()!);
+					LogPacketBodyDebug("GameServer ChatCommand body", body.ToArray());
 
-					var unk0 = packet.Body!.ReadUInt32();
-					var unk1 = packet.Body.ReadUInt32();
-					var unk2 = packet.Body.ReadUInt32();
-					var unk3 = packet.Body.ReadUInt32();
-					var text = packet.Body.ReadString();
+					var unk0 = body.ReadUInt32();
+					var unk1 = body.ReadUInt32();
+					var unk2 = body.ReadUInt32();
+					var unk3 = body.ReadUInt32();
+					var text = body.ReadString();
 
 					if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.Type >= AccountType.GameMaster)
 						await HandleGmCommand(client, text);
@@ -1280,7 +1289,7 @@ namespace Faolan.GameServer
 				{
 					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
 					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
-					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
+					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode), frameLength);
 					break;
 				}
 			}
@@ -1288,11 +1297,12 @@ namespace Faolan.GameServer
 
 		// GameCharAgent dispatch: the 0x2002/0x2003 collision forms (bind/tutorial) + every per-character method
 		// (loot / shop / respawn / shortcut / latency / ...). Routed here by receiver class from ReceivedPacket.
-		private async Task HandleGameCharAgentPacket(INetworkClient client, ConanPacket packet)
+		private async Task HandleGameCharAgentPacket(INetworkClient client, Rpc packet, int frameLength)
 		{
+			var body = packet.BodyReader();
 			var charOp = (GameCharAgentOpcodes)packet.Opcode;
 			if (charOp is not GameCharAgentOpcodes.Ping)
-				LogPacketReceived(packet, charOp);
+				LogPacketReceived(packet, charOp, frameLength);
 
 			switch (charOp)
 			{
@@ -1304,8 +1314,8 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.SetTutorialStats: // 0x2003 = SetTutorialStats (Tortage tutorial tracking)
 				{
-					var tutorialStat = packet.Body.Length - packet.Body.Position >= sizeof(uint)
-						? packet.Body.ReadUInt32()
+					var tutorialStat = body.Length - body.Position >= sizeof(uint)
+						? body.ReadUInt32()
 						: 0;
 					Logger.LogDebug("GameCharAgent.SetTutorialStats(0x{Value:X8}); no reply.", tutorialStat);
 					return;
@@ -1313,20 +1323,17 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.SetHideInspectOption:
 				{
-					if (packet.Body != null)
-					{
-						LogPacketBodyDebug("GameServer 0x207E body", packet.Body.ToArray());
-						if (packet.Body.Length > 0)
-							Logger.LogInformation("0x207E decoded: value0={Value0:X2}", packet.Body.ToArray()[0]);
-					}
+					LogPacketBodyDebug("GameServer 0x207E body", body.ToArray());
+					if (body.Length > 0)
+						Logger.LogInformation("0x207E decoded: value0={Value0:X2}", body.ToArray()[0]);
 
 					break;
 				}
 
 				case GameCharAgentOpcodes.CinematicTransition:
 				{
-					var unk0 = packet.Body.ReadUInt32(); // 0xc350
-					var characterId = packet.Body.ReadUInt32();
+					var unk0 = body.ReadUInt32(); // 0xc350
+					var characterId = body.ReadUInt32();
 
 					if (client.Session.IsUnnamedCreatePhase)
 					{
@@ -1355,8 +1362,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.DoSkillSellback:
 				{
-					if (packet.Body != null)
-						LogPacketBodyDebug("GameServer 0x205C body", packet.Body.ToArray());
+					LogPacketBodyDebug("GameServer 0x205C body", body.ToArray());
 
 					break;
 				}
@@ -1366,8 +1372,7 @@ namespace Faolan.GameServer
 					// #234 create-cutscene speech: the client is asking us to resolve a stock phrase
 					// ({stock_N}) and BLOCKS up to 60 s for the 0x205D reply. Answer it (Kalanthes's beach
 					// lines) instead of silently timing out. See Dialogue/StockConversationService.cs.
-					if (packet.Body != null)
-						await _stockConversation.HandlePlayStockphraseAsSubtitle(client, packet.Body.ToArray());
+					await _stockConversation.HandlePlayStockphraseAsSubtitle(client, body.ToArray());
 
 					break;
 				}
@@ -1395,9 +1400,9 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.BuyItem:
 				{
-					packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
-					var shopId = packet.Body.ReadUInt32();
-					var pos = packet.Body.ReadUInt32();
+					body.ReadUInt32(); // shop ID32 type (0xC75B)
+					var shopId = body.ReadUInt32();
+					var pos = body.ReadUInt32();
 
 					// Resolve the clicked slot against the open shop, debit the wallet and grant the item live
 					// (DispatchAddItem). The item-grant wall that gated this is gone (protocol_containeradditem).
@@ -1457,8 +1462,8 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.RespawnMe: // the player's release/resurrect click; body = [u32 token]
 				{
-					var token = packet.Body?.Length >= sizeof(uint)
-						? packet.Body.ReadUInt32()
+					var token = body.Length >= sizeof(uint)
+						? body.ReadUInt32()
 						: 0;
 
 					// Retail respawn is click-driven (vitals restore + tombstone + teleport + re-render at the
@@ -1474,8 +1479,8 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId(base)][u32 charId]
 				{
-					var buffId = packet.Body.ReadUInt32();
-					var charId = packet.Body.ReadUInt32();
+					var buffId = body.ReadUInt32();
+					var charId = body.ReadUInt32();
 					var self = client.Session.Character.Id;
 					var entity = _simulation.PlayerWorldEntity(client);
 
@@ -1569,7 +1574,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
 				{
-					LogPacketBodyDebug("GameServer 0x207B body", packet.Body?.ToArray()!);
+					LogPacketBodyDebug("GameServer 0x207B body", body.ToArray());
 
 					//Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
 
@@ -1583,7 +1588,7 @@ namespace Faolan.GameServer
 					// spellweave captures), 0xFF = open the Crafting -> Recipes book, 0x6C/0x6D/0x70/0xF0 = melee
 					// combo inputs (Hoxxling/AssassinL23 combo captures). Only 0xFC drives the trance - blindly routing
 					// every 0x205A to spellweave made opening the recipe book start a weave on a necro.
-					var action = packet.Body.ReadUInt32();
+					var action = body.ReadUInt32();
 
 					Logger.LogInformation("0x205A (PerformSpecialAction) param={Action:X4}", action);
 
@@ -1610,18 +1615,18 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
 				{
-					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray()!);
+					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", body.ToArray());
 
 					break;
 				}
 
 				case GameCharAgentOpcodes.SplitInventoryItem:
 				{
-					var unk0 = packet.Body.ReadUInt32();
-					var unk1 = packet.Body.ReadUInt32();
-					var sourceSlot = packet.Body.ReadUInt32();
-					var targetStackSize = packet.Body.ReadUInt32();
-					var targetSlot = packet.Body.ReadUInt32();
+					var unk0 = body.ReadUInt32();
+					var unk1 = body.ReadUInt32();
+					var sourceSlot = body.ReadUInt32();
+					var targetStackSize = body.ReadUInt32();
+					var targetSlot = body.ReadUInt32();
 
 					// 0x00, 0x00, 0x00, 0x68, 					// 0x11, 0x01, 0xB4, 0xF5, 					// 0x00, 0x00, 0x00, 0x09, // source slot
 					// 0x00, 0x00, 0x00, 0x29, // 41 (target stack size)
@@ -1685,7 +1690,7 @@ namespace Faolan.GameServer
 				{
 					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
 					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
-					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
+					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode), frameLength);
 					break;
 				}
 			}
@@ -1707,8 +1712,9 @@ namespace Faolan.GameServer
 		// The 3rd field is the target's overhead NAME-COLOUR category (0 friendly / 1 hostile / 2 neutral), the SOLE
 		// driver of the red/green/yellow name (proven by live gdb, #256) - not a live-aggro flag. We answer every
 		// poll (still unblocks the load) and now set 1 for hostile NPCs so their names render red like retail.
-		private async Task HandleGameCharAgentProject(INetworkClient client, ConanPacket packet)
+		private async Task HandleGameCharAgentProject(INetworkClient client, Rpc packet)
 		{
+			var body = packet.BodyReader();
 			switch ((GameCharAgentProjectOpcodes)packet.Opcode)
 			{
 				case GameCharAgentProjectOpcodes.RequestAggroStatus: // 0x2000 - GATES the loading screen (must reply)
@@ -1730,8 +1736,8 @@ namespace Faolan.GameServer
 					// during sprint - verified: 1 packet across a sprint-heavy capture). We don't reply or drive the bar;
 					// we only MIRROR the drain into the tracked session.Energy so spellweaving starts from the real
 					// current value and Exhausted can fire at 0 (docs/subsystems/combos.md).
-					var state = packet.Body != null && packet.Body.Length - packet.Body.Position >= sizeof(ushort)
-						? packet.Body.ReadUInt16()
+					var state = body.Length - body.Position >= sizeof(ushort)
+						? body.ReadUInt16()
 						: (ushort)0;
 					TrackSprintEnergy(client, state == 1);
 					break;
@@ -1747,13 +1753,14 @@ namespace Faolan.GameServer
 			}
 		}
 
-		private async Task HandleRequestAggroStatus(INetworkClient client, ConanPacket packet)
+		private async Task HandleRequestAggroStatus(INetworkClient client, Rpc packet)
 		{
+			var body = packet.BodyReader();
 			// RequestAggroStatus(const ID32& charId, const ID32& targetId): each ID32 is [u32 type][u32 instance].
-			packet.Body.ReadUInt32(); // charId.type   (0x0000C350)
-			packet.Body.ReadUInt32(); // charId.instance (the polling player)
-			var targetType = packet.Body.ReadUInt32(); // targetId.type (0x0000C350)
-			var targetInstance = packet.Body.ReadUInt32();
+			body.ReadUInt32(); // charId.type   (0x0000C350)
+			body.ReadUInt32(); // charId.instance (the polling player)
+			var targetType = body.ReadUInt32(); // targetId.type (0x0000C350)
+			var targetInstance = body.ReadUInt32();
 
 			var instance = client.Session.Character.Id;
 
@@ -1782,17 +1789,18 @@ namespace Faolan.GameServer
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
 		}
 
-		private async Task HandleRequestBindLocation(INetworkClient client, ConanPacket packet)
+		private async Task HandleRequestBindLocation(INetworkClient client, Rpc packet)
 		{
+			var body = packet.BodyReader();
 			// body = [u32 ID32 type][u32 requesterId]; tolerate a SHORT/empty poll (the client sends a bare-header
 			// variant) - the reply is derived from the character, not the body, and requesterId is only for the log.
 			// Reading past a short body threw EndOfStreamException, which propagated out of ReceivedPacket and CLOSED
 			// the connection (the client dropped at world entry).
 			uint requesterId = 0;
-			if (packet.Body.Length >= 8)
+			if (body.Length >= 8)
 			{
-				packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
-				requesterId = packet.Body.ReadUInt32();
+				body.ReadUInt32(); // ID32 type (0x0000C350)
+				requesterId = body.ReadUInt32();
 			}
 
 			// The bind playfield is the map of the character's persisted bind RespawnPoint (set by .bind / a
@@ -1811,18 +1819,19 @@ namespace Faolan.GameServer
 		// the client renders the show/hide itself. Body = [u32 slot][u32 removedItemOccupySlots][u8 toggleState]. We
 		// PERSIST it (CharacterEquipment vanity flags) so it survives relog: a withheld vanity item then drops out of
 		// the character snapshot equipment (PlayerSpawnEquipment), which is how the client restores the toggle on login.
-		private async Task HandleToggleVanityArmorFilter(INetworkClient client, ConanPacket packet)
+		private async Task HandleToggleVanityArmorFilter(INetworkClient client, Rpc packet)
 		{
+			var body = packet.BodyReader();
 			var character = client.Session.Character;
-			if (character == null || packet.Body == null || packet.Body.Length - packet.Body.Position < 9)
+			if (character == null || body.Length - body.Position < 9)
 				return;
 
-			var slot = packet.Body.ReadUInt32();
-			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
+			var slot = body.ReadUInt32();
+			body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
 									  // Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
 									  // shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
 									  // (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
-			var toggleState = Convert.ToBoolean(packet.Body.ReadByte());
+			var toggleState = Convert.ToBoolean(body.ReadByte());
 
 			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);
 			Logger.LogDebug("ToggleVanityArmorFilter(slot={Slot}, toggleState={toggleState}) {Applied}.", slot, toggleState, applied

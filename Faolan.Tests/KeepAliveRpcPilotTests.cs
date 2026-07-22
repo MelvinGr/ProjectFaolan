@@ -37,8 +37,9 @@ namespace Faolan.Tests
 			const uint counter = 0x00000007;
 			var client = ClientAt(Instance);
 
-			// Stimulus: an inbound LatencyCheck whose body starts with the counter the reply must echo.
-			var incoming = new ConanPacket(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance,
+			// Stimulus: an inbound LatencyCheck whose body starts with the counter the reply must echo. Parsed straight
+			// into the Rpc the receive path now dispatches on (Gitea #407).
+			var incoming = PacketParser.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance,
 				(ushort)GameCharInterfaceOpcodes.DispatchPong, [], [0x00, 0x00, 0x00, 0x07]));
 
 			await KeepAliveService.HandleLatencyCheck(client, incoming);
