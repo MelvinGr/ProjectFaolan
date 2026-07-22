@@ -8,9 +8,11 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -42,16 +44,28 @@ namespace Faolan.Web.Content
 
 		public static int Main(string[] args)
 		{
-			var ip = GetOption(args, "--ip") ?? "127.0.0.1";
+			var builder = WebApplication.CreateBuilder(args);
 
-			var port = GetOption(args, "--port") is { } p
-				? int.Parse(p)
-				: 7081;
+			// Config precedence (highest wins): environment variables > command line > faolan.json. faolan.json is
+			// OPTIONAL - the mirror runs on the built-in defaults with no file (parity with the server / Faolan.Web).
+			// The --store/--ip/--port switches are mapped onto the CdnMirror* keys so the existing launch scripts keep
+			// working (as the command-line layer, overriding faolan.json but below env vars). Sources are cleared first
+			// so the order is exactly this (no appsettings.json in the mix).
+			builder.Configuration.Sources.Clear();
+			builder.Configuration.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true); // repo-root-relative (CWD-independent), like Faolan.Web
+			builder.Configuration.AddCommandLine(args, new Dictionary<string, string>
+			{
+				["--store"] = "CdnMirrorStore",
+				["--ip"] = "CdnMirrorIp",
+				["--port"] = "CdnMirrorPort"
+			});
+			builder.Configuration.AddEnvironmentVariables();
 
-			var storeDir = Path.GetFullPath(GetOption(args, "--store") ?? "mirror-store");
+			var ip = builder.Configuration.CdnMirrorIp;
+			var port = builder.Configuration.CdnMirrorPort;
+			var storeDir = Path.GetFullPath(builder.Configuration.CdnMirrorStore);
 			Directory.CreateDirectory(storeDir);
 
-			var builder = WebApplication.CreateBuilder(args);
 			builder.WebHost.UseUrls($"http://{ip}:{port}");
 			// Don't let HttpClient transparently gunzip: we store and re-serve the exact payload bytes the client's
 			// own decompressor expects. Requesting identity upstream keeps HTTP out of the picture entirely.
@@ -148,14 +162,6 @@ namespace Faolan.Web.Content
 			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store}", ip, port, storeDir);
 			app.Run();
 			return 0;
-		}
-
-		private static string? GetOption(string[] args, string name)
-		{
-			var i = Array.IndexOf(args, name);
-			return i >= 0 && i + 1 < args.Length
-				? args[i + 1]
-				: null;
 		}
 
 		// Replace the three real CDN /upm bases in a served LocalConfig.xml with this mirror, so a patcher that

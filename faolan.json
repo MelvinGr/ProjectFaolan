@@ -11,6 +11,12 @@
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
+	// Faolan.Web.Content CDN mirror (optional; also --store/--ip/--port or env CdnMirror*). Machine-local store paths
+	// belong in run.sh/run.bat, which override --store; this default is a CWD-relative dir so the repo stays portable.
+	"CdnMirrorStore": "mirror-store",
+	"CdnMirrorIp": "127.0.0.1",
+	"CdnMirrorPort": 7081,
+
 	"LogFile": "faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
 	"LogPacketBytes": true, // false = drop the raw header/body hex dump, keep just the opcode + lengths
 
