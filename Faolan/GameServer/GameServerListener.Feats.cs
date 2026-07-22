@@ -10,6 +10,7 @@ using Faolan.Core.Network.Codecs.Feats;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -119,10 +120,9 @@ namespace Faolan.GameServer
 
 			// Ack: echo the requested id list back (state 0x05), byte-for-byte as retail does. The client renders the
 			// trained feats off this; the next spawn regenerates them from the persisted CharacterFeat rows.
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(FeatIirCodec.Build(handle, FeatIirCodec.StateAck, featIds))
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(FeatIirCodec.Build(handle, FeatIirCodec.StateAck, featIds))));
 
 			Logger.LogInformation("Character {CharacterId} trained {Added} feat(s) [{Ids}].", character.Id, added, string.Join(",", featIds));
 		}
@@ -166,10 +166,9 @@ namespace Faolan.GameServer
 			var token = character.Id; // a per-request token the client echoes back in the answer (player handle == id)
 			client.Session.PendingFeatUntrainToken = token;
 
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchFeatUntrainMessageBox)
-				.WriteArray(FeatUntrainMessageBoxCodec.Build(1, 0, token)) // kind 1 = untrain-all; value 0 = free (no cost model yet)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchFeatUntrainMessageBox,
+				FeatUntrainMessageBoxCodec.Build(1, 0, token))); // kind 1 = untrain-all; value 0 = free (no cost model yet)
 
 			Logger.LogInformation("Sent feat untrain-all confirm to character {CharacterId} ({Count} feats).", character.Id, feats.Length);
 		}

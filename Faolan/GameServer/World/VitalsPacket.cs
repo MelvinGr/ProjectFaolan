@@ -2,7 +2,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 
 namespace Faolan.GameServer.World
 {
@@ -17,9 +17,8 @@ namespace Faolan.GameServer.World
 		// Builds a framed 0x96B8DC59 stat-update packet for an entity (defaults to the session's own client instance).
 		public static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
-			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(StatUpdateCodec.BuildBody(entityHandle, stats));
-			return ps.WriteLengthHash().ToArray();
+			return PacketSerializer.Serialize(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(StatUpdateCodec.BuildBody(entityHandle, stats))));
 		}
 	}
 }

@@ -12,6 +12,7 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -176,10 +177,9 @@ namespace Faolan.GameServer
 			// as "Claim All" deletes rows one by one (which would otherwise shift every later index).
 			client.Session.ClaimSlots = rows.Select(r => r.Id).ToList();
 
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))));
 
 			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
 			// so a re-entry this session doesn't re-glow).
@@ -197,10 +197,9 @@ namespace Faolan.GameServer
 			if (!client.Session.Account.ClaimsAvailable)
 				return;
 
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))));
 		}
 
 		// The sub-0x05 refresh for a multi-charge claim: echo the redeemed row (at its 1-based list index) with its new
@@ -213,10 +212,9 @@ namespace Faolan.GameServer
 				: claim.Code;
 			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
 
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
 		}
 
 		// Map DB rows to wire entries: assign 1-based indices in Id order and, per row, emit the item's real TEA key

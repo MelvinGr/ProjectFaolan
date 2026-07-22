@@ -9,6 +9,8 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -66,12 +68,11 @@ namespace Faolan.GameServer
 
 			var owner = client.Session.Character.Id;
 			entity.OwnerHandle = owner;
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
 					? PetIirCodec.CombatKind
-					: PetIirCodec.SocialKind))
-				.SendAsync(client);
+					: PetIirCodec.SocialKind))));
 
 			_broadcaster.SetNpcFollow(client, entity.Handle, true);
 			return entity;
@@ -223,10 +224,9 @@ namespace Faolan.GameServer
 		{
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
 
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []))
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []))));
 		}
 
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
@@ -237,10 +237,8 @@ namespace Faolan.GameServer
 		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
 		private Task SendLearnSpell(INetworkClient client, uint spellId)
 		{
-			return new PacketStream()
-				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchLearnSpell)
-				.WriteArray(AbilityGrantBody.BuildLearnSpellBody(spellId))
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchLearnSpell, AbilityGrantBody.BuildLearnSpellBody(spellId)));
 		}
 
 		// Sends the MagicBuffIIR (ApplySpell 0x6B87E316) carrier with an already-CONSTRUCTED payload and, for a SELF
@@ -255,10 +253,8 @@ namespace Faolan.GameServer
 			// (NpcSpellCastBuilderTests). Built once so the identical bytes go to the caster AND to nearby viewers below.
 			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
 
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(body)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 
 			// #48-analogue: nearby players see the cast EFFECT, not just the gesture. Retail streams the actor's
 			// ApplySpell to observers who see the caster (other_playersvisible capture: other-player self-buffs +
@@ -337,12 +333,9 @@ namespace Faolan.GameServer
 		// -> GameCharInterfaceProject/instance; energy full = 8910 for the necro).
 		private Task SendSprintBar(INetworkClient client, uint energy)
 		{
-			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType),
-					GameCharInterfaceProjectOpcodes.DispatchUpdateSprintBar)
-				.WriteUInt32(energy)
-				.WriteByte(0x01)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.EndpointOf(Endpoints.GameCharInterfaceProjectType),
+				GameCharInterfaceProjectOpcodes.DispatchUpdateSprintBar,
+				body => body.WriteUInt32(energy).WriteByte(0x01)));
 		}
 
 		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
@@ -369,12 +362,10 @@ namespace Faolan.GameServer
 		// `sender` defaults to the login/world grant sender (GameCharAgent 0x58); the create-editor world-prep grant
 		// rides its own conversation (GameCharAgent 0x0C), so it passes that in - the only thing that differs between
 		// the two grant sites (the 81-byte body incl. the TEA key comes wholly from the Ability row either way).
-		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, byte[]? sender = null)
+		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, ProtoEndpoint? sender = null)
 		{
-			return new PacketStream()
-				.WriteHeader(sender ?? LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchAddSpecialAbility)
-				.WriteArray(AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce))
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(sender ?? LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchAddSpecialAbility, AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)));
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute

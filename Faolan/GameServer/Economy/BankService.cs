@@ -7,6 +7,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
@@ -60,17 +61,15 @@ namespace Faolan.GameServer.Economy
 			ushort recordId = 0x0A18; // sequential per-slot record id (session-volatile; matches the capture's range)
 			foreach (var entry in bank.Items)
 			{
-				var ps = new PacketStream();
-				ps.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetItemStat);
-				BankIirCodec.WriteBankSlotRegistration(ps, charInstance, entry.Pos, recordId++);
-				await ps.SendAsync(client);
+				var slotRecordId = recordId++;
+				await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+					GameCharInterfaceOpcodes.DispatchSetItemStat,
+					body => BankIirCodec.WriteBankSlotRegistration(body, charInstance, entry.Pos, slotRecordId)));
 			}
 
 			var record = BankIirCodec.BuildBankIirRecord(charInstance, bank);
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(record)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 
 			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullPlayerCharacterBuilder.BankKind);
 		}

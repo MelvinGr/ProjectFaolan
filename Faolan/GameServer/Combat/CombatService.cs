@@ -13,6 +13,7 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -230,9 +231,9 @@ namespace Faolan.GameServer.Combat
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(instance)
@@ -261,8 +262,7 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(damage)
 					.WriteUInt32(2)
 					.WriteUInt32(0)
-					.WriteUInt32(0))
-				.SendAsync(client);
+					.WriteUInt32(0))));
 
 			// 2) DamageResultIIR - the hit / floating number (crits are just a bigger number, same school).
 			await SendDamageNumber(client, targetHandle, instance, damage, school);
@@ -626,10 +626,8 @@ namespace Faolan.GameServer.Combat
 		// rides the DispatchPassBlob directly (WriteArray, not WriteArrayUInt32Length).
 		public static Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta))
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta)));
 		}
 
 		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
@@ -687,16 +685,14 @@ namespace Faolan.GameServer.Combat
 		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
 		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(feedbackBody).SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, feedbackBody));
 		}
 
 		// Frames a raw 0x2000 body on the world conversation.
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(body)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 	}
 }

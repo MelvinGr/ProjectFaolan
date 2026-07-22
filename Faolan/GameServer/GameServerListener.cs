@@ -93,9 +93,11 @@ namespace Faolan.GameServer
 		private const uint SpellweaveToggleParam = 0xFC;
 
 		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x58);
+		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x58);
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
 		private static readonly byte[] LoginWorld201CSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
+		private static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
 		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32) in
 		// their Retail*Burst sender methods. The client instance is the character's real id: it is written into the
 		// body with WriteUInt32(id) and woven into the sender/receiver conversation id by building each endpoint
@@ -572,5 +574,10 @@ namespace Faolan.GameServer
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's; it's the client's
 		// default IIR PollStatus log). Reverted to 0x58 (the proven value).
 		public static readonly byte[] Sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x58);
+
+		// The same conversation in structured (ProtoEndpoint) form, for the Rpc send boundary (Gitea #406). Coexists
+		// with the byte[] Sender through the GameServer migration; the byte[] retires once no world send hand-frames a
+		// PacketStream anymore.
+		public static readonly ProtoEndpoint SenderEndpoint = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
 	}
 }
