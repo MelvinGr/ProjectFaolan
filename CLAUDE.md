@@ -244,6 +244,19 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
 - Don't "refactor away" magic packet constants or verbatim payloads unless the replacement is proven
   byte-for-byte against a capture. Wrong-looking values are often capture-derived; check the comment
   and the referenced capture first.
+- **Never commit a machine-local absolute path** (`/home/<user>/…`, `/mnt/…`, a `/tmp/claude-…` scratchpad
+  dir, a `C:\Users\…` path) into ANY tracked file — code, tests, docs, scripts, config. The repo is meant to
+  go public and must stay machine-agnostic; a local path is wrong on every other clone and leaks the layout.
+  Instead:
+  - **Runtime code / config:** take the location from a CLI flag or env var, falling back to a clear error —
+    the client RDB dir is `--rdb` → `AOC_RDB` (`ReportCli.RdbDir`); `Faolan.Web`'s `RdbDir` is blank in the
+    committed `appsettings.json` and set in the gitignored `appsettings.Development.json` or the env.
+  - **RE / tool scripts:** write outputs under a repo-relative dir (Ghidra → `Captures/ghidra/output/`) or the
+    system temp dir (`tempfile.gettempdir()`, `Path.GetTempPath()`) — never a hardcoded scratchpad path.
+  - **Docs / prose:** use a placeholder — `<data-repo>/Captures`, `<rdb-dir>`, `$PWD/faolan.db`. Concrete local
+    paths belong in agent memory only (under `~/.claude`), not the repo. See the `no_local_paths_in_repo` memory.
+  - `run.sh` is the one deliberate exception (personal dev launcher, kept local); its Windows twin `run.bat`
+    takes `FAOLAN_CDN_STORE` / `AOC_EXE2` instead.
 - **`docs/` is organized by kind** (see [`docs/protocol/README.md`](docs/protocol/README.md) for the index):
   - `docs/protocol/` — the **verified wire reference**: every fact carries a `[Vn: …]` verification tag a test
     resolves, and `docs/protocol/gen/` is GENERATED from the code (opcodes, IIR types, protobuf, coverage,
