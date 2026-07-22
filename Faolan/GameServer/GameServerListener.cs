@@ -231,9 +231,9 @@ namespace Faolan.GameServer
 			_questProgression = new QuestProgressionService(database, _broadcaster, _questHandler, agentServerDispatcher, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
 				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
-			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
+			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Character.Id, msg),
 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-				// reactive element list + fire burst (docs/subsystems/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+									 // reactive element list + fire burst (docs/subsystems/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
 				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
@@ -280,7 +280,7 @@ namespace Faolan.GameServer
 				{
 					var account = nc.Session.Account;
 					var character = nc.Session.Character;
-					return new SessionInfo(nc.IpAddress!, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name);
+					return new SessionInfo(nc.IpAddress!, account?.Id, account?.UserName, character?.Id, character?.Name);
 				})
 				.ToArray();
 		}

@@ -350,7 +350,7 @@ namespace Faolan.GameServer
 									? "dismount"
 									: "mount", args);
 
-								var self = client.Session.Account!.ClientInstance;
+								var self = client.Session.Character.Id;
 								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId); // cast begin: bar + animation
 
 								if (dismounting)
@@ -460,7 +460,7 @@ namespace Faolan.GameServer
 								var spellId = target != 0
 									? target
 									: args.Target?.Type ?? args.BccActionId;
-								var casterHandle = client.Session.Account!.ClientInstance;
+								var casterHandle = client.Session.Character.Id;
 								var targetHandle = args.Target?.Instance ?? 0;
 
 								// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
@@ -877,7 +877,7 @@ namespace Faolan.GameServer
 						// contains a remote player equipping - single-player traces only).
 						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory)
 						{
-							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
+							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
 							if (behaviorRelay != null)
 								await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
 						}
@@ -1052,7 +1052,7 @@ namespace Faolan.GameServer
 					// (the client-instance ack/keepalive stream). With the create flow now using the real
 					// character id, that id is dynamic (not a fixed enum value like the old 0x021662C8), so
 					// it lands here. Treat it as a benign ping: log quietly, don't spam system messages.
-					if ((uint)pbOpcode == client.Session.Account!.ClientInstance || (uint)pbOpcode == client.Session.Character?.Id)
+					if ((uint)pbOpcode == client.Session.Character.Id)
 					{
 						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
 						break;
@@ -1069,7 +1069,7 @@ namespace Faolan.GameServer
 
 					Logger.LogDebug("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} raw payload: {RawPayload}", pbOpcode.ToHex(), rawPayload.ToHex());
 
-					await _agentServerDispatcher.SendSystemMessage(client.Session.Account.ClientInstance, $"Unknown 0x2000 Opcode: {pbOpcode.ToHex()} ({rawPayload.Length} bytes)");
+					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"Unknown 0x2000 Opcode: {pbOpcode.ToHex()} ({rawPayload.Length} bytes)");
 
 					break;
 				}
@@ -1125,15 +1125,11 @@ namespace Faolan.GameServer
 					if (client.Session.Account == null)
 						throw new Exception($"Account not found: {accountId:X}");
 
-					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
 					client.Session.Account.ClientInstance = clientInstance;
-					client.Session.Character = resolvedCharacter!;
-					if (resolvedCharacter?.Id != clientInstance)
-					{
-						Logger.LogInformation(
-							"GameServer Hello: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8} while preserving the retail temporary instance for create-flow traffic.",
-							clientInstance, resolvedCharacter?.Id ?? 0, accountId);
-					}
+
+					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance);
+					if (client.Session.Character == null)
+						throw new Exception($"Character not found for account {accountId:X} and client instance {clientInstance:X}");
 
 					Logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
 
@@ -1482,7 +1478,7 @@ namespace Faolan.GameServer
 				{
 					var buffId = packet.Body.ReadUInt32();
 					var charId = packet.Body.ReadUInt32();
-					var self = client.Session.Account.ClientInstance;
+					var self = client.Session.Character.Id;
 					var entity = _simulation.PlayerWorldEntity(client);
 
 					// The client sends the buff's BASE id (rank byte stripped, e.g. 0x0037F38C); our registry keys are
@@ -1773,7 +1769,7 @@ namespace Faolan.GameServer
 			var targetType = packet.Body.ReadUInt32(); // targetId.type (0x0000C350)
 			var targetInstance = packet.Body.ReadUInt32();
 
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 
 			// The reply's third field (cCategory) is the client's overhead NAME-COLOUR category for this target, 			// NOT a live-aggro toggle: 0 = friendly (green), 1 = hostile (red), 2 = neutral (yellow). Proven by live
 			// gdb (#256): DispatchUpdateAggroStatus -> FUN_0115eb10 emits the disposition signal that writes the

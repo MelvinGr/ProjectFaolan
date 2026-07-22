@@ -87,7 +87,7 @@ namespace Faolan.GameServer.Combat
 			}
 
 			var profile = SpellweaveCatalog.ForClass(session.Character.Class);
-			var caster = session.Account.ClientInstance;
+			var caster = session.Character.Id;
 			session.WeaveComponents.Add(componentIndex);
 			_logger.LogInformation("Spellweave ADD component #{Idx} (#{Count}) for '{Name}'.", componentIndex, session.WeaveComponents.Count, session.Character.Name);
 
@@ -161,7 +161,7 @@ namespace Faolan.GameServer.Combat
 		{
 			var session = client.Session;
 			var profile = SpellweaveCatalog.ForClass(session.Character.Class);
-			var caster = session.Account.ClientInstance;
+			var caster = session.Character.Id;
 			var components = string.Join(",", session.WeaveComponents);
 			_logger.LogInformation("Spellweave FIRE for '{Name}': {Count} components [{Components}].", session.Character.Name, session.WeaveComponents.Count, components);
 
@@ -271,7 +271,7 @@ namespace Faolan.GameServer.Combat
 			session.IsSpellweaving = true;
 			session.WeaveComponents.Clear();
 			session.SpellweaveBuffStack = 0;
-			var caster = session.Account.ClientInstance;
+			var caster = session.Character.Id;
 
 			// Ensure the persistent energy loop is running (inits the pool + regens it between weaves) so the weave
 			// drains from the CURRENT tracked value, not a stale 0 left by a previous weave.

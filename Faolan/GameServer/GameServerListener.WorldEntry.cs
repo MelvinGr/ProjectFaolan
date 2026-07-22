@@ -851,7 +851,7 @@ namespace Faolan.GameServer
 					var qdef = await Database.GetQuestDefinition(q.QuestId);
 					if (qdef?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
 					{
-						_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Account.ClientInstance, true);
+						_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
 						break;
 					}
 				}
@@ -862,7 +862,7 @@ namespace Faolan.GameServer
 		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
 		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			// Source the destination playfield token from the destination map's burst so the announce matches the token
 			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
 			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
@@ -883,7 +883,7 @@ namespace Faolan.GameServer
 		// capture). Sent before the AttributeChanged burst (combat-levelup capture ordering).
 		private async Task SendLevelUpDings(INetworkClient client, uint fromLevel, uint toLevel, uint finalRemainingXp)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			var @class = client.Session.Character.Class;
 			for (var lvl = fromLevel + 1; lvl <= toLevel; lvl++)
 			{
@@ -1015,7 +1015,7 @@ namespace Faolan.GameServer
 				? character.Rotation
 				: Quaternion.Identity;
 
-			var body = PlayerSpawnBuilder.BuildFromScratch(client.Session.Account.ClientInstance, playfield, character.Position, rotation, message.ToProtobuf(), scaffoldCharacter);
+			var body = PlayerSpawnBuilder.BuildFromScratch(client.Session.Character.Id, playfield, character.Position, rotation, message.ToProtobuf(), scaffoldCharacter);
 			return body == null
 				? null
 				: BuildWorldEntrySpawn(client, body);
@@ -1026,7 +1026,7 @@ namespace Faolan.GameServer
 			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal, IReadOnlyDictionary<uint, QuestArea> indexAreas,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>> areaCatalog)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
 			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
 				indexAreas, areaCatalog);
@@ -1089,7 +1089,7 @@ namespace Faolan.GameServer
 			return new PacketStream()
 				.WriteHeader(sender, receiver, GameCharInterfaceOpcodes.DispatchSetItemStat)
 				.WriteUInt32(prefix)
-				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(client.Session.Character.Id)
 				.WriteUInt32(state)
 				.WriteUInt32(0x00000017)
 				.WriteUInt32(ticket)

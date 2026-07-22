@@ -22,11 +22,7 @@ namespace Faolan.PlayerAgent
 		// address, not the process-global config. Resolved from the selected character (ClientInstance is set at EnterWorld).
 		private async Task<Realm> ResolveActiveRealm(INetworkClient client)
 		{
-			var account = client.Session.Account;
-			var activeCharacter = await Database.GetCharacterForAccount(account.Id, account.ClientInstance) ??
-			                      throw new Exception($"Unable to resolve active character for account {account.Id:X8} and client instance {account.ClientInstance:X8}");
-
-			return await Database.GetRealm(activeCharacter.RealmId) ?? throw new Exception($"Character {activeCharacter.Id:X8} has no realm to route to.");
+			return await Database.GetRealm(client.Session.Character.RealmId) ?? throw new Exception($"Character {client.Session.Character.Id:X8} has no realm to route to.");
 		}
 
 		private async Task SendCharacterList(INetworkClient client)
@@ -35,13 +31,13 @@ namespace Faolan.PlayerAgent
 
 			var aBuffer = new PacketStream();
 			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterList);
-			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Character.Id);
 			aBuffer.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 
 			foreach (var character in characters)
 			{
 				aBuffer.WriteUInt32(character.Id);
-				aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // PlayerInstance
+				aBuffer.WriteUInt32(client.Session.Character.Id); // PlayerInstance
 				aBuffer.WriteUInt32(character.Id);
 				aBuffer.WriteString(character.Name!);
 				aBuffer.WriteUInt32(character.RealmId);
@@ -69,7 +65,7 @@ namespace Faolan.PlayerAgent
 			aBuffer.WriteUInt32(0x00000001);
 			aBuffer.WriteUInt32(0x00000002);
 			aBuffer.WriteUInt32(0x00000014);
-			aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // 0x3bc035ec
+			aBuffer.WriteUInt32(client.Session.Character.Id); // 0x3bc035ec
 			aBuffer.WriteUInt32(0x000c0001);
 			aBuffer.WriteUInt32(Global.Premium
 				? 0x00018081
@@ -97,7 +93,7 @@ namespace Faolan.PlayerAgent
 				.WriteUInt16(realm.ChatServerPort)
 				.WriteUInt32(client.Session.Account.Id)
 				.WriteUInt32(0x0000c350)
-				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(client.Session.Character.Id)
 				.SendAsync(client);
 		}
 
@@ -111,25 +107,24 @@ namespace Faolan.PlayerAgent
 				.WriteUInt16(realm.CsPlayerAgentPort)
 				.WriteUInt32(client.Session.Account.Id)
 				.WriteUInt32(0x0000c350)
-				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(client.Session.Character.Id)
 				.SendAsync(client);
 		}
 
 		private async Task SendGameServer(INetworkClient client)
 		{
-			var account = client.Session.Account;
 			var realm = await ResolveActiveRealm(client);
 
 			await new PacketStream()
 				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
 					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D])
 				.WriteString($"{realm.IpAddress}:{realm.Port}")
-				.WriteUInt32(account.Id)
+				.WriteUInt32(client.Session.Account.Id)
 				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(account.ClientInstance)
-				.WriteArray((byte[])[0x62, 0x00, 0x00, 0xC7, 0x9C, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00])
-				.WriteUInt32(account.ClientInstance)
-				.WriteArray((byte[])[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x9C, 0x50, 0x01, 0xC9, 0x43, 0xC1, 0x00])
+				.WriteUInt32(client.Session.Character.Id)
+				.WriteArray(0x62, 0x00, 0x00, 0xC7, 0x9C, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00)
+				.WriteUInt32(client.Session.Character.Id)
+				.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x9C, 0x50, 0x01, 0xC9, 0x43, 0xC1, 0x00)
 				.SendAsync(client);
 		}
 
@@ -193,7 +188,7 @@ namespace Faolan.PlayerAgent
 			return new PacketStream()
 				.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox20B9)
 				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(client.Session.Character.Id)
 				.WriteUInt32(0)
 				.SendAsync(client);
 		}

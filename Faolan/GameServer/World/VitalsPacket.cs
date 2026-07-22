@@ -15,12 +15,10 @@ namespace Faolan.GameServer.World
 	public static class VitalsPacket
 	{
 		// Builds a framed 0x96B8DC59 stat-update packet for an entity (defaults to the session's own client instance).
-		public static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		public static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
-			var handle = entityHandle ?? client.Session.Account.ClientInstance;
-
 			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(StatUpdateCodec.BuildBody(handle, stats));
+			ps.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(StatUpdateCodec.BuildBody(entityHandle, stats));
 			return ps.WriteLengthHash().ToArray();
 		}
 	}

@@ -20,7 +20,7 @@ namespace Faolan.ChatServer
 			// always see their own message.
 			foreach (var client in NetworkClients)
 			{
-				var recipientId = client.Session.Character?.Id ?? client.Session.Account?.ClientInstance ?? 0;
+				var recipientId = client.Session.Character?.Id ?? 0;
 				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(recipientId))
 					continue;
 
@@ -105,8 +105,8 @@ namespace Faolan.ChatServer
 		// clients are subscribed to it and the rest ignore it). The sender sees their own message too.
 		private async Task BroadcastChannelChat(INetworkClient sender, byte channelType, uint channelId, string message)
 		{
-			var senderId = sender.Session.Account?.ClientInstance ?? 0;
-			var senderName = sender.Session.Character?.Name?.Length > 0
+			var senderId = sender.Session.Character.Id;
+			var senderName = sender.Session.Character.Name?.Length > 0
 				? sender.Session.Character.Name
 				: $"Character{senderId}";
 

@@ -32,7 +32,7 @@ namespace Faolan.Tests.Support
 
 		internal static async Task SendCreateWorldSceneBurst(INetworkClient client)
 		{
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchReportDimesionID)
 				.WriteArray(0x00, 0x01, 0x31)
@@ -4652,7 +4652,7 @@ namespace Faolan.Tests.Support
 
 		internal static async Task SendNextCreateWorldChunk(INetworkClient client)
 		{
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			// One chunk per client cutscene trigger, in order: ClientLoadingDone, StartScript, 	// StartScript, Move, IntroDone.
 			switch (client.Session.CreateWorldChunkIndex++)
 			{

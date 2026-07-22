@@ -236,7 +236,7 @@ namespace Faolan.Core.Network
 		// ClientInstance (e.g. client.Endpoint(Endpoints.GameCharInterfaceType)).
 		public static byte[] Endpoint(this INetworkClient client, uint endpointType)
 		{
-			return Endpoints.EndpointBytes(endpointType, client.Session.Account.ClientInstance);
+			return Endpoints.EndpointBytes(endpointType, client.Session.Character.Id);
 		}
 	}
 }

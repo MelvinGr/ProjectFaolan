@@ -318,7 +318,7 @@ namespace Faolan.GameServer
 		// (retail's rank-1 end twin) before applying the new one so only one is ever shown.
 		private async Task SendShieldOfTheRisen(INetworkClient client)
 		{
-			var self = client.Session.Account.ClientInstance;
+			var self = client.Session.Character.Id;
 			var map = await Database.GetMap(client.Session.Character.MapId);
 			var desired = map?.InstanceMode is null or MapInstanceMode.Shared
 				? ShieldOfTheRisenBase2 // 10h shared/open-world

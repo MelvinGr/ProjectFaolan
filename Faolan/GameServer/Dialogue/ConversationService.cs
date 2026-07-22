@@ -249,7 +249,7 @@ namespace Faolan.GameServer.Dialogue
 		// one screen (the greeting, or an option's reply); the player's next KnubotAnswer picks the child.
 		private async Task ServeScreen(INetworkClient client, ConversationNode node, uint clickedNpcHandle)
 		{
-			var liveInstance = client.Session.Account.ClientInstance;
+			var liveInstance = client.Session.Character.Id;
 
 			// The live player's name/guild are regenerated into each screen's remoteformat XML (replacing the captured
 			// player's), so a dialogue addresses the player who's actually talking. Guild is empty when guildless.
@@ -409,7 +409,7 @@ namespace Faolan.GameServer.Dialogue
 				? client.Session.ConversationAgentInstance
 				: 0x08;
 			EndConversation(client); // end any active conversation
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 
 			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
 			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).

@@ -92,8 +92,8 @@ namespace Faolan.GameServer
 			}
 
 			if (!await Database.SetAccountState(account.Id, ban
-				    ? AccountState.Banned
-				    : AccountState.Active))
+					? AccountState.Banned
+					: AccountState.Active))
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">Account '{account.UserName}' not found.</span>");
 				return;
@@ -220,7 +220,7 @@ namespace Faolan.GameServer
 			// Mark this client as a teleport re-entry so the reconnect Hello arms the post-0x205F follow-up (the
 			// changemap reconnect carries no 0x205F, so 0x2024 ReadyForPlayScreen would otherwise never fire and the
 			// loading screen would hang - #28). Consumed in the GameServer Hello existing-character branch.
-			PendingTeleportReentry.TryAdd(client.Session.Account.ClientInstance, 0);
+			PendingTeleportReentry.TryAdd(client.Session.Character.Id, 0);
 
 			// We've just persisted the destination position above; stop THIS (old) connection's imminent disconnect
 			// from saving its stale pre-teleport live position back over it (ClientDisconnected does a fire-and-forget
@@ -312,7 +312,7 @@ namespace Faolan.GameServer
 			packet.Body.ReadUInt32(); // type 0xC350
 			var petHandle = packet.Body.ReadUInt32();
 			var command = packet.Body.ReadUInt32<PetCommand>();
-			var owner = client.Session.Account.ClientInstance;
+			var owner = client.Session.Character.Id;
 			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, command);
 
 			if (command == PetCommand.Dismiss)
@@ -392,7 +392,7 @@ namespace Faolan.GameServer
 		private async Task KillCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
-			var selfHandle = client.Session.Account.ClientInstance;
+			var selfHandle = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
 
 			uint targetHandle;
@@ -549,7 +549,7 @@ namespace Faolan.GameServer
 			// (#209): the kill path (CombatService.PushLevelUp) sets the same three stats, so both level-up paths emit an
 			// identical Level + AttributeChanged-burst + vitals max push.
 			await SendStatUpdate(client,
-				new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)));
+				new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)), client.Session.Character.Id);
 			await SendVitals(client);
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
@@ -743,7 +743,7 @@ namespace Faolan.GameServer
 			// Invariant culture so a comma-decimal locale doesn't reject the dotted coordinates.
 			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) &&
-			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
+				float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
 			{
 				await DoTeleport(characterId, client.Session.Character.MapId, new Vector3(px, py, pz));
 				return;
@@ -753,7 +753,7 @@ namespace Faolan.GameServer
 			// (#247). The map is the first token, the trailing three are the coordinates; the map name itself may contain
 			// spaces, so everything before the last three tokens is the map argument.
 			if (tokens.Length >= 4 && float.TryParse(tokens[^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpx) &&
-			    float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy) && float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
+				float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy) && float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
 			{
 				var mapArg = string.Join(' ', tokens[..^3]);
 				var resolved = await ResolveMap(mapArg);

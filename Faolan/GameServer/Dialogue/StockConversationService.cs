@@ -46,7 +46,7 @@ namespace Faolan.GameServer.Dialogue
 				return;
 			}
 
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
 					GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText)

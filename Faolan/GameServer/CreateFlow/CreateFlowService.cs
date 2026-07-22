@@ -322,7 +322,7 @@ namespace Faolan.GameServer.CreateFlow
 		// The post-creation world entry: handshake + burst-less live-char world + cutscene start.
 		internal async Task SendCreateWorldWithCutscene(INetworkClient client)
 		{
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 
 			// (a) The create-world handshake - the three records the verbatim scene burst opened with (the shared
 			// Hello handshake at GameServerListener is skipped for isCreateWorldEntry, so send it here).
@@ -410,7 +410,7 @@ namespace Faolan.GameServer.CreateFlow
 			if (character == null)
 				return;
 
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			var sender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C);
 			var receiver = Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id);
 
@@ -498,7 +498,7 @@ namespace Faolan.GameServer.CreateFlow
 		// `groupId` is the requested id from the StartScript callback (0 for the other lifecycle callbacks).
 		private async Task SendCreateCutsceneStep(INetworkClient client, string token, uint groupId)
 		{
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			switch (token)
 			{
 				case "PlayResult":
@@ -556,7 +556,7 @@ namespace Faolan.GameServer.CreateFlow
 		// "NicknameOk" callback (echoes the name) + 0xF508F4C1 (fixed) + an 0xA36D3B74 "CharCreationFinished".
 		private async Task SendNicknameAccepted(INetworkClient client, string name)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 
 			await SendIir(client, MorphAckSender, Receiver(client), GameServer0X2000Opcodes.SetNameIIR, CreateEditorRecordBuilder.BuildSetNameIir(instance, name));
 
@@ -595,7 +595,7 @@ namespace Faolan.GameServer.CreateFlow
 
 		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository? database = null)
 		{
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
 
@@ -835,7 +835,7 @@ namespace Faolan.GameServer.CreateFlow
 
 		internal static async Task SendRetailCreateEditorCreationScriptBurst(INetworkClient client)
 		{
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
 			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
 
@@ -927,7 +927,7 @@ namespace Faolan.GameServer.CreateFlow
 			foreach (var requestId in requestIds)
 				await SendRetailCreateEditorPostReadyAck(client, requestId);
 
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
 					GameCharInterfaceOpcodes.DispatchValidResurrectionSpots)
@@ -1044,7 +1044,7 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR);
 					s.WriteUInt32(EntityClass.Character);
-					s.WriteUInt32(client.Session.Account.ClientInstance);
+					s.WriteUInt32(client.Session.Character.Id);
 					s.WriteByte(0x00);
 					s.WriteProtobufUInt32Length(new ProtoScryScriptIIR
 					{
@@ -1109,7 +1109,7 @@ namespace Faolan.GameServer.CreateFlow
 		// (values starting with '*') use 1.0, body morphs use -0.03 (the only two values seen in retail).
 		private static Task SendMorphValueAck(INetworkClient client, string morphValue)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			var counter = client.Session.MorphAckCounter == 0
 				? client.Session.MorphAckCounter = 2
 				: ++client.Session.MorphAckCounter;
@@ -1152,7 +1152,7 @@ namespace Faolan.GameServer.CreateFlow
 		// client instance substituted. This is what nudges the client to send the TheNameIs callback.
 		private static async Task SendPostMorphBurst(INetworkClient client)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 
 			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.StatIIR, [0x01, 0x00, 0x00, 0x05, 0x78, 0x00, 0x00, 0x00, 0x00], instance);
 			await SendCreateEditor2000Record(client, ScryScript.BuildStartScriptGroup(instance, 35820)); // StartScriptGroupOnClient (#223)
@@ -1164,7 +1164,7 @@ namespace Faolan.GameServer.CreateFlow
 		// A ScryScriptIIR step on the GameAgent->GameInterface conversation (the framing the verbatim burst uses).
 		private static Task SendScry(INetworkClient client, byte[] scry)
 		{
-			var id = client.Session.Account.ClientInstance;
+			var id = client.Session.Character.Id;
 			return new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(scry))

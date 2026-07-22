@@ -291,7 +291,7 @@ namespace Faolan.GameServer
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared
 		// with the CombatService); this delegates so the existing SendStatUpdate/SendVitals/BuildVitals callers
 		// (login replay, GM, the regen tick) are unchanged.
-		internal static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		internal static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
 			return VitalsPacket.BuildStatUpdate(client, stats, entityHandle);
 		}
@@ -321,7 +321,7 @@ namespace Faolan.GameServer
 				.Set(CharacterStatId.Exp, character.Experience)
 				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 
-			return BuildStatUpdate(client, block);
+			return BuildStatUpdate(client, block, client.Session.Character.Id);
 		}
 
 		// Assembles the complete world-entry snapshot packet for `client` from a pre-built root + tails. The record
@@ -331,7 +331,7 @@ namespace Faolan.GameServer
 		// outer wrap: the RpcHeader + outer length/CRC. No captured packet is consulted.
 		internal static byte[] BuildWorldEntrySnapshot(INetworkClient client, byte[] rootBytes, byte[] tailsBytes)
 		{
-			var body = FullCharSnapshotCodec.BuildBody(client.Session.Account.ClientInstance, rootBytes, tailsBytes);
+			var body = FullCharSnapshotCodec.BuildBody(client.Session.Character.Id, rootBytes, tailsBytes);
 			return FrameWorldEntryRecord(client, body);
 		}
 
@@ -405,7 +405,7 @@ namespace Faolan.GameServer
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
 		// remoteformat template lands.
 
-		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
 			return client.SendAsync(BuildStatUpdate(client, stats, entityHandle));
 		}
@@ -436,7 +436,7 @@ namespace Faolan.GameServer
 			// Emit the values under the CURRENT ids (0x001B/0x01F8/0x01FA) - matches the retail full-spawn announce, 			// which sends current (== max at full health) and lets the client show full bars; max rides the snapshot.
 			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, health).Set(CharacterStatId.StaminaCurrent, stamina).Set(CharacterStatId.ManaCurrent, mana);
 
-			return SendStatUpdate(client, stats);
+			return SendStatUpdate(client, stats, client.Session.Character.Id);
 		}
 
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's

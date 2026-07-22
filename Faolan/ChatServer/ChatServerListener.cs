@@ -39,12 +39,7 @@ namespace Faolan.ChatServer
 		public IReadOnlyList<SessionInfo> GetSessions()
 		{
 			return NetworkClients
-				.Select(nc =>
-				{
-					var account = nc.Session.Account;
-					var character = nc.Session.Character;
-					return new SessionInfo(nc.IpAddress!, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name);
-				})
+				.Select(nc => new SessionInfo(nc.IpAddress!, nc.Session.Account?.Id, nc.Session.Account?.UserName, nc.Session.Character?.Id, nc.Session.Character?.Name))
 				.ToArray();
 		}
 
@@ -76,15 +71,11 @@ namespace Faolan.ChatServer
 					if (client.Session.Account == null)
 						throw new Exception($"Account not found: {accountId:X}");
 
-					if (client.Session.Account.ClientInstance != clientInstance)
-					{
-						Logger.LogWarning("ChatServer hello: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.", accountId,
-							client.Session.Account.ClientInstance, clientInstance);
-					}
-
-					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
 					client.Session.Account.ClientInstance = clientInstance;
-					client.Session.Character = resolvedCharacter!;
+
+					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance);
+					if (client.Session.Character == null)
+						throw new Exception($"Character not found for account: {accountId:X} and clientInstance: {clientInstance:X}");
 
 					Logger.LogInformation("ChatServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
 
@@ -113,11 +104,11 @@ namespace Faolan.ChatServer
 					await new FaolanStream()
 						.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 						.WriteArrayUInt16Length(s => s
-							.WriteUInt32(client.Session.Account.ClientInstance)
+							.WriteUInt32(client.Session.Character.Id)
 							.WriteUInt32(0x00000000)
 							.WriteString(client.Session.Character?.Name?.Length > 0
 								? client.Session.Character.Name
-								: $"Character{client.Session.Account.ClientInstance}"))
+								: $"Character{client.Session.Character.Id}"))
 						.SendAsync(client);
 
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
@@ -155,7 +146,7 @@ namespace Faolan.ChatServer
 					// and replies via SendClaudeChannelMessage); the normal broadcast above still shows them in-game.
 					if (Configuration.McpEnabled && channelId == ClaudeChannel.ChannelId)
 					{
-						var senderId = client.Session.Account?.ClientInstance ?? 0;
+						var senderId = client.Session.Character.Id;
 						var senderName = client.Session.Character?.Name?.Length > 0
 							? client.Session.Character.Name
 							: $"Character{senderId}";
@@ -173,7 +164,7 @@ namespace Faolan.ChatServer
 					// The sender's client renders its own outgoing tell locally - retail echoes nothing back.
 					var targetCharacterId = packet.Body.ReadUInt32();
 					var message = packet.Body.ReadString();
-					var senderId = client.Session.Account?.ClientInstance ?? 0;
+					var senderId = client.Session.Character.Id;
 					var senderName = client.Session.Character?.Name?.Length > 0
 						? client.Session.Character.Name
 						: $"Character{senderId}";
@@ -235,7 +226,7 @@ namespace Faolan.ChatServer
 		{
 			try
 			{
-				var senderId = client.Session.Account?.ClientInstance ?? 0;
+				var senderId = client.Session.Character.Id;
 				var senderName = client.Session.Character?.Name?.Length > 0
 					? client.Session.Character.Name
 					: $"Character{senderId}";

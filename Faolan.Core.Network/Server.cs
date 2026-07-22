@@ -154,7 +154,7 @@ namespace Faolan.Core.Network
 
 		protected INetworkClient? ClientForCharacter(uint characterId)
 		{
-			return NetworkClients.FirstOrDefault(nc => nc.Session.Account?.ClientInstance == characterId || nc.Session.Character?.Id == characterId);
+			return NetworkClients.FirstOrDefault(nc => nc.Session.Character?.Id == characterId);
 		}
 
 		// Extra, opcode-specific body dump some inbound handlers emit on their own line. Gated on the global

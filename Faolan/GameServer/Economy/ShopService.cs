@@ -176,7 +176,7 @@ namespace Faolan.GameServer.Economy
 		// content. `rawPayload` is the inbound Interact exactly as received (the echo re-frames it).
 		public async Task HandleVendorTradeOpen(INetworkClient client, byte[] rawPayload, uint mode, Shop shop, uint npcHandle)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			await SendWorldPacket(client, ShopOpenBuilder.BuildTradeSelectEcho(instance, npcHandle));
 			await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, mode, padTail: false));
 			await SendShopData(client, shop, npcHandle);

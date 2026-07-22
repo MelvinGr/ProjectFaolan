@@ -57,7 +57,6 @@ namespace Faolan.Core.Database.Tables
 		// the temporary create-editor instance (0x021662C8) during character creation. Deliberately NOT a
 		// foreign key - it must hold the temp instance without a constraint violation (so db.SaveChanges
 		// works), and deleting a character must never cascade into deleting the account.
-		[Obsolete("Use Session.Character.Id instead")]
 		public uint ClientInstance { get; set; }
 
 		public override string ToString()

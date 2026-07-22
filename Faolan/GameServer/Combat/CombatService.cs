@@ -177,7 +177,7 @@ namespace Faolan.GameServer.Combat
 			if (rawPayload.Length < 26)
 				return;
 
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
 			// argsLen is the u32 at offset 22 (the request args length). The old code read it as a u16 at 22 (= the
 			// high half = 0), so the ack echoed EMPTY args and the client's behaviour FSM desynced after one swing.
@@ -289,7 +289,7 @@ namespace Faolan.GameServer.Combat
 			if (rawPayload.Length < 26)
 				return;
 
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, mode));
 
 			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
@@ -316,7 +316,7 @@ namespace Faolan.GameServer.Combat
 
 			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character.Level);
 			player.ApplyManaDelta(-(int)cost);
-			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
+			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Character.Id);
 		}
 
 		// Damages every attackable NPC within GroundAoeRadiusUnits of `target` for one tick: shows the floating
@@ -406,7 +406,7 @@ namespace Faolan.GameServer.Combat
 			await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
 
 			var block = new CharacterStatBlock().Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
-			await SendStatUpdate(killer!, block, killer!.Session.Account.ClientInstance);
+			await SendStatUpdate(killer!, block, killer!.Session.Character.Id);
 			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
 		}
 
@@ -438,7 +438,7 @@ namespace Faolan.GameServer.Combat
 				npcEntity.MarkDead();
 				// Record the killer so the corpse's loot bag is owned by them (the allowed looter), not whoever is in
 				// range - retail's NewAllowedLooterIIR is a loot-PERMISSION grant (#263).
-				npcEntity.LastAttackerHandle = killer.Session.Account.ClientInstance;
+				npcEntity.LastAttackerHandle = killer.Session.Character.Id;
 
 				// #204/#349: the health=0 StatUpdate alone does NOT play the death animation. Retail drives an NPC
 				// death with a death-pose MoveTask (type 0x06, freezes the corpse in place) + a death-behavior BccIIR
@@ -471,7 +471,7 @@ namespace Faolan.GameServer.Combat
 		// them (a ding heals) and push the new Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
 		private async Task PushLevelUp(INetworkClient killer, Character character, uint levelsGained)
 		{
-			var instance = killer.Session.Account.ClientInstance;
+			var instance = killer.Session.Character.Id;
 
 			// The level-up EVENT first (0x6D314743) - fires the client's "reached level N" banner + effect (#209);
 			// retail sends a SEPARATE event PER level ahead of the AttributeChanged lines (combat-levelup frame 9937,
@@ -512,7 +512,7 @@ namespace Faolan.GameServer.Combat
 				.Set(CharacterStatId.Level, character.Level)
 				.Set(CharacterStatId.Exp, character.Experience)
 				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
-			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
+			await SendStatUpdate(killer, block, killer.Session.Character.Id);
 
 			// Level-gated ability unlocks (#209/#73): retail grants the abilities that unlock at the new level as
 			// ANNOUNCED 0x2052s at the ding (Rest at the L1->L2 ding - Blablabla frame 9937, Blablatest 1357,
@@ -593,7 +593,7 @@ namespace Faolan.GameServer.Combat
 			if (rawPayload.Length < 26)
 				return Task.CompletedTask;
 
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			var phase = mode != 0
 				? mode
 				: (uint)(++client.Session.NormalAttackAckPhase);
@@ -605,7 +605,7 @@ namespace Faolan.GameServer.Combat
 		// BEGIN args + the incoming cancel payload (behaviorId + tail). Phase = the begin's Mode.
 		public static Task SendCastInterruptAbort(INetworkClient client, byte[] beginArgs, byte[] cancelPayload, uint phase)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			return SendWorldPacket(client, BehaviorAckBody.BuildCastInterruptAbort(beginArgs, cancelPayload, instance, phase));
 		}
 
@@ -641,7 +641,7 @@ namespace Faolan.GameServer.Combat
 			if (rawPayload.Length < 26)
 				return;
 
-			await SendWorldPacket(client, BehaviorAckBody.BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
+			await SendWorldPacket(client, BehaviorAckBody.BuildEquipMoveAckBody(rawPayload, client.Session.Character.Id, mode, movedItem));
 		}
 
 		// Sends the NPC counter-attack ANIMATION ack to the player it hit: a BehaviorControlCenterIIR with actor = the
@@ -651,7 +651,7 @@ namespace Faolan.GameServer.Combat
 		// swingCounter increments per NPC swing to mirror the per-actor counter the capture carries.
 		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
 		{
-			var playerHandle = client.Session.Account.ClientInstance;
+			var playerHandle = client.Session.Character.Id;
 			// args.f1 is the NormalAttack BEHAVIOR TypeId the client resolves to pick the swing animation - NOT an
 			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
 			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
@@ -666,7 +666,7 @@ namespace Faolan.GameServer.Combat
 		// PushVitals; this is the cast packet/effect.
 		public static Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)
 		{
-			var playerHandle = client.Session.Account.ClientInstance;
+			var playerHandle = client.Session.Character.Id;
 			var body = NpcSpellCastBuilder.Build(playerHandle, npcHandle, spell.SpellId, spell.Payload);
 			return SendWorldPacket(client, body);
 		}
@@ -679,7 +679,7 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).
-		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
 			return client.SendAsync(VitalsPacket.BuildStatUpdate(client, stats, entityHandle));
 		}

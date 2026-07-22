@@ -49,29 +49,15 @@ namespace Faolan.CSPlayerAgent
 					var accountId = packet.Body.ReadUInt32();
 					var authReply = packet.Body.ReadUInt32();
 
-					var account = await Database.GetAccount(accountId);
-					if (account == null)
+					client.Session.Account = await Database.GetAccount(accountId);
+					if (client.Session.Account == null)
 						throw new Exception($"Account not found: {accountId:X}");
 
-					var character = await Database.GetCharacterForAccount(accountId, characterId);
-					if (character == null)
+					client.Session.Account.ClientInstance = characterId;
+
+					client.Session.Character = await Database.GetCharacterForAccount(accountId, characterId);
+					if (client.Session.Character == null)
 						throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
-
-					if (account.ClientInstance != characterId)
-					{
-						Logger.LogWarning("CsPlayerAgent Authenticate: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.",
-							accountId, account.ClientInstance, characterId);
-					}
-
-					if (character.Id != characterId)
-					{
-						Logger.LogInformation("CsPlayerAgent Authenticate: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8}.",
-							characterId, character.Id, accountId);
-					}
-
-					account.ClientInstance = characterId;
-					client.Session.Account = account;
-					client.Session.Character = character;
 
 					// Remember this connection's reply endpoints so guild events (invites, member-joined) can be
 					// pushed to it later without an incoming packet to echo.
