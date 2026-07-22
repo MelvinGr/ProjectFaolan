@@ -308,7 +308,7 @@ namespace Faolan.GameServer
 						query.Page, listings.Length);
 
 					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no rows).
-					await TradepostResponses.SendSearchResults(client, packet, listings);
+					await TradepostResponses.SendSearchResults(client, packet.Sender.Instance, listings);
 					break;
 				}
 

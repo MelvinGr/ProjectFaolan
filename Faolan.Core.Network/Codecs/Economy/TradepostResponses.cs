@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
@@ -30,33 +29,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// Server source endpoint for tradepost dispatches: GameCharAgent sub-id 0x59, constant across both
 		// captures (same bytes as the new-character ready-for-play-screen sender).
 		private const uint GameCharAgentInstance = 0x59;
-
-		// DispatchOpenTradepost body = the auctioneer access point [posX][posY][posZ][maxRadius] (big-endian floats).
-		// This captured value (Tortage auctioneer + 15.0) is kept only as the golden-test oracle; live opens build
-		// the body from the player's position (BuildAccessPointBody) so the client's within-radius check passes.
-		private static readonly byte[] CapturedAccessPointBody = [0x44, 0x7D, 0x70, 0x0C, 0x42, 0xE6, 0x2E, 0x00, 0x44, 0x1A, 0x8D, 0xDB, 0x41, 0x70, 0x00, 0x00];
-
-		// A captured single-row DispatchTradepostSearchResults body (necrol80 auctionhouse pkt#1028: seller "Jocko",
-		// item 0x755D, price 1,000,000, qty 1, + the item's ProtoAcgItem). [head:u32][row]* per
-		// docs/subsystems/tradepost-protocol.md. The LIVE search path is fully DB-driven (SendSearchResults -> TradepostListingCodec);
-		// this blob is now kept ONLY as the byte-exact golden-test oracle (BuildSearchResultsBytes / TradepostResponseTests),
-		// the same role CapturedAccessPointBody plays for the open packet - it is no longer sent at runtime.
-		private static readonly byte[] SearchResultsReplayBody = Convert.FromHexString("000007e220d82b60902c95450c0457f300054a6f636b6f00000000000f4240000000010000755d000000000000000015" +
-		                                                                               "da16700000008008c5aab28189ec8aec201205080010a1081204081a1001120708820210c0843d12090889021085aa8c" +
-		                                                                               "d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" +
-		                                                                               "1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000");
-
-		// Finalized on-the-wire bytes (length + crc filled) — for byte-exact golden tests vs the captured packets.
-		// Open uses the captured access-point body (the oracle); search uses the replay body.
-		public static byte[] BuildOpenTradepostBytes(uint interfaceInstance)
-		{
-			return Finalize(Build(TradepostInterfaceOpcodes.DispatchOpenTradepost, CapturedAccessPointBody, interfaceInstance));
-		}
-
-		public static byte[] BuildSearchResultsBytes(uint interfaceInstance)
-		{
-			return Finalize(Build(TradepostInterfaceOpcodes.DispatchTradepostSearchResults, SearchResultsReplayBody, interfaceInstance));
-		}
 
 		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
 		// `cat` is NOT echoed back as the search-results `head`, as this used to say: that head is the protocol's
@@ -134,10 +106,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// theory was a red herring: retail's per-row ItemHandle is a SHARED per-item value and the seller Handle
 		// repeats across rows, yet all rows render - the client keys rows by saleId, not handle. So the handles come
 		// straight off the stored listing rows, which already carry the retail-shaped shared ItemHandle + seller Handle.)
-		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound, IReadOnlyCollection<TradepostListing> listings)
+		public static Task SendSearchResults(INetworkClient client, uint interfaceInstance, IReadOnlyCollection<TradepostListing> listings)
 		{
 			var head = ListFrame.ForCount(listings.Count); // the LIST COUNT, not a category echo - see TradepostListingCodec
-			return Build(TradepostInterfaceOpcodes.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance).SendAsync(client);
+			return Build(TradepostInterfaceOpcodes.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), interfaceInstance).SendAsync(client);
 		}
 
 		private static PacketStream Build(TradepostInterfaceOpcodes method, byte[] body, uint interfaceInstance)
@@ -165,12 +137,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 			s.WriteVector3(position);
 			s.WriteFloat(radius);
 			return s.ToArray();
-		}
-
-		private static byte[] Finalize(PacketStream stream)
-		{
-			stream.WriteLengthHash();
-			return stream.ToArray();
 		}
 
 		public readonly record struct SearchQuery(string Lang, uint Category, uint Page, uint ItemId);
