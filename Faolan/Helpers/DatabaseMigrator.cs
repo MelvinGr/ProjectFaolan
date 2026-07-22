@@ -30,16 +30,11 @@ namespace Faolan.Helpers
 			{
 				await using var ctx = _contextFactory.CreateDbContext();
 
-				// Both providers migrate the same way - each has its own migration project (see UseFaolanDatabase);
-				// Migrate applies the pending set for the active provider.
-				await ctx.Database.MigrateAsync(cancellationToken);
-
-				// A world can't serve without a realm (guild/AH/mail/character FK it, #324) or an account to log into.
-				// Both are config state, not schema, so ensure the defaults here rather than shipping them in the
-				// migration - the same seed the importer applies to a fresh DB (DefaultSeeder). Idempotent.
-				if (await DefaultSeeder.EnsureDefaultRealmAsync(ctx, cancellationToken))
+				// Migrate + seed the default realm/account - the shared sequence the importer runs too (DatabaseInitializer).
+				var seeded = await DatabaseInitializer.InitializeAsync(ctx, cancellationToken);
+				if (seeded.RealmCreated)
 					_logger.LogInformation("No realm present - inserted the default realm.");
-				if (await DefaultSeeder.EnsureDefaultAccountAsync(ctx, cancellationToken))
+				if (seeded.AccountCreated)
 					_logger.LogInformation("No account present - inserted the default account.");
 			}
 			catch (Exception ex)

@@ -127,14 +127,12 @@ namespace Faolan.Importer.Cli
 			optionsBuilder.UseFaolanDatabase(provider, connection);
 
 			await using var db = new DatabaseContext(optionsBuilder.Options);
-			// Both providers migrate the same way (each has its own migration project). Migrations run here, outside
-			// the runner's transaction (they can't run inside one).
-			await db.Database.MigrateAsync();
-
-			// Ensure the default realm + account exist before any module runs (shared with the server; see DefaultSeeder).
-			if (await DefaultSeeder.EnsureDefaultRealmAsync(db))
+			// Migrate + seed the default realm/account before any module runs - the same sequence the server runs
+			// (DatabaseInitializer). Migrations run here, outside the runner's transaction (they can't run inside one).
+			var seeded = await DatabaseInitializer.InitializeAsync(db);
+			if (seeded.RealmCreated)
 				Console.WriteLine("Importer: no realm present - inserted the default realm.");
-			if (await DefaultSeeder.EnsureDefaultAccountAsync(db))
+			if (seeded.AccountCreated)
 				Console.WriteLine("Importer: no account present - inserted the default account.");
 
 			var ctx = new ImportContext
