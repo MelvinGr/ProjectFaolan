@@ -56,11 +56,10 @@ the `Item.Key` (Data1..4) quad + `Item.Hash`, buildable via the hash-gated snaps
    live add (no relog needed). **Live item-REMOVE — `DispatchRemoveItem` (s2c 0x201F)** is now built too (2026-06-14):
    byte-exact builder (`WriteRemoveItemBody`/`SendRemoveItem`, body `[container ID32][u32 pos][u32 amount]`,
    `DispatchRemoveItemTests`), `RemoveItemFromBackpack` clears the persisted cell AND pushes the live remove, wired to
-   the `.removeitem <slot>` GM command (inverse of `.additem`). Needs an in-client confirmation pass.
+   the `.removeitem <slot>` GM command (inverse of `.additem`).
 4. **Bag-poison items**: an item only ever captured WORN (never inside an inventory container) can render
    the WHOLE bag empty when placed in `CharacterInventory` (repro: 13826 Combatant's Hauberk; client logs
-   VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources. Keep such items out of bags
-   until the resource gap is solved (TODO).
+   VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources.
 5. **Wire health matters more than content**: `Socket.Send/SendAsync` partial writes used to truncate the
    ~10 KB snapshot mid-frame (send buffer full right after the world burst), making byte-identical
    snapshots fail "sometimes". Sends now loop to completion (`NetworkClient`).

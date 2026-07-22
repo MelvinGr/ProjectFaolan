@@ -1,18 +1,14 @@
 # Faolan.Importer — Module-Based Import
 
-Status: **CURRENT** · Supersedes the original linear importer plan and the
-old C++ `aocdatabase.sql` archive importer (deleted).
-
 `Faolan.Importer` rebuilds `faolan.db` from the capture sources (the DB is the single source of truth; the
 server carries no embedded data blobs). It is **module-based**: every importable subsystem is a selectable
 `IImportModule`. `Program.Main` delegates straight to `ImportCli.RunAsync`; `--list` shows every module and
 `--dry-run` writes nothing (it runs the real module code in a rolled-back transaction and prints the exact
 per-table delta).
 
-One tracked follow-up remains (the `TODO(importer step 2a)` markers): `WriteMode` is honoured at the
-orchestration level (npcs/conversations/map-loot) but the leaf `CaptureX` importers still do their
-inherent upsert for `insert`/`upsert` — threading `ctx.Mode` into each is the open item (modules advertise
-their `SupportedModes` + warn).
+`WriteMode` is honoured at the orchestration level (npcs/conversations/map-loot); the leaf `CaptureX`
+importers still do their inherent upsert for `insert`/`upsert`. Modules advertise their `SupportedModes`
+and warn when a requested mode is not fully threaded through.
 
 ## Project layout
 

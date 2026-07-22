@@ -69,9 +69,7 @@ flags & 1    -> [FUN_0048f550 ×2] ...   # alt branch (packed; size not yet pinn
 else         -> [u32 count][ count × (3 floats = a waypoint) (+ FUN_00a31ec0) ]
 ```
 
-The `else` branch is the **patrol waypoint list** (the count-prefixed 3-float positions). The exact per-waypoint
-trailer (whether `FUN_00a31ec0` consumes bytes past the 3 floats) and the `flags & 1` packed branch are the
-remaining byte-alignment to pin against the captured bodies.
+The `else` branch is the **patrol waypoint list** (the count-prefixed 3-float positions).
 
 All mode-1/5/6/7 leaves are now field-mapped (`DumpMoveTaskLeafReaders.java` + `DumpMoveTaskTail.java`):
 
@@ -93,7 +91,6 @@ validates the spline and reads nothing), so both PathMoveTask branches end with 
   (`BuildPathBody` — the multi-waypoint path; `BuildWalkBody` — the 2-point walk segment), mode 2 stationary
   (Rotate, the 61-B form), mode 8 approach-target. The full recursive form (incl. `ListMoveTask`) is covered by
   `MoveTaskComposite` (parse + re-emit any record byte-exact — `MoveTaskCompositeTests`, all 9468 records).
-- **Remaining**: recursive typed `MoveTaskCodec` builders for the other leaves (Ballistic/Animated/Formation/List)
-  as they're needed. (The grouped `PatrolPath` + `PatrolWaypoint` DB tables — ordered `Waypoints` by `Ordinal` —
-  now exist; the broadcaster emits mode-1 path moves via `BuildWalkBody` for chase steps and re-addresses the
-  captured patrol body via `SendPatrol`.)
+- The grouped `PatrolPath` + `PatrolWaypoint` DB tables — ordered `Waypoints` by `Ordinal` — exist; the
+  broadcaster emits mode-1 path moves via `BuildWalkBody` for chase steps and re-addresses the captured patrol
+  body via `SendPatrol`.

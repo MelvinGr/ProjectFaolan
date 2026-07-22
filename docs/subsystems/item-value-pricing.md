@@ -57,12 +57,10 @@ header (same grammar as `DispatchAddItemTests`). The value is **field 74**, and 
 - `Item.Value` column (part of the squashed `InitialCreate` migration; the standalone `AddItemValue`
   migration no longer exists); `RdbItemImporter.TryReadPropertyField` extracts field 74
   (1677/2453 keyed items populated).
-- `ShopService`: `VendorPriceTin(value, count) = round(value/10)×count`; `VendorBuyPriceTin = ×4 markup`;
+- `ShopService`: `VendorPriceTin(value, count) = round(value/10)×count`; `VendorBuyPriceTin = ×4 markup`
+  (a stand-in over the real sell value, with no captured anchor);
   **value 0 ⇒ unsellable** (`HandleSellItemToShop` refuses). Golden tests = the anchors above (`ShopTests`).
 - `stat 356` (in the shop window) is a CONSTANT `0x394E0034`, **not** a price.
-
-## Remaining (open)
-The BUY markup (×4) has no captured anchor — it's a stand-in over the now-real sell value.
 
 ## Reproduce
 - RDB install: the client's `RDB/` folder (`<rdb-dir>`; the concrete path is in the

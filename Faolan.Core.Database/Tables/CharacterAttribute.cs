@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 	// attributes (Tag = the attribute value, Value = 0x3F800000 weight 1.0), the higher ones the morph/feat
 	// entries (Tag = morph/slider id, Value = float bits) and the closing [u16][u32] record. Wire order is
 	// Sequence, NOT StatId - captures exist where the closing record's index is lower than its predecessor's.
-	// See docs/re/player-spawn-generation-plan.md "VALIDATED GRAMMAR" / [[CharacterSkill]].
+	// See docs/re/player-spawn-generation.md "VALIDATED GRAMMAR" / [[CharacterSkill]].
 	public class CharacterAttribute : BaseEntity
 	{
 		public uint CharacterId { get; set; }

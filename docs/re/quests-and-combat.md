@@ -55,7 +55,7 @@ Mana/Stamina, clamped deltas), `CombatState` (in-memory per-handle vitals store;
 persisted), `CombatResolver` (provisional level-scaled damage; spell power/mitigation TBD). The client's
 `CastSpell` interact (`ActionType 0x4`) now broadcasts the `0x6B87E316` ApplySpell and, for a cast at another
 entity, calls `ResolveOffensiveCast` → applies damage to the target's vitals → pushes a `0x96B8DC59` update so
-its health bar moves. Death is detected (HP→0) but despawn + XP are TODO (packet not decoded). GM test commands
+its health bar moves. Death is detected (HP→0); the despawn + XP packet is not decoded. GM test commands
 `.hurt [n]` / `.heal [n]` / `.spelltest <id>` have since been removed (the `.kill` command now drives the death
 path). Tests: `CombatTests`.
 
@@ -73,10 +73,6 @@ splice (`InsertBehaviorPhaseField`) reproduces the captured swing-1 ack args byt
   falling back to `CombatResolver.NpcMaxHealthForLevel`), so a damaged mob's bar matches the HP the client
   rendered; `GetOrAddNpcVitals` only falls back to `CombatResolver.DefaultNpcMaxHealth` for an NPC with no world
   entity (the built-NPC test).
-- **Still TODO (needs in-client + a multi-swing capture):** retail also sends a SECOND ack for the NPC's OWN
-  behaviour (actor = target handle) that drives the mob's counter-attack, plus a multi-result block — not yet
-  reproduced, so mobs may not visibly fight back. The phase counter's absolute start is also unconfirmed (the
-  capture began mid-session at 3; ours starts at 1 — monotonic is what matters). See TODO #3.
 
 ### Mounts (summon spell found)
 Decoded from demol80's `...very_long_loading_screen_after_field_change` capture (the player rides: 122 MountedRun
@@ -180,8 +176,6 @@ path calls `QuestProgressionService.AdvanceKillGoals`, which (via `QuestProgress
 whose target matches the slain NPC, pushes `QuestGoal`, persists, and completes at the required count (state +
 system message). The objective target/count now comes from the imported `QuestDefinition`/`QuestGoalDefinition`
 tables (the quest engine has since grown loot/talk goals and multi-stage chains — `QuestProgressionService`).
-Remaining VM pieces: accept-from-dialogue trigger, rewards/turn-in (`0xA36D3B74 QuestRewards`), branching,
-QuestFullUpdate replay ([[protocol_conversation_routing]]).
 
 **Accept-from-dialogue is VM-gated (checked 2026-06-11).** In `hoxxling-login-gameplay` the `QuestIIR(add)` for quest
 `0x34A7` follows a chain of quest-giver Interacts; the client's accept Interact (`actionType 0x0F`) carries **no quest
@@ -192,11 +186,3 @@ ENGINE (state + kill-objective tracking) is done. **Update:** accept-from-dialog
 live Lua VM — a per-node `ConversationNode.GrantQuestId` column (the data-mined NPC→quest map above) is granted when
 its branch is reached (`ConversationService`), and objectives/turn-in run off the imported `QuestDefinition` /
 `QuestGoalDefinition` tables.
-
-## Next steps
-- Confirm ApplySpell magnitude sign/scale and whether damage is in the cast or only in the following vitals
-  update.
-- Decode the entity-update sub-ops (`FEC4158A`/`D751EBB4`/`04B82B2D`) — likely animation/aggro/buff state.
-- Isolate quest-accept vs decline, and the quest-log/objective state packet.
-- Find the level-up packet (the capture has a level-up; Level `0x36` rises in the vitals/snapshot but the
-  "ding" event packet isn't isolated).

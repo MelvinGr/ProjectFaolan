@@ -16,7 +16,7 @@ namespace Faolan.Importer.Rdb
 	// (*hairmesh/*beardmesh/*piercingmesh/*texscript) - with a category, a weight and a 1-based id. The spawn
 	// scaffold's weighted entry-table records carry id-1 as their tag, so rows are stored under that wire tag.
 	// (Cracked 2026-06-10: faolanx's 7 weighted spawn entries resolve 7/7 against his editor resource refs;
-	// see docs/re/player-spawn-generation-plan.md "Weighted attributes".)
+	// see docs/re/player-spawn-generation.md "Weighted attributes".)
 	public static class RdbMorphTargetImporter
 	{
 		private const uint RegistryType = 1000076;

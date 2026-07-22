@@ -1,68 +1,17 @@
-# Plan: extract game data from the client RDB files
+# Client RDB data extraction
 
 > **STATUS: COMPLETE — kept as the derivation reference, not open work.** The live extraction pipeline is the
-> module-based importer ([`../tooling/importer-plan.md`](../tooling/importer-plan.md)); the recovered asset
+> module-based importer ([`../tooling/importer.md`](../tooling/importer.md)); the recovered asset
 > formats are documented in this folder (`rdb-type-catalog.md`, `gear-rendering.md`, `skeleton-grammar.md`, …).
-
-## Why
-
-Across this project the recurring wall is **"the client renders that from its local RDB, the server never sends
-it"**. The RDB (Funcom Dreamworld resource database, shipped with the client) is the authoritative source for
-exactly the data we keep failing to obtain from packet captures:
-
-| Open gap | RDB resource that would solve it |
-|----------|----------------------------------|
-| Buildable items only from player inventory snapshots (vendor/AH do not help) | item/template definitions (the client-side `p_items` equivalent: names, stats, archetype, the `Data1..4` identity) |
-| NPC dialogue coverage-bound; Casilda's create-world text not capturable (`protocol_conversation_routing`) | conversation/dialogue + `remoteformat`/`localized` string tables (text by id) |
-| Combat uses a placeholder NPC max HP (`docs/re/quests-and-combat.md`) | NPC/creature definitions (stats incl. health) |
-| Spells are id-only, names client-side (`CaptureSpellImporter`) | spell/ability definitions (names, params) |
-| Create-world intro fails on `invalid camera path "Kalanthes"` (`project_create_editor_flow`) | the Tortage cinematic / camera-path resources |
-| World bursts are literal replayed packets, not reconstructed from Maps/MapObjects | playfield / map / spawn-template data |
-
-If even a couple of these come out cleanly, it changes the data strategy from "scrape captures" to "import the
-real client data" — far more complete and not coverage-bound.
 
 ## What we have
 
 - `<AoC>/RDB/`: **27 × 1 GB `NN.rdbdata`** blobs (~27 GB) + `RDBHashIndex.bin` (41 MB) + `RDBDiffIndex.bin` (1 MB).
 - `RDBHashIndex.bin` starts with magic **`RDHI`**, version **6** (`06 00 00 00`), then a header
   (counts: `0x000D5474` ≈ 873k, plus a few more u32s) and fixed-size entries. Each entry looks like a 16-byte
-  GUID/hash + a few u32s (type, file index, offset, length) pointing into the `NN.rdbdata` files. Confirming this
-  layout is step 1.
+  GUID/hash + a few u32s (type, file index, offset, length) pointing into the `NN.rdbdata` files.
 - The client itself reads this at runtime (we already see `ResourceManager ... does not exist` for the assets
   it's missing), so the format is exactly what the live client consumes.
-
-## Candidate tool
-
-**`philippelatulippe/rdbreader`** (C/C++): extracts files from Funcom RDB archives; "run it in the directory
-containing the RDB directory", configured via `config.h` (output dir + which types to extract). Ships
-`fctxconverter` (Funcom texture → DDS) and `lipreader` (LIP audio), and a `structs.h` documenting the format.
-Built for VS2012 / Debian Squeeze (≈2013), so it likely predates **RDHI v6** — version/format drift is the main
-risk. "or similar": also evaluate any newer AoC/AO community extractors and the AO `RDBExplorer`-style tools
-(the RDB format is shared across Funcom's Dreamworld titles).
-
-We care about the **structured data resources** (items/NPCs/spells/conversations/strings), NOT textures/audio/
-models — so the texture/audio converters are irrelevant; what matters is whether the tool (a) parses the v6
-index and (b) lets us pull resources by **type id**.
-
-## Phases
-
-### Phase 0 — format validation (no extraction yet)
-- [ ] Read `rdbreader`'s `structs.h` / `common.h`: does it understand `RDHI` and which version(s)? What is its
-      index entry layout and resource-type enumeration?
-- [ ] Independently verify the `RDBHashIndex.bin` v6 layout by hand (a small Python parser: magic, header,
-      entry stride, `(type, fileIndex, offset, length, id/hash)`). Cross-check a couple of entries against the
-      `.rdbdata` files (seek to offset, read length, sanity-check the bytes).
-- [ ] Decide: does rdbreader work as-is on v6, need a patch, or do we write our own minimal index parser?
-      (A from-scratch index reader is small once the entry layout is known — the 27 GB blobs are just
-      offset+length slices.)
-
-### Phase 1 — resource-type inventory
-- [ ] Tally entries by **type id** (count + total size per type). This reveals what's in there and how big.
-- [ ] Identify the type ids for the data we want by sampling a few blobs per type and looking for: readable
-      strings (names/dialogue), the item `Data1..4`/archetype pattern we already know, NPC stat blocks, etc.
-- [ ] Map type id → meaning (build a legend, like `docs/tooling/capture-events.md` does for packets). Lean on AO/AoC
-      community docs where they exist.
 
 > ## ⭐ CONVERSATIONS — SCOPED & PINNED (2026-06-11): RDB dialogue is a quest VM, not a table import. DEFERRED.
 > Inspected the dialogue resources in the live client RDB (`Faolan.Importer --rdb`):
@@ -95,39 +44,7 @@ index and (b) lets us pull resources by **type id**.
 > captures (correlate each KnubotAnswer with the following AddTag/QuestIIR effect) is the only data-driven path, and
 > it only covers captured conversations.
 
-### Phase 2 — targeted extraction + parse (one data type at a time, by value)
-Prioritise by payoff/effort:
-1. **Localized strings / `remoteformat` text** — likely the easiest win and unblocks all dialogue/UI text.
-2. **Item/template definitions** — the big one for the importer (names + archetype + `Data1..4` for *every*
-   item, not just held ones). Validate by matching a known captured item (e.g. the item Daggamalt: f4/f5 template
-   180450, archetype `0x4847505A`) to its RDB record.
-3. **NPC/creature definitions** — for combat HP and spawn templates.
-4. **Spell/ability definitions** — names/params to enrich the id-only `Spell` rows.
-5. (later) cinematic/camera-path + playfield/map data.
-- For each: extract the resource blobs of that type, reverse the blob's internal record format, decode a handful
-  by hand against known ground truth (captures + the screenshots), then write a parser.
-
-### Phase 3 — integrate into Faolan.Importer → DB
-- [ ] Add an `--rdb <path>` source to `Faolan.Importer` (alongside `--captures` / `--archive`), with a per-type
-      extractor that parses the RDB resources and **upserts** into the existing tables (`Items`, `Spell`,
-      `ConversationNode`/text, NPC stats, …). DB stays the single source of truth ([[faolan_importer]],
-      [[db_access_model]]).
-- [ ] Keep it a **one-time/optional** import like `--archive`: the 27 GB RDB is not committed; only the extracted
-      rows land in `faolan.db`. Document the exact client build/version the data came from.
-- [ ] Reconcile with captured data: RDB gives the canonical definition; captures still give live wire bytes /
-      session specifics. Prefer RDB for identity/text, captures for on-wire framing.
-
-## Risks / unknowns
-- **Format version drift:** rdbreader may not read RDHI v6 → may need patching or a own parser (likely small).
-- **Compression/encryption:** individual resources may be zlib/LZMA-compressed or obfuscated; need to confirm
-  (the GameServer stream is zlib, so zlib-per-resource is plausible).
-- **Resource format complexity:** extracting the blob is easy; *parsing* each resource type's internal binary
-  layout is the real work (per-type RE, like the packet work).
-- **Type-id identification:** which type id is "item" vs "creature" vs "string" needs sampling/community docs.
-- **Disk/time:** full extraction is tens of GB; prefer index-driven *selective* extraction by type, not a full dump.
-- **Scope creep:** this is a parallel data pipeline — timebox Phase 0/1 before committing to Phase 2+.
-
-## Phase 0 findings (executed 2026-06-08)
+## RDB format findings (2026-06-08)
 
 Significant de-risking — the tool and format are identified:
 
@@ -398,39 +315,6 @@ stats (HP) are not in the client RDB** — they were server-authoritative in ret
 tables). Combat HP must come from **captures or the Archive C++ server data**, not the RDB. Of the gameplay
 data only items (`1000020`) are `RDBH`-encrypted; everything else is plain XML and extractable if ever needed.
 (Index note: detail entries with file byte `0xff`/255 are absent/empty sentinels — skip them.)
-
-**Next (structured data → DB):**
-1. ~~Item-template identity~~ — **blocked** (`RDBH`-encrypted, identity absent; from captures only).
-2. ~~MONSTERDATA → NPC HP~~ — **not applicable** (1010201 is the model def, not stats; HP isn't in the RDB).
-   NPC combat stats come from captures / the `Archive/` C++ server data instead.
-3. (optional, if ever needed) the plain-XML gameplay types above are trivially extractable via `RdbReader`
-   (combos, fatalities, playfield/treasure, text). None are required for the current create→login→play work.
-
-### Phase 0 conclusion (2026-06-08)  [superseded by the breakthrough above]
-v6 is **fully reverse-engineerable but it's a real project, not a quick crack.** Mapped so far: the resource
-TYPE enum, the type+idx section (pinned: 294,125 records at 40,308,696..42,661,696, confirmed real type/idx),
-and that the front ~40 MB is multi-layered — header + a hash table (16-byte hashes, sorted by hash so NOT in
-type+idx record order) + name strings + a large **reference/dependency table** (~28–40 MB; a commonly-shared
-resource like `1010003:3147889` appears ~190× there as `(type,idx)` cross-refs). The **detail table
-(file/offset/size) is NOT a fixed-stride block** — every stride/field-arrangement tried resolves <11% of
-records against the `.rdbdata` files, so offsets are encoded differently (variable records, packed, or a
-separate structure keyed off the hash table). Cracking it needs sustained RE (hash-function identification or
-full section delimitation), not more brute-force.
-
-**Recommended pragmatic path: side-step v6 with a v5 client.** rdbreader *fully* supports RDB index **v5
-(Age of Conan)**, and the game DATA (items / NPC stats / dialogue / spells) is essentially the same across
-client builds. So obtaining an **older AoC client build whose RDB is v5** lets the existing, working tool
-extract everything cleanly — no v6 RE required. Order of preference:
-1. Run rdbreader on a v5 AoC client RDB (fastest; reuses a working tool). ← recommended
-2. Find a community RDB extractor that already handles current-era (v6) AoC clients.
-3. Commit to a focused v6 RE session (anchor: identify the hash function and/or fully delimit the front
-   sections; the type+idx section is already solved as a (record→type,idx) map).
-
-## Decision gate
-After **Phase 0 + Phase 1** (cheap: index parse + type inventory) we'll know whether the structured game data is
-present and extractable. Green-light Phase 2 only if at least the **string table** or **item definitions** look
-parseable. If the data is encrypted/opaque or the format is intractable, fall back to the capture-driven approach
-and close this out.
 
 ## Notes
 - Legal/ethical: this reads the **user's own legally-installed client** for a private preservation/interop

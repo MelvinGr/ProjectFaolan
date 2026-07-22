@@ -1,10 +1,8 @@
 # Tradepost (auction house) + mail protocol
 
-> **STATUS (2026-06-12): ⛔ PINNED — awaiting an in-client render check.** The protocol below is decoded
-> byte-exact and the open + search replies are wired + golden-tested (`Faolan/GameServer/GameServerListener.Tradepost.cs`
-> + `Faolan.Core.Network/Codecs/Economy/`, `TradepostResponseTests`). What's unverified is whether the client actually renders the AH window/listings —
-> test with the `.ah` GM command (sends `DispatchOpenTradepost` at the player's position). Once it renders,
-> proceed to Step 3 (DB-backed listings + the `Mail`/`MailAttachment` model + buy→mail). Tracked as Gitea issues under `area:economy`.
+The protocol below is decoded byte-exact and the open + search replies are wired + golden-tested
+(`Faolan/GameServer/GameServerListener.Tradepost.cs` + `Faolan.Core.Network/Codecs/Economy/`,
+`TradepostResponseTests`). The `.ah` GM command sends `DispatchOpenTradepost` at the player's position.
 
 Decoded 2026-06-12 from two captures via `TradepostListingCodecTests`:
 - `account-faolan-character-necrol80-...-sell_items_to_trader-intract-with-auctionhouse` (browse/search)
@@ -113,9 +111,7 @@ heuristic; the real entry boundary is the explicit `entryLen` u32, so C# reads i
 
 **Status (2026-06-13):** DB-backed search is WIRED — `TradepostItemSearch` queries `TradepostListing` rows by the
 searched `itemId` (cheapest first) and builds the grid byte-exact via `TradepostListingCodec.Build`; the captured
-single-row replay is the fallback when no listing matches (so the grid still renders pre-import). Still to build:
-a listings importer/seed (harvest the captured search rows into `TradepostListing`), SELL into the AH (create a
-listing from a bank item), and BUY → mail delivery.
+single-row replay is the fallback when no listing matches (so the grid still renders pre-import).
 
 ## Buy → mail delivery (confirmed)
 
@@ -178,8 +174,7 @@ work off the DB-backed mail: `GetAllMails` (poll → each mail base + `DispatchR
 bag via the proven `GrantItemToBackpack`/`DispatchAddItem 0x2020` render path, then re-send the now-itemless mail),
 `MarkMailRead` (footer 0x0b→0x09), `DeleteMail`. Repo methods + `TradepostMailBody` (the `TradePostGUI_MailItemBought`
 remoteformat XML, **byte-exact for the captured inputs** — `TradepostMailBodyTests`); the mail-flow ordering matches
-the capture (BuyItem F502 → mail poll/preview/take F509–F557). IN-CLIENT GATE: buy a listing → coins deducted, a
-mail arrives, opening it shows the item, "take" puts it in the bag. KNOWN INTERIMS: the mail-body **item-name**
+the capture (BuyItem F502 → mail poll/preview/take F509–F557). KNOWN INTERIMS: the mail-body **item-name**
 fragment is left empty (per-item RDB name key unsynthesizable — same client-RDB-by-id limit as conversation text);
 the granted item uses the **Items-template** identity, not the listed instance's exact Data quad (like vendor BUY);
 the seller isn't credited (importer-seeded sellers aren't live characters).
@@ -219,8 +214,7 @@ added (`DatabaseContext` `TradepostListing` → `Items` FK, `DeleteBehavior.Rest
 `Template` is a SECOND FK to `Items` (`Restrict`, distinct from the `ItemId` search key, which usually differs):
 the instance's per-template TEA key lives once in `Items` and the codec reads it through the `TemplateItem` nav —
 the old inline `Data1..4`/`Key1..4` columns were dropped (`ItemHash` stays a row column: the AH wire hash is 0,
-not `Items.Hash`). `MailAttachment` got the same treatment (`Template` FK → `Items`, inline key dropped). (Open: the in-client "Torn Rags in every category" browse persisted after the DB fix —
-likely a client AH cache or a non-listings category-browse path, not the listing data.)
+not `Items.Hash`). `MailAttachment` got the same treatment (`Template` FK → `Items`, inline key dropped).
 
 **`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), WIRED
 (`HandleTradepostSendMail`): creates a Mail to the recipient; the attached item STAYS in the sender's bank with a
@@ -234,13 +228,12 @@ slot (`Mail.SenderBankSlot`; schema now in the squashed `InitialCreate` migratio
 F499 = to "DemoL80", body "Hello this is a test", money 0, attach bank slot 5 (the `0x7E2` word is the same category
 constant the AH search carries; preserved). Reply `DispatchSendMailResult` (S→C `0x2003`) = `[u8 success][u16+remoteformat XML]`
 (F500: success=1 + a result-message remoteformat). This is the player-composed mail path (distinct from the
-AH buy→system-mail already wired); to implement, create a `Mail` to the recipient with the bank item escrowed.
+AH buy→system-mail already wired).
 
-## Implementation notes (for TODO §9a)
+## Implementation notes
 
 - No new connection/server: handle these on the existing GameServer dispatcher (mirror the IIR sub-op handlers).
 - A `Mail` + `MailAttachment` DB model (sender, recipient, body token + args, attached money/items, read flag);
   buy = create a mail to the buyer with the item escrowed → grant on `GetMailItem`.
 - A `TradepostListing` table (saleId, sellerName, itemId, price, qty, expiry) drives search; `DispatchOpenTradepost`
   needs the access NPC's position + a 15.0 radius.
-- Capture-replay PoC first (replay a captured `0x2005` so the AH window renders), then go DB-backed.

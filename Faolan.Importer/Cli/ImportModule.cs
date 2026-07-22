@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Faolan.Importer.Cli
 {
-	// Importer module scaffolding. See docs/tooling/importer-plan.md. Each importable subsystem is an IImportModule,
+	// Importer module scaffolding. See docs/tooling/importer.md. Each importable subsystem is an IImportModule,
 	// selected by Name (--only/--skip), ordered by DependsOn, and run inside one transaction so --dry-run can
 	// roll the whole thing back and just print the delta.
 
@@ -17,7 +17,7 @@ namespace Faolan.Importer.Cli
 		Db
 	}
 
-	// How a module's extracted rows land. See docs/tooling/importer-plan.md "Write modes".
+	// How a module's extracted rows land. See docs/tooling/importer.md "Write modes".
 	//   Insert    - add only rows whose key is absent; never modify/delete existing.
 	//   Upsert    - update existing by key AND insert new; never delete. (default)
 	//   Overwrite - replace the module's OWNED data wholesale for the keys it touches, then insert.

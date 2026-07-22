@@ -2,7 +2,7 @@
 
 Status as of 2026-07-14. Feats are **decoded at the wire level but not implemented as a subsystem.**
 This is the pickup document: what a feat is (vs. what the code currently calls a "skill"), the wire
-protocol we recovered, what the capture dumps do and don't contain, and the ordered next steps.
+protocol we recovered, and what the capture dumps do and don't contain.
 
 ## TL;DR
 
@@ -117,8 +117,7 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
     tier/parent-feat prerequisite graph still needs the `Feat` definition table.
   - GM command `.feat list | train <id>... | reset` is the test bootstrap (the retail trigger is the client's Feats
     window + its point economy, which the server can't drive).
-- Still missing: a `Feat` **definition** table (tree/tier/parent-prereqs/exact costs — the wiki job).
-  `DoSkillSellback` (`0x205C`) is still a debug-log stub.
+- `DoSkillSellback` (`0x205C`) is a debug-log stub.
 - The skills scaffold (`CharacterSkill`) is imported per captured char by `CaptureCharacterImporter` (via
   `PlayerSpawnScaffoldRows.ExtractTo`) and hand-transcribed per class in `PlayerSpawnScaffoldRows.FullSkillIdsFor`
   (from Necro/Demo/Assassin/Herald high-level captures). On level-up / a GM command, the class scaffold is granted so
@@ -137,36 +136,6 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   hash + grammar. Run headless via the `#`-free symlink (see the `ghidra_hash_path_symlink` memory).
 - RDB feat catalog: type 1000020, ~20,417 plaintext feats (id + name + tree + rank; all tree names present); ~79% are
   TEA-encrypted with server-only keys (costs/prereqs unrecoverable from captures — see the `feat_trees_decode_251` memory).
-
-## Open questions / blockers
-
-1. ~~**Login-time full feat-set delivery — not captured.**~~ **RESOLVED 2026-07-14** — it rides the player spawn
-   (`FA015807` pre-IIR), decoded by `tools/capture/decode_unlocked_feats.py`. No fresh capture needed.
-2. **id → name / tree mapping.** Scaffold and `FeatIIR` ids are GDB ids; they do not join the RDB 1000020 catalog
-   id-space. The tree STRUCTURE (trees/tiers/prereqs/costs) is in the client RDB (partly plaintext) and on the wiki
-   (https://aoc.fandom.com/wiki/Feat_Tree); the id↔name bridge is server-GDB-only and never transmitted.
-3. **Confirm the `featId = featBase*100 + rank` encoding.** The low digits track rank (hakotep `110004` = base
-   `1100` rank 4 vs `FeatIIR` request base `110000`). Cross-check against a multi-rank train capture / the wiki tiers.
-4. **Feat points** (spent / available per tree) — not yet located in the spawn; may be a nearby pre-IIR field or a
-   separate record. Decode alongside the id list.
-
-## Next steps (ordered)
-
-1. ~~**Model + generation.**~~ **DONE 2026-07-14.** `CharacterFeat` table (a per-character unlocked-feat list,
-   distinct from `CharacterSkill`; `FeatId` composite + `Sequence` for the train order), migration `AddCharacterFeat`.
-   `PlayerSpawnScaffoldRows.ExtractPreFrameFeats` / `FreshPreFrame(class, mask, feats)` extract & regenerate the
-   pre-IIR feat list; `ExtractTo`/`TryApplyFrom` map it to/from rows (golden tests in `PlayerSpawnScaffoldRowsTests`).
-   The importer seeds it from captures (`CaptureCharacterImporter`, `>` level 5 only): NecroL80/DemoL80 25, Hakotep 6.
-2. **Tree structure.** Ingest the wiki tree (trees / tiers / prereqs / point costs / names) as reference data — the RDB
-   can't give costs/prereqs (encrypted), the wiki can. A `Feat` definition table (id → name/tree/tier) is the join
-   target for `CharacterFeat.FeatId`.
-3. ~~**Training protocol.**~~ **DONE 2026-07-14** — `FeatIIR` 0x04→0x05 train, the `UntrainFeat` →
-   `DispatchFeatUntrainMessageBox` → `FeatUntrainAnswer` reset dialog, and the feat-point prerequisite guard
-   (`FeatRules`), all in `GameServerListener.Feats.cs`. Remaining: exact per-feat costs + the tier/parent-prereq
-   graph (needs the `Feat` definition table from step 2).
-3. **Training protocol.** Implement `AdjustSkill` (`0x202E`) train / `UntrainFeat` (`0x2041`) / the feat-window
-   request-reply, emitting `FeatIIR` on train (its builder is grammar-complete) and updating the per-char feat table
-   so the next spawn reflects it.
 
 ## References
 

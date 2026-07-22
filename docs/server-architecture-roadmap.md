@@ -156,7 +156,7 @@ So today it behaves like **single-player instances stitched from captures**, not
 ### 5. Progression + quests
 - XP / leveling (kill-XP + level-up now ship, above; `CharacterMaxStats.CreateDefaults` is retail-anchored at L1 for
   all 12 classes, with per-level growth still rough — no longer a stub). The quest/tag state machine — the **same Lua-VM**
-  effort dialogue branching needs (pinned in `protocol_conversation_routing` / `docs/rdb/rdb-extraction-plan.md`).
+  effort dialogue branching needs (pinned in `protocol_conversation_routing` / `docs/rdb/rdb-extraction.md`).
 
 ### 6. State/persistence discipline & scaling (later)
 - Cleanly split **transient world state** (positions, vitals, buffs — live in the zone model) from **persisted

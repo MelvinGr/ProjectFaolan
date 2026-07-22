@@ -22,7 +22,7 @@ namespace Faolan.Importer.Extractors
 	// character only ever WORE (never carried in a bag snapshot - e.g. Seadog's Shorts) buildable, so the spawn
 	// equipment renderer (PlayerSpawnEquipment, gated on Hash != 0) can draw them. The quad + hash are
 	// exactly what SnapshotItemBuilder / PlayerSpawnEquipment need. Merged result is embedded as
-	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/re/spawn-dissection-plan.md Phase 5.
+	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/re/spawn-dissection.md Phase 5.
 	public static class ItemHashHarvester
 	{
 		private const uint BankIirSubOpcode = (uint)GameServer0X2000Opcodes.BankIIR; // 0x0BA1C1CB - same framing

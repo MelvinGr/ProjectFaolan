@@ -56,7 +56,7 @@ field 972 is whitelisted to the 5 attribute ids.
 
 Across all 3201 decrypted templates every vital `amount` is divisible by 100 and every attribute `amount` by
 10 — **0 violations in 448 records** (`gcd` per stat id = its scale). And it reproduces an
-**independently in-client-verified tooltip** (`docs/re/spawn-dissection-plan.md` STEP (b), 2026-06-07): the
+**independently in-client-verified tooltip** (`docs/re/spawn-dissection.md` STEP (b), 2026-06-07): the
 **Royal Signet** (template `3774542`) shows *+30 Constitution / +52 Magic Damage / +15 Hit Rating* in-client,
 and its three records decode **exactly**:
 
@@ -89,7 +89,7 @@ read via the strict property run; min ≤ max). Raw template values — **scale 
 ÷100, tune in-client). `CombatResolver.ResolveMeleeDamage` drives melee off the equipped weapon instead of the
 flat level placeholder. `[V0: exact combat scale/formula — the real per-hit damage is a server-GDB formula, undecoded]`
 
-## Status / next step
+## Implemented
 
 - **Decoded + validated:** `972`/`971` primary attribute (Str/Dex +1/+2/+3) AND the full `[2][9]` region
   (vitals + attributes + Magic Damage + Hit Rating, wire-scaled) — Royal-Signet-anchored
@@ -105,11 +105,7 @@ flat level placeholder. `[V0: exact combat scale/formula — the real per-hit da
   `CharacterStatId.GetScale()` to a display total.
 - **APPLIED (vitals):** at world entry `GetEquippedStatItems` -> `MaxStatAggregator` folds the gear vital totals
   onto the class/level base in `EntityVitals.FromCharacter`, seeding current == the geared max, so a `+HP` piece
-  raises the ceiling and the regen bar starts full. ⚠️ **Needs in-client verification** of the client's
-  max-computation model: this sends the *geared* max as the wire `HealthMax`. If the client instead adds gear on
-  top of a base max (the #3 320→648 observation), that double-counts — flip to sending the base max on the wire
-  and keeping only the regen ceiling geared.
-- **NEXT:** patch attribute totals (`+Str`/`+Dex`) into the sent stat block so worn attributes show in-client.
+  raises the ceiling and the regen bar starts full. This sends the *geared* max as the wire `HealthMax`.
 
 ## Spells share the region — but it is per-stat scaled (#367)
 
@@ -128,6 +124,6 @@ its scale is NOT the item scale.**
   mount-speed buff; `Sustaining Wrath` ranks step `108000 → 180000`. A health entry (`0x1B`) even carries a
   `-100000000` drain/kill sentinel on non-buff spells.
 
-So a live **apply/revert engine** needs a per-stat scale table **verified against in-client buff tooltips** before
-the server can honor these (a blind apply would corrupt combat/vitals). The decoded `SpellStatEffect` table is kept
-as the foundation; the apply engine is deferred to that verification (#367, `needs-testing`).
+A blind apply would corrupt combat/vitals, because the spell region's per-stat scale is not the item
+`CharacterStatId.GetScale()`. The decoded `SpellStatEffect` table is the foundation. Open work is tracked in
+Gitea #367.

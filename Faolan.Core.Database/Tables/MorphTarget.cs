@@ -8,7 +8,7 @@ namespace Faolan.Core.Database.Tables
 	// Faolan.Importer --rdb. The spawn scaffold's weighted (1.0) entry-table records reference these by
 	// WireTag = registry id - 1 (verified: faolanx's 7 weighted entries resolve 7/7 against his create-editor
 	// resource refs; the few retail mismatches are live-server/client data-version drift). See
-	// docs/re/player-spawn-generation-plan.md "Weighted attributes".
+	// docs/re/player-spawn-generation.md "Weighted attributes".
 	public class MorphTarget : BaseEntity
 	{
 		// The registry's category: 0 face sliders, 1 body sliders, 2 face paint (never emitted in spawns),

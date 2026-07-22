@@ -16,7 +16,7 @@ namespace Faolan.GameServer.Inventory
 	// out of GameServerListener as a composed collaborator (like CombatService): pure persistence, no packet sends.
 	// The Inbound handlers (Handle0x2000) call into it. NOTE: reflecting an item moved into an equip slot the
 	// captured snapshot has no entry for (e.g. a ring) needs ADDING an equipped entry, not just the in-place replace
-	// we do today - see docs/re/spawn-dissection-plan.md.
+	// we do today - see docs/re/spawn-dissection.md.
 	public sealed class EquipmentService
 	{
 		private readonly IDatabaseRepository _database;

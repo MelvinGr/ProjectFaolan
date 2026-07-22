@@ -6,7 +6,7 @@ using Faolan.Importer.Modules;
 namespace Faolan.Importer.Cli
 {
 	// The catalog of import modules + selection/dependency resolution. Each module wraps a CaptureX/Rdb
-	// importer or extractor (see docs/tooling/importer-plan.md). Registration order is the stable tie-break for the
+	// importer or extractor (see docs/tooling/importer.md). Registration order is the stable tie-break for the
 	// topo sort.
 	public static class ModuleRegistry
 	{

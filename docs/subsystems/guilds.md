@@ -118,16 +118,7 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   registrar NPC window. The old `.guild create <name>` GM bootstrap was removed with the other GM test
   commands (commit `54f55dee`); the surviving GM commands are `.ah`/`.teleport`/… (no `.guild`).
 
-## Open items
-
-> Tracked as Gitea issue **#104** ("Guild protocol gaps"). The decode notes below are the context.
-
-- Member-left / kick / promote / demote fan-out packets: no capture exercises them.
-- The 0x202D invite-reply-to-inviter and failure replies (bad name, on cooldown): opcodes not decoded.
-- 0x203A "counters update" (52 b, frequent): small u32 counters, semantics unknown.
-- Renown block internal framing; renown history (0x2039) is a replayed blob; the mass-PvP / guild-search list
-  (0x2010 `DispatchMassivePvpInfoRequestReturn`) is still a verbatim blob. Rankings (0x2038) are now constructed.
-- Other players' guild tags ride in their spawn data (cross-player visibility is future work anyway).
+Open work is tracked in Gitea #104.
 
 ## Ghidra: guild s2c reader topology (2026-06-16, #219)
 
@@ -157,5 +148,5 @@ strings (name/desc/motd), then the renown block = `ReadByte(flag)` + `ReadList`(
 where `[0x40]` is the live renown total) + 2×u32 + 8×u64 + 3×u64 + u32 + u64. ``GuildPacketTests`
 --walk` replays this exact sequence and lands byte-exact on the following member record (helpers: FUN_0048f900
 ReadU32, FUN_0048f720 ReadU64, FUN_0048f6d0/FUN_004e0390 ReadByte, FUN_0048f840 ReadString, FUN_004d4c70
-ReadList). The C# field↔offset map is in `GuildRenownBlock`. Remaining: the per-guild meaning of the feat/city/
-cap fields is not recoverable from the stripped binary (no symbol names; only RenownCounters[1] varies in capture).
+ReadList). The C# field↔offset map is in `GuildRenownBlock`. The per-guild meaning of the feat/city/cap fields is
+not recoverable from the stripped binary (no symbol names; only RenownCounters[1] varies in capture).

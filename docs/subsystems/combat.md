@@ -28,7 +28,7 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
    damage slot and the `0x06 000000CB` constant - `SendNormalAttackResponse`), then `DamageResultIIR
    (0xFEC4158A)` + the target's vitals application + `EnergyIIR (0x40749B8A)` stamina.
 4. **Targeted UNARMED damage was not captured** (the capture's unarmed swings hit air); the server reuses
-   the armed damage path as an extension - revisit if a targeted-unarmed capture lands.
+   the armed damage path as an extension.
 5. Equip moves (0x09) ack with the identity-block variant + a 0x201C record - `docs/subsystems/inventory.md`.
 
 The `B2 90 80 5C 29 E6 27 CA` 8-byte sequence is the standard null-identity filler wherever an item
@@ -77,7 +77,7 @@ never showed). **NPC death and player death use DIFFERENT triggers** — decoded
   (a hit-direction/ragdoll selector). Built by `WorldDeath.BuildDeathPose` + `BuildDeathBcc(handle,
   NpcDeathVariant)` (byte-exact goldens), sent by `CombatService.OnNpcKilled` after the killing-blow vitals. We
   send the common humanoid death (behaviorId 41877, `NpcDeathVariant` = 0x05); per-creature death behaviorIds
-  need per-NPC behavior data we don't yet carry (follow-up).
+  need per-NPC behavior data we don't yet carry.
 - **Player death** (#214) uses `SimpleCharKilledByUpdateIIR_t` (**0xB066AFC2**) — the "you were killed by X"
   record that drives the local release/resurrect UI, ABSENT from NPC kills. Record:
   `[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `WorldDeath.BuildKilledBy`
@@ -187,8 +187,7 @@ Decode: `CombatEffectBuilderTests` (98/98 frames of the strickenbla capture). Bu
 `CombatPacketCodec.BuildNpcAttackAnimationAckBody`, byte-exact against frame 6472 in
 `CombatPacketCodecTests`. Wired into `WorldSimulation.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
-semantically decoded - capture-typical defaults for the live send; **needs in-client verification** that the
-swing actually animates.
+semantically decoded - capture-typical defaults for the live send.
 
 ## NPC chase / aggro movement (#190, 2026-06-15)
 
@@ -203,10 +202,9 @@ the target out in the field also sends it home. WORKS in-client (it moves + leas
 On arrival home the NPC now also emits a **StopIIR** (`StopCodec` → `BroadcastNpcStop`, the `NpcStopped`
 tick effect) to formally close the move stream (#190), and on engage the broadcaster pushes the NPC's
 **aggro** — a `HateListUpdate` + `ThreatLevel` (`HateListCodec`/`ThreatLevelCodec` → `BroadcastNpcAggro`,
-#216) — alongside the combat-mode weapon-draw. Both are gated by `NpcAutoAttackEnabled` and await in-client
-verification.
+#216) — alongside the combat-mode weapon-draw. Both are gated by `NpcAutoAttackEnabled`.
 
-**Open polish (walk gait + slight snap).** The 61-byte form has no speed field, so the client uses a default
+**Walk gait + slight snap.** The 61-byte form has no speed field, so the client uses a default
 interpolation (a small teleport/snap) and a **walk** gait. Findings from the MoveTask grammar:
 - The task-type byte **@30** (offset incl. the 4-byte length prefix) is the form discriminator: `0x02` orient
   (the 61-byte form we send), `0x04` patrol/segment-list, `0x08` **follow-entity**. NB the FULL recursive grammar
@@ -218,9 +216,8 @@ interpolation (a small teleport/snap) and a **walk** gait. Findings from the Mov
 - ⚠️ `MoveTaskCodec` bodies (`BuildStationary`/`BuildPatrol`/...) carry their **own** 4-byte length prefix,
   so they must be framed RAW after the RPC header - wrapping them in a `WriteArrayUInt32Length` length prefix
   double-prefixes and the client drops the packet.
-- **Next candidate** for run gait + no snap: the `0x05` "pace" form (len 69) `[05][const 12][f32][vec3][vec3]`
-  - a speed float + two positions (a linear move WITH speed). Drive the per-tick step from it instead of the
-  61-byte form. Full MoveTask grammar: `docs/re/spawn-dissection-plan.md`.
+- The `0x05` "pace" form (len 69) is `[05][const 12][f32][vec3][vec3]` — a speed float + two positions (a linear
+  move WITH speed). Full MoveTask grammar: `docs/re/spawn-dissection.md`.
 
 ## NPC weapon-draw / combat stance (#218, decoded 2026-06-16)
 
@@ -273,7 +270,7 @@ the ability re-grant. The set lives in the per-character `CharacterSpell` table 
 client absorbs them silently — see `SendWorldEntry`), and `CaptureSpellImporter.ImportLearnedSpellsAsync` seeds captured characters from the grants in
 the pcaps (attributed via the grant's RpcHeader **receiver instance** = the character id; the GameCharAgent→
 GameCharInterface class pair disambiguates the 0x200A opcode collisions). Level-up auto-grant is NOT implemented —
-captures don't say which spell is learned at which level. **In-client verification pending** (needs-testing on #74).
+captures don't say which spell is learned at which level.
 
 The sibling ops the RE listed — `DispatchForgetSpell 0x200B`, `RemoveSpecialAbility 0x2053`, `UntrainSingleFeat
 0x2011`, `PassiveAbilityEquip/Unequip` — have **zero** packets on this class in any capture, so no byte-exact
@@ -355,7 +352,7 @@ invariant):
   `SendMagicBuffIir`), so the buff/effect that lands renders on nearby clients, not just the gesture. The capture
   streams both other-player **self-buffs** (e.g. player `0x01316e68`) and **offensive casts** (player
   `0x01316cee` on NPC targets) to the observer, framed to the observer's endpoint. Verbatim-relay + Known-gating
-  locked by `CrossPlayerSpellRelayTests` against the captured body. **2-client in-client confirmation pending.**
+  locked by `CrossPlayerSpellRelayTests` against the captured body.
 
 ## Spell cast FSM (#236)
 A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in
@@ -382,7 +379,7 @@ begin×2 / cancel×1; every cast in the ice-strike/casilda/casting captures is b
   (an entity cast sends `kind=1` and a garbage position). `CombatService.ResolveGroundAoe` then damages every
   attackable NPC (Disposition ≠ Friendly) within `GroundAoeRadiusUnits` of the reticle — on empty ground it is a
   no-op like retail. **[V0]** the AoE radius is a single interim constant (no per-spell radius in the RDB spell
-  record) and the channel's per-tick DoT is resolved as one hit on completion — both are Gitea follow-ups.
+  record) and the channel's per-tick DoT is resolved as one hit on completion.
 
 ## Starting gear (#220)
 A brand-new beach character is seeded its slave outfit in `EnsureBeachStarterEquipment`
@@ -396,9 +393,4 @@ A brand-new beach character is seeded its slave outfit in `EnsureBeachStarterEqu
   Necromancer → Broken Bottle (0x33D0A0), Tempest of Set → Broken Bottle (215711, the other bottle). **Per-class,
   NOT per-archetype** (Conqueror + Guardian are both Soldiers and do
   not share a weapon). Coverage is only the classes the create dumps contain; the rest start unarmed. The Fleshy
-  Club (a level-2 char) and Broken Oar (a login capture) are NOT create-flow starters and are excluded. In-client
-  verification pending (needs-testing on #220).
-
-## Known gaps (Gitea, `area:combat`)
-- HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
-  (above, #204); a decoded death-state IIR is still open.
+  Club (a level-2 char) and Broken Oar (a login capture) are NOT create-flow starters and are excluded.

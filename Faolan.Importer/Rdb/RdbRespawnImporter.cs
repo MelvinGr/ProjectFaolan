@@ -18,7 +18,7 @@ namespace Faolan.Importer.Rdb
 	// this hands the mirror-proxy base to RdbReader and just calls ReadDecompressed: the reader already resolves a CDN
 	// entry by content hash, unwraps IOz1+zlib, and negative-caches misses, and the proxy is store-and-forward so the
 	// pull is archived for preservation. The payload is XML <resurrectionpoint ...><position x y z>; the record id is
-	// the playfield/map id, discoverable="false" => AlwaysKnown (the starter). See docs/rdb/rdb-extraction-plan.md.
+	// the playfield/map id, discoverable="false" => AlwaysKnown (the starter). See docs/rdb/rdb-extraction.md.
 	// UPSERTS the real per-map data for the maps we have, keyed on the RDB Guid.
 	//
 	// The `name` attribute is the world EDITOR's object label, not a display name, and it is not unique: 95 points are

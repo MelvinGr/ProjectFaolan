@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// transient session state and are deliberately not stored - a buffed captured spawn extracts to the same rows
 	// as its unbuffed form. Fresh characters get the fresh-character defaults below (extracted from the Dikketest
 	// create capture - a just-created character at world entry; the same role Strie's template played, but with a
-	// genuinely fresh scaffold). See docs/re/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
+	// genuinely fresh scaffold). See docs/re/player-spawn-generation.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
 		// Offset of the u32 feat-list count marker within the PreFrame. The pre-IIR frame carries the character's
@@ -368,7 +368,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
 		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
 		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
-		// docs/re/fa015807-spawn-reader.md (FUN_01121c00) + docs/re/player-spawn-generation-plan.md.
+		// docs/re/fa015807-spawn-reader.md (FUN_01121c00) + docs/re/player-spawn-generation.md.
 		private static byte FrameArchetype(Class @class)
 		{
 			return @class switch

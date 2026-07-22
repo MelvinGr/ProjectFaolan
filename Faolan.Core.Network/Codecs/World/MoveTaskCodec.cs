@@ -136,7 +136,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is
 		// what a moving NPC needs: a current position plus a list of waypoints it walks between at `speed`. The
-		// grammar (docs/re/spawn-dissection-plan.md, dissect_movetask.py) for this dominant form is:
+		// grammar (docs/re/spawn-dissection.md, dissect_movetask.py) for this dominant form is:
 		//   [00 00][curPos vec3 BE]
 		//   04 01 00 02 01 01 00 00 00 00          segment-list + move-block header (flag bytes constant here)
 		//   [count u8][count x waypoint vec3 BE]    the patrol path

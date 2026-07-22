@@ -10,7 +10,7 @@ namespace Faolan.Tests
 	// The build-side oracle for the spawn's CharacterStats component (sex/side/race/class/health/... = the
 	// generated ProtoCoreCharacterIIR.CharacterStats): decoding the real captured block and re-encoding it is
 	// byte-identical, so the component is BUILT from a typed object populated from DB character data - which is
-	// what TryRebuildPlayerSpawnFromDb ships today (docs/re/player-spawn-generation-plan.md).
+	// what TryRebuildPlayerSpawnFromDb ships today (docs/re/player-spawn-generation.md).
 	public class CharacterStatsRoundTripTests
 	{
 		[Fact]

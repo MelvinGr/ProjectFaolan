@@ -28,11 +28,9 @@
 > play-mode conversation, and **NOT** a missing handshake packet. It is the **stateful server-side
 > conversation/object model** the real n3 server maintains (keeping the world conversation + its entities alive as
 > resolvable remote objects across the load→play transition) — a slice of the missing simulation layer
-> (`server_architecture_roadmap`), which Faolan's byte-replay bridge lacks. **Next, both client-gated to verify:**
-> (1) build a minimal live remote-object/conversation registration on the world connection and check in-client
-> whether PollStatus then resolves a mid-session spawn; (2) Ghidra: what `CharInPlayIIR`'s Activate flips to end
-> construction-mode leniency. Key client functions are listed in parts 4–7. (The playfield-instance map gate in
-> parts 2–3 is the downstream RENDER path, hit equally by burst + mid-session — NOT the selective blocker.)
+> (`server_architecture_roadmap`), which Faolan's byte-replay bridge lacks. Key client functions are listed in
+> parts 4–7. (The playfield-instance map gate in parts 2–3 is the downstream RENDER path, hit equally by burst +
+> mid-session — NOT the selective blocker.)
 
 **Symptom.** Nothing spawned mid-session renders in-client: `.spawnnpc` (NPC), `.spawnbag` / kill-drop loot
 bags, `.mount` (the horse), interest-streamed NPCs. Only the login **world burst** renders entities. The server
@@ -91,19 +89,6 @@ mid-session world-conversation sender as unknown / "0").
 - **Missing registration packet** — none. The subop-set diff vs retail is only movement/combat/map types
   (`StopIIR`, `ClimbingDynel`, `ApplySpell`); the rendering mount has no `0x201c`/registration precursor.
 - **96C46740 MoveTask** — only 8 of 42 burst NPCs have it (it's movement, not a render requirement).
-
-## Next step — CLIENT-SIDE RE (packet analysis is exhausted)
-
-Ghidra on `AgeOfConan.exe`, the `FA015807` / interest-registration dispatch + the conversation-table validation:
-- Why does the client register + poll a world-entity spawn during load but not after `CharInPlayIIR`?
-- What does the play-mode entity handler validate (conversation instance? a playfield "object set" populated only
-  at load? an interest-subscription the burst seeds that a mid-session push lacks?).
-- Find the step retail's world-entry runs that leaves the client's mid-session interest/poll loop ACTIVE for
-  newly-pushed handles — and replicate it.
-
-Until then, mid-session spawning is impossible, which gates **loot bags, `.spawnbag`, `.spawnnpc`, mounts, and
-interest-streaming**. (The `DispatchAddItem` live inventory add is unaffected — it's a HUD/inventory update on the
-GameCharAgent conversation, not a world-entity spawn, and is in-client verified.)
 
 ## Ghidra progress (2026-06-16) — the client-side "register handle" chain mapped
 
@@ -187,11 +172,7 @@ mode) but never performs that server-side registration.
 a server never runs) and NOT "switch conversations." It's that the real n3 server registers the world
 conversation + its objects as live remote objects and keeps them alive; Faolan, being a byte-replay bridge with no
 stateful conversation/object model (see `server_architecture_roadmap` — "protocol done, simulation layer
-missing"), never sends the registration the client needs to later resolve the remote. **Open question:** is that
-registration a single replayable handshake packet, or does it require the stateful conversation model (a slice of
-the missing simulation layer)? **NEXT (offline):** diff retail's world-entry handshake (around the load→play
-`CharInPlayIIR`/`ReadyForPlayScreen` transition) vs ours for a conversation/object-registration step we skip; if
-it's a discrete packet it's replayable, otherwise it's a simulation-layer build. Confirming any fix needs an
+missing"), never sends the registration the client needs to later resolve the remote. Confirming any fix needs an
 in-client render (`PollStatus` runs only in the live client).
 
 ### HANDSHAKE DIFF (part 7) — no discrete missing registration packet
@@ -213,10 +194,7 @@ ONE conversation for both phases), the answer to the open question lands on **st
 real n3 server keeps the world conversation + its entities alive as resolvable remote objects across the load→play
 transition, and Faolan's byte-replay bridge has no such model, so once the client leaves construction mode the
 remote can't resolve. The fix is therefore a **slice of the missing simulation/conversation layer**
-(`server_architecture_roadmap`), not a replayable handshake. This is the end of the productive offline trail for
-#23; the next move is either (1) build a minimal live remote-object/conversation registration on the world
-connection and test in-client whether `PollStatus` then resolves a mid-session spawn, or (2) deeper Ghidra on the
-n3 dispatch to learn exactly when/how the construction-mode leniency ends (what `CharInPlayIIR`'s Activate flips).
+(`server_architecture_roadmap`), not a replayable handshake.
 
 ### The playfield-instance map lookup (part 3) — the downstream RENDER path (kept for reference)
 
@@ -256,11 +234,7 @@ the world-load descriptor) is NOT the same as the zone token we stamp into spawn
 spawn misses the playfield map → dropped. The burst renders because its spawns carry the captured token verbatim
 (which, in the captured session, matched the real playfield instance).
 
-**NEXT (fix direction):** (a) confirm the equality — in-client, log the registered `GetPlayfield(+0x94)` instance
-vs the token we stamp; OR finish tracing client descriptor[8] → its wire field and compare to what our world-entry
-sends; (b) if they differ, stamp mid-session spawns with the world-load-registered instance instead of the
-snapshot token. Also still open: the CharInPlayIIR *Activate* slot (same `+0x94` "cant resolve simplechar"
-family). Helper scripts: `tools/ghidra/{DumpVtableX,ReadSlotFn,Xrefs}.java`. (Any candidate fix still needs an
+Helper scripts: `tools/ghidra/{DumpVtableX,ReadSlotFn,Xrefs}.java`. (Any candidate fix still needs an
 in-client render to confirm — packet/golden tests can't see the client's poll loop.)
 
 Memory: `protocol_midsession_spawn_blocked`. Related: `protocol_201c_spawn_subprotocol` (the poll loop),

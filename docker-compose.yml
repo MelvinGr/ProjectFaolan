@@ -3,7 +3,7 @@
 # Default: ONE all-in-one server (login tier + the first realm's world) — the simplest deploy. `docker compose up`
 # builds the image (Dockerfile) and runs it, persisting the game data via a bind mount.
 #
-# For a PROCESS-PER-REALM deployment (#324, docs/subsystems/multi-realm-plan.md) see the commented `login` +
+# For a PROCESS-PER-REALM deployment (#324, docs/subsystems/multi-realm.md) see the commented `login` +
 # `realm-*` services at the bottom. Two caveats for that mode:
 #   - The Realm rows' IpAddress must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT
 #     127.0.0.1 — the login tier advertises Realm.IpAddress:Port and the client connects there from OUTSIDE Docker;

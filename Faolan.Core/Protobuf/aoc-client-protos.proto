@@ -8,7 +8,7 @@
 //   protogen --csharp_out=Faolan.Core/Protobuf --proto_path=docs aoc-client-protos.proto
 //   # then rename the emitted aoc-client-protos.cs -> AocProtocol.g.cs
 // Notably: ProtoAcgItem.{key1,key2,key3}=ProtoDecryptionKey carry the per-item TEA decryption keys (= the
-// Items.Data1..4 quad) that unlock the RDBH item templates - see docs/rdb-extraction-plan.md.
+// Items.Data1..4 quad) that unlock the RDBH item templates - see docs/rdb/rdb-extraction.md.
 syntax = "proto2";
 package aoc;
 option csharp_namespace = "Faolan.Core.Protobuf";

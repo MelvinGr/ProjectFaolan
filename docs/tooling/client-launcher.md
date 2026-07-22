@@ -173,8 +173,7 @@ needs interactive editor input, which the launcher flags can't provide — it'd 
 The smoke-test script → **14/14 PASS**: Proton launched the client → server logged `login accepted` →
 `RequestAuth` → `EnterWorld (0x20B6)` → CSPlayerAgent auth → in-world GameServer traffic; client applied the
 gametweaks with no Dispatcher failures; the loopback pcap held 360 packets across 7010+7014; the launcher applied
-the `UniverseAddr` redirect — all with **no manual interaction**. This unblocks the **TODO #7**
-create-world loopback-capture diff (its pinned next step needed exactly this repeatable live run).
+the `UniverseAddr` redirect — all with **no manual interaction**.
 
 ---
 

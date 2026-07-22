@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		// code (a before/after narrative) legitimately names symbols/paths that no longer exist.
 		private static readonly HashSet<string> Allowlist = new(StringComparer.Ordinal)
 		{
-			// docs/re/spawn-dissection-plan.md documents the RETIRED Faolan.PacketAnalyzer approach (#82) as the
+			// docs/re/spawn-dissection.md documents the RETIRED Faolan.PacketAnalyzer approach (#82) as the
 			// before-state of the construct-don't-replay work - these name that removed project's types/paths on purpose.
 			"ArchetypeHarvester",
 			"ArchiveDataImporter",

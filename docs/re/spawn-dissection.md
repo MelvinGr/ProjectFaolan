@@ -1,4 +1,4 @@
-# Plan: dissect the verbatim world packets → load players & NPCs from the DB
+# World-packet dissection: players & NPCs from the DB
 
 > **STATUS: COMPLETE — kept as the byte-level derivation reference, not open work.** The verified per-message
 > index + coverage are [`../protocol/gen/messages.md`](../protocol/gen/messages.md) and
@@ -31,23 +31,15 @@
 > - **`737A6DF9` inventory snapshot** — containers + tails parse→reserialize byte-identical (`InventorySnapshotTests`).
 > - **`642CD3D6` Interact** (inbound) — actionType/args/trailing slots+handle decoded (combat, equip, conversation).
 >
-> **What remains is NOT dissection** — it is construction-from-DB + cross-session normalization + content import,
-> all of which need **in-client validation the user cannot run right now**, or fresh captures:
-> (a) drive arbitrary `NpcSpawns`/`WorldObject` rows by re-addressing the cross-session body (handle/scaffold/
-> instance refs + the chest `stateHandle`/interaction) — the byte-identical wiring is shipped, the cross-session
-> reconstruction is the in-client gate; (b) the inventory add/remove client stall (semantic/client-side, not a
-> packet defect); (c) full conversation trees + per-character remoteformat (content import, needs fresh captures);
-> (d) the MoveTask mode-00 "approach/face" param floats + a `PatrolPath` table to SOURCE waypoints; (e) folding
-> the pre-IIR/post-IIR scaffolds into rows. The sections below are the per-family dissection detail + history.
+> The sections below are the per-family dissection detail + history.
 
 > **2026-06-10: the PLAYER-SPAWN half of this plan is COMPLETE and documented in
-> `docs/re/player-spawn-generation-plan.md`** — the player's FA015807 is fully generated from DB rows
+> `docs/re/player-spawn-generation.md`** — the player's FA015807 is fully generated from DB rows
 > (identity/stats/equipment via `ProtoCoreCharacterIIR`, the scaffold frame via `PlayerSpawnScaffoldCodec` +
 > the CharacterAttribute/CharacterSkill/CharacterScaffoldPair/CharacterSpawnFrame rows);
 > `spawn-player-template.bin` and the `PlayerSpawnTemplate` constant are both gone. The morph-encoding
-> blocker recorded below is SUPERSEDED: the editor sliders are the float-valued scaffold entries (only the
-> slider→float mapping remains). The sections below stand for the still-open phases (NPC spawns from DB,
-> static-world dissection, conversation content) and as dissection history.
+> blocker recorded below is SUPERSEDED: the editor sliders are the float-valued scaffold entries. The
+> sections below cover the NPC-spawn, static-world and conversation families and dissection history.
 
 ## Status (updated 2026-06-07)
 
@@ -57,7 +49,7 @@
 - **Phase 2 DONE** — any beach character (`Character.MapId == 0xFAA`) uses the replay; the capture's instance is
   re-addressed to the live one (`RewriteBurstInstance`); SpawnCheck gated on `Session.UsedWorldBurstReplay`.
   Structurally verified (no-op/byte-identical for Strie); needs in-client confirm for a non-Strie id.
-- **Name field dissected** — `0A <len> <utf8>`; length-change needs a nested-length rebuild (see below). Not done.
+- **Name field dissected** — `0A <len> <utf8>`; length-change needs a nested-length rebuild (see below).
 - **Three hard-won gotchas**: inject burst packets via the raw `client.SendAsync` path + manual CRC (NOT
   `PacketStream.SendAsync`, which reshapes TCP segmentation and stalls the client); don't rebuild the rotation
   yet; and the player handle == the client instance (the client never polls its own handle).
@@ -67,9 +59,8 @@
 - **Per-character name confirmed in-client** — renamed char spawns with its own (different-length) name and loads.
 
 So a non-Strie beach character now: renders the world+NPCs, spawns at its DB position with its DB name, and can
-open NPC dialogue. The then-remaining piece — appearance/equipment/scaffold, the bulk of the FA015807 body — was
-finished 2026-06-10 (see the banner at the top + docs/re/player-spawn-generation-plan.md); only the morph
-slider→float mapping is still open.
+open NPC dialogue. The appearance/equipment/scaffold — the bulk of the FA015807 body — was
+finished 2026-06-10 (see the banner at the top + docs/re/player-spawn-generation.md).
 
 - **Transform now CONSTRUCTED** (2026-06): `SpawnPacketBuilder.BuildSpawnBody` builds the header + transform
   (position/rotation = typed `ProtoVec3`/`ProtoQuat`, i.e. `ProtoGameCodeDynelIIR`) instead of offset-patching a
@@ -89,55 +80,9 @@ slider→float mapping is still open.
 - **Field mapping RESOLVED + wired (2026-06-10)**: `race` (field 3) = the `Race` enum; `sex` (field 1) = the
   `Sex` enum + 2 (Male=2, Female=3); `life`/`health` are ×100 the player-facing `CharacterMaxStats` values.
   All driven from the DB in `TryRebuildPlayerSpawnFromDb` (Phase 3 DONE — the player spawn is fully DB-driven,
-  see docs/re/player-spawn-generation-plan.md).
+  see docs/re/player-spawn-generation.md).
 
-Next up:
-1. **Phase 4 — NPC spawns from `Npcs`/`NpcBodies`** (the builder already generalizes to NPC FA015807 bodies).
-2. Conversation content import (full dialogue trees) — separate, larger.
-
-## Goal
-
-Replace the verbatim Strie-login replay (`RetailLoginReplay.cs` + `strie-login-worldburst.bin`) with
-**dynamically constructed** world-entry packets sourced from the database, so that:
-
-1. **Any** character logs in and renders with **its own** position, orientation, appearance (race / sex /
-   class / morphs), name, equipment and stats — not Strie's captured bytes.
-2. **NPCs** spawn from the `Npcs` / `NpcBodies` / `NpcEquipment` tables the same way.
-3. Eventually: full inventory (`Items` / `CharacterEquipment`), stats, spells, quest state.
-
-The verbatim replay stays as the reference oracle: for any field group we make dynamic, we rebuild it from
-the DB values that match a captured character and assert the bytes are identical to the capture. Nothing
-ships dynamic until it is byte-equal to retail for the known case.
-
-## Packets to dissect (the `0x2000` world build, in priority order)
-
-| sub-opcode  | what it is                          | source table(s)                         | priority |
-|-------------|-------------------------------------|-----------------------------------------|----------|
-| `FA015807`  | entity **Spawn** (player + NPCs)    | `Characters`,`CharacterBodies`,`-Equipment`,`Npcs`,`NpcBodies`,`NpcEquipment` | 1 |
-| `96C46740`  | per-entity registration (paired w/ Spawn) | same as Spawn                     | 2 |
-| `0x2008`/`0x2020`/`0x2076` | spawn-poll handshake + manifest | session handle table             | 2 |
-| `737A6DF9`  | inventory dump                      | `Items`, `CharacterEquipment`           | 4 |
-| `66AEDD50` `F096251E` `33A56FB0` | static world objects / geometry | `Maps`, `MapObjects`         | 5 |
-| `5D85BFC7`  | MapChange                           | `Maps`, `Characters.MapId`              | 1 (already hand-built) |
-| `0x2024`    | ReadyForPlayScreen                  | `Characters` position (BE floats)       | 3 |
-| `0x2052`    | per-entity spawn data (pos/quats)   | spawn model                             | 3 |
-
-## Method: differential analysis against multiple captures
-
-We cannot generate new captures (no client on the dev side), but we have several characters with **known,
-differing** attributes: `Strie`, `dikketest`, `strickenbla`, `demol80`, `faolanx` (+ the create captures).
-Aligning the *same* packet type across two characters isolates each field:
-
-- bytes that **differ** between two spawns ↔ the attributes that differ (name text/length, position floats,
-  race/sex/class ids, equipment item ids, appearance morph ids, the entity handle).
-- bytes that are **constant** across all spawns ↔ fixed scaffolding (tags, type markers, defaults).
-
-`FA015807` is already partly tag-structured (protobuf-ish): e.g. position is
-`2C 0A 0F 0D <x:f32> 15 <y:f32> 1D <z:f32>` and rotation `0D <rx> 15 <ry> 1D <rz> 25 <rw>` — field numbers
-1–4, wire types fixed32. So most of it can be parsed as nested length-delimited + fixed32/varint fields with
-the existing `ProtoMessage` parser; the rest is differential.
-
-## Tooling to build (Phase 0) — DONE
+## Tooling
 
 Implemented: `NpcSpawnAppearanceTests` (workbench: decodes handle/position/rotation/name per spawn, plus a
 `diff` mode); `Faolan.Core.Network/Codecs/Spawn/SpawnPacketBuilder.cs` (then template-based; the embedded
@@ -146,31 +91,9 @@ Implemented: `NpcSpawnAppearanceTests` (workbench: decodes handle/position/rotat
 `SpawnPacketBuilderTests` byte-exact rebuild + `SpawnHandleTableTests` (the spawn tests now live in
 `Faolan.Tests/`). Phase 0 complete.
 
-The handle allocator is built but NOT yet wired - it activates in Phase 2 when spawns are built with our own
-handles instead of replayed with the capture's. Until then the verbatim handles are used.
+## Dissection history
 
-Original outline:
-
-
-
-1. **`NpcSpawnAppearanceTests`** — for a given sub-opcode (default `FA015807`), extract every matching
-   `0x2000` body from one or more capture JSONs, parse into a tag/length/value field tree (reuse the
-   `ProtoMessage`-style walk), and print them **side-by-side** with a per-field "constant / varies" flag and
-   the known character attribute next to each varying field. This is the dissection workbench.
-   - Seed the known attributes per capture from `Characters` rows (Strie) + README reference values.
-2. **`SpawnPacketBuilder`** (C#, `Faolan/GameServer/Spawn/`) — builds an `FA015807` body from a typed
-   `SpawnModel { uint Handle; Vector3 Position; Quaternion Rotation; uint Race, Sex, Class; string Name;
-   AppearanceMorphs; Equipment; Stats; ... }`. Start as a faithful re-expression of the captured Strie player
-   spawn (so it round-trips byte-exact), then replace literal regions with model fields one at a time.
-3. **Round-trip test** (`Faolan.PacketAnalyzer.Tests` or a small xunit) — `BuildSpawn(strieModel)` must equal
-   the captured Strie `FA015807` bytes. Add a case per field group as it goes dynamic; this is the gate.
-4. **Session handle allocator** — `SpawnHandleTable` mapping each spawned entity (the player + each NPC) to a
-   server handle (retail used `0x000818xx`/`0x00081906`-style ids). Used consistently by Spawn, `96C46740`,
-   the `0x2020`→`0x2008` SpawnCheck (drop the hardcoded `StriePlayerSpawnHandle`), and the `0x2076` manifest.
-
-## Phases (each independently testable: byte-diff vs capture, then in-client)
-
-**Phase 1 — Player self-spawn from DB.** DONE (position only).
+**Phase 1 — Player self-spawn from DB** (position only).
 `RetailLoginReplay.TryRebuildPlayerSpawnFromDb` detects the player's own `FA015807` in the world burst (the
 one whose handle == client instance) and rebuilds its **position** from the DB `Character` via
 `SpawnPacketBuilder.BuildSpawnBody`; everything else stays verbatim. For Strie the DB position equals the
@@ -184,11 +107,9 @@ the new body in, recompute the CRC in-place (`Crc32.Calculate(rebuilt[8..])`), a
 whole plan: built packets injected into the burst should use the raw path + manual CRC, not PacketStream.
 
 GOTCHA 2 - rotation: rebuilding the **rotation** from the DB also stalled loading (and existing characters have
-unreliable rotation data), so rotation is kept verbatim from the template for now - revisit once DB rotation is
-trustworthy. Still literal too: the embedded **name** (variable length - needs the length-aware rebuild) and
-appearance/equipment.
+unreliable rotation data), so rotation is kept verbatim from the template.
 
-**Phase 2 — Any character (instance generalization).** DONE (rendering; needs in-client confirm).
+**Phase 2 — Any character (instance generalization).**
 The login gate changed from `clientInstance == 0x02165EFF` to `Character.MapId == 0xFAA`, so ANY beach
 character uses the world-burst replay. `RetailLoginReplay.RewriteBurstInstance` re-addresses the capture's
 instance to the live one in every burst packet: the receiver-conversation varint + inventory nested varints
@@ -214,7 +135,7 @@ node from a content DB). That is a separate content-import phase, out of scope f
 
 Still the capture's appearance/name for the player (Phase 3 / name-rebuild).
 
-**Name field — DONE (needs in-client confirm).** The entity name is a length-prefixed string `0A <len> <utf8>`
+**Name field.** The entity name is a length-prefixed string `0A <len> <utf8>`
 at body offset 308 in the Strie player template. The enclosing lengths were nailed down (the earlier `@296`
 candidate was coincidental): name → `@304` (4-byte BE, 469) → `@133` (4-byte BE, 802) → body length `@0` →
 packet length. Proven by self-consistency: within `@133`'s `[137,939)`, `167 + (4 + @304-block 469) + 162 =
@@ -248,8 +169,8 @@ entries of the post-CharacterIIR scaffold entry table** (now `CharacterAttribute
 `[u8 type][u8 sliderId][f32 bits]`). Dikketest's 7 type-0x01 entries (slider ids 0x00-0x06) match his editor
 slider multiset {59×4, 14×2, 30×1} exactly; Hoxxling, who modified ALL sliders, has ~26 type-0x00 entries
 (face slider ids 0x02-0x24). Only the exact slider→float mapping remains (59 → −0.03, 14 → +0.007,
-30 → +0.015 for Dikketest — not a simple linear map). Full grammar + remaining work in
-docs/re/player-spawn-generation-plan.md.
+30 → +0.015 for Dikketest — not a simple linear map). Full grammar in
+docs/re/player-spawn-generation.md.
 
 **Phase 3 — Appearance & orientation fidelity.**
 Dissect the morph/appearance region of `FA015807` and source it from `CharacterBodies` (populated from the
@@ -313,8 +234,7 @@ scaffold key. So the lift is: model the fixed field sequence as a struct (most f
 spatial), emit the empty 0x3F1 scaffold word, and the block regenerates from columns — no raw `Data` blob, no
 cross-session stale refs. (Caveat: cross-session humanoid render still has a separate unknown — minimal
 post-IIR breaks humanoids, `memory npc_spawn_minimal_postiir_breaks_humanoids` — so prove the regenerated
-pre-IIR in-client.) Next: correlate the 53-u32 order with a captured NPC body (`NpcSpawnAppearanceTests`)
-to label the spatial fields, then a `NpcSpawnPreIirCodec` (Parse/Build) golden-tested like `PlayerSpawnScaffoldCodec`.
+pre-IIR in-client.)
 
 PREMISE CORRECTION 2026-06-14 (#185): the long-standing claim that cross-session NPC rows fail to render
 because their **pre-IIR / post-IIR carry the wrong session's instance refs is WRONG.** Scanning 8 beach NPC
@@ -325,9 +245,7 @@ float exponents), **also no handles**. So both blocks are session-INDEPENDENT (s
 own waypoints) and fully regeneratable from columns. The real cross-session render blocker is therefore NOT
 these blocks — it is elsewhere (the CharacterIIR content, or a client-side gate), and
 [[npc_spawn_minimal_postiir_breaks_humanoids]] (minimal post-IIR breaks humanoids) is consistent with
-"humanoids need their captured post-IIR waypoints, don't strip them" rather than a ref problem. Re-scopes #185:
-build the pre-IIR codec + keep/regenerate the post-IIR waypoints; the cross-session mystery needs a fresh
-in-client bisect on the CharacterIIR, not the scaffolds.
+"humanoids need their captured post-IIR waypoints, don't strip them" rather than a ref problem.
 
 IN-CLIENT BISECT 2026-06-14 (#185, driven via Faolan.ClientLauncher + server-side diff logging). Forcing the
 23 diverged beach NPC rebuilds onto the wire (`FAOLAN_FORCE_NPC_REBUILD=1`): **no crash, no `pcDynel is NULL`**
@@ -341,10 +259,8 @@ never the identity/IIR:
   transform floats + pre-IIR/post-IIR scaffold values diverge (the row's exact float pos/state ≠ the burst's;
   position-match rounds to 0.1 so sub-precision differences survive).
 Conclusion: it is the same NPC with a different session's per-instance transform+scaffold state, and the client
-silently rejects a body whose state doesn't match what it expects. Next: build the pre-IIR codec so the
-transform+scaffold are GENERATED from the row's columns (not the cross-session `Data` blob) → the rebuild's
-state becomes self-consistent with its transform, which is the candidate fix for the silent-drop. The
-`FAOLAN_FORCE_NPC_REBUILD` lever + diff logging were experiments (reverted); re-add when building the codec.
+silently rejects a body whose state doesn't match what it expects. The
+`FAOLAN_FORCE_NPC_REBUILD` lever + diff logging were experiments (reverted).
 
 MOVETASK CARRIES POSITIONS (2026-06-14, supports the #185 hypothesis + #190). Each burst FA015807 spawn is
 paired with a `96C46740` MoveTaskIIR_c, and that MoveTask body is **full of position floats** — a waypoint /
@@ -352,9 +268,7 @@ patrol path (e.g. a len-214 beach MoveTask has waypoints at 677.7, 352.1, 741.3,
 float ~offset 3 is the start position). So when a forced from-DB rebuild changes the spawn's exact position
 (row float ≠ burst float, same rounded 0.1), the spawn is now **inconsistent with its paired MoveTask's
 waypoints** (the MoveTask is sent verbatim from the burst). That is the leading explanation for the silent
-drop, and is exactly what `FAOLAN_NPC_BURST_XFORM` (splice the burst transform into the rebuild) tests —
-**pending the visual check (Gitea #185).** Next decode target either way: `MoveTaskIIR_c::ReadSubClass` (the
-waypoint-list grammar) for #190 + to rebuild the MoveTask consistently with a from-DB spawn.
+drop, and is exactly what `FAOLAN_NPC_BURST_XFORM` (splice the burst transform into the rebuild) tests.
 
 CONSTRUCTION PROGRESS (2026-06-10):
 - ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
@@ -366,7 +280,7 @@ CONSTRUCTION PROGRESS (2026-06-10):
   quaternion (only position was stored before). Populated in faolan.db: 1645/1704 spawns carry a template_id
   (the rest are world objects with no NPC IIR), 1422 humanoids flagged with equipment. `NpcSpawnExtractorTests`
   asserts the lift against the real Casilda/Crocodile bodies. (Importer needs `--skip-characters` on a populated
-  DB — the known non-idempotent `CaptureCharacterImporter`, UNIQUE CharacterBodies.CharacterId, still TODO.)
+  DB — the known non-idempotent `CaptureCharacterImporter`, UNIQUE CharacterBodies.CharacterId.)
 
 - ✓ Full construction primitives (commit 84b14dd): `SetCharacterMessage` generalized to locate the IIR via
   `PlayerSpawnReader` (works for NPC + player; adjusts body-length @0 + IIR-length @iirOff-4; the @133 island is
@@ -393,20 +307,7 @@ CONSTRUCTION PROGRESS (2026-06-10):
   player's spawn (a far-off injection was ignored), and the SpawnCheck is reactive (answers any polled handle),
   so no manifest entry is needed for an injected spawn.
 
-STILL TO DO:
-1. THE BLOCKER for driving arbitrary `NpcSpawns` rows: a row whose `Data` is from ANOTHER session is REJECTED by
-   the client (the first built attempt, a cross-session Crocodile, never polled); only same-session/byte-identical
-   bodies render. The cross-session body bakes a different handle/scaffold/instance refs — re-addressing the
-   rebuilt body + remapping the paired 96C46740 is the work. This is the same cross-session problem deferred for
-   the byte-identical wiring, now confirmed in-client as the gate.
-2. Then retire `Data`: lift the 273B pre-IIR float block + the post-IIR scaffold into rows the way the player
-   spawn does (`PlayerSpawnScaffoldCodec`/`Rows` — the NPC post-IIR header word is 4→5, animal minimal is a
-   constant 41B), and add a per-template `Npc` row set so instances need only handle/pos/rot/monster_scale.
-3. Assemble the full burst-free world entry (built spawns + built stationary MoveTasks + built world objects,
-   all with server-allocated handles) as an alternative to the MapWorldBurst replay — the primitives are now
-   in-client-proven; the cross-session body fix (#1) is the prerequisite for using the table rows directly.
-
-**Phase 5 — Inventory & equipment.** (IN PROGRESS — significant existing work.)
+**Phase 5 — Inventory & equipment.**
 The `0x737A6DF9` giant inventory snapshot is already parsed: `Faolan/GameServer/Packets/0x737A6DF9_Test/`
 (`InventorySnapshotInspector` = container/item/stats model; `BigboyTailsFile` = the stats/quest tails;
 `Send0x2000_0x737A6DF9.cs` loads a captured "bigboy", parses, mutates, rebuilds). Structure: body =
@@ -526,9 +427,6 @@ entry count and the tails stay byte-stable - the lowest-risk way to prove the cl
 - Count forced to 1 (Royal Signet is non-stackable) to avoid a confound.
 - Structurally verified by `SnapshotItemBuilderTests.ReplaceFirstBagItem_InPlace_KeepsCountAndSwapsTemplate`
   (re-parse: entry count unchanged, first bag item now reports template 3774542, itemId/record preserved).
-IN-CLIENT TEST: log in a beach character; the first bag item should become "Royal Signet" and the client should
-load normally. If it loads -> DB-built items are accepted in-client (the add/remove stall was the fabricated
-identity, now solved). If it stalls -> the root-size change / tails need attention next.
 
 STEP (b) — DRIVEN FROM CharacterEquipment (2026-06-07, pending in-client test). The hardcoded demo is replaced
 by a real DB-driven path keyed off `CharacterEquipment` (which already has the per-slot Item navs - no new table):
@@ -564,12 +462,7 @@ KNOWN LIMITATION (relogin rendering): persistence is correct in the DB, but refl
 by the in-place-replace approach - we can only swap entries the captured snapshot already has (equipped slots
 5/6/16/18 + the first bag slot). An item equipped into a slot with no captured entry (e.g. a ring, slot 9) is
 saved but won't render until we ADD equipped entries; an emptied slot still shows the captured item until we
-support REMOVE. Those (add/remove of equipped entries) are the next rendering step.
-
-NEXT: widen coverage (slot-correct buildable items; the equipped container only has entries for slots already in
-the capture); ADD/REMOVE equipped+bag entries so persisted changes fully render on relogin (real-identity adds
-are proven safe); model the bag as a list; then the full DB-assembled `737A6DF9` (containers + prefix + tails)
-and the op-`0x1d` live add path.
+support REMOVE.
 
 **Phase 6 — Static world & retire the replay.**
 DONE (2026-06-08, partial): the world burst is now **DB-driven per map**. `Faolan.Importer`
@@ -615,11 +508,9 @@ CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC sp
   `WorldObjectBuilder.TryBuildOntoLivePlacement` - keeps the LIVE placement (handle/transform/playfield) and
   splices in only the DB object identity (message + tail), put on the wire when byte-identical. Beach: 4/12
   (the static zone + decor) now come from the table byte-identical, zero risk.
-- REMAINING: the 8 interactive chests differ in the tail's `stateHandle` + `interaction` protobuf (the
-  now-isolated per-session object state — see the tail dissection above), so they keep the verbatim burst body
-  until that state is normalized (needs in-client to validate re-addressing). The tail's stable part (state
-  string + bbox + scale) is dissected; a per-class `WorldObject` build from columns + fresh handle/playfield +
-  a normalized stateHandle is what fully retires the burst objects.
+- The 8 interactive chests differ in the tail's `stateHandle` + `interaction` protobuf (the
+  now-isolated per-session object state — see the tail dissection above), so they keep the verbatim burst body.
+  The tail's stable part (state string + bbox + scale) is dissected.
 
 96C46740 MoveTask (per-entity movement registration) — GRAMMAR CRACKED 2026-06-11 (workbench
 `MoveTaskCodecTests`, `coverage` mode). Each FA015807 spawn is paired with a 96C46740 MoveTask that
@@ -672,13 +563,10 @@ against the captured golden `Faolan.Tests/Golden/MoveTaskPatrol.bin` (handle 0x1
 speed} — the data a `PatrolPath` schema would hold — complementing `BuildStationary` for non-movers. 165 of the
 captured beach/world patrols match this canonical header byte-for-byte.
 
-STILL TO DO: (a) the residual ~8% type-04 forms (the mode-00 parametric "approach/face" segments and a few
-multi-block tail variants — workbench `coverage` lists them); (b) a `PatrolPath` table + extractor to SOURCE the
-waypoints (they're per-NPC AI data in no table yet), then drive `BuildPatrol` from rows. For now `BuildStationary`
+`BuildStationary`
 + the spawn position constructs a non-moving NPC's registration (proven in-client); `BuildPatrol` constructs a
 mover when the path is supplied. The burst-free spawn primitives (built spawn + built MoveTask + built world
-objects, fresh handles) are validated; the remaining gate before they retire the MapWorldBurst blob is the
-cross-session body fix (Phase 4 STILL-TO-DO #1).
+objects, fresh handles) are validated.
 
 ## Phase 7 — NPC conversations (dialogue)
 
@@ -712,39 +600,6 @@ Current state: a **data-driven conversation replay engine** is implemented.
   (4->4 bytes, so length prefixes stay valid; `PacketStream.SendAsync` recomputes the CRC), and sends them.
   The `TalkToNpc` handler tries this first, falling back to the create-world Kalanthes intro.
 
-Remaining for this phase: capture more option branches (only the clicked-through nodes are recorded); the
-fallback Kalanthes intro still embeds the "Dikketest" player name (rebuild per-character); generalise off the
-Strie gate (instance substitution needs a varint-aware receiver rebuild when the live instance differs).
-
-To finish:
-- Source per-NPC conversation trees (the client drives them by category/key; the server sends the matching
-  `remoteformat`). Likely a `NpcConversations` table or a content import keyed by NPC.
-- Rebuild the `remoteformat` XML per-character (player name, guild) instead of the captured "Dikketest".
-- Model dialogue-tree advancement (the follow-up nodes the player clicks through), not just the opening node.
-- Restore the create-world intro to Kalanthes's approach moment specifically (it is intro content, not a
-  generic click response).
-
-## DB / model gaps to close along the way
-
-- `CharacterBodies` & `CharacterEquipment` are **empty** — populate `CharacterBodies` from the create-editor
-  morph stream (`SetMorphValue`/`TheNameIs` in `HandleCommandPacket.cs`) and give new characters default
-  equipment. Until then Phase 3/5 fall back to captured literals.
-- Need a handle allocator (above) — handles are server-assigned per session, not stored.
-- Seed a few `Npcs` rows for the Tortage beach (from the dissected beach spawns) to drive Phase 4.
-- Stats/level/class tables exist on `Characters`; map them to the relevant `FA015807` fields once dissected.
-
-## Acceptance per phase
-
-1. Round-trip unit test green (built bytes == capture for the known character/NPC).
-2. `tools/capture/compare_log_to_dump.py` shows the dynamic path produces the same (family, opcode) profile.
-3. In-client: a non-Strie character (and NPCs) render correctly at their own DB-driven position/appearance.
-
-## Order of attack (smallest first)
-
-Phase 0 tooling → Phase 1 (player position/name, highest value, smallest dissection) → Phase 2 (handles,
-unblocks any-character) → Phase 4 (NPCs from DB) → Phase 3/5 (appearance, inventory) → Phase 6 (static world,
-retire replay).
-
 ## Archive reference (the OLD C++ server) — a data & protocol goldmine
 
 `Archive/` in this repo (extracted to `/tmp/faolan-archive/trunk`) is the **previous-generation Project Faolan
@@ -768,8 +623,7 @@ best **reference and DATA source** we have — it shipped real world content. Wh
 
 How to use it: when a phase needs DATA (item templates, NPC rows, stat ids, equipment-slot meanings, class/race
 enums) or a question about "what does retail send here", check the archive first — it usually has the answer that
-the captures alone don't. Concrete near-term wins it unblocks: importing `p_items` + `player_items` for inventory
-(Phase 5), seeding `npcs` for Phase 4, and `StatIds`/`playerstats` for stats.
+the captures alone don't.
 
 NOT-YET-IMPORTED archive tables (kept on the shelf — embedded in `Faolan/GameServer/Data/archive/aocdatabase.sql`,
 import on demand by extending `ArchiveDataImporter` if/when a consumer appears):

@@ -10,7 +10,7 @@ world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`, 
 only world-entry path); the captured `BeachTailsTemplate.bin` survives only as the golden test oracle. See the
 memory `snapshot_tails_construction_scope`.
 
-## Status & handover (2026-06-17, updated)
+## Tails build from scratch (2026-06-17)
 
 **The WHOLE tails now build from scratch — no captured-tails template.** `FullCharSnapshotSubClass.BuildFromScratch`
 assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`):
@@ -27,7 +27,7 @@ So the captured Strie tails are no longer needed to *author* a beach entry's tai
 now serves only as the golden test oracle. **`BuildFromScratch` is now wired into the burst-less world entry
 (#210) — the ONLY world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`/
 `BuildBurstlessSnapshot`); the captured-burst tails are retired.** The production FullChar tails are fully
-generated. Branch `development`, all green (506 tests).
+generated.
 
 **UPDATE 2026-06-19 — MULTI-QUEST journal generates byte-exact + WIRED LIVE (#255 closed, verified in-client; commit e89e83fe).**
 The quest region now carries the player's full set of held quests (from `CharacterQuests`), not just the beach quest —
@@ -158,26 +158,23 @@ DONE (#210, since landed): both remaining integration steps below are complete �
    generated, not a captured burst's.
 2. **In-client chat-connect smoke test** — the standing acceptance gate for any byte-changing snapshot step.
 
-## Multi-quest layout (2026-06-16) — toward authoring the player's full quest log
+## Multi-quest layout (2026-06-16)
 
-Decoded the 2-quest snapshot (`xxx-login`: 10238 + 13479) vs the 1-quest (`Strie`: 10238) to author the
+Decoded the 2-quest snapshot (`xxx-login`: 10238 + 13479) vs the 1-quest (`Strie`: 10238), authoring the
 player's accepted quests on login from `CharacterQuests` (replacing the snapshot's single beach quest). Findings:
 - **Index marker is DERIVED from the count**: `marker = 0x3F1 * (questCount + 1)` (1 quest → `0x7E2`, 2 quests →
   `0xBD3`). It is NOT a per-quest constant; baked into `QuestIndexRegion.Build` (the `IndexMarker` DB column is now
   unused). Index = `[0x3F1][marker][questId × N][N][0xF1]` + the W6QT goal-id table with ALL quests' goal steps.
 - Quest journal = N concatenated `Quest_c` records (one per quest); the index lists all N ids.
 
-REMAINING to author multi-quest (the gating work, decode-first):
-1. **Decode the 2-quest `Quest_c` List A + `@609` objective region.** Pinpointed 2026-06-16: running the production
+Multi-quest decode notes:
+1. **The 2-quest `Quest_c` List A + `@609` objective region.** Pinpointed 2026-06-16: running the production
    `FullCharSnapshotSubClass`/`QuestcRegion.Parse` on the `xxx-login` 2-quest tails THROWS `Quest_c record: listKey 3027 !=
    questId 9` (3027 = `0xBD3` = the objective region's chapterTag). So after the two `Quest_c` records the parser runs
    into the `@609` objective region and reads its `0xBD3`/`[1][9]` as a third record's listKey - i.e. `QuestcRegion`'s
    List A model (validated only on the 1-quest beach, whose record's 4 objective sub-lists are EMPTY and consume
    exactly to @609) does NOT handle the 2-quest case. Likely the 13479 record (state=3 in-progress) has NON-empty
-   objective sub-lists that consume extra bytes, so the parser misaligns. Decode the 13479 `Quest_c` record's
-   sub-lists + the 2-quest objective region from `xxx-login` (manual byte walk / dynamic Ghidra trace), then fix
-   `QuestcRegion`/`QuestObjectiveRegion` to round-trip the `xxx-login` tails byte-exact - the prerequisite to
-   generating multiple quests.
+   objective sub-lists that consume extra bytes, so the parser misaligns.
 
    **2-quest layout fully mapped from the bytes (2026-06-16, `xxx-login` snapshot body offsets):**
    ```
@@ -194,18 +191,10 @@ REMAINING to author multi-quest (the gating work, decode-first):
    Quest_c records, and the two quests are structurally DIFFERENT (10238 = split record + separate 0xBD3 objregion
    like the beach; 13479 = a single inline 879 B block). This is the exact ambiguity flagged above: whether the
    client's List A reads 2 records with List B/C/MainQuest consuming 10238's objregion, or List A interleaves
-   record+objregion per quest. Disambiguating needs a **dynamic Ghidra trace** of `FUN_0091f5c0` (List A) +
-   `FUN_00798c70`/`FUN_004d4c70`/`FUN_00922210` (Lists B/C/MainQuest) on the 2-quest tails to see which reader
-   consumes @1065..1624. Then model the quest region as the real per-quest (record [+ objregion]) sequence in
-   `FullCharSnapshotSubClass`/`QuestcRegion` and regenerate from `CharacterQuests`.
+   record+objregion per quest.
 2. ~~**Harvest 13479's snapshot scalars + goals**~~ DONE 2026-07-20: harvested for every captured quest, not just
    the seeds (`ObjectiveGoalExtractor`, `QuestAreaExtractor`, `CompletedQuestExtractor`). ⚠️ The index block's
    `GoalSteps` are NOT goal ids - they are the AREA's quest catalog, renamed `Block.AreaQuestIds`.
-3. **Extend `FullCharSnapshotSubClass.BuildQuestPortion` → `BuildQuestPortion(IReadOnlyList<(def,state)>)`** — emit N
-   `Quest_c` records + the N-quest objective region + the N-id index; validate byte-exact against `xxx-login`'s
-   2-quest region (golden test) before wiring.
-4. **Wire from `CharacterQuests`** via `FullCharSnapshotSubClass.Deserialize`→replace the 3 quest regions→`ToArray()` (variable
-   length; the access-window/stat regions follow) — drops the fixed `@0..1292` splice. Then in-client smoke test.
 
 ## Class id → reader
 
@@ -363,8 +352,7 @@ u32 objLen ; <remoteformat category="50304" …>      # objective text, u32-leng
 
 The objective TEXT is fully **DB-sourced** (every `key=` matches `QuestTextRefs` for quest 10238), but the
 STRUCTURE is per-goal and the starter carries **two** goals each with its own world marker — richer than
-`QuestDefinition` today (one `GoalId`, one marker). So generating this region needs a **per-goal definition
-model** (Gitea #186, remaining item 2).
+`QuestDefinition` today (one `GoalId`, one marker). Open work is tracked in Gitea #186.
 
 **CORRECTION (2026-06-16):** the earlier claim that `@609` is "a QuestFullUpdate block authored by
 `WorldQuest.BuildQuestFullUpdate`" is **WRONG** for the beach starter. Empirically (`Snapshot609AnalysisTests`):
@@ -387,16 +375,13 @@ it consumes exactly to the objective-block boundary `@609`; `listKey == questId`
 `QuestcRegion`/`QuestcRecord` (Parse/ToArray + typed fields) round-trips the template's `@0–609` **byte-exact**
 (`QuestcRegionTests`) and is **wired into `FullCharSnapshotSubClass`** — it now models the tails' front region instead of
 the former opaque `Header0`/`Unknown*`/`RemoteFormat*` fields. The live snapshot is byte-identical (all 400
-tests pass, incl. `BeachSnapshotConstructionTests`). Generating DIFFERENT quests from a character's
-`CharacterQuests` is the next step (gated by an in-client chat-connect smoke test).
+tests pass, incl. `BeachSnapshotConstructionTests`).
 
 **Generation (DONE, byte-exact).** `QuestcRecord.BuildSingle(QuestDefinition, state, n, fieldEc, fieldF0,
 fieldF8)` assembles a record from a DB `QuestDefinition` (its 5 header text refs + `AreaId`) plus the few
 per-quest scalars not yet harvested into the definition (`N`, the `@0xf0`/`@0xf8` words). `QuestcGenerationTests`
 proves building the beach starter (10238) from `faolan.db` reproduces the template's `@0–609` byte-exact - the
-journal text is fully DB-sourced. Remaining for arbitrary quests: harvest `N`/`@0xf0`/`@0xf8` into
-`QuestDefinition`, and regenerate the `@609` objective block + index (authored by `QuestObjectiveRegion.Build` +
-`QuestIndexRegion.Build`, NOT `BuildQuestFullUpdate`).
+journal text is fully DB-sourced.
 
 So the human-readable journal text is entirely the **5 header strings**; the numeric objective records are
 unused for the beach starter (its objectives render from the strings). The raw wire emit is: `listKey` +
@@ -422,7 +407,7 @@ are a flat playfield-entry table (`u32 playfieldId, u8 section, u32 kind, u32, s
 developed NecroL80 snapshot both carry the SAME **172** `PFAccessWindow_` name strings — i.e. it is reference
 data, identical for every character, not per-character progression.
 
-Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin`):
+Regions of a fully-synthetic fresh-beach tails (which lets the `.bin` be deleted):
 - **`Quest_c` (List A) DONE** — wire grammar pinned + field-labeled + ground-truth-validated against the
   template (above); a fresh single-quest record is authorable from `(questId, state, areaId, N, 5 text tokens)`.
 - **List B et al. — NO WORK NEEDED:** empirically empty (above); the from-scratch builder already omits them
@@ -437,7 +422,7 @@ Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin
 Dumps: `tools/ghidra/output/fullchar_reader.txt`, `tools/ghidra/output/fullchar_records.txt` (regenerate with the two
 scripts above).
 
-## Per-character CLASS identity still open; class-derived stats now authored (2026-06-17, #239/#4/#186)
+## Per-character CLASS identity; class-derived stats now authored (2026-06-17, #239/#4/#186)
 Historically the beach snapshot was the captured **Strie** packet (an Assassin = **Rogue**) and the login path
 patched level / current vitals / quest / containers but **not the class or class-derived stats**, so every
 character shipped Strie's Rogue identity (sheet showed "Barbarian", Rogue weapon proficiency, wrong mana).

@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Golden decode of the item stat-modifier region (docs/rdb/item-template-stats.md, #3). Ground truth is the
-	// in-client-verified Royal Signet tooltip (template 3774542, verified 2026-06-07 in docs/re/spawn-dissection-plan.md
+	// in-client-verified Royal Signet tooltip (template 3774542, verified 2026-06-07 in docs/re/spawn-dissection.md
 	// STEP (b)): +30 Constitution / +52 Magic Damage / +15 Hit Rating. The bytes below are that item's real decrypted
 	// RDB template BODY (the span after the 12-byte RDB-Id header), so this is NOT self-referential - it proves the
 	// parser reproduces an independently-observed tooltip.

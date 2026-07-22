@@ -128,7 +128,7 @@ cracked and implemented (`CharacterMorphs.TryApply`, driven by the create-flow `
   sliders produce NO entry (strickenbla, zero morphs: 6 weighted attributes + closer at idx 7).
 Locked by `CharacterMorphsTests` (Hoxxling's raw editor stream → his 28 wire entries bit-exact) and the
 re-pointed `FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture` (Dikketest's raw stream → his captured
-spawn byte-for-byte). The old verdict in spawn-dissection-plan.md ("the floats are progression skills, NOT
+spawn byte-for-byte). The old verdict in spawn-dissection.md ("the floats are progression skills, NOT
 morphs") was wrong.
 
 ## Weighted attributes — CRACKED & WIRED (2026-06-10, fourth session)
@@ -173,7 +173,7 @@ colors, tattoos and scars have NO IIR fields — they render from the scaffold's
 morph entries (both DB-generated above), so the visual appearance pipeline for fresh characters is complete:
 IIR (head/voice/scale) + weighted entries (chosen resources) + morph entries (sliders).
 
-## FullChar (0x737A6DF9) generation — IN PROGRESS (2026-06-10, sixth session)
+## FullChar (0x737A6DF9) generation (2026-06-10, sixth session)
 
 The same playbook applied to the FullChar/inventory snapshot:
 
@@ -235,18 +235,5 @@ memory `snapshot_tails_construction_scope`):
   the burst prefix/tails + delta-adjust.
 - Bag **moves/drops/splits persist** now (`Faolan/GameServer/Inventory/EquipmentService.cs`, locked by `EquipmentPersistenceTests`).
 
-Remaining: **progressed-character** tails (the `UnknownBefore` block grows to 100s of KB of feat/spell/quest
-records — generate from server-side progression when those systems exist); bag capacity upgrades; the quest-count
-`X` once quests are real.
-
-## Remaining (optional)
-
-- (equip `pos` 3/8/20/21 mapped 2026-06-10: Tokens/OffHandWeapon/RangedWeapon/Ammo, see above.)
-- **FullChar (0x737A6DF9)** is the analogous next generation target (test the `ProtoFullCharacterIIR`
-  round-trip first, same playbook).
-- Extraction of CAPTURED characters into rows currently exists as the test-side mapping
-  (`PlayerSpawnScaffoldRows.ExtractTo`); a Faolan.Importer step that materializes e.g. necrol80 as a playable
-  geared character would reuse it as-is.
-
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture and
-docs/re/spawn-dissection-plan.md for the wider (NPC/inventory/conversation) dissection history.
+docs/re/spawn-dissection.md for the wider (NPC/inventory/conversation) dissection history.

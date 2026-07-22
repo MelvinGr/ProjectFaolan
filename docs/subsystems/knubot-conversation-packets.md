@@ -21,8 +21,7 @@ reproduces the captured XML byte-for-byte (652/652 screens, 6090 parameters); th
 from the rows via `ConversationScreenColumns.ToScreen` → `RemoteFormatXml.Build`, with **no fallback** — the
 columns are authoritative. The **live player name/guild are regenerated** into each screen's `name`/`guildname`
 parameters (`RemoteFormatXml.WithLivePlayer`) so the NPC greets the real character — the captured player's name
-is gone. **Remaining:** the screen TEXT (`key`) is still the captured template; generating it from RDB text +
-the Lua/tag VM is blocked on the harvested, client-validated content `key` (non-computable, same as the item
+is gone. The screen TEXT (`key`) is the captured template; the content `key` is non-computable (same as the item
 TEA keys).
 
 `AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 163/163 +
@@ -81,9 +80,4 @@ columns, and the runtime BUILDS the packet from those columns via
 `DialogueCameraBody.BuildDialogueCameraPacket` re-addressed to the live player + NPC handles (byte-exact in
 `ConversationConstructTests`). The interleaved quest-grant packets are built by the `WorldQuest` builders.
 
-## Remaining for #188
-- Harvest the dialogue TREE (screens + option remoteformat refs + branching) from the RDB (the captures
-  already give the screens; `memory rdb_extraction` for the RDB side).
-- Build `KnubotOpenChatWindow`/`AppendText`/`AnswerList` from those refs (byte-exact golden tests vs the
-  captured `ConversationPacket` bodies), then drive them from the Lua/tag VM (conditions + grants already
-  landed, #37) instead of replaying. Retire `ConversationService.ServeScreen`'s verbatim path.
+Open work is tracked in Gitea #188.

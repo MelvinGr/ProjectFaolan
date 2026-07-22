@@ -46,32 +46,21 @@ playfield** when `InitPath` ran — not a data/animation bug.
 This matches the last in-client result (camera + audio correct; no more `invalid camera path`). **The
 camera-path/playfield theory is resolved and is no longer the blocker.**
 
-## Remaining gap: actor animation (client-script / content, not server packets)
+## Actor animation is client-side content, not server packets
 
-What still doesn't play (per the **last known** in-client create run — see caveat below) is the scripted
-**actor animation** (galley sinking, the player avatar's knockout). Because the drowning cutscene is
-client-autonomous, there is no server directive to add — the client-side galley script (RDB script id
-105937) spawns and drives its own actors. Lead:
+The scripted **actor animation** (galley sinking, the player avatar's knockout) is client-side. Because the
+drowning cutscene is client-autonomous, there is no server directive to add — the client-side galley script
+(RDB script id 105937) spawns and drives its own actors.
 
 - **Cinematic actor-tagging.** `TagCharacterForCinematicScriptCommand` (`FUN_014514c0`) parses an
   `"object"` reference identifying which character the cinematic controls. This is the server-driven path
   used by the **Kalanthes** beach cutscene (`ThisIsKalanthes`/`Kneel`), not the autonomous drowning one.
 
-> **Caveat — no recent create run.** The latest `AgeOfConan.log` (2026-06-14 22:51) is a **failed login**
-> (`Authentication Failure (14)` 4 s after boot), not a create-flow run, so it does NOT show the current
-> cutscene state. Its `1010004:<id> does not exist` lines are **boot-time texture loads**, unrelated to the
-> cutscene manifest — do not treat them as evidence of a content gap. The actor-animation conclusion above
-> comes from earlier in-client sessions (memory `createworld_cutscene_diagnosis`); re-confirm it with a fresh
-> create run before acting on it.
-
-## Pinned next step (needs the live client)
-
-First, **do a fresh create run** and grab `AgeOfConan.log` — we don't currently have a recent one, so the
-actual current symptom is unconfirmed. Then capture **our** server's create flow and diff the **editor**
-stream packet-by-packet against the retail editor stream (stricken998 `create-no-worldenter` :7030) for any
-runtime divergence (timing of the deadlock-breaker post-ready flush vs. the playfield-4000 load; a missing
-prerequisite spawn). The static data says our packets are correct, so the remaining isolation is a live-run
-diff.
+> **Caveat — evidence provenance.** The actor-animation conclusion above comes from earlier in-client
+> sessions (memory `createworld_cutscene_diagnosis`), not the latest `AgeOfConan.log` (2026-06-14 22:51),
+> which is a **failed login** (`Authentication Failure (14)` 4 s after boot), not a create-flow run. Its
+> `1010004:<id> does not exist` lines are **boot-time texture loads**, unrelated to the cutscene manifest —
+> not evidence of a content gap.
 
 Reproduce the RE: `tools/ghidra/DumpCutscene.java` (strings + xrefs), `DecompileFns.java`
 (`FNS=00515420,005230b0,014514c0`), `FindStr.java` (`NEEDLE=…`) against `tools/ghidra/output` (see

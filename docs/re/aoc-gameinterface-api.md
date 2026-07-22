@@ -18,14 +18,14 @@ files), not the binary — extracting that is the deeper, RDB-side layer (see [[
 | `Game.TargetingInterface` | target selection / target frame |
 | `Game.TeamInterface`, `Game.GroupElement` | team/group (CSPlayerAgent team packets) |
 | `Game.BuffData` | buffs/abilities (`MagicBuffIIR` / ApplySpell `0x6B87E316`, ability grant `0x2052`) |
-| `Game.Camera` | cutscene camera (`DispatchSetDialogueCamera`, the create-world scry — TODO #7) |
+| `Game.Camera` | cutscene camera (`DispatchSetDialogueCamera`, the create-world scry) |
 | `ProgressBars.ProgressBarsInterface` | vitals/cast bars (`StatUpdateIIR` `0x96B8DC59`, see [[protocol_stats_and_combat]]) |
 | `Factions.Faction(Interface)` | faction standing |
 | `Guild.Guild*` (Member/Rank/Renown/Permission/Feat) | guild data |
 | `Inventory`, `InventoryItem` | inventory snapshot (`FullPlayerCharacterIIR`, see [[inventory_db_items_work]]) |
 | `FeatWindows.AAFeatTree`, `MultiSpecsFeatsInterface` | feats / alternate-advancement (the gametweaks `AAPointsPerLevel`/`AlternateAdvancement_*`) |
 | `Fifo.FifoInterface` | the client FIFO / chat scroll (`DispatchShowClientFIFO(remoteFormat)`) |
-| `ScryWidgets` | scry/cutscene widgets (TODO #7) |
+| `ScryWidgets` | scry/cutscene widgets |
 | `DialogIF` | NPC conversation (see [[protocol_conversation_routing]]) |
 | `ItemShop`, `ItemShopBrowser`, `ItemShopGameItem` | the cash/item shop |
 | `GroupFinder*` (Activity/Category/Prerequisite) | the group/raid finder (the `category=100` `GroupFinder*` remoteformats) |

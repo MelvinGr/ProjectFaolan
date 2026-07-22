@@ -89,10 +89,3 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
   `CreateEditorRecordTests`): it multiplexes by endpoint-class pair, and the entity full-updates
   reuse the login/world-entry spawn grammar.
 - **Chat before exit**: a chat send (`642CD3D6`/text) near the end; chat broadcast is `0x203f` (see guild).
-
-## Open questions (for later dissection)
-- Isolate the **guild invite accept**, **resurrect confirm**, **level-up**, and **quest accept/complete state**
-  packets to specific sub-opcodes (the remoteformat dialogs are found; the state-change packets are not).
-- Decode `0x2038` (quest title/area) and `0x20a5` (quest tracker) bodies.
-- Combat damage/health: identify the entity-state update sub-op carrying HP changes (see playerstat work).
-- `0x2002 category=629` token remoteformats = the trade-post/mail/auction UI protocol (TradePostGUI_*).
