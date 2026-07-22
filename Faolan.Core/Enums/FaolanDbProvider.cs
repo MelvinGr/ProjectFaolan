@@ -2,7 +2,7 @@ namespace Faolan.Core.Enums
 {
 	public enum FaolanDbProvider
 	{
-		Sqlite,
-		Postgres
+		Sqlite = 0,
+		Postgres = 1
 	}
 }

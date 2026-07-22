@@ -1,7 +1,6 @@
 {
-	"DatabaseProvider": "Sqlite",
-	"DatabaseConnectionString": "Data Source=faolan.db",
-	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
+	"DatabaseProvider": "Sqlite", // Postgres
+	"DatabaseConnectionString": "Data Source=faolan.db", // "Host=localhost;Port=5432;Database=faolan;Username=faolan;Password=faolan"
 
 	"ServerIpAddress": "127.0.0.1",
 	"UniverseAgentPort": 7010,
@@ -9,6 +8,8 @@
 
 	"McpEnabled": true,
 	"McpPort": 7099,
+
+	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
 	"WelcomeString": "Welcome to Project Faolan!"
 }
