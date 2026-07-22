@@ -77,7 +77,7 @@ namespace Faolan.GameServer.Combat
 		public async Task AddComponentAsync(INetworkClient client, uint componentIndex)
 		{
 			var session = client.Session;
-			if (session?.Character == null || session.Account == null)
+			if (session.Character == null || session.Account == null)
 				return;
 
 			if (!session.IsSpellweaving)
@@ -113,7 +113,7 @@ namespace Faolan.GameServer.Combat
 				Task.RunAfter(ElementCooldownMs, async () =>
 				{
 					var session = client.Session;
-					if (session?.Account == null || !session.IsSpellweaving)
+					if (session.Account == null || !session.IsSpellweaving)
 						return;
 
 					// Refresh the Spellweaving buff at the NEXT stack level (a new buff id that overlaps the previous
@@ -136,7 +136,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ToggleAsync(INetworkClient client, uint param)
 		{
 			var session = client.Session;
-			if (session?.Character == null || session.Account == null)
+			if (session.Character == null || session.Account == null)
 				return;
 
 			if (!session.IsSpellweaving)
@@ -213,7 +213,7 @@ namespace Faolan.GameServer.Combat
 				while (await timer.WaitForNextTickAsync())
 				{
 					var session = client.Session;
-					if (session?.Account == null || !session.IsSpellweaving || _sendIir == null)
+					if (session.Account == null || !session.IsSpellweaving || _sendIir == null)
 						return; // trance closed
 
 					if (session.Energy > 0)

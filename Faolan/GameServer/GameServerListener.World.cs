@@ -85,7 +85,7 @@ namespace Faolan.GameServer
 
 		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
 		{
-			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
+			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Character.Id);
 		}
 
 		Task IWorldOutbound.ReenterWorld(INetworkClient client)

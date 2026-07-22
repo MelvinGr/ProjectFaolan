@@ -93,7 +93,7 @@ namespace Faolan.GameServer.Combat
 				for (var tick = 0; tick < tickCount; tick++)
 				{
 					await Task.Delay(GroundAoeTickIntervalMs);
-					if (client.Session?.Account == null)
+					if (client.Session.Account == null)
 						return; // disconnected
 					if (client.Session.ActiveCastToken != castToken)
 						return; // interrupted (moved / cancelled) - stop ticking
@@ -383,7 +383,7 @@ namespace Faolan.GameServer.Combat
 		// back on a navigation conflict).
 		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
 		{
-			var character = killer?.Session?.Character;
+			var character = killer.Session.Character;
 			if (character == null)
 				return;
 

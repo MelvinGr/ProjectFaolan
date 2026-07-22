@@ -20,7 +20,7 @@ namespace Faolan.ChatServer
 			// always see their own message.
 			foreach (var client in NetworkClients)
 			{
-				var recipientId = client.Session?.Character?.Id ?? client.Session?.Account?.ClientInstance ?? 0;
+				var recipientId = client.Session.Character?.Id ?? client.Session.Account?.ClientInstance ?? 0;
 				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(recipientId))
 					continue;
 

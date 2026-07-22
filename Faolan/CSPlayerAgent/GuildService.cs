@@ -259,7 +259,7 @@ namespace Faolan.CSPlayerAgent
 			foreach (var member in guild.Members)
 			{
 				var memberClient = _clientForCharacter(member.Id);
-				if (memberClient?.Session?.Character == null || !_replyEndpoints.TryGetValue(memberClient, out var endpoints))
+				if (memberClient?.Session.Character == null || !_replyEndpoints.TryGetValue(memberClient, out var endpoints))
 					continue;
 
 				await SendGuildMessageOfTheDayChanged(memberClient, endpoints.Sender, endpoints.Receiver, motd);

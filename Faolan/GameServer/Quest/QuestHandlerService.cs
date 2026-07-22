@@ -112,7 +112,7 @@ namespace Faolan.GameServer.Quest
 			var body = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
 			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
 				? "CAPTIVE"
-				: "freed", casildaHandle, client.Session?.Character?.Name);
+				: "freed", casildaHandle, client.Session.Character.Name);
 			return SendWorldIir(client, body);
 		}
 

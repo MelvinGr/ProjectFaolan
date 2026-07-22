@@ -381,7 +381,7 @@ namespace Faolan.GameServer
 								var mountCastPayload = (byte[])rawPayload.Clone();
 								Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
 								{
-									if (client.Session?.Account == null)
+									if (client.Session.Account == null)
 										return;
 
 									if (mountCastPayload.Length > 17)
@@ -516,7 +516,7 @@ namespace Faolan.GameServer
 
 									Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
 									{
-										if (client.Session?.Account != null)
+										if (client.Session.Account != null)
 											await Resolve();
 									}, Logger);
 								}

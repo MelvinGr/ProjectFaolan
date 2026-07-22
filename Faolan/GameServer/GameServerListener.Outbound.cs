@@ -55,7 +55,7 @@ namespace Faolan.GameServer
 		public async Task<bool> SendGuildTag(uint characterId, string guildName)
 		{
 			var client = ClientForCharacter(characterId);
-			if (client?.Session?.Account == null)
+			if (client?.Session.Account == null)
 				return false;
 
 			await client.SendAsync(BuildGuildTag(client, characterId, guildName ?? ""));
@@ -185,7 +185,7 @@ namespace Faolan.GameServer
 		// cleanly with no recipes.
 		private async Task SendCraftingRecipeBook(INetworkClient client)
 		{
-			var handle = client.Session.Account.ClientInstance;
+			var handle = client.Session.Character.Id;
 			var rows = await Database.GetRecipes();
 			var records = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
 
@@ -274,7 +274,7 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 			var charInstance = map?.PlayfieldInstanced ?? true
-				? client.Session.Account.ClientInstance
+				? character.Id
 				: 0u;
 			var count = map?.PlayfieldCount ?? 2u;
 			var fieldB = map?.PlayfieldFieldB ?? 3u;
@@ -382,7 +382,7 @@ namespace Faolan.GameServer
 		// FifoBannerTypeFlags for the top-of-screen FIFO banner. Addressed to the player's GameInterface instance.
 		private static async Task SendFeedback(INetworkClient client, string xml, uint typeFlags = FormatFeedbackCodec.FifoBannerTypeFlags, uint footer = 1)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.Latin1.GetBytes(xml));
 
 			var ps = new PacketStream();
@@ -443,7 +443,7 @@ namespace Faolan.GameServer
 		// GameInterface instance, on the world conversation.
 		private static async Task SendWorldChat(INetworkClient client, string xml)
 		{
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 			var body = ChatTextCodec.Build(instance, Encoding.Latin1.GetBytes(xml));
 
 			var ps = new PacketStream();

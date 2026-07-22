@@ -197,7 +197,7 @@ namespace Faolan.GameServer.Dialogue
 		// definition (state is still persisted; there is just nothing to render).
 		private async Task<QuestDefinition?> PrepareQuestGrant(INetworkClient client, ConversationNode node)
 		{
-			var character = client.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null)
 				return null;
 

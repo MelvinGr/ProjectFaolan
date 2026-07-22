@@ -168,7 +168,7 @@ namespace Faolan.GameServer
 		private async Task SendClaimList(INetworkClient client)
 		{
 			var accountId = client.Session.Account.Id;
-			var handle = client.Session.Account.ClientInstance;
+			var handle = client.Session.Character.Id;
 			var rows = await Database.GetAccountClaims(accountId);
 			var entries = BuildClaimEntries(accountId, rows);
 
@@ -199,7 +199,7 @@ namespace Faolan.GameServer
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Account.ClientInstance))
+				.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))
 				.SendAsync(client);
 		}
 
@@ -215,7 +215,7 @@ namespace Faolan.GameServer
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Account.ClientInstance, entry))
+				.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))
 				.SendAsync(client);
 		}
 

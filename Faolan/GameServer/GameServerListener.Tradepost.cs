@@ -296,15 +296,15 @@ namespace Faolan.GameServer
 				{
 					// Sent (empty body) AFTER the client received DispatchOpenTradepost (auctioneer / .ah) - the
 					// observed "window opened" signal; nothing to send back, just log.
-					Logger.LogInformation("Tradepost: {Char} opened the auction house.", client.Session?.Character.Name);
+					Logger.LogInformation("Tradepost: {Char} opened the auction house.", client.Session.Character.Name);
 					break;
 				}
 
 				case TradepostAgentOpcodes.ItemSearch:
 				{
 					var query = TradepostResponses.ParseSearch(packet.Body);
-					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character?.RealmId ?? 0); // #324: realm-local market
-					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", client.Session?.Character!.Name, query.Lang, query.ItemId,
+					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character.RealmId); // #324: realm-local market
+					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", client.Session.Character!.Name, query.Lang, query.ItemId,
 						query.Page, listings.Length);
 
 					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no rows).
@@ -352,7 +352,7 @@ namespace Faolan.GameServer
 
 				case TradepostAgentOpcodes.Close:
 				{
-					Logger.LogInformation("Tradepost: {Char} closed the auction house.", client.Session?.Character.Name);
+					Logger.LogInformation("Tradepost: {Char} closed the auction house.", client.Session.Character.Name);
 					break;
 				}
 
@@ -370,7 +370,7 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					Logger.LogInformation("Tradepost: {Char} unknown method 0x{Method:X4} (bodylen={Len}).", client.Session?.Character.Name, packet.Opcode, packet.Body?.Length ?? 0);
+					Logger.LogInformation("Tradepost: {Char} unknown method 0x{Method:X4} (bodylen={Len}).", client.Session.Character.Name, packet.Opcode, packet.Body?.Length ?? 0);
 					break;
 				}
 			}

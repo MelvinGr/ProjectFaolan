@@ -71,7 +71,7 @@ namespace Faolan.GameServer.Quest
 		// inert - that's what makes the brick nodes only respond while Shipwrecked V is active). One item per call.
 		public async Task<uint?> TryAdvanceCollectPickup(INetworkClient client)
 		{
-			var character = client?.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null)
 				return null;
 
@@ -135,7 +135,7 @@ namespace Faolan.GameServer.Quest
 		// solved). Advances scripted objectives without bespoke per-quest C#.
 		public async Task SolveGoal(INetworkClient client, uint goalId)
 		{
-			var character = client?.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null || goalId == 0)
 				return;
 
@@ -175,7 +175,7 @@ namespace Faolan.GameServer.Quest
 		// stage, or (chainless kill) awaits turn-in at the giver - the legacy #47 path.
 		private async Task Advance(INetworkClient client, QuestGoalType triggerType, string targetName, uint? targetTemplateId = null)
 		{
-			var character = client?.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null || (string.IsNullOrEmpty(targetName) && targetTemplateId is null))
 				return;
 
@@ -286,7 +286,7 @@ namespace Faolan.GameServer.Quest
 			// (TrailingRefId, e.g. Casilda 9411), not a hard-coded name; the player's world handle is its ClientInstance.
 			if (nextGoal is { GoalType: QuestGoalType.Escort, TrailingRefId: not 0 })
 			{
-				_outbound.SetNpcFollowByTemplate(character.MapId, nextGoal.TrailingRefId, client.Session.Account.ClientInstance, true);
+				_outbound.SetNpcFollowByTemplate(character.MapId, nextGoal.TrailingRefId, character.Id, true);
 				// After-quest world effects now that the escort is active - e.g. the beach chain-wall collision drops
 				// (data-driven off WorldObject.EffectQuestId; map-scoped, so it no-ops off the beach). Then clear the
 				// escortee's captive struggle pose so she stands/walks as she follows.

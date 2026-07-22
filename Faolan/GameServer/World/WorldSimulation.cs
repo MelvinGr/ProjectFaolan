@@ -136,11 +136,11 @@ namespace Faolan.GameServer.World
 		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null)
 		{
-			var character = client.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null)
 				return;
 
-			var handle = client.Session!.Account.ClientInstance;
+			var handle = character.Id;
 			// The player's pre-existing entity (null on a fresh login) decides whether this is a re-entry that should
 			// keep its current instance vs. a fresh placement that picks one from the map's mode (#268).
 			Players.TryGetValue(client, out var existing);
@@ -168,7 +168,7 @@ namespace Faolan.GameServer.World
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
-			if (client.Session?.Account is { } account)
+			if (client.Session.Account is { } account)
 			{
 				entity.GodMode = account.GmGodMode;
 				entity.Invisible = account.GmInvisible;
@@ -192,7 +192,7 @@ namespace Faolan.GameServer.World
 		public async Task RelocateSameMap(INetworkClient client, Vector3 destination)
 		{
 			var entity = PlayerWorldEntity(client);
-			var character = client?.Session?.Character;
+			var character = client.Session.Character;
 			if (entity == null || character == null)
 				return;
 
@@ -224,7 +224,7 @@ namespace Faolan.GameServer.World
 		// doesn't resolve, fall back to the closest-known logic (RespawnPlayer). No-op if the player isn't dead.
 		public async Task<bool> RespawnAtChosenPoint(INetworkClient client, uint spawnPointId)
 		{
-			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
+			if (!Players.TryGetValue(client, out var entity) || client.Session.Character == null)
 				return false;
 
 			var vitals = entity.Vitals;
@@ -266,7 +266,7 @@ namespace Faolan.GameServer.World
 			if (entity == null)
 			{
 				// Not in the world model yet - fall back to just the sender so they still see their own message.
-				if (sender.Session?.Character != null)
+				if (sender.Session.Character != null)
 					ids.Add(sender.Session.Character.Id);
 				return ids;
 			}
@@ -297,7 +297,7 @@ namespace Faolan.GameServer.World
 		// (and does nothing) otherwise.
 		public async Task<bool> TryRespawnNow(INetworkClient client)
 		{
-			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
+			if (!Players.TryGetValue(client, out var entity) || client.Session.Character == null)
 				return false;
 
 			var vitals = entity.Vitals;
@@ -314,8 +314,8 @@ namespace Faolan.GameServer.World
 		// drops.
 		private async Task ApplyNpcAttack(WorldEntity npc, WorldEntity target)
 		{
-			var client = target?.Client;
-			var character = client?.Session?.Character;
+			var client = target.Client;
+			var character = client.Session.Character;
 			if (character == null)
 				return;
 
@@ -349,8 +349,8 @@ namespace Faolan.GameServer.World
 		// melee-scaled value for now - the captured payload's magnitude isn't decoded, same interim as buffs.
 		private async Task ApplyNpcCast(WorldEntity npc, WorldEntity target)
 		{
-			var client = target?.Client;
-			var character = client?.Session?.Character;
+			var client = target.Client;
+			var character = client.Session.Character;
 			if (character == null || npc.Spells.Count == 0)
 				return;
 
@@ -415,7 +415,7 @@ namespace Faolan.GameServer.World
 			foreach (var pair in Players)
 			{
 				var client = pair.Key;
-				var character = client.Session?.Character;
+				var character = client.Session.Character;
 				if (character == null)
 					continue;
 
@@ -518,7 +518,7 @@ namespace Faolan.GameServer.World
 			foreach (var pair in Players)
 			{
 				var client = pair.Key;
-				var character = client.Session?.Character;
+				var character = client.Session.Character;
 				if (character == null)
 					continue;
 
@@ -591,7 +591,7 @@ namespace Faolan.GameServer.World
 		{
 			// The last thing that hit them wins - alive or not. A stale/dead handle is fine: it just isn't the local
 			// player, so the client takes the instant path. This is what keeps a DoT-kill (caster long dead) instant.
-			if (player?.LastAttackerHandle is { } lastAttacker && lastAttacker != selfHandle)
+			if (player.LastAttackerHandle is { } lastAttacker && lastAttacker != selfHandle)
 				return lastAttacker;
 
 			if (World.TryGetZone(mapId, out var zone))
@@ -636,7 +636,7 @@ namespace Faolan.GameServer.World
 
 			vitals.ReviveTo(target?.RestorationLevel ?? 0f); // no point resolved -> full
 
-			var handle = entity?.Handle ?? client.Session.Account.ClientInstance;
+			var handle = entity?.Handle ?? character.Id;
 			await _output.SendRevive(client, handle, target?.Id ?? 0);
 			await _output.PushVitals(client, vitals);
 			_logger.LogInformation("Combat: {Player} resurrected (point '{Point}', map {Map}).", character.Name, target?.Name ?? "none", character.MapId);
@@ -866,7 +866,7 @@ namespace Faolan.GameServer.World
 			// that spell's client RDB effect sets stat 0x546 (the wave-respawn timer) = 15, ANOTHER wave trigger. The
 			// dead state is fully driven by the BccIIR below, so the effect is redundant; dropping it + the mob-killer
 			// above are the two fixes that make the client take the instant-respawn path like retail beach.
-			var handle = client.Session.Account.ClientInstance;
+			var handle = character.Id;
 			var killer = ResolveKiller(playerEntity, deathPosition, character.MapId, handle);
 			await _output.SendDeathPose(client, handle, deathPosition);
 			await _output.SendDeathTrigger(client, handle, killer);
@@ -895,7 +895,7 @@ namespace Faolan.GameServer.World
 			{
 				var client = pair.Key;
 				var entity = pair.Value;
-				if (client.Session?.Character == null)
+				if (client.Session.Character == null)
 					continue;
 
 				var areas = await GetMapAreasCached(entity.MapId);
@@ -948,7 +948,7 @@ namespace Faolan.GameServer.World
 				{
 					if (buff.Value.Expired(now) && pair.Value.ActiveBuffs.TryRemove(buff.Key, out _))
 					{
-						_logger.LogInformation("Buff 0x{Buff:X8} expired on {Player}.", buff.Key, pair.Key.Session?.Character?.Name);
+						_logger.LogInformation("Buff 0x{Buff:X8} expired on {Player}.", buff.Key, pair.Key.Session.Character?.Name);
 						// Mirror the apply: applyTo = the affected player, applyFrom = the caster (self for a self-buff,
 						// the NPC for an NPC-cast debuff). CasterHandle carries the applyFrom (#274).
 						await _output.SendBuffRemoval(pair.Key, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
@@ -964,7 +964,7 @@ namespace Faolan.GameServer.World
 			{
 				var entity = pair.Value;
 				var client = pair.Key;
-				var character = client.Session?.Character;
+				var character = client.Session.Character;
 				if (character == null)
 					continue;
 
@@ -1002,7 +1002,7 @@ namespace Faolan.GameServer.World
 			foreach (var pair in Players)
 			{
 				var client = pair.Key;
-				var character = client.Session?.Character;
+				var character = client.Session.Character;
 				if (character == null)
 					continue;
 

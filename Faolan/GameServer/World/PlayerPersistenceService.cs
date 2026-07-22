@@ -49,7 +49,7 @@ namespace Faolan.GameServer.World
 		// saves it. Used by the autosave loop, .save, and disconnect. Errors are logged (callers may not await).
 		public async Task<bool> SavePlayerState(INetworkClient client, WorldEntity entity)
 		{
-			var character = client.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null)
 				return false;
 

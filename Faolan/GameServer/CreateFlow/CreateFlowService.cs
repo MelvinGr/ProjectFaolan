@@ -216,7 +216,7 @@ namespace Faolan.GameServer.CreateFlow
 					// names (e.g. Stricken -> Strickennn -> Strickenen); the last one that sticks wins.
 					var commit = await CommitCharacterName(client, valueString);
 
-					if (commit == NameCommitResult.Committed && client.Session.Character?.Name == valueString)
+					if (commit == NameCommitResult.Committed && client.Session.Character.Name == valueString)
 					{
 						// Confirm the name (NicknameOk + CharCreationFinished) so the client advances to enter-world.
 						await SendNicknameAccepted(client, valueString!);

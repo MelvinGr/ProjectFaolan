@@ -35,7 +35,7 @@ namespace Faolan.GameServer
 		internal void EnsureEnergyLoop(INetworkClient client)
 		{
 			var session = client.Session;
-			if (session?.Character == null)
+			if (session.Character == null)
 				return;
 
 			if (session.EnergyMax == 0)
@@ -64,7 +64,7 @@ namespace Faolan.GameServer
 			if (entity == null)
 				return null;
 
-			var owner = client.Session.Account.ClientInstance;
+			var owner = client.Session.Character.Id;
 			entity.OwnerHandle = owner;
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
@@ -115,10 +115,10 @@ namespace Faolan.GameServer
 		// (so a plain self-buff cast, which never sets ActiveShieldSpellBase, leaves it untouched).
 		private async Task BreakShieldOnAggression(INetworkClient client)
 		{
-			if (client.Session?.ActiveShieldSpellBase is not { } shieldBase)
+			if (client.Session.ActiveShieldSpellBase is not { } shieldBase)
 				return;
 
-			var self = client.Session.Account.ClientInstance;
+			var self = client.Session.Character.Id;
 			var appliedId = shieldBase << 8;
 
 			// Retail shows the "lost the grace" on-screen line the instant the shield is LOST to an aggressive action,
@@ -150,7 +150,7 @@ namespace Faolan.GameServer
 				return;
 
 			var now = DateTimeOffset.UtcNow;
-			var self = client.Session.Account.ClientInstance;
+			var self = client.Session.Character.Id;
 			var restored = 0;
 
 			foreach (var buff in buffs)
@@ -188,7 +188,7 @@ namespace Faolan.GameServer
 				while (await timer.WaitForNextTickAsync())
 				{
 					var session = client.Session;
-					if (session?.Account == null)
+					if (session.Account == null)
 						return; // disconnected
 
 					if (session.IsSpellweaving)
@@ -208,7 +208,7 @@ namespace Faolan.GameServer
 			finally
 			{
 				var session = client.Session;
-				session?.EnergyLoopActive = false;
+				session.EnergyLoopActive = false;
 			}
 		}
 
@@ -347,7 +347,7 @@ namespace Faolan.GameServer
 
 		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
 		{
-			if (client.Session?.Character == null)
+			if (client.Session.Character == null)
 				return;
 
 			client.Session.IsSprinting = sprinting;

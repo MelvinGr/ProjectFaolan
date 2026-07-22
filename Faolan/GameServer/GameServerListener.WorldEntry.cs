@@ -107,7 +107,7 @@ namespace Faolan.GameServer
 		// .recall, death-resurrect) fails. No-op when the map defines no respawn point (nothing to bind to).
 		private async Task EnsureCharacterBound(INetworkClient client)
 		{
-			var character = client.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null || character.HasBind)
 				return;
 
@@ -272,7 +272,7 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(client.Session.Account.ClientInstance)
+					.WriteUInt32(client.Session.Character.Id)
 					.WriteByte(0x01)
 					.WriteUInt32(0x00000013)
 					.WriteUInt32(0x00000000))
@@ -282,7 +282,7 @@ namespace Faolan.GameServer
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(client.Session.Character.Id)
 				.WriteByte(0)
 				.SendAsync(client);
 
@@ -336,7 +336,7 @@ namespace Faolan.GameServer
 			// #304: the legacy verbatim beach NPC records (spawns/MoveTasks/despawns/BehaviorCC on captured handles) were
 			// deleted - WorldBroadcaster interest streaming owns the beach population, confirmed in-client.
 
-			var instance = client.Session.Account.ClientInstance;
+			var instance = client.Session.Character.Id;
 
 			// "New claims available" glow (CoreClaimIIR sub 0x0009) - pushed ONLY when the account has unseen claims,
 			// matching retail (present on a fresh login with new claims, absent once viewed). Previously this fired
@@ -446,7 +446,7 @@ namespace Faolan.GameServer
 			{
 				var guild = await Database.GetGuild(guildId);
 				if (guild != null)
-					await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
+					await client.SendAsync(BuildGuildTag(client, client.Session.Character.Id, guild.Name));
 			}
 
 			client.Session.HasPendingPost205FFollowUp = false;
@@ -507,7 +507,7 @@ namespace Faolan.GameServer
 			if (character == null)
 				return;
 
-			var instance = client.Session.Account.ClientInstance;
+			var instance = character.Id;
 
 			// The combo book = the persisted CharacterCombo rows UNION the class's combos up to its level, from the
 			// class<->combo ACCESS map (ClassCombo). This replaces the class-INDEPENDENT LevelComboCatalog, which gave
@@ -598,7 +598,7 @@ namespace Faolan.GameServer
 		// Items WITH an hash already rode the snapshot, so this only touches the dropped ones (no duplication).
 		private async Task RedeliverNonSnapshotBagItems(INetworkClient client)
 		{
-			var character = client.Session?.Character;
+			var character = client.Session.Character;
 			if (character == null)
 				return;
 
@@ -651,7 +651,7 @@ namespace Faolan.GameServer
 			if (mount == null)
 				return;
 
-			var self = client.Session.Account.ClientInstance;
+			var self = character.Id;
 			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
 			await SendStatUpdate(client, new CharacterStatBlock
 			{
@@ -884,7 +884,7 @@ namespace Faolan.GameServer
 		private async Task SendLevelUpDings(INetworkClient client, uint fromLevel, uint toLevel, uint finalRemainingXp)
 		{
 			var instance = client.Session.Account.ClientInstance;
-			var @class = client.Session.Character?.Class ?? default;
+			var @class = client.Session.Character.Class;
 			for (var lvl = fromLevel + 1; lvl <= toLevel; lvl++)
 			{
 				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);

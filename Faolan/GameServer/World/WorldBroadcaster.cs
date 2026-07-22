@@ -161,7 +161,7 @@ namespace Faolan.GameServer.World
 			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
 				.Select(s => WorldBroadcastBodies.Record(def, s))
 				.ToArray();
-			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Account.ClientInstance, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Character.Id, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
 				def.MapId, def.MarkerX, def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
 			return new PacketStream()
@@ -175,7 +175,7 @@ namespace Faolan.GameServer.World
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestGoal(client.Session.Account.ClientInstance, questId, goalId, count)))
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, count)))
 				.SendAsync(client);
 		}
 
@@ -184,7 +184,7 @@ namespace Faolan.GameServer.World
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestIir(client.Session.Account.ClientInstance, questId, state)))
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestIir(client.Session.Character.Id, questId, state)))
 				.SendAsync(client);
 		}
 
@@ -524,7 +524,7 @@ namespace Faolan.GameServer.World
 				await SendQuestMarkerIfGiver(client, npc);
 
 				// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose).
-				if (npc.NpcTemplateId == QuestHandlerService.CasildaTemplateId && client.Session?.Character != null && !await _questHandler.IsCasildaFreed(client.Session.Character.Id))
+				if (npc.NpcTemplateId == QuestHandlerService.CasildaTemplateId && client.Session.Character != null && !await _questHandler.IsCasildaFreed(client.Session.Character.Id))
 					await _questHandler.SendCasildaPose(client, npc.Handle, true);
 
 				// #363 dev nameplate override (dev-only, gated on .togglenpcgroup).
@@ -737,7 +737,7 @@ namespace Faolan.GameServer.World
 			var zone = _sim.World.ZoneForEntity(player);
 			foreach (var viewer in zone.PlayersInRange(obj.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client?.Session?.WorldEntered == true)
+				if (viewer.Client.Session.WorldEntered)
 					await SendWorldDespawn(viewer.Client, zone.PlayfieldToken, handle, classWord);
 			}
 
@@ -1047,7 +1047,7 @@ namespace Faolan.GameServer.World
 		// completion (the change fires the instant the player reaches the quest state).
 		public async Task ApplyQuestWorldEffects(INetworkClient client)
 		{
-			var character = client.Session?.Character;
+			var character = client.Session.Character;
 			var player = _sim.PlayerWorldEntity(client);
 			if (character == null || player == null)
 				return;
@@ -1364,7 +1364,7 @@ namespace Faolan.GameServer.World
 		public Task<WeaponSet> TogglePlayerWeaponSet(INetworkClient client)
 		{
 			var current = _sim.PlayerWorldEntity(client)?.ActiveWeaponSet
-						  ?? client.Session?.Character?.ActiveWeaponSet
+					  ?? client.Session.Character?.ActiveWeaponSet
 						  ?? WeaponSet.Primary;
 			return SetPlayerWeaponSet(client, current == WeaponSet.Primary
 				? WeaponSet.Secondary
@@ -1378,7 +1378,7 @@ namespace Faolan.GameServer.World
 			var player = _sim.PlayerWorldEntity(client);
 			player?.ActiveWeaponSet = set;
 
-			if (client.Session?.Character is { } character)
+			if (client.Session.Character is { } character)
 			{
 				character.ActiveWeaponSet = set;
 				await _database.SaveCharacterWeaponSet(character.Id, set);
@@ -1556,7 +1556,7 @@ namespace Faolan.GameServer.World
 						// death/loot/aggro land where the client actually has it.
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
-						if (!ev.Subject.IsPlayer && ev.Subject.NpcTemplateId == QuestHandlerService.CasildaTemplateId && recipient.Session?.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
+					if (!ev.Subject.IsPlayer && ev.Subject.NpcTemplateId == QuestHandlerService.CasildaTemplateId && recipient.Session.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
 							await _questHandler.SendCasildaPose(recipient, ev.Subject.Handle, true);
 						break;
 					}
@@ -1579,7 +1579,7 @@ namespace Faolan.GameServer.World
 		// #261: reload the player entity's ActiveQuestIds from the DB (the set interest gating tests gated NPCs against).
 		private async Task LoadActiveQuestIds(WorldEntity entity)
 		{
-			var characterId = entity?.Client?.Session.Character?.Id;
+			var characterId = entity.Client.Session.Character?.Id;
 			if (characterId == null)
 				return;
 
@@ -1851,7 +1851,7 @@ namespace Faolan.GameServer.World
 				.ToList();
 			var trailing = WorldQuest.BuildTrackedQuestPointer();
 
-			var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
+			var body = WorldQuest.BuildQuestJournal(client.Session.Character.Id, first.AreaId, areaHeader, entries, trailing);
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
@@ -1863,7 +1863,7 @@ namespace Faolan.GameServer.World
 		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
 		public static Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{
-			var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds,
+			var body = WorldQuest.BuildQuestLogList(client.Session.Character.Id, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds,
 				WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)

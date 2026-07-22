@@ -41,8 +41,8 @@ namespace Faolan.ChatServer
 			return NetworkClients
 				.Select(nc =>
 				{
-					var account = nc.Session?.Account;
-					var character = nc.Session?.Character;
+					var account = nc.Session.Account;
+					var character = nc.Session.Character;
 					return new SessionInfo(nc.IpAddress!, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name);
 				})
 				.ToArray();
@@ -235,8 +235,8 @@ namespace Faolan.ChatServer
 		{
 			try
 			{
-				var senderId = client.Session?.Account?.ClientInstance ?? 0;
-				var senderName = client.Session?.Character?.Name?.Length > 0
+				var senderId = client.Session.Account?.ClientInstance ?? 0;
+				var senderName = client.Session.Character?.Name?.Length > 0
 					? client.Session.Character.Name
 					: $"Character{senderId}";
 				await Database.SaveChatMessage(new ChatMessage

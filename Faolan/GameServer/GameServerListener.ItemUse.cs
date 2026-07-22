@@ -21,7 +21,7 @@ namespace Faolan.GameServer
 		// same buff is already active - the reason the last consumable in the capture "did nothing".
 		private async Task UseConsumable(INetworkClient client, Item item, int slot, uint spellBase)
 		{
-			var self = client.Session.Account.ClientInstance;
+			var self = client.Session.Character.Id;
 			var wireSpellId = spellBase << 8;
 
 			if (_simulation.PlayerWorldEntity(client)?.ActiveBuffs.ContainsKey(wireSpellId) == true)

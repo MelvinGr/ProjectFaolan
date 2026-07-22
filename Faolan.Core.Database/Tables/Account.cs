@@ -39,7 +39,9 @@ namespace Faolan.Core.Database.Tables
 		public DateTimeOffset CreationDate { get; set; }
 		public DateTimeOffset? LastConnection { get; set; }
 
+		[Obsolete]
 		public int CreateCounter { get; set; } // TODO: delete, not used
+		[Obsolete]
 		public int CreateState { get; set; } // TODO: delete, not used
 
 		[MaxLength(128)]
@@ -60,6 +62,7 @@ namespace Faolan.Core.Database.Tables
 		// the temporary create-editor instance (0x021662C8) during character creation. Deliberately NOT a
 		// foreign key - it must hold the temp instance without a constraint violation (so db.SaveChanges
 		// works), and deleting a character must never cascade into deleting the account.
+		[Obsolete("Use Session.Character.Id instead")]
 		public uint ClientInstance { get; set; }
 
 		/*public Account()

@@ -103,9 +103,9 @@ namespace Faolan.GameServer
 			if (ban)
 			{
 				// Snapshot before iterating: Stop() -> Disconnected mutates the client set.
-				foreach (var c in NetworkClients.Where(nc => nc.Session?.Account?.Id == account.Id).ToList())
+				foreach (var c in NetworkClients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
 				{
-					if (c.Session?.Character?.Id is { } cid)
+					if (c.Session.Character?.Id is { } cid)
 						await _agentServerDispatcher.SendSystemMessage(cid, "<span style=\"color: red;\">You have been banned by a GM.</span>");
 					c.Stop();
 					kicked++;
