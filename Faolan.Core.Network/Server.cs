@@ -7,7 +7,6 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets;
@@ -26,7 +25,7 @@ namespace Faolan.Core.Network
 
 		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
 		private readonly IPacketLogger _outgoingPacketLogger;
-		private readonly string _channelName;
+		private string ChannelName => _outgoingPacketLogger?.ChannelName ?? ""; // Reuse the outbound logger's channel name for the inbound (UL) lines, so both directions read "[Channel …]".
 		private readonly TcpListener _tcpListener;
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
@@ -38,8 +37,6 @@ namespace Faolan.Core.Network
 			Configuration = configuration;
 			Database = database;
 			_outgoingPacketLogger = outgoingPacketLogger ?? NullPacketLogger.Instance;
-			// Reuse the outbound logger's channel name for the inbound (UL) lines, so both directions read "[Channel …]".
-			_channelName = (outgoingPacketLogger as OutgoingPacketLogger)?.ChannelName ?? "";
 			_tcpListener = new TcpListener(IPAddress.Any, port);
 		}
 
@@ -161,34 +158,25 @@ namespace Faolan.Core.Network
 			return NetworkClients.FirstOrDefault(nc => nc.Session.Character?.Id == characterId);
 		}
 
-		// Extra, opcode-specific body dump some inbound handlers emit on their own line. Gated on the global
-		// LogPacketBytes switch so disabling packet bytes silences these too.
+		// Inbound (UL) trace, forwarded to the logging layer - all line shaping + the byte-dump gate live there.
 		protected void LogPacketBodyDebug(string label, byte[] bytes)
 		{
-			if (bytes?.Length > 0 && PacketLogOptions.ShouldLogBytes(Logger))
-				Logger.LogDebug("{Label} ({Length} bytes): {Bytes}", label, bytes.Length, bytes.ToHex());
+			Logger.LogBodyDump(label, bytes);
 		}
 
 		protected void LogPacketReceived(Packet packet, Enum opcode)
 		{
-			Logger.LogPacket(PacketLogFormatter.Uplink, _channelName, PacketLogFormatter.OpcodeName(opcode), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0,
-				("body", packet.Body?.ToArray()));
+			Logger.LogReceived(ChannelName, packet, opcode);
 		}
 
 		protected void LogUnknownPacket(Packet packet, Enum opcode)
 		{
-			var opcodeName = Enum.IsDefined(opcode.GetType(), opcode)
-				? opcode.ToString()
-				: "Unknown";
-
-			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
-				packet.Bytes?.Length ?? 0, PacketLogOptions.BytesSuffix(Logger, ("body", packet.Body?.ToArray())));
+			Logger.LogUnhandled(ChannelName, packet, opcode);
 		}
 
 		protected void LogUnknownPacket(Packet packet, ushort opcode, string opcodeName = "Unknown")
 		{
-			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
-				packet.Bytes?.Length ?? 0, PacketLogOptions.BytesSuffix(Logger, ("body", packet.Body?.ToArray())));
+			Logger.LogUnhandled(ChannelName, packet, opcode, opcodeName);
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, TPacket packet);

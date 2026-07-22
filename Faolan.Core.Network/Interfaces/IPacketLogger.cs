@@ -4,6 +4,11 @@ namespace Faolan.Core.Network.Interfaces
 {
 	public interface IPacketLogger
 	{
+		// The channel label ("GameServer", "ChatServer", …) this logger tags its DL trace lines with, and which the
+		// Server reuses for the matching inbound (UL) lines so both directions read "[Channel …]". "" when untagged
+		// (the null logger). Lets the inbound path read the channel without downcasting to OutgoingPacketLogger.
+		string ChannelName => "";
+
 		void Log(byte[] bytes);
 
 		// Structured server->client (DL) log for an Rpc send (Gitea #406 phase 6): render the trace directly from the
@@ -17,6 +22,8 @@ namespace Faolan.Core.Network.Interfaces
 		}
 	}
 
+	// The "no logging" IPacketLogger (the default when a listener wires up no trace). LogRpc uses the interface
+	// default, which routes to Log - a no-op here - so it needs no override.
 	public sealed class NullPacketLogger : IPacketLogger
 	{
 		public static readonly NullPacketLogger Instance = new();
@@ -26,10 +33,6 @@ namespace Faolan.Core.Network.Interfaces
 		}
 
 		public void Log(byte[] bytes)
-		{
-		}
-
-		public void LogRpc(in Rpc rpc, byte[] wireBytes)
 		{
 		}
 	}

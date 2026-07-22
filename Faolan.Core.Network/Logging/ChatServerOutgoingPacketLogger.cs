@@ -1,5 +1,3 @@
-using System;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.ChatServer;
 using Microsoft.Extensions.Logging;
@@ -15,10 +13,7 @@ namespace Faolan.Core.Network.Logging
 		protected override void LogPacket(byte[] bytes)
 		{
 			var packet = new ChatServerPacket(bytes);
-			var opcode = (ushort)packet.Opcode;
-			var opcodeName = Enum.IsDefined(typeof(ChatServerInterfaceOpcodes), opcode)
-				? $"{packet.Opcode} ({opcode.ToHex()})"
-				: opcode.ToHex();
+			var opcodeName = PacketLogFormatter.OpcodeName(typeof(ChatServerInterfaceOpcodes), (ushort)packet.Opcode);
 
 			Logger.LogPacket(PacketLogFormatter.Downlink, ChannelName, opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length, ("body", packet.Body?.ToArray()));
 		}

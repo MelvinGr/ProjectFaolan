@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
@@ -50,6 +51,39 @@ namespace Faolan.Core.Network.Logging
 			{
 				logger.LogInformation("{Direction} [{Channel} {OpcodeName}] subOpcode={SubOpcodeName}, payloadLength={PayloadLength}, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
 					direction, channel, opcodeName, subOpcodeName, payloadLength, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
+			}
+
+			// An inbound (UL) packet whose opcode the listener didn't handle: same line shape as LogPacket, at Warning
+			// level with an UNHANDLED marker. `opcodeName` already carries its "(0xHEX)" (via OpcodeName).
+			public void LogUnknownPacket(string channel, string opcodeName, long bodyLength, long packetLength, params (string Label, byte[]? Data)[] byteSegments)
+			{
+				logger.LogWarning("{Direction} [{Channel} {OpcodeName}] UNHANDLED, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
+					Uplink, channel, opcodeName, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
+			}
+
+			// Inbound (UL) trace: the Server forwards the raw packet + the typed opcode the listener dispatched on, and
+			// these shape the line - so ALL packet-trace formatting (and the byte-dump gate) lives here, not in Server.
+			public void LogReceived(string channel, Packet packet, Enum opcode)
+			{
+				logger.LogPacket(Uplink, channel, OpcodeName(opcode), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
+			}
+
+			public void LogUnhandled(string channel, Packet packet, Enum opcode)
+			{
+				logger.LogUnknownPacket(channel, OpcodeName(opcode), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
+			}
+
+			public void LogUnhandled(string channel, Packet packet, ushort opcode, string opcodeName)
+			{
+				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
+			}
+
+			// An extra opcode-specific body dump some inbound handlers emit on their own line, gated on the byte-dump
+			// switch (PacketLogOptions.ShouldLogBytes) so disabling packet bytes silences these too.
+			public void LogBodyDump(string label, byte[]? bytes)
+			{
+				if (bytes?.Length > 0 && PacketLogOptions.ShouldLogBytes(logger))
+					logger.LogDebug("{Label} ({Length} bytes): {Bytes}", label, bytes.Length, bytes.ToHex());
 			}
 		}
 	}
