@@ -11,5 +11,7 @@
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
+	"LogPacketBytes": true, // false = drop the raw header/body hex dump, keep just the opcode + lengths
+
 	"WelcomeString": "Welcome to Project Faolan!"
 }

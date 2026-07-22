@@ -50,9 +50,15 @@ namespace Faolan
 			if (Global.IsDebug)
 				builder.Environment.EnvironmentName = "Development";
 
+			// Config precedence (highest wins): environment variables > command line > faolan.json. faolan.json is
+			// OPTIONAL - a container can be configured entirely by env vars (e.g. DatabaseProvider /
+			// DatabaseConnectionString) with no file baked in. Sources are cleared first so the order is exactly this
+			// (no appsettings.json in the mix).
+			builder.Configuration.Sources.Clear();
 			builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
-			builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"));
+			builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"), optional: true);
 			builder.Configuration.AddCommandLine(args);
+			builder.Configuration.AddEnvironmentVariables();
 
 			// Packet trace bytes: each packet logs on a single line; set "LogPacketBytes": false (faolan.json or
 			// --LogPacketBytes false) to drop the raw headerData/body hex dump and keep just the opcode + lengths.

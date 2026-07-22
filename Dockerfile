@@ -8,15 +8,19 @@ WORKDIR /src
 
 # Restore against just the project files first so the (slow) restore layer is cached until a .csproj changes.
 # The server's runtime dependency graph (post the Faolan.Core split, #290):
-#   Faolan -> { Faolan.Core, Faolan.Core.Network -> Faolan.Core.Database -> Faolan.Core, Faolan.Mcp }
-# (Faolan.Core.Rdb is NOT in the server graph - it's importer/web-only.) Directory.Build.props supplies the
-# shared TargetFramework (net10.0); logo.ico is the projects' ApplicationIcon.
+#   Faolan -> { Faolan.Core, Faolan.Core.Network -> Faolan.Core.Database -> Faolan.Core, Faolan.Mcp,
+#               Faolan.Core.Rdb (TerrainService), Faolan.Core.Database.Migrations.{Sqlite,Postgres} -> Faolan.Core.Database }
+# (The two migration projects are Migrate()'d at startup, #379 - the server references both so EF loads the one the
+# active provider needs.) Directory.Build.props supplies the shared TargetFramework (net10.0); logo.ico is the icon.
 COPY Directory.Build.props logo.ico ./
 COPY Faolan/Faolan.csproj Faolan/
 COPY Faolan.Core/Faolan.Core.csproj Faolan.Core/
 COPY Faolan.Core.Database/Faolan.Core.Database.csproj Faolan.Core.Database/
 COPY Faolan.Core.Network/Faolan.Core.Network.csproj Faolan.Core.Network/
+COPY Faolan.Core.Rdb/Faolan.Core.Rdb.csproj Faolan.Core.Rdb/
 COPY Faolan.Mcp/Faolan.Mcp.csproj Faolan.Mcp/
+COPY Faolan.Core.Database.Migrations.Sqlite/Faolan.Core.Database.Migrations.Sqlite.csproj Faolan.Core.Database.Migrations.Sqlite/
+COPY Faolan.Core.Database.Migrations.Postgres/Faolan.Core.Database.Migrations.Postgres.csproj Faolan.Core.Database.Migrations.Postgres/
 RUN dotnet restore Faolan/Faolan.csproj
 
 # Then the sources for the projects in the graph and publish (Release -> IsDebug=false -> prod paths).
@@ -24,7 +28,10 @@ COPY Faolan/ Faolan/
 COPY Faolan.Core/ Faolan.Core/
 COPY Faolan.Core.Database/ Faolan.Core.Database/
 COPY Faolan.Core.Network/ Faolan.Core.Network/
+COPY Faolan.Core.Rdb/ Faolan.Core.Rdb/
 COPY Faolan.Mcp/ Faolan.Mcp/
+COPY Faolan.Core.Database.Migrations.Sqlite/ Faolan.Core.Database.Migrations.Sqlite/
+COPY Faolan.Core.Database.Migrations.Postgres/ Faolan.Core.Database.Migrations.Postgres/
 RUN dotnet publish Faolan/Faolan.csproj -c Release -o /app/publish --no-restore
 
 # ---- runtime --------------------------------------------------------------------------------------------------

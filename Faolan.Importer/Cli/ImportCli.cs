@@ -50,7 +50,12 @@ namespace Faolan.Importer.Cli
 			// Provider + connection come from the SHARED faolan.json (the same DB the server uses), so the connection
 			// string lives in ONE place. `--db <connection string>` overrides just the connection (e.g. a throwaway
 			// "Data Source=/tmp/test.db"); the provider still follows the config.
-			var config = new ConfigurationBuilder().AddJsonFile(RepoPaths.Combine("faolan.json")).Build();
+			// Config precedence: environment variables > faolan.json (optional) - same story as the server, so a
+			// Docker seed job can be pointed at Postgres purely by env vars (DatabaseProvider / DatabaseConnectionString).
+			var config = new ConfigurationBuilder()
+				.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true)
+				.AddEnvironmentVariables()
+				.Build();
 			var provider = config.DatabaseProvider;
 			var connection = GetOption(args, "--db") ?? config.DatabaseConnection;
 

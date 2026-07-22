@@ -70,3 +70,34 @@ services:
 #    volumes:
 #      - ./faolan.db:/app/faolan.db
 #    restart: unless-stopped
+
+# ---------------------------------------------------------------------------------------------------------------
+# POSTGRES backend (commented). Run the game DB on Postgres instead of the bind-mounted SQLite faolan.db - the
+# store for a shared multi-realm deployment (no single-writer file lock; see the caveat note at the top). To use it:
+#   1. Uncomment the `postgres` service + the top-level `volumes:` block below.
+#   2. On each game process (`faolan`, or `login` + every `realm-*`): DROP its `./faolan.db` bind mount, set the
+#      DatabaseProvider / DatabaseConnectionString env vars pointing at the `postgres` service, and add
+#      `depends_on: [postgres]`. Env vars are the highest-precedence config source, so they override the image's
+#      baked-in SQLite selection without editing faolan.json. (A realm host keeps its own `--role` command arg too.)
+#   3. Seed the fresh PG DB before/at first run: point Faolan.Importer at the same connection (set DatabaseProvider +
+#      DatabaseConnectionString env vars, or pass --db) - EF Migrates the schema, then the modules load the data.
+# ---------------------------------------------------------------------------------------------------------------
+#  postgres:
+#    image: postgres:17
+#    environment:
+#      POSTGRES_USER: faolan
+#      POSTGRES_PASSWORD: faolan
+#      POSTGRES_DB: faolan
+#    volumes:
+#      - faolan-pgdata:/var/lib/postgresql/data
+#    restart: unless-stopped
+#
+#  # ...and on the faolan service (remove its `./faolan.db` volume, since the DB is now Postgres):
+#  #    environment:
+#  #      DatabaseProvider: Postgres
+#  #      DatabaseConnectionString: "Host=postgres;Port=5432;Database=faolan;Username=faolan;Password=faolan"  # Host = service name
+#  #    depends_on:
+#  #      - postgres
+#
+# volumes:
+#  faolan-pgdata:
