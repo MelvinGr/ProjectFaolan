@@ -40,6 +40,6 @@ namespace Faolan.Tests
 		// Read-only options for an existing SQLite database at `path` - the committed faolan.db golden fixture
 		// (TestPaths.FaolanDb); read-only so a test can't mutate the shared committed data.
 		public static DbContextOptions<DatabaseContext> ReadOnly(string path)
-			=> DatabaseServiceCollectionExtensions.BuildOptions(FaolanDbProvider.Sqlite, $"Data Source={path};Mode=ReadOnly");
+			=> DatabaseExtensions.BuildOptions(FaolanDbProvider.Sqlite, $"Data Source={path};Mode=ReadOnly");
 	}
 }

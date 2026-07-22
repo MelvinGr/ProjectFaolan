@@ -940,7 +940,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Reports read the SQLite fixture (faolan.db) at --db; one short-lived context through the shared factory.
-		private static DatabaseContext OpenDb(string dbPath) => DatabaseServiceCollectionExtensions.CreateContext(FaolanDbProvider.Sqlite, $"Data Source={dbPath}");
+		private static DatabaseContext OpenDb(string dbPath) => DatabaseExtensions.CreateContext(FaolanDbProvider.Sqlite, $"Data Source={dbPath}");
 
 		// RDB -> 3D-model asset graph (Gitea #275, Phase 0). With no --report-arg: a corpus summary (how many
 		// MESHINDEXFILE manifests resolve to geometry, how their textures are split local vs CDN). With --report-arg

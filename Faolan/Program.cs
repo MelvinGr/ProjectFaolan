@@ -7,8 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.ChatServer;
 using Faolan.Core;
-using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
+using Faolan.Core.Database.Helpers;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
@@ -22,7 +22,6 @@ using Faolan.Helpers;
 using Faolan.Mcp;
 using Faolan.PlayerAgent;
 using Faolan.UniverseAgent;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -77,7 +76,7 @@ namespace Faolan
 			// container); default is logs/<epoch>.log (epoch = process start, unix seconds) so each run is a
 			// distinct, retained file instead of overwriting one logs.txt every start (#282).
 			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ??
-			                                                   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
+															   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
 
 			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
 			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
@@ -120,7 +119,7 @@ namespace Faolan
 			Realm? hostRealm = null;
 			if (runRealm)
 			{
-				using var probe = DatabaseServiceCollectionExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
+				using var probe = DatabaseExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
 				hostRealm = selectedRealmId.HasValue
 					? probe.Realms.FirstOrDefault(r => r.Id == selectedRealmId.Value)
 					: probe.Realms.OrderBy(r => r.Id).FirstOrDefault();

@@ -8,8 +8,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Faolan.Core.Database.Extensions
 {
-	public static class DatabaseServiceCollectionExtensions
+	public static class DatabaseExtensions
 	{
+		// Options for a DatabaseContext on the given provider + connection, routed through UseFaolanDatabase - so no
+		// site hand-rolls `new DbContextOptionsBuilder<DatabaseContext>().UseSqlite(...)` and drifts (e.g. a stale
+		// MigrationsAssembly). Callers add extras (lazy-loading proxies) on the returned builder if needed.
+		public static DbContextOptions<DatabaseContext> BuildOptions(FaolanDbProvider provider, string connection)
+		{
+			var builder = new DbContextOptionsBuilder<DatabaseContext>();
+			builder.UseFaolanDatabase(provider, connection);
+			return builder.Options;
+		}
+
 		public static IServiceCollection ConfigureFaolanDatabase(this IServiceCollection services, IConfiguration configuration)
 		{
 			// Game-server persistence model: live state lives in memory (the session); the DB is a persistence
@@ -30,6 +40,13 @@ namespace Faolan.Core.Database.Extensions
 			return services;
 		}
 
+		// A ready DatabaseContext for the given provider + connection (the shared factory for one-off short-lived
+		// contexts - reports, tools). Long-lived server/DI use goes through the pooled factory (ConfigureFaolanDatabase).
+		public static DatabaseContext CreateContext(FaolanDbProvider provider, string connection)
+		{
+			return new DatabaseContext(BuildOptions(provider, connection));
+		}
+
 		// The one place the provider is chosen. Every context - server, importer, tests, design-time - routes its
 		// DbContextOptions through here so a single switch covers them all. `connection` is a SQLite `Data Source=...`
 		// string OR a full Npgsql connection string, per provider.
@@ -44,19 +61,5 @@ namespace Faolan.Core.Database.Extensions
 				_ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unknown database provider.")
 			};
 		}
-
-		// Options for a DatabaseContext on the given provider + connection, routed through UseFaolanDatabase - so no
-		// site hand-rolls `new DbContextOptionsBuilder<DatabaseContext>().UseSqlite(...)` and drifts (e.g. a stale
-		// MigrationsAssembly). Callers add extras (lazy-loading proxies) on the returned builder if needed.
-		public static DbContextOptions<DatabaseContext> BuildOptions(FaolanDbProvider provider, string connection)
-		{
-			var builder = new DbContextOptionsBuilder<DatabaseContext>();
-			builder.UseFaolanDatabase(provider, connection);
-			return builder.Options;
-		}
-
-		// A ready DatabaseContext for the given provider + connection (the shared factory for one-off short-lived
-		// contexts - reports, tools). Long-lived server/DI use goes through the pooled factory (ConfigureFaolanDatabase).
-		public static DatabaseContext CreateContext(FaolanDbProvider provider, string connection) => new(BuildOptions(provider, connection));
 	}
 }

@@ -11,8 +11,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<Realm?> GetRealm(uint id);
 		Task<Realm[]> GetRealms();
 		Task<ChatMessage[]> GetRecentChatMessages(int limit = 100, uint? channelId = null);
-		Task SaveChatMessage(ChatMessage message);
-		Task SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status);
+		Task<bool> SaveChatMessage(ChatMessage message);
+		Task<bool> SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status);
 	}
 
 	public partial class DatabaseRepository
@@ -38,17 +38,17 @@ namespace Faolan.Core.Database.Repositories
 			return await q.OrderByDescending(m => m.Id).Take(limit).ToArrayAsync();
 		}
 
-		public async Task SaveChatMessage(ChatMessage message)
+		public async Task<bool> SaveChatMessage(ChatMessage message)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			ctx.ChatMessages.Add(message);
-			await ctx.SaveChangesAsync();
+			return await ctx.SaveChangesAsync() > 0;
 		}
 
-		public async Task SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status)
+		public async Task<bool> SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx.Realms.Where(r => r.Id == realmId).ExecuteUpdateAsync(s => s.SetProperty(r => r.OnlineStatus, status));
+			return await ctx.Realms.Where(r => r.Id == realmId).ExecuteUpdateAsync(s => s.SetProperty(r => r.OnlineStatus, status)) > 0;
 		}
 	}
 }

@@ -1,13 +1,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Database;
-using Faolan.Core.Database.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.Helpers
+namespace Faolan.Core.Database.Helpers
 {
 	// Applies pending EF schema migrations on startup. The server does NOT seed data: the database is the single
 	// source of truth (committed faolan.db). Game data is (re)built from the raw sources by the Faolan.Importer
@@ -29,7 +27,7 @@ namespace Faolan.Helpers
 		{
 			try
 			{
-				await using var ctx = _contextFactory.CreateDbContext();
+				await using var ctx = await _contextFactory.CreateDbContextAsync(cancellationToken);
 
 				// Migrate + seed the default realm/account - the shared sequence the importer runs too (DatabaseInitializer).
 				var seeded = await DatabaseInitializer.InitializeAsync(ctx, cancellationToken);

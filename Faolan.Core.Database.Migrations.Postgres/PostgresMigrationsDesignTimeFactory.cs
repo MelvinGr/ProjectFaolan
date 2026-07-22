@@ -1,4 +1,3 @@
-using Faolan.Core;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -17,7 +16,7 @@ namespace Faolan.Core.Database.Migrations.Postgres
 		public DatabaseContext CreateDbContext(string[] args)
 		{
 			var config = new ConfigurationBuilder().AddJsonFile(RepoPaths.Combine("faolan.json")).Build();
-			return DatabaseServiceCollectionExtensions.CreateContext(FaolanDbProvider.Postgres, config.DatabaseConnection);
+			return DatabaseExtensions.CreateContext(FaolanDbProvider.Postgres, config.DatabaseConnection);
 		}
 	}
 }

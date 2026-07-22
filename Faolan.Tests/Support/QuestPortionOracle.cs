@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;

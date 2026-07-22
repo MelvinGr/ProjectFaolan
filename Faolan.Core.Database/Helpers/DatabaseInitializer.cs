@@ -22,14 +22,14 @@ namespace Faolan.Core.Database.Helpers
 			db.Accounts.Add(new Account
 			{
 				UserName = "faolan",
-				Password = "faolan",
+				Password = "",
 				Type = AccountType.Administrator,
 				State = AccountState.Active,
 				AuthChallenge = "",
 				LastIpAddress = ""
 			});
-			await db.SaveChangesAsync(cancellationToken);
-			return true;
+
+			return await db.SaveChangesAsync(cancellationToken) == 1;
 		}
 
 		// Ports/type mirror the committed faolan.db realm so a fresh DB matches the reference deployment. The realm's
@@ -46,13 +46,14 @@ namespace Faolan.Core.Database.Helpers
 				Port = 7014,
 				ChatServerPort = 7012,
 				CsPlayerAgentPort = 7001,
-				Type = RealmType.PvP
+				Type = RealmType.PvP,
+				Country = RealmCountry.English
 			});
-			await db.SaveChangesAsync(cancellationToken);
-			return true;
+
+			return await db.SaveChangesAsync(cancellationToken) == 1;
 		}
 
-		public static async Task<InitResult> InitializeAsync(DatabaseContext db, CancellationToken cancellationToken = default)
+		public static async Task<(bool RealmCreated, bool AccountCreated)> InitializeAsync(DatabaseContext db, CancellationToken cancellationToken = default)
 		{
 			// Both providers migrate the same way - each has its own migration project (see UseFaolanDatabase);
 			// Migrate applies the pending set for the active provider.
@@ -62,9 +63,7 @@ namespace Faolan.Core.Database.Helpers
 			// These are config state, not schema, so they're ensured here rather than shipped in a migration. Idempotent.
 			var realmCreated = await EnsureDefaultRealmAsync(db, cancellationToken);
 			var accountCreated = await EnsureDefaultAccountAsync(db, cancellationToken);
-			return new InitResult(realmCreated, accountCreated);
+			return (realmCreated, accountCreated);
 		}
-
-		public readonly record struct InitResult(bool RealmCreated, bool AccountCreated);
 	}
 }

@@ -30,14 +30,14 @@ namespace Faolan.Helpers
 
 		public async Task StartAsync(CancellationToken cancellationToken)
 		{
-			await _database.SetRealmOnlineStatus(_realmId, RealmOnlineStatus.Online);
-			_logger.LogInformation("Realm {RealmId} marked Online.", _realmId);
+			if (await _database.SetRealmOnlineStatus(_realmId, RealmOnlineStatus.Online))
+				_logger.LogInformation("Realm {RealmId} marked Online.", _realmId);
 		}
 
 		public async Task StopAsync(CancellationToken cancellationToken)
 		{
-			await _database.SetRealmOnlineStatus(_realmId, RealmOnlineStatus.Offline);
-			_logger.LogInformation("Realm {RealmId} marked Offline.", _realmId);
+			if (await _database.SetRealmOnlineStatus(_realmId, RealmOnlineStatus.Offline))
+				_logger.LogInformation("Realm {RealmId} marked Offline.", _realmId);
 		}
 	}
 }

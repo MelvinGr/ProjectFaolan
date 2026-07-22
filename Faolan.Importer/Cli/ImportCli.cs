@@ -4,14 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Helpers;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
 using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
@@ -126,7 +124,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine($"Read {captures.Count} captures ({rawPackets.Count} raw packets, {createCaptures.Count} create-flow).");
 
-			await using var db = DatabaseServiceCollectionExtensions.CreateContext(provider, connection);
+			await using var db = DatabaseExtensions.CreateContext(provider, connection);
 			// Migrate + seed the default realm/account before any module runs - the same sequence the server runs
 			// (DatabaseInitializer). Migrations run here, outside the runner's transaction (they can't run inside one).
 			var seeded = await DatabaseInitializer.InitializeAsync(db);
