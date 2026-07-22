@@ -18,6 +18,7 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Quest;
 using Microsoft.Extensions.Logging;
@@ -164,28 +165,24 @@ namespace Faolan.GameServer.World
 			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Character.Id, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
 				def.MapId, def.MarkerX, def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(body)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 
 		// Sends a QuestGoal (objective progress) to the player.
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, count))
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, count))));
 		}
 
 		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(WorldQuest.BuildQuestIir(client.Session.Character.Id, questId, state))
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestIir(client.Session.Character.Id, questId, state))));
 		}
 
 		// Make the named NPC in `mapId`'s zone follow (or stop following) the given player handle - the quest-driven
@@ -250,11 +247,9 @@ namespace Faolan.GameServer.World
 
 			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCloseLootBag)
-				.WriteUInt32(WorldLoot.LootTypeTag)
-				.WriteUInt32(bag.Handle)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchCloseLootBag,
+				body => body.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
 			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
 			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
 			await SendWorldIir(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
@@ -329,10 +324,8 @@ namespace Faolan.GameServer.World
 				if (viewer.Client == null)
 					continue;
 
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, viewer.Client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(body)
-					.SendAsync(viewer.Client);
+				await viewer.Client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, viewer.Client.EndpointOf(Endpoints.GameInterfaceType),
+					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 			}
 		}
 
@@ -976,21 +969,18 @@ namespace Faolan.GameServer.World
 
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle))
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle))));
 
 			// The actual window-open is DispatchOpenLootBag (0x2037) on the GameCharAgent -> GameCharInterface
 			// conversation (the same class-pair as the 0x201C spawn handshake / SpawnCheck), body [loot typetag][bag
 			// handle] - NOT a SimpleDynelVisualChange on the world conversation (that only played the open animation, no
 			// window). Decoded from the hoxxling gameplay capture (f1477): after this the client itself sends
 			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchOpenLootBag)
-				.WriteUInt32(WorldLoot.LootTypeTag)
-				.WriteUInt32(bag.Handle)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchOpenLootBag,
+				body => body.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
 
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 			return true;
@@ -1691,10 +1681,9 @@ namespace Faolan.GameServer.World
 				return Task.CompletedTask;
 			}
 
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(WorldDespawn.BuildBody(subjectHandle, token, classWord))
-				.SendAsync(recipient);
+			return recipient.SendAsync(new Rpc(WorldFraming.SenderEndpoint, recipient.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(WorldDespawn.BuildBody(subjectHandle, token, classWord))));
 		}
 
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
@@ -1721,9 +1710,8 @@ namespace Faolan.GameServer.World
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
 			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
 
-			var ps = new PacketStream();
-			ps.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(body);
-			return ps.WriteLengthHash().ToArray();
+			return PacketSerializer.Serialize(new Rpc(WorldFraming.SenderEndpoint, recipient.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 
 		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
@@ -1852,10 +1840,8 @@ namespace Faolan.GameServer.World
 			var trailing = WorldQuest.BuildTrackedQuestPointer();
 
 			var body = WorldQuest.BuildQuestJournal(client.Session.Character.Id, first.AreaId, areaHeader, entries, trailing);
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(body)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 
 		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
@@ -1865,10 +1851,8 @@ namespace Faolan.GameServer.World
 		{
 			var body = WorldQuest.BuildQuestLogList(client.Session.Character.Id, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds,
 				WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(body)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 
 		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
@@ -1969,7 +1953,7 @@ namespace Faolan.GameServer.World
 		// placed at the corpse's spot.
 		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
 		{
-			return new PacketStream().WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob).WriteArray(body).SendAsync(recipient);
+			return recipient.SendAsync(new Rpc(WorldFraming.SenderEndpoint, recipient.EndpointOf(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 
 		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
@@ -1991,12 +1975,9 @@ namespace Faolan.GameServer.World
 		// (same framing as the static create-editor marker burst).
 		private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state)
 		{
-			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(npcHandle)
-				.WriteByte(state)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
+				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle).WriteByte(state)));
 		}
 
 		// #363 pushes a SetNameIIR (0xADCE0CDA) to `recipient` overriding entity `handle`'s floating nameplate with
