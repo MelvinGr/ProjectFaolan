@@ -26,11 +26,10 @@ namespace Faolan.Core.Network.Logging
 
 		// Phase 6: log a sent Rpc from its own fields - the model already carries the Opcode, Receiver (which names the
 		// opcode's interface) and the HeaderData/Body the trace needs, so there is no reason to serialize-then-re-parse.
-		// `wireBytes` is the already-serialized frame, used only for the total wire length the byte[] path read off
-		// ConanPacket.Bytes.Length.
-		protected override void LogPacket(in Rpc rpc, byte[] wireBytes)
+		// `frameByteLength` is the serialized frame length the byte[] path read off ConanPacket.Bytes.Length.
+		protected override void LogPacket(in Rpc rpc, int frameByteLength)
 		{
-			Render(rpc.Opcode, rpc.Receiver, rpc.HeaderData.ToArray(), rpc.Body.ToArray(), wireBytes.Length);
+			Render(rpc.Opcode, rpc.Receiver, rpc.HeaderData.ToArray(), rpc.Body.ToArray(), frameByteLength);
 		}
 
 		// The shared render used by both paths (re-parsed bytes and the structured Rpc). Names the opcode from the

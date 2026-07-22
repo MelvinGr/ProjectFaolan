@@ -9,21 +9,18 @@ namespace Faolan.Core.Network.Interfaces
 		// (the null logger). Lets the inbound path read the channel without downcasting to OutgoingPacketLogger.
 		string ChannelName => "";
 
+		// Log a raw server->client (DL) frame from its bytes. Used by protocols that hand the transport bytes (the chat
+		// server) and by any residual raw send - the logger has to parse the bytes to trace them.
 		void Log(byte[] bytes);
 
-		// Structured server->client (DL) log for an Rpc send (Gitea #406 phase 6): render the trace directly from the
-		// message model instead of re-parsing the serialized bytes back into a packet. `wireBytes` is the already-
-		// serialized frame (so the log can report the total wire length). The default falls back to the byte[] path for
-		// loggers that don't model the Conan RPC header (the chat logger, the null logger); ConanOutgoingPacketLogger
-		// overrides it to render from the Rpc's own Sender/Receiver/Opcode/HeaderData/Body.
-		void LogRpc(in Rpc rpc, byte[] wireBytes)
-		{
-			Log(wireBytes);
-		}
+		// Log a server->client (DL) frame from the structured Rpc that produced it (Gitea #406 phase 6): the trace is
+		// rendered from the message's own Opcode/Receiver/HeaderData/Body with NO re-parse. `frameByteLength` is the
+		// serialized frame's length (known for free at the send site) - the only thing the trace needs that the Rpc
+		// itself doesn't carry.
+		void Log(in Rpc rpc, int frameByteLength);
 	}
 
-	// The "no logging" IPacketLogger (the default when a listener wires up no trace). LogRpc uses the interface
-	// default, which routes to Log - a no-op here - so it needs no override.
+	// The "no logging" IPacketLogger (the default when a listener wires up no trace).
 	public sealed class NullPacketLogger : IPacketLogger
 	{
 		public static readonly NullPacketLogger Instance = new();
@@ -33,6 +30,10 @@ namespace Faolan.Core.Network.Interfaces
 		}
 
 		public void Log(byte[] bytes)
+		{
+		}
+
+		public void Log(in Rpc rpc, int frameByteLength)
 		{
 		}
 	}

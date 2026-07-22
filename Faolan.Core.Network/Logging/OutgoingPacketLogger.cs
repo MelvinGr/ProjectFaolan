@@ -34,15 +34,13 @@ namespace Faolan.Core.Network.Logging
 			}
 		}
 
-		// The structured send-path log (Gitea #406 phase 6). Default renders the SAME way as Log(byte[]) - by
-		// serializing-and-re-parsing - for loggers that don't model the Conan RPC header (the chat logger). The Conan
-		// logger overrides LogPacket(in Rpc, ...) to skip the re-parse and render from the Rpc fields directly; the
-		// try/catch lives here so a render failure can never crash the send path just to trace it.
-		public void LogRpc(in Rpc rpc, byte[] wireBytes)
+		// The structured send-path log (Gitea #406 phase 6): render from the Rpc, no re-parse. The try/catch lives here
+		// so a render failure can never crash the send path just to trace it.
+		public void Log(in Rpc rpc, int frameByteLength)
 		{
 			try
 			{
-				LogPacket(in rpc, wireBytes);
+				LogPacket(in rpc, frameByteLength);
 			}
 			catch (Exception ex)
 			{
@@ -52,10 +50,10 @@ namespace Faolan.Core.Network.Logging
 
 		protected abstract void LogPacket(byte[] bytes);
 
-		// Default: fall back to the byte[] decode path. ConanOutgoingPacketLogger overrides this to render from the Rpc.
-		protected virtual void LogPacket(in Rpc rpc, byte[] wireBytes)
+		// The Rpc render. Default is a no-op (protocols that don't model the Conan RPC header - the chat server - never
+		// send an Rpc); ConanOutgoingPacketLogger overrides it to render from the Rpc fields.
+		protected virtual void LogPacket(in Rpc rpc, int frameByteLength)
 		{
-			LogPacket(wireBytes);
 		}
 	}
 }

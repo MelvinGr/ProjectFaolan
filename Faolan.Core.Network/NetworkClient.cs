@@ -80,7 +80,7 @@ namespace Faolan.Core.Network
 		public virtual Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
 			var bytes = PacketSerializer.Serialize(rpc);
-			LogOutgoing(in rpc, bytes);
+			LogOutgoing(in rpc, bytes.Length);
 			return SendRawAsync(bytes, cancellationToken);
 		}
 
@@ -93,7 +93,7 @@ namespace Faolan.Core.Network
 		{
 		}
 
-		protected virtual void LogOutgoing(in Rpc rpc, byte[] wireBytes)
+		protected virtual void LogOutgoing(in Rpc rpc, int frameByteLength)
 		{
 		}
 
@@ -127,9 +127,9 @@ namespace Faolan.Core.Network
 			_outgoingPacketLogger.Log(value);
 		}
 
-		protected override void LogOutgoing(in Rpc rpc, byte[] wireBytes)
+		protected override void LogOutgoing(in Rpc rpc, int frameByteLength)
 		{
-			_outgoingPacketLogger.LogRpc(in rpc, wireBytes);
+			_outgoingPacketLogger.Log(in rpc, frameByteLength);
 		}
 
 		protected override void SendRaw(byte[] value)

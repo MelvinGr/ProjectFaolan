@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Gitea #406 phase 6 oracle: the structured DL log path (ConanOutgoingPacketLogger.LogRpc, which renders straight
+	// Gitea #406 phase 6 oracle: the structured DL log path (ConanOutgoingPacketLogger.Log(in Rpc), which renders straight
 	// from the Rpc model) must produce the EXACT same trace line as the historical byte[] path (Log, which re-parses
 	// the serialized frame back into a ConanPacket). If the two ever drift, "no re-parse" would silently change what
 	// operators see in the log - so we pin them equal for the representative frame shapes.
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 				var reParsed = Assert.Single(capture.Messages);
 
 				capture.Messages.Clear();
-				packetLogger.LogRpc(in rpc, wire); // phase 6: render from the Rpc model
+				packetLogger.Log(in rpc, wire.Length); // phase 6: render from the Rpc model
 				var structured = Assert.Single(capture.Messages);
 
 				Assert.Equal(reParsed, structured);
