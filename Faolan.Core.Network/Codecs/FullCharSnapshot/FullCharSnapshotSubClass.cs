@@ -308,31 +308,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			}
 		}
 
-		// The single-quest quest portion (golden-test oracle for the multi-quest BuildQuestPortion: for one held quest
-		// the two are byte-identical - see BuildQuestPortionTests).
-		public static byte[] BuildSingleQuestPortion(QuestDefinition def, uint state, uint instance)
-		{
-			ArgumentNullException.ThrowIfNull(def);
-
-			var record = QuestcRecord.BuildSingle(def, state, def.SnapshotUnknown118, def.SnapshotUnknownEc, def.SnapshotUnknownF0, def.SnapshotUnknownF8);
-			record.Objectives = QuestObjectiveRegion.Build(def, instance);
-			var quests = new QuestcRegion
-			{
-				Records =
-				{
-					record
-				}
-			};
-			var index = QuestIndexRegion.Build([def], def);
-
-			// The empty completed-journal frame (0x3F1) always sits between the active journal and the index (#391).
-			byte[] portion = [.. quests.ToArray(), .. CompletedQuestJournalRegion.Build([]).ToArray(), .. index.ToArray()];
-			if (portion.Length != QuestPortionLength)
-				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {QuestPortionLength}");
-
-			return portion;
-		}
-
 		public static FullCharSnapshotSubClass Deserialize(byte[] data)
 		{
 			ArgumentNullException.ThrowIfNull(data);

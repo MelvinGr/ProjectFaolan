@@ -110,7 +110,7 @@ namespace Faolan.Tests
 		{
 			var beach = await LoadDefinition(10238);
 			var built = FullCharSnapshotSubClass.BuildQuestPortion([beach], beach, CaptureInstance);
-			var single = FullCharSnapshotSubClass.BuildSingleQuestPortion(beach, beach.Level, CaptureInstance);
+			var single = QuestPortionOracle.BuildSingle(beach, beach.Level, CaptureInstance);
 			Assert.True(single.SequenceEqual(built), "single-quest portion must equal the multi-quest form");
 		}
 

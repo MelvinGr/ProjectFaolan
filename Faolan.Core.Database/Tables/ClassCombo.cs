@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 {
 	// The class<->combo ACCESS map - the combo analogue of ClassAbility / ClassSpell. Combos are per-class weapon
 	// content, so this attributes each combo to the class(es) that actually have it, with a PER-CLASS unlock LEVEL.
-	// It replaces the old class-INDEPENDENT LevelComboCatalog, which gave EVERY class the same level-keyed set - so a
+	// It replaces the old class-INDEPENDENT level-keyed catalog, which gave EVERY class the same set - so a
 	// Necromancer (a caster with no weapon combos) "learned" Sweep/Slam/Hell Strikes on every login. Casters
 	// (Necromancer/Demonologist/Priest of Mitra/Tempest of Set) simply have NO rows here, so they get no combos.
 	//

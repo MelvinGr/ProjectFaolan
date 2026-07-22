@@ -510,7 +510,7 @@ namespace Faolan.GameServer
 			var instance = character.Id;
 
 			// The combo book = the persisted CharacterCombo rows UNION the class's combos up to its level, from the
-			// class<->combo ACCESS map (ClassCombo). This replaces the class-INDEPENDENT LevelComboCatalog, which gave
+			// class<->combo ACCESS map (ClassCombo). This replaces the old class-INDEPENDENT level-keyed catalog, which gave
 			// every class the same level-keyed set - so a Necromancer (a caster with no weapon combos) re-"learned"
 			// Sweep/Slam/Hell Strikes on every login. ClassCombo has NO rows for casters, and ships empty until
 			// populated from dumps, so today this grants only the persisted CharacterCombo rows (the safe default).
@@ -897,8 +897,8 @@ namespace Faolan.GameServer
 				await SendWorldIir(client, NewLevelIirCodec.Build(instance, lvl, deltas));
 
 				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
-				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the
-				// class-independent LevelComboCatalog (casters have no rows); empty until populated from dumps.
+				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
+				// class-independent level-keyed catalog (casters have no rows); empty until populated from dumps.
 				foreach (var combo in await Database.GetClassCombosUnlockedBetween(@class, lvl - 1, lvl))
 					await SendWorldIir(client, ComboBookIirCodec.Build(instance, combo.Id));
 			}

@@ -5,7 +5,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Builds the ComboBookIIR (sub-opcode 0xA8BBEB7F) body - grants ONE combo into the client's combo book. Sent as
 	// part of the create-flow world-prep burst (the starting combos) AND on a level-up ding (the combos unlocked at
 	// the new level - #209). The level-up combos are level-keyed and class-INDEPENDENT (Guardian/Conqueror/Assassin/
-	// Mage all get the same set at L2), captured in LevelComboCatalog.
+	// Mage all get the same set at L2).
 	//
 	// Carried as an IIR on the WORLD conversation (opcode 0x2000; receiver = the player's GameInterface). Wire grammar
 	// (big-endian), decoded from the create + combat-levelup captures (golden-tested in ComboBookIirCodecTests):

@@ -488,8 +488,8 @@ namespace Faolan.GameServer.Combat
 				await SendWorldFeedback(killer, NewLevelIirCodec.Build(instance, lvl, deltas));
 
 				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
-				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the
-				// class-independent LevelComboCatalog (casters have no rows); it ships empty until populated from dumps,
+				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
+				// class-independent level-keyed catalog (casters have no rows); it ships empty until populated from dumps,
 				// so this is a no-op today.
 				foreach (var combo in await _database.GetClassCombosUnlockedBetween(character.Class, lvl - 1, lvl))
 					await SendWorldFeedback(killer, ComboBookIirCodec.Build(instance, combo.Id));

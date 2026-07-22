@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var portion = FullCharSnapshotSubClass.BuildSingleQuestPortion(def, BeachState, 0x02165EFF);
+			var portion = QuestPortionOracle.BuildSingle(def, BeachState, 0x02165EFF);
 
 			Assert.Equal(FullCharSnapshotSubClass.QuestPortionLength, portion.Length);
 			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
