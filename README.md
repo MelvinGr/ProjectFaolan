@@ -80,8 +80,11 @@ we've seen_, and names the gaps). Regenerate with
 
 - ✅ **Melee & spellcasting** — the full attack/cast cycle: weapon draw, cast bar, hits, damage, and vitals, with a
   threat/hate list driving who NPCs go after
-- ✅ **Floating damage numbers & combat log** for your hits, matching retail's distinct melee and spell number styles
+- ✅ **Floating damage numbers & combat log** for your hits, matching retail's distinct melee and spell number styles,
+  each tagged with the correct damage school (physical, fire, cold, …) the way retail sends it
 - ✅ **Interrupts** — moving mid-cast cancels the spell and shows the "Interrupted" message, exactly like retail (#347)
+- ✅ **Health, mana & stamina regen** — your pools refill smoothly out of combat over retail's own per-tick regen
+  channel (RegenIIR), and stop the moment a fight starts (retail's out-of-combat-only regen)
 - ✅ **Death & resurrection** — the release screen lists the resurrection points you've discovered, nearest first,
   and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
@@ -95,11 +98,12 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Gear-driven combat stats** — your equipped gear feeds the fight: weapon damage rolls per swing, worn armour and
   magical Protection mitigate incoming physical/spell hits, and Critical Rating / Critical Damage Rating produce crits
   (the larger "critical" numbers). The damage/mitigation/crit curves are provisional pending in-client tuning (#395,
-  #399, #401)
+  #401)
 - 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
   cadence are still approximate (#349)
-- 🟡 **Buff stat effects** — buffs show as icon + timer today; applying their actual stat bonuses needs a data
-  decode still in progress (damage-over-time already works) (#367)
+- 🟡 **Buff stat effects** — buffs show as icon + timer, and each one's per-stat bonus/penalty magnitudes are now
+  decoded from the spell templates; feeding those deltas into your live stats is the remaining step (damage-over-time
+  already works) (#367)
 - 🟡 **Spell cooldowns** — fully reverse-engineered; the client runs the recast timer from its own data (retail
   sends nothing), pending an in-client confirm of the server-override case (#271)
 - 🟡 **Spellweaving** (necromancer) — built and playable; the energy-bar drain is the last piece (#141)
@@ -117,8 +121,8 @@ we've seen_, and names the gaps). Regenerate with
   live protocol (driven by a GM command for now); what's missing is the feat *catalog* itself — which feats exist,
   their tiers and prerequisites, per-feat costs, and each class's tree layout (#251)
 - 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
-- 🟡 Class spell / combo / ability catalogs are still filling in, and a few spellbook entries render nameless
-  (#296, #303, #300)
+- 🟡 Class spell / combo / ability catalogs are still filling in; empty spell and item names were backfilled from the
+  client's own English string table (LDB), so far fewer entries render nameless (#291, #296, #303, #300)
 - ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144)
 
 ### Items & economy
@@ -136,7 +140,7 @@ we've seen_, and names the gaps). Regenerate with
   class base, better weapons hit harder (min–max per swing), armour and magical Protection reduce incoming damage,
   Critical Rating / Critical Damage Rating drive crits, Magic Damage boosts spells, Combat Rating boosts melee, and
   Natural Mana/Stamina Regen speed the bars. The exact per-hit damage/mitigation/crit formulas are provisional
-  (server-side in retail) pending in-client tuning (#3, #395, #399, #401)
+  (server-side in retail) pending in-client tuning (#3, #395, #401)
 - 🟡 Guild bank (#132)
 - ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing for attribute bonuses (#311)
 

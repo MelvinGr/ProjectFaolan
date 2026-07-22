@@ -54,9 +54,14 @@ namespace Faolan.Importer.Rdb
 			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity
 		];
 
-		// The [2][9]-region stats we import + apply today: vitals (the #3 health-bar-fill headline) + the five
-		// attributes. The region also carries ratings (Magic Damage, Hit Rating, ...) that are decoded but have no
-		// server consumer yet, so they're left unimported until one lands (#367 / a ratings pass).
+		// The [2][9]-region stats we import + apply today: vitals (the #3 health-bar-fill headline), the five
+		// attributes, and the combat ratings that now HAVE a consumer (Armor/Protection mitigation #401, Hit/Crit/
+		// CombatRating + Magic Damage + regen #399, all read off gearBonuses in WorldSimulation.RegisterPlayerInWorld).
+		// The region's other ~30 unnamed rating ids stay unimported until a consumer lands. NB the five attributes are
+		// imported for server-side derived-stat use, NOT to patch the sent stat block: retail sends BASELINE attributes
+		// (Str=Int=10) in the snapshot for every char L1-L80 and NEVER updates them live (verified across every login
+		// capture + a level-up) - the client derives displayed attributes itself from class/level/feats + worn gear, so
+		// patching gear totals onto the wire would diverge from retail and double-count (#399 item 1, won't-do).
 		private static readonly HashSet<uint> ApplicableStatIds =
 		[
 			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax,
