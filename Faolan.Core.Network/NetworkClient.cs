@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
@@ -18,6 +19,15 @@ namespace Faolan.Core.Network
 
 		void Send(byte[] value);
 		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
+
+		// The structured send boundary (Gitea #406, phase 4): a handler builds an Rpc and hands it here instead of a
+		// hand-framed PacketStream. Serializes to the wire frame (byte-identical to the PacketStream builder, locked by
+		// PacketFrameRoundTripTests) and sends. Logging still runs off the serialized bytes for now; moving it onto the
+		// Rpc model (no re-parse) is phase 6.
+		Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
+		{
+			return SendAsync(PacketSerializer.Serialize(rpc), cancellationToken);
+		}
 
 		void Start();
 		void Stop();

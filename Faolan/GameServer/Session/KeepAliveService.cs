@@ -1,9 +1,11 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.GameServer.Session
 {
@@ -13,11 +15,15 @@ namespace Faolan.GameServer.Session
 	// Both are fixed-shape replies with a tiny bit of per-reply data (the echoed counter / the tick). Extracted
 	// out of the GameServerListener dispatch switch as a composed collaborator (#200); the two switch cases are
 	// now thin one-liners delegating here. No deps - it just builds + sends on the client.
+	//
+	// PILOT for the structured send boundary (Gitea #406, phase 4): these build an Rpc and hand it to
+	// client.SendAsync(Rpc) instead of a hand-framed PacketStream. The wire output is byte-identical (locked by
+	// KeepAliveRpcPilotTests) - the sender/receiver/opcode are now the Rpc's fields, the body is built separately.
 	public sealed class KeepAliveService
 	{
 		// LatencyCheck rides the GameCharAgent conversation (sub-id 0x08); Ping rides GameAgent (sub-id 0x08).
-		private static readonly byte[] LatencySender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08);
-		private static readonly byte[] PingSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08);
+		private static readonly ProtoEndpoint LatencySender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08);
+		private static readonly ProtoEndpoint PingSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x08);
 
 		// LatencyCheck (0x2085): reply body = [counter echoed][0x00000012][server tick]. The tick is a
 		// monotonically increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s interval, ms precision).
@@ -26,12 +32,13 @@ namespace Faolan.GameServer.Session
 			var counter = packet.Body.ReadUInt32();
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
-			return new PacketStream()
-				.WriteHeader(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong, [0x01])
-				.WriteUInt32(counter)
-				.WriteUInt32(0x00000012)
-				.WriteUInt32(tick)
-				.SendAsync(client);
+			using var body = new FaolanStream();
+			body.WriteUInt32(counter);
+			body.WriteUInt32(0x00000012);
+			body.WriteUInt32(tick);
+
+			return client.SendAsync(new Rpc(LatencySender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, client.Session.Character.Id),
+				(ushort)GameCharInterfaceOpcodes.DispatchPong, new byte[] { 0x01 }, body.ToArray()));
 		}
 
 		// Ping (0x2005, empty): reply on GameAgent with GameServerStats. Body = [float][0][0]; retail's leading
@@ -39,12 +46,13 @@ namespace Faolan.GameServer.Session
 		// plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
 		public static Task HandlePing(INetworkClient client)
 		{
-			return new PacketStream()
-				.WriteHeader(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchGameServerStats)
-				.WriteUInt32(0x42B32A07)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.SendAsync(client);
+			using var body = new FaolanStream();
+			body.WriteUInt32(0x42B32A07);
+			body.WriteUInt32(0);
+			body.WriteUInt32(0);
+
+			return client.SendAsync(new Rpc(PingSender, Endpoints.Endpoint(Endpoints.GameInterfaceType, client.Session.Character.Id),
+				(ushort)GameInterfaceOpcodes.DispatchGameServerStats, default, body.ToArray()));
 		}
 	}
 }
