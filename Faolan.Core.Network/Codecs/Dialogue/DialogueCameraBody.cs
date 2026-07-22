@@ -1,5 +1,5 @@
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
@@ -19,11 +19,8 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				.WriteArray(cameraParams ?? [])
 				.ToArray();
 
-			var ps = new PacketStream().WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, agentInstance), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, liveInstance),
-				(ushort)ConversationScreenDecoder.SetDialogueCamera);
-			ps.WriteArray(body);
-			ps.WriteLengthHash();
-			return ps.ToArray();
+			return PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, agentInstance), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, liveInstance),
+				(ushort)ConversationScreenDecoder.SetDialogueCamera, body));
 		}
 	}
 }

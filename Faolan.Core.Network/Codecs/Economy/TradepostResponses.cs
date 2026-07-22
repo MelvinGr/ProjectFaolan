@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
@@ -61,13 +62,13 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// form (includeAttachments=false) is the mailbox-poll/preview; with attachments it carries the bought item.
 		public static Task SendMailMessage(INetworkClient client, Mail mail, bool includeAttachments, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return Build(TradepostInterfaceOpcodes.DispatchMailMessage, MailMessageCodec.Build(mail, includeAttachments), interfaceInstance).SendAsync(client);
+			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchMailMessage, MailMessageCodec.Build(mail, includeAttachments), interfaceInstance));
 		}
 
 		// DispatchSendMailResult (0x2003) [u8 success][u8 error] - the result of a send/mark/delete op.
 		public static Task SendMailResult(INetworkClient client, bool success, byte error = 0, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return Build(TradepostInterfaceOpcodes.DispatchSendMailResult, [Convert.ToByte(success), error], interfaceInstance).SendAsync(client);
+			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchSendMailResult, [Convert.ToByte(success), error], interfaceInstance));
 		}
 
 		// DispatchSendMailResult for a player SendMail (0x2002 -> 0x2003): [u8 success][u16 len + remoteformat XML]
@@ -77,7 +78,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			var s = new FaolanStream();
 			s.WriteByte(Convert.ToByte(success));
 			s.WriteString(SendMailResultXml);
-			return Build(TradepostInterfaceOpcodes.DispatchSendMailResult, s.ToArray(), interfaceInstance).SendAsync(client);
+			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchSendMailResult, s.ToArray(), interfaceInstance));
 		}
 
 		// Open the auction house at `position` (the auctioneer/player location) so the client's within-radius check
@@ -85,13 +86,13 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// the player's live position (the capture shows DispatchOpenTradepost precedes TradepostOpen).
 		public static Task SendOpenTradepost(INetworkClient client, Vector3 position, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return Build(TradepostInterfaceOpcodes.DispatchOpenTradepost, BuildAccessPointBody(position, AccessRadius), interfaceInstance).SendAsync(client);
+			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchOpenTradepost, BuildAccessPointBody(position, AccessRadius), interfaceInstance));
 		}
 
 		// DispatchRetrieveMailResult (0x2004) - a single 0x01 byte (the "mailbox retrieved" ack in the capture).
 		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return Build(TradepostInterfaceOpcodes.DispatchRetrieveMailResult, [0x01], interfaceInstance).SendAsync(client);
+			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchRetrieveMailResult, [0x01], interfaceInstance));
 		}
 
 		// Reply to TradepostItemSearch with DB-backed listings for the searched item (rows built byte-exact by
@@ -109,10 +110,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 		public static Task SendSearchResults(INetworkClient client, uint interfaceInstance, IReadOnlyCollection<TradepostListing> listings)
 		{
 			var head = ListFrame.ForCount(listings.Count); // the LIST COUNT, not a category echo - see TradepostListingCodec
-			return Build(TradepostInterfaceOpcodes.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), interfaceInstance).SendAsync(client);
+			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), interfaceInstance));
 		}
 
-		private static PacketStream Build(TradepostInterfaceOpcodes method, byte[] body, uint interfaceInstance)
+		private static Rpc Build(TradepostInterfaceOpcodes method, byte[] body, uint interfaceInstance)
 		{
 			var sender = new ProtoEndpoint
 			{
@@ -125,10 +126,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				Instance = interfaceInstance
 			};
 
-			var stream = new PacketStream();
-			stream.WriteHeader(sender, receiver, method);
-			stream.WriteArray(body);
-			return stream;
+			return new Rpc(sender, receiver, method, body);
 		}
 
 		private static byte[] BuildAccessPointBody(Vector3 position, float radius)
