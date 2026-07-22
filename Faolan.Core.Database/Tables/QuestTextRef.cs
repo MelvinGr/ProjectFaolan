@@ -1,11 +1,19 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
 	// One text slot of a quest definition: a <remoteformat>/<localized> reference the client resolves by
 	// (RefId, Category) against its RDB.
-	public class QuestTextRef : BaseEntity
+	//
+	// KEY is the natural (QuestId, Slot): a quest carries each slot at most once - both harvest paths already dedup by
+	// slot within a quest (ImportOps.AddRefIfMissing / QuestDefinitionExtractor.SetRef), and it is unique across every
+	// captured row. Using it as the PK (instead of a synthetic AUTOINCREMENT Id) keeps a re-harvest byte-stable: the
+	// importer delete+reinserts these rows, and a surrogate id would be reassigned each time, churning faolan.sql for
+	// no semantic change. QuestId doubles as the FK to QuestDefinitions.
+	[PrimaryKey(nameof(QuestId), nameof(Slot))]
+	public class QuestTextRef
 	{
 		public uint QuestId { get; set; }
 
