@@ -55,11 +55,11 @@ mount buff `…01 empty=dismount`). So a caster's real cast = the rank-0 apply; 
   standalone cast).
 
 ## In-client VERIFIED (2026-06-17, #232 done)
-A spawned caster casts at the player in-client. Repro: `.spawnnpc Poacher Marksman` (a caster with an `NpcSpells`
+A spawned caster casts at the player in-client. Repro: spawn a Poacher Marksman (a caster with an `NpcSpells`
 row, spell id `0x316DCB00`), engage it → it follows and applies its debuff via `MagicBuffIIR (0x6B87E316)`,
 applyFrom = the NPC handle, spell `0x316DCB` ("Ripper Volley") — it casts instead of meleeing.
-**Fix that enabled the test:** `WorldBroadcaster.SpawnNpcForPlayer` (the `.spawnnpc` path) was
+**Fix that enabled the test:** `WorldBroadcaster.SpawnNpcForPlayer` (the summon/test-spawn path) was
 a minimal spawn that NEVER loaded `entity.Spells` — only the zone-load path did — so a summoned caster could never
 cast regardless of data. It now loads the NPC's `NpcSpells` rows like the zone path, so `IsCaster` lights up.
 Caveat: the applied debuff doesn't expire (no duration honored — #67; "Ripper Volley" shows a 6s tooltip but
-sticks). NpcSpells data is still sparse (~14 named casters); `.spawnnpc` mobs also get no loot table.
+sticks). NpcSpells data is still sparse (~14 named casters); summoned test mobs also get no loot table.

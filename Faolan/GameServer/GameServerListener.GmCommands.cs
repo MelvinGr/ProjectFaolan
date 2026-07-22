@@ -122,7 +122,7 @@ namespace Faolan.GameServer
 		// captured import artifacts (phantom players that happened to be in the pcap when the world was captured). A
 		// faction mob (hostile) deletes only the rows at the target's spot (don't wipe every same-name mob); a neutral
 		// named entity deletes every same-name row on the map (its cross-session captures collapse to one render).
-		// Unlike .despawnnpc (live-only, comes back on relog), .delete is durable.
+		// Unlike a plain live despawn (comes back on relog), .delete is durable.
 		private async Task DeleteCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;

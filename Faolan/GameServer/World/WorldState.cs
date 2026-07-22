@@ -196,7 +196,7 @@ namespace Faolan.GameServer.World
 					{
 						if (entity.TickCorpseLinger(deltaSeconds))
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootable));
-						// Summoned (.spawnnpc) NPCs don't revive: once the post-death timer elapses, fade + remove the
+						// Summoned (test) NPCs don't revive: once the post-death timer elapses, fade + remove the
 						// corpse (LootExpired) instead of respawning it.
 						if (entity.NoRespawn)
 						{

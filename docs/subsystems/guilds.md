@@ -115,8 +115,7 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   character/team/PvP-matchmaking searches (`0x200A`→`0x2010`, `0x200B`→`0x200F`, `0x2054`→`0x2092`) return well-formed
   empty `0x3F1` lists (retail's own no-result bodies), and `0x2055` gets no reply (retail sends none).
 - Create path: the capture-true `CreateGuild` RPC (0x2021 → `HandleCreateGuild`), triggered in-client from a
-  registrar NPC window. The old `.guild create <name>` GM bootstrap was removed with the other GM test
-  commands (commit `54f55dee`); the surviving GM commands are `.ah`/`.teleport`/… (no `.guild`).
+  registrar NPC window. There is no GM guild-create command — creation is only via that in-world registrar window.
 
 Open work is tracked in Gitea #104.
 

@@ -8,7 +8,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Proves the decoded DispatchShopData grammar round-trips byte-exact: parse the captured trader blob
-	// (the .shop PoC replay bytes) into rows, rebuild with ShopContentCodec.Build from those rows, and the
+	// (the PoC replay bytes) into rows, rebuild with ShopContentCodec.Build from those rows, and the
 	// output must equal the capture bit-for-bit. This is what makes the DB-backed vendor construction safe.
 	public class ShopContentCodecTests
 	{

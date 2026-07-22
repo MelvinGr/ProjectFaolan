@@ -101,8 +101,8 @@ namespace Faolan.GameServer.World
 		// Quest-giver NPC name -> granted quest id, cached once (small set).
 		private Dictionary<string, uint> _questGivers = null!;
 
-		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs, GM
-		// `.spawnnpc`, and the #363 ambient pool members (not loot-specific despite the range's origin). CRITICAL: the
+		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs,
+		// and the #363 ambient pool members (not loot-specific despite the range's origin). CRITICAL: the
 		// value must be in the SAME LOW range retail assigns mid-session entity handles - the client only tracks/polls
 		// handles in that range, and the render of a mid-session spawn is completed by the client polling 0x2020 for the
 		// entity's handle (-> server SpawnCheck 0x2008). Captured retail mid-session spawns (the mount + interest NPCs)
@@ -266,7 +266,7 @@ namespace Faolan.GameServer.World
 
 		// The SOURCE NPC name of a loot bag (a corpse bag REUSES the dead NPC's WorldEntity + handle, so its Name is the
 		// NPC's, e.g. "Scavenger Tuut") - the match key for a LootFromNpc quest goal (#261), since the quest item itself
-		// is RDB content we don't materialise. Null for a non-bag handle or a bag with no source name (.spawnbag).
+		// is RDB content we don't materialise. Null for a non-bag handle or a bag with no source name.
 		public string? BagSourceName(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -1186,7 +1186,7 @@ namespace Faolan.GameServer.World
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
 			entity.SpawnBody = body;
-			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)
+			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death
 
 			// Load this NPC type's caster spells (same as the zone-load path) so a summoned caster actually casts
 			// (#232) instead of only meleeing - the sim's cast branch lights up when entity.Spells is non-empty.
@@ -1767,7 +1767,7 @@ namespace Faolan.GameServer.World
 
 		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled
 		// loot model: the bag is a real world object (no vitals, no respawn; tick-expired via TickExpiry), independent
-		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
+		// of whatever dropped it. Used by NPC death drops (#246) so the dead NPC's handle is free to
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
 		private async Task<WorldEntity?> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle,
@@ -1819,8 +1819,8 @@ namespace Faolan.GameServer.World
 				// appeared after a relog). Retail follows the FullUpdate with a NewAllowedLooterIIR at the bag's
 				// mid-session spawn (capture fr1358), which is what makes the client INSTANTIATE + render it live. This
 				// packet is a loot-PERMISSION grant, so it names the bag's OWNER (the killer / spawning player), not the
-				// recipient - a drop belongs to whoever earned it. Fall back to the viewer when there's no owner (e.g. a
-				// legacy .spawnbag) so the bag still renders.
+				// recipient - a drop belongs to whoever earned it. Fall back to the viewer when there's no owner
+				// so the bag still renders.
 				await SendWorldIir(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, allowedLooterHandle != 0
 					? allowedLooterHandle
 					: viewer.Handle));

@@ -84,8 +84,8 @@ first mounted move at idx 787):
   "Fading Black Horse", "Armored Rabicano Horse", handles `0x0004xxxx`);
 - then the player's Move switches to MountedRun.
 
-So the mount spell is **`0x3BAD7D`** (present in the `Spells` table; names are client-side). A GM command
-`.mount [spellIdHex]` (since removed) broadcast that ApplySpell on the player (default `0x3BAD7D`). NOTE: full mounting also
+So the mount spell is **`0x3BAD7D`** (present in the `Spells` table; names are client-side): broadcasting that
+ApplySpell on the player is the mount cast. NOTE: full mounting also
 needs the mount entity spawn (`0xFA015807`) + the MountedRun transition; only the cast broadcast was wired.
 `0x96B8DC59` is NOT the mount packet (it's the vitals update). NOTE: the "Black Horse" strings in `0x2038` are
 **guild names** ("Black Horse Company"), not mounts - a red herring.

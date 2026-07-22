@@ -9,7 +9,7 @@ namespace Faolan.Core.Network.Constants
 	//   - SummonMount `from` 0x3E34F1 = "Fading Black Horse", 0x3E34F2 = "Swift Fading Black Horse"
 	//     (Handle0x2000 SummonMount comments + the 0x2076 action-bar entries).
 	//   - the summon cast is ApplySpell spell 0x3BAD7D (the channelled 0xF508F4C1 summon that precedes the
-	//     "Fading Black Horse" FA015807 spawn; the `.mount` GM command's documented id).
+	//     "Fading Black Horse" FA015807 spawn).
 	// Typed catalog rather than a captured blob: the id/name/spell are the only per-mount facts and they are tiny
 	// + capture-proven (construct-don't-replay). The mount CREATURE model is harvested into the DB by
 	// CaptureMountImporter and rendered via the normal NPC-spawn path (SpawnMountForPlayer).
@@ -47,7 +47,7 @@ namespace Faolan.Core.Network.Constants
 			new MountDef(0x3E34F1u, "Fading Black Horse", FadingHorseSummonSpell, 0x00313C9Bu), new MountDef(0x3E34F2u, "Swift Fading Black Horse", FadingHorseSummonSpell, 0x00313C9Bu)
 		];
 
-		// The default mount the GM `.mount` command summons when given no argument (the in-client-observed Tortage mount).
+		// The default mount summoned when no specific mount is given (the in-client-observed Tortage mount).
 		public static MountDef Default => All[0];
 		private static readonly Dictionary<uint, MountDef> ById = BuildById();
 		private static readonly Dictionary<string, MountDef> ByName = BuildByName();

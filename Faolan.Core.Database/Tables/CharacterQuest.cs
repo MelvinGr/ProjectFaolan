@@ -23,7 +23,7 @@ namespace Faolan.Core.Database.Tables
 
 		// A kill objective: the NPC name whose death advances this quest's goal (null = no kill objective). The real
 		// quest objective definitions live in the pinned RDB Lua quest VM; until then the target is set when the quest
-		// is added (e.g. via .quest), and the tracker advances GoalProgress on a matching kill.
+		// is added, and the tracker advances GoalProgress on a matching kill.
 		[MaxLength(128)]
 		public string? GoalTargetName { get; set; }
 

@@ -192,8 +192,7 @@ is the sole spawn-body path.
 **GM commands** (`Faolan/GameServer/GameServerListener.GmCommands.cs`, account type >= GameMaster, typed as `.cmd` in chat)
 are the standard test bootstrap for features whose retail trigger isn't wired yet (`.additem`, `.teleport`, `.ah`,
 `.setnpcgroup`, ...). The registered set is the `_gmCommandsDict` in that file (`InitGmCommands`) — check it before
-assuming a command exists; several older ones (`.money`, `.spawnbag`, `.spawnnpc`, `.quest`, `.tag`, `.shop`, `.guild`)
-were removed, and the MCP tools wrapping them are stale.
+assuming a command exists; several older ones were removed, and any MCP tools wrapping them are stale.
 
 **MCP server:** the running server hosts an in-process MCP endpoint at `http://127.0.0.1:7099/mcp`
 (DB queries + live-session inspection + GM-command routing).

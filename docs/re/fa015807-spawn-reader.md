@@ -144,7 +144,7 @@ Implemented:
    526 tests green).
 
 **In-client flip DONE (2026-06-17, #185 verified):** logged onto the beach with the minimal scaffolds active —
-world-entry / interest / `.spawnnpc` NPCs render the same ("ncs seem the same"), chat connects (the real load
+world-entry and interest-streamed NPCs render the same ("ncs seem the same"), chat connects (the real load
 confirmation), zero stream errors. So the minimal scaffold was made the **default** (commit `48be35a`) and the
 `FAOLAN_MINIMAL_SCAFFOLD` / `FAOLAN_NPC_VERBATIM` env toggles + the dead `FAOLAN_BUILT_NPC_TEST` injector were
 removed — construct-don't-replay is now the only NPC spawn path. The per-spawn sub-list (`@1122b10`) entry

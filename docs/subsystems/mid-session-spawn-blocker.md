@@ -7,9 +7,9 @@
 > only because it was replayed from the same session whose token IS the live one. Fix: `SendWorldSpawn`
 > now re-stamps the token to the live `Zone.PlayfieldToken` via `SpawnPlayfieldRewriter` (loot bags are built from
 > scratch with the live `Zone.PlayfieldToken` stamped in directly by `WorldObjectBuilder.BuildBody`, no rewriter
-> pass; commit `0827af5`). **Verified in-client:** a `.spawnnpc Crocodile` drew the first mid-session `0x2020` poll +
-> `0x2008` SpawnCheck in the project's history and rendered. This fixes `.spawnnpc`, mount, interest-streaming,
-> NPC respawn, and loot bags.
+> pass; commit `0827af5`). **Verified in-client:** spawning a Crocodile mid-session drew the first mid-session
+> `0x2020` poll + `0x2008` SpawnCheck in the project's history and rendered. This fixes mid-session NPC spawns,
+> mounts, interest-streaming, NPC respawn, and loot bags.
 >
 > The "stateful conversation / `n3InfoItemRemote::PollStatus` keepalive" conclusion below (parts 4–7) was
 > **DISPROVEN in-client this session:** streaming a continuous `BehaviorControlCenterIIR` (`0x642CD3D6`) heartbeat on
@@ -32,12 +32,12 @@
 > parts 4–7. (The playfield-instance map gate in parts 2–3 is the downstream RENDER path, hit equally by burst +
 > mid-session — NOT the selective blocker.)
 
-**Symptom.** Nothing spawned mid-session renders in-client: `.spawnnpc` (NPC), `.spawnbag` / kill-drop loot
-bags, `.mount` (the horse), interest-streamed NPCs. Only the login **world burst** renders entities. The server
+**Symptom.** Nothing spawned mid-session renders in-client: mid-session NPC spawns, kill-drop loot
+bags, mounts, interest-streamed NPCs. Only the login **world burst** renders entities. The server
 spawns them correctly (they appear in the world model, the packet goes out) — the client just never draws them.
 
 **This is NOT a packet bug.** Proven by a loopback capture (`dumpcap -i lo -f "tcp port 7014"`, no root) of our
-own `.spawnnpc`: the outgoing `FA015807` is byte-structurally identical to (a) retail's mid-session spawn and
+own mid-session spawn: the outgoing `FA015807` is byte-structurally identical to (a) retail's mid-session spawn and
 (b) our own rendering login burst — same sender `0x13CE71B1:0x58`, receiver `GameInterfaceType:charId`, body
 `[u32 recordLen][fa015807][0000c350][u32 handle][00000000][2c 0a 0f 0d <vec3> 12 <quat> ...]`. Our full
 world-entry handshake is also structurally identical to retail's (`0x2003`→`0x200b`/`0x200c`/`0x2001`→`0x201c`×5
@@ -64,7 +64,7 @@ Proven in `Captures/NecroL80_mage-necromancer_login_mount_move_dismount.tshark.j
 
 Our client polls correctly **at world-entry** — ~264 `0x2020`/`SpawnCheck` exchanges for the burst handles
 (`0x000818xx`), which is exactly what renders the burst (our server answers via `SendSpawnCheckResponse`). But
-**mid-session our client never polls.** A loopback capture during `.spawnnpc` showed the client sending only
+**mid-session our client never polls.** A loopback capture during a mid-session spawn showed the client sending only
 `4517aa81` (movement) and **zero `0x2020`** — it never polls for our pushed crocodile, so it never gets a
 SpawnCheck, so it never renders. The client **refuses to register our mid-session `FA015807`** in its interest
 set (whereas it registers + polls the retail mount, the same kind of unsolicited push).

@@ -126,7 +126,7 @@ namespace Faolan.GameServer.World
 		// Cleared on arrival, death and respawn.
 		public bool Moving { get; set; }
 
-		// A summoned/test NPC (e.g. .spawnnpc) that should NOT revive when killed: once dead it lingers as a lootable
+		// A summoned/test NPC that should NOT revive when killed: once dead it lingers as a lootable
 		// corpse for RespawnDelaySeconds, then the tick fades + removes it instead of respawning it.
 		public bool NoRespawn { get; set; }
 
@@ -229,7 +229,7 @@ namespace Faolan.GameServer.World
 		// For a LOOT BAG dropped by a kill: the NAME of the NPC whose corpse it is (e.g. "Scavenger Tuut"). The bag is a
 		// decoupled entity (#246) whose own Name is the generic "Bag of loot", so the source is recorded separately - it
 		// is the match key for a LootFromNpc quest goal (#261), since the quest item itself is RDB content we don't
-		// materialise. Null for a standalone .spawnbag (no source NPC).
+		// materialise. Null for a standalone bag (no source NPC).
 		public string LootSourceName { get; set; } = null!;
 		public string Name { get; }
 
@@ -243,7 +243,7 @@ namespace Faolan.GameServer.World
 		// zone load. Null/empty = this NPC has no captured chatter group and stays silent.
 		public string[] ChatterLines { get; set; } = null!;
 
-		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the .spawnbag player). Sent as the
+		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the spawning player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever
 		// earned it rather than everyone in range. 0 = unowned (anyone). Loot-permission ENFORCEMENT (gating the take
 		// on this) is a later step (#101 shared-zone loot); today's Tortage is single-player-instanced so it's moot.
