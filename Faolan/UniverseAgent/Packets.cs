@@ -16,7 +16,7 @@ namespace Faolan.UniverseAgent
 			return new PacketStream()
 				.WriteHeader(Sender, client.Session.ClientConversation, UniverseInterfaceOpcodes.DispatchAckAuthenticate)
 				.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
-				.WriteUInt64(client.Session.Account.LongId)
+				.WriteUInt64(0x0000271200000000u + client.Session.Account.Id)
 				.WriteString($"{Configuration.ServerIpAddress}:{Configuration.PlayerAgentPort}")
 				.WriteUInt32(client.Session.Account.Id)
 				.WriteUInt32(0x00000000)

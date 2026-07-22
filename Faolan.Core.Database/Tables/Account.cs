@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -11,9 +10,6 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(UserName), IsUnique = true)]
 	public class Account : BaseEntity
 	{
-		[NotMapped]
-		public ulong LongId => 0x0000271200000000u + Id; // As used by the client
-
 		public virtual ICollection<AccountClaim> Claims { get; set; } = [];
 
 		public virtual ICollection<Character> Characters { get; set; } = [];
