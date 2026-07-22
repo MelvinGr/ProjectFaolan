@@ -22,6 +22,7 @@ using Faolan.Helpers;
 using Faolan.Mcp;
 using Faolan.PlayerAgent;
 using Faolan.UniverseAgent;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -45,42 +46,14 @@ namespace Faolan
 			Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
 			Console.WriteLine(Global.StartupBanner);
 
-			var builder = Host.CreateApplicationBuilder(args);
-
-			if (Global.IsDebug)
-				builder.Environment.EnvironmentName = "Development";
-
-			// Config precedence (highest wins): environment variables > command line > faolan.json. faolan.json is
-			// OPTIONAL - a container can be configured entirely by env vars (e.g. DatabaseProvider /
-			// DatabaseConnectionString) with no file baked in. Sources are cleared first so the order is exactly this
-			// (no appsettings.json in the mix).
-			builder.Configuration.Sources.Clear();
-			builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
-			builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"), optional: true);
-			builder.Configuration.AddCommandLine(args);
-			builder.Configuration.AddEnvironmentVariables();
-
-			// Packet trace bytes: each packet logs on a single line; set "LogPacketBytes": false (faolan.json or
-			// --LogPacketBytes false) to drop the raw headerData/body hex dump and keep just the opcode + lengths.
-			PacketLogOptions.IncludeBytes = builder.Configuration.LogPacketBytes;
-
-			builder.Logging.SetMinimumLevel(Global.IsDebug
-				? LogLevel.Debug
-				: LogLevel.Information);
-			builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
-
-			builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
-			builder.Logging.AddFilter("ModelContextProtocol.Server.McpServer", LogLevel.Warning);
-
-			builder.Logging.AddSimpleConsole(options =>
-			{
-				options.IncludeScopes = true;
-				options.SingleLine = true;
-			});
-
-			// Mirror the console log to a file. LogFile config (env > cmdline > json) sets the location; default is
-			// faolan.log in the CWD (repo root), rewritten each start. Point it at a mounted volume in a container.
-			builder.Logging.AddProvider(new FileLoggerProvider(builder.Configuration.LogFile));
+			// Config sources (highest precedence wins): environment variables > command line > faolan.json. faolan.json
+			// is OPTIONAL - a container can be configured entirely by env vars (e.g. DatabaseProvider /
+			// DatabaseConnectionString) with no file baked in. Applied to a throwaway config below (to shape the host)
+			// and to the host builder's own configuration identically.
+			void AddConfigSources(IConfigurationBuilder cfg) => cfg
+				.AddJsonFile(Path.GetFullPath("faolan.json"), optional: true) // absolute (CWD-rooted), so no SetBasePath needed
+				.AddCommandLine(args)
+				.AddEnvironmentVariables();
 
 			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
 			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
@@ -91,6 +64,7 @@ namespace Faolan
 			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical dev run).
 			// At most ONE realm role per process: co-hosting several realms in one process would share the chat/world
 			// dispatchers + session aggregation across realms (a cross-realm leak) - that's what separate processes avoid.
+			// Parsed from argv up front (before the host is built) because the host SHAPE depends on it - see runMcp below.
 			var roles = CollectRoleArgs(args); // repeated --role values, parsed from argv (config binding keeps only the last)
 			uint? selectedRealmId = null;
 			bool runLogin = false, runRealm = false;
@@ -116,6 +90,49 @@ namespace Faolan
 						throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{role}'.");
 				}
 			}
+
+			// The in-process MCP server (streamable HTTP on a localhost port) is the ONLY thing here that needs a web
+			// server. It runs only for a realm host and only when enabled, so we pick the host shape accordingly: a
+			// WebApplication (Kestrel) when MCP runs - mapping the endpoint straight onto that host, sharing its DI so the
+			// tools resolve the live singletons directly (no nested host, no by-instance re-import) - and a plain generic
+			// host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port). McpEnabled is
+			// read from a throwaway config; the builder's own configuration is set up identically just below.
+			var preConfig = new ConfigurationBuilder();
+			AddConfigSources(preConfig);
+			var runMcp = runRealm && preConfig.Build().McpEnabled;
+
+			IHostApplicationBuilder builder = runMcp
+				? WebApplication.CreateBuilder(args)
+				: Host.CreateApplicationBuilder(args);
+
+			if (Global.IsDebug)
+				builder.Environment.EnvironmentName = "Development";
+
+			// Sources are cleared first so the precedence is exactly env > cmdline > json (no appsettings.json in the mix).
+			builder.Configuration.Sources.Clear();
+			AddConfigSources(builder.Configuration);
+
+			// Packet trace bytes: each packet logs on a single line; set "LogPacketBytes": false (faolan.json or
+			// --LogPacketBytes false) to drop the raw headerData/body hex dump and keep just the opcode + lengths.
+			PacketLogOptions.IncludeBytes = builder.Configuration.LogPacketBytes;
+
+			builder.Logging.SetMinimumLevel(Global.IsDebug
+				? LogLevel.Debug
+				: LogLevel.Information);
+			builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+
+			builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+			builder.Logging.AddFilter("ModelContextProtocol.Server.McpServer", LogLevel.Warning);
+
+			builder.Logging.AddSimpleConsole(options =>
+			{
+				options.IncludeScopes = true;
+				options.SingleLine = true;
+			});
+
+			// Mirror the console log to a file. LogFile config (env > cmdline > json) sets the location; default is
+			// faolan.log in the CWD (repo root), rewritten each start. Point it at a mounted volume in a container.
+			builder.Logging.AddProvider(new FileLoggerProvider(builder.Configuration.LogFile));
 
 			// The realm this process hosts (realm role). Resolved from the DB up front - the Realm row is the single
 			// source of truth for the bind ports, so the world/chat/guild listeners bind exactly what the login tier
@@ -167,9 +184,11 @@ namespace Faolan
 				// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.
 				builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
 
-				// In-process MCP server (Claude tooling) on a localhost Kestrel port; shares the live singletons above.
+				// In-process MCP server (Claude tooling) mapped onto THIS host's Kestrel; shares the live singletons above
+				// directly. runMcp already folds in McpEnabled and drove the WebApplication host-shape choice above, so
+				// the AddFaolanMcp registration and the MapFaolanMcp endpoint (at the tail) are consistently gated on it.
 				// When disabled the ChatServer also skips the Claude chat-channel subscription (nothing reads the log).
-				if (builder.Configuration.McpEnabled)
+				if (runMcp)
 					builder.Services.AddFaolanMcp();
 
 				builder.Services.AddScopedHostedService(provider =>
@@ -190,8 +209,16 @@ namespace Faolan
 					new RealmStatusService(provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<ILogger<RealmStatusService>>(), hostRealm!.Id));
 			}
 
-			var host = builder.Build();
-			await host.RunAsync();
+			// One host. When MCP runs, the builder is a WebApplication - map the endpoint onto its Kestrel and run it;
+			// otherwise it's a plain generic host with no web server (see runMcp above).
+			if (builder is WebApplicationBuilder webBuilder)
+			{
+				var app = webBuilder.Build();
+				app.MapFaolanMcp();
+				await app.RunAsync();
+			}
+			else
+				await ((HostApplicationBuilder)builder).Build().RunAsync();
 		}
 
 		// All --role values from argv (the option is repeatable: `--role login --role realm=2`). The config binder keeps
