@@ -11,7 +11,6 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -661,8 +660,7 @@ namespace Faolan.GameServer
 			}, self);
 
 			var entity = PlayerWorldEntity(client);
-			if (entity != null)
-				entity.IsMounted = true;
+			entity?.IsMounted = true;
 
 			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.CreatureName, character.Name, character.MapId);
 		}

@@ -208,8 +208,7 @@ namespace Faolan.GameServer
 			finally
 			{
 				var session = client.Session;
-				if (session != null)
-					session.EnergyLoopActive = false;
+				session?.EnergyLoopActive = false;
 			}
 		}
 

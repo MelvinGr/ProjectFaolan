@@ -370,8 +370,7 @@ namespace Faolan.GameServer
 										[CharacterStatId.Mount] = 0 // clear the mount stat (frame 1449)
 									};
 									await SendStatUpdate(client, dismountStats, self);
-									if (playerEntity != null)
-										playerEntity.IsMounted = false;
+									playerEntity?.IsMounted = false;
 
 									// Voluntary dismount -> forget the mount so it isn't restored on the next world entry.
 									client.Session.Character.MountId = null;
@@ -399,8 +398,7 @@ namespace Faolan.GameServer
 										[CharacterStatId.MountSpeed] = 100
 									}; // the mount StatUpd (frame 520)
 									await SendStatUpdate(client, mountStats, self);
-									if (playerEntity != null)
-										playerEntity.IsMounted = true;
+									playerEntity?.IsMounted = true;
 
 									// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
 									// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.
@@ -726,7 +724,7 @@ namespace Faolan.GameServer
 								// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
 								// the greeting is swallowed and dialogue never opens.
 								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
-								    await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
+									await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
 								{
 									await _shop.HandleVendorTradeOpen(client, rawPayload, args.CommandqueueClientId, vendorShop, npcHandle);
 									break;
@@ -738,7 +736,7 @@ namespace Faolan.GameServer
 								// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
 								// click it, so their own position trivially satisfies the 15-unit client proximity check.
 								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
-								    talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
+									talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
 								{
 									await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 									break;
@@ -1840,9 +1838,9 @@ namespace Faolan.GameServer
 
 			var slot = packet.Body.ReadUInt32();
 			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-			// Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
-			// shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
-			// (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
+									  // Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
+									  // shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
+									  // (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
 			var toggleState = Convert.ToBoolean(packet.Body.ReadByte());
 
 			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);

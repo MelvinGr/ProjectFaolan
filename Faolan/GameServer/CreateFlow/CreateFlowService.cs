@@ -155,28 +155,23 @@ namespace Faolan.GameServer.CreateFlow
 				// the raw 2x value makes the client show dashes for race/class on the select screen.
 				case "ChangeSex":
 				{
-					if (character != null)
-					{
-						// Same 2x editor convention as race/class: the halved (zigzag-decoded) value is the wire sex-code
-						// 2=MALE / 3=FEMALE (anchored on Hoxxling, male: ChangeSex 4 -> 2). The Sex enum is Male=2/Female=3,
-						// so the decoded value casts straight to the enum: 4->2 Male, 6->3 Female. No magic ==.
-						character.Sex = (Sex)value;
-					}
+					// Same 2x editor convention as race/class: the halved (zigzag-decoded) value is the wire sex-code
+					// 2=MALE / 3=FEMALE (anchored on Hoxxling, male: ChangeSex 4 -> 2). The Sex enum is Male=2/Female=3,
+					// so the decoded value casts straight to the enum: 4->2 Male, 6->3 Female. No magic ==.
+					character?.Sex = (Sex)value;
 
 					break;
 				}
 
 				case "ChangeRace":
 				{
-					if (character != null)
-						character.Race = (Race)value;
+					character?.Race = (Race)value;
 					break;
 				}
 
 				case "ChangeClass":
 				{
-					if (character != null)
-						character.Class = (Class)value;
+					character?.Class = (Class)value;
 					break;
 				}
 

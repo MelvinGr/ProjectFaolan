@@ -151,8 +151,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
 			var caster = _sim.PlayerWorldEntity(client);
-			if (caster != null)
-				caster.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
+			caster?.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
 			var casterLevel = client.Session.Character.Level;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamage ?? 0);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
@@ -216,9 +215,8 @@ namespace Faolan.GameServer.Combat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
 			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
 			var attackerEntity = _sim.PlayerWorldEntity(client);
-			if (attackerEntity != null)
-				attackerEntity.LastCombatAt = DateTimeOffset.UtcNow; // attacking -> in combat (halts HP/mana regen)
-			// Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
+			attackerEntity?.LastCombatAt = DateTimeOffset.UtcNow; // attacking -> in combat (halts HP/mana regen)
+																  // Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
 			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101), attackerEntity?.CombatRating ?? 0);
 			// #399: roll a critical hit off the player's Critical Rating; a crit scales the damage by the base 1.5x plus
 			// their Critical Damage Rating. A crit is NOT a distinct wire flag - RE of all captured DamageResults
@@ -255,8 +253,8 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(targetHandle)
 					.WriteUInt32(0) // result: count, c350, VICTIM=target, 0 - the entity that plays the hit-react/blood.
-					// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
-					// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
+									// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
+									// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
 					.WriteByte(0x06)
 					.WriteUInt32(0x000000CBu) // result constant (was 0xCD; the capture's BccAck result block uses 0xCB)
 					.WriteUInt32(0)

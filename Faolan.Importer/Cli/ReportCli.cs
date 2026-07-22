@@ -331,7 +331,7 @@ namespace Faolan.Importer.Cli
 							langHisto[lang] = langHisto.GetValueOrDefault(lang) + 1;
 							byLang[(category, id, lang)] = str;
 							perCategory[category] = perCategory.GetValueOrDefault(category) + 1;
-							if (thisPage != null) thisPage[id] = str;
+							thisPage?[id] = str;
 						}
 						if (thisPage is { Count: > 0 })
 						{
@@ -472,26 +472,26 @@ namespace Faolan.Importer.Cli
 		private static void Anim(IReadOnlyList<NamedCapture> captures, string target)
 		{
 			foreach (var c in captures)
-			foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
-			{
-				var body = e.Data is { Length: >= 12 }
-					? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
-					: null;
-				var anim = body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read)
-					? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
-					: "(unreadable)";
-				Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
-			}
+				foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
+				{
+					var body = e.Data is { Length: >= 12 }
+						? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+						: null;
+					var anim = body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read)
+						? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
+						: "(unreadable)";
+					Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
+				}
 		}
 
 		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)
 		{
 			foreach (var c in captures)
-			foreach (var g in ConversationExtractor.Extract(c.Packets).Where(e => !string.IsNullOrEmpty(e.NpcName)).GroupBy(e => e.NpcName).OrderBy(g => g.Key))
-			{
-				var grants = g.Where(e => e.GrantQuestId != 0).OrderBy(e => e.AnswerPath).Select(e => $"'{e.AnswerPath}'->{e.GrantQuestId}");
-				Console.WriteLine($"{c.Name} | {g.Key} | screens={g.Count()} | grants=[{string.Join(", ", grants)}]");
-			}
+				foreach (var g in ConversationExtractor.Extract(c.Packets).Where(e => !string.IsNullOrEmpty(e.NpcName)).GroupBy(e => e.NpcName).OrderBy(g => g.Key))
+				{
+					var grants = g.Where(e => e.GrantQuestId != 0).OrderBy(e => e.AnswerPath).Select(e => $"'{e.AnswerPath}'->{e.GrantQuestId}");
+					Console.WriteLine($"{c.Name} | {g.Key} | screens={g.Count()} | grants=[{string.Join(", ", grants)}]");
+				}
 		}
 
 		// Per-NPC dialogue screens + mid-conversation quest grants per (capture, NPC) (#37).
@@ -504,14 +504,14 @@ namespace Faolan.Importer.Cli
 			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
 			var greeted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var c in captures)
-			foreach (var n in ConversationExtractor.GreetedNpcNames(c.Packets))
-				greeted.Add(n);
+				foreach (var n in ConversationExtractor.GreetedNpcNames(c.Packets))
+					greeted.Add(n);
 
 			// Shops: vendors whose 0x2033 window appears in a dump (denominator) vs imported Shop rows (numerator).
 			var vendorsSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var c in captures)
-			foreach (var e in CaptureShopImporter.Extract(c.Packets))
-				vendorsSeen.Add(e.VendorName);
+				foreach (var e in CaptureShopImporter.Extract(c.Packets))
+					vendorsSeen.Add(e.VendorName);
 
 			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
 			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -595,10 +595,10 @@ namespace Faolan.Importer.Cli
 
 			// Imported-content stats: the scale of the DB (the server's source of truth). One `·`-separated line.
 			var stats = $"**Imported content** (the DB is the server's source of truth): " +
-			            $"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · " +
-			            $"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · " +
-			            $"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · " +
-			            $"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";
+						$"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · " +
+						$"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · " +
+						$"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · " +
+						$"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";
 			Console.WriteLine("\n" + stats);
 
 			if (string.Equals(arg, "readme", StringComparison.OrdinalIgnoreCase))
@@ -620,28 +620,28 @@ namespace Faolan.Importer.Cli
 		private static void Equip(IReadOnlyList<NamedCapture> captures, string target)
 		{
 			foreach (var c in captures)
-			foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
-			{
-				var body = e.Data is { Length: >= 12 }
-					? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
-					: null;
-				if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
 				{
-					Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} | (unreadable)");
-					continue;
-				}
+					var body = e.Data is { Length: >= 12 }
+						? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+						: null;
+					if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					{
+						Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} | (unreadable)");
+						continue;
+					}
 
-				var slots = read
-					.Message.InventoryEntries.Select(entry => NpcSpawnEquipmentBuilder.TryLift<NpcSpawnEquipment>(entry, out var row)
-						// The row stores only slot/template/level now (the quad + hash are the Items row Template FKs to);
-						// read the identity for the report off the captured entry itself.
-						? $"slot{row.Pos}=tpl{row.Template}[k={entry.Item.Key1.Key1},{entry.Item.Key1.Key2},{entry.Item.Key1.Key3},{entry.Item.Key1.Key4} lvl={row.Level} hash={entry.Item.Hash}]"
-						: "slot?=unliftable")
-					.ToList();
-				Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} pos=({e.X:0.#},{e.Z:0.#})");
-				foreach (var s in slots)
-					Console.WriteLine($"    {s}");
-			}
+					var slots = read
+						.Message.InventoryEntries.Select(entry => NpcSpawnEquipmentBuilder.TryLift<NpcSpawnEquipment>(entry, out var row)
+							// The row stores only slot/template/level now (the quad + hash are the Items row Template FKs to);
+							// read the identity for the report off the captured entry itself.
+							? $"slot{row.Pos}=tpl{row.Template}[k={entry.Item.Key1.Key1},{entry.Item.Key1.Key2},{entry.Item.Key1.Key3},{entry.Item.Key1.Key4} lvl={row.Level} hash={entry.Item.Hash}]"
+							: "slot?=unliftable")
+						.ToList();
+					Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} pos=({e.X:0.#},{e.Z:0.#})");
+					foreach (var s in slots)
+						Console.WriteLine($"    {s}");
+				}
 		}
 
 		private static string? GetOption(string[] args, string name)
@@ -809,24 +809,24 @@ namespace Faolan.Importer.Cli
 			// captures) or still vary by session - the gate for whether a per-map stored template is sound.
 			var byMap = new Dictionary<uint, List<(string Cap, string Masked)>>();
 			foreach (var c in captures)
-			foreach (var p in c.Packets)
-			{
-				if (p.Opcode != 0x2000u || p.SubOpcode != (uint)GameServer0X2000Opcodes.PlayfieldFIIR || p.Bytes.Length < 16)
-					continue;
+				foreach (var p in c.Packets)
+				{
+					if (p.Opcode != 0x2000u || p.SubOpcode != (uint)GameServer0X2000Opcodes.PlayfieldFIIR || p.Bytes.Length < 16)
+						continue;
 
-				var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
-				if (body.Length < 79)
-					continue;
+					var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
+					if (body.Length < 79)
+						continue;
 
-				var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
-				var masked = (byte[])body.Clone();
-				Array.Clear(masked, 42, 4); // instance
-				Array.Clear(masked, 58, 4); // playfield token
-				Array.Clear(masked, 75, 4); // playfield token (2nd)
-				(byMap.TryGetValue(map, out var l)
-					? l
-					: byMap[map] = []).Add((c.Name, Convert.ToHexString(masked)));
-			}
+					var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					var masked = (byte[])body.Clone();
+					Array.Clear(masked, 42, 4); // instance
+					Array.Clear(masked, 58, 4); // playfield token
+					Array.Clear(masked, 75, 4); // playfield token (2nd)
+					(byMap.TryGetValue(map, out var l)
+						? l
+						: byMap[map] = []).Add((c.Name, Convert.ToHexString(masked)));
+				}
 
 			foreach (var (map, list) in byMap.OrderBy(kv => kv.Key))
 			{
@@ -877,7 +877,7 @@ namespace Faolan.Importer.Cli
 
 			Console.Error.WriteLine($"{ops2.Count} opcode columns + {subs2.Count} sub-opcode columns across {captures.Count} captures");
 			Console.WriteLine("capture," + string.Join(",", ops2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}")) + "," +
-			                  string.Join(",", subs2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}:0x{x.Sub:X8}")));
+							  string.Join(",", subs2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}:0x{x.Sub:X8}")));
 			foreach (var c in captures.OrderBy(c => c.Name, StringComparer.Ordinal))
 			{
 				var op = perCapOp[c.Name];
@@ -1243,17 +1243,17 @@ namespace Faolan.Importer.Cli
 		{
 			var snaps = new List<(string Cap, byte[] Body)>();
 			foreach (var c in captures)
-			foreach (var p in c.Packets)
-			{
-				if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
-					continue;
+				foreach (var p in c.Packets)
+				{
+					if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+						continue;
 
-				var body = p.Bytes.Length >= 16
-					? p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..]
-					: [];
-				if (body.Length >= 16)
-					snaps.Add((c.Name, body));
-			}
+					var body = p.Bytes.Length >= 16
+						? p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..]
+						: [];
+					if (body.Length >= 16)
+						snaps.Add((c.Name, body));
+				}
 
 			foreach (var (cap, body) in snaps.OrderByDescending(s => s.Body.Length).Take(6))
 			{

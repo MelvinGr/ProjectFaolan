@@ -206,10 +206,8 @@ namespace Faolan.GameServer.World
 		private bool SetNpcFollow(uint mapId, uint playerHandle, bool follow, Func<WorldEntity, bool> match, string label)
 		{
 			var zone = _sim.World.ZonesForMap(mapId).FirstOrDefault(z => z.TryGet(playerHandle, out _));
-			if (zone == null)
-				return false;
 
-			var npc = zone.Entities.FirstOrDefault(e => !e.IsPlayer && match(e));
+			var npc = zone?.Entities.FirstOrDefault(e => !e.IsPlayer && match(e));
 			if (npc == null)
 				return false;
 
@@ -227,8 +225,7 @@ namespace Faolan.GameServer.World
 		public void InvalidateReachGoals(INetworkClient client)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player != null)
-				player.PendingReachGoals = null!;
+			player?.PendingReachGoals = null!;
 		}
 
 		// Called after items are taken from a bag (loot-all OR a single drag): confirm the take to the client with
@@ -1169,8 +1166,8 @@ namespace Faolan.GameServer.World
 			}
 
 			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
-			// baked ones are just placeholders (the player's zone token here).
+											  // Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
+											  // baked ones are just placeholders (the player's zone token here).
 			var body = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken);
 
 			EntityVitals? vitals = null;
@@ -1237,9 +1234,9 @@ namespace Faolan.GameServer.World
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
-			// (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
-			// than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
-			// client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
+												   // (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
+												   // than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
+												   // client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
 			entity.Level = level;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true;
@@ -1367,8 +1364,8 @@ namespace Faolan.GameServer.World
 		public Task<WeaponSet> TogglePlayerWeaponSet(INetworkClient client)
 		{
 			var current = _sim.PlayerWorldEntity(client)?.ActiveWeaponSet
-			              ?? client.Session?.Character?.ActiveWeaponSet
-			              ?? WeaponSet.Primary;
+						  ?? client.Session?.Character?.ActiveWeaponSet
+						  ?? WeaponSet.Primary;
 			return SetPlayerWeaponSet(client, current == WeaponSet.Primary
 				? WeaponSet.Secondary
 				: WeaponSet.Primary);
@@ -1379,8 +1376,7 @@ namespace Faolan.GameServer.World
 		public async Task<WeaponSet> SetPlayerWeaponSet(INetworkClient client, WeaponSet set)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player != null)
-				player.ActiveWeaponSet = set;
+			player?.ActiveWeaponSet = set;
 
 			if (client.Session?.Character is { } character)
 			{
@@ -1960,11 +1956,11 @@ namespace Faolan.GameServer.World
 		{
 			return resolvedBy switch
 			{
-				SpawnResolutionSource.Name          => "name",
-				SpawnResolutionSource.Containment   => "contain",
+				SpawnResolutionSource.Name => "name",
+				SpawnResolutionSource.Containment => "contain",
 				SpawnResolutionSource.IdPropagation => "id-prop",
-				SpawnResolutionSource.Manual        => "manual",
-				_                                   => "unresolved"
+				SpawnResolutionSource.Manual => "manual",
+				_ => "unresolved"
 			};
 		}
 
