@@ -1,5 +1,4 @@
 using System;
-using Faolan.Core;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Protocol
