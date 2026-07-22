@@ -61,5 +61,31 @@ namespace Faolan.Core.Network.Constants
 		{
 			return Endpoint(type, instance).ToProtobuf();
 		}
+
+		// Parse those [0x0D <type LE32> 0x10 <instance varint>] sub-message bytes back into a ProtoEndpoint - for the
+		// few hand-rolled capture-literal endpoints (e.g. the UniverseAgent InitAuth receiver) that live as byte[] in
+		// source, not as type+instance. Round-trips: EndpointFromBytes(x).ToProtobuf() == x.
+		public static ProtoEndpoint EndpointFromBytes(params byte[] subMessage)
+		{
+			using var stream = new FaolanStream(subMessage);
+			var endpoint = new ProtoEndpoint();
+			while (stream.Position < stream.Length)
+			{
+				switch (stream.ReadByte<ProtoEndpoint.FieldTags>())
+				{
+					case ProtoEndpoint.FieldTags.Type:
+						endpoint.Type = stream.ReadUInt32LittleEndian();
+						break;
+					case ProtoEndpoint.FieldTags.Instance:
+						endpoint.Instance = (uint)stream.ReadVarint();
+						break;
+					case ProtoEndpoint.FieldTags.Token:
+						endpoint.Token = (uint)stream.ReadVarint();
+						break;
+				}
+			}
+
+			return endpoint;
+		}
 	}
 }

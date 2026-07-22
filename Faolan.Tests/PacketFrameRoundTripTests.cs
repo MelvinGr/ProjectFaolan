@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
@@ -60,6 +61,18 @@ namespace Faolan.Tests
 			Assert.Equal(headerData, rpc.HeaderData.ToArray());
 			Assert.Equal(body, rpc.Body.ToArray());
 			Assert.Equal(frame, PacketSerializer.Serialize(rpc));
+		}
+
+		// Endpoints.EndpointFromBytes must reconstruct a ProtoEndpoint that re-serializes to the EXACT input bytes, so
+		// the hand-rolled capture-literal endpoints (the UniverseAgent InitAuth receiver, and the old echo-receiver it
+		// replaced) survive the migration to the structured Rpc receiver byte-for-byte.
+		[Theory]
+		[InlineData("0d5440380c1099a742")] // InitAuth receiver (instance 0x109399)
+		[InlineData("0d5440380c10eceb80de03")] // the old hardcoded echo receiver (larger instance)
+		public void EndpointFromBytes_RoundTripsToTheSameBytes(string hex)
+		{
+			var bytes = Convert.FromHexString(hex);
+			Assert.Equal(bytes, Endpoints.EndpointFromBytes(bytes).ToProtobuf());
 		}
 
 		// Builds a whole wire frame exactly as PacketStream.SendAsync does: WriteHeader (+ body) then WriteLengthHash

@@ -24,10 +24,6 @@ namespace Faolan.UniverseAgent
 			var opcode = (UniverseAgentOpcodes)packet.Opcode;
 			LogPacketReceived(packet, opcode);
 
-			// Remember the client's conversation id (the sender endpoint's bytes) so responses echo it back as the
-			// receiver, matching retail instead of a hardcoded capture id.
-			client.Session.ClientConversation = packet.Sender.ToProtobuf();
-
 			switch (opcode)
 			{
 				case UniverseAgentOpcodes.InitiateAuthentication:
@@ -39,7 +35,7 @@ namespace Faolan.UniverseAgent
 					if (client.Session.Account == null)
 					{
 						Logger.LogWarning("UniverseAgent login: unknown account '{Account}' - rejecting (invalid login).", accountName);
-						await SendInvalidLogin(client, InvalidLoginReasons.InvalidLogin);
+						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
 					}
 					else
 						await InitAuth(client);
@@ -89,21 +85,21 @@ namespace Faolan.UniverseAgent
 
 					if (!authenticated)
 					{
-						await SendInvalidLogin(client, InvalidLoginReasons.InvalidLogin);
+						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
 						break;
 					}
 
 					if (account.State != AccountState.Active)
 					{
-						await SendInvalidLogin(client, InvalidLoginReasons.AccountFrozen);
+						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.AccountFrozen);
 						break;
 					}
 
 					Logger.LogInformation("UniverseAgent login accepted for user {UserName} ({AccountId})", account.UserName, account.Id.ToHex());
 					await Database.SetAccountLastInfo(account.Id, client.IpAddress!);
 
-					await SetRegionState(client);
-					await SendPlayerAgentRealm(client);
+					await SetRegionState(client, packet.Sender);
+					await SendPlayerAgentRealm(client, packet.Sender);
 
 					break;
 				}
