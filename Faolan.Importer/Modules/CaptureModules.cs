@@ -250,8 +250,9 @@ namespace Faolan.Importer.Modules
 	{
 		public ImportSource Source => ImportSource.Captures;
 
-		// NpcsModule (#244): conversation nodes FK-key on NpcTemplateId, so the NPC TYPEs must be imported first.
-		public IReadOnlyList<string> DependsOn => [nameof(NpcsModule)];
+		// Conversation nodes FK NpcTemplateId (NpcsModule, #244) and GrantQuestId (QuestsModule) - both must import
+		// first so the references resolve (FK is enforced on every provider; no import-time deferral).
+		public IReadOnlyList<string> DependsOn => [nameof(NpcsModule), nameof(QuestsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{

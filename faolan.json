@@ -1,5 +1,6 @@
 {
-	"DatabasePath": "faolan.db",
+	"DatabaseProvider": "Sqlite",
+	"DatabaseConnectionString": "Data Source=faolan.db",
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
 	"ServerIpAddress": "127.0.0.1",

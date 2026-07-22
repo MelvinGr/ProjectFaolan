@@ -127,10 +127,9 @@ namespace Faolan.Importer.Cli
 			optionsBuilder.UseFaolanDatabase(provider, connection);
 
 			await using var db = new DatabaseContext(optionsBuilder.Options);
-			if (provider == FaolanDbProvider.Postgres)
-				await db.Database.EnsureCreatedAsync(); // no PG migration set yet; materialise schema from the model
-			else
-				await db.Database.MigrateAsync(); // outside the runner's transaction (migrations can't run inside one)
+			// Both providers migrate the same way (each has its own migration project). Migrations run here, outside
+			// the runner's transaction (they can't run inside one).
+			await db.Database.MigrateAsync();
 
 			// Ensure the default realm + account exist before any module runs (shared with the server; see DefaultSeeder).
 			if (await DefaultSeeder.EnsureDefaultRealmAsync(db))

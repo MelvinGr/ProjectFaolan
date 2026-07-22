@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.IO;
 using System.Net;
 using Faolan.Core.Enums;
 using Microsoft.Extensions.Configuration;
@@ -16,21 +15,12 @@ namespace Faolan.Core.Extensions
 			// bridges. Defaults to enabled when unset; set "McpEnabled": false in faolan.json to disable both.
 			public bool McpEnabled => !bool.TryParse(config["McpEnabled"], out var enabled) || enabled;
 
-			public string DatabasePath => Path.GetFullPath(Required(config, "DatabasePath"));
-
-			// The database backend: "Sqlite" (default) or "Postgres". Set "DatabaseProvider": "Postgres" in
-			// faolan.json to run against Postgres instead of the committed faolan.db seed (#379).
+			// The database backend: "Sqlite" or "Postgres". Governs which EF provider parses DatabaseConnectionString.
 			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(Required(config, "DatabaseProvider"), true);
 
-			// The connection string to hand the EF provider. Postgres uses the required "DatabaseConnectionString"
-			// (a full Npgsql string); SQLite derives `Data Source=<DatabasePath>` from the existing key, so the
-			// default single-key faolan.json keeps working unchanged.
-			public string DatabaseConnection => config.DatabaseProvider switch
-			{
-				FaolanDbProvider.Postgres => Required(config, "DatabaseConnectionString"),
-				FaolanDbProvider.Sqlite => $"Data Source={config.DatabasePath}",
-				_ => throw new ArgumentOutOfRangeException(nameof(config), config.DatabaseProvider, "Unknown database provider.")
-			};
+			// The full connection string for the selected provider - a SQLite "Data Source=..." string OR a full
+			// Npgsql string. One key for both providers (the SQLite path lives inside its "Data Source=").
+			public string DatabaseConnection => Required(config, "DatabaseConnectionString");
 
 			public string ServerIpAddress => Required(config, "ServerIpAddress");
 
