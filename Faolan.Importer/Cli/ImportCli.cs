@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
+using Faolan.Core.Database.Helpers;
 using Faolan.Core.Enums;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
