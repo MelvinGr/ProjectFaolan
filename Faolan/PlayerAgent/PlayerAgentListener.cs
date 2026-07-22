@@ -22,23 +22,25 @@ namespace Faolan.PlayerAgent
 			//
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
+		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket frame)
 		{
+			var packet = frame.ToRpc();
 			var opcode = (PlayerAgentOpcodes)packet.Opcode;
-			LogPacketReceived(packet, opcode);
+			LogPacketReceived(frame, opcode);
 
+			var body = packet.BodyReader();
 			switch (opcode)
 			{
 				case PlayerAgentOpcodes.Authenticate:
 				{
-					var accountId = packet.Body.ReadUInt32();
-					var cookie = packet.Body.ReadUInt32();
+					var accountId = body.ReadUInt32();
+					var cookie = body.ReadUInt32();
 
 					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
 						throw new Exception("client.Account == null");
 
-					client.Session.Account.AuthStatus = packet.Body.ReadUInt32();
+					client.Session.Account.AuthStatus = body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
 					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.InitAuth, body => body.WriteUInt32(client.Session.Account.AuthStatus)));
@@ -48,7 +50,7 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.GetStartupData:
 				{
-					var unk1 = packet.Body.ReadUInt16();
+					var unk1 = body.ReadUInt16();
 
 					await SendSmallCharList(client, packet.Sender);
 
@@ -59,7 +61,7 @@ namespace Faolan.PlayerAgent
 				{
 					// The client's own count-framed list (ListFrame): a malformed word means we would loop on garbage,
 					// so reject it rather than trusting inbound arithmetic.
-					var word = packet.Body.ReadUInt32();
+					var word = body.ReadUInt32();
 					if (!ListFrame.TryCountOf(word, out var charCount))
 					{
 						Logger.LogWarning("FinishGetStartupData: 0x{Word:X} is not a count-framed list word; ignoring the entries.", word);
@@ -68,8 +70,8 @@ namespace Faolan.PlayerAgent
 
 					for (var i = 0; i < charCount; i++)
 					{
-						var unk1 = packet.Body.ReadUInt32();
-						var unk2 = packet.Body.ReadString();
+						var unk1 = body.ReadUInt32();
+						var unk2 = body.ReadString();
 
 						Logger.LogDebug("RequestCharRealmData entry: characterId={CharacterId:X8}, authChallenge={AuthChallenge}", unk1, unk2);
 					}
@@ -92,14 +94,14 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.LoginCharacter:
 				{
-					var characterId = packet.Body.ReadUInt32();
-					var unk0 = packet.Body.ReadUInt32();
-					var unk1 = packet.Body.ReadUInt32();
-					var unk2 = packet.Body.ReadUInt32();
-					var unk3 = packet.Body.ReadByte();
-					var unk4 = packet.Body.ReadUInt32();
-					var unk5 = packet.Body.ReadUInt32();
-					var unk6 = packet.Body.ReadUInt32();
+					var characterId = body.ReadUInt32();
+					var unk0 = body.ReadUInt32();
+					var unk1 = body.ReadUInt32();
+					var unk2 = body.ReadUInt32();
+					var unk3 = body.ReadByte();
+					var unk4 = body.ReadUInt32();
+					var unk5 = body.ReadUInt32();
+					var unk6 = body.ReadUInt32();
 
 					client.Session.Account.ClientInstance = characterId;
 					client.Session.Character = (await Database.GetCharacter(characterId))!;
@@ -113,7 +115,7 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.VerifyLanguageSetting:
 				{
-					var languageId = packet.Body.ReadUInt32();
+					var languageId = body.ReadUInt32();
 
 					Logger.LogInformation("PlayerAgent language report: languageId={LanguageId}", languageId);
 
@@ -168,7 +170,7 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.CreateCharacter:
 				{
-					var realmId = packet.Body.ReadUInt32();
+					var realmId = body.ReadUInt32();
 					var newCharacter = await Database.CreateCharacter(client.Session.Account.Id, realmId);
 
 					client.Session.Character = newCharacter;
@@ -189,7 +191,7 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.DeleteCharacter:
 				{
-					var characterId = packet.Body.ReadUInt32();
+					var characterId = body.ReadUInt32();
 					Logger.LogInformation("DeleteCharacter request: characterId={CharacterId:X8}.", characterId);
 
 					var deleted = await Database.DeleteCharacter(characterId);
@@ -203,7 +205,7 @@ namespace Faolan.PlayerAgent
 
 				default:
 				{
-					LogUnknownPacket(packet, opcode);
+					LogUnknownPacket(frame, opcode);
 					break;
 				}
 			}
