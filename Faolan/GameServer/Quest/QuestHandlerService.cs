@@ -173,7 +173,7 @@ namespace Faolan.GameServer.Quest
 		// framing WorldBroadcaster uses for every rendered move/pose/visual-change.
 		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
 		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.EndpointOf(Endpoints.GameInterfaceType),
+			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 	}

@@ -82,7 +82,7 @@ namespace Faolan.GameServer.Inventory
 				return;
 
 			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
-			await client.SendAsync(new Rpc(ReplySender, client.EndpointOf(Endpoints.GameCharInterfaceType),
+			await client.SendAsync(new Rpc(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchShortcutBarReply, ShortcutBarBuilder.BuildBody(shortcuts)));
 			_logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
 		}

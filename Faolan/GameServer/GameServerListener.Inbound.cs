@@ -203,7 +203,7 @@ namespace Faolan.GameServer
 									BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(22, 4), acceptedPosition.Z);
 								}
 
-								await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+								await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 									GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(echoBody)));
 
 								// Interest-managed broadcast: spawn this player to newly-near players and forward the move
@@ -813,7 +813,7 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
 										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
-										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType), 0x00000065, target,
+										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
@@ -834,7 +834,7 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack with null identity + a 0x201C entry
 										// (prefix 0x68, state 0). Capture frames 320-321.
 										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
-										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType), 0x00000068, 0,
+										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
@@ -1177,7 +1177,7 @@ namespace Faolan.GameServer
 							: WorldSenderEndpoint;
 						var authReceiver = isNewCharacter
 							? CreateFlowService.Receiver(client)
-							: client.EndpointOf(Endpoints.GameInterfaceType);
+							: client.Endpoint(Endpoints.GameInterfaceType);
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006

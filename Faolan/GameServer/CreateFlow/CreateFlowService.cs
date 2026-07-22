@@ -805,7 +805,7 @@ namespace Faolan.GameServer.CreateFlow
 		// receiver baked in 0x021662C8; see Endpoints / ProtoEndpointGoldenTests).
 		internal static ProtoEndpoint Receiver(INetworkClient client)
 		{
-			return client.EndpointOf(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
+			return client.Endpoint(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
 		}
 
 		// Retail create-editor CHARACTER-CREATION SCRIPT burst from
@@ -895,7 +895,7 @@ namespace Faolan.GameServer.CreateFlow
 
 		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
 		{
-			return client.SendAsync(new Rpc(RetailCreateEditorPostReadyAckSender, client.EndpointOf(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance),
+			return client.SendAsync(new Rpc(RetailCreateEditorPostReadyAckSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(requestId)

@@ -231,7 +231,7 @@ namespace Faolan.GameServer.Combat
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
@@ -626,7 +626,7 @@ namespace Faolan.GameServer.Combat
 		// rides the DispatchPassBlob directly (WriteArray, not WriteArrayUInt32Length).
 		public static Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta)));
 		}
 
@@ -685,13 +685,13 @@ namespace Faolan.GameServer.Combat
 		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
 		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, feedbackBody));
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, feedbackBody));
 		}
 
 		// Frames a raw 0x2000 body on the world conversation.
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 	}

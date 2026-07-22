@@ -324,7 +324,7 @@ namespace Faolan.GameServer
 
 			if (command == PetCommand.Dismiss)
 			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 					GameInterfaceOpcodes.DispatchPassBlob,
 					body => body.WriteArrayUInt32Length(PetIirCodec.BuildRemove(owner, petHandle))));
 

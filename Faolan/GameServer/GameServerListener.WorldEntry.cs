@@ -270,7 +270,7 @@ namespace Faolan.GameServer
 			// cleanup the old "Remove ...Name != null checks below" TODO asked for, now that the early return is in
 			// place: the create-vs-named conditionals that used to guard this body were all unreachable dead code.
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
@@ -281,7 +281,7 @@ namespace Faolan.GameServer
 					.WriteUInt32(0x00000000))));
 			Logger.LogInformation("Sent deferred (uint)GameServer0X2000Opcodes.StatIIR prompt.");
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
 				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteByte(0)));
 
@@ -509,7 +509,7 @@ namespace Faolan.GameServer
 
 			foreach (var comboId in comboIds)
 			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 					GameInterfaceOpcodes.DispatchPassBlob, ComboBookIirCodec.Build(instance, comboId)));
 			}
 
@@ -895,7 +895,7 @@ namespace Faolan.GameServer
 
 			var receiver = client.Session.IsUnnamedCreatePhase
 				? Endpoints.EndpointFromBytes(0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10)
-				: client.EndpointOf(Endpoints.GameCharInterfaceType);
+				: client.Endpoint(Endpoints.GameCharInterfaceType);
 
 			using var bodyStream = new FaolanStream();
 			if (client.Session.IsUnnamedCreatePhase)
@@ -930,7 +930,7 @@ namespace Faolan.GameServer
 			// 0x00 after (Ranochar frames 125 -> 698).
 			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType),
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
 				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));
 		}
@@ -1046,7 +1046,7 @@ namespace Faolan.GameServer
 
 		private static async Task Send0X201C(INetworkClient client)
 		{
-			var receiver = client.EndpointOf(Endpoints.GameCharInterfaceType);
+			var receiver = client.Endpoint(Endpoints.GameCharInterfaceType);
 			var ticketBase = 0x00160000u + ((uint)Environment.TickCount & 0xFFFF);
 
 			// Retail (Strie login) sends five channel registrations before the spawn burst: four with the

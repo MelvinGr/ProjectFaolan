@@ -205,7 +205,7 @@ namespace Faolan.GameServer.Economy
 			var waresByPos = shop.Items.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null).ToDictionary(w => w.Pos);
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchShopData, body));
 
 			_logger.LogInformation("Shop: served \"{Vendor}\" (instance 0x{Instance:X}, {Count} wares) to {Character}.", shop.VendorName, instance, waresByPos.Count, client.Session.Character?.Name);
@@ -245,7 +245,7 @@ namespace Faolan.GameServer.Economy
 		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 

@@ -177,7 +177,7 @@ namespace Faolan.GameServer
 			// as "Claim All" deletes rows one by one (which would otherwise shift every later index).
 			client.Session.ClaimSlots = rows.Select(r => r.Id).ToList();
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))));
 
@@ -197,7 +197,7 @@ namespace Faolan.GameServer
 			if (!client.Session.Account.ClaimsAvailable)
 				return;
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))));
 		}
@@ -212,7 +212,7 @@ namespace Faolan.GameServer
 				: claim.Code;
 			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
 		}

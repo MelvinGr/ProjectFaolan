@@ -243,19 +243,11 @@ namespace Faolan.Core.Network
 
 	public static class ClientEndpointExtensions
 	{
-		// The client's server->client INTERFACE endpoint bytes for `endpointType`, addressed to the logged-in
-		// character (e.g. client.Endpoint(Endpoints.GameCharInterfaceType)). Pass `instance` to override with a
-		// non-character id — the create flow has no committed Character yet, so it passes Account.ClientInstance
-		// (the temporary create-editor instance).
-		public static byte[] Endpoint(this INetworkClient client, uint endpointType, uint? instance = null)
-		{
-			return Endpoints.EndpointBytes(endpointType, instance ?? client.Session.Character.Id);
-		}
-
-		// The same endpoint in structured (ProtoEndpoint) form, for the Rpc send boundary (Gitea #406, phase 5).
-		// Coexists with the byte[] Endpoint above through the migration; that one retires and this becomes Endpoint at
-		// phase 8, once no send site hand-frames a PacketStream anymore.
-		public static ProtoEndpoint EndpointOf(this INetworkClient client, uint endpointType, uint? instance = null)
+		// The client's server->client INTERFACE endpoint (ProtoEndpoint) for `endpointType`, addressed to the logged-in
+		// character (e.g. client.Endpoint(Endpoints.GameCharInterfaceType)) — the receiver every Rpc send frames against.
+		// Pass `instance` to override with a non-character id — the create flow has no committed Character yet, so it
+		// passes Account.ClientInstance (the temporary create-editor instance).
+		public static ProtoEndpoint Endpoint(this INetworkClient client, uint endpointType, uint? instance = null)
 		{
 			return Endpoints.Endpoint(endpointType, instance ?? client.Session.Character.Id);
 		}

@@ -120,7 +120,7 @@ namespace Faolan.GameServer
 
 			// Ack: echo the requested id list back (state 0x05), byte-for-byte as retail does. The client renders the
 			// trained feats off this; the next spawn regenerates them from the persisted CharacterFeat rows.
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(FeatIirCodec.Build(handle, FeatIirCodec.StateAck, featIds))));
 
@@ -166,7 +166,7 @@ namespace Faolan.GameServer
 			var token = character.Id; // a per-request token the client echoes back in the answer (player handle == id)
 			client.Session.PendingFeatUntrainToken = token;
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchFeatUntrainMessageBox,
 				FeatUntrainMessageBoxCodec.Build(1, 0, token))); // kind 1 = untrain-all; value 0 = free (no cost model yet)
 

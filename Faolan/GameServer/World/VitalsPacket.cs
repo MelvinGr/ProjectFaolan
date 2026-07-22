@@ -17,7 +17,7 @@ namespace Faolan.GameServer.World
 		// Builds a framed 0x96B8DC59 stat-update packet for an entity (defaults to the session's own client instance).
 		public static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
-			return PacketSerializer.Serialize(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return PacketSerializer.Serialize(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(StatUpdateCodec.BuildBody(entityHandle, stats))));
 		}
 	}
