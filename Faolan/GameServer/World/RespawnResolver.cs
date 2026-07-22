@@ -4,7 +4,7 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.World
 {
-	// Picks where a dead player respawns (docs/server-architecture-roadmap.md): the CLOSEST resurrection point the
+	// Picks where a dead player respawns (Gitea #404): the CLOSEST resurrection point the
 	// player KNOWS - either an always-known starter point or one they have discovered. Pure over the map's points +
 	// the player's discovered set so it is unit-testable; the caller supplies the data and applies the move.
 	public static class RespawnResolver

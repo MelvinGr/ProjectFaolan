@@ -1,6 +1,6 @@
 namespace Faolan.GameServer.World
 {
-	// Lets a behaviour run at its own cadence on top of a faster base game tick (docs/server-architecture-roadmap.md).
+	// Lets a behaviour run at its own cadence on top of a faster base game tick (Gitea #404).
 	// The loop ticks at a high base rate (so continuous systems - movement/respawn - stay smooth); slower rate-based
 	// systems (e.g. vitals regen at 1 Hz) accumulate the base dt and fire when their interval has elapsed.
 	//

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The live in-memory world model (docs/server-architecture-roadmap.md): per-map zones, an entity registry, and
+	// The live in-memory world model (Gitea #404): per-map zones, an entity registry, and
 	// the spatial range queries interest management uses to send moves/spawns to nearby players only.
 	public class WorldStateTests
 	{

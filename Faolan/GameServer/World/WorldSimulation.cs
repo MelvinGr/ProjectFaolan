@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// The live in-memory world (docs/server-architecture-roadmap.md): owns the world model + the connected players'
+	// The live in-memory world (Gitea #404): owns the world model + the connected players'
 	// authoritative transforms/vitals, and drives the 10 Hz simulation tick (NPC respawn/AI, vitals regen, player
 	// death/respawn, resurrection-point discovery). Extracted out of GameServerListener so the simulation's state +
 	// timing are no longer fused with the networking front-door; it reaches the wire through IWorldOutbound. Packet
@@ -643,7 +643,7 @@ namespace Faolan.GameServer.World
 			await RelocateToRespawnPoint(client, entity, character, target);
 		}
 
-		// The server game loop (docs/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
+		// The server game loop (Gitea #404): a 10 Hz base tick that advances continuous systems
 		// every tick with the REAL elapsed dt (NPC respawn/AI, player death timers, boundary-crossing tests) and runs
 		// rate-based systems (vitals regen, ambient pools) via a TickAccumulator at their own interval, dt-scaled.
 		// Wall-clock dt is measured so a late tick doesn't desync the rates. Cancelled on shutdown.

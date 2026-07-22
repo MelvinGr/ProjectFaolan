@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Interest management (docs/server-architecture-roadmap.md): as a player moves, compute the spawn/move/despawn
+	// Interest management (Gitea #404): as a player moves, compute the spawn/move/despawn
 	// events so each player's view stays correct - the logic that makes two players see each other.
 	public class InterestManagerTests
 	{

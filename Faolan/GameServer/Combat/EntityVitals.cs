@@ -49,7 +49,7 @@ namespace Faolan.GameServer.Combat
 		/// <summary>
 		///     Regenerates the three pools by the given amounts, each clamped to its max. Returns true if any pool
 		///     actually increased, so the caller can skip pushing a vitals update when nothing changed (e.g. at full).
-		///     Driven by the game loop (docs/server-architecture-roadmap.md).
+		///     Driven by the game loop (Gitea #404).
 		/// </summary>
 		public bool Regenerate(uint health, uint stamina, uint mana)
 		{

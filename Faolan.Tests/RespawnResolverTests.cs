@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Respawn-point selection (docs/server-architecture-roadmap.md): a dead player respawns at the CLOSEST point they
+	// Respawn-point selection (Gitea #404): a dead player respawns at the CLOSEST point they
 	// know - an always-known starter or one they've discovered.
 	public class RespawnResolverTests
 	{

@@ -9,7 +9,7 @@ using Faolan.Core.Database.Tables;
 namespace Faolan.GameServer.World
 {
 	// The live world: one Zone per map, created on demand. The authoritative in-memory model the GameServer simulation
-	// is built on (docs/server-architecture-roadmap.md). A single instance is shared across the listener; entities are
+	// is built on (Gitea #404). A single instance is shared across the listener; entities are
 	// placed when a player/NPC enters a map and removed on disconnect/despawn. Map changes move an entity between zones.
 	public sealed class WorldState
 	{
@@ -160,7 +160,7 @@ namespace Faolan.GameServer.World
 				: DefaultInstance;
 		}
 
-		// Advances the world model by `deltaSeconds` (docs/server-architecture-roadmap.md) and returns the wire-visible
+		// Advances the world model by `deltaSeconds` (Gitea #404) and returns the wire-visible
 		// effects for the caller to broadcast: dead NPCs whose respawn delay elapsed (revived here - vitals + transform
 		// reset), loot bags whose lifetime expired (despawned + removed), and aggroed NPCs swinging at a nearby player.
 		// Player transforms are driven by Move packets, not the tick; aggroed NPCs chase here (NpcMove effects, broadcast

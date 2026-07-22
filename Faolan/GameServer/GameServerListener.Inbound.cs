@@ -117,7 +117,7 @@ namespace Faolan.GameServer
 							var moveRotation = packet.Body.ReadVector3(); // not sure if this is correct
 							var datadat = packet.Body.ReadRemainingArray();
 
-							// The WorldEntity owns the live transform (docs/server-architecture-roadmap.md); the
+							// The WorldEntity owns the live transform (Gitea #404); the
 							// persisted Character is only the spawn seed (movement is never persisted live). Update the
 							// authoritative entity and broadcast from it; fall back to the Character only if the player
 							// isn't in the world model yet.
@@ -208,7 +208,7 @@ namespace Faolan.GameServer
 									.SendAsync(client);
 
 								// Interest-managed broadcast: spawn this player to newly-near players and forward the move
-								// to players who already see them (docs/server-architecture-roadmap.md). No-op solo.
+								// to players who already see them (Gitea #404). No-op solo.
 								await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, relayMovingType, livePosition, liveRotation, datadat);
 							}
 
