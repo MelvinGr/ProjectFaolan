@@ -257,6 +257,10 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
     paths belong in agent memory only (under `~/.claude`), not the repo. See the `no_local_paths_in_repo` memory.
   - `run.sh` is the one deliberate exception (personal dev launcher, kept local); its Windows twin `run.bat`
     takes `FAOLAN_CDN_STORE` / `AOC_EXE2` instead.
+- **Docs carry CONFIRMED info only — progress/TODOs live in Gitea, not `docs/`.** No "Remaining / Next steps /
+  Open items / IN PROGRESS / status-at-a-glance / handoff" sections and no `*-handoff.md` "how to continue"
+  docs; keep the verified facts (decoded grammar, shipped behaviour, code maps) and replace any open-work list
+  with a one-line pointer to the Gitea issue (`open work tracked in Gitea #NNN`). The backlog has one home.
 - **`docs/` is organized by kind** (see [`docs/protocol/README.md`](docs/protocol/README.md) for the index):
   - `docs/protocol/` — the **verified wire reference**: every fact carries a `[Vn: …]` verification tag a test
     resolves, and `docs/protocol/gen/` is GENERATED from the code (opcodes, IIR types, protobuf, coverage,
