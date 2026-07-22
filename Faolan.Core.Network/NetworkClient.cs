@@ -232,11 +232,13 @@ namespace Faolan.Core.Network
 
 	public static class ClientEndpointExtensions
 	{
-		// The client's server->client INTERFACE endpoint bytes for `endpointType`, addressed to the session's
-		// ClientInstance (e.g. client.Endpoint(Endpoints.GameCharInterfaceType)).
-		public static byte[] Endpoint(this INetworkClient client, uint endpointType)
+		// The client's server->client INTERFACE endpoint bytes for `endpointType`, addressed to the logged-in
+		// character (e.g. client.Endpoint(Endpoints.GameCharInterfaceType)). Pass `instance` to override with a
+		// non-character id — the create flow has no committed Character yet, so it passes Account.ClientInstance
+		// (the temporary create-editor instance).
+		public static byte[] Endpoint(this INetworkClient client, uint endpointType, uint? instance = null)
 		{
-			return Endpoints.EndpointBytes(endpointType, client.Session.Character.Id);
+			return Endpoints.EndpointBytes(endpointType, instance ?? client.Session.Character.Id);
 		}
 	}
 }

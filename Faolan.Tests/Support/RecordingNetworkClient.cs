@@ -23,6 +23,12 @@ namespace Faolan.Tests.Support
 			{
 				ClientInstance = clientInstance
 			};
+			// For a logged-in player handle == ClientInstance == Character.Id, so mirror that: world-entry code
+			// reads Character.Id. Tests that need more character fields replace or mutate this.
+			Session.Character = new Character
+			{
+				Id = clientInstance
+			};
 		}
 
 		public void Send(byte[] value)

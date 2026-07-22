@@ -59,6 +59,7 @@ namespace Faolan.Tests
 			var spawn = Map.NewPlayerSpawnSpawnPoint.Position;
 			client.Session.Character = new Character
 			{
+				Id = StriePlayerInstance,
 				MapId = BeachMapId,
 				PositionX = spawn.X,
 				PositionY = spawn.Y,
