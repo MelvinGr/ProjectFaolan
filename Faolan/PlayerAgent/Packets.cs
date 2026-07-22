@@ -31,13 +31,16 @@ namespace Faolan.PlayerAgent
 
 			var aBuffer = new PacketStream();
 			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterList);
-			aBuffer.WriteUInt32(client.Session.Character.Id);
+			// The account's current character instance (0 on a first login, the last-played id afterwards). This is the
+			// character-SELECTION screen - no character is selected yet, so Session.Character is null here; ClientInstance
+			// is the pre-selection-safe account field. (Do NOT "clean up" to Session.Character.Id - it NREs here.)
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 
 			foreach (var character in characters)
 			{
 				aBuffer.WriteUInt32(character.Id);
-				aBuffer.WriteUInt32(client.Session.Character.Id); // PlayerInstance
+				aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // PlayerInstance (account's current instance; pre-selection, no Session.Character)
 				aBuffer.WriteUInt32(character.Id);
 				aBuffer.WriteString(character.Name!);
 				aBuffer.WriteUInt32(character.RealmId);
@@ -65,7 +68,7 @@ namespace Faolan.PlayerAgent
 			aBuffer.WriteUInt32(0x00000001);
 			aBuffer.WriteUInt32(0x00000002);
 			aBuffer.WriteUInt32(0x00000014);
-			aBuffer.WriteUInt32(client.Session.Character.Id); // 0x3bc035ec
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // (pre-selection, no Session.Character)
 			aBuffer.WriteUInt32(0x000c0001);
 			aBuffer.WriteUInt32(Global.Premium
 				? 0x00018081
