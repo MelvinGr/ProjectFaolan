@@ -800,11 +800,11 @@ namespace Faolan.Tests
 				}
 
 				// Resolve + remove the listing (the buy).
-				var listing = await repo.GetTradepostListingBySaleId(0x20d82b62d02b198b);
+				var listing = await repo.GetTradepostListingBySaleId(0x20d82b62d02b198b, 1);
 				Assert.NotNull(listing);
 				Assert.Equal("Ponakin", listing!.SellerName);
-				await repo.DeleteTradepostListing(0x20d82b62d02b198b);
-				Assert.Null(await repo.GetTradepostListingBySaleId(0x20d82b62d02b198b));
+				await repo.DeleteTradepostListing(0x20d82b62d02b198b, 1);
+				Assert.Null(await repo.GetTradepostListingBySaleId(0x20d82b62d02b198b, 1));
 
 				// Create the system mail with the bought item escrowed.
 				var mail = new Mail

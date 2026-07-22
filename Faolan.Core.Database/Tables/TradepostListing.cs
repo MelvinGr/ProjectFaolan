@@ -11,7 +11,10 @@ namespace Faolan.Core.Database.Tables
 	// seller posted, so the identity lives here, not via the Items table (the row's ItemId search key and the
 	// instance's Template can differ). Keyed by SaleId (the unique listing id the BuyItem targets); SellerName is
 	// the stable seller identity (handles are session-volatile).
-	[Index(nameof(SaleId), IsUnique = true), Index(nameof(ItemId))]
+	// SaleId is unique WITHIN a realm, not globally (#324): the AH is realm-local, and two realms can independently
+	// mint the same SaleId, so the unique key is the compound (RealmId, SaleId). The leading RealmId also serves the
+	// realm-scoped FK, so a separate RealmId index is redundant.
+	[Index(nameof(RealmId), nameof(SaleId), IsUnique = true), Index(nameof(ItemId))]
 	public class TradepostListing : BaseEntity
 	{
 		// The catalog item (template id) the listing is filed/searched under (the row's itemId field). FK to Items:

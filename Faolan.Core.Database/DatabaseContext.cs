@@ -168,6 +168,22 @@ namespace Faolan.Core.Database
 			//
 		}
 
+		protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+		{
+			base.ConfigureConventions(configurationBuilder);
+
+			// PostgreSQL has no unsigned integer types and Npgsql refuses to map uint/ulong (it would pick oid/xid8),
+			// so store them as signed wider types: uint -> bigint, ulong -> numeric(20) (holds the full u64 range).
+			// The model uses uint for every id (BaseEntity.Id) and ulong for money/renown/wire-ids. This runs ONLY on
+			// Npgsql - EF caches the model per provider - so the SQLite schema (the committed faolan.db seed) is left
+			// byte-for-byte unchanged, where uint/ulong already store as INTEGER natively.
+			if (Database.IsNpgsql())
+			{
+				configurationBuilder.Properties<uint>().HaveConversion<long>();
+				configurationBuilder.Properties<ulong>().HaveConversion<decimal>().HavePrecision(20, 0);
+			}
+		}
+
 		// No OnConfiguring: the context is created short-lived from a pooled DbContextFactory (one per persistence
 		// unit of work), so lazy-loading proxies are deliberately NOT used - they tether entities to a live context
 		// and break once it is disposed. Navigations are loaded explicitly with Include where needed.
@@ -176,7 +192,7 @@ namespace Faolan.Core.Database
 		{
 			// Enum columns marked [ConstrainToEnumValues] get a generated CHECK constraint (the allowed list is built from
 			// the enum, so it stays in sync). CharacterStatId is intentionally left open (Unknown fillers for undecoded ids).
-			ConstrainToEnumValuesAttribute.ApplyEnumCheckConstraints(modelBuilder);
+			ConstrainToEnumValuesAttribute.ApplyEnumCheckConstraints(modelBuilder, quoteColumns: Database.IsNpgsql());
 
 			// Natural-key catalogs whose Id is an external id set by the importer (RDB/wire id), never DB-generated - so
 			// EF must not treat the integer PK as auto-increment (like Character/RespawnPoint/MorphTarget below).

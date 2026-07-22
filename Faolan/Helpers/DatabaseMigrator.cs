@@ -29,7 +29,22 @@ namespace Faolan.Helpers
 			try
 			{
 				await using var ctx = _contextFactory.CreateDbContext();
-				await ctx.Database.MigrateAsync(cancellationToken);
+
+				// SQLite is the migration-tracked seed store (the committed faolan.db). The Postgres prototype has no
+				// migration set yet, so it materialises the schema from the model with EnsureCreated (seed data comes
+				// from re-running Faolan.Importer against it) - a parallel Postgres migrations assembly is the follow-up.
+				if (ctx.Database.IsNpgsql())
+					await ctx.Database.EnsureCreatedAsync(cancellationToken);
+				else
+					await ctx.Database.MigrateAsync(cancellationToken);
+
+				// A world can't serve without a realm (guild/AH/mail/character FK it, #324) or an account to log into.
+				// Both are config state, not schema, so ensure the defaults here rather than shipping them in the
+				// migration - the same seed the importer applies to a fresh DB (DefaultSeeder). Idempotent.
+				if (await DefaultSeeder.EnsureDefaultRealmAsync(ctx, cancellationToken))
+					_logger.LogInformation("No realm present - inserted the default realm.");
+				if (await DefaultSeeder.EnsureDefaultAccountAsync(ctx, cancellationToken))
+					_logger.LogInformation("No account present - inserted the default account.");
 			}
 			catch (Exception ex)
 			{

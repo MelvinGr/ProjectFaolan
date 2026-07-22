@@ -20,31 +20,10 @@ namespace Faolan.GameServer
 		// with shop vendors. Talking to it opens the Tradepost (GameServerListener.Inbound TalkToNpc auctioneer branch).
 		private const string AuctioneerNpcName = "Trader";
 
-		// A unique wire MailId. The id is session/instance-volatile (like entity handles), so a random 64-bit value
-		// is fine; retry on the rare collision with an existing persisted mail.
+		// The next wire MailId: a deterministic sequence (max + 1), not a random id + collision retry.
 		private async Task<ulong> AllocateMailId()
 		{
-			for (var attempt = 0; attempt < 8; attempt++)
-			{
-				var id = (ulong)Random.Shared.NextInt64(1, long.MaxValue);
-				if (await Database.GetMailByWireId(id) == null)
-					return id;
-			}
-
-			return (ulong)Random.Shared.NextInt64(1, long.MaxValue);
-		}
-
-		// A unique sale id for a new listing (session-volatile, like the mail id); retry on the rare collision.
-		private async Task<ulong> AllocateSaleId()
-		{
-			for (var attempt = 0; attempt < 8; attempt++)
-			{
-				var id = (ulong)Random.Shared.NextInt64(1, long.MaxValue);
-				if (await Database.GetTradepostListingBySaleId(id) == null)
-					return id;
-			}
-
-			return (ulong)Random.Shared.NextInt64(1, long.MaxValue);
+			return await Database.GetNextMailId();
 		}
 
 		// Builds the system mail for a completed AH purchase: recipient = the buyer, sender empty (system), the bought
@@ -114,7 +93,7 @@ namespace Faolan.GameServer
 
 			var saleId = packet.Body.ReadUInt64(); // searchResultId follows but isn't needed to resolve the sale
 
-			var listing = await Database.GetTradepostListingBySaleId(saleId);
+			var listing = await Database.GetTradepostListingBySaleId(saleId, character.RealmId);
 			if (listing == null)
 			{
 				Logger.LogWarning("Tradepost BUY: {Char} bought unknown listing saleId=0x{Sale:X16} (already sold?).", character.Name, saleId);
@@ -134,7 +113,7 @@ namespace Faolan.GameServer
 			var mail = await BuildPurchaseMail(character.Name!, listing);
 			mail.RealmId = character.RealmId; // #324: no cross-realm mail (recipient = buyer)
 			await Database.CreateMail(mail);
-			await Database.DeleteTradepostListing(saleId);
+			await Database.DeleteTradepostListing(saleId, character.RealmId);
 
 			// The listed item stayed in the SELLER's bank (with a "listed" overlay) until now - the sale removes it
 			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
@@ -188,7 +167,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await Database.DeleteTradepostListing(listing.SaleId);
+			await Database.DeleteTradepostListing(listing.SaleId, character.RealmId);
 			// Clear the bank-slot overlay (capture F398): flag back to normal, price to 0.
 			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
 			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, 0);
@@ -212,7 +191,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await Database.SetTradepostListingPrice(listing.SaleId, newPrice);
+			await Database.SetTradepostListingPrice(listing.SaleId, character.RealmId, newPrice);
 			// Update the bank-slot overlay's price stat (capture F364).
 			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, (uint)newPrice);
 			Logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.", character.Name, listing.SaleId, bankSlot, listing.Price,
@@ -403,7 +382,7 @@ namespace Faolan.GameServer
 
 			var listing = new TradepostListing
 			{
-				SaleId = await AllocateSaleId(),
+				SaleId = await Database.GetNextTradepostSaleId(character.RealmId),
 				Handle = 0,
 				RealmId = character.RealmId, // #324: the AH is realm-local (the seller's realm)
 				SellerName = character.Name!,
@@ -519,7 +498,10 @@ namespace Faolan.GameServer
 				mail.SenderBankSlot = (uint)bankSlot;
 				mail.Attachments.Add(new MailAttachment
 				{
-					ItemInstanceId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
+					// Deterministic per-mail instance id (the escrow mail has one attachment); mirrors the purchase
+					// mail's ItemInstanceId = listing.SaleId. Only needs to be unique within the mail's attachments -
+					// TakeMailItem resolves the item by Template, not by this id.
+					ItemInstanceId = mail.MailId,
 					Quantity = row.Count == 0
 						? 1u
 						: row.Count,

@@ -101,7 +101,10 @@ namespace Faolan.Importer.Captures
 			return harvested;
 		}
 
-		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<TradepostListing> listings, ILogger? logger = null)
+		// realmId scopes the imported listings to a realm (#324): captures don't carry our local realm ids, so the AH
+		// listings join the deployment's realm (the same one imported characters join). Required because
+		// TradepostListing.RealmId FKs Realms and Postgres ENFORCES that (SQLite tolerated the RealmId=0 default).
+		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<TradepostListing> listings, uint realmId, ILogger? logger = null)
 		{
 			var added = 0;
 			var updated = 0;
@@ -117,7 +120,8 @@ namespace Faolan.Importer.Captures
 			foreach (var e in merged)
 			{
 				e.TemplateItem = null!; // key already harvested into Items above; persist only the Template FK column
-				var existing = await db.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == e.SaleId);
+				e.RealmId = realmId;
+				var existing = await db.TradepostListings.FirstOrDefaultAsync(l => l.RealmId == realmId && l.SaleId == e.SaleId);
 				if (existing == null)
 				{
 					db.TradepostListings.Add(e);
@@ -125,6 +129,7 @@ namespace Faolan.Importer.Captures
 				}
 				else
 				{
+					existing.RealmId = realmId;
 					existing.Handle = e.Handle;
 					existing.SellerName = e.SellerName;
 					existing.Price = e.Price;

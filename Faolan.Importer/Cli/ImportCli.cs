@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Extensions;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 
@@ -111,9 +112,25 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine($"Read {captures.Count} captures ({rawPackets.Count} raw packets, {createCaptures.Count} create-flow).");
 
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}", x => x.MigrationsAssembly("Faolan")).Options;
-			await using var db = new DatabaseContext(options);
-			await db.Database.MigrateAsync(); // outside the runner's transaction (migrations can't run inside one)
+			// Provider: SQLite by default (--db path); Postgres with `--provider postgres --connection <npgsql>`,
+			// which seeds a fresh Postgres DB (EnsureCreated builds the schema from the model - no PG migrations yet).
+			var provider = FaolanDbProviderExtensions.ParseProvider(GetOption(args, "--provider"));
+			var connection = provider == FaolanDbProvider.Postgres
+				? GetOption(args, "--connection") ?? throw new ArgumentException("--provider postgres requires --connection <npgsql connection string>")
+				: $"Data Source={dbPath}";
+			var optionsBuilder = new DbContextOptionsBuilder<DatabaseContext>();
+			optionsBuilder.UseFaolanDatabase(provider, connection);
+			await using var db = new DatabaseContext(optionsBuilder.Options);
+			if (provider == FaolanDbProvider.Postgres)
+				await db.Database.EnsureCreatedAsync(); // no PG migration set yet; materialise schema from the model
+			else
+				await db.Database.MigrateAsync(); // outside the runner's transaction (migrations can't run inside one)
+
+			// Ensure the default realm + account exist before any module runs (shared with the server; see DefaultSeeder).
+			if (await DefaultSeeder.EnsureDefaultRealmAsync(db))
+				Console.WriteLine("Importer: no realm present - inserted the default realm.");
+			if (await DefaultSeeder.EnsureDefaultAccountAsync(db))
+				Console.WriteLine("Importer: no account present - inserted the default account.");
 
 			var ctx = new ImportContext
 			{

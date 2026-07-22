@@ -23,7 +23,9 @@ namespace Faolan.Importer.Cli
 				// Table names come from the trusted EF model (not user input) and a table identifier can't be a SQL
 				// parameter anyway, so the interpolation is safe - suppress the raw-SQL injection advisory.
 #pragma warning disable EF1002
-				var count = await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*) AS Value FROM \"{table}\"").SingleAsync();
+				// Alias quoted ("Value") so Postgres keeps the case EF's scalar wrapper expects; an unquoted alias
+				// folds to l-case there and the wrapper's "Value" lookup fails. SQLite accepts the quoted alias too.
+				var count = await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*) AS \"Value\" FROM \"{table}\"").SingleAsync();
 #pragma warning restore EF1002
 				counts[table!] = count;
 			}

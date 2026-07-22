@@ -35,7 +35,9 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var listings = ctx.Captures.SelectMany(c => CaptureListingImporter.Extract(c.Packets));
-			var (seen, added, updated) = await CaptureListingImporter.ImportAsync(ctx.Db, listings);
+			// AH listings are realm-scoped (#324); join the deployment's realm (ensured before any module runs).
+			var realmId = await ctx.Db.Realms.OrderBy(r => r.Id).Select(r => r.Id).FirstAsync();
+			var (seen, added, updated) = await CaptureListingImporter.ImportAsync(ctx.Db, listings, realmId);
 			return new ImportResult($"{seen} listings, {added} new, {updated} updated.");
 		}
 	}
@@ -432,13 +434,14 @@ namespace Faolan.Importer.Modules
 			if (ctx.ModeFor(Name) == WriteMode.Overwrite)
 			{
 				removed = await ctx.Db.NpcSpawns.CountAsync();
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnMorphs");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnEquipment");
+				// Table names double-quoted so they survive Postgres identifier case-folding (SQLite accepts the quotes too).
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"NpcSpawnMorphs\"");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"NpcSpawnEquipment\"");
 				// Patrols FK the spawn (#316) - delete them (children first) before the spawns they reference.
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolNodeWaypoints");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolNodes");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolPaths");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawns");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolNodeWaypoints\"");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolNodes\"");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolPaths\"");
+				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"NpcSpawns\"");
 			}
 
 			await ImportOps.ImportNpcSpawns(ctx.Db, spawns);

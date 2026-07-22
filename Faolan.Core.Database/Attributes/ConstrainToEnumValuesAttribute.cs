@@ -18,7 +18,12 @@ namespace Faolan.Core.Database.Attributes
 		// Emits a generated CHECK constraint for every property marked [ConstrainToEnumValues]: "<Column> IN (<the
 		// enum's defined integer values>)". Building the list from the enum keeps the DB constraint in sync with the
 		// enum automatically, so a single attribute on the table property is all a new constrained column needs.
-		public static void ApplyEnumCheckConstraints(ModelBuilder modelBuilder)
+		// `quoteColumns` delimits the column identifier in the CHECK SQL. SQLite folds an unquoted identifier
+		// case-insensitively so the bare `State IN (...)` form has always worked there; PostgreSQL folds an unquoted
+		// identifier to lower-case (`state`), which does not exist, so on Npgsql the name must be double-quoted
+		// (`"State"`). Kept provider-conditional so the SQLite CHECK text - baked into the committed faolan.db and its
+		// squashed migration - stays byte-for-byte unchanged.
+		public static void ApplyEnumCheckConstraints(ModelBuilder modelBuilder, bool quoteColumns = false)
 		{
 			foreach (var entityType in modelBuilder.Model.GetEntityTypes())
 			{
@@ -34,7 +39,8 @@ namespace Faolan.Core.Database.Attributes
 
 					var values = Enum.GetValues(enumType).Cast<object>().Select(Convert.ToInt64).Distinct().OrderBy(v => v).JoinAsString(", ");
 					var column = property.GetColumnName(store.Value);
-					entityType.AddCheckConstraint($"CK_{entityType.ClrType.Name}_{property.Name}", $"{column} IN ({values})");
+					var columnRef = quoteColumns ? $"\"{column}\"" : column;
+					entityType.AddCheckConstraint($"CK_{entityType.ClrType.Name}_{property.Name}", $"{columnRef} IN ({values})");
 				}
 			}
 		}

@@ -10,16 +10,18 @@ namespace Faolan.Core.Database.Repositories
 		Task CreateMail(Mail mail);
 		Task CreateTradepostListing(TradepostListing listing);
 		Task DeleteMail(ulong mailId);
-		Task DeleteTradepostListing(ulong saleId);
+		Task DeleteTradepostListing(ulong saleId, uint realmId);
 		Task<Mail?> GetMailByWireId(ulong mailId);
+		Task<ulong> GetNextMailId();
 		Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId);
-		Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId);
+		Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId);
+		Task<ulong> GetNextTradepostSaleId(uint realmId);
 		Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
 		Task<TradepostListing[]> GetTradepostListings(uint itemId, uint realmId);
 		Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId);
 		Task SetMailMoney(ulong mailId, ulong money);
 		Task SetMailRead(ulong mailId, bool read);
-		Task SetTradepostListingPrice(ulong saleId, ulong price);
+		Task SetTradepostListingPrice(ulong saleId, uint realmId, ulong price);
 	}
 
 	public partial class DatabaseRepository
@@ -44,16 +46,25 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.Mails.Where(m => m.MailId == mailId).ExecuteDeleteAsync();
 		}
 
-		public async Task DeleteTradepostListing(ulong saleId)
+		public async Task DeleteTradepostListing(ulong saleId, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx.TradepostListings.Where(l => l.SaleId == saleId).ExecuteDeleteAsync();
+			await ctx.TradepostListings.Where(l => l.RealmId == realmId && l.SaleId == saleId).ExecuteDeleteAsync();
 		}
 
 		public async Task<Mail?> GetMailByWireId(ulong mailId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).FirstOrDefaultAsync(m => m.MailId == mailId);
+		}
+
+		// The next wire MailId: max + 1 (MailId is the global PK, #368). A deterministic sequence, not a random id +
+		// collision retry. Computed in MEMORY because SQLite cannot MAX a ulong (its INTEGER is signed 64-bit).
+		public async Task<ulong> GetNextMailId()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var mailIds = await ctx.Mails.Select(m => m.MailId).ToListAsync();
+			return mailIds.Count == 0 ? 1UL : mailIds.Max() + 1UL;
 		}
 
 		public async Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId)
@@ -71,10 +82,20 @@ namespace Faolan.Core.Database.Repositories
 			return rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).ToArray();
 		}
 
-		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId)
+		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == saleId);
+			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.RealmId == realmId && l.SaleId == saleId);
+		}
+
+		// The next sale id for a new listing in this realm: max in the realm + 1 (SaleId is realm-unique, #324). A
+		// deterministic sequence, not a random id + collision retry. Computed in MEMORY because SQLite cannot MAX a
+		// ulong (its INTEGER is signed 64-bit); a realm's listing set is small, so the load is cheap.
+		public async Task<ulong> GetNextTradepostSaleId(uint realmId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var saleIds = await ctx.TradepostListings.Where(l => l.RealmId == realmId).Select(l => l.SaleId).ToListAsync();
+			return saleIds.Count == 0 ? 1UL : saleIds.Max() + 1UL;
 		}
 
 		public async Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId)
@@ -112,10 +133,10 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.Mails.Where(m => m.MailId == mailId).ExecuteUpdateAsync(s => s.SetProperty(m => m.IsRead, read));
 		}
 
-		public async Task SetTradepostListingPrice(ulong saleId, ulong price)
+		public async Task SetTradepostListingPrice(ulong saleId, uint realmId, ulong price)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx.TradepostListings.Where(l => l.SaleId == saleId).ExecuteUpdateAsync(s => s.SetProperty(l => l.Price, price));
+			await ctx.TradepostListings.Where(l => l.RealmId == realmId && l.SaleId == saleId).ExecuteUpdateAsync(s => s.SetProperty(l => l.Price, price));
 		}
 	}
 }
