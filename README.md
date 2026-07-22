@@ -245,6 +245,33 @@ dotnet run --project Faolan -- --role realm=3        # another realm, on that Re
 login tier and realm 2 together. At most one `realm` role per process (co-hosting realms would share chat/session
 state across them); run one process per realm for isolation.
 
+## Configuration
+
+Every server-side executable — the server, the importer, `Faolan.Web`, the `Faolan.Web.Content` CDN mirror,
+and the `Faolan.Mcp` chat-bridge — shares **one** config model: **environment variables > command line >
+`faolan.json`**, with `faolan.json` **optional** (a container can be configured entirely by env vars, with no
+file baked into the image). It lives at the repo root.
+
+The shared, required keys stay flat; the per-concern tuning is grouped into sections:
+
+| Key | Meaning |
+| --- | --- |
+| `DatabaseProvider` / `DatabaseConnectionString` | `Sqlite` (default; `Data Source=faolan.db`) or `Postgres` + its connection string |
+| `ServerIpAddress` | the address the login tier advertises to clients (must be reachable from the client) |
+| `UniverseAgentPort` / `PlayerAgentPort` | login-tier listen ports (7010 is the fixed client entry point) |
+| `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
+| `Mcp` `{ Enabled, Port, Url }` | the in-process MCP endpoint, and the chat-bridge's target URL |
+| `CdnMirror` `{ Store, Ip, Port }` | the `Faolan.Web.Content` mirror's store dir + bind address |
+| `ChatBridge` `{ PollMs, BacklogGraceMs }` | the Claude chat-bridge poll-loop tuning |
+| `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
+
+Any key can be overridden from the environment (this is how the Docker images are configured) — a flat key by
+its own name (`DatabaseConnectionString=…`), a grouped key with the `__` separator (`Mcp__Port=7098`,
+`CdnMirror__Store=/data`). A few tools also expose a short flag that maps onto a key: the importer's
+`--db "<connection string>"` (→ `DatabaseConnectionString`) and the mirror's `--store` / `--ip` / `--port`
+(→ `CdnMirror:*`). `Faolan.ClientLauncher` is the one exception — its flags are client-launch parameters, not
+server config, so it has its own arguments (see below).
+
 ## Test
 
 The test suite uses byte-exact "golden" round-trips against captured packets as its acceptance gates:
