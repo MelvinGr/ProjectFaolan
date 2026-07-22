@@ -19,19 +19,20 @@ namespace Faolan.Core.Network.Packets.Conan
 
 		public ConanPacket(byte[] bytes) : base(bytes)
 		{
-			Length = Stream.ReadUInt32();
-			Crc32 = Stream.ReadUInt32();
+			using var stream = new FaolanStream(bytes);
+			Length = stream.ReadUInt32();
+			Crc32 = stream.ReadUInt32();
 
-			IsValid = Crc32 == Crypt.Crc32.Calculate(Stream);
+			IsValid = Crc32 == Crypt.Crc32.Calculate(stream);
 			// if (!IsValid) Console.WriteLine($"Invalid {GetType().Name}");
 
-			using var header = new FaolanStream(Stream.ReadArrayUInt32Length());
+			using var header = new FaolanStream(stream.ReadArrayUInt32Length());
 			Sender = ProtoEndpoint.Read(header);
 			Receiver = ProtoEndpoint.Read(header);
 			Opcode = header.ReadUInt16();
 			HeaderData = header.ReadRemainingArray();
 
-			Body = new FaolanStream(Stream.ReadRemainingArray());
+			Body = new FaolanStream(stream.ReadRemainingArray());
 		}
 
 		public override string ToString()

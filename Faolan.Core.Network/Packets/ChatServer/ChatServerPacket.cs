@@ -8,17 +8,18 @@ namespace Faolan.Core.Network.Packets.ChatServer
 
 		public ChatServerPacket(byte[] bytes) : base(bytes)
 		{
-			Opcode = Stream.ReadUInt16<ChatServerOpcodes>();
-			Length = Stream.ReadUInt16(); // body length (the bytes AFTER this 4-byte opcode+length header)
+			using var stream = new FaolanStream(bytes);
+			Opcode = stream.ReadUInt16<ChatServerOpcodes>();
+			Length = stream.ReadUInt16(); // body length (the bytes AFTER this 4-byte opcode+length header)
 
-			var available = Stream.Length - Stream.Position;
+			var available = stream.Length - stream.Position;
 			if (Length == 0 || Length > available)
 			{
 				IsValid = false;
 				return;
 			}
 
-			Body = new FaolanStream(Stream.ReadArray(Length));
+			Body = new FaolanStream(stream.ReadArray(Length));
 			IsValid = true;
 		}
 	}
