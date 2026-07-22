@@ -13,4 +13,4 @@ Everything in this directory is produced from the repo's own sources of truth:
 A regeneration test in `Faolan.Tests` fails if these drift from their sources, so a change to
 `Opcodes.cs` must be accompanied by a regenerated page in the same commit.
 
-Edit the generator, never the output. See `../PLAN.md`.
+Edit the generator, never the output. See `../methodology.md`.

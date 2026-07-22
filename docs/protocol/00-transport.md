@@ -3,7 +3,7 @@
 How bytes become packets. Everything above this layer (RPC, IIR, message bodies) assumes a framed, decompressed
 packet; this page is how you get one.
 
-Every fact is tagged. See [`PLAN.md`](PLAN.md#1-the-verification-ladder) for what the tags mean.
+Every fact is tagged. See [`methodology.md`](methodology.md#1-the-verification-ladder) for what the tags mean.
 
 ---
 

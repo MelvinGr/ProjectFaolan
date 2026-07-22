@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// P3 of docs/protocol/PLAN.md - the citation linter. It is the whole difference between a doc that CLAIMS to be
+	// P3 of docs/protocol/methodology.md - the citation linter. It is the whole difference between a doc that CLAIMS to be
 	// verified and one that IS: every verification tag in the protocol reference must name an artifact that exists.
 	//
 	//   [V3: BurstGoldenTests.CreateWorldEntryBurst_IsByteStable]   -> a real xUnit test method
@@ -17,7 +17,7 @@ namespace Faolan.Tests
 	//   [V1: tools/ghidra/DumpRpcTables.java]                    -> a real repo path
 	//   [V0: ...]                                                   -> must be listed in docs/protocol/gaps.md
 	//
-	// A stale citation is worse than none - it looks authoritative. This test already caught three: PLAN.md's own
+	// A stale citation is worse than none - it looks authoritative. This test already caught three: methodology.md's own
 	// examples cited a test method deleted with SendWorldPrepBurst, a capture filename with a literal "...", and a
 	// Ghidra script (DumpRpcMethods.java) that never existed.
 	//
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			Assert.True(all.Count >= 3, $"only {all.Count} citations found - the linter is probably not scanning docs/");
 		}
 
-		// V0 = unproven: PLAN.md §1 requires every V0 to be tracked in gaps.md, so a gap can never go silent.
+		// V0 = unproven: methodology.md §1 requires every V0 to be tracked in gaps.md, so a gap can never go silent.
 		[Fact]
 		public void V0Citations_AreListedInGapsMd()
 		{

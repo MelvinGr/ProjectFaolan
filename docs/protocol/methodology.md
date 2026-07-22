@@ -1,4 +1,4 @@
-# Plan — the verified protocol reference (`docs/protocol/`)
+# The verified protocol reference (`docs/protocol/`) — method & conventions
 
 **Goal:** one authoritative reference for the Age of Conan wire protocol — framing, opcodes, message
 layouts, encodings — in which **every stated fact carries a verification tag and a citation**, and in which
@@ -8,7 +8,7 @@ the machine-derivable parts are *generated* rather than hand-written.
 actively contradicted the code: `create-editor-bursts.md` described `WorldPrepBurst` as "decoded + built +
 wired" months after it was deleted; `guilds.md` stated the guild leader's wire rank is 6 when the capture
 proves it is 4. A tidy tree of wrong documents is worse than a messy one — it *looks* authoritative. So the
-plan's spine is: **generate what's derivable, cite what isn't, and let a test enforce both.**
+method's spine is: **generate what's derivable, cite what isn't, and let a test enforce both.**
 
 ---
 
@@ -143,44 +143,3 @@ docs/
 Grouping the leftovers happens **last**, once migration shrinks them and the natural grouping is obvious
 rather than guessed.
 
----
-
-## 8. Phases
-
-- [x] **P0 — Runway.** Archive resolved handoffs; delete dead docs; create `protocol/` + `gen/`.
-- [x] **P1 — Generators.** `gen/opcodes.md` (819 entries), `gen/iir-types.md` (75, 74 BKDR-31-self-verified),
-      `gen/protobuf.md` (60 msgs / 348 fields, zigzag + fixed32 surfaced), all from the COMPILED types by
-      reflection, + the `ProtocolDocsTests` regeneration guard (proven to fail on a one-char drift).
-- [x] **P2 — Coverage matrix.** `gen/coverage.md`: 819 RPC opcodes (V1), 75 IIR types (48 V3 / 16 V2 / 11 V1).
-      Attribution is **exact**, not heuristic: every codec declares its `Opcode`/`HandledTypes` (#317), and
-      `CodecConventionTests` forbids a bare opcode hex literal in `Codecs/`, so nothing can emit an IIR
-      unattributed. The 11 V1s are genuinely undecoded. Migration order (P5) is driven by this — V3 areas first.
-- [x] **P3 — Citation linter.** `ProtocolCitationTests` resolves every tag in `docs/` (minus `archive/`) against the
-      repo: `[V3:]` → a real `[Fact]`/`[Theory]` method, `[V2:]` → a real file under `Captures/`, `[V1:]` → a real
-      path, `[V0:]` → an entry in `gaps.md`. Proven to fail on a bogus citation at each level. Prose can now claim
-      verification. (It caught its first three on day one — PLAN.md's own examples were all stale.)
-- [x] **P4 — Layer pages** (§4), each fact tagged. `00-transport` … `05-identity` + `README.md` (index) +
-      `gaps.md` (the V0 register, pulled forward from P6 so unproven facts have a home). Every tag resolves through
-      the P3 linter — ~30 citations across the six pages, all V3/V2/V1 backed or listed in `gaps.md`.
-- [~] **P5 — Per-message layouts** (§5), V3 first. **Skeleton landed:** generated `gen/messages.md` — one row per IIR
-      type with opcode, level, codec, and (V3) the golden test emitted as a live `[V3: …]` tag the citation
-      linter resolves (48/48 auto-cited citations pass). Attribution shares `CodecIndex` with `coverage.md` (proven
-      byte-identical after the extraction). The field-level layout lives in the linked codec source — the authoritative
-      spec — so the remaining hand-fill is lifting the highest-traffic layouts into tagged prose + absorbing the
-      scattered decode docs, incrementally.
-- [x] **P6 — `gaps.md`.** The register exists (landed with P4) and every open V0 is now a tracked Gitea issue:
-      #318 (compression-marker bytes 4..7), #319 (RpcHeader trailing headerData), #320 (PlayerAgent 32-bit hash
-      dispatch); #321 (ChatText trailer) is now decoded — the two halves are the NPCChatTextType_e selector + a
-      flags word (see ChatTextCodec). The FeedbackIIR/RegenIIR verbatim residue rides #223. Each gap links
-      its issue, so an unknown lives on the backlog, not just in a doc.
-- [x] **P7 — Regroup the residue.** The ~50 flat docs are now sorted into the converged tree: `rdb/` (7 client-asset
-      docs), `tooling/` (5 launcher/capture/importer docs), `subsystems/` (22 our-implementation docs), and `re/` (16
-      opcode-methodology + grammar/reader RE artifacts, joining the existing decompile dumps). All referrers repointed
-      (CLAUDE.md, README, ~30 code-comment pointers, cross-doc links); all markdown links resolve. Two findings: the
-      three opcode-catalog docs this plan marked "delete" are referenced from CODE as the RE-derivation source, so they
-      went to `re/`, not the trash; and `entity-class-ids.md` + `entity-handles.md` stay at the root as `05-identity.md`
-      absorption candidates. Handoffs stayed with their category (both issues still open, so not archived).
-
-**Expectation to set now:** the finished reference contains *every piece of information we actually have, each
-tagged with how we know it, plus a complete and explicit list of what we do not.* Some of the 819 opcodes will
-never rise above V1 without new captures — the doc must say so **per opcode**, rather than leave a silent hole.

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// Generates docs/protocol/gen/messages.md - the per-message index (PLAN.md §5). For every IIR carrier type it
+	// Generates docs/protocol/gen/messages.md - the per-message index (methodology.md §5). For every IIR carrier type it
 	// lists the opcode, verification level, the codec that builds it, and - for the V3 ones - the golden test method
 	// that pins it byte-exact, emitted as a live [V3: Class.Method] tag the citation linter resolves. So this page is
 	// not just a list: each V3 row carries a machine-verified proof-of-layout, and the field-level layout itself lives

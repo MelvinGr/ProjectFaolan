@@ -1,8 +1,8 @@
-# Feats subsystem — handoff (Gitea #251)
+# Feats subsystem (Gitea #251)
 
-Status as of 2026-07-14. Feats are **decoded at the wire level but not implemented as a subsystem.**
-This is the pickup document: what a feat is (vs. what the code currently calls a "skill"), the wire
-protocol we recovered, and what the capture dumps do and don't contain.
+Feats are **decoded at the wire level but not implemented as a subsystem.** This documents what a feat is
+(vs. what the code currently calls a "skill"), the wire protocol recovered, and what the capture dumps do
+and don't contain.
 
 ## TL;DR
 

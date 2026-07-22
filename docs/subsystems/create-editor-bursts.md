@@ -95,8 +95,11 @@ create-specific to decode, only builder wiring to do:
   morph wiring itself is already covered by [[character_appearance_morphs_unused]].
 - **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/subsystems/create-cutscene-camera-paths.md`.
 
-## 4. What's left (the #189 backlog)
-1. ~~Construct `SimpleCharFullUpdate` (editor scene characters)~~ **DONE** — `CreateEditorCharBuilder.Reconstruct`
+## 4. Burst record construction
+
+Every record in `RetailCreateEditorInitialBurst` is constructed from typed data (byte-exact vs `InitialBurst.bin`).
+
+- **`SimpleCharFullUpdate` (editor scene characters)** — `CreateEditorCharBuilder.Reconstruct`
    rebuilds every scene-pedestal `SimpleChar` (the "Stygian Female" avatar + the four example models: Saddur /
    Male+Female Template / Stygian Slaver) through `SpawnPacketBuilder`: the **transform** from the typed
    `ProtoVec3`/`ProtoQuat` pose, the **identity/appearance** by decoding + re-encoding the `ProtoCoreCharacterIIR`
@@ -107,7 +110,7 @@ create-specific to decode, only builder wiring to do:
    full burst still equals `InitialBurst.bin` (`BurstGoldenTests`). The live `Character…` preview stays on
    `IirId` (it carries the live client instance as its handle; also already covered by `PlayerSpawnScaffoldCodec`
    / `SpawnEditorPreview.bin`) — the seam for the eventual live chosen-looks preview.
-2. ~~Construct the editor-scene `SimpleDynel` props~~ **DONE** — the 18 props are `WorldObjects` rows on map
+- **Editor-scene `SimpleDynel` props** — the 18 props are `WorldObjects` rows on map
    4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the
    `IDatabaseRepository` and SOURCES each scene dynel from its row: `LoadEditorSceneDynels` loads the map-4000
    `WorldObjects` keyed by `CapturedHandle`, then the burst loops the fixed `EditorSceneDynelHandles` and builds
@@ -119,13 +122,13 @@ create-specific to decode, only builder wiring to do:
    localized `3072626`, handle `0x0002A7FE` — had no DB row: it shares an exact position with `347659` and the
    importer's position-keyed `WorldObject` dedup dropped it. Fixed by keying world objects by (position,
    `display_name` identity) in the dedup + replay + coverage; `3072626` now has its own row.)
-3. ~~Decode + build `PlayfieldFIIR`/`GameTimeIIR`~~ **DONE & WIRED** — both are now constructed in the burst
+- **`PlayfieldFIIR`/`GameTimeIIR`** — both are constructed in the burst
    via `CreateEditorRecordBuilder.BuildPlayfieldFiir`/`BuildGameTimeIir`. MapChange is built from the editor
    map id + the session playfield token (carried twice); SetDayTime from the captured day-time/timestamp/rate.
    Wiring `InitialBurst.bin` surfaced an un-pinned u32 at PlayfieldFIIR `[58:62]` (0 in the test capture,
    `0x01000000` here) — added as the `field58` pass-through param. Locked by `BurstGoldenTests`.
-4. **Remaining** — every record in `RetailCreateEditorInitialBurst` is now constructed except the live
-   `Character…` preview (`IirId`, intentionally verbatim — see item 1). Across `WorldPrepBurst` +
+- **Record coverage** — the only record left verbatim is the live `Character…` preview (`IirId`, intentionally
+   verbatim — see above). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
    + wired** (the two dissectors were retired with the burst - they read `Faolan.Tests/Golden/WorldPrepBurst.bin`,
    deleted in `0683e84d`; builders in

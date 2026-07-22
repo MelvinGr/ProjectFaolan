@@ -3,7 +3,7 @@
 One authoritative reference for the protocol, in which **every stated fact carries a verification tag and a
 citation** that a test resolves against the repo. The machine-derivable parts are *generated*, not hand-written.
 
-Read [`PLAN.md`](PLAN.md) for the method (the verification ladder, the anti-drift tests, the migration order).
+Read [`methodology.md`](methodology.md) for the method (the verification ladder, the anti-drift tests, the migration order).
 
 ## Layer pages (hand-written, every fact tagged)
 

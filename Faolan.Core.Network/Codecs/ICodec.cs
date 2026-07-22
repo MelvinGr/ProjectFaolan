@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs
 	// cannot implement an interface, and those codecs are stateless operations over domain inputs (Build(instance,
 	// xml), Parse(record), ...) rather than instances that serialize themselves. Their uniform contract is the
 	// `Opcode` / `HandledTypes` constant instead, enforced by CodecConventionTests. Trying to make one interface
-	// span both shapes is what motivated #317 - see docs/protocol/PLAN.md.
+	// span both shapes is what motivated #317 - see docs/protocol/methodology.md.
 	public interface ICodec<out T>
 	{
 		void Write(FaolanStream s);
