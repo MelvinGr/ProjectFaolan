@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Server.GameServer;

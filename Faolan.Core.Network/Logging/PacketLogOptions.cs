@@ -1,7 +1,7 @@
 using Faolan.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.Core.Network
+namespace Faolan.Core.Network.Logging
 {
 	// Global packet-trace logging switches. Each in/outbound packet is now logged on a SINGLE line; the raw
 	// byte dump (headerData/body hex) is folded onto that same line rather than emitted as separate lines.

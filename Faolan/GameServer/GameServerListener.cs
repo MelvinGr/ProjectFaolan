@@ -12,6 +12,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;

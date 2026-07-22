@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Interfaces;
+using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -25,6 +26,7 @@ namespace Faolan.Core.Network
 
 		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
 		private readonly IPacketLogger _outgoingPacketLogger;
+		private readonly string _channelName;
 		private readonly TcpListener _tcpListener;
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
@@ -36,6 +38,8 @@ namespace Faolan.Core.Network
 			Configuration = configuration;
 			Database = database;
 			_outgoingPacketLogger = outgoingPacketLogger ?? NullPacketLogger.Instance;
+			// Reuse the outbound logger's channel name for the inbound (UL) lines, so both directions read "[Channel …]".
+			_channelName = (outgoingPacketLogger as OutgoingPacketLogger)?.ChannelName ?? "";
 			_tcpListener = new TcpListener(IPAddress.Any, port);
 		}
 
@@ -167,12 +171,8 @@ namespace Faolan.Core.Network
 
 		protected void LogPacketReceived(Packet packet, Enum opcode)
 		{
-			var opcodeName = Enum.IsDefined(opcode.GetType(), opcode)
-				? opcode.ToString()
-				: "Unknown";
-
-			Logger.LogInformation("UL [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
-				packet.Bytes?.Length ?? 0, PacketLogOptions.BytesSuffix(Logger, ("body", packet.Body?.ToArray())));
+			Logger.LogPacket(PacketLogFormatter.Uplink, _channelName, PacketLogFormatter.OpcodeName(opcode), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0,
+				("body", packet.Body?.ToArray()));
 		}
 
 		protected void LogUnknownPacket(Packet packet, Enum opcode)

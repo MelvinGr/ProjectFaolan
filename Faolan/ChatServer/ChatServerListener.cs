@@ -10,6 +10,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Server.ChatServer;

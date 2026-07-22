@@ -5,6 +5,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.Extensions.Configuration;
