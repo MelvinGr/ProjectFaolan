@@ -18,7 +18,6 @@ namespace Faolan.Core.Network
 
 		string? IpAddress { get; }
 
-		void Send(byte[] value);
 		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
 
 		// The structured send boundary (Gitea #406): a handler builds an Rpc and hands it here instead of a hand-framed
@@ -58,14 +57,8 @@ namespace Faolan.Core.Network
 			Logger = logger;
 		}
 
-		// The byte[] send path: trace the frame (the logger re-parses it), then put it on the wire.
-		public void Send(byte[] value)
-		{
-			ArgumentNullException.ThrowIfNull(value);
-			LogOutgoing(value);
-			SendRaw(value);
-		}
-
+		// The byte[] send path: trace the frame (the logger re-parses it), then put it on the wire. Used by the chat
+		// server (its own framing has no Rpc model) and by the SendAsync(Rpc) default for lightweight test doubles.
 		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -84,8 +77,7 @@ namespace Faolan.Core.Network
 			return SendRawAsync(bytes, cancellationToken);
 		}
 
-		// The raw socket writes (no logging), supplied by the concrete client.
-		protected abstract void SendRaw(byte[] value);
+		// The raw socket write (no logging), supplied by the concrete client.
 		protected abstract Task SendRawAsync(byte[] value, CancellationToken cancellationToken);
 
 		// Send-path trace hooks the concrete client routes to its IPacketLogger. No-op by default.
@@ -130,29 +122,6 @@ namespace Faolan.Core.Network
 		protected override void LogOutgoing(in Rpc rpc, int frameByteLength)
 		{
 			_outgoingPacketLogger.Log(in rpc, frameByteLength);
-		}
-
-		protected override void SendRaw(byte[] value)
-		{
-			_sendLock.Wait();
-			try
-			{
-				// Socket.Send can write FEWER bytes than requested when the send buffer is full; loop until the
-				// whole frame is on the wire (see SendRawAsync for the bug this fixes).
-				var sent = 0;
-				while (sent < value.Length)
-				{
-					var n = Socket.Send(value, sent, value.Length - sent, SocketFlags.None);
-					if (n <= 0)
-						throw new SocketException((int)SocketError.ConnectionReset);
-
-					sent += n;
-				}
-			}
-			finally
-			{
-				_sendLock.Release();
-			}
 		}
 
 		protected override async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)

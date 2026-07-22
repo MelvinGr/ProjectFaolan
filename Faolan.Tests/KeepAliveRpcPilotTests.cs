@@ -91,11 +91,6 @@ namespace Faolan.Tests
 			public INetworkClientSession Session { get; } = new NetworkClientSession();
 			public string? IpAddress => "127.0.0.1";
 
-			public void Send(byte[] value)
-			{
-				Sent = value;
-			}
-
 			public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
 			{
 				Sent = value;

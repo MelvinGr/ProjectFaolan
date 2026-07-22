@@ -31,11 +31,6 @@ namespace Faolan.Tests.Support
 			};
 		}
 
-		public void Send(byte[] value)
-		{
-			Sent.Add(value);
-		}
-
 		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
 		{
 			Sent.Add(value);
