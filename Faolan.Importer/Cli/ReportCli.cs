@@ -286,9 +286,10 @@ namespace Faolan.Importer.Cli
 					var byLang = new Dictionary<(uint cat, uint id, uint lang), string>();
 					var langHisto = new Dictionary<uint, int>();
 					var perCategory = new Dictionary<uint, int>();
-					// Per-page id->string for the spell-name category (50210), so we can crib-identify the ENGLISH page(s)
-					// against the names our Spells catalog already carries (#291/#300).
+					// Per-page id->string for name categories, so we can crib-identify the ENGLISH page(s) against the
+					// names our catalog already carries (#291/#300): 50210 spell names, 50200/50220 item names.
 					var spellNamePages = new List<(uint page, Dictionary<uint, string> ids)>();
+					var itemNamePages = new List<(uint cat, uint page, Dictionary<uint, string> ids)>();
 					int pages = 0, badMagic = 0;
 					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
 					{
@@ -305,7 +306,7 @@ namespace Faolan.Importer.Cli
 						var indexStart = blobStart + (int)size;
 						if (indexStart + (long)count * 16 > span.Length) continue; // grammar mismatch for this page
 						pages++;
-						var thisPage = category == 50210 ? new Dictionary<uint, string>() : null;
+						var thisPage = category is 50210 or 50200 or 50220 ? new Dictionary<uint, string>() : null;
 						for (var i = 0; i < count; i++)
 						{
 							var rec = span.Slice(indexStart + i * 16, 16);
@@ -325,7 +326,11 @@ namespace Faolan.Importer.Cli
 							perCategory[category] = perCategory.GetValueOrDefault(category) + 1;
 							if (thisPage != null) thisPage[id] = str;
 						}
-						if (thisPage is { Count: > 0 }) spellNamePages.Add((e.Id, thisPage));
+						if (thisPage is { Count: > 0 })
+						{
+							if (category == 50210) spellNamePages.Add((e.Id, thisPage));
+							else itemNamePages.Add((category, e.Id, thisPage));
+						}
 					}
 					Console.WriteLine($"LDB: {pages} pages parsed, {map.Count} unique ids, {badMagic} bad-magic, {perCategory.Count} categories.");
 					// Per-category: count + an ASCII-ratio on a sample so English (high ASCII) is distinguishable from CJK.
@@ -375,6 +380,42 @@ namespace Faolan.Importer.Cli
 						Console.WriteLine($"=== backfill preview: {english.Count} English pages, {englishNames.Count} English names; {emptyNamed.Count} empty-name Spells, {fillable.Count} fillable ===");
 						foreach (var id in fillable.Take(20))
 							Console.WriteLine($"  spell {id}: '{englishNames[id]}'");
+
+						// Items: same crib, per candidate category (50200 dev-names, 50220). Which category is keyed by
+						// item id AND English is what this tells us.
+						var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "")
+							.ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
+						foreach (var cat in new uint[] { 50200, 50220 })
+						{
+							var catPages = itemNamePages.Where(p => p.cat == cat).ToList();
+							Console.WriteLine($"=== item crib cat {cat} ({catPages.Count} pages vs {itemNames.Count} named Items) ===");
+							var scoredI = catPages
+								.Select(p =>
+								{
+									int overlap = 0, match = 0;
+									foreach (var (id, str) in p.ids)
+										if (itemNames.TryGetValue(id, out var known))
+										{
+											overlap++;
+											if (Norm(str) == known) match++;
+										}
+									return (p.page, p.ids.Count, overlap, match, pct: overlap == 0 ? 0 : match * 100 / overlap);
+								})
+								.Where(x => x.overlap >= 5)
+								.OrderByDescending(x => x.match)
+								.ToList();
+							foreach (var x in scoredI.Take(8))
+								Console.WriteLine($"  page {x.page,-9} ids={x.Item2,-6} overlap={x.overlap,-5} match={x.match,-5} {x.pct,3}% {(x.pct >= 80 ? "<-- ENGLISH" : "")}");
+							var engI = new Dictionary<uint, string>();
+							foreach (var x in scoredI.Where(x => x.pct >= 80))
+								foreach (var (id, str) in catPages.First(p => p.page == x.page).ids)
+									engI[id] = str;
+							var emptyI = await db.Items.Where(i => i.Name == null || i.Name == "").Select(i => i.Id).ToListAsync();
+							var fillI = emptyI.Where(engI.ContainsKey).ToList();
+							Console.WriteLine($"    -> {engI.Count} English names; {emptyI.Count} empty-name Items, {fillI.Count} fillable");
+							foreach (var id in fillI.Take(10))
+								Console.WriteLine($"       item {id}: '{engI[id]}'");
+						}
 					}
 					return 0;
 				}

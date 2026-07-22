@@ -55,24 +55,29 @@ is unambiguous and self-calibrating (no hard-coded page id).
 
 ## Importer
 
-`RdbLdbNameImporter` (module `rdb-ldb-names`, runs after `rdb-spells`) parses every cat-50210 page, crib-picks the
-English page, and backfills **only EMPTY** `Spells.Name` from `LDB[50210][spell.Id]`. Filling only empties means a
-wrong page could never overwrite a good template name, and if no page cribs clean (`≥ 80 %` over `≥ 50` shared ids)
-nothing is written. Run:
+`RdbLdbNameImporter` (module `rdb-ldb-names`, runs after `rdb-spells`) parses the name-category pages, crib-picks
+the English page per category, and backfills **only EMPTY** names — `Spells.Name` from `LDB[50210][spell.Id]` and
+`Items.Name` from `LDB[50200][item.Id]`. Filling only empties means a wrong page could never overwrite a good
+template name, and if no page cribs clean (`≥ 80 %` over `≥ 50` shared ids) nothing is written. Run:
 
 ```zsh
 dotnet run --project Faolan.Importer -- --only rdb-ldb-names --rdb <RDB> --captures <data-repo>/Captures
 ```
 
+Result on the current data: **1 spell** (222675) and **1015 items** backfilled (item empties `1020 → 5`).
+
 Diagnostic: `--report ldb-resolve` dumps the whole id→string map, the per-category / per-language breakdown, and
-the spell-name crib scores.
+the spell + item crib scores.
 
 ## Still open
 
-- **Items** (`1076` empty names) — same mechanism against the item-name category (`50200` dev-names / a
-  player-facing category), once the item name-id keying is confirmed. Not yet wired.
-- **Missing catalog rows** — e.g. spell `222682` is absent from `Spells` entirely (an extraction gap), so there is
-  no row to name; that is separate from the name *source* this solved.
+- **Polished item names** — cat `50200` (id == item id, backfilled above) carries the same **dev-style** names our
+  template `ExtractName` already uses (e.g. `NPC_Aquilonia_na_heavy_head_(A0296/NA)` for NPC-only gear alongside
+  real ones like `High Priest Leather Cap`), so it recovers a catalog-CONSISTENT name but not the polished localized
+  UI name. Those live in cat `50220` (e.g. "Basic Cloth Armor"), which is keyed by a **separate name-id, NOT the item
+  id** (its ids don't overlap the item ids at all), so it needs the item template's name-id field decoded first.
+- **Missing catalog rows** — e.g. spell `222682` is absent from `Spells` entirely (an extraction gap, #402), so
+  there is no row to name; that is separate from the name *source* this solved.
 - **Appearance (hair) names** (#291's original target) — the hair LDB page holds only ~15 internal art codenames,
   and a hair meshid maps to a style-group not present in the registry/XML, so the localized hair names this issue
   hoped for don't exist in a usable form. Face/head/tattoo/beard/piercing already resolve from their own `name=`.

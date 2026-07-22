@@ -140,7 +140,7 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var r = await RdbLdbNameImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
-			return new ImportResult($"{r.Pages} cat-50210 pages, {r.EnglishNames} English names, filled {r.Filled} empty spell names.");
+			return new ImportResult($"spells: {r.SpellEnglish} English names, filled {r.SpellsFilled}; items: {r.ItemEnglish} English names, filled {r.ItemsFilled}.");
 		}
 	}
 
