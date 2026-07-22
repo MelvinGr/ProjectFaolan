@@ -17,7 +17,7 @@ public class DumpGameActionTypes extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/gameaction_types.txt");
+        PrintWriter out = new PrintWriter("Captures/ghidra/output/gameaction_types.txt");
         // stat-key table: byte index -> real key (0..255)
         int[] keyTable = new int[256];
         for (int i = 0; i < 256; i++) keyTable[i] = u32(STATKEYS + i * 4L);
@@ -41,6 +41,6 @@ public class DumpGameActionTypes extends GhidraScript {
             out.println(String.format("type=0x%04x (idx %3d) keys=[ %s]%s", t, t - FIRST, sb.toString(), flag));
         }
         out.flush(); out.close();
-        println("WROTE /home/melvin/Development/Ghidra/Aoc/gameaction_types.txt");
+        println("WROTE Captures/ghidra/output/gameaction_types.txt");
     }
 }

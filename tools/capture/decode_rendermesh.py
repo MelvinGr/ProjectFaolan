@@ -19,7 +19,7 @@ Layout recovered from the simplest decor meshes (flat strips where min_y==max_y=
 This is the decode-first dissector; the C# reader follows once the grammar is firm. We locate (stride,vertexCount)
 by scanning after the params text and validating: every position inside the manifest bbox AND every index < vertexCount.
 """
-import struct, zlib, sys, os, re
+import struct, zlib, sys, os, re, tempfile
 
 RDB = os.environ.get("AOC_RDB", "")
 MESHINDEX, RENDERMESH = 1010030, 1010001
@@ -122,7 +122,7 @@ def export_obj(rm, subs, path):
 def main():
     ids = [int(a) for a in sys.argv[1:]] or [4832165]
     loc = load_index(RDB)
-    outdir = "/tmp/claude-1000/-home-melvin-Development-C--Project-Faolan/b0778add-a126-477b-8758-2620da06bf1b/scratchpad/mesh"
+    outdir = os.environ.get("OUT_DIR", os.path.join(tempfile.gettempdir(), "faolan-mesh"))
     os.makedirs(outdir, exist_ok=True)
     for mesh_idx_id in ids:
         mi = read(RDB, loc, MESHINDEX, mesh_idx_id)

@@ -1,6 +1,7 @@
+import os, tempfile
 import frida, time, json, sys
 WIN_PID = int(sys.argv[1]) if len(sys.argv) > 1 else 1156
-OUT = open('/tmp/claude-1000/-home-melvin-Development-C--Project-Faolan/1056f362-b1be-4721-a7fb-d2143b69e32b/scratchpad/frida_entry.jsonl', 'w')
+OUT = open(os.path.join(tempfile.gettempdir(), 'frida_entry.jsonl'), 'w')
 dev = frida.get_device_manager().add_remote_device('127.0.0.1:27042')
 session = dev.attach(WIN_PID)
 print("ATTACHED", WIN_PID, flush=True)
