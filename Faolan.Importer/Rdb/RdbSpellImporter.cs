@@ -30,9 +30,13 @@ namespace Faolan.Importer.Rdb
 	//
 	// #402: a record with NO embedded name is NOT automatically junk. A handful of real player-facing spells (e.g.
 	// the "Set's Ruin" necro family 222682-222685, "Warlord's March", ...) carry no 0x21 string in their 1040005
-	// body - their name lives ONLY in the LDB (RDB 1030002, cat 50210). Left dropped, such a spell shows in a
-	// player's spellbook with a mana cost but no name/description. So a nameless record is still catalogued when the
-	// LDB knows it as a real spell name - EXCEPT the LDB's own dev/PvP-internal markers ("XX"/"CTF"-tagged names,
+	// body - their name lives ONLY in the LDB (RDB 1030002, cat 50210). This is NOT about the display name (the
+	// client resolves spell names from its OWN RDB by id; we never send them - the recovered Name is for our
+	// tooling). It is about catalog MEMBERSHIP: CharacterSpell.SpellId FKs Spells, and ImportKnownSpells SKIPS any
+	// learned id not in the catalog (CaptureCharacterImporter), so an uncataloged spell was dropped from the
+	// character's KnownSpellList entirely - missing from the spellbook, not merely unnamed. So a nameless record is
+	// still catalogued when the LDB knows it as a real spell name - EXCEPT the LDB's own dev/PvP-internal markers
+	// ("XX"/"CTF"-tagged names,
 	// see IsDevMarker), which are test/flag buffs, not player spells. The row is inserted with an EMPTY name; the
 	// rdb-ldb-names module (RdbLdbNameImporter, run after) cribs the English LDB name onto it. Of 681 nameless
 	// records: 189 have no LDB name at all and 467 are dev markers - both stay dropped (asset/aura junk); the
