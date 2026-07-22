@@ -8,8 +8,11 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Helpers;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
 {
@@ -17,11 +20,8 @@ namespace Faolan.Importer.Cli
 	// migrates, and hands a resolved plan to ImportRunner. See docs/tooling/importer.md for the CLI spec.
 	public static class ImportCli
 	{
-		private static readonly string RepoRoot = RepoPaths.Root;
-
 		public static async Task<int> RunAsync(string[] args)
 		{
-			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
 			var capturesDir = GetOption(args, "--captures");
 			var rdbDir = GetOption(args, "--rdb");
 
@@ -49,10 +49,23 @@ namespace Faolan.Importer.Cli
 			var dryRun = args.Contains("--dry-run");
 			var force = args.Contains("--force");
 
-			if (!File.Exists(dbPath))
+			// Provider + connection come from the SHARED faolan.json (the same DB the server uses), so the connection
+			// string lives in ONE place. `--db <path>` is a convenience override that targets a specific SQLite file
+			// (a throwaway/test DB).
+			var config = new ConfigurationBuilder().AddJsonFile(RepoPaths.Combine("faolan.json")).Build();
+			var dbOverride = GetOption(args, "--db");
+			var provider = dbOverride != null ? FaolanDbProvider.Sqlite : config.DatabaseProvider;
+			var connection = dbOverride != null ? $"Data Source={dbOverride}" : config.DatabaseConnection;
+
+			// A SQLite DB is a FILE that must already exist (the DB is the source of truth). Postgres targets a server.
+			if (provider == FaolanDbProvider.Sqlite)
 			{
-				await Console.Error.WriteLineAsync($"Database not found: {dbPath} (the DB is the source of truth; point --db at it).");
-				return 1;
+				var dbFile = new SqliteConnectionStringBuilder(connection).DataSource;
+				if (!File.Exists(dbFile))
+				{
+					await Console.Error.WriteLineAsync($"Database not found: {dbFile} (the DB is the source of truth; point --db at it, or set DatabaseConnectionString in faolan.json).");
+					return 1;
+				}
 			}
 
 			if (!Directory.Exists(capturesDir))
@@ -101,7 +114,7 @@ namespace Faolan.Importer.Cli
 				return 1;
 			}
 
-			Console.WriteLine($"Faolan.Importer: db={dbPath}  captures={capturesDir}  rdb={rdbDir ?? "(none)"}");
+			Console.WriteLine($"Faolan.Importer: {provider} [{connection}]  captures={capturesDir}  rdb={rdbDir ?? "(none)"}");
 			var captures = LoadCaptures(capturesDir);
 
 			// Raw packet bytes across every capture PLUS the loose *.bin files (the `itemPackets` source).
@@ -113,16 +126,6 @@ namespace Faolan.Importer.Cli
 			var createCaptures = captures.Where(c => c.Name.Contains("creat", StringComparison.OrdinalIgnoreCase)).Select(c => (IReadOnlyList<byte[]>)c.Packets.Select(p => p.Bytes).ToList()).ToList();
 
 			Console.WriteLine($"Read {captures.Count} captures ({rawPackets.Count} raw packets, {createCaptures.Count} create-flow).");
-
-			// Provider: SQLite by default (--db path); Postgres with `--provider postgres --connection <npgsql>`,
-			// which seeds a fresh Postgres DB (EnsureCreated builds the schema from the model - no PG migrations yet).
-			var provider = Enum.Parse<FaolanDbProvider>(GetOption(args, "--provider"), true);
-			var connection = provider switch
-			{
-				FaolanDbProvider.Postgres => GetOption(args, "--connection") ?? throw new ArgumentException("--provider postgres requires --connection <npgsql connection string>"),
-				FaolanDbProvider.Sqlite => $"Data Source={dbPath}",
-				_ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unknown database provider.")
-			};
 
 			var optionsBuilder = new DbContextOptionsBuilder<DatabaseContext>();
 			optionsBuilder.UseFaolanDatabase(provider, connection);
