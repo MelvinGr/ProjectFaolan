@@ -31,6 +31,12 @@ namespace Faolan.Core
 		{
 		}
 
+		// A read-only cursor over a WINDOW of an existing array (no copy) - used to read a message body that is a slice
+		// of a larger buffer (e.g. Rpc.BodyReader over the inbound frame's array).
+		public FaolanStream(byte[] data, int index, int count) : base(data, index, count, false, true)
+		{
+		}
+
 		public byte[] ReadArray(uint length)
 		{
 			// Never allocate more than the buffer can supply: a hostile length-prefix (up to 0xFFFFFFFF) would

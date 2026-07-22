@@ -19,17 +19,19 @@ namespace Faolan.UniverseAgent
 		{
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
+		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket frame)
 		{
+			var packet = frame.ToRpc();
 			var opcode = (UniverseAgentOpcodes)packet.Opcode;
-			LogPacketReceived(packet, opcode);
+			LogPacketReceived(frame, opcode);
 
+			var body = packet.BodyReader();
 			switch (opcode)
 			{
 				case UniverseAgentOpcodes.InitiateAuthentication:
 				{
-					var accountName = packet.Body.ReadString();
-					var unk0 = packet.Body.ReadUInt32();
+					var accountName = body.ReadString();
+					var unk0 = body.ReadUInt32();
 
 					client.Session.Account = await Database.GetAccount(accountName);
 					if (client.Session.Account == null)
@@ -45,7 +47,7 @@ namespace Faolan.UniverseAgent
 
 				case UniverseAgentOpcodes.AnswerChallenge:
 				{
-					var loginKey = packet.Body.ReadString();
+					var loginKey = body.ReadString();
 					var account = client.Session.Account;
 
 					// Decrypt the DH+TEA login block. This only succeeds for a PATCHED client (one using our DH
@@ -106,7 +108,7 @@ namespace Faolan.UniverseAgent
 
 				default:
 				{
-					LogUnknownPacket(packet, opcode);
+					LogUnknownPacket(frame, opcode);
 					break;
 				}
 			}

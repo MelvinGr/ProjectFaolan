@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Protocol
@@ -59,6 +60,16 @@ namespace Faolan.Core.Network.Protocol
 		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> body)
 			: this(sender, receiver, Convert.ToUInt16(opcode), default, body)
 		{
+		}
+
+		// A fresh reader over the body, for the RECEIVE path (handlers read fields sequentially off it). The send path
+		// uses Body directly as immutable memory. Wraps the backing array with NO copy when the body is array-backed
+		// (always, for our inbound frames); a new cursor per call, so callers keep their own position.
+		public FaolanStream BodyReader()
+		{
+			return MemoryMarshal.TryGetArray(Body, out var segment) && segment.Array is not null
+				? new FaolanStream(segment.Array, segment.Offset, segment.Count)
+				: new FaolanStream(Body.ToArray());
 		}
 
 		private static byte[] BuildBody(Action<FaolanStream> body)
