@@ -50,12 +50,11 @@ namespace Faolan.Importer.Cli
 			var force = args.Contains("--force");
 
 			// Provider + connection come from the SHARED faolan.json (the same DB the server uses), so the connection
-			// string lives in ONE place. `--db <path>` is a convenience override that targets a specific SQLite file
-			// (a throwaway/test DB).
+			// string lives in ONE place. `--db <connection string>` overrides just the connection (e.g. a throwaway
+			// "Data Source=/tmp/test.db"); the provider still follows the config.
 			var config = new ConfigurationBuilder().AddJsonFile(RepoPaths.Combine("faolan.json")).Build();
-			var dbOverride = GetOption(args, "--db");
-			var provider = dbOverride != null ? FaolanDbProvider.Sqlite : config.DatabaseProvider;
-			var connection = dbOverride != null ? $"Data Source={dbOverride}" : config.DatabaseConnection;
+			var provider = config.DatabaseProvider;
+			var connection = GetOption(args, "--db") ?? config.DatabaseConnection;
 
 			// A SQLite DB is a FILE that must already exist (the DB is the source of truth). Postgres targets a server.
 			if (provider == FaolanDbProvider.Sqlite)
@@ -63,7 +62,7 @@ namespace Faolan.Importer.Cli
 				var dbFile = new SqliteConnectionStringBuilder(connection).DataSource;
 				if (!File.Exists(dbFile))
 				{
-					await Console.Error.WriteLineAsync($"Database not found: {dbFile} (the DB is the source of truth; point --db at it, or set DatabaseConnectionString in faolan.json).");
+					await Console.Error.WriteLineAsync($"Database not found: {dbFile} (the DB is the source of truth; set DatabaseConnectionString in faolan.json, or pass --db \"Data Source=<path>\").");
 					return 1;
 				}
 			}
@@ -127,10 +126,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine($"Read {captures.Count} captures ({rawPackets.Count} raw packets, {createCaptures.Count} create-flow).");
 
-			var optionsBuilder = new DbContextOptionsBuilder<DatabaseContext>();
-			optionsBuilder.UseFaolanDatabase(provider, connection);
-
-			await using var db = new DatabaseContext(optionsBuilder.Options);
+			await using var db = DatabaseServiceCollectionExtensions.CreateContext(provider, connection);
 			// Migrate + seed the default realm/account before any module runs - the same sequence the server runs
 			// (DatabaseInitializer). Migrations run here, outside the runner's transaction (they can't run inside one).
 			var seeded = await DatabaseInitializer.InitializeAsync(db);

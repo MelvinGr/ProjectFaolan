@@ -120,9 +120,7 @@ namespace Faolan
 			Realm? hostRealm = null;
 			if (runRealm)
 			{
-				var probeOptions = new DbContextOptionsBuilder<DatabaseContext>();
-				probeOptions.UseFaolanDatabase(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
-				using var probe = new DatabaseContext(probeOptions.Options);
+				using var probe = DatabaseServiceCollectionExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
 				hostRealm = selectedRealmId.HasValue
 					? probe.Realms.FirstOrDefault(r => r.Id == selectedRealmId.Value)
 					: probe.Realms.OrderBy(r => r.Id).FirstOrDefault();

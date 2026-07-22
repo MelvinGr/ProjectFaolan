@@ -8,7 +8,9 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
@@ -439,7 +441,7 @@ namespace Faolan.Importer.Cli
 		// and dumps the printable strings - the ability NAME lives in that (encrypted-but-key-available) template.
 		private static void AbilityNames(string rdbDir, string dbPath)
 		{
-			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			using var db = OpenDb(dbPath);
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			foreach (var a in db.Abilities.OrderBy(x => x.Slot).Include(ability => ability.Key).ToList())
 			{
@@ -513,7 +515,7 @@ namespace Faolan.Importer.Cli
 				foreach (var e in CaptureShopImporter.Extract(c.Packets))
 					vendorsSeen.Add(e.VendorName);
 
-			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			using var db = OpenDb(dbPath);
 			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var shopImported = (await db.Shops.Select(s => s.VendorName).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -660,7 +662,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			using var db = OpenDb(dbPath);
 			var item = db.Items.FirstOrDefault(i => i.Id == itemId);
 			if (item == null)
 			{
@@ -937,11 +939,8 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{(k.Dl ? "S2C" : "C2S")} op=0x{k.Op:X4} sub=0x{k.Sub:X8}  total={count}  in {globalDumps[k].Count} dumps");
 		}
 
-		private static DatabaseContext OpenDb(string dbPath)
-		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}", x => x.MigrationsAssembly("Faolan")).Options;
-			return new DatabaseContext(options);
-		}
+		// Reports read the SQLite fixture (faolan.db) at --db; one short-lived context through the shared factory.
+		private static DatabaseContext OpenDb(string dbPath) => DatabaseServiceCollectionExtensions.CreateContext(FaolanDbProvider.Sqlite, $"Data Source={dbPath}");
 
 		// RDB -> 3D-model asset graph (Gitea #275, Phase 0). With no --report-arg: a corpus summary (how many
 		// MESHINDEXFILE manifests resolve to geometry, how their textures are split local vs CDN). With --report-arg
@@ -1401,7 +1400,7 @@ namespace Faolan.Importer.Cli
 		//   dotnet run --project Faolan.Importer -- --report terrain-export [--rdb <dir>] [--terrain-out <dir>]
 		private static async Task TerrainExport(string dbPath, string rdbDir, string outDir)
 		{
-			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			using var db = OpenDb(dbPath);
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			Directory.CreateDirectory(outDir);
 

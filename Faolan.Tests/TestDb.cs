@@ -1,4 +1,6 @@
 using Faolan.Core.Database;
+using Faolan.Core.Database.Extensions;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Tests
@@ -22,11 +24,13 @@ namespace Faolan.Tests
 	// THIS CLASS IS THE SINGLE SEAM: to change the strategy, edit only these two methods; the tests don't change.
 	public static class TestDb
 	{
-		// A writable throwaway SQLite database at `path` (typically a temp file). The Faolan migrations assembly is
-		// wired so EnsureCreated/Migrate-based tests work. Opt into lazy-loading proxies for the few that need them.
+		// A writable throwaway SQLite database at `path` (typically a temp file). Routed through the shared
+		// UseFaolanDatabase (SQLite - the test fixture is always SQLite, see above) so it inherits the right migrations
+		// assembly + settings. Opt into lazy-loading proxies for the few tests that need them.
 		public static DbContextOptions<DatabaseContext> Options(string path, bool lazyLoadingProxies = false)
 		{
-			var builder = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan"));
+			var builder = new DbContextOptionsBuilder<DatabaseContext>();
+			builder.UseFaolanDatabase(FaolanDbProvider.Sqlite, $"Data Source={path}");
 			if (lazyLoadingProxies)
 				builder.UseLazyLoadingProxies();
 
@@ -36,8 +40,6 @@ namespace Faolan.Tests
 		// Read-only options for an existing SQLite database at `path` - the committed faolan.db golden fixture
 		// (TestPaths.FaolanDb); read-only so a test can't mutate the shared committed data.
 		public static DbContextOptions<DatabaseContext> ReadOnly(string path)
-		{
-			return new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path};Mode=ReadOnly").Options;
-		}
+			=> DatabaseServiceCollectionExtensions.BuildOptions(FaolanDbProvider.Sqlite, $"Data Source={path};Mode=ReadOnly");
 	}
 }
