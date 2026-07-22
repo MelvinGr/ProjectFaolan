@@ -1,0 +1,8 @@
+{
+	"profiles": {
+		"Faolan": {
+			"commandName": "Project",
+			"workingDirectory": ".."
+		}
+	}
+}
