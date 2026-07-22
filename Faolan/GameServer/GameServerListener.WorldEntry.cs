@@ -727,7 +727,7 @@ namespace Faolan.GameServer
 			// #3: aggregate the equipped-gear stat bonuses so the player's live vitals seed with gear-boosted maxes.
 			var gearBonuses = character == null
 				? null
-				: Combat.MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id));
+				: Combat.MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet));
 			_simulation.RegisterPlayerInWorld(client, map?.InstanceMode ?? MapInstanceMode.Shared, gearBonuses);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);

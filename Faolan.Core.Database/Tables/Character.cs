@@ -47,6 +47,12 @@ namespace Faolan.Core.Database.Tables
 		// entry only when the destination map allows mounts (Map.PlayfieldFlags mount bit).
 		public uint? MountId { get; set; }
 
+		// #400: which of the two swappable weapon LOADOUTS (WeaponSet.Primary = equip slots 6/8, Secondary = 20/21)
+		// the character currently has drawn. Toggled by the SwitchWeaponsButton action (0x2E, capture-confirmed as the
+		// SET switch) and persisted so BOTH the drawn set and the login-time gear-stat aggregation (which counts only
+		// the ACTIVE set's weapons, CharacterEquipment.StatBearingItemIds) survive relog. Default Primary.
+		public WeaponSet ActiveWeaponSet { get; set; }
+
 		// Required: set on creation (CreateCharacter) and by the capture importer.
 		public uint RealmId { get; set; }
 

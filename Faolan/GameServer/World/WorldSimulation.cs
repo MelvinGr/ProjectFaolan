@@ -161,7 +161,10 @@ namespace Faolan.GameServer.World
 				MagicDamage = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0),
 				// Cache the worn-gear natural mana/stamina regen added onto the base regen tick.
 				NaturalManaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalManaRegen) ?? 0),
-				NaturalStaminaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalStaminaRegen) ?? 0)
+				NaturalStaminaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalStaminaRegen) ?? 0),
+				// #400: seed the live drawn weapon set from the persisted value so a mid-session swap starts from the set
+				// the character last had out (and the gearBonuses above were aggregated for that same set).
+				ActiveWeaponSet = character.ActiveWeaponSet
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.

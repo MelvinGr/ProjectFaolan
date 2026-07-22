@@ -70,10 +70,6 @@ namespace Faolan.GameServer.World
 		// value every actual melee swinger sends.)
 		private const uint NpcCombatModeValue = 4;
 
-		// The combat-mode stat value a PLAYER sends when it draws its weapon (#218/#259): 1, vs the mob's 4 (the field is
-		// a stance/mode code; 1 is the value the captured player carries on combat entry). 0 sheathes.
-		private const uint PlayerCombatModeValue = 1;
-
 		// Dev visualization (#363): when true, an NPC that resolves to an RDB spawn AREA has that area's label pushed as
 		// its overhead nameplate (via SetNameIIR after spawn) so a manual creature-labeling pass sees which area it's in.
 		// Off by default; toggled live per-session by the `.togglenpcgroup` GM command (ToggleAreaLabels) - no config.
@@ -462,29 +458,6 @@ namespace Faolan.GameServer.World
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 					await SendWorldRecord(viewer.Client, record);
-			}
-		}
-
-		// #259 toggle-combat: push the PLAYER's combat-mode stat (draw / sheathe their weapon) to themselves AND nearby
-		// viewers who see them, mirroring BroadcastNpcCombatMode. The local client needs the stat to draw its own avatar's
-		// weapon, so unlike the NPC path this also addresses the player's own connection. The captured player value is 1
-		// (vs the mob's 4); 0 sheathes.
-		public async Task BroadcastPlayerCombatMode(INetworkClient client, bool inCombat)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return;
-
-			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, inCombat
-				? PlayerCombatModeValue
-				: 0u);
-			var body = StatUpdateCodec.BuildBody(player.Handle, stats);
-
-			await SendWorldIir(client, body); // the player's own view draws/sheathes its weapon
-			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
-			{
-				if (viewer.Client != null && viewer.Client != client && viewer.Known.Contains(player.Handle))
-					await SendWorldIir(viewer.Client, body);
 			}
 		}
 
@@ -1386,17 +1359,36 @@ namespace Faolan.GameServer.World
 			return (DebugAreaLabels, affected);
 		}
 
-		// #259 toggle-combat: flip the player's manual combat stance and return the new state. The player entity's
-		// InCombat flag is unused by the sim tick (players are skipped there), so it's the natural place to hold the
-		// toggle. No-op-safe: returns false if the player isn't in the world yet.
-		public bool TogglePlayerCombatStance(INetworkClient client)
+		// #400 weapon-set switch: flip the player's active weapon LOADOUT (Primary<->Secondary), persist it so the drawn
+		// set + the login-time gear-stat aggregation (which counts only the active set's weapons) survive relog, and
+		// mirror it on the live entity. Returns the now-active set. The SwitchWeaponsButton action (0x2E) is the SET
+		// switch, not a draw/sheathe (capture-confirmed: the acting player's newly-active weapon main slot alternates
+		// 6<->20). No-op-safe: defaults Primary->Secondary if the player isn't in the world yet.
+		public Task<WeaponSet> TogglePlayerWeaponSet(INetworkClient client)
+		{
+			var current = _sim.PlayerWorldEntity(client)?.ActiveWeaponSet
+			              ?? client.Session?.Character?.ActiveWeaponSet
+			              ?? WeaponSet.Primary;
+			return SetPlayerWeaponSet(client, current == WeaponSet.Primary
+				? WeaponSet.Secondary
+				: WeaponSet.Primary);
+		}
+
+		// Set the player's active weapon set explicitly (the .weaponset GM test-bootstrap forces a set; the live
+		// SwitchWeaponsButton toggles via TogglePlayerWeaponSet). Persists + mirrors on the live entity; returns it.
+		public async Task<WeaponSet> SetPlayerWeaponSet(INetworkClient client, WeaponSet set)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return false;
+			if (player != null)
+				player.ActiveWeaponSet = set;
 
-			player.InCombat = !player.InCombat;
-			return player.InCombat;
+			if (client.Session?.Character is { } character)
+			{
+				character.ActiveWeaponSet = set;
+				await _database.SaveCharacterWeaponSet(character.Id, set);
+			}
+
+			return set;
 		}
 
 		// Seat the player on a BENCH (the sit interaction - tools/capture/decode_sit.py). Interacting with a bench

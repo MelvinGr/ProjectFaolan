@@ -25,7 +25,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterByName(string name, uint realmId);
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
-		Task<Item[]> GetEquippedStatItems(uint characterId);
+		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
 		Task<uint[]> GetCharacterFeats(uint characterId);
 		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
@@ -47,6 +47,7 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterDeadState(uint characterId, bool isDead);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterMount(uint characterId, uint? mountId);
+		Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank);
@@ -286,14 +287,16 @@ namespace Faolan.Core.Database.Repositories
 		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3). Reads the
 		// equipment's *Id columns (no nav load), then fetches only those Items + their modifiers. Empty when the
 		// character has no equipment row or no stat-bearing gear.
-		public async Task<Item[]> GetEquippedStatItems(uint characterId)
+		public async Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var equipment = await ctx.CharacterEquipment.AsNoTracking().FirstOrDefaultAsync(e => e.CharacterId == characterId);
 			if (equipment == null)
 				return [];
 
-			var ids = equipment.StatBearingItemIds().ToHashSet();
+			// #400: fold in only the ACTIVE weapon set's two weapon slots (armour + jewellery always apply); counting
+			// both the melee and ranged sets when both are equipped would double-count.
+			var ids = equipment.StatBearingItemIds(activeSet).ToHashSet();
 			if (ids.Count == 0)
 				return [];
 
@@ -549,6 +552,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.MountId, mountId));
+		}
+
+		// #400: persist the character's drawn weapon SET after a SwitchWeaponsButton toggle, so the active loadout (and
+		// the login-time gear-stat aggregation that counts only its weapons) survives relog. Targeted update, no load.
+		public async Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.ActiveWeaponSet, activeSet));
 		}
 
 		public async Task SaveCharacterScaffold(Character character)

@@ -116,6 +116,11 @@ namespace Faolan.GameServer.World
 
 		public bool IsPlayer { get; }
 
+		// #400: a PLAYER's currently-drawn weapon set (Primary = equip slots 6/8, Secondary = 20/21). Toggled by the
+		// SwitchWeaponsButton action and seeded from Character.ActiveWeaponSet on world entry; the swap is relayed to
+		// viewers via the BCC behavior channel. Unused for NPCs (they carry a fixed loadout).
+		public WeaponSet ActiveWeaponSet { get; set; }
+
 		// #272: true while this entity is mid-move (chasing / returning home / following a player). Drives the segment
 		// throttle (the anchor is seeded when a move starts) and the one-shot stop (so an arrival emits a single StopIIR).
 		// Cleared on arrival, death and respawn.

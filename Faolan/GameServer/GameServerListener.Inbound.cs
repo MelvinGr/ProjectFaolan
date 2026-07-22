@@ -298,16 +298,20 @@ namespace Faolan.GameServer
 
 					if (actionType == ActionType.SwitchWeaponsButton)
 					{
-						// #259: the toggle carries no extra data. Echo-ack the behavior (docs/subsystems/combat.md rule 1) and toggle
-						// the player's combat stance, pushing the CombatMode stat so the client draws/sheathes the weapon -
-						// the player analogue of the NPC weapon-draw (#218). NEEDS in-client verification of the exact
-						// mechanism (stat push vs behavior-only) against a capture.
+						// #400: SwitchWeaponsButton is the weapon-SET switch (toggles the two swappable loadouts), NOT a draw/sheathe -
+						// capture-confirmed: a character wearing both sets pressed it 3x and the newly-active weapon main slot alternated
+						// 6->20->6 (Stihetfv armed-and-unarmed). Echo-ack to self, toggle+persist the active set, then RELAY the swap
+						// behavior to nearby viewers so they re-render the drawn weapons (the cross-player render channel is the BCC
+						// command replication - Ghidra FUN_005e1c70 - the same path the combat swing/cast relay below uses; the
+						// SetItemStat retail also sends is owner-only inventory bookkeeping, so it is not broadcast). NEEDS in-client verification.
 						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-						var drawn = _broadcaster.TogglePlayerCombatStance(client);
-						await _broadcaster.BroadcastPlayerCombatMode(client, drawn);
-						Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}", drawn
-							? "drawn"
-							: "sheathed", args);
+						var activeSet = await _broadcaster.TogglePlayerWeaponSet(client);
+
+						var swapRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
+						if (swapRelay != null)
+							await _broadcaster.BroadcastBehaviorToViewers(client, swapRelay);
+
+						Logger.LogInformation("SwitchWeaponsButton -> weapon set {Set}. {Args}", activeSet, args);
 					}
 					else
 					{
@@ -868,8 +872,12 @@ namespace Faolan.GameServer
 						// #48: the combat responses above are framed to the ACTOR only - so the swing/cast was invisible
 						// to other players. Relay the actor's behavior (the BCC animation) to nearby viewers so the attack
 						// renders on their clients too (retail relays this exact echo body, only the frame receiver
-						// differs - other-players-visible capture). Limited to the world-visible combat behaviors.
-						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell)
+						// differs - other-players-visible capture). The cross-player render channel is the BCC command replication
+						// (Ghidra FUN_005e1c70), so it also carries the APPEARANCE-changing behaviors: equipping/unequipping an item
+						// (#400 sibling - a new chestpiece/weapon on another player) rides the same relay; the weapon-SET switch is
+						// relayed in its own branch above. NEEDS in-client verification for the equip case (no multiplayer capture
+						// contains a remote player equipping - single-player traces only).
+						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory)
 						{
 							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
 							if (behaviorRelay != null)

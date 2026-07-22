@@ -99,6 +99,9 @@ we've seen_, and names the gaps). Regenerate with
   magical Protection mitigate incoming physical/spell hits, and Critical Rating / Critical Damage Rating produce crits
   (the larger "critical" numbers). The damage/mitigation/crit curves are provisional pending in-client tuning (#395,
   #401)
+- 🟡 **Weapon-set swap** — switching between your two weapon loadouts changes which set's stats the server counts
+  and is relayed to nearby players so they see you draw the other weapons; equipping/unequipping gear now rides the
+  same viewer-relay, so other players see your gear change too. Pending in-client verification (#400)
 - 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
   cadence are still approximate (#349)
 - 🟡 **Buff stat effects** — buffs show as icon + timer, and each one's per-stat bonus/penalty magnitudes are now

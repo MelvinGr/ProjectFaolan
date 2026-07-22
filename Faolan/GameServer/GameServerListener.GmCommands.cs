@@ -355,8 +355,35 @@ namespace Faolan.GameServer
 				["setnpcgroup"] = SetNpcGroupCommand,
 				["target"] = (client, _) => TargetInfoCommand(client),
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
-				["graduatenpcgroup"] = GraduateNpcGroupCommand
+				["graduatenpcgroup"] = GraduateNpcGroupCommand,
+				["weaponset"] = WeaponSetCommand
 			};
+		}
+
+		// .weaponset [primary | secondary]  - the server-side test bootstrap for the SwitchWeaponsButton set switch (#400).
+		// No arg (or "swap"/"toggle") flips the active loadout; "primary"/"secondary" (or 1/2) forces one. Persists the
+		// set and mirrors it on the live entity so the login-time gear-stat aggregation (which counts only the active
+		// set's weapons) uses it. NB this drives the MODEL only - the cross-player swap RELAY needs the real BCC payload,
+		// so exercise that with the retail weapon-swap key against a live viewer.
+		private async Task WeaponSetCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+
+			WeaponSet set;
+			if (arg.Equals("secondary", StringComparison.OrdinalIgnoreCase) || arg == "2")
+				set = WeaponSet.Secondary;
+			else if (arg.Equals("primary", StringComparison.OrdinalIgnoreCase) || arg == "1")
+				set = WeaponSet.Primary;
+			else
+			{
+				var toggled = await _broadcaster.TogglePlayerWeaponSet(client);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Weapon set toggled -> {toggled} (persisted).");
+				return;
+			}
+
+			await _broadcaster.SetPlayerWeaponSet(client, set);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Weapon set -> {set} (persisted).");
 		}
 
 		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the

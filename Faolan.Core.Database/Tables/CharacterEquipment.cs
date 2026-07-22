@@ -429,19 +429,34 @@ namespace Faolan.Core.Database.Tables
 		// another (e.g. two identical rings) yields the id twice, so each worn copy counts once when its stat modifiers
 		// are aggregated (#3). 0/null slots are skipped.
 		//
-		// The four WEAPON slots (melee MainHandLeft/OffHandLeft, ranged MainHandRight/OffHandRight) are deliberately
-		// EXCLUDED: only the actively WIELDED weapon set's stats apply, and we don't track which set is drawn yet (the
-		// combat stance we track is only drawn/sheathed, not melee-vs-ranged) - counting both would double-count. Fold
-		// the active weapon back in once weapon-set tracking lands (#400). Excludes the cosmetic Vanity* slots (appearance
-		// only) and the Bag / ResourceBag / FirstPosBag containers (their capacity is a bag stat, not a combat stat).
-		public IEnumerable<uint> StatBearingItemIds()
+		// The four WEAPON slots are handled via `activeSet` (#400): only the actively WIELDED weapon SET's two slots are
+		// folded in, because a character can have BOTH a melee set (MainHandLeft/OffHandLeft) and a ranged set
+		// (MainHandRight/OffHandRight) equipped at once and counting all four would double-count. `activeSet` null =
+		// fold in NO weapons (the pre-#400 armour+jewellery-only behaviour, kept as the default so callers that don't
+		// yet track the drawn set are unchanged). Excludes the cosmetic Vanity* slots (appearance only) and the Bag /
+		// ResourceBag / FirstPosBag containers (their capacity is a bag stat, not a combat stat).
+		public IEnumerable<uint> StatBearingItemIds(WeaponSet? activeSet = null)
 		{
-			uint?[] slots = [NeckId, HeadId, ChestId, BeltId, RingLeftId, RingRightId, CloakId, ShoulderId, BootsId, HandsId, LegsId, WristId];
-			foreach (var id in slots)
+			uint?[] armour = [NeckId, HeadId, ChestId, BeltId, RingLeftId, RingRightId, CloakId, ShoulderId, BootsId, HandsId, LegsId, WristId];
+			foreach (var id in armour)
 			{
 				if (id is > 0)
 					yield return id.Value;
 			}
+
+			// The active loadout's main + off slot only. Set 1 = slots 6/8 -> MainHandLeft/OffHandLeft; Set 2 = slots
+			// 20/21 -> MainHandRight/OffHandRight (see CharacterEquipmentSlot's column map). The two sets are just
+			// swappable loadouts (not inherently melee vs ranged) - #400.
+			var (main, off) = activeSet switch
+			{
+				WeaponSet.Primary   => (MainHandLeftId, OffHandLeftId),
+				WeaponSet.Secondary => (MainHandRightId, OffHandRightId),
+				_                   => ((uint?)null, (uint?)null)
+			};
+			if (main is > 0)
+				yield return main.Value;
+			if (off is > 0)
+				yield return off.Value;
 		}
 	}
 }
