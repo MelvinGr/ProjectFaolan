@@ -75,6 +75,7 @@ namespace Faolan.ChatServer
 				.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 				.WriteArrayUInt16Length(s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName))
 				.SendAsync(target);
+
 			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
 
 			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message}", true, true);
@@ -130,7 +131,8 @@ namespace Faolan.ChatServer
 		internal static byte[] BuildWhisper(uint peerCharacterId, string message)
 		{
 			using var stream = new FaolanStream();
-			stream.WriteUInt16(ChatServerInterfaceOpcodes.Whisper).WriteArrayUInt16Length(s => s.WriteUInt32(peerCharacterId).WriteString(message).WriteByte(0x00).WriteByte(0x01).WriteByte(0x00));
+			stream.WriteUInt16(ChatServerInterfaceOpcodes.Whisper)
+				.WriteArrayUInt16Length(s => s.WriteUInt32(peerCharacterId).WriteString(message).WriteByte(0x00).WriteByte(0x01).WriteByte(0x00));
 			return stream.ToArray();
 		}
 

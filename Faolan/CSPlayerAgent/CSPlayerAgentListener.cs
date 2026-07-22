@@ -4,7 +4,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Server.GameServer;
 using Microsoft.Extensions.Configuration;
@@ -31,12 +31,6 @@ namespace Faolan.CSPlayerAgent
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
 		}
 
-		protected override Task ClientDisconnected(INetworkClient client)
-		{
-			_guild.OnClientDisconnected(client);
-			return base.ClientDisconnected(client);
-		}
-
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
 		{
 			var opcode = (CSPlayerAgentOpcodes)packet.Opcode;
@@ -60,31 +54,22 @@ namespace Faolan.CSPlayerAgent
 					if (client.Session.Character == null)
 						throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
 
-					// Remember this connection's reply endpoints so guild events (invites, member-joined) can be
-					// pushed to it later without an incoming packet to echo.
-					_guild.RememberReplyEndpoints(client, packet.Receiver, packet.Sender);
-
-					await new PacketStream()
-						.WriteHeader(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck)
-						.WriteUInt32(authReply)
-						.SendAsync(client);
+					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck,
+						body => body.WriteUInt32(authReply)));
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
-					await new PacketStream()
-						.WriteHeader(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderUpdateFeaturedActivities, [0x01])
-						.WriteArray(0x00, 0x00, 0x03, 0xF1)
-						.SendAsync(client);
+					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderUpdateFeaturedActivities,
+						(byte[]) [0x01], body => body.WriteArray(0x00, 0x00, 0x03, 0xF1)));
 
 					//if(character.Name == null)
 					{
-						await new PacketStream()
-							.WriteHeader(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderRemoved, [0x01])
-							.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
-							.WriteByte(0x01)
-							.SendAsync(client);
+						await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderRemoved,
+							(byte[]) [0x01],
+							body => body.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
+								.WriteByte(0x01)));
 					}
 
 					break;

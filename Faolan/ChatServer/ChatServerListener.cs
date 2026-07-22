@@ -198,6 +198,7 @@ namespace Faolan.ChatServer
 						.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
 						.WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName))
 						.SendAsync(target);
+
 					await target.SendAsync(BuildWhisper(senderId, message));
 
 					break;
