@@ -65,8 +65,7 @@ namespace Faolan.Core.Network.Codecs.World
 			return s
 				.WriteUInt32(0)
 				.WriteUInt32(0) // obj+0x6c / +0x70
-				.WriteUInt32(positionBlob.Length)
-				.WriteArray(positionBlob)
+				.WriteArrayUInt32Length(positionBlob)
 				.WriteByte(0x00) // n3TeleportIIR trailing bool
 				.ToArray();
 		}

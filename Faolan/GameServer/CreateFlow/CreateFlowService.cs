@@ -1167,7 +1167,7 @@ namespace Faolan.GameServer.CreateFlow
 			var id = client.Session.Account.ClientInstance;
 			return new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(scry))
+				.WriteArrayUInt32Length(scry)
 				.SendAsync(client);
 		}
 

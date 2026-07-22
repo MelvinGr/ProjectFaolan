@@ -367,8 +367,7 @@ namespace Faolan.GameServer
 				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
 				await new PacketStream()
 					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteUInt32(startFixed3d.Length)
-					.WriteArray(startFixed3d)
+					.WriteArrayUInt32Length(startFixed3d)
 					.SendAsync(client);
 			}
 
@@ -400,8 +399,7 @@ namespace Faolan.GameServer
 				var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
 				await new PacketStream()
 					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteUInt32(welcomeTutorial.Length)
-					.WriteArray(welcomeTutorial)
+					.WriteArrayUInt32Length(welcomeTutorial)
 					.SendAsync(client);
 			}
 
@@ -870,7 +868,7 @@ namespace Faolan.GameServer
 			{
 				await new PacketStream()
 					.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(s => s.WriteArray(body))
+					.WriteArrayUInt32Length(body)
 					.SendAsync(client);
 			}
 		}

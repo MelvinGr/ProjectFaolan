@@ -238,8 +238,7 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(instance)
 					.WriteUInt16(next)
 					.WriteUInt32(0x0000000Fu)
-					.WriteUInt32(echoedArgs.Length)
-					.WriteArray(echoedArgs)
+					.WriteArrayUInt32Length(echoedArgs)
 					.WriteUInt32(0)
 					.WriteUInt32(0)
 					.WriteUInt32(1) // result block: count

@@ -68,9 +68,9 @@ namespace Faolan.GameServer
 			entity.OwnerHandle = owner;
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(PetIirCodec.BuildAssign(owner, entity.Handle, combat
+				.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
 					? PetIirCodec.CombatKind
-					: PetIirCodec.SocialKind)))
+					: PetIirCodec.SocialKind))
 				.SendAsync(client);
 
 			_broadcaster.SetNpcFollow(client, entity.Handle, true);
@@ -225,7 +225,7 @@ namespace Faolan.GameServer
 
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, [])))
+				.WriteArrayUInt32Length(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []))
 				.SendAsync(client);
 		}
 
@@ -257,7 +257,7 @@ namespace Faolan.GameServer
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 
 			// #48-analogue: nearby players see the cast EFFECT, not just the gesture. Retail streams the actor's

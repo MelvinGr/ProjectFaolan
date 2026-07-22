@@ -1819,7 +1819,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -1966,11 +1966,11 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -2076,7 +2076,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -2407,7 +2407,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -2554,7 +2554,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -2738,7 +2738,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -2751,7 +2751,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -2818,11 +2818,11 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -3306,7 +3306,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -3419,7 +3419,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -3446,7 +3446,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -3662,7 +3662,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -3774,7 +3774,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -3948,7 +3948,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -4179,7 +4179,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -4218,7 +4218,7 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -4383,11 +4383,11 @@ namespace Faolan.Tests.Support
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
@@ -4628,20 +4628,20 @@ namespace Faolan.Tests.Support
 			await EnergyIir(client, id, id, 0x01, 0x36B0);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStartScriptGroup(id, 48126)))
+				.WriteArrayUInt32Length(ScryScript.BuildStartScriptGroup(id, 48126))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id,
+				.WriteArrayUInt32Length(ScryScript.BuildStep(id,
 					"<remoteformat token=\"playorskip(100)|onclientconnected(1)|character_creation Tortage Beach (server-side)\" category=\"50023\" key=\"*&#36;!0mcl&#36;Z!5Ii0UG!TV?\" knubot=\"0\"  ></remoteformat>",
 					6,
 					resources:
 					"1010003:3147889;1010003:3147890;1010003:3147891;1010003:3147892;1010003:3147893;1010003:3147894;1010003:137283;1010003:202270;1010003:210528;1010003:205370;1010003:3147896;1010003:3147895;1010003:3147897;1010003:3147898;1010003:3147899;1010003:3147900;1010003:208235;1010003:3203880;1010003:3203879;1010003:3203881;1010003:3203876;1010003:3203877;1010003:3203878",
-					f6Field1: 4617355, f6Field2: 7004418)))
+					f6Field1: 4617355, f6Field2: 7004418))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStartScriptGroup(id, 385910)))
+				.WriteArrayUInt32Length(ScryScript.BuildStartScriptGroup(id, 385910))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, id),
@@ -4763,7 +4763,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: 97795)))
+						.WriteArrayUInt32Length(ScryScript.BuildStep(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: 97795))
 						.SendAsync(client);
 					await StatUpdateIir(client, id, id, [(0xBAu, 0x00u)]);
 					await new PacketStream()
@@ -4954,7 +4954,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStartScriptGroup(id, 7088774)))
+						.WriteArrayUInt32Length(ScryScript.BuildStartScriptGroup(id, 7088774))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -4995,7 +4995,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "WelcomeTutorial")))
+						.WriteArrayUInt32Length(ScryScript.BuildStep(id, "WelcomeTutorial"))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -5154,7 +5154,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -5239,7 +5239,7 @@ namespace Faolan.Tests.Support
 				{
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStartScriptGroup(id, 7124502)))
+						.WriteArrayUInt32Length(ScryScript.BuildStartScriptGroup(id, 7124502))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -5570,11 +5570,11 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
@@ -5808,7 +5808,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -6007,7 +6007,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -6095,7 +6095,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "Kneel")))
+						.WriteArrayUInt32Length(ScryScript.BuildStep(id, "Kneel"))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -6128,7 +6128,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -6211,7 +6211,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
@@ -6571,7 +6571,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -6810,7 +6810,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
@@ -6837,7 +6837,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -7106,7 +7106,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E3F, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -7145,7 +7145,7 @@ namespace Faolan.Tests.Support
 				{
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "StartFixed3d")))
+						.WriteArrayUInt32Length(ScryScript.BuildStep(id, "StartFixed3d"))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
@@ -7269,7 +7269,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStartScriptGroup(id, 7727158)))
+						.WriteArrayUInt32Length(ScryScript.BuildStartScriptGroup(id, 7727158))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,
@@ -7463,7 +7463,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E29, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -7579,7 +7579,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E40, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
@@ -7601,7 +7601,7 @@ namespace Faolan.Tests.Support
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-						.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C)))
+						.WriteArrayUInt32Length(WorldDespawn.BuildBody(0x00017E2B, 0x01EA985C))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id), GameCharInterfaceOpcodes.DispatchPong,

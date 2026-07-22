@@ -42,7 +42,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (s.Scale != null)
 				payload.WriteByte(0x25).WriteArray(s.Scale);
 
-			payload.WriteByte(0x18).WriteVarint(s.Playfield).WriteArray(s.PreFrame).WriteUInt32(s.CharacterIir.Length).WriteArray(s.CharacterIir).WriteArray(post);
+			payload.WriteByte(0x18).WriteVarint(s.Playfield).WriteArray(s.PreFrame).WriteArrayUInt32Length(s.CharacterIir).WriteArray(post);
 
 			return new FaolanStream().WriteArrayUInt32Length(payload.ToArray()).ToArray();
 		}

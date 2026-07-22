@@ -174,7 +174,7 @@ namespace Faolan.GameServer.Quest
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.WriteArrayUInt32Length(body)
 				.SendAsync(recipient);
 		}
 	}

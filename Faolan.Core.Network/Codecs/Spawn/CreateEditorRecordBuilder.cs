@@ -283,7 +283,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var bytes = Encoding.Latin1.GetBytes(name ?? "");
 			if (bytes.Length > 31)
 				bytes = bytes[..31];
-			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(0x00).WriteUInt32(3u).WriteByte(0x01).WriteByte(0x01).WriteUInt32((uint)bytes.Length).WriteArray(bytes).ToArray();
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(0x00).WriteUInt32(3u).WriteByte(0x01).WriteByte(0x01).WriteArrayUInt32Length(bytes).ToArray();
 		}
 	}
 }

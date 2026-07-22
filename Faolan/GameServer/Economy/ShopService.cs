@@ -250,7 +250,7 @@ namespace Faolan.GameServer.Economy
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
 

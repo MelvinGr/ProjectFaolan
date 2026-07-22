@@ -38,8 +38,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(instance)
 				.WriteUInt16(seq + 1)
 				.WriteUInt32(behaviorId)
-				.WriteUInt32(echoedArgs.Length)
-				.WriteArray(echoedArgs)
+				.WriteArrayUInt32Length(echoedArgs)
 				.WriteArray(tail);
 			if (padTail)
 				s.WriteArray(new byte[12]);
@@ -84,8 +83,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(instance)
 				.WriteUInt16(0x0007)
 				.WriteUInt32(behaviorId)
-				.WriteUInt32(echoedArgs.Length)
-				.WriteArray(echoedArgs)
+				.WriteArrayUInt32Length(echoedArgs)
 				.WriteArray(tail);
 			return s.ToArray();
 		}

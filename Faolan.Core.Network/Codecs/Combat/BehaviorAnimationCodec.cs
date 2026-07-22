@@ -157,8 +157,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(actor)
 				.WriteUInt16(seq)
 				.WriteUInt32(behaviorId)
-				.WriteUInt32(args.Length)
-				.WriteArray(args)
+				.WriteArrayUInt32Length(args)
 				.WriteArray(trailer)
 				.ToArray();
 		}

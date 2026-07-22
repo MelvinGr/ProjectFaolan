@@ -100,8 +100,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0004) // form
 				.WriteUInt32(0x0000001F) // slot
-				.WriteUInt32((uint)protobuf.Length)
-				.WriteArray(protobuf)
+				.WriteArrayUInt32Length(protobuf)
 				.ToArray();
 		}
 
@@ -152,8 +151,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(handle)
 				.WriteUInt16(0x0004) // form
 				.WriteUInt32(0x00000025) // slot
-				.WriteUInt32(ReviveBccProtobuf.Length)
-				.WriteArray(ReviveBccProtobuf)
+				.WriteArrayUInt32Length(ReviveBccProtobuf)
 				.WriteUInt32(0x00000003) // tail prefix
 				.WriteUInt32(respawnPointId) // the chosen resurrection-point id
 				.ToArray();

@@ -30,8 +30,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(Handle)
 				.WriteByte(Env)
-				.WriteUInt32(InventoryProtobuf.Length)
-				.WriteArray(InventoryProtobuf));
+				.WriteArrayUInt32Length(InventoryProtobuf));
 		}
 
 		public static UpdateInventoryCodec Parse(byte[] body)

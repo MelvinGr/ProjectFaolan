@@ -166,7 +166,7 @@ namespace Faolan.GameServer.World
 
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
 
@@ -175,7 +175,7 @@ namespace Faolan.GameServer.World
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, count)))
+				.WriteArrayUInt32Length(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, count))
 				.SendAsync(client);
 		}
 
@@ -184,7 +184,7 @@ namespace Faolan.GameServer.World
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestIir(client.Session.Character.Id, questId, state)))
+				.WriteArrayUInt32Length(WorldQuest.BuildQuestIir(client.Session.Character.Id, questId, state))
 				.SendAsync(client);
 		}
 
@@ -331,7 +331,7 @@ namespace Faolan.GameServer.World
 
 				await new PacketStream()
 					.WriteHeader(WorldFraming.Sender, viewer.Client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(s => s.WriteArray(body))
+					.WriteArrayUInt32Length(body)
 					.SendAsync(viewer.Client);
 			}
 		}
@@ -978,7 +978,7 @@ namespace Faolan.GameServer.World
 			// capture frame 1477).
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle)))
+				.WriteArrayUInt32Length(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle))
 				.SendAsync(client);
 
 			// The actual window-open is DispatchOpenLootBag (0x2037) on the GameCharAgent -> GameCharInterface
@@ -1693,7 +1693,7 @@ namespace Faolan.GameServer.World
 
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(subjectHandle, token, classWord)))
+				.WriteArrayUInt32Length(WorldDespawn.BuildBody(subjectHandle, token, classWord))
 				.SendAsync(recipient);
 		}
 
@@ -1854,7 +1854,7 @@ namespace Faolan.GameServer.World
 			var body = WorldQuest.BuildQuestJournal(client.Session.Character.Id, first.AreaId, areaHeader, entries, trailing);
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
 
@@ -1867,7 +1867,7 @@ namespace Faolan.GameServer.World
 				WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.WriteArrayUInt32Length(body)
 				.SendAsync(client);
 		}
 
@@ -2016,7 +2016,7 @@ namespace Faolan.GameServer.World
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.WriteArrayUInt32Length(body)
 				.SendAsync(recipient);
 		}
 

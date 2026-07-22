@@ -31,7 +31,7 @@ namespace Faolan.GameServer
 		{
 			return new PacketStream()
 				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathBcc(dyingHandle)))
+				.WriteArrayUInt32Length(WorldDeath.BuildDeathBcc(dyingHandle))
 				.SendAsync(client);
 		}
 
@@ -39,7 +39,7 @@ namespace Faolan.GameServer
 		{
 			return new PacketStream()
 				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathEffect(dyingHandle)))
+				.WriteArrayUInt32Length(WorldDeath.BuildDeathEffect(dyingHandle))
 				.SendAsync(client);
 		}
 
@@ -47,7 +47,7 @@ namespace Faolan.GameServer
 		{
 			return new PacketStream()
 				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathPose(dyingHandle, deathPosition)))
+				.WriteArrayUInt32Length(WorldDeath.BuildDeathPose(dyingHandle, deathPosition))
 				.SendAsync(client);
 		}
 
@@ -55,7 +55,7 @@ namespace Faolan.GameServer
 		{
 			return new PacketStream()
 				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint)))
+				.WriteArrayUInt32Length(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint))
 				.SendAsync(client);
 		}
 
@@ -74,7 +74,7 @@ namespace Faolan.GameServer
 			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
 			return new PacketStream()
 				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildRevive(handle, respawnPointId)))
+				.WriteArrayUInt32Length(WorldDeath.BuildRevive(handle, respawnPointId))
 				.SendAsync(client);
 		}
 
@@ -84,7 +84,7 @@ namespace Faolan.GameServer
 			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
 			return new PacketStream()
 				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(TeleportCodec.BuildReviveDestination(handle, mapId, handle, position, facingX, facingZ)))
+				.WriteArrayUInt32Length(TeleportCodec.BuildReviveDestination(handle, mapId, handle, position, facingX, facingZ))
 				.SendAsync(client);
 		}
 
@@ -94,7 +94,7 @@ namespace Faolan.GameServer
 			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
 			return new PacketStream()
 				.WriteHeader(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s.WriteArray(TeleportCodec.BuildReviveTeleport(handle, mapId, handle, playfieldToken)))
+				.WriteArrayUInt32Length(TeleportCodec.BuildReviveTeleport(handle, mapId, handle, playfieldToken))
 				.SendAsync(client);
 		}
 
