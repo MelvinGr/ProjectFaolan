@@ -128,7 +128,7 @@ Rules and edge cases:
 dotnet run --project Faolan.Importer -- [paths] [selection] [modifiers]
 
 Paths
-  --db <conn string>   override the connection; default: faolan.json DatabaseConnectionString (e.g. Data Source=faolan.db)
+  --connectionstring <s>  override the connection; default: faolan.json Database:ConnectionString (e.g. Data Source=faolan.db)
   --captures <dir>     default: <repo>/Captures
   --rdb <dir>          client RDB dir (enables rdb-* modules)
 

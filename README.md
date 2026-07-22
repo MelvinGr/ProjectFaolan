@@ -252,11 +252,11 @@ and the `Faolan.Mcp` chat-bridge — shares **one** config model: **environment 
 `faolan.json`**, with `faolan.json` **optional** (a container can be configured entirely by env vars, with no
 file baked into the image). It lives at the repo root.
 
-The shared, required keys stay flat; the per-concern tuning is grouped into sections:
+Related keys are grouped into sections; the remaining shared keys stay flat:
 
 | Key | Meaning |
 | --- | --- |
-| `DatabaseProvider` / `DatabaseConnectionString` | `Sqlite` (default; `Data Source=faolan.db`) or `Postgres` + its connection string |
+| `Database` `{ Provider, ConnectionString }` | `Sqlite` (default; `Data Source=faolan.db`) or `Postgres` + its connection string |
 | `ServerIpAddress` | the address the login tier advertises to clients (must be reachable from the client) |
 | `UniverseAgentPort` / `PlayerAgentPort` | login-tier listen ports (7010 is the fixed client entry point) |
 | `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
@@ -266,10 +266,10 @@ The shared, required keys stay flat; the per-concern tuning is grouped into sect
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 
 Any key can be overridden from the environment (this is how the Docker images are configured) — a flat key by
-its own name (`DatabaseConnectionString=…`), a grouped key with the `__` separator (`Mcp__Port=7098`,
-`CdnMirror__Store=/data`). A few tools also expose a short flag that maps onto a key: the importer's
-`--db "<connection string>"` (→ `DatabaseConnectionString`) and the mirror's `--store` / `--ip` / `--port`
-(→ `CdnMirror:*`). `Faolan.ClientLauncher` is the one exception — its flags are client-launch parameters, not
+its own name (`ServerIpAddress=…`), a grouped key with the `__` separator (`Database__ConnectionString=…`,
+`Mcp__Port=7098`, `CdnMirror__Store=/data`). A few tools also expose a short flag that maps onto a key: the
+importer's `--connectionstring "<…>"` (→ `Database:ConnectionString`) and the mirror's `--store` / `--ip` /
+`--port` (→ `CdnMirror:*`). `Faolan.ClientLauncher` is the one exception — its flags are client-launch parameters, not
 server config, so it has its own arguments (see below).
 
 ## Test

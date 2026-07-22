@@ -34,8 +34,8 @@ namespace Faolan.Core.Extensions
 			// Required values. faolan.json is OPTIONAL now (a container can be configured purely by env vars), so a
 			// missing key must fail with a CLEAR message rather than an NRE (config[key]!) / ArgumentNullException
 			// (Enum.Parse(null)) / silent 0 (Convert.ToUInt16(null)).
-			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(Required(config, "DatabaseProvider"), true);
-			public string DatabaseConnection => Required(config, "DatabaseConnectionString");
+			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(Required(config, "Database:Provider"), true);
+			public string DatabaseConnection => Required(config, "Database:ConnectionString");
 			public string ServerIpAddress => Required(config, "ServerIpAddress");
 			public string WelcomeString => Required(config, "WelcomeString");
 			public ushort McpPort => ushort.Parse(Required(config, "Mcp:Port"));

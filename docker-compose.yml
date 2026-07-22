@@ -13,8 +13,8 @@
 name: projectfaolan
 
 x-faolan-config: &faolan-config
-  DatabaseProvider: Sqlite
-  DatabaseConnectionString: "Data Source=/app/faolan.db"
+  Database__Provider: Sqlite                            # nested key -> env uses the __ separator (Database:Provider)
+  Database__ConnectionString: "Data Source=/app/faolan.db"
   ServerIpAddress: "127.0.0.1"   # host IP / hostname for a real deploy (see note above)
   UniverseAgentPort: 7010
   PlayerAgentPort: 7011
@@ -90,11 +90,11 @@ services:
 #      bind mount, and add `depends_on: [postgres]`:
 #          environment:
 #            <<: *faolan-config
-#            DatabaseProvider: Postgres
-#            DatabaseConnectionString: "Host=postgres;Port=5432;Database=faolan;Username=faolan;Password=faolan"
+#            Database__Provider: Postgres
+#            Database__ConnectionString: "Host=postgres;Port=5432;Database=faolan;Username=faolan;Password=faolan"
 #          depends_on: [postgres]
-#   3. Seed the fresh PG DB before/at first run: point Faolan.Importer at the same connection (DatabaseProvider +
-#      DatabaseConnectionString env vars) - EF Migrates the schema, then the modules load the data.
+#   3. Seed the fresh PG DB before/at first run: point Faolan.Importer at the same connection (Database__Provider +
+#      Database__ConnectionString env vars) - EF Migrates the schema, then the modules load the data.
 # ---------------------------------------------------------------------------------------------------------------
 #  postgres:
 #    image: postgres:17
@@ -116,8 +116,8 @@ services:
 #      dockerfile: Faolan.Web/Dockerfile
 #    image: projectfaolan-web
 #    environment:
-#      DatabaseProvider: Sqlite
-#      DatabaseConnectionString: "Data Source=/app/faolan.db"
+#      Database__Provider: Sqlite
+#      Database__ConnectionString: "Data Source=/app/faolan.db"
 #      RdbDir: "/rdb"                                             # the client RDB, mounted below
 #      CdnUrl: "http://host.docker.internal:7081/gameupdate/upm/rdb"
 #    ports:

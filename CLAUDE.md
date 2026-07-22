@@ -214,7 +214,7 @@ dotnet run --project Faolan.Importer -- --report corpus-extract --captures <data
 ```
 
 `--captures` is how every importer command takes it (`--rdb` likewise). The importer's DB comes from faolan.json
-(`DatabaseProvider` + `DatabaseConnectionString`), the same as the server; override the connection with `--db "<conn string>"`
+(the `Database` section: `Database:Provider` + `Database:ConnectionString`), the same as the server; override the connection with `--connectionstring "<conn string>"`
 
 ⚠️ The extract is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
 gate while they all still pass - the exact failure mode those gates exist to catch. Its manifest pins the

@@ -32,7 +32,7 @@ namespace Faolan.Importer.Cli
 
 		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
 		// capture/RDB-only reports (corpus-extract, coverage-of-captures, ...) need no DB config at all. Same source
-		// and precedence as the import path (env > cmdline(--db) > faolan.json) - see CliConfig.
+		// and precedence as the import path (env > cmdline(--connectionstring) > faolan.json) - see CliConfig.
 		private static string[] _args = [];
 		private static (FaolanDbProvider Provider, string Connection)? _db;
 
@@ -945,7 +945,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{(k.Dl ? "S2C" : "C2S")} op=0x{k.Op:X4} sub=0x{k.Sub:X8}  total={count}  in {globalDumps[k].Count} dumps");
 		}
 
-		// Reports read the SQLite fixture (faolan.db) at --db; one short-lived context through the shared factory.
+		// Reports read the DB from the shared config (faolan.db by default, --connectionstring to override); one short-lived context.
 		private static DatabaseContext OpenDb()
 		{
 			_db ??= CliConfig.ResolveDatabase(_args);
