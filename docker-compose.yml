@@ -3,22 +3,30 @@
 # Default: ONE all-in-one server (login tier + the first realm's world) — the simplest deploy. `docker compose up`
 # builds the image (Dockerfile) and runs it, persisting the game data via a bind mount.
 #
-# For a PROCESS-PER-REALM deployment (#324, docs/subsystems/multi-realm.md) see the commented `login` +
-# `realm-*` services at the bottom. Two caveats for that mode:
-#   - The Realm rows' IpAddress must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT
-#     127.0.0.1 — the login tier advertises Realm.IpAddress:Port and the client connects there from OUTSIDE Docker;
-#     each realm's ports must be published on the host too.
-#   - All processes share one faolan.db over the bind mount, and SQLite is single-writer (file locking is awkward
-#     for concurrent containers) — fine for light/dev use, but production multi-realm wants a server DB (Postgres;
-#     see the DB-provider note in the plan). Then the shared DB is a service, not a bind mount.
+# CONFIG COMES FROM ENV VARS. The image carries NO faolan.json (it's optional; precedence is env > cmdline > json),
+# so every game process sets its config in `environment:` - shared here via the `x-faolan-config` anchor. Two caveats:
+#   - ServerIpAddress must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT 127.0.0.1 -
+#     the login tier advertises it (and each Realm row's IpAddress) and the client connects there from OUTSIDE Docker.
+#   - The all-in-one SQLite default bind-mounts faolan.db; a shared multi-realm deployment wants Postgres (no
+#     single-writer file lock) - see the commented POSTGRES section.
 
 name: projectfaolan
+
+x-faolan-config: &faolan-config
+  DatabaseProvider: Sqlite
+  DatabaseConnectionString: "Data Source=/app/faolan.db"
+  ServerIpAddress: "127.0.0.1"   # host IP / hostname for a real deploy (see note above)
+  UniverseAgentPort: 7010
+  PlayerAgentPort: 7011
+  McpPort: 7099
+  WelcomeString: "Welcome to Project Faolan!"
 
 services:
   faolan:
     build: .
     image: projectfaolan
     # All-in-one: login tier + the first realm's world (the Dockerfile ENTRYPOINT, no --role override).
+    environment: *faolan-config
     ports:
       - "7010:7010" # UniverseAgent — the fixed client entry port
       - "7011:7011" # PlayerAgent
@@ -33,13 +41,14 @@ services:
 
 # ---------------------------------------------------------------------------------------------------------------
 # PROCESS-PER-REALM example (uncomment; remove/keep the all-in-one `faolan` service above as you like). One shared
-# login/router tier + one game host per realm, all against the shared faolan.db. Seed a Realm row per realm first
+# login/router tier + one game host per realm, all against the shared DB. Seed a Realm row per realm first
 # (id + IpAddress reachable by the client + its Port/AgentServerPort/CsPlayerAgentPort), then publish those ports.
 # ---------------------------------------------------------------------------------------------------------------
 #  login:
 #    build: .
 #    image: projectfaolan
 #    command: ["--role", "login"]        # UniverseAgent + PlayerAgent only; owns no world
+#    environment: *faolan-config
 #    ports:
 #      - "7010:7010"
 #      - "7011:7011"
@@ -51,6 +60,7 @@ services:
 #    build: .
 #    image: projectfaolan
 #    command: ["--role", "realm=2"]      # one realm's game host, bound to Realm row 2's ports
+#    environment: *faolan-config
 #    ports:
 #      - "7014:7014"                      # world / chat / cs = Realm row 2's Port / AgentServerPort / CsPlayerAgentPort
 #      - "7012:7012"
@@ -63,6 +73,7 @@ services:
 #    build: .
 #    image: projectfaolan
 #    command: ["--role", "realm=3"]      # a second realm (seed Realm row 3 with these ports first)
+#    environment: *faolan-config
 #    ports:
 #      - "7024:7024"
 #      - "7022:7022"
@@ -72,15 +83,18 @@ services:
 #    restart: unless-stopped
 
 # ---------------------------------------------------------------------------------------------------------------
-# POSTGRES backend (commented). Run the game DB on Postgres instead of the bind-mounted SQLite faolan.db - the
-# store for a shared multi-realm deployment (no single-writer file lock; see the caveat note at the top). To use it:
+# POSTGRES backend (commented). Run the game DB on Postgres instead of the bind-mounted SQLite faolan.db - the store
+# for a shared multi-realm deployment (no single-writer file lock). To use it:
 #   1. Uncomment the `postgres` service + the top-level `volumes:` block below.
-#   2. On each game process (`faolan`, or `login` + every `realm-*`): DROP its `./faolan.db` bind mount, set the
-#      DatabaseProvider / DatabaseConnectionString env vars pointing at the `postgres` service, and add
-#      `depends_on: [postgres]`. Env vars are the highest-precedence config source, so they override the image's
-#      baked-in SQLite selection without editing faolan.json. (A realm host keeps its own `--role` command arg too.)
-#   3. Seed the fresh PG DB before/at first run: point Faolan.Importer at the same connection (set DatabaseProvider +
-#      DatabaseConnectionString env vars, or pass --db) - EF Migrates the schema, then the modules load the data.
+#   2. On each game process, MERGE the anchor and override the DB keys (env > everything), DROP its `./faolan.db`
+#      bind mount, and add `depends_on: [postgres]`:
+#          environment:
+#            <<: *faolan-config
+#            DatabaseProvider: Postgres
+#            DatabaseConnectionString: "Host=postgres;Port=5432;Database=faolan;Username=faolan;Password=faolan"
+#          depends_on: [postgres]
+#   3. Seed the fresh PG DB before/at first run: point Faolan.Importer at the same connection (DatabaseProvider +
+#      DatabaseConnectionString env vars) - EF Migrates the schema, then the modules load the data.
 # ---------------------------------------------------------------------------------------------------------------
 #  postgres:
 #    image: postgres:17
@@ -91,13 +105,27 @@ services:
 #    volumes:
 #      - faolan-pgdata:/var/lib/postgresql/data
 #    restart: unless-stopped
-#
-#  # ...and on the faolan service (remove its `./faolan.db` volume, since the DB is now Postgres):
-#  #    environment:
-#  #      DatabaseProvider: Postgres
-#  #      DatabaseConnectionString: "Host=postgres;Port=5432;Database=faolan;Username=faolan;Password=faolan"  # Host = service name
-#  #    depends_on:
-#  #      - postgres
-#
+
+# ---------------------------------------------------------------------------------------------------------------
+# WEB armory / 3D viewer / GM tools (commented; #275). Its own image (Faolan.Web/Dockerfile). Reads the roster from
+# the same DB, plus the client RDB dir (RdbDir - a DATA mount) for meshes/renders and CdnUrl (Faolan.Web.Content proxy).
+# ---------------------------------------------------------------------------------------------------------------
+#  web:
+#    build:
+#      context: .
+#      dockerfile: Faolan.Web/Dockerfile
+#    image: projectfaolan-web
+#    environment:
+#      DatabaseProvider: Sqlite
+#      DatabaseConnectionString: "Data Source=/app/faolan.db"
+#      RdbDir: "/rdb"                                             # the client RDB, mounted below
+#      CdnUrl: "http://host.docker.internal:7081/gameupdate/upm/rdb"
+#    ports:
+#      - "7080:8080"                                             # armory/viewer (Kestrel listens on 8080 in-container)
+#    volumes:
+#      - ./faolan.db:/app/faolan.db:ro                           # read-only roster
+#      - /path/to/client/RDB:/rdb:ro                             # the client RDB (3D models / renders)
+#    restart: unless-stopped
+
 # volumes:
 #  faolan-pgdata:

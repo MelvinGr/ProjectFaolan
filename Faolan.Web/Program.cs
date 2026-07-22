@@ -29,9 +29,13 @@ namespace Faolan.Web
 		{
 			var builder = WebApplication.CreateBuilder(args);
 
-			builder.Configuration.AddJsonFile(RepoPaths.Combine("faolan.json"));
-			// The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD repo root.
+			// Shared config (DB provider/connection, etc.) - OPTIONAL, like the server, so a container can supply it
+			// by env vars instead. The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD.
+			builder.Configuration.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true);
 			builder.Configuration.AddJsonFile("appsettings.json");
+			// Env vars / command line override the files (parity with the server): env > cmdline > json.
+			builder.Configuration.AddCommandLine(args);
+			builder.Configuration.AddEnvironmentVariables();
 
 			builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 

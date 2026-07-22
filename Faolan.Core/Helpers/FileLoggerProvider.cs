@@ -13,7 +13,11 @@ namespace Faolan.Core.Helpers
 
 		public FileLoggerProvider(string path)
 		{
-			Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+			// Only create a directory when the path actually names one - a bare filename ("faolan.log") writes to the
+			// CWD, and Path.GetDirectoryName returns "" for it, which Directory.CreateDirectory rejects (empty path).
+			var directory = Path.GetDirectoryName(path);
+			if (!string.IsNullOrEmpty(directory))
+				Directory.CreateDirectory(directory);
 
 			// AutoFlush is OFF: flushing on every line turns each log call into a synchronous disk write under a
 			// lock, which causes severe lag spikes under the in-world packet stream (hundreds of log lines/sec).

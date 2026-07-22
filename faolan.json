@@ -11,6 +11,7 @@
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
+	"LogFile": "faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
 	"LogPacketBytes": true, // false = drop the raw header/body hex dump, keep just the opcode + lengths
 
 	"WelcomeString": "Welcome to Project Faolan!"

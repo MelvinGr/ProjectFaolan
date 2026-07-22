@@ -78,10 +78,9 @@ namespace Faolan
 				options.SingleLine = true;
 			});
 
-			// Mirror the console log to a file. FAOLAN_LOG_FILE overrides the location (e.g. a mounted volume in a
-			// container); default is logs/<epoch>.log (epoch = process start, unix seconds) so each run is a
-			// distinct, retained file instead of overwriting one logs.txt every start (#282).
-			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ?? "faolan.log"));
+			// Mirror the console log to a file. LogFile config (env > cmdline > json) sets the location; default is
+			// faolan.log in the CWD (repo root), rewritten each start. Point it at a mounted volume in a container.
+			builder.Logging.AddProvider(new FileLoggerProvider(builder.Configuration.LogFile));
 
 			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
 			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
