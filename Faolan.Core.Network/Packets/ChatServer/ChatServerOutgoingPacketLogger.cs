@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Packets.ChatServer
 					: opcode.ToHex();
 
 				var bytesSuffix = PacketLogOptions.BytesSuffix(_logger, ("body", packet.Body?.ToArray()));
-				_logger.LogInformation("<= [ChatServer {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length,
+				_logger.LogInformation("DL [ChatServer {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length,
 					bytesSuffix);
 			}
 			catch (Exception ex)

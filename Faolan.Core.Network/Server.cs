@@ -171,7 +171,7 @@ namespace Faolan.Core.Network
 				? opcode.ToString()
 				: "Unknown";
 
-			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
+			Logger.LogInformation("UL [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0,
 				packet.Bytes?.Length ?? 0, PacketLogOptions.BytesSuffix(Logger, ("body", packet.Body?.ToArray())));
 		}
 
