@@ -8,6 +8,8 @@
 
 	"McpEnabled": true,
 	"McpPort": 7099,
+	"McpUrl": "http://127.0.0.1:7099/mcp", // Faolan.Mcp chat-bridge -> game-server MCP endpoint (also env McpUrl)
+	// "ChannelPollMs": 1500, "ChannelBacklogGraceMs": 120000, // chat-bridge poll loop tuning (defaults shown)
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 

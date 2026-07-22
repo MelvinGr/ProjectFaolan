@@ -6,6 +6,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
+using Faolan.Core.Extensions;
+using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -37,19 +40,14 @@ namespace Faolan.Mcp
 
 		private static McpClient? _gameServer;
 
-		private static readonly string FaolanMcpUrl = Environment.GetEnvironmentVariable("FAOLAN_MCP_URL") ?? "http://127.0.0.1:7099/mcp";
-
-		// On its first read after (re)connecting the bridge skips pre-existing posts as "backlog", but only those
+		// Set once from config in Main (McpUrl = the game-server MCP endpoint this bridge connects to). _backlogGrace:
+		// on its first read after (re)connecting the bridge skips pre-existing posts as "backlog", but only those
 		// OLDER than this window - posts newer than it are delivered, so a bridge that comes up just after a player
 		// speaks still surfaces that post instead of dropping it forever (#205). The bridge is respawned on every
 		// /mcp reconnect / session restart, so a fresh process must catch the immediately-preceding chatter.
-		private static readonly TimeSpan BacklogGrace = TimeSpan.FromMilliseconds(double.TryParse(Environment.GetEnvironmentVariable("FAOLAN_CHANNEL_BACKLOG_GRACE_MS"), out var graceMs)
-			? graceMs
-			: 120_000);
-
-		private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(double.TryParse(Environment.GetEnvironmentVariable("FAOLAN_CHANNEL_POLL_MS"), out var ms)
-			? ms
-			: 1500);
+		private static string _mcpUrl = "";
+		private static TimeSpan _backlogGrace;
+		private static TimeSpan _pollInterval;
 
 		// The backlog floor for the bridge's first successful read: the newest message OLDER than the grace
 		// window (relative to <paramref name="nowUtc" />). Messages newer than the window have Sequence greater
@@ -61,8 +59,20 @@ namespace Faolan.Mcp
 			return messages.Where(m => m.TimestampUtc < cutoff).Select(m => m.Sequence).DefaultIfEmpty(0UL).Max();
 		}
 
-		public static async Task Main()
+		public static async Task Main(string[] args)
 		{
+			// Config: env > cmdline > json, with an OPTIONAL faolan.json (located via RepoPaths, CWD-independent) - parity
+			// with the server / Faolan.Web / importer. Claude Code spawns this bridge with no args/env, so it runs on the
+			// defaults; override McpUrl / ChannelPollMs / ChannelBacklogGraceMs in faolan.json or the environment.
+			var config = new ConfigurationBuilder()
+				.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true)
+				.AddCommandLine(args)
+				.AddEnvironmentVariables()
+				.Build();
+			_mcpUrl = config.McpUrl;
+			_backlogGrace = TimeSpan.FromMilliseconds(config.ChannelBacklogGraceMs);
+			_pollInterval = TimeSpan.FromMilliseconds(config.ChannelPollMs);
+
 			var options = new McpServerOptions
 			{
 				ServerInfo = new Implementation
@@ -121,7 +131,7 @@ namespace Faolan.Mcp
 
 			var transport = new HttpClientTransport(new HttpClientTransportOptions
 			{
-				Endpoint = new Uri(FaolanMcpUrl),
+				Endpoint = new Uri(_mcpUrl),
 				Name = "faolan"
 			});
 			_gameServer = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
@@ -152,7 +162,7 @@ namespace Faolan.Mcp
 		private static async Task PollLoop(McpServer server, CancellationToken cancellationToken)
 		{
 			ulong? cursor = null;
-			using var timer = new PeriodicTimer(PollInterval);
+			using var timer = new PeriodicTimer(_pollInterval);
 			while (await timer.WaitForNextTickAsync(cancellationToken))
 			{
 				try
@@ -180,8 +190,8 @@ namespace Faolan.Mcp
 						// reconnect / session restart spawns one) whose first read lands just AFTER a player spoke
 						// would otherwise skip that post as "backlog" and never surface it (#205). The floor is the
 						// newest post older than the window; newer posts (Sequence > floor) fall through and forward.
-						cursor = InitialCursor(read.Messages.Select(m => (m.Sequence, m.TimestampUtc)), DateTime.UtcNow, BacklogGrace);
-						await Console.Error.WriteLineAsync($"[faolan-chat] connected; backlog floor sequence {cursor}, forwarding posts newer than {BacklogGrace.TotalSeconds:0}s");
+						cursor = InitialCursor(read.Messages.Select(m => (m.Sequence, m.TimestampUtc)), DateTime.UtcNow, _backlogGrace);
+						await Console.Error.WriteLineAsync($"[faolan-chat] connected; backlog floor sequence {cursor}, forwarding posts newer than {_backlogGrace.TotalSeconds:0}s");
 					}
 
 					foreach (var message in read.Messages.Where(m => !m.FromClaude && m.Sequence > cursor.Value))

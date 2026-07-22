@@ -23,6 +23,13 @@ namespace Faolan.Core.Extensions
 			public string CdnMirrorIp => config["CdnMirrorIp"] ?? "127.0.0.1";
 			public ushort CdnMirrorPort => ushort.TryParse(config["CdnMirrorPort"], out var port) ? port : (ushort)7081;
 
+			// Faolan.Mcp chat-bridge (the stdio "faolan-chat" MCP server). All optional with the built-in defaults so
+			// the bridge runs with no config; McpUrl is the game-server MCP endpoint it connects to, the two Channel*
+			// values tune its poll loop (milliseconds).
+			public string McpUrl => config["McpUrl"] ?? "http://127.0.0.1:7099/mcp";
+			public double ChannelBacklogGraceMs => double.TryParse(config["ChannelBacklogGraceMs"], out var ms) ? ms : 120_000;
+			public double ChannelPollMs => double.TryParse(config["ChannelPollMs"], out var ms) ? ms : 1500;
+
 			// Required values. faolan.json is OPTIONAL now (a container can be configured purely by env vars), so a
 			// missing key must fail with a CLEAR message rather than an NRE (config[key]!) / ArgumentNullException
 			// (Enum.Parse(null)) / silent 0 (Convert.ToUInt16(null)).
