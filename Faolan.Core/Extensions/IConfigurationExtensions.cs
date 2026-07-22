@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Net;
+using Faolan.Core.Enums;
 using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Core.Extensions
@@ -19,14 +20,17 @@ namespace Faolan.Core.Extensions
 
 			// The database backend: "Sqlite" (default) or "Postgres". Set "DatabaseProvider": "Postgres" in
 			// faolan.json to run against Postgres instead of the committed faolan.db seed (#379).
-			public string? DatabaseProvider => config["DatabaseProvider"];
+			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(Required(config, "DatabaseProvider"), true);
 
 			// The connection string to hand the EF provider. Postgres uses the required "DatabaseConnectionString"
 			// (a full Npgsql string); SQLite derives `Data Source=<DatabasePath>` from the existing key, so the
 			// default single-key faolan.json keeps working unchanged.
-			public string DatabaseConnection => string.Equals(config.DatabaseProvider, "Postgres", StringComparison.OrdinalIgnoreCase)
-				? Required(config, "DatabaseConnectionString")
-				: $"Data Source={config.DatabasePath}";
+			public string DatabaseConnection => config.DatabaseProvider switch
+			{
+				FaolanDbProvider.Postgres => Required(config, "DatabaseConnectionString"),
+				FaolanDbProvider.Sqlite => $"Data Source={config.DatabasePath}",
+				_ => throw new ArgumentOutOfRangeException(nameof(config), config.DatabaseProvider, "Unknown database provider.")
+			};
 
 			public string ServerIpAddress => Required(config, "ServerIpAddress");
 
