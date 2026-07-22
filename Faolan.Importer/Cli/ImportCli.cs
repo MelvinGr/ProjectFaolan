@@ -10,7 +10,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
 {
@@ -47,17 +46,9 @@ namespace Faolan.Importer.Cli
 			var dryRun = args.Contains("--dry-run");
 			var force = args.Contains("--force");
 
-			// Provider + connection come from the SHARED faolan.json (the same DB the server uses), so the connection
-			// string lives in ONE place. `--db <connection string>` overrides just the connection (e.g. a throwaway
-			// "Data Source=/tmp/test.db"); the provider still follows the config.
-			// Config precedence: environment variables > faolan.json (optional) - same story as the server, so a
-			// Docker seed job can be pointed at Postgres purely by env vars (DatabaseProvider / DatabaseConnectionString).
-			var config = new ConfigurationBuilder()
-				.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true)
-				.AddEnvironmentVariables()
-				.Build();
-			var provider = config.DatabaseProvider;
-			var connection = GetOption(args, "--db") ?? config.DatabaseConnection;
+			// Provider + connection come from the SHARED config (the same DB the server uses); see CliConfig. `--db` is
+			// a DatabaseConnectionString override in the command-line layer (env > cmdline > json), the provider follows config.
+			var (provider, connection) = CliConfig.ResolveDatabase(args);
 
 			// A SQLite DB is a FILE that must already exist (the DB is the source of truth). Postgres targets a server.
 			if (provider == FaolanDbProvider.Sqlite)

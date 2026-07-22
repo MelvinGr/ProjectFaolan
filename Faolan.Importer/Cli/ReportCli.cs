@@ -30,6 +30,12 @@ namespace Faolan.Importer.Cli
 	{
 		private static readonly string RepoRoot = RepoPaths.Root;
 
+		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
+		// capture/RDB-only reports (corpus-extract, coverage-of-captures, ...) need no DB config at all. Same source
+		// and precedence as the import path (env > cmdline(--db) > faolan.json) - see CliConfig.
+		private static string[] _args = [];
+		private static (FaolanDbProvider Provider, string Connection)? _db;
+
 		// The client's RDB folder is part of the game install, not this repo. Resolve it from --rdb, else the
 		// AOC_RDB env var; RDB-backed reports fail with a clear message if neither is set.
 		private static string RdbDir(string[] args) =>
@@ -39,7 +45,7 @@ namespace Faolan.Importer.Cli
 
 		public static async Task<int> RunAsync(string[] args, string report)
 		{
-			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
+			_args = args; // OpenDb resolves the DB connection from these on demand (CliConfig)
 			var capturesDir = GetOption(args, "--captures");
 			var arg = GetOption(args, "--report-arg");
 
@@ -72,7 +78,7 @@ namespace Faolan.Importer.Cli
 
 				case "coverage":
 				{
-					await Coverage(dbPath, LoadCaptures(capturesDir), arg, GetOption(args, "--rdb"));
+					await Coverage(LoadCaptures(capturesDir), arg, GetOption(args, "--rdb"));
 					return 0;
 				}
 
@@ -120,7 +126,7 @@ namespace Faolan.Importer.Cli
 
 				case "worldobj":
 				{
-					await WorldObj(dbPath, arg ?? "hangingwoman");
+					await WorldObj(arg ?? "hangingwoman");
 					return 0;
 				}
 
@@ -168,13 +174,13 @@ namespace Faolan.Importer.Cli
 
 				case "item-template":
 				{
-					ItemTemplate(RdbDir(args), dbPath, arg ?? "", GetOption(args, "--out"));
+					ItemTemplate(RdbDir(args), arg ?? "", GetOption(args, "--out"));
 					return 0;
 				}
 
 				case "ability-names":
 				{
-					AbilityNames(RdbDir(args), dbPath);
+					AbilityNames(RdbDir(args));
 					return 0;
 				}
 
@@ -186,7 +192,7 @@ namespace Faolan.Importer.Cli
 
 				case "terrain-export":
 				{
-					await TerrainExport(dbPath, RdbDir(args),
+					await TerrainExport(RdbDir(args),
 						GetOption(args, "--terrain-out") ?? Path.Combine(RepoRoot, "Terrain"));
 					return 0;
 				}
@@ -357,7 +363,7 @@ namespace Faolan.Importer.Cli
 					// English names our Spells catalog already carries (from the template ExtractName). The page whose
 					// strings match our names is English; the FR/DE/ES/RU/PL/KO copies of the same ids won't.
 					static string Norm(string s) => s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
-					await using (var db = OpenDb(dbPath))
+					await using (var db = OpenDb())
 					{
 						var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "")
 							.ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
@@ -439,9 +445,9 @@ namespace Faolan.Importer.Cli
 
 		// Decrypts each Ability's RDB 1000020 entry with its stored Data1..4 TEA key (same scheme as item templates, #137)
 		// and dumps the printable strings - the ability NAME lives in that (encrypted-but-key-available) template.
-		private static void AbilityNames(string rdbDir, string dbPath)
+		private static void AbilityNames(string rdbDir)
 		{
-			using var db = OpenDb(dbPath);
+			using var db = OpenDb();
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			foreach (var a in db.Abilities.OrderBy(x => x.Slot).Include(ability => ability.Key).ToList())
 			{
@@ -501,7 +507,7 @@ namespace Faolan.Importer.Cli
 		// we import. Capture-relative by necessity (there is no authoritative game-wide vendor/dialogue list - retail
 		// dialogue is TEA-encrypted in the RDB), so it measures import completeness OF WHAT WE'VE SEEN and names the
 		// gaps to go capture/decode. `--report-arg readme` rewrites the marked section of README.md; else it prints.
-		private static async Task Coverage(string dbPath, IReadOnlyList<NamedCapture> captures, string? arg, string? rdbDir)
+		private static async Task Coverage(IReadOnlyList<NamedCapture> captures, string? arg, string? rdbDir)
 		{
 			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
 			var greeted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -515,7 +521,7 @@ namespace Faolan.Importer.Cli
 				foreach (var e in CaptureShopImporter.Extract(c.Packets))
 					vendorsSeen.Add(e.VendorName);
 
-			using var db = OpenDb(dbPath);
+			using var db = OpenDb();
 			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var shopImported = (await db.Shops.Select(s => s.VendorName).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -654,7 +660,7 @@ namespace Faolan.Importer.Cli
 				: null;
 		}
 
-		private static void ItemTemplate(string rdbDir, string dbPath, string? arg, string? outDir = null)
+		private static void ItemTemplate(string rdbDir, string? arg, string? outDir = null)
 		{
 			if (!uint.TryParse(arg, out var itemId))
 			{
@@ -662,7 +668,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var db = OpenDb(dbPath);
+			using var db = OpenDb();
 			var item = db.Items.FirstOrDefault(i => i.Id == itemId);
 			if (item == null)
 			{
@@ -940,7 +946,11 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Reports read the SQLite fixture (faolan.db) at --db; one short-lived context through the shared factory.
-		private static DatabaseContext OpenDb(string dbPath) => DatabaseExtensions.CreateContext(FaolanDbProvider.Sqlite, $"Data Source={dbPath}");
+		private static DatabaseContext OpenDb()
+		{
+			_db ??= CliConfig.ResolveDatabase(_args);
+			return DatabaseExtensions.CreateContext(_db.Value.Provider, _db.Value.Connection);
+		}
 
 		// RDB -> 3D-model asset graph (Gitea #275, Phase 0). With no --report-arg: a corpus summary (how many
 		// MESHINDEXFILE manifests resolve to geometry, how their textures are split local vs CDN). With --report-arg
@@ -1398,9 +1408,9 @@ namespace Faolan.Importer.Cli
 		// in the DB that has terrain, so the GAME SERVER can serve ground-snap + line-of-sight from these small files
 		// instead of shipping the ~28 GB client RDB. Output: <out>/<mapId>.terrain (TerrainFile format). Run:
 		//   dotnet run --project Faolan.Importer -- --report terrain-export [--rdb <dir>] [--terrain-out <dir>]
-		private static async Task TerrainExport(string dbPath, string rdbDir, string outDir)
+		private static async Task TerrainExport(string rdbDir, string outDir)
 		{
-			using var db = OpenDb(dbPath);
+			using var db = OpenDb();
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
 			Directory.CreateDirectory(outDir);
 
@@ -1471,9 +1481,9 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Build a named world object via the burstless world-entry path and print its hex (render diffing).
-		private static async Task WorldObj(string dbPath, string target)
+		private static async Task WorldObj(string target)
 		{
-			await using var db = OpenDb(dbPath);
+			await using var db = OpenDb();
 			foreach (var row in await db.WorldObjects.Where(o => o.Name!.Contains(target)).ToListAsync())
 			{
 				byte[]? baseBody = null;
