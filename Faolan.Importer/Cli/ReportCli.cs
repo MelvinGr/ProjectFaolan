@@ -271,9 +271,82 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "ldb-resolve":
+				{
+					// #291: parse the LDB (RDB 1030002) TDC2 pages with the CORRECT grammar recovered from the client
+					// loader FUN_0060e5c0 - each page carries an EXPLICIT per-string id index (the earlier RE mis-read
+					// the string blob as a flat NUL-separated positional array and missed the trailing id table). Build a
+					// global id -> string map and print lookups for the pins + any --report-arg ids, to verify offline.
+					//   body: [12 RDB-Id][u32 "TDC2"][u32 category][u32 flags][u32 size][u32 count][16 MD5]
+					//         [size string-blob][count x { u32 id, u32 unk, u32 offset, u32 length }]
+					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					var map = new Dictionary<uint, string>();
+					var byCat = new Dictionary<(uint cat, uint id), string>();
+					var byLang = new Dictionary<(uint cat, uint id, uint lang), string>();
+					var langHisto = new Dictionary<uint, int>();
+					var perCategory = new Dictionary<uint, int>();
+					int pages = 0, badMagic = 0;
+					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
+					{
+						byte[] b;
+						try { b = rdb.ReadDecompressed(e); }
+						catch { continue; }
+						if (b.Length < 48) continue;
+						var span = b.AsSpan(12);
+						if (System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span) != 0x32434454u) { badMagic++; continue; }
+						var category = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
+						var size = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12, 4));
+						var count = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16, 4));
+						var blobStart = 36; // span: TDC2(4) + cat/flags/size/count(16) + MD5(16) = 36
+						var indexStart = blobStart + (int)size;
+						if (indexStart + (long)count * 16 > span.Length) continue; // grammar mismatch for this page
+						pages++;
+						for (var i = 0; i < count; i++)
+						{
+							var rec = span.Slice(indexStart + i * 16, 16);
+							var id = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec);
+							var lang = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(4, 4)); // 2nd u32 = language (loader arg3)
+							var off = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(8, 4));
+							var len = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(12, 4));
+							if (off + len > size) continue;
+							var strBytes = span.Slice(blobStart + (int)off, (int)len);
+							var nul = strBytes.IndexOf((byte)0);
+							if (nul >= 0) strBytes = strBytes.Slice(0, nul);
+							var str = System.Text.Encoding.UTF8.GetString(strBytes);
+							map[id] = str;
+							byCat[(category, id)] = str;
+							langHisto[lang] = langHisto.GetValueOrDefault(lang) + 1;
+							byLang[(category, id, lang)] = str;
+							perCategory[category] = perCategory.GetValueOrDefault(category) + 1;
+						}
+					}
+					Console.WriteLine($"LDB: {pages} pages parsed, {map.Count} unique ids, {badMagic} bad-magic, {perCategory.Count} categories.");
+					// Per-category: count + an ASCII-ratio on a sample so English (high ASCII) is distinguishable from CJK.
+					Console.WriteLine("=== categories (id, count, asciiPct, sample) ===");
+					foreach (var (cat, cnt) in perCategory.OrderByDescending(kv => kv.Value).Take(30))
+					{
+						var sample = byCat.First(kv => kv.Key.cat == cat).Value;
+						var ascii = sample.Length == 0 ? 0 : sample.Count(c => c < 128) * 100 / sample.Length;
+						Console.WriteLine($"  cat {cat,-8} n={cnt,-6} ascii={ascii,3}%  '{sample.Substring(0, Math.Min(40, sample.Length))}'");
+					}
+					Console.WriteLine("=== language histogram (2nd u32 per index entry) ===");
+					foreach (var (lang, n) in langHisto.OrderByDescending(kv => kv.Value).Take(12))
+						Console.WriteLine($"  lang {lang,-6} n={n}");
+					Console.WriteLine("=== pins across ALL (category, lang) ===");
+					foreach (var (id, expect) in new (uint, string)[] { (222682, "Set's Ruin"), (222675, "Set's Cold Hatred") })
+					{
+						var hits = byLang.Where(kv => kv.Key.id == id).ToList();
+						Console.WriteLine($"  {id} (expect '{expect}'): {hits.Count} hit(s)");
+						foreach (var h in hits)
+							Console.WriteLine($"      cat {h.Key.cat} lang {h.Key.lang}: '{h.Value.Substring(0, Math.Min(50, h.Value.Length))}'");
+					}
+					return 0;
+				}
+
 				default:
 				{
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings, ldb-resolve.");
 					return 1;
 				}
 			}
