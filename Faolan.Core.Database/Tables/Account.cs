@@ -36,13 +36,8 @@ namespace Faolan.Core.Database.Tables
 		public bool GmGodMode { get; set; }
 		public bool GmInvisible { get; set; }
 
-		public DateTimeOffset CreationDate { get; set; }
+		public DateTimeOffset CreationDate { get; set; } = DateTimeOffset.UtcNow;
 		public DateTimeOffset? LastConnection { get; set; }
-
-		[Obsolete]
-		public int CreateCounter { get; set; } // TODO: delete, not used
-		[Obsolete]
-		public int CreateState { get; set; } // TODO: delete, not used
 
 		[MaxLength(128)]
 		public string Password { get; set; } = null!;
@@ -64,12 +59,6 @@ namespace Faolan.Core.Database.Tables
 		// works), and deleting a character must never cascade into deleting the account.
 		[Obsolete("Use Session.Character.Id instead")]
 		public uint ClientInstance { get; set; }
-
-		/*public Account()
-		{
-		    CreationDate = DateTimeOffset.UtcNow;
-		    AuthChallenge = Guid.NewGuid().ToString("N");
-		}*/
 
 		public override string ToString()
 		{
