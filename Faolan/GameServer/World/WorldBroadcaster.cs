@@ -468,9 +468,9 @@ namespace Faolan.GameServer.World
 		// append to the entry burst (`toSend`) plus the NPCs themselves, whose quest markers / captive pose ride
 		// SendEntryNpcFollowups after the burst flush (those are separate IIRs, not spawn records). The entering
 		// player is spawned to OTHER viewers separately (BroadcastPlayerEntry, section 2).
-		public async Task<(List<byte[]> Records, List<WorldEntity> Npcs)> BuildEntryNpcBurst(INetworkClient client)
+		public async Task<(List<Rpc> Records, List<WorldEntity> Npcs)> BuildEntryNpcBurst(INetworkClient client)
 		{
-			var records = new List<byte[]>();
+			var records = new List<Rpc>();
 			var npcs = new List<WorldEntity>();
 
 			var entity = _sim.PlayerWorldEntity(client);
@@ -608,17 +608,14 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// Stashes the player's own FA015807 body (the bytes after the RPC header) on their world entity, so the
-		// broadcaster can re-frame it to spawn this player on other clients.
-		public void CaptureOwnSpawnBody(INetworkClient client, byte[] spawnPacket)
+		// Stashes the player's own FA015807 body on their world entity, so the broadcaster can re-frame it to spawn this
+		// player on other clients. The spawn Rpc's Body IS that record body (the `packet[bodyStart..]` form
+		// BuildWorldEntrySpawn framed), so it is stored directly - no need to re-parse a serialized packet to find it.
+		public void CaptureOwnSpawnBody(INetworkClient client, in Rpc spawnPacket)
 		{
 			var entity = _sim.PlayerWorldEntity(client);
-			if (entity == null || spawnPacket.Length < 12)
-				return;
-
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(spawnPacket.AsSpan(8, 4));
-			if (bodyStart <= spawnPacket.Length)
-				entity.SpawnBody = spawnPacket[bodyStart..];
+			if (entity != null)
+				entity.SpawnBody = spawnPacket.Body.ToArray();
 		}
 
 		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
@@ -1691,7 +1688,7 @@ namespace Faolan.GameServer.World
 		// patched in and the playfield-instance token re-stamped to `playfieldToken`. Shared by the interest send
 		// (SendWorldSpawn) and the world-entry burst (#398, BuildEntryNpcBurst) so both produce byte-identical spawn
 		// records - the burst is retail's shape (close NPCs on map enter) with our DB-constructed bodies.
-		private static byte[] BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
+		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
 		{
 			var body = (byte[])subject.SpawnBody.Clone();
 			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
@@ -1709,8 +1706,8 @@ namespace Faolan.GameServer.World
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
 			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
 
-			return PacketSerializer.Serialize(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, body));
+			return new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, body);
 		}
 
 		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)

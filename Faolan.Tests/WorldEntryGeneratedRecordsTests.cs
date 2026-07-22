@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.GameServer;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;
@@ -29,7 +30,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildGameTime_ReproducesCapturedRecord()
 		{
-			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient()));
+			var record = DecodeIir(PacketSerializer.Serialize(GameServerListener.BuildGameTime(BeachClient())));
 
 			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal((uint)GameServer0X2000Opcodes.GameTimeIIR, record.IirType);
@@ -42,7 +43,7 @@ namespace Faolan.Tests
 		public void BuildMapChange_ReproducesCapturedRecord()
 		{
 			// map=null -> BuildMapChange uses the beach defaults (instanced, count 2, fieldB 3, flags 0), reproducing the beach capture.
-			var record = DecodeIir(GameServerListener.BuildMapChange(BeachClient(), null!, WorldState.DefaultPlayfieldToken));
+			var record = DecodeIir(PacketSerializer.Serialize(GameServerListener.BuildMapChange(BeachClient(), null!, WorldState.DefaultPlayfieldToken)));
 
 			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal((uint)GameServer0X2000Opcodes.PlayfieldFIIR, record.IirType);

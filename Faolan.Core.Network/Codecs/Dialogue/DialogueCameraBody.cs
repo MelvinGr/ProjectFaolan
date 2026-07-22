@@ -9,7 +9,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// Byte-exact in ConversationConstructTests; the service keeps the routing/send.
 	public static class DialogueCameraBody
 	{
-		public static byte[] BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
+		public static Rpc BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
 		{
 			var body = new FaolanStream()
 				.WriteUInt32(EntityClass.Character)
@@ -19,8 +19,8 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				.WriteArray(cameraParams ?? [])
 				.ToArray();
 
-			return PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, agentInstance), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, liveInstance),
-				(ushort)ConversationScreenDecoder.SetDialogueCamera, body));
+			return new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, agentInstance), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, liveInstance),
+				(ushort)ConversationScreenDecoder.SetDialogueCamera, body);
 		}
 	}
 }

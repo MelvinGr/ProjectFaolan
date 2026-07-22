@@ -45,7 +45,7 @@ namespace Faolan.GameServer
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on
 		// the row's captured handle + the live playfield instance (the rewrite the live splice path applies).
-		private IEnumerable<byte[]> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance, IReadOnlySet<uint> activeQuestIds)
+		private IEnumerable<Rpc> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance, IReadOnlySet<uint> activeQuestIds)
 		{
 			foreach (var row in rows)
 			{
@@ -768,17 +768,17 @@ namespace Faolan.GameServer
 			var snapshot = BuildBurstlessSnapshot(client, equipment!, inventoryRows, characterTags, snapshotQuests, primaryQuest!, knownSpellIds, statSheet, playfieldToken, completedJournal, indexAreas,
 				areaCatalog);
 
-			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
+			var toSend = new List<Rpc>(worldObjectRows.Length + 5)
 			{
 				BuildMapChange(client, map!, playfieldToken)
 			};
 			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken, activeQuestIds));
 
 			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment!, scaffoldCharacter!, playfieldToken);
-			if (playerSpawn != null)
+			if (playerSpawn is { } spawn)
 			{
-				toSend.Add(playerSpawn);
-				_broadcaster.CaptureOwnSpawnBody(client, playerSpawn); // so other players can be sent this player's spawn
+				toSend.Add(spawn);
+				_broadcaster.CaptureOwnSpawnBody(client, spawn); // so other players can be sent this player's spawn
 			}
 			else
 				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);
@@ -796,8 +796,8 @@ namespace Faolan.GameServer
 			toSend.Add(BuildVitals(client));
 			toSend.Add(BuildGameTime(client));
 
-			foreach (var bytes in toSend)
-				await client.SendAsync(bytes);
+			foreach (var rpc in toSend)
+				await client.SendAsync(rpc);
 
 			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs in the burst).", mapId, character?.Name, toSend.Count,
 				entryBurstNpcs.Count);
@@ -978,7 +978,7 @@ namespace Faolan.GameServer
 		}
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
-		private static byte[]? BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
+		private static Rpc? BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
 		{
 			var character = client.Session.Character;
 			// The CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258):
@@ -997,7 +997,7 @@ namespace Faolan.GameServer
 				: BuildWorldEntrySpawn(client, body);
 		}
 
-		private static byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags,
+		private static Rpc BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags,
 			IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet,
 			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal, IReadOnlyDictionary<uint, QuestArea> indexAreas,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>> areaCatalog)

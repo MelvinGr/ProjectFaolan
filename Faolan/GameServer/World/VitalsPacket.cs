@@ -14,11 +14,12 @@ namespace Faolan.GameServer.World
 	// host framing types (WorldSenderEndpoint + INetworkClient).
 	public static class VitalsPacket
 	{
-		// Builds a framed 0x96B8DC59 stat-update packet for an entity (defaults to the session's own client instance).
-		public static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
+		// The framed 0x96B8DC59 stat-update packet for an entity (defaults to the session's own client instance), as an
+		// Rpc the transport serializes + logs once (no re-parse).
+		public static Rpc BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
-			return PacketSerializer.Serialize(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(StatUpdateCodec.BuildBody(entityHandle, stats))));
+			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(StatUpdateCodec.BuildBody(entityHandle, stats)));
 		}
 	}
 }

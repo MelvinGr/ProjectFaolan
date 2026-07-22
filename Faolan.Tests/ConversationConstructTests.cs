@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Dialogue;
 using Xunit;
 
@@ -37,7 +38,7 @@ namespace Faolan.Tests
 			var npc = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 4, 4));
 			var player = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 12, 4));
 
-			var rebuilt = DialogueCameraBody.BuildDialogueCameraPacket(cols.SenderInstance!.Value, player, npc, cols.CameraParams!);
+			var rebuilt = PacketSerializer.Serialize(DialogueCameraBody.BuildDialogueCameraPacket(cols.SenderInstance!.Value, player, npc, cols.CameraParams!));
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(rebuilt));
 		}
 

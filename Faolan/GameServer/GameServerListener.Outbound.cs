@@ -243,20 +243,20 @@ namespace Faolan.GameServer
 
 		// 0x4F57DC08 GameTime - the world clock. Global (no map/player data); the client advances it locally, so a
 		// fixed snapshot is emitted. Live day/night cycle is #351 (advance dayTime at rate; pin its unit in-client).
-		internal static byte[] BuildGameTime(INetworkClient client)
+		internal static Rpc BuildGameTime(INetworkClient client)
 		{
-			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build())));
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build()));
 		}
 
 		// Frames the GuildUpdateIIR_c (GuildTagBody) on the world conversation: [RpcHeader][DispatchPassBlob]
 		// [u32 len][GuildTagBody]. Sent on login for guilded characters and pushed live by the CsPlayerAgent
 		// guild-accept flow through the dispatcher seam. The body grammar + round-trip live on GuildTagBody.
-		internal static byte[] BuildGuildTag(INetworkClient client, uint characterId, string guildName)
+		internal static Rpc BuildGuildTag(INetworkClient client, uint characterId, string guildName)
 		{
-			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(x => new GuildTagBody(characterId, guildName).Write(x))));
+				s => s.WriteArrayUInt32Length(x => new GuildTagBody(characterId, guildName).Write(x)));
 		}
 
 		// 0x5D85BFC7 MapChange = the PlayfieldFIIR: tells the client which playfield/instance the player is entering.
@@ -266,7 +266,7 @@ namespace Faolan.GameServer
 		// NOT universal (beach vs mainland differ), so they come from the DB (Map.PlayfieldCount/FieldB/Flags/Instanced), 		// defaulting to the beach values for un-sourced maps. Position is the character's entry transform (per-session);
 		// nearClip 15.0 + the farClip float are camera params (left constant). `map` may be null (fresh/unmapped -> beach
 		// defaults).
-		internal static byte[] BuildMapChange(INetworkClient client, Map map, uint playfieldToken)
+		internal static Rpc BuildMapChange(INetworkClient client, Map map, uint playfieldToken)
 		{
 			var character = client.Session.Character;
 			var charInstance = map?.PlayfieldInstanced ?? true
@@ -276,23 +276,23 @@ namespace Faolan.GameServer
 			var fieldB = map?.PlayfieldFieldB ?? 3u;
 			var flags = map?.PlayfieldFlags ?? 0u;
 
-			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(MapChangeCodec.BuildIir(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId,
-					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB)))));
+					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB))));
 		}
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared
 		// with the CombatService); this delegates so the existing SendStatUpdate/SendVitals/BuildVitals callers
 		// (login replay, GM, the regen tick) are unchanged.
-		internal static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
+		internal static Rpc BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
 			return VitalsPacket.BuildStatUpdate(client, stats, entityHandle);
 		}
 
 		// Builds the player's own vitals (0x96B8DC59) from the live character's MaxStats - the world-entry replay
 		// emits this instead of replaying the captured player's vitals.
-		internal static byte[] BuildVitals(INetworkClient client)
+		internal static Rpc BuildVitals(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			var stats = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
@@ -323,7 +323,7 @@ namespace Faolan.GameServer
 		// FullCharSnapshotWriter, which owns the prefix model next to the reader that parses it - it used to be
 		// stated here as well, and the two drifted (see that type's header). This adds only the client-dependent
 		// outer wrap: the RpcHeader + outer length/CRC. No captured packet is consulted.
-		internal static byte[] BuildWorldEntrySnapshot(INetworkClient client, byte[] rootBytes, byte[] tailsBytes)
+		internal static Rpc BuildWorldEntrySnapshot(INetworkClient client, byte[] rootBytes, byte[] tailsBytes)
 		{
 			var body = FullCharSnapshotCodec.BuildBody(client.Session.Character.Id, rootBytes, tailsBytes);
 			return FrameWorldEntryRecord(client, body);
@@ -333,7 +333,7 @@ namespace Faolan.GameServer
 		// `spawnBody` is the `packet[bodyStart..]` form ([u32 bodyLen][IirType=0xFA015807][TypeTag][Handle][FieldA]
 		// [transform + CharacterIIR + scaffold]) that the SpawnPacketBuilder override engine produces; this wraps it in
 		// the shared world-entry header so the spawn no longer needs the captured packet's header (the burst-less path).
-		internal static byte[] BuildWorldEntrySpawn(INetworkClient client, byte[] spawnBody)
+		internal static Rpc BuildWorldEntrySpawn(INetworkClient client, byte[] spawnBody)
 		{
 			ArgumentNullException.ThrowIfNull(spawnBody);
 			return FrameWorldEntryRecord(client, spawnBody);
@@ -343,10 +343,10 @@ namespace Faolan.GameServer
 		// record body that ALREADY carries its own [u32 bodyLen] prefix - i.e. the `packet[bodyStart..]` form that
 		// SpawnPacketBuilder and WriteArrayUInt32Length produce. This is the keystone that lets a
 		// from-scratch record body reach the wire without a captured packet header.
-		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
+		internal static Rpc FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
-			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, bodyWithLenPrefix.ToArray()));
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, bodyWithLenPrefix.ToArray());
 		}
 
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
