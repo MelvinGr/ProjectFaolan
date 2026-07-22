@@ -1,5 +1,7 @@
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Net;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +27,8 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(64)]
 		public string IpAddress { get; set; } = null!;
+
+		public uint IpAddressLong => BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(IpAddress).GetAddressBytes());
 
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;

@@ -54,11 +54,6 @@ namespace Faolan.Core.Network
 		// (The create-world flow uses IsCreateWorldSession alongside this.)
 		bool WorldEntered { get; set; }
 
-		// The client's conversation id for this connection (the value bytes of the incoming packet's sender
-		// field), captured per packet. Auth-handoff responses (UniverseAgent/PlayerAgent) echo this back as the
-		// receiver, exactly as retail does, instead of a hardcoded capture-derived id.
-		byte[] ClientConversation { get; set; }
-
 		// The in-flight cast's begin ARGS block + its Mode, held only while a timed cast is pending (#347). The client
 		// cancels the cast on a mid-cast move (its own cancel BCC); the server answers with the state=0x0007 abort that
 		// drops the cast bar - and that abort echoes the begin's args (with the phase=Mode field spliced in). Only the
@@ -187,7 +182,6 @@ namespace Faolan.Core.Network
 		// then reverts after the ~2.6s blend. This gates the assert to fire exactly once per sit.
 		public bool SeatedHoldConfirmed { get; set; }
 		public bool WorldEntered { get; set; }
-		public byte[] ClientConversation { get; set; } = null!;
 		public byte[] PendingCastArgs { get; set; } = null!;
 		public Character Character { get; set; } = null!;
 

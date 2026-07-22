@@ -1,13 +1,14 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -26,10 +27,6 @@ namespace Faolan.PlayerAgent
 			var opcode = (PlayerAgentOpcodes)packet.Opcode;
 			LogPacketReceived(packet, opcode);
 
-			// Remember the client's conversation id (the sender endpoint's bytes) so responses echo it back as the
-			// receiver, matching retail instead of a hardcoded capture id.
-			client.Session.ClientConversation = packet.Sender.ToProtobuf();
-
 			switch (opcode)
 			{
 				case PlayerAgentOpcodes.Authenticate:
@@ -44,7 +41,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.AuthStatus = packet.Body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
-					await new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.InitAuth).WriteUInt32(client.Session.Account.AuthStatus).SendAsync(client);
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.InitAuth, body => body.WriteUInt32(client.Session.Account.AuthStatus)));
 
 					break;
 				}
@@ -53,7 +50,7 @@ namespace Faolan.PlayerAgent
 				{
 					var unk1 = packet.Body.ReadUInt16();
 
-					await SendSmallCharList(client);
+					await SendSmallCharList(client, packet.Sender);
 
 					break;
 				}
@@ -77,21 +74,18 @@ namespace Faolan.PlayerAgent
 						Logger.LogDebug("RequestCharRealmData entry: characterId={CharacterId:X8}, authChallenge={AuthChallenge}", unk1, unk2);
 					}
 
-					await SendCharacterList(client);
-					await SendRealmList(client);
+					await SendCharacterList(client, packet.Sender);
+					await SendRealmList(client, packet.Sender);
 
-					await new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterRealmData).WriteUInt32(1).SendAsync(client);
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.SendCharacterRealmData, body => body.WriteUInt32(1)));
 
 					break;
 				}
 
 				case PlayerAgentOpcodes.LoadFacebookToken:
 				{
-					await new PacketStream() // headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
-						.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox209C)
-						.WriteUInt16(0)
-						.WriteByte(0)
-						.SendAsync(client);
+					// headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.Ox209C, body => body.WriteUInt16(0).WriteByte(0)));
 
 					break;
 				}
@@ -112,7 +106,7 @@ namespace Faolan.PlayerAgent
 					await Database.UpdateLastInfo(client.Session.Character!.Id, client.IpAddress!);
 					await Database.SaveAccount(client.Session.Account);
 
-					await SendOx20B9(client);
+					await SendOx20B9(client, packet.Sender);
 
 					break;
 				}
@@ -129,14 +123,13 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentOpcodes.ReceivedCharacterSettings: // after 0x20B9
 				{
 					// Retail order (login dump): CsPlayerAgent, then ChatServer, then GameServer, then gametweaks.
-					await SendCsPlayerAgent(client);
-					await SendChatServer(client);
-					await SendGameServer(client);
+					await SendCsPlayerAgent(client, packet.Sender);
+					await SendChatServer(client, packet.Sender);
+					await SendGameServer(client, packet.Sender);
 
 					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on
 					// login. Body is built inline from the named-tweak list below; the wire format is locked byte-for-byte by GameTweaksTests.cs.
-					var gameTweaks = new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
-						[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07]);
+					using var gameTweaks = new FaolanStream();
 
 					// The PlayerInterface OverrideGameTweaks (0x1A07) payload: the server's "dynamic game tweaks" the client
 					// applies on login (ApplyDynamicGameTweaks: "Applying N gametweaks"). Reverse-engineered from the retail
@@ -167,7 +160,8 @@ namespace Faolan.PlayerAgent
 					foreach (var (name, value) in Defaults)
 						gameTweaks.WriteString(name).WriteDouble(value);
 
-					await gameTweaks.SendAsync(client);
+					await client.SendAsync(new Rpc(ServiceConnectionSender, packet.Sender, PlayerInterfaceOpcodes.OverrideGameTweaks,
+						(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07], gameTweaks.ToArray()));
 
 					break;
 				}
@@ -188,7 +182,7 @@ namespace Faolan.PlayerAgent
 					Logger.LogInformation("CreateCharacter: created character {CharacterId:X8}; using it as the create-flow client instance.", newCharacter.Id);
 					await Database.SaveAccount(client.Session.Account);
 
-					await SendOx20B9(client);
+					await SendOx20B9(client, packet.Sender);
 
 					break;
 				}
@@ -202,7 +196,7 @@ namespace Faolan.PlayerAgent
 					Logger.LogInformation("DeleteCharacter: characterId={CharacterId:X8} deleted={Deleted}.", characterId, deleted);
 
 					// The refreshed list re-queries the DB (GetCharactersByAccount), so it omits the deleted character.
-					await SendSmallCharList(client);
+					await SendSmallCharList(client, packet.Sender);
 
 					break;
 				}

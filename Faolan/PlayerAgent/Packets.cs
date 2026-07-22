@@ -1,6 +1,4 @@
 using System;
-using System.Buffers.Binary;
-using System.Net;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
@@ -8,14 +6,32 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.PlayerAgent
 {
 	partial class PlayerAgentListener
 	{
-		private static readonly byte[] Sender = Endpoints.EndpointBytes(Endpoints.PlayerAgentType, 0x02);
-		private static readonly byte[] ServiceConnectionSender = Endpoints.EndpointBytes(Endpoints.PlayerAgentServiceConnectionType, 0x08);
+		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02);
+		private static readonly ProtoEndpoint ServiceConnectionSender = Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x08);
+
+		// The reply receiver echoes the request's caller endpoint (packet.Sender), passed through by the handler - it is
+		// client-specific and can't be generated (see the UniverseAgent migration / ce487719).
+		//
+		// PlayerInterface s2c uniquely carries a 32-bit method id in the header after the opcode; PlayerRpc appends it
+		// (PlayerAgentMethodIds) as the HeaderData so senders don't hand-roll it, mirroring the
+		// WriteHeader(byte[], byte[], PlayerInterfaceOpcodes) overload it replaces. Sends that carry a NON-standard
+		// header tail (SmallCharList, the OverrideGameTweaks handoffs) pass their literal HeaderData to Rpc directly.
+		private static Rpc PlayerRpc(ProtoEndpoint sender, ProtoEndpoint receiver, PlayerInterfaceOpcodes opcode, ReadOnlyMemory<byte> body)
+		{
+			return new Rpc(sender, receiver, opcode, PlayerAgentMethodIds.HeaderId((ushort)opcode), body);
+		}
+
+		private static Rpc PlayerRpc(ProtoEndpoint sender, ProtoEndpoint receiver, PlayerInterfaceOpcodes opcode, Action<FaolanStream> body)
+		{
+			return new Rpc(sender, receiver, opcode, PlayerAgentMethodIds.HeaderId((ushort)opcode), body);
+		}
 
 		// The active character's realm - the routing target for the world/chat/guild handoffs (#324). Every service
 		// the client is about to connect to lives IN that realm's process, so all three handoffs advertise this realm's
@@ -25,138 +41,128 @@ namespace Faolan.PlayerAgent
 			return await Database.GetRealm(client.Session.Character.RealmId) ?? throw new Exception($"Character {client.Session.Character.Id:X8} has no realm to route to.");
 		}
 
-		private async Task SendCharacterList(INetworkClient client)
+		private async Task SendCharacterList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
-			var aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendCharacterList);
+			using var body = new FaolanStream();
 			// The account's current character instance (0 on a first login, the last-played id afterwards). This is the
 			// character-SELECTION screen - no character is selected yet, so Session.Character is null here; ClientInstance
 			// is the pre-selection-safe account field. (Do NOT "clean up" to Session.Character.Id - it NREs here.)
-			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
-			aBuffer.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
+			body.WriteUInt32(client.Session.Account.ClientInstance);
+			body.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 
 			foreach (var character in characters)
 			{
-				aBuffer.WriteUInt32(character.Id);
-				aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // PlayerInstance (account's current instance; pre-selection, no Session.Character)
-				aBuffer.WriteUInt32(character.Id);
-				aBuffer.WriteString(character.Name!);
-				aBuffer.WriteUInt32(character.RealmId);
-				aBuffer.WriteUInt32(character.Sex);
-				aBuffer.WriteString((character.LastConnection ?? character.CreationDate).ToString("MM/dd/yyyy HH:mm:ss"));
-				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteUInt32(character.MapId);
-				aBuffer.WriteUInt32(character.Level);
-				aBuffer.WriteUInt32(character.Class);
-				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteUInt32(0x60355308);
-				aBuffer.WriteUInt32(0x00000002);
-				aBuffer.WriteUInt32(character.Race);
-				aBuffer.WriteString(character.Language!); // enEN
-				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteString(character.AuthChallenge!);
-				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteUInt32(0x00000001);
+				body.WriteUInt32(character.Id);
+				body.WriteUInt32(client.Session.Account.ClientInstance); // PlayerInstance (account's current instance; pre-selection, no Session.Character)
+				body.WriteUInt32(character.Id);
+				body.WriteString(character.Name!);
+				body.WriteUInt32(character.RealmId);
+				body.WriteUInt32(character.Sex);
+				body.WriteString((character.LastConnection ?? character.CreationDate).ToString("MM/dd/yyyy HH:mm:ss"));
+				body.WriteUInt32(0x00000000);
+				body.WriteUInt32(character.MapId);
+				body.WriteUInt32(character.Level);
+				body.WriteUInt32(character.Class);
+				body.WriteUInt32(0x00000000);
+				body.WriteUInt32(0x00000000);
+				body.WriteUInt32(0x60355308);
+				body.WriteUInt32(0x00000002);
+				body.WriteUInt32(character.Race);
+				body.WriteString(character.Language!); // enEN
+				body.WriteUInt32(0x00000000);
+				body.WriteUInt32(0x00000000);
+				body.WriteString(character.AuthChallenge!);
+				body.WriteUInt32(0x00000000);
+				body.WriteUInt32(0x00000001);
 			}
 
-			aBuffer.WriteUInt32(0x00000bd3);
-			aBuffer.WriteUInt32(0x00000001);
-			aBuffer.WriteUInt32(0x00000001);
-			aBuffer.WriteUInt32(0x00000002);
-			aBuffer.WriteUInt32(0x00000014);
-			aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // (pre-selection, no Session.Character)
-			aBuffer.WriteUInt32(0x000c0001);
-			aBuffer.WriteUInt32(Global.Premium
+			body.WriteUInt32(0x00000bd3);
+			body.WriteUInt32(0x00000001);
+			body.WriteUInt32(0x00000001);
+			body.WriteUInt32(0x00000002);
+			body.WriteUInt32(0x00000014);
+			body.WriteUInt32(client.Session.Account.ClientInstance); // (pre-selection, no Session.Character)
+			body.WriteUInt32(0x000c0001);
+			body.WriteUInt32(Global.Premium
 				? 0x00018081
 				: 0x00018181); // subscribed flag byte: 0x80 premium / 0x81 free
-			aBuffer.WriteUInt32(0x00000015);
-			aBuffer.WriteUInt32(0x00000020);
-			aBuffer.WriteUInt32(Global.Premium
+			body.WriteUInt32(0x00000015);
+			body.WriteUInt32(0x00000020);
+			body.WriteUInt32(Global.Premium
 				? Global.PremiumCharSlots
 				: Global.FreeCharSlots); // unlocked character slots
-			aBuffer.WriteUInt32(0x00000000);
-			aBuffer.WriteString("https://www.facebook.com/dialog/oauth?client_id=.....");
-			aBuffer.WriteUInt32(0x00000000);
-			aBuffer.WriteUInt32(0x00000001);
+			body.WriteUInt32(0x00000000);
+			body.WriteString("https://www.facebook.com/dialog/oauth?client_id=.....");
+			body.WriteUInt32(0x00000000);
+			body.WriteUInt32(0x00000001);
 
-			await aBuffer.SendAsync(client);
+			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterList, body.ToArray()));
 		}
 
-		private async Task SendChatServer(INetworkClient client)
+		private async Task SendChatServer(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realm = await ResolveActiveRealm(client);
-			await new PacketStream()
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
-					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02])
-				.WriteUInt32(IpToLong(realm.IpAddress))
-				.WriteUInt16(realm.ChatServerPort)
-				.WriteUInt32(client.Session.Account.Id)
-				.WriteUInt32(0x0000c350)
-				.WriteUInt32(client.Session.Character.Id)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
+				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02],
+				body => body.WriteUInt32(realm.IpAddressLong)
+					.WriteUInt16(realm.ChatServerPort)
+					.WriteUInt32(client.Session.Account.Id)
+					.WriteUInt32(0x0000c350)
+					.WriteUInt32(client.Session.Character.Id)));
 		}
 
-		private async Task SendCsPlayerAgent(INetworkClient client)
+		private async Task SendCsPlayerAgent(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realm = await ResolveActiveRealm(client);
-			await new PacketStream() // send CSPlayerAgent
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
-					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05])
-				.WriteUInt32(IpToLong(realm.IpAddress))
-				.WriteUInt16(realm.CsPlayerAgentPort)
-				.WriteUInt32(client.Session.Account.Id)
-				.WriteUInt32(0x0000c350)
-				.WriteUInt32(client.Session.Character.Id)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
+				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05],
+				body => body.WriteUInt32(realm.IpAddressLong)
+					.WriteUInt16(realm.CsPlayerAgentPort)
+					.WriteUInt32(client.Session.Account.Id)
+					.WriteUInt32(0x0000c350)
+					.WriteUInt32(client.Session.Character.Id)));
 		}
 
-		private async Task SendGameServer(INetworkClient client)
+		private async Task SendGameServer(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realm = await ResolveActiveRealm(client);
-
-			await new PacketStream()
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerInterfaceOpcodes.OverrideGameTweaks,
-					[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D])
-				.WriteString($"{realm.IpAddress}:{realm.Port}")
-				.WriteUInt32(client.Session.Account.Id)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(client.Session.Character.Id)
-				.WriteArray(0x62, 0x00, 0x00, 0xC7, 0x9C, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00)
-				.WriteUInt32(client.Session.Character.Id)
-				.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x9C, 0x50, 0x01, 0xC9, 0x43, 0xC1, 0x00)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
+				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D],
+				body => body.WriteString($"{realm.IpAddress}:{realm.Port}")
+					.WriteUInt32(client.Session.Account.Id)
+					.WriteUInt32(EntityClass.Character)
+					.WriteUInt32(client.Session.Character.Id)
+					.WriteArray(0x62, 0x00, 0x00, 0xC7, 0x9C, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00)
+					.WriteUInt32(client.Session.Character.Id)
+					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x9C, 0x50, 0x01, 0xC9, 0x43, 0xC1, 0x00)));
 		}
 
-		private async Task SendRealmList(INetworkClient client)
+		private async Task SendRealmList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realms = await Database.GetRealms();
 
-			var aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SendRealmList);
-
-			aBuffer.WriteUInt32(realms.Length);
-			foreach (var realm in realms)
+			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SendRealmList, body =>
 			{
-				aBuffer.WriteUInt32(realm.Id);
-				aBuffer.WriteUInt32(realm.OnlineStatus);
-				aBuffer.WriteString(realm.Name);
-				aBuffer.WriteUInt32(0x00000001); //u2
-				aBuffer.WriteUInt32(0x00000000); //u3
-				aBuffer.WriteUInt32(0x00000000); //u4
-				aBuffer.WriteUInt32(realm.LoadStatus == RealmLoadStatus.Full);
-				aBuffer.WriteUInt32(realm.LoadStatus);
-				aBuffer.WriteUInt16(0x0000);
-				aBuffer.WriteByte(0x00);
-				aBuffer.WriteUInt16(realm.Type);
-				aBuffer.WriteUInt32(realm.Country);
-				aBuffer.WriteByte(0x00);
-			}
-
-			await aBuffer.SendAsync(client);
+				body.WriteUInt32(realms.Length);
+				foreach (var realm in realms)
+				{
+					body.WriteUInt32(realm.Id);
+					body.WriteUInt32(realm.OnlineStatus);
+					body.WriteString(realm.Name);
+					body.WriteUInt32(0x00000001); //u2
+					body.WriteUInt32(0x00000000); //u3
+					body.WriteUInt32(0x00000000); //u4
+					body.WriteUInt32(realm.LoadStatus == RealmLoadStatus.Full);
+					body.WriteUInt32(realm.LoadStatus);
+					body.WriteUInt16(0x0000);
+					body.WriteByte(0x00);
+					body.WriteUInt16(realm.Type);
+					body.WriteUInt32(realm.Country);
+					body.WriteByte(0x00);
+				}
+			}));
 		}
 
 		// The small character list (id + auth challenge per named character). Sent in response to
@@ -164,36 +170,25 @@ namespace Faolan.PlayerAgent
 		// Id + AuthChallenge (length-prefixed string), verified against retail (Faolanx_mage-necromancer_login: all bytes
 		// consumed, no per-entry trailer - an extra field shifts every following entry and the client loops
 		// once there is more than one character).
-		private async Task SendSmallCharList(INetworkClient client)
+		private async Task SendSmallCharList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
-			var buffer = new PacketStream();
-			buffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.SmallCharList, [0x94, 0xa7, 0x60]);
-			buffer.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
-
-			foreach (var character in characters)
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SmallCharList, (byte[])[0x94, 0xa7, 0x60], body =>
 			{
-				buffer.WriteUInt32(character.Id);
-				buffer.WriteString(character.AuthChallenge!);
-			}
-
-			await buffer.SendAsync(client);
+				body.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
+				foreach (var character in characters)
+				{
+					body.WriteUInt32(character.Id);
+					body.WriteString(character.AuthChallenge!);
+				}
+			}));
 		}
 
-		private static uint IpToLong(string ip)
+		private static Task SendOx20B9(INetworkClient client, ProtoEndpoint receiver)
 		{
-			return BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(ip).GetAddressBytes());
-		}
-
-		private static Task SendOx20B9(INetworkClient client)
-		{
-			return new PacketStream()
-				.WriteHeader(Sender, client.Session.ClientConversation, PlayerInterfaceOpcodes.Ox20B9)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(client.Session.Character.Id)
-				.WriteUInt32(0)
-				.SendAsync(client);
+			return client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.Ox20B9,
+				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteUInt32(0)));
 		}
 	}
 }
