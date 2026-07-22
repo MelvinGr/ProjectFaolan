@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -16,6 +17,8 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.World;
@@ -267,24 +270,20 @@ namespace Faolan.GameServer
 			// cleanup the old "Remove ...Name != null checks below" TODO asked for, now that the early return is in
 			// place: the create-vs-named conditionals that used to guard this body were all unreachable dead code.
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(client.Session.Character.Id)
 					.WriteByte(0x01)
 					.WriteUInt32(0x00000013)
-					.WriteUInt32(0x00000000))
-				.SendAsync(client);
+					.WriteUInt32(0x00000000))));
 			Logger.LogInformation("Sent deferred (uint)GameServer0X2000Opcodes.StatIIR prompt.");
 
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(client.Session.Character.Id)
-				.WriteByte(0)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
+				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteByte(0)));
 
 			// Retail sends 0x2024 ReadyForPlayScreen right after the spawn handshake (0x2076) - the "leave the
 			// loading screen and enter the world" signal. We were sending the manifest but never this, so the client
@@ -344,18 +343,13 @@ namespace Faolan.GameServer
 			await SendNewClaimsGlowIfAny(client);
 
 			// record 0: 0x00002000, 17-byte body
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(instance)
-				.WriteArray(0x00)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50).WriteUInt32(instance).WriteArray(0x00)));
 
 			// record 1: 0x0000200C, 1-byte body
-			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance), GameInterfaceOpcodes.DispatchReportServerID)
-				.WriteArray(0x01)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
+				GameInterfaceOpcodes.DispatchReportServerID, (byte[])[0x01]));
 
 			// record 2: 0x00002000 - the StartFixed3d destiny step (ScryScriptIIR 0xA36D3B74), constructed (was verbatim;
 			// byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture). The body is [u32 len][step bytes].
@@ -365,10 +359,8 @@ namespace Faolan.GameServer
 			if (!client.Session.IsCreateWorldSession)
 			{
 				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(startFixed3d)
-					.SendAsync(client);
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
+					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(startFixed3d)));
 			}
 
 			// record 2b (BEACH ONLY, #267): the destiny SCRIPT GROUP that builds the chained-Casilda tableau - it
@@ -387,20 +379,17 @@ namespace Faolan.GameServer
 			// ReSharper disable once ConditionIsAlwaysTrueOrFalse
 			if (enableTutorialOverlay)
 			{
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
-					.WriteUInt32(instance)
-					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)
-					.SendAsync(client);
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
+					GameInterfaceOpcodes.DispatchPassBlob,
+					body => body.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
+						.WriteUInt32(instance)
+						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)));
 
 				// record 4: 0x00002000 - the WelcomeTutorial destiny step (ScryScriptIIR 0xA36D3B74), constructed (was
 				// verbatim; byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture).
 				var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, Endpoints.EndpointBytes(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(welcomeTutorial)
-					.SendAsync(client);
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
+					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(welcomeTutorial)));
 			}
 
 			// #262: apply any after-quest world-object effects up-front (e.g. a relog after freeing Casilda drops the
@@ -520,10 +509,8 @@ namespace Faolan.GameServer
 
 			foreach (var comboId in comboIds)
 			{
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArray(ComboBookIirCodec.Build(instance, comboId))
-					.SendAsync(client);
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+					GameInterfaceOpcodes.DispatchPassBlob, ComboBookIirCodec.Build(instance, comboId)));
 			}
 
 			if (comboIds.Count > 0)
@@ -723,7 +710,7 @@ namespace Faolan.GameServer
 			// #3: aggregate the equipped-gear stat bonuses so the player's live vitals seed with gear-boosted maxes.
 			var gearBonuses = character == null
 				? null
-				: Combat.MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet));
+				: MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet));
 			_simulation.RegisterPlayerInWorld(client, map?.InstanceMode ?? MapInstanceMode.Shared, gearBonuses);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
@@ -866,10 +853,8 @@ namespace Faolan.GameServer
 			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
 			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor) })
 			{
-				await new PacketStream()
-					.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(body)
-					.SendAsync(client);
+				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client),
+					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 			}
 		}
 
@@ -905,21 +890,19 @@ namespace Faolan.GameServer
 		private async Task SendReadyForPlayScreen(INetworkClient client)
 		{
 			var sender = client.Session.IsUnnamedCreatePhase
-				? Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59)
-				: Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
+				? Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59)
+				: Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
 
 			var receiver = client.Session.IsUnnamedCreatePhase
-				? [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10]
-				: client.Endpoint(Endpoints.GameCharInterfaceType);
+				? Endpoints.EndpointFromBytes(0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10)
+				: client.EndpointOf(Endpoints.GameCharInterfaceType);
 
-			using var newPs = new PacketStream();
-			newPs.WriteHeader(sender, receiver, GameCharInterfaceOpcodes.DispatchValidResurrectionSpots);
-
+			using var bodyStream = new FaolanStream();
 			if (client.Session.IsUnnamedCreatePhase)
 			{
 				// New-character create flow: the create-capture's ValidResurrectionSpots body - a sibling of the login
 				// WriteValidResurrectionSpotsBody with the create variant's own constants (see ResurrectionSpotsBody).
-				ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(newPs, client.Session.Character.Position);
+				ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(bodyStream, client.Session.Character.Position);
 			}
 			else
 			{
@@ -930,10 +913,10 @@ namespace Faolan.GameServer
 				// advertises our REAL RespawnPoint.Id (the id RespawnMe echoes back) instead of the Strie capture's hardcoded
 				// beach point. Falls back to the universal Tortage Beach default when the map defines no point.
 				var spot = await ResolveLoginResurrectionSpot(client.Session.Character);
-				ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(newPs, client.Session.Character.Position, [spot]);
+				ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(bodyStream, client.Session.Character.Position, [spot]);
 			}
 
-			await newPs.SendAsync(client);
+			await client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, bodyStream.ToArray()));
 		}
 
 		// Answers a client 0x2020 spawn poll with a 0x2008 SpawnCheck on the 201C conversation: body is
@@ -947,12 +930,9 @@ namespace Faolan.GameServer
 			// 0x00 after (Ranochar frames 125 -> 698).
 			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
 
-			await new PacketStream()
-				.WriteHeader(LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(handle)
-				.WriteByte(status)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
+				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));
 		}
 
 		// The single existing-character WORLD ENTRY used by both login and the teleport GM command: send the 0x201c
@@ -990,11 +970,9 @@ namespace Faolan.GameServer
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
 			var address = $"{realm!.IpAddress}:{realm.Port}";
 
-			await new PacketStream()
-				.WriteHeader(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchRedirectToServer)
-				.WriteByte(0x00)
-				.WriteStringByteLength(address)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client),
+				GameInterfaceOpcodes.DispatchRedirectToServer,
+				body => body.WriteByte(0x00).WriteStringByteLength(address)));
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}
@@ -1055,43 +1033,41 @@ namespace Faolan.GameServer
 		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
 		// the character's real id now, so the unnamed-character state alone identifies the editor flow.
 
-		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender, byte[] receiver)
+		private static Task ReportDimensionId(INetworkClient client, uint realmId, ProtoEndpoint sender, ProtoEndpoint receiver)
 		{
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchReportDimesionID).WriteString(realmId.ToString()).SendAsync(client);
+			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchReportDimesionID, s => s.WriteString(realmId.ToString())));
 		}
 
-		private static Task ReportServerId(INetworkClient client, uint value, byte[] sender, byte[] receiver)
+		private static Task ReportServerId(INetworkClient client, uint value, ProtoEndpoint sender, ProtoEndpoint receiver)
 		{
 			// Body: [u32 0x54 (fixed header)][u32 value]. The create-flow auth handshake reports value 1.
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchReportServerID).WriteUInt32(0x54u).WriteUInt32(value).SendAsync(client);
+			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchReportServerID, s => s.WriteUInt32(0x54u).WriteUInt32(value)));
 		}
 
 		private static async Task Send0X201C(INetworkClient client)
 		{
-			var receiver = client.Endpoint(Endpoints.GameCharInterfaceType);
+			var receiver = client.EndpointOf(Endpoints.GameCharInterfaceType);
 			var ticketBase = 0x00160000u + ((uint)Environment.TickCount & 0xFFFF);
 
 			// Retail (Strie login) sends five channel registrations before the spawn burst: four with the
 			// 0x65 prefix and state ids {5, 6, 0x10, 0x12}, then a final 0x68 prefix with state 1. The old
 			// three-entry set (with a duplicated state 6 and missing 5/0x12/the 0x68 entry) left the client
 			// stuck before it ever started polling spawns (0x2020), so nothing rendered.
-			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000005, ticketBase);
-			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000006, ticketBase + 1);
-			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000010, ticketBase + 2);
-			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000065, 0x00000012, ticketBase + 3);
-			await Send0X201CEntry(client, LoginWorld201CSender, receiver, 0x00000068, 0x00000001, ticketBase + 4);
+			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000005, ticketBase);
+			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000006, ticketBase + 1);
+			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000010, ticketBase + 2);
+			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000012, ticketBase + 3);
+			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000068, 0x00000001, ticketBase + 4);
 		}
 
-		private static Task Send0X201CEntry(INetworkClient client, byte[] sender, byte[] receiver, uint prefix, uint state, uint ticket)
+		private static Task Send0X201CEntry(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, uint prefix, uint state, uint ticket)
 		{
-			return new PacketStream()
-				.WriteHeader(sender, receiver, GameCharInterfaceOpcodes.DispatchSetItemStat)
-				.WriteUInt32(prefix)
-				.WriteUInt32(client.Session.Character.Id)
-				.WriteUInt32(state)
-				.WriteUInt32(0x00000017)
-				.WriteUInt32(ticket)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchSetItemStat,
+				body => body.WriteUInt32(prefix)
+					.WriteUInt32(client.Session.Character.Id)
+					.WriteUInt32(state)
+					.WriteUInt32(0x00000017)
+					.WriteUInt32(ticket)));
 		}
 	}
 }

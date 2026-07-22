@@ -190,7 +190,7 @@ namespace Faolan.GameServer
 			var rows = await Database.GetRecipes();
 			var records = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
 
-			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(TradeskillRecipeCodec.BuildReplyIir(handle, records))));
 
@@ -245,7 +245,7 @@ namespace Faolan.GameServer
 		// fixed snapshot is emitted. Live day/night cycle is #351 (advance dayTime at rate; pin its unit in-client).
 		internal static byte[] BuildGameTime(INetworkClient client)
 		{
-			return PacketSerializer.Serialize(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build())));
 		}
 
@@ -254,7 +254,7 @@ namespace Faolan.GameServer
 		// guild-accept flow through the dispatcher seam. The body grammar + round-trip live on GuildTagBody.
 		internal static byte[] BuildGuildTag(INetworkClient client, uint characterId, string guildName)
 		{
-			return PacketSerializer.Serialize(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(x => new GuildTagBody(characterId, guildName).Write(x))));
 		}
@@ -276,7 +276,7 @@ namespace Faolan.GameServer
 			var fieldB = map?.PlayfieldFieldB ?? 3u;
 			var flags = map?.PlayfieldFlags ?? 0u;
 
-			return PacketSerializer.Serialize(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(MapChangeCodec.BuildIir(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId,
 					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB)))));
@@ -345,7 +345,7 @@ namespace Faolan.GameServer
 		// from-scratch record body reach the wire without a captured packet header.
 		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
-			return PacketSerializer.Serialize(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return PacketSerializer.Serialize(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, bodyWithLenPrefix.ToArray()));
 		}
 
@@ -375,7 +375,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Character.Id;
 			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.Latin1.GetBytes(xml));
 
-			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 
@@ -432,14 +432,14 @@ namespace Faolan.GameServer
 			var instance = client.Session.Character.Id;
 			var body = ChatTextCodec.Build(instance, Encoding.Latin1.GetBytes(xml));
 
-			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
 		private static Task SendWorldIir(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 	}

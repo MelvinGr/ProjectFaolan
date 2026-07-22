@@ -245,7 +245,7 @@ namespace Faolan.GameServer.Economy
 		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 

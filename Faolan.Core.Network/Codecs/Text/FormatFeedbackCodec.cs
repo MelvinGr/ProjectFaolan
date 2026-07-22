@@ -9,7 +9,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// reveal `GenericDisplayAreaName`, pickup notices `GenericSimpleDynelPickup`, PvP trackers, ...). Plain tokens
 	// (`AttributeChanged`/`Increased`, `LostGraceEffect`, ...) render the smaller feedback lines.
 	//
-	// Carried as an IIR on the WORLD conversation (opcode 0x2000; sender = WorldFraming.Sender 0xB171CE13/0x58,
+	// Carried as an IIR on the WORLD conversation (opcode 0x2000; sender = GameServerListener.WorldSenderEndpoint 0xB171CE13/0x58,
 	// receiver = the player's GameInterface = GameInterfaceType + ClientInstance). The IIR body's `instance` equals
 	// that receiver instance (verified in the Strie capture: all 1249 GameInterfaceType packets AND the feedback share
 	// 0x02165EFF), so a live send is fully addressable from the session, not just a replay.

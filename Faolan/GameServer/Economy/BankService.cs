@@ -68,7 +68,7 @@ namespace Faolan.GameServer.Economy
 			}
 
 			var record = BankIirCodec.BuildBankIirRecord(charInstance, bank);
-			await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 
 			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullPlayerCharacterBuilder.BankKind);

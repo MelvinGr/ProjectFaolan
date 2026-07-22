@@ -200,8 +200,8 @@ namespace Faolan.Importer.Cli
 				case "spell-template":
 				{
 					var rdbDir = RdbDir(args);
-					var ids = (arg ?? "").Split(',', System.StringSplitOptions.RemoveEmptyEntries);
-					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					var ids = (arg ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
+					using var rdb = new RdbReader(rdbDir);
 					foreach (var idStr in ids)
 					{
 						var id = uint.Parse(idStr.Trim());
@@ -213,14 +213,14 @@ namespace Faolan.Importer.Cli
 						var b = rdb.ReadDecompressed(e);
 						// The [2][9] stat-modifier region - SAME parser as item templates. Body = the span after the
 						// 12-byte RDB-Id header.
-						var mods = Faolan.Core.Rdb.ItemTemplateStatModifiers.Parse(b.AsSpan(12));
+						var mods = ItemTemplateStatModifiers.Parse(b.AsSpan(12));
 						var mag = 0u;
 						var w = new uint[b.Length / 4];
 						for (var i = 3; i + 1 < w.Length; i += 2)
 						{
-							var f = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(i * 4, 4));
+							var f = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(i * 4, 4));
 							if (f == 551)
-								mag = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan((i + 1) * 4, 4));
+								mag = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan((i + 1) * 4, 4));
 						}
 						var modStr = string.Join(", ", mods.Select(m => $"0x{m.StatId:x}={m.WireAmount}"));
 						Console.WriteLine($"  {id}: mag(551)={mag}  region[{mods.Count}]: {modStr}");
@@ -231,9 +231,9 @@ namespace Faolan.Importer.Cli
 				case "spell-stat-coverage":
 				{
 					var rdbDir = RdbDir(args);
-					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					using var rdb = new RdbReader(rdbDir);
 					int total = 0, withMods = 0, records = 0;
-					var byStat = new System.Collections.Generic.Dictionary<uint, int>();
+					var byStat = new Dictionary<uint, int>();
 					foreach (var e in rdb.EntriesOfType(1040005).Where(x => x.IsLocal))
 					{
 						byte[] dec;
@@ -242,7 +242,7 @@ namespace Faolan.Importer.Cli
 						if (dec.Length < 12)
 							continue;
 						total++;
-						var mods = Faolan.Core.Rdb.ItemTemplateStatModifiers.Parse(dec.AsSpan(12));
+						var mods = ItemTemplateStatModifiers.Parse(dec.AsSpan(12));
 						if (mods.Count == 0)
 							continue;
 						withMods++;
@@ -260,13 +260,13 @@ namespace Faolan.Importer.Cli
 				{
 					var rdbDir = RdbDir(args);
 					var needle = (arg ?? "damage").ToLowerInvariant();
-					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					using var rdb = new RdbReader(rdbDir);
 					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
 					{
 						byte[] dec;
 						try { dec = rdb.ReadDecompressed(e); }
 						catch { continue; }
-						var sb = new System.Text.StringBuilder();
+						var sb = new StringBuilder();
 						var runs = new List<string>();
 						foreach (var b in dec)
 						{
@@ -295,7 +295,7 @@ namespace Faolan.Importer.Cli
 					//   body: [12 RDB-Id][u32 "TDC2"][u32 category][u32 flags][u32 size][u32 count][16 MD5]
 					//         [size string-blob][count x { u32 id, u32 unk, u32 offset, u32 length }]
 					var rdbDir = RdbDir(args);
-					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+					using var rdb = new RdbReader(rdbDir);
 					var map = new Dictionary<uint, string>();
 					var byCat = new Dictionary<(uint cat, uint id), string>();
 					var byLang = new Dictionary<(uint cat, uint id, uint lang), string>();
@@ -313,10 +313,10 @@ namespace Faolan.Importer.Cli
 						catch { continue; }
 						if (b.Length < 48) continue;
 						var span = b.AsSpan(12);
-						if (System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span) != 0x32434454u) { badMagic++; continue; }
-						var category = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
-						var size = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12, 4));
-						var count = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16, 4));
+						if (BinaryPrimitives.ReadUInt32LittleEndian(span) != 0x32434454u) { badMagic++; continue; }
+						var category = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
+						var size = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12, 4));
+						var count = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16, 4));
 						var blobStart = 36; // span: TDC2(4) + cat/flags/size/count(16) + MD5(16) = 36
 						var indexStart = blobStart + (int)size;
 						if (indexStart + (long)count * 16 > span.Length) continue; // grammar mismatch for this page
@@ -325,15 +325,15 @@ namespace Faolan.Importer.Cli
 						for (var i = 0; i < count; i++)
 						{
 							var rec = span.Slice(indexStart + i * 16, 16);
-							var id = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec);
-							var lang = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(4, 4)); // 2nd u32 = language (loader arg3)
-							var off = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(8, 4));
-							var len = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(12, 4));
+							var id = BinaryPrimitives.ReadUInt32LittleEndian(rec);
+							var lang = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(4, 4)); // 2nd u32 = language (loader arg3)
+							var off = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(8, 4));
+							var len = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(12, 4));
 							if (off + len > size) continue;
 							var strBytes = span.Slice(blobStart + (int)off, (int)len);
 							var nul = strBytes.IndexOf((byte)0);
 							if (nul >= 0) strBytes = strBytes.Slice(0, nul);
-							var str = System.Text.Encoding.UTF8.GetString(strBytes);
+							var str = Encoding.UTF8.GetString(strBytes);
 							map[id] = str;
 							byCat[(category, id)] = str;
 							langHisto[lang] = langHisto.GetValueOrDefault(lang) + 1;

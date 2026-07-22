@@ -59,7 +59,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(Attacker)
 				.WriteUInt32(Damage)
-				.WriteUInt32((uint)School)
+				.WriteUInt32(School)
 				.WriteUInt32(0)
 				.WriteUInt32(0);
 		}

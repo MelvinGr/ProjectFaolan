@@ -162,18 +162,18 @@ namespace Faolan.GameServer.Quest
 			}
 		}
 
-		// Sends a constructed Kalanthes MoveTask on the world conversation (WorldFraming + IirCarrier - the same framing
+		// Sends a constructed Kalanthes MoveTask on the world conversation (WorldSenderEndpoint + IirCarrier - the same framing
 		// every rendered NPC move goes out on).
 		public static Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
 		{
 			return SendWorldIir(client, body);
 		}
 
-		// The world-conversation IIR send (WorldFraming + IirCarrier) shared by the scripted sends above - the same
+		// The world-conversation IIR send (WorldSenderEndpoint + IirCarrier) shared by the scripted sends above - the same
 		// framing WorldBroadcaster uses for every rendered move/pose/visual-change.
 		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
 		{
-			return recipient.SendAsync(new Rpc(WorldFraming.SenderEndpoint, recipient.EndpointOf(Endpoints.GameInterfaceType),
+			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.EndpointOf(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 	}

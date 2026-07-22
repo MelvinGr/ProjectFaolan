@@ -92,25 +92,26 @@ namespace Faolan.GameServer
 		// spellweaves.
 		private const uint SpellweaveToggleParam = 0xFC;
 
-		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x58);
 		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x58);
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
-		private static readonly byte[] LoginWorld201CSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
 		private static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
-		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32) in
-		// their Retail*Burst sender methods. The client instance is the character's real id: it is written into the
-		// body with WriteUInt32(id) and woven into the sender/receiver conversation id by building each endpoint
-		// through Endpoints.EndpointBytes(type, id).
+		// The create-flow packets build each endpoint through Endpoints.Endpoint(type, id) with the client instance
+		// (the character's real id) woven into the sender/receiver conversation id.
 
-		// The retail login world-entry rides ONE conversation for everything (auth, MapChange, world objects, 		// player and NPC spawns, time): family prefix + sub-id 0x58 on the sender, and the receiver family
-		// prefix + the character instance as a varint. Confirmed from the Strie login capture. Keeping every
-		// login packet on this single conversation is what lets the client tie the spawns to the loaded
-		// playfield and render them (the player avatar renders regardless, but NPCs do not). The bytes live on
-		// World.WorldFraming (the single source shared with the WorldBroadcaster); these delegate to it.
+		// The world-conversation sender shared by every world-entry / world-event packet (formerly the WorldFraming
+		// class): sender = the world-system conversation (family prefix hash("GameAgent") + sub-id 0x58); the receiver
+		// is the recipient's GameInterface endpoint addressed to its client instance. Confirmed from the Strie login
+		// capture - keeping every world packet on this single conversation is what lets the client tie the spawns to the
+		// loaded playfield and render them. Public because the composed collaborators (WorldBroadcaster, CombatService,
+		// the economy services, VitalsPacket) frame their own world sends against it.
+		// Instance 0x58 from the Strie capture; retail's per-session value varies (hoxxling 0x08, randochar 0x0b).
+		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
+		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
+		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
 
 		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
-		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldFraming.Sender that
+		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldSenderEndpoint that
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
 		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
@@ -560,24 +561,5 @@ namespace Faolan.GameServer
 				return false;
 			}
 		}
-	}
-
-	// The world-conversation framing shared by every world-entry / world-event packet: sender = the world-system
-	// conversation (family prefix + sub-id 0x58), receiver = the recipient's GameInterfaceType endpoint addressed to its
-	// client instance. Confirmed from the Strie login capture - keeping every world packet on this single conversation
-	// is what lets the client tie spawns to the loaded playfield and render them. Single source of truth, used by the
-	// WorldBroadcaster and by the listener's login/create-flow senders (which delegate here).
-	public static class WorldFraming
-	{
-		// Instance 0x58 from the Strie capture; retail's per-session value varies (hoxxling 0x08, randochar 0x0b).
-		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
-		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's; it's the client's
-		// default IIR PollStatus log). Reverted to 0x58 (the proven value).
-		public static readonly byte[] Sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x58);
-
-		// The same conversation in structured (ProtoEndpoint) form, for the Rpc send boundary (Gitea #406). Coexists
-		// with the byte[] Sender through the GameServer migration; the byte[] retires once no world send hand-frames a
-		// PacketStream anymore.
-		public static readonly ProtoEndpoint SenderEndpoint = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
 	}
 }

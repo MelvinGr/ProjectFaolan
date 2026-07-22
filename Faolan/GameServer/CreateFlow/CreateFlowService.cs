@@ -14,6 +14,7 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
@@ -44,10 +45,10 @@ namespace Faolan.GameServer.CreateFlow
 		internal const string CreateWorldScriptToken =
 			"<remoteformat token=\"playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley (server-side)\" category=\"50023\" key=\"&quot;B]SZ.AGRGrAyOGe*BG-\" knubot=\"0\"  ></remoteformat>";
 
-		internal static readonly byte[] MorphAckSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x0C);
+		internal static readonly ProtoEndpoint MorphAckSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x0C);
 		private static readonly byte[] EditorAvatarSnapshot = Program.LoadEmbeddedResource("Faolan.CreateEditorAvatarSnapshot.bin");
 
-		private static readonly byte[] RetailCreateEditorPostReadyAckSender = Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x59);
+		private static readonly ProtoEndpoint RetailCreateEditorPostReadyAckSender = Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x59);
 
 		// Character ids that have just been named in the create-editor and are about to open their FIRST world
 		// connection (the second GameServer connection, after the 0x2002 enter-world handoff). Added when the name is
@@ -326,18 +327,12 @@ namespace Faolan.GameServer.CreateFlow
 
 			// (a) The create-world handshake - the three records the verbatim scene burst opened with (the shared
 			// Hello handshake at GameServerListener is skipped for isCreateWorldEntry, so send it here).
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchReportDimesionID)
-				.WriteArray(0x00, 0x01, 0x31)
-				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchReportServerID)
-				.WriteArray(0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03)
-				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchAckAuthenticate)
-				.WriteArray(0x00, 0x00, 0x00, 0x01)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
+				GameInterfaceOpcodes.DispatchReportDimesionID, (byte[])[0x00, 0x01, 0x31]));
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
+				GameInterfaceOpcodes.DispatchReportServerID, (byte[])[0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03]));
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
+				GameInterfaceOpcodes.DispatchAckAuthenticate, (byte[])[0x00, 0x00, 0x00, 0x01]));
 
 			// (b) The live-char world (constructed; same path existing-char logins use).
 			await _sendBurstlessWorldEntry(client, client.Session.Character.MapId);
@@ -346,7 +341,7 @@ namespace Faolan.GameServer.CreateFlow
 			// step, and the two opening script groups). The per-callback steps follow via SendCreateCutsceneStep.
 			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
 			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
-			await SendIir(client, Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.EnergyIIR,
+			await SendIir(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.EnergyIIR,
 				CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x36B0));
 			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
 			await SendScry(client,
@@ -357,11 +352,8 @@ namespace Faolan.GameServer.CreateFlow
 					"1010003:3147889;1010003:3147890;1010003:3147891;1010003:3147892;1010003:3147893;1010003:3147894;1010003:137283;1010003:202270;1010003:210528;1010003:205370;1010003:3147896;1010003:3147895;1010003:3147897;1010003:3147898;1010003:3147899;1010003:3147900;1010003:208235;1010003:3203880;1010003:3203879;1010003:3203881;1010003:3203876;1010003:3203877;1010003:3203878",
 					f6Field1: 4617355, f6Field2: 7004418));
 			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 385910));
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, id),
-					GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, id),
+				GameInterfaceOpcodes.DispatchPassBlob, (byte[])[0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00]));
 		}
 
 		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string? name)
@@ -411,12 +403,12 @@ namespace Faolan.GameServer.CreateFlow
 				return;
 
 			var id = client.Session.Account.ClientInstance;
-			var sender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x0C);
-			var receiver = Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id);
+			var sender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x0C);
+			var receiver = Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id);
 
 			var spells = await _database.GetStartingSpells(character.Level, character.Class);
 			foreach (var spellId in spells)
-				await new PacketStream().WriteHeader(sender, receiver, GameCharInterfaceOpcodes.DispatchLearnSpell).WriteUInt32(spellId).SendAsync(client);
+				await client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchLearnSpell, s => s.WriteUInt32(spellId)));
 
 			_logger.LogInformation("Create: granted {Count} starting spell(s) (0x200A) to '{Name}' (class={Class}) so the client bars them.", spells.Length, character.Name, character.Class);
 		}
@@ -596,8 +588,8 @@ namespace Faolan.GameServer.CreateFlow
 		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository? database = null)
 		{
 			var id = client.Session.Account.ClientInstance;
-			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
-			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
+			var sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
+			var receiver = Endpoints.Endpoint(Endpoints.GameInterfaceType, id);
 
 			// The galley scene props are WorldObjects rows on the editor map (4000), loaded here keyed by captured
 			// handle and streamed below (after the MapChange) built byte-exact from their columns via WorldObjectBuilder
@@ -755,20 +747,19 @@ namespace Faolan.GameServer.CreateFlow
 				0xF8, 0xDC, 0x04, 0x15, 0x00, 0x00, 0x00, 0x00, 0x18, 0x01, 0x50, 0x00, 0xA0, 0x01, 0x00, 0xA8, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02,
 				0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1);
 
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(0x00, 0x00, 0x1F, 0x8E, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x00, 0x00, 0x00, 0x00, 0x44, 0x28, 0x81, 0x06, 0x32, 0x0E, 0x0A, 0x07, 0x08, 0x65, 0x10)
-				.WriteVarint(id)
-				.WriteArray(0x10, 0x84, 0x08, 0x18, 0x00, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x68, 0x10)
-				.WriteVarint(id)
-				.WriteArray(0x10, 0x18, 0x18, 0x00, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x70, 0x10)
-				.WriteVarint(id)
-				.WriteArray(0x10, 0x30, 0x18, 0x0C, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x71, 0x10)
-				.WriteVarint(id)
-				.WriteArray(EditorAvatarSnapshot)
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArray(0x00, 0x00, 0x1F, 0x8E, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
+					.WriteUInt32(id)
+					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x44, 0x28, 0x81, 0x06, 0x32, 0x0E, 0x0A, 0x07, 0x08, 0x65, 0x10)
+					.WriteVarint(id)
+					.WriteArray(0x10, 0x84, 0x08, 0x18, 0x00, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x68, 0x10)
+					.WriteVarint(id)
+					.WriteArray(0x10, 0x18, 0x18, 0x00, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x70, 0x10)
+					.WriteVarint(id)
+					.WriteArray(0x10, 0x30, 0x18, 0x0C, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x71, 0x10)
+					.WriteVarint(id)
+					.WriteArray(EditorAvatarSnapshot)));
 
 			// SetDayTime: CONSTRUCTED from the captured day-time + wall-clock timestamp + rate (#189 item 3).
 			await Iir(GameServer0X2000Opcodes.GameTimeIIR, CreateEditorRecordBuilder.BuildGameTimeIir(0x0147_43EB_0000_0000UL, 0x01, 0x0001_9272_6A1D_3837UL));
@@ -796,10 +787,8 @@ namespace Faolan.GameServer.CreateFlow
 
 			Task IirId(GameServer0X2000Opcodes iir, byte[] prefix, params byte[] suffix)
 			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(prefix).WriteUInt32(id).WriteArray(suffix))
-					.SendAsync(client);
+				return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob,
+					s => s.WriteArrayUInt32Length(x => x.WriteUInt32(iir).WriteArray(prefix).WriteUInt32(id).WriteArray(suffix))));
 			}
 		}
 
@@ -814,9 +803,9 @@ namespace Faolan.GameServer.CreateFlow
 		// The create-editor 0x2000 receiver: the player object (GameInterfaceType) addressed to this session's
 		// client instance. Built as a typed ProtoEndpoint so the type+instance can't drift (the old hardcoded
 		// receiver baked in 0x021662C8; see Endpoints / ProtoEndpointGoldenTests).
-		internal static byte[] Receiver(INetworkClient client)
+		internal static ProtoEndpoint Receiver(INetworkClient client)
 		{
-			return client.Endpoint(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
+			return client.EndpointOf(Endpoints.GameInterfaceType, client.Session.Account.ClientInstance);
 		}
 
 		// Retail create-editor CHARACTER-CREATION SCRIPT burst from
@@ -836,8 +825,8 @@ namespace Faolan.GameServer.CreateFlow
 		internal static async Task SendRetailCreateEditorCreationScriptBurst(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
-			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
-			var receiver = Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id);
+			var sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
+			var receiver = Endpoints.Endpoint(Endpoints.GameInterfaceType, id);
 
 			const uint W = EntityClass.Character; // EntityClass.Character (0xC350)
 
@@ -854,17 +843,15 @@ namespace Faolan.GameServer.CreateFlow
 			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(W, id, 0x00, 0x0360, 0x02));
 
 			// MagicBuff carries the instance twice (caster + target).
-			await new PacketStream()
-				.WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s => s
+			await client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
 					.WriteArray(0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
 					.WriteArray(0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00,
-						0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3D, 0x5F, 0xC9, 0x66))
-				.SendAsync(client);
+						0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3D, 0x5F, 0xC9, 0x66))));
 
 			await Iir(GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(W, id, 0x01, 0x00));
 
@@ -902,20 +889,19 @@ namespace Faolan.GameServer.CreateFlow
 			// the length prefix is recomputed by WriteArrayUInt32Length.
 			Task IirRecord(byte[] record)
 			{
-				return new PacketStream().WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
+				return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 			}
 		}
 
 		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
 		{
-			return new PacketStream()
-				.WriteHeader(RetailCreateEditorPostReadyAckSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(requestId)
-				.WriteUInt32(requestId == 0x0009FF95
-					? 0x00000000u
-					: 0x00000002u)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(RetailCreateEditorPostReadyAckSender, client.EndpointOf(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteUInt32(EntityClass.Character)
+					.WriteUInt32(requestId)
+					.WriteUInt32(requestId == 0x0009FF95
+						? 0x00000000u
+						: 0x00000002u)));
 		}
 
 		// Verbatim replay of the fixed tail of the retail create-editor post-ready follow-up from
@@ -928,13 +914,11 @@ namespace Faolan.GameServer.CreateFlow
 				await SendRetailCreateEditorPostReadyAck(client, requestId);
 
 			var id = client.Session.Account.ClientInstance;
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchValidResurrectionSpots)
-				.WriteArray(0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0x07, 0xE2, 0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD,
-					0x00, 0x00, 0xC7, 0x9E, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00)
-				.SendAsync(client);
-			await SendIir(client, Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.CharInPlayIIR,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
+				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots,
+				(byte[])[0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0x07, 0xE2, 0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD,
+					0x00, 0x00, 0xC7, 0x9E, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00]));
+			await SendIir(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.CharInPlayIIR,
 				CreateEditorRecordBuilder.BuildCharInPlayIir(id));
 
 			// The racial CHARACTER-TEMPLATE choice list the creation editor reads (Male/Female/StygianSlaver ->
@@ -1038,9 +1022,8 @@ namespace Faolan.GameServer.CreateFlow
 		// HandleCommandPacket already reads typed. It used to be written as raw tag bytes.
 		private static Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
-			return new PacketStream()
-				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
+			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR);
 					s.WriteUInt32(EntityClass.Character);
@@ -1059,30 +1042,27 @@ namespace Faolan.GameServer.CreateFlow
 							Instance = 0
 						}
 					});
-				})
-				.SendAsync(client);
+				})));
 		}
 
 		// Builds a creator-connection 0x2000 packet: subOpcode + ack(0xC350) + clientInstance + fixed tail.
 		private static Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
-			return new PacketStream()
-				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
+			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(subOpcode);
 					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteArray(tail);
-				})
-				.SendAsync(client);
+				})));
 		}
 
 		// Sends a fully-built create-editor IIR record (one that already begins with its sub-opcode, e.g.
 		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
 		private static Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
-			return new PacketStream().WriteHeader(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(record).SendAsync(client);
+			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
 		// Emits a GameActionListIIR (0xF508F4C1) carrier for `dynel`, delivered to frame `id`. The fixed record
@@ -1090,17 +1070,16 @@ namespace Faolan.GameServer.CreateFlow
 		// the still-opaque property-map action tail rides verbatim; the carrier length is computed from the body.
 		private static Task SendGameActionListRecord(INetworkClient client, byte agentSub, uint id, uint dynel, byte[] actionTail)
 		{
-			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, agentSub), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(GameActionListCodec.BuildBody(id, dynel, 0u, actionTail))
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, agentSub), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameActionListCodec.BuildBody(id, dynel, 0u, actionTail))));
 		}
 
 		// The create-flow send idiom: one 0x2000 record ([u32 len][u32 iir opcode][body]) delivered via DispatchPassBlob.
 		// Every editor/world-prep burst funnels its records through here instead of re-spelling the PacketStream chain.
-		private static Task SendIir(INetworkClient client, byte[] sender, byte[] receiver, GameServer0X2000Opcodes iir, params byte[] body)
+		private static Task SendIir(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, GameServer0X2000Opcodes iir, params byte[] body)
 		{
-			return new PacketStream().WriteHeader(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
+			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(x => x.WriteUInt32(iir).WriteArray(body))));
 		}
 
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
@@ -1120,9 +1099,8 @@ namespace Faolan.GameServer.CreateFlow
 				? 0x3F800000u
 				: 0xBCF5C28Fu;
 
-			return new PacketStream()
-				.WriteHeader(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(s =>
+			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.SetMorphValueIIR);
 					s.WriteUInt32(EntityClass.Character);
@@ -1132,8 +1110,7 @@ namespace Faolan.GameServer.CreateFlow
 					s.WriteUInt32(floatBits);
 					s.WriteByte(0);
 					s.WriteUInt32(counter);
-				})
-				.SendAsync(client);
+				})));
 		}
 
 		// Reject a chosen name so the client re-prompts instead of dead-ending (no loading screen). Retail answers a
@@ -1165,10 +1142,8 @@ namespace Faolan.GameServer.CreateFlow
 		private static Task SendScry(INetworkClient client, byte[] scry)
 		{
 			var id = client.Session.Account.ClientInstance;
-			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(scry)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(scry)));
 		}
 
 		private static async Task TrySendPostMorphBurstOnce(INetworkClient client)

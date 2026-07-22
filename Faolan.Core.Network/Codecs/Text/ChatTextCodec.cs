@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// channel chat). The text is a `remoteformat` (localized tokens + parameters), the same XML shape the feedback
 	// and Knubot packets use, so the server can emit a localized system line without literal strings.
 	//
-	// Carried as an IIR on the WORLD conversation (opcode 0x2000; sender = WorldFraming.Sender, receiver = the
+	// Carried as an IIR on the WORLD conversation (opcode 0x2000; sender = GameServerListener.WorldSenderEndpoint, receiver = the
 	// player's GameInterface = GameInterfaceType + ClientInstance). The IIR body's `instance` is that receiver
 	// instance, so a live send is fully addressable from the session.
 	//

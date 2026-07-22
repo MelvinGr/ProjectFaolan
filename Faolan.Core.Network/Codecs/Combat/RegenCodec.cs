@@ -31,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public void Write(FaolanStream s)
 		{
 			s.WriteArrayUInt32Length(body => body.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env)
-				.WriteUInt32((uint)HealthDelta).WriteUInt32((uint)ManaDelta).WriteUInt32((uint)StaminaDelta));
+				.WriteUInt32(HealthDelta).WriteUInt32(ManaDelta).WriteUInt32(StaminaDelta));
 		}
 
 		// The DELTAS are the ×100 wire vitals scale (display value × 100), matching the current-vital stats they add to.

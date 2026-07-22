@@ -11,6 +11,7 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
@@ -202,10 +203,8 @@ namespace Faolan.GameServer
 									BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(22, 4), acceptedPosition.Z);
 								}
 
-								await new PacketStream()
-									.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-									.WriteArrayUInt32Length(echoBody)
-									.SendAsync(client);
+								await client.SendAsync(new Rpc(WorldSenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+									GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(echoBody)));
 
 								// Interest-managed broadcast: spawn this player to newly-near players and forward the move
 								// to players who already see them (Gitea #404). No-op solo.
@@ -814,7 +813,7 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
 										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
-										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
+										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType), 0x00000065, target,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
@@ -835,7 +834,7 @@ namespace Faolan.GameServer
 										// Retail's reply: the behavior ack with null identity + a 0x201C entry
 										// (prefix 0x68, state 0). Capture frames 320-321.
 										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
-										await Send0X201CEntry(client, LoginWorld201CSender, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
+										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.EndpointOf(Endpoints.GameCharInterfaceType), 0x00000068, 0,
 											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
@@ -1174,15 +1173,15 @@ namespace Faolan.GameServer
 					if (!isCreateWorldEntry)
 					{
 						var authSender = isNewCharacter
-							? Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59)
-							: WorldFraming.Sender;
+							? Endpoints.Endpoint(Endpoints.GameAgentType, 0x59)
+							: WorldSenderEndpoint;
 						var authReceiver = isNewCharacter
 							? CreateFlowService.Receiver(client)
-							: client.Endpoint(Endpoints.GameInterfaceType);
+							: client.EndpointOf(Endpoints.GameInterfaceType);
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
-						await new PacketStream().WriteHeader(authSender, authReceiver, GameInterfaceOpcodes.DispatchAckAuthenticate).WriteUInt32(1).SendAsync(client);
+						await client.SendAsync(new Rpc(authSender, authReceiver, GameInterfaceOpcodes.DispatchAckAuthenticate, s => s.WriteUInt32(1)));
 					}
 
 					client.Session.HasPendingPost205FFollowUp = false;
@@ -1787,12 +1786,11 @@ namespace Faolan.GameServer
 			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target))
 				category = target.Disposition;
 
-			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, Endpoints.EndpointBytes(Endpoints.GameCharInterfaceProjectType, instance), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteUInt32(targetType)
-				.WriteUInt32(targetInstance)
-				.WriteUInt32(category) // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
+				GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteUInt32(targetType)
+					.WriteUInt32(targetInstance)
+					.WriteUInt32(category))); // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
 
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
 		}
@@ -1817,7 +1815,7 @@ namespace Faolan.GameServer
 			if (character?.BindRespawnPointId is { } bindPointId)
 				bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 
-			await new PacketStream().WriteHeader(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchUpdateBindLocation).WriteUInt32(bindMapId).SendAsync(client);
+			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchUpdateBindLocation, s => s.WriteUInt32(bindMapId)));
 			Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
 		}
 
