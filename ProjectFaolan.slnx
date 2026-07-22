@@ -9,6 +9,7 @@
         <File Path="Dockerfile" />
         <File Path="faolan.db" />
         <File Path="faolan.json" />
+        <File Path="faolan.sql" />
         <File Path="logo.ico" />
         <File Path="logo.png" />
         <File Path="ProjectFaolan.sln.DotSettings" />
