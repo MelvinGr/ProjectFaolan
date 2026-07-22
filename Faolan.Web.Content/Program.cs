@@ -55,9 +55,9 @@ namespace Faolan.Web.Content
 			builder.Configuration.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true); // repo-root-relative (CWD-independent), like Faolan.Web
 			builder.Configuration.AddCommandLine(args, new Dictionary<string, string>
 			{
-				["--store"] = "CdnMirrorStore",
-				["--ip"] = "CdnMirrorIp",
-				["--port"] = "CdnMirrorPort"
+				["--store"] = "CdnMirror:Store",
+				["--ip"] = "CdnMirror:Ip",
+				["--port"] = "CdnMirror:Port"
 			});
 			builder.Configuration.AddEnvironmentVariables();
 

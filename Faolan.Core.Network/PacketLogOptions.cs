@@ -5,7 +5,7 @@ namespace Faolan.Core.Network
 {
 	// Global packet-trace logging switches. Each in/outbound packet is now logged on a SINGLE line; the raw
 	// byte dump (headerData/body hex) is folded onto that same line rather than emitted as separate lines.
-	// Set from faolan.json "LogPacketBytes" at startup (see Program.cs).
+	// Set from faolan.json Log:PacketBytes at startup (see Program.cs).
 	public static class PacketLogOptions
 	{
 		// When false, the raw byte dump is suppressed on every packet line even at Debug level (leaving just the

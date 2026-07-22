@@ -1,26 +1,35 @@
 {
+	// Shared / required config - stays FLAT (Docker sets these by env: DatabaseProvider, DatabaseConnectionString, ...).
 	"DatabaseProvider": "Sqlite", // Postgres
 	"DatabaseConnectionString": "Data Source=faolan.db", // "Host=localhost;Port=5432;Database=faolan;Username=faolan;Password=faolan"
 
 	"ServerIpAddress": "127.0.0.1",
 	"UniverseAgentPort": 7010,
 	"PlayerAgentPort": 7011,
-
-	"McpEnabled": true,
-	"McpPort": 7099,
-	"McpUrl": "http://127.0.0.1:7099/mcp", // Faolan.Mcp chat-bridge -> game-server MCP endpoint (also env McpUrl)
-	// "ChannelPollMs": 1500, "ChannelBacklogGraceMs": 120000, // chat-bridge poll loop tuning (defaults shown)
+	"WelcomeString": "Welcome to Project Faolan!",
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
-	// Faolan.Web.Content CDN mirror (optional; also --store/--ip/--port or env CdnMirror*). Machine-local store paths
-	// belong in run.sh/run.bat, which override --store; this default is a CWD-relative dir so the repo stays portable.
-	"CdnMirrorStore": "mirror-store",
-	"CdnMirrorIp": "127.0.0.1",
-	"CdnMirrorPort": 7081,
+	// Per-concern tuning (optional) - grouped. Env override uses the __ hierarchy separator, e.g. Mcp__Port, CdnMirror__Store.
+	"Mcp": {
+		"Enabled": true,
+		"Port": 7099,
+		"Url": "http://127.0.0.1:7099/mcp" // Faolan.Mcp chat-bridge -> game-server MCP endpoint
+	},
 
-	"LogFile": "faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
-	"LogPacketBytes": true, // false = drop the raw header/body hex dump, keep just the opcode + lengths
+	// Faolan.Web.Content CDN mirror (also --store/--ip/--port). Machine-local store paths belong in run.sh/run.bat,
+	// which override --store; this default is a CWD-relative dir so the repo stays portable.
+	"CdnMirror": {
+		"Store": "mirror-store",
+		"Ip": "127.0.0.1",
+		"Port": 7081
+	},
 
-	"WelcomeString": "Welcome to Project Faolan!"
+	// "ChatBridge": { "PollMs": 1500, "BacklogGraceMs": 120000 }, // chat-bridge poll loop tuning (defaults shown)
+
+	// "Log" (not "Logging" - that section name is reserved by the .NET logging config).
+	"Log": {
+		"File": "faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
+		"PacketBytes": true // false = drop the raw header/body hex dump, keep just the opcode + lengths
+	}
 }

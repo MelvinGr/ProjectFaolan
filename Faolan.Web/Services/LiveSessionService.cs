@@ -41,7 +41,7 @@ namespace Faolan.Web.Services
 		{
 			_logger = logger;
 			// Default to the game server's documented MCP port; overridable so a non-default deployment still resolves.
-			var port = config["McpPort"] ?? "7099";
+			var port = config["Mcp:Port"] ?? "7099";
 			_endpoint = new Uri($"http://127.0.0.1:{port}/mcp");
 		}
 

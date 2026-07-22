@@ -9,26 +9,27 @@ namespace Faolan.Core.Extensions
 	{
 		extension(IConfiguration config)
 		{
-			// Optional toggles - default off when unset.
-			public bool LogPacketBytes => bool.TryParse(config["LogPacketBytes"], out var enabled) && enabled;
-			public bool McpEnabled => bool.TryParse(config["McpEnabled"], out var enabled) && enabled;
+			// Optional toggles - default off when unset. The grouped keys use the "Section:Key" path (nested in
+			// faolan.json; env override with the __ separator, e.g. Log__PacketBytes / Mcp__Enabled).
+			public bool LogPacketBytes => bool.TryParse(config["Log:PacketBytes"], out var enabled) && enabled;
+			public bool McpEnabled => bool.TryParse(config["Mcp:Enabled"], out var enabled) && enabled;
 
 			// Log file location. Optional - defaults to faolan.log in the CWD; point it at a mounted volume (container)
 			// or a per-run path via env/cmdline/json like any other config value.
-			public string LogFile => config["LogFile"] ?? "faolan.log";
+			public string LogFile => config["Log:File"] ?? "faolan.log";
 
 			// CDN content mirror (Faolan.Web.Content). All optional with the built-in defaults so the mirror runs with no
 			// config at all; override via faolan.json, env vars, or the --store/--ip/--port switches (mapped to these keys).
-			public string CdnMirrorStore => config["CdnMirrorStore"] ?? "mirror-store";
-			public string CdnMirrorIp => config["CdnMirrorIp"] ?? "127.0.0.1";
-			public ushort CdnMirrorPort => ushort.TryParse(config["CdnMirrorPort"], out var port) ? port : (ushort)7081;
+			public string CdnMirrorStore => config["CdnMirror:Store"] ?? "mirror-store";
+			public string CdnMirrorIp => config["CdnMirror:Ip"] ?? "127.0.0.1";
+			public ushort CdnMirrorPort => ushort.TryParse(config["CdnMirror:Port"], out var port) ? port : (ushort)7081;
 
 			// Faolan.Mcp chat-bridge (the stdio "faolan-chat" MCP server). All optional with the built-in defaults so
 			// the bridge runs with no config; McpUrl is the game-server MCP endpoint it connects to, the two Channel*
 			// values tune its poll loop (milliseconds).
-			public string McpUrl => config["McpUrl"] ?? "http://127.0.0.1:7099/mcp";
-			public double ChannelBacklogGraceMs => double.TryParse(config["ChannelBacklogGraceMs"], out var ms) ? ms : 120_000;
-			public double ChannelPollMs => double.TryParse(config["ChannelPollMs"], out var ms) ? ms : 1500;
+			public string McpUrl => config["Mcp:Url"] ?? "http://127.0.0.1:7099/mcp";
+			public double ChannelBacklogGraceMs => double.TryParse(config["ChatBridge:BacklogGraceMs"], out var ms) ? ms : 120_000;
+			public double ChannelPollMs => double.TryParse(config["ChatBridge:PollMs"], out var ms) ? ms : 1500;
 
 			// Required values. faolan.json is OPTIONAL now (a container can be configured purely by env vars), so a
 			// missing key must fail with a CLEAR message rather than an NRE (config[key]!) / ArgumentNullException
@@ -37,7 +38,7 @@ namespace Faolan.Core.Extensions
 			public string DatabaseConnection => Required(config, "DatabaseConnectionString");
 			public string ServerIpAddress => Required(config, "ServerIpAddress");
 			public string WelcomeString => Required(config, "WelcomeString");
-			public ushort McpPort => ushort.Parse(Required(config, "McpPort"));
+			public ushort McpPort => ushort.Parse(Required(config, "Mcp:Port"));
 			public ushort PlayerAgentPort => ushort.Parse(Required(config, "PlayerAgentPort"));
 			public ushort UniverseAgentPort => ushort.Parse(Required(config, "UniverseAgentPort"));
 		}

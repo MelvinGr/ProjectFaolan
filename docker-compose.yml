@@ -18,7 +18,7 @@ x-faolan-config: &faolan-config
   ServerIpAddress: "127.0.0.1"   # host IP / hostname for a real deploy (see note above)
   UniverseAgentPort: 7010
   PlayerAgentPort: 7011
-  McpPort: 7099
+  Mcp__Port: 7099                # nested key -> env uses the __ separator (Mcp:Port)
   WelcomeString: "Welcome to Project Faolan!"
 
 services:

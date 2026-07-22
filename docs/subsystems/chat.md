@@ -40,7 +40,7 @@ The ChatServer wire format is `[u16 opcode][u16 bodyLen][body]` (`ChatServerMess
 ## Claude channel (MCP bridge) — added 2026-06-12
 
 A server-defined channel **"Claude"** (`04/0x00C1A0DE/flag 0x8044`, id far outside the retail range) is
-appended to the login subscription list. The whole bridge is gated on `"McpEnabled"` in `faolan.json`
+appended to the login subscription list. The whole bridge is gated on the `Mcp:Enabled` key in `faolan.json`
 (default true): disabled = no MCP host, no channel subscription, no log capture. Player posts on it broadcast normally AND are recorded in the
 in-memory `ClaudeChannel` log (`Faolan.Core.Network/Server/ChatServer/ClaudeChannel.cs`, ring of 500, monotonic
 sequence numbers). The MCP tools `read_claude_channel` (poll by `afterSequence`) and
