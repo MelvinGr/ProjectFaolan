@@ -35,6 +35,25 @@ namespace Faolan.Core.Network.Protocol
 		{
 		}
 
+		// Enum-opcode overloads so call sites pass GameInterfaceOpcodes.Foo directly instead of (ushort)-casting every
+		// one (mirrors WriteHeader's Convert.ToUInt16). Constructors can't be generic, so the param is the boxing base
+		// Enum - one negligible box per packet. The 16-bit interface opcodes are ushort-backed; a value that overflows
+		// ushort throws here (fail-fast) rather than silently truncating.
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, ReadOnlyMemory<byte> body)
+			: this(sender, receiver, Convert.ToUInt16(opcode), headerData, body)
+		{
+		}
+
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body)
+			: this(sender, receiver, Convert.ToUInt16(opcode), headerData, body)
+		{
+		}
+
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, Action<FaolanStream> body)
+			: this(sender, receiver, Convert.ToUInt16(opcode), body)
+		{
+		}
+
 		private static byte[] BuildBody(Action<FaolanStream> body)
 		{
 			using var stream = new FaolanStream();

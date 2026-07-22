@@ -32,7 +32,7 @@ namespace Faolan.GameServer.Session
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
 			return client.SendAsync(new Rpc(LatencySender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, client.Session.Character.Id),
-				(ushort)GameCharInterfaceOpcodes.DispatchPong, new byte[] { 0x01 },
+				GameCharInterfaceOpcodes.DispatchPong, new byte[] { 0x01 },
 				body => body.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
 		}
 
@@ -42,7 +42,7 @@ namespace Faolan.GameServer.Session
 		public static Task HandlePing(INetworkClient client)
 		{
 			return client.SendAsync(new Rpc(PingSender, Endpoints.Endpoint(Endpoints.GameInterfaceType, client.Session.Character.Id),
-				(ushort)GameInterfaceOpcodes.DispatchGameServerStats,
+				GameInterfaceOpcodes.DispatchGameServerStats,
 				body => body.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
 		}
 	}
