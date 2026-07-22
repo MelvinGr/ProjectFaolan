@@ -37,11 +37,11 @@ namespace Faolan.CSPlayerAgent
 			var opcode = (CSPlayerAgentOpcodes)packet.Opcode;
 			LogPacketReceived(frame, opcode);
 
-			var body = packet.BodyReader();
 			switch (opcode)
 			{
 				case CSPlayerAgentOpcodes.Authenticate:
 				{
+					var body = packet.BodyReader();
 					var characterId = body.ReadUInt32();
 					var accountId = body.ReadUInt32();
 					var authReply = body.ReadUInt32();
@@ -79,6 +79,7 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.StartVoteRetreat:
 				{
+					var body = packet.BodyReader();
 					var unk0 = body.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
 					var nClientInst = body.ReadUInt32();
 
@@ -250,6 +251,7 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.EchoGroupFinderUpdateFeaturedActivities:
 				{
+					var body = packet.BodyReader();
 					var unk0 = body.ReadUInt32();
 					// { 0x00, 0x00, 0x03, 0xF1 } // Same data that we send in Authenticate
 
@@ -260,6 +262,7 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.RemovePvpPoints:
 				{
+					var body = packet.BodyReader();
 					var data = body.ReadRemainingArray();
 
 					// Contains guild names or something like that
