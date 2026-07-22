@@ -4,8 +4,8 @@ Recovers the 16-bit RPC method opcodes (`0x2000..0x20FF`) from `AgeOfConan.exe`.
 `docs/re/aoc-rpc-method-opcodes.md`; finding summary in `docs/re/aoc-opcode-ids.md` (Stage 3b).
 
 ## Reproduce
-Analyzed Ghidra project at `tools/ghidra/output` (re-import if `/tmp` was cleared — exe is
-`/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe`, PE32 i386, stripped).
+Analyzed Ghidra project at `tools/ghidra/output` (re-import if `/tmp` was cleared — exe is the client's
+`AgeOfConan.exe` from its install dir, PE32 i386, stripped).
 Run each post-script against the already-analyzed program (no re-analysis):
 
 ```

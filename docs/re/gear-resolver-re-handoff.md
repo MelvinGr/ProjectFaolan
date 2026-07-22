@@ -92,7 +92,7 @@ stack**, and **winedbg isn't shipped by Proton**. **Frida works**, but only via 
 1. Windows x86 (32-bit) `frida-server.exe` matching the host frida (17.14.1 here), run inside the game's Proton
    prefix so it shares the game's wineserver:
    ```
-   WINEPREFIX=/mnt/btrfs/@games/debian-installation/steamapps/compatdata/217750/pfx/ \
+   WINEPREFIX="<steam-lib>/steamapps/compatdata/217750/pfx/" \
    WINEDLLPATH="<Proton>/files/lib/vkd3d:<Proton>/files/lib/wine" WINEESYNC=0 WINEFSYNC=0 \
    "<Proton - Experimental>/files/bin/wine" frida-server.exe -l 127.0.0.1:27042
    ```

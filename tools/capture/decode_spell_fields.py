@@ -28,11 +28,11 @@ Usage:
   decode_spell_fields.py <name|id> [more...]   # dump the field table for spells (name from faolan.db, or RDB id)
   decode_spell_fields.py --grep <substr>       # dump every faolan.db spell whose name contains <substr>
   decode_spell_fields.py --check               # cross-check a field vs ellatha-known levels (edit GT below)
-Options: --rdb <dir> (default: the client install), --db <faolan.db>
+Options: --rdb <dir> (default: $AOC_RDB), --db <faolan.db>
 """
 import struct, sqlite3, sys, os
 
-DEFAULT_RDB = "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB/"
+DEFAULT_RDB = os.environ.get("AOC_RDB", "")
 SPELL_TYPE = 1040005
 
 

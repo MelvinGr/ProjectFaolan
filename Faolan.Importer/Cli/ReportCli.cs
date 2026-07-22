@@ -28,6 +28,13 @@ namespace Faolan.Importer.Cli
 	{
 		private static readonly string RepoRoot = RepoPaths.Root;
 
+		// The client's RDB folder is part of the game install, not this repo. Resolve it from --rdb, else the
+		// AOC_RDB env var; RDB-backed reports fail with a clear message if neither is set.
+		private static string RdbDir(string[] args) =>
+			GetOption(args, "--rdb")
+			?? Environment.GetEnvironmentVariable("AOC_RDB")
+			?? throw new InvalidOperationException("Pass --rdb <dir> (or set AOC_RDB) pointing at the client's RDB folder.");
+
 		public static async Task<int> RunAsync(string[] args, string report)
 		{
 			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
@@ -117,74 +124,74 @@ namespace Faolan.Importer.Cli
 
 				case "spell-fields":
 				{
-					SpellFields(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg);
+					SpellFields(RdbDir(args), arg);
 					return 0;
 				}
 
 				case "rdb-assets":
 				{
-					RdbAssets(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg, GetOption(args, "--out"), args.Contains("--dump-mesh"));
+					RdbAssets(RdbDir(args), arg, GetOption(args, "--out"), args.Contains("--dump-mesh"));
 					return 0;
 				}
 
 				case "rdb-skeleton":
 				{
-					RdbSkeleton(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "14853");
+					RdbSkeleton(RdbDir(args), arg ?? "14853");
 					return 0;
 				}
 
 				case "rdb-rig":
 				{
-					RdbRig(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "", GetOption(args, "--out"), GetOption(args, "--skeleton"));
+					RdbRig(RdbDir(args), arg ?? "", GetOption(args, "--out"), GetOption(args, "--skeleton"));
 					return 0;
 				}
 
 				case "rdb-search":
 				{
-					RdbSearch(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "");
+					RdbSearch(RdbDir(args), arg ?? "");
 					return 0;
 				}
 
 				case "rdb-id":
 				{
-					RdbId(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "");
+					RdbId(RdbDir(args), arg ?? "");
 					return 0;
 				}
 
 				case "rdb-dump":
 				{
-					RdbDump(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "", GetOption(args, "--out"));
+					RdbDump(RdbDir(args), arg ?? "", GetOption(args, "--out"));
 					return 0;
 				}
 
 				case "item-template":
 				{
-					ItemTemplate(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", dbPath, arg ?? "", GetOption(args, "--out"));
+					ItemTemplate(RdbDir(args), dbPath, arg ?? "", GetOption(args, "--out"));
 					return 0;
 				}
 
 				case "ability-names":
 				{
-					AbilityNames(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", dbPath);
+					AbilityNames(RdbDir(args), dbPath);
 					return 0;
 				}
 
 				case "rdb-types":
 				{
-					RdbTypes(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB");
+					RdbTypes(RdbDir(args));
 					return 0;
 				}
 
 				case "terrain-export":
 				{
-					await TerrainExport(dbPath, GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB",
+					await TerrainExport(dbPath, RdbDir(args),
 						GetOption(args, "--terrain-out") ?? Path.Combine(RepoRoot, "Terrain"));
 					return 0;
 				}
 
 				case "spell-template":
 				{
-					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					var rdbDir = RdbDir(args);
 					var ids = (arg ?? "").Split(',', System.StringSplitOptions.RemoveEmptyEntries);
 					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
 					foreach (var idStr in ids)
@@ -215,7 +222,7 @@ namespace Faolan.Importer.Cli
 
 				case "spell-stat-coverage":
 				{
-					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					var rdbDir = RdbDir(args);
 					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
 					int total = 0, withMods = 0, records = 0;
 					var byStat = new System.Collections.Generic.Dictionary<uint, int>();
@@ -243,7 +250,7 @@ namespace Faolan.Importer.Cli
 
 				case "ldb-strings":
 				{
-					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					var rdbDir = RdbDir(args);
 					var needle = (arg ?? "damage").ToLowerInvariant();
 					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
 					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
@@ -279,7 +286,7 @@ namespace Faolan.Importer.Cli
 					// global id -> string map and print lookups for the pins + any --report-arg ids, to verify offline.
 					//   body: [12 RDB-Id][u32 "TDC2"][u32 category][u32 flags][u32 size][u32 count][16 MD5]
 					//         [size string-blob][count x { u32 id, u32 unk, u32 offset, u32 length }]
-					var rdbDir = GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+					var rdbDir = RdbDir(args);
 					using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
 					var map = new Dictionary<uint, string>();
 					var byCat = new Dictionary<(uint cat, uint id), string>();
@@ -536,9 +543,9 @@ namespace Faolan.Importer.Cli
 			// the encrypted RDBH header, so a per-category %-of-total is impossible (we can't tell an undecrypted
 			// entry's category) - we report the overall decrypted share + the absolute per-category decrypted counts.
 			var rdb = string.IsNullOrEmpty(rdbDir)
-				? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB"
+				? Environment.GetEnvironmentVariable("AOC_RDB")
 				: rdbDir;
-			if (Directory.Exists(rdb))
+			if (!string.IsNullOrEmpty(rdb) && Directory.Exists(rdb))
 			{
 				var itemIds = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
 				var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();

@@ -65,7 +65,7 @@ header (same grammar as `DispatchAddItemTests`). The value is **field 74**, and 
 The BUY markup (×4) has no captured anchor — it's a stand-in over the now-real sell value.
 
 ## Reproduce
-- RDB install: `/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB/` (see the
+- RDB install: the client's `RDB/` folder (`<rdb-dir>`; the concrete path is in the
   `client_rdb_install_path` agent memory).
 - Dump decrypted templates: `dotnet run --project Faolan.Importer -- --only rdb-items --rdb "<RDB>" --dump-templates /tmp/itpl`
   (`rdb-items` is an opt-in module; `--dump-templates` is its disk-write sub-option — stop the server first,

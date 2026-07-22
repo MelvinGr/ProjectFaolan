@@ -95,7 +95,9 @@ namespace Faolan.Web.Services
 		{
 			_dbFactory = dbFactory;
 			_cache = cache;
-			_rdbDir = config["RdbDir"] ?? throw new InvalidOperationException("RdbDir not configured");
+			_rdbDir = config["RdbDir"] is { Length: > 0 } dir
+				? dir
+				: throw new InvalidOperationException("RdbDir not configured - set it to the client's RDB folder in appsettings.Development.json or the RdbDir env var");
 			// Optional ContentMirror proxy base for on-demand (CDN-only) resources, e.g. the CDN race bodies that aren't
 			// in the local RDB. Store-and-forward, so requesting one archives it for the future (#275, [[aoc_content_cdn_mirror]]).
 			_cdnUrl = config["CdnUrl"];

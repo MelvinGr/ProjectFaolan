@@ -21,7 +21,7 @@ by scanning after the params text and validating: every position inside the mani
 """
 import struct, zlib, sys, os, re
 
-RDB = os.environ.get("AOC_RDB", "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB")
+RDB = os.environ.get("AOC_RDB", "")
 MESHINDEX, RENDERMESH = 1010030, 1010001
 
 

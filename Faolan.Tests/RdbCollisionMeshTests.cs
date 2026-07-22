@@ -24,10 +24,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void RealBeachCollision_MatchesPythonValidation()
 		{
-			// Non-hermetic: only runs where the client RDB is present. Locks the C# parser to the Python decode
-			// (beach 4010 = 666 actors / 116,178 triangles) so a real-data regression is caught, not just the synthetic.
-			const string rdbDir = "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
-			if (!File.Exists(Path.Combine(rdbDir, "le.idx")))
+			// Non-hermetic: only runs where the client RDB is present (set AOC_RDB to the client's RDB folder).
+			// Locks the C# parser to the Python decode (beach 4010 = 666 actors / 116,178 triangles) so a
+			// real-data regression is caught, not just the synthetic.
+			var rdbDir = Environment.GetEnvironmentVariable("AOC_RDB");
+			if (string.IsNullOrEmpty(rdbDir) || !File.Exists(Path.Combine(rdbDir, "le.idx")))
 				return; // client RDB unavailable (CI) - skip
 
 			using var rdb = new RdbReader(rdbDir);
