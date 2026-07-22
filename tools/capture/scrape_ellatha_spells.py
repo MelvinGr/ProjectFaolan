@@ -3,7 +3,7 @@
 
 The client RDB spell record (type 1040005) does NOT carry the character-level requirement (level is class-
 progression/trainer data - see decode_spell_fields.py), so we source it here. USE THIS FOR LEVELS ONLY:
-ellatha's other stats are wrong (e.g. Chill rank 5 lists mana 107 vs the in-game 417), per Melvin.
+ellatha's other stats are wrong (e.g. Chill rank 5 lists mana 107 vs the in-game 417).
 
 The list paginates at spellslist.asp?start=N (N = 1, 21, 41, ... step 20; "Records 1 to 20 of 587"). Each row is
   <td><a ...spellsview.asp?title=NAME...>NAME</a>&nbsp;</td><td>RANK</td><td>LEVEL</td><td>MANA</td><td>CAST</td>

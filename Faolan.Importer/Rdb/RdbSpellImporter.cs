@@ -44,9 +44,9 @@ namespace Faolan.Importer.Rdb
 		// Pestilential Blast R7 at Level 0, the RDB says 80. 19,239 of 20,822 rows had no level at all, so this is
 		// nearly all upside (coverage 1,583 -> 8,202). (#367)
 		//
-		// PRECEDENCE: the RDB LEADS on level data - over the ellatha/wiki scrapes AND over captures (Melvin,
-		// 2026-07-16: "rdb is leading, so if a wiki import says something else, take rdb" / "rdb is also leading over
-		// captures"). So this OVERWRITES whatever is there. The RDB and the scrapes agree on 7,135 of the 7,645 spells
+		// PRECEDENCE: the RDB LEADS on level data - over the ellatha/wiki scrapes AND over captures (decided
+		// 2026-07-16: rdb is leading, so if a wiki import says something else, take rdb; rdb is also leading over
+		// captures). So this OVERWRITES whatever is there. The RDB and the scrapes agree on 7,135 of the 7,645 spells
 		// it knows (93%), so the 185 rows it changes are a small correction to a cross-validated field.
 		//
 		// Nothing needs protecting from this any more. `starter-spells` used to encode the create-granted kit by

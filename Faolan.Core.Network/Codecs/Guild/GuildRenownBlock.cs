@@ -154,7 +154,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 		// 30,000,000 and Counters64D = 975,000,000, identified as constants, not per-guild values). EVERYTHING else
 		// stays zero. This is built explicitly rather than as "CapturedPlaceholder with a few fields cleared" because
 		// that left the Sepulchra guild's feat/city stats (Group1/Group3/Group4[0]/Counters64B) in place - which is why
-		// a freshly-created guild rendered a guild city + feats it never built (Melvin's "Faolan" guild). Cosmetic and
+		// a freshly-created guild rendered a guild city + feats it never built. Cosmetic and
 		// in-client unverified for the still-opaque slots, but a fresh guild with them ZERO is unambiguously correct.
 		public static GuildRenownBlock ForFreshGuild()
 		{

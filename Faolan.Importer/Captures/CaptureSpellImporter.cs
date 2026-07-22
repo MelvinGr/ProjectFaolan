@@ -298,7 +298,7 @@ namespace Faolan.Importer.Captures
 		// Ice Strike (Rank 1) at create even though its requirement really is level 7 (the RDB and ellatha AGREE on 7;
 		// the old comment here blamed an ellatha mis-tag, but the client says the same). The starter kit is a fixed
 		// LIST, not a level query, so it is now stated outright and Spells.Level is left to the RDB, which leads on
-		// level data (Melvin, 2026-07-16). Idempotent; only classes whose create capture actually reached a grant are
+		// level data (verified 2026-07-16). Idempotent; only classes whose create capture actually reached a grant are
 		// touched, and it no longer has to run after the level modules.
 		public static async Task<(int Starters, int Cleared)> MarkStarterSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{

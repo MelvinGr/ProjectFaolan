@@ -34,7 +34,7 @@ rendered, following minion. This is structurally the retail flow minus the class
 
 ## FULL pet protocol — from the chat-annotated capture (2026-07-05)
 
-`NecroL80_..._casting-with-chat-notes.pcapng` — Melvin typed a local-say note before each action, so every packet
+`NecroL80_..._casting-with-chat-notes.pcapng` — a local-say note was typed before each action, so every packet
 is labelled. The two **Deathless Acolyte** casts (Arcanist, Magnus) are the real necro pets ("Pleasurable
 Company" is a generic companion; "sit on bench" was clicking a bench world-object to sit on it — a sittable
 Interact, not a pet action and not an emote).
@@ -81,7 +81,7 @@ spawn/own/command subsystem for ALL pets; combat pets stack the buff + combat-AI
 
 ## Implementation (2026-07-05) — pets spawn from the creature TYPE (the right way, #244)
 
-Wired end-to-end. Melvin's steer: `NpcSpawns` are world PLACEMENTS — wrong for a summon-on-demand pet — so
+Wired end-to-end. Design steer: `NpcSpawns` are world PLACEMENTS — wrong for a summon-on-demand pet — so
 pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift):
 - `Npc.StatCore` (the `NpcStatCore` side table, incl. `.Level`): the type-level captured stat core, so a creature can be built standalone (the `Npc.Data` blob is retired — the body builds from typed columns).
 - `NpcSpawnBuilder.TryBuildFromType(Npc, handle, pos, rot)`: builds the `FA015807` from the type + a

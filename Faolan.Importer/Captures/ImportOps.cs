@@ -201,8 +201,8 @@ namespace Faolan.Importer.Captures
 
 			foreach (var q in harvest.Quests)
 			{
-				// Maps and areas are FK targets - a placeholder beats dropping the quest (Melvin: "its okay to insert
-				// maps wihtout name").
+				// Maps and areas are FK targets - a placeholder beats dropping the quest (it's okay to insert
+				// maps without a name).
 				if (q.MapId != 0 && maps.Add(q.MapId))
 					db.Maps.Add(new Map
 					{

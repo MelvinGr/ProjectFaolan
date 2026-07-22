@@ -692,7 +692,7 @@ namespace Faolan.GameServer
 											break;
 
 										// Unknown object: no bench/door/loot behavior. Surface the gap the same way as an
-										// un-imported vendor/dialogue NPC (Melvin: notify the player, never a silent no-op).
+										// un-imported vendor/dialogue NPC (notify the player, never a silent no-op).
 										// Float the bubble over the clicked object so the client shows it in place.
 										var usedMapId = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
 										var usedObj = await Database.GetWorldObject(usedMapId, target);
@@ -769,7 +769,7 @@ namespace Faolan.GameServer
 										"TalkToNpc: no conversation node for npcHandle=0x{NpcTemplate:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle,
 										routedName, args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId);
 
-									// Surface the gap instead of silently closing (Melvin: have them say so). A greeting click
+									// Surface the gap instead of silently closing (have them say so). A greeting click
 									// that reaches here has NEITHER an imported shop (the vendor branch above didn't match)
 									// NOR an imported conversation node - and we can't tell a vendor-without-shop from a plain
 									// talk NPC (no merchant flag on the NPC), so one honest bubble covers both. Sender = the NPC
@@ -1840,7 +1840,7 @@ namespace Faolan.GameServer
 
 			var slot = packet.Body.ReadUInt32();
 			packet.Body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-			// Polarity CONFIRMED in-client (Melvin): checkbox ON (the slot's vanity toggle enabled / its vanity item is
+			// Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
 			// shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
 			// (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
 			var toggleState = Convert.ToBoolean(packet.Body.ReadByte());

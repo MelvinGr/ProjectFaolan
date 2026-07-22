@@ -119,8 +119,8 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Seeds the UNIVERSAL level-1 ability kit onto every class (ClassAbility), from the create captures: the
-		// 0x2052 grants that follow a create. Melvin: "Rest needs to be granted to all classes, same with the
-		// directional attacks etc" - these are basic combat/movement/UI abilities, not class kit (#296).
+		// 0x2052 grants that follow a create. Rest needs to be granted to all classes, same with the
+		// directional attacks, etc. - these are basic combat/movement/UI abilities, not class kit (#296).
 		//
 		// The kit is the UNION across all 12 create dumps, granted to all 12 classes - NOT each dump's own subset.
 		// That is what the data says: all 12 dumps together yield only **8 distinct** ability ids (Rest, Upper Left /

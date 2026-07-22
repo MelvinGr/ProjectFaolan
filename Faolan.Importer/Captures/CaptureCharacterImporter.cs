@@ -41,7 +41,7 @@ namespace Faolan.Importer.Captures
 		// Login validation is stubbed, so any password works.
 		//
 		// This used to import to a dedicated "captured" account, justified in a comment by "a 20+ entry character
-		// list breaks the client's auto-enter flow". That is NOT true (Melvin, 2026-07-20), so the split bought
+		// list breaks the client's auto-enter flow". That is NOT true (verified 2026-07-20), so the split bought
 		// nothing and only made the reference characters awkward to reach.
 		public static uint AccountId = 0;
 

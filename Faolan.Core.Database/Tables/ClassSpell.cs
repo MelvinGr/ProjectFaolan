@@ -31,7 +31,7 @@ namespace Faolan.Core.Database.Tables
 		// This used to be encoded by PINNING Spells.Level = 1 for granted spells and pushing every other level-1 row of
 		// that class to 2, so that a level-gated "Level <= charLevel" query happened to return the captured set. That
 		// overwrote a correct level with a sentinel and made Level mean two things at once. Now the level stays true
-		// and the grant is stated outright. (Melvin: the RDB leads on level data, including over captures.)
+		// and the grant is stated outright. The RDB leads on level data, including over captures.
 		public bool IsStarter { get; set; }
 
 		// The level at which a capture SHOWS this class actually being granted this spell: a NewLevelIIR (0x6D314743)

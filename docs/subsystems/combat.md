@@ -54,7 +54,7 @@ world tick (`WorldState.Tick`) drives two independent timers off the death:
    (`WorldEntity.NoRespawn`, set in `SpawnNpcForPlayer` — the pet-summon / test-spawn path): once dead they don't
    revive — the post-death timer runs
    as a despawn (`TickPostDeathDespawn` → `LootExpired` fade+remove) so a test mob fades out instead of coming
-   back (commit `df8f90d`, a GM QoL Melvin asked for).
+   back (commit `df8f90d`, a GM QoL).
 
 `.delete [<handle>]` (GM, `DeleteCommand`): the DURABLE removal — despawns the selected entity live AND deletes its
 `NpcSpawns` row(s) (`IDatabaseRepository.DeleteNpcSpawns`) so it never re-renders, unlike a plain live despawn

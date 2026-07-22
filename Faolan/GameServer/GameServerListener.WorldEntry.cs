@@ -314,7 +314,7 @@ namespace Faolan.GameServer
 			// have learned a new spell" on every login; the known-list makes it redundant.)
 			// Shield of the Risen (#221): re-applies the persistent protection self-buff every character carries.
 			// This flush is also re-armed on teleport/changemap re-entry, so the buff is re-asserted on each
-			// playfield change too (Melvin: "on every map change / login"). RESOLVED 2026-07-11: the old id
+			// playfield change too (on every map change / login). RESOLVED 2026-07-11: the old id
 			// 0x000B9000 was the wrong spell (rendered as the "Exhausted" debuff, no DB row -> never cleared).
 			// The capture-proven ids are bases 4061768 (1h) + 3666828 (10h) - both in Spells with real durations,
 			// so #274 arms a matching expiry and they clear on schedule. Rendered top-of-screen by the client.
