@@ -115,9 +115,13 @@ namespace Faolan.Importer.Cli
 			// Provider: SQLite by default (--db path); Postgres with `--provider postgres --connection <npgsql>`,
 			// which seeds a fresh Postgres DB (EnsureCreated builds the schema from the model - no PG migrations yet).
 			var provider = FaolanDbProviderExtensions.ParseProvider(GetOption(args, "--provider"));
+			// Foreign Keys=False defers FK enforcement for the whole SQLite import (bulk load): EF's SQLite provider
+			// enables PRAGMA foreign_keys=ON by default, which would reject rows a later module satisfies (e.g.
+			// conversations reference quest definitions imported afterwards). The Postgres equivalent is the
+			// SET session_replication_role in ImportRunner. The runtime server keeps FK on (a plain connection string).
 			var connection = provider == FaolanDbProvider.Postgres
 				? GetOption(args, "--connection") ?? throw new ArgumentException("--provider postgres requires --connection <npgsql connection string>")
-				: $"Data Source={dbPath}";
+				: $"Data Source={dbPath};Foreign Keys=False";
 			var optionsBuilder = new DbContextOptionsBuilder<DatabaseContext>();
 			optionsBuilder.UseFaolanDatabase(provider, connection);
 			await using var db = new DatabaseContext(optionsBuilder.Options);

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
@@ -19,6 +20,13 @@ namespace Faolan.Importer.Cli
 			var before = await TableSnapshot.CaptureAsync(ctx.Db);
 
 			await using var tx = await ctx.Db.Database.BeginTransactionAsync();
+
+			// Bulk import: defer FK enforcement so module ordering doesn't matter (e.g. conversations reference quest
+			// definitions the quests module inserts later in the same transaction). This matches SQLite's FK-off import
+			// default. SET LOCAL is transaction-scoped, so normal enforcement resumes on commit and the runtime server
+			// still enforces every FK. (Postgres only; requires the import role to be able to set the GUC.)
+			if (ctx.Db.Database.IsNpgsql())
+				await ctx.Db.Database.ExecuteSqlRawAsync("SET LOCAL session_replication_role = replica");
 
 			foreach (var module in plan)
 			{
