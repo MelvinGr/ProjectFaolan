@@ -24,9 +24,20 @@ namespace Faolan.Importer.Rdb
 	//     they are not backfillable from this record.)
 	// Catalogs the FULL spell list from the RDB: every type-1040005 record that carries a display name is upserted
 	// into the Spell table with its Name (the 0x21 string, same framing as item templates - see
-	// RdbItemImporter.ExtractName), CastTime, Range, DamageRating, DurationMs and (additively) Level. Records with no
-	// name are skipped (asset/aura junk). EffectSpell/ManaCost/min-max damage stay untouched - those really are
-	// rank/level-COMPUTED and absent from this record. Idempotent: re-running only rewrites changed values. (#236)
+	// RdbItemImporter.ExtractName), CastTime, Range, DamageRating, DurationMs and (additively) Level.
+	// EffectSpell/ManaCost/min-max damage stay untouched - those really are rank/level-COMPUTED and absent from this
+	// record. Idempotent: re-running only rewrites changed values. (#236)
+	//
+	// #402: a record with NO embedded name is NOT automatically junk. A handful of real player-facing spells (e.g.
+	// the "Set's Ruin" necro family 222682-222685, "Warlord's March", ...) carry no 0x21 string in their 1040005
+	// body - their name lives ONLY in the LDB (RDB 1030002, cat 50210). Left dropped, such a spell shows in a
+	// player's spellbook with a mana cost but no name/description. So a nameless record is still catalogued when the
+	// LDB knows it as a real spell name - EXCEPT the LDB's own dev/PvP-internal markers ("XX"/"CTF"-tagged names,
+	// see IsDevMarker), which are test/flag buffs, not player spells. The row is inserted with an EMPTY name; the
+	// rdb-ldb-names module (RdbLdbNameImporter, run after) cribs the English LDB name onto it. Of 681 nameless
+	// records: 189 have no LDB name at all and 467 are dev markers - both stay dropped (asset/aura junk); the
+	// remaining 25 are real player spells absent from every other source (the "Set's Ruin"/"Set's Cold Hatred"
+	// families, "War Lord's March", "Mass Ignition", ...).
 	//
 	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=rank, 125=level, 287=range, 294=cast,
 	// 347/129/349=splash radius/percent/max-targets, 348=damage rating, 551=a rank-scaling MAGNITUDE, 79=icon (an id
@@ -58,11 +69,49 @@ namespace Faolan.Importer.Rdb
 		private const uint LevelField = 0x07D;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
+		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
+
+		// #402: the game's dev/PvP-internal naming conventions for the buffs that live in cat 50210 but are NOT
+		// player-facing spells - flag/test/spawner/wrapper buffs. Their name begins with an "XX" or "CTF" tag
+		// (as a whole token: "XX", "XX_", "XX ", "XX-", "CTF_", ... - not the start of a real word), case-insensitive,
+		// or the row is unnamed. A record nameless in its own 1040005 body is recovered only if NONE of its localized
+		// names is such a marker.
+		private static bool IsDevMarker(string ldbName)
+		{
+			var t = ldbName.Trim();
+			if (t.Length == 0)
+				return true;
+			return HasTagPrefix(t, "XX") || HasTagPrefix(t, "CTF");
+
+			// The tag is a standalone leading token: <tag> optionally followed by a non-letter (separator), so it
+			// matches "XX_Foo"/"XX Foo"/"XX-Foo"/"XX" but never a real name that merely starts with those letters.
+			static bool HasTagPrefix(string s, string tag) =>
+				s.StartsWith(tag, StringComparison.OrdinalIgnoreCase)
+				&& (s.Length == tag.Length || !char.IsLetter(s[tag.Length]));
+		}
 
 		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
 			ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, cdnBase);
+
+			// #402: the LDB (cat 50210) roster of spell-name ids, used to recover real player spells whose 1040005
+			// record embeds no name. The id set is language-independent (every localized page shares it). We collect
+			// ALL of an id's localized names, because the dev/PvP-internal "XX"/"CTF" marker is reliable ONLY in
+			// certain languages - e.g. id 3977071 is "Bloqué" in French but "XX_Blocked" in English, so a first-page
+			// (French) check would miss it. A real spell carries the marker in NO language; a dev buff carries it in
+			// at least one. The localized (English) display name is cribbed on later by RdbLdbNameImporter.
+			var ldbSpellNames = new Dictionary<uint, List<string>>();
+			foreach (var e in rdb.EntriesOfType(LdbType).Where(x => x.IsLocal))
+			{
+				byte[] page;
+				try { page = rdb.ReadDecompressed(e); }
+				catch { continue; }
+				if (LdbStringIndex.CategoryOf(page) != LdbStringIndex.SpellNameCategory)
+					continue;
+				foreach (var entry in LdbStringIndex.Parse(page))
+					(ldbSpellNames.TryGetValue(entry.Id, out var names) ? names : ldbSpellNames[entry.Id] = []).Add(entry.Value);
+			}
 
 			var byId = (await db.Spells.ToListAsync()).ToDictionary(s => s.Id);
 			var toAdd = new List<Spell>();
@@ -95,7 +144,14 @@ namespace Faolan.Importer.Rdb
 
 				var name = RdbItemImporter.ExtractName(body);
 				if (string.IsNullOrEmpty(name))
-					continue; // no display name -> not a player-facing spell record
+				{
+					// #402: no embedded name. Recover it ONLY if the LDB knows it as a real (non-dev) spell name;
+					// insert with an empty name and let RdbLdbNameImporter crib the English name on. Otherwise it is
+					// asset/aura junk and stays dropped.
+					if (!ldbSpellNames.TryGetValue(entry.Id, out var ldbNames) || ldbNames.Any(IsDevMarker))
+						continue;
+					name = ""; // provisional: rdb-ldb-names fills the localized name (a raw name here would block that)
+				}
 
 				seen++;
 
@@ -141,7 +197,8 @@ namespace Faolan.Importer.Rdb
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
 					inserted++;
-					namesSet++;
+					if (!string.IsNullOrEmpty(name)) // #402: an LDB-recovered row is inserted nameless (filled later)
+						namesSet++;
 					if (level != 0)
 						levelsSet++;
 					if (castTime != 0)
@@ -149,7 +206,9 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				if (spell.Name != name)
+				// #402: never clobber an existing (possibly LDB-cribbed) name with the empty provisional name a
+				// nameless-record recovery carries.
+				if (!string.IsNullOrEmpty(name) && spell.Name != name)
 				{
 					spell.Name = name;
 					namesSet++;
