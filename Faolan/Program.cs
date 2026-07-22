@@ -62,7 +62,7 @@ namespace Faolan
 
 			// Packet trace bytes: each packet logs on a single line; set "LogPacketBytes": false (faolan.json or
 			// --LogPacketBytes false) to drop the raw headerData/body hex dump and keep just the opcode + lengths.
-			PacketLogOptions.IncludeBytes = builder.Configuration.GetValue("LogPacketBytes", true);
+			PacketLogOptions.IncludeBytes = builder.Configuration.LogPacketBytes;
 
 			builder.Logging.SetMinimumLevel(Global.IsDebug
 				? LogLevel.Debug
@@ -81,8 +81,7 @@ namespace Faolan
 			// Mirror the console log to a file. FAOLAN_LOG_FILE overrides the location (e.g. a mounted volume in a
 			// container); default is logs/<epoch>.log (epoch = process start, unix seconds) so each run is a
 			// distinct, retained file instead of overwriting one logs.txt every start (#282).
-			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ??
-															   Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
+			builder.Logging.AddProvider(new FileLoggerProvider(Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ?? "faolan.log"));
 
 			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
 			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):

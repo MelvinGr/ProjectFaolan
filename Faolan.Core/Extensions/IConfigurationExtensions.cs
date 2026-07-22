@@ -9,6 +9,7 @@ namespace Faolan.Core.Extensions
 	{
 		extension(IConfiguration config)
 		{
+			public bool LogPacketBytes => bool.TryParse(config["LogPacketBytes"], out var enabled) && enabled;
 			public bool McpEnabled => bool.TryParse(config["McpEnabled"], out var enabled) && enabled;
 			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(config["DatabaseProvider"]!, true);
 			public string DatabaseConnection => config["DatabaseConnectionString"]!;
