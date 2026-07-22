@@ -3,38 +3,32 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Session;
 using Xunit;
 
 namespace Faolan.Tests
 {
-	// Verifies the phase-4 pilot (Gitea #406): KeepAliveService now builds an Rpc and hands it to client.SendAsync(Rpc)
-	// instead of a hand-framed PacketStream. Drives the REAL handlers through a capturing client and asserts the wire
-	// bytes are identical to what the old WriteHeader path produced - so the structured send boundary is proven
-	// byte-preserving on a live handler, not just on the serializer in isolation.
+	// Verifies KeepAliveService (Gitea #406): it builds an Rpc and hands it to client.SendAsync(Rpc). Drives the REAL
+	// handlers through a capturing client and asserts the wire bytes match the expected frame - so the structured send
+	// boundary is proven byte-preserving on a live handler, not just on the serializer in isolation.
 	public class KeepAliveRpcPilotTests
 	{
 		private const uint Instance = 0x3BC035EC;
 
 		[Fact]
-		public async Task HandlePing_ProducesTheSameFrameAsTheWriteHeaderPath()
+		public async Task HandlePing_ProducesTheExpectedFrame()
 		{
 			var client = ClientAt(Instance);
 
 			await KeepAliveService.HandlePing(client);
 
-			// The pre-Rpc frame: GameAgent -> GameInterface, GameServerStats, body [0x42B32A07][0][0].
-			var expected = new PacketStream();
-			expected.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, Instance),
-				(ushort)GameInterfaceOpcodes.DispatchGameServerStats);
-			expected.WriteUInt32(0x42B32A07);
-			expected.WriteUInt32(0);
-			expected.WriteUInt32(0);
-			expected.WriteLengthHash();
+			// The expected frame: GameAgent -> GameInterface, GameServerStats, body [0x42B32A07][0][0].
+			var expected = PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, Instance),
+				GameInterfaceOpcodes.DispatchGameServerStats, body => body.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
 
-			Assert.Equal(expected.ToArray(), client.Sent);
+			Assert.Equal(expected, client.Sent);
 		}
 
 		[Fact]
@@ -72,14 +66,7 @@ namespace Faolan.Tests
 
 		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] headerData, byte[] body)
 		{
-			var packet = new PacketStream();
-			packet.WriteHeader(Endpoints.EndpointBytes(senderType, senderInstance), Endpoints.EndpointBytes(receiverType, receiverInstance), opcode,
-				headerData.Length > 0
-					? headerData
-					: null);
-			packet.WriteArray(body);
-			packet.WriteLengthHash();
-			return packet.ToArray();
+			return PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body));
 		}
 
 		// Minimal INetworkClient that records the last-sent bytes. The default SendAsync(Rpc) on the interface

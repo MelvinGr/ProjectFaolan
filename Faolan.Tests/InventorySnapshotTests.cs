@@ -6,8 +6,9 @@ using Faolan.Core;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -38,9 +39,7 @@ namespace Faolan.Tests
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xFF, 0xBD, 0xD9, 0x10];
 
-			var stream = new PacketStream();
-			stream.WriteHeader(sender, receiver, packet.Opcode);
-			stream.WriteArrayUInt32Length(s =>
+			var produced = PacketSerializer.Serialize(new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);
@@ -48,9 +47,7 @@ namespace Faolan.Tests
 				s.WriteArray(parts.Prefix);
 				s.WriteArray(parts.Root.ToProtobuf());
 				s.WriteArray(parts.SubClass.ToArray());
-			});
-			stream.WriteLengthHash();
-			var produced = stream.ToArray();
+			})));
 
 			var firstDiff = -1;
 			for (var i = 0; i < Math.Min(original.Length, produced.Length); i++)
@@ -137,9 +134,7 @@ namespace Faolan.Tests
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, .. EncodeVarint(newInstance)];
 
-			var stream = new PacketStream();
-			stream.WriteHeader(sender, receiver, packet.Opcode);
-			stream.WriteArrayUInt32Length(s =>
+			var produced = PacketSerializer.Serialize(new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);
@@ -147,9 +142,7 @@ namespace Faolan.Tests
 				s.WriteArray(parts.Prefix);
 				s.WriteArray(parts.Root.ToProtobuf());
 				s.WriteArray(parts.SubClass.ToArray());
-			});
-			stream.WriteLengthHash();
-			var produced = stream.ToArray();
+			})));
 
 			var firstDiff = -1;
 			for (var i = 0; i < Math.Min(substituted.Length, produced.Length); i++)

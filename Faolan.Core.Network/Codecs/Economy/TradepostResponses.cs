@@ -4,7 +4,6 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 

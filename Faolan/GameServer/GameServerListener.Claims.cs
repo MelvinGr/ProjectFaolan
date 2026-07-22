@@ -10,7 +10,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;

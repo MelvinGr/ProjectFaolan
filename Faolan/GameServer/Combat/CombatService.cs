@@ -12,7 +12,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;

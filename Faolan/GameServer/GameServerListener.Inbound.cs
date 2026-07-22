@@ -12,7 +12,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
@@ -1612,18 +1611,6 @@ namespace Faolan.GameServer
 				case GameCharAgentOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
 				{
 					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray()!);
-
-					/*var part1 = packet.Data.ReadUInt32();
-					var spawnId = packet.Data.ReadUInt32();
-					var unk0 = packet.Data.ReadUInt32();
-					var nClientInst = packet.Data.ReadUInt32();
-
-					new PacketStream()
-						.WriteHeader(Sender9, Receiver9, null, GameCharInterfaceOpcodes.DispatchSetQuestMarker)
-						.WriteUInt32(part1)
-						.WriteUInt32(spawnId)
-						.WriteByte(0)
-						.Send(client);*/
 
 					break;
 				}

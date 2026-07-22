@@ -10,7 +10,6 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 

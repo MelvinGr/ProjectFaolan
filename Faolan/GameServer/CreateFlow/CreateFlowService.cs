@@ -12,7 +12,6 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
@@ -953,7 +952,7 @@ namespace Faolan.GameServer.CreateFlow
 		// Captures/Dikketest_rogue-barbarian_create_random-actions.tshark.json (creator gs013:7016, 		// idx 364-438, excluding the 0x2082/0x2009 keepalive replies which are answered naturally), with the
 		// client instance retargeted from dikketest's 0x01316D2B to the local temp instance 0x021662C8
 		// (receiver varint AB DA C5 09 -> C8 C5 D9 10, body instance 01 31 6D 2B -> 02 16 62 C8). Each packet
-		// is resent through PacketStream so its CRC/length are recomputed for the retargeted bytes.
+		// is re-serialized (as an Rpc) so its CRC/length are recomputed for the retargeted bytes.
 
 		// Consumes (removes) a pending create-world-entry marker for `clientInstance`, returning true if one was set.
 		// The listener's world Hello calls this to recognise the post-creation world connection (and skip the helper

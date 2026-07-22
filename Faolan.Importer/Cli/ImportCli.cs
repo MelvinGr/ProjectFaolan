@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Helpers;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
 using Microsoft.Data.Sqlite;
 

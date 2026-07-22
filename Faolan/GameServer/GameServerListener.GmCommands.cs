@@ -14,7 +14,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;

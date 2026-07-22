@@ -18,9 +18,8 @@ namespace Faolan.Tests
 			"f508f4c10000c35000017e2c00000007e20000cfec000000000000000400000000000000010000000000000001000000090000000100042652000000000000000000002580ffffffce0000004b00000014000002bc0000000000";
 
 		// The two create-editor racial CHARACTER-TEMPLATE choice records (dynel 0xD00C) constructed in
-		// RetailCreateEditorPostReadyBurst, plus the world-entry action record (dynel 0xCF0D) still emitted
-		// verbatim in the auto-generated RetailCreateWorldEntryBurst. Gates that BuildBody reproduces each
-		// captured body byte-exact, so the burst now feeding BuildBody the same dynel/tail is wire-identical.
+		// RetailCreateEditorPostReadyBurst, plus a world-entry action record (dynel 0xCF0D). Gates that BuildBody
+		// reproduces each captured body byte-exact, so a burst feeding BuildBody the same dynel/tail is wire-identical.
 		private const string TemplateChoiceBodyA =
 			"f508f4c10000c35000017e0300000007e20000d00c000000000000000400000000000000010000000000000001000000090039bf9300504d616c6554656d706c6174653d35303030303a3635353235323b46656d616c6554656d706c6174653d35303030303a3635353235333b5374796769616e536c617665723d35303030303a3635353235340000000000";
 

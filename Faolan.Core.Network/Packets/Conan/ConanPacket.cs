@@ -7,12 +7,13 @@ namespace Faolan.Core.Network.Packets.Conan
 	public class ConanPacket : Packet
 	{
 		public readonly byte[] HeaderData; // Remaining data
-		public readonly ProtoEndpoint Receiver;
 
 		// Typed header endpoints, read straight off the header stream (ProtoEndpoint.Read). Sender = RpcHeader.caller_id
 		// (field 1), Receiver = RpcHeader.endpoint_id (field 2); each carries Type (object-class id) + Instance (the
 		// addressed object). See Endpoints. Echo them back with WriteHeader(receiver, sender, ...) for a reply.
+		public readonly ProtoEndpoint Receiver;
 		public readonly ProtoEndpoint Sender;
+
 		public readonly uint Crc32;
 		public readonly ushort Opcode;
 

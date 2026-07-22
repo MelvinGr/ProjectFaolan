@@ -1,7 +1,6 @@
 using Faolan.Core.Extensions;
 using Faolan.Mcp.Tools;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

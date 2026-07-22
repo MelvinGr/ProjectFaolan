@@ -6,7 +6,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;

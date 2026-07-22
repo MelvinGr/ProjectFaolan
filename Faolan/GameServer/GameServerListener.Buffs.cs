@@ -8,7 +8,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;

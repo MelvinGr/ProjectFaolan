@@ -40,7 +40,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIirCodec` | [V3: V1IirCodecTests.Feedback_RoundTripsCapturedBody] |
 | V3 | `FormatFeedbackIIR` | `0x8D5A8B6B` | `FormatFeedbackCodec` | [V3: AttributeChangedFeedbackTests.Build_FromFields_MatchesCapturedLevelUpMessage] |
 | V3 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `FullPlayerCharacterBuilder` | [V3: FullCharIirRoundTripTests.BuildRoot_FromCapturedFields_ReEncodesByteIdentically] |
-| V3 | `GameActionListIIR` | `0xF508F4C1` | `GameActionListCodec` | [V3: GameActionListCodecTests.Parse_ThenBuild_RoundTripsByteExact] |
+| V3 | `GameActionListIIR` | `0xF508F4C1` | `GameActionListCodec` | [V3: SpellRecastActionBuilderTests.ChangeRecastTimeBody_RoundTripsThroughGameActionListCodec] |
 | V3 | `GameTimeIIR` | `0x4F57DC08` | `GameTimeCodec` | [V3: GameTimeCodecTests.Build_MatchesCapturedSnapshot] |
 | V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildTagBody` | [V3: GuildPacketTests.GuildTagBody_Matches_ExpectedLayout] |
 | V3 | `HateListUpdateIIR` | `0x8A01E5A1` | `HateListCodec` | [V3: CombatRecordCodecTests.HateList_BuildsByteExact] |

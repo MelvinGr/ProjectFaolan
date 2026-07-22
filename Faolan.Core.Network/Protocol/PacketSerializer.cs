@@ -1,25 +1,43 @@
-using Faolan.Core.Network.Packets;
+using Faolan.Core.Crypt;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Protocol
 {
 	// Rpc -> wire frame. The counterpart to PacketParser; the two are inverses, locked by PacketFrameRoundTripTests.
-	//
-	// This currently reuses the proven PacketStream header encoder, so the output is byte-identical to today's send
-	// path BY CONSTRUCTION - the point of phase 2 (Gitea #406) is the Rpc<->bytes boundary the transport will sit on,
-	// not a byte-level rewrite. The zero-alloc span / IBufferWriter encoder (reserve length+crc, write, backfill) is a
-	// later drop-in behind this same signature (phase 7), where the Pipelines transport makes the allocation matter.
-	// Unlike the fluent send pattern, the stream is disposed here.
+	// This is the ONE place a Conan frame is encoded: [u32 length][u32 crc32][u32 headerLen][0x0A sender][0x12 receiver]
+	// [u16 opcode][headerData][body], with length + crc backfilled once the frame is laid out. (Phase 8, Gitea #406:
+	// the header encoding used to live on PacketStream, which is now retired; the zero-alloc span / IBufferWriter
+	// encoder is a later drop-in behind this same signature.)
 	public static class PacketSerializer
 	{
 		public static byte[] Serialize(in Rpc rpc)
 		{
-			using var packet = new PacketStream();
-			packet.WriteHeader(rpc.Sender, rpc.Receiver, rpc.Opcode, rpc.HeaderData.Length > 0
-				? rpc.HeaderData.ToArray()
-				: null);
-			packet.WriteArray(rpc.Body.ToArray());
-			packet.WriteLengthHash();
-			return packet.ToArray();
+			var sender = rpc.Sender.ToProtobuf();
+			var receiver = rpc.Receiver.ToProtobuf();
+			var headerData = rpc.HeaderData.Span;
+			var body = rpc.Body.Span;
+
+			using var stream = new FaolanStream();
+			stream.WriteUInt32(0); // length     - backfilled below
+			stream.WriteUInt32(0); // crc32      - backfilled below
+			// headerLen = [0x0A][byteLen] + sender + [0x12][byteLen] + receiver + opcode(u16) + headerData
+			stream.WriteUInt32((uint)(sizeof(byte) * 2 + sender.Length + sizeof(byte) * 2 + receiver.Length + sizeof(ushort) + headerData.Length));
+			stream.WriteByte(0x0A);
+			stream.WriteArrayByteLength(sender);
+			stream.WriteByte(0x12);
+			stream.WriteArrayByteLength(receiver);
+			stream.WriteUInt16(rpc.Opcode);
+			if (headerData.Length > 0)
+				stream.WriteArray(headerData);
+			stream.WriteArray(body);
+
+			// Backfill the length (everything after the length field) and the CRC over the whole frame.
+			var end = stream.Position;
+			stream.Position = 0;
+			stream.WriteUInt32(stream.Length - sizeof(uint));
+			stream.WriteUInt32(Crc32.Calculate(stream));
+			stream.Position = end;
+			return stream.ToArray();
 		}
 	}
 }

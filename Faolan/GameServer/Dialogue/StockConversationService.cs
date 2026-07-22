@@ -7,7 +7,6 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Dialogue

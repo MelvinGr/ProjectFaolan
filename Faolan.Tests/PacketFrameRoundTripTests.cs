@@ -1,19 +1,17 @@
 using System;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Xunit;
 
 namespace Faolan.Tests
 {
-	// GUARDRAIL for the structured-packet-pipeline epic (Gitea #406, phase 0). Locks the CURRENT wire frame
-	// contract - [u32 length][u32 crc32][u32 headerLen][sender endpoint][receiver endpoint][u16 opcode][headerData][body]
-	// - as the migration baseline, by proving the builder (PacketStream.WriteHeader + WriteLengthHash) and the
-	// parser (ConanPacket) are mutual inverses, cross-checked by the parser's INDEPENDENT crc recompute (IsValid).
-	// The future PacketSerializer.Serialize / PacketParser.Parse (phase 2) must satisfy these exact assertions, so a
-	// rewrite that changes a single frame byte fails here rather than silently on the wire.
+	// GUARDRAIL for the structured-packet-pipeline epic (Gitea #406). Locks the wire frame contract -
+	// [u32 length][u32 crc32][u32 headerLen][sender endpoint][receiver endpoint][u16 opcode][headerData][body] - by
+	// proving the serializer (PacketSerializer.Serialize) and the parser (ConanPacket / PacketParser) are mutual
+	// inverses, cross-checked by the parser's INDEPENDENT crc recompute (IsValid). A rewrite that changes a single
+	// frame byte fails here rather than silently on the wire.
 	public class PacketFrameRoundTripTests
 	{
 		// (senderType, senderInstance, receiverType, receiverInstance, opcode, headerDataHex, bodyHex)
@@ -75,16 +73,10 @@ namespace Faolan.Tests
 			Assert.Equal(bytes, Endpoints.EndpointFromBytes(bytes).ToProtobuf());
 		}
 
-		// Builds a whole wire frame exactly as PacketStream.SendAsync does: WriteHeader (+ body) then WriteLengthHash
-		// (backfills the length + crc32), then ToArray.
+		// Builds a whole wire frame through the production serializer.
 		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] headerData, byte[] body)
 		{
-			var packet = new PacketStream();
-			packet.WriteHeader(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode,
-				headerData.Length > 0 ? headerData : null);
-			packet.WriteArray(body);
-			packet.WriteLengthHash();
-			return packet.ToArray();
+			return PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body));
 		}
 	}
 }

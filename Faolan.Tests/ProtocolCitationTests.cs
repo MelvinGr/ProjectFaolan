@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	// P3 of docs/protocol/methodology.md - the citation linter. It is the whole difference between a doc that CLAIMS to be
 	// verified and one that IS: every verification tag in the protocol reference must name an artifact that exists.
 	//
-	//   [V3: BurstGoldenTests.CreateWorldEntryBurst_IsByteStable]   -> a real xUnit test method
+	//   [V3: BurstGoldenTests.CreationScriptBurst_IsByteStable]   -> a real xUnit test method
 	//   [V2: DemoL80_..._create-guild.tshark.json frame 366]         -> a real file under Captures/
 	//   [V1: tools/ghidra/DumpRpcTables.java]                    -> a real repo path
 	//   [V0: ...]                                                   -> must be listed in docs/protocol/gaps.md

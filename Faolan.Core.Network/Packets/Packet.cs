@@ -7,12 +7,12 @@ namespace Faolan.Core.Network.Packets
 		public FaolanStream Body { get; protected init; } = null!;
 
 		public uint Length { get; protected init; }
-		protected PacketStream Stream { get; }
+		protected FaolanStream Stream { get; }
 
 		protected Packet(byte[] bytes)
 		{
 			Bytes = bytes;
-			Stream = new PacketStream(bytes);
+			Stream = new FaolanStream(bytes);
 		}
 	}
 }
