@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Protocol
@@ -17,5 +18,28 @@ namespace Faolan.Core.Network.Protocol
 		ProtoEndpoint Receiver,
 		ushort Opcode,
 		ReadOnlyMemory<byte> HeaderData,
-		ReadOnlyMemory<byte> Body);
+		ReadOnlyMemory<byte> Body)
+	{
+		// Body-building overloads: build the body inline with the fluent FaolanStream writers, e.g.
+		//   new Rpc(sender, receiver, opcode, body => body.WriteUInt32(x).WriteArrayUInt32Length(blob))
+		// instead of newing + disposing a stream at every call site. The scratch stream is created and DISPOSED here
+		// (unlike the old fluent PacketStream send pattern). The Action<FaolanStream> is distinct from the primary
+		// ctor's ReadOnlyMemory<byte> Body, so there is no overload ambiguity.
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body)
+			: this(sender, receiver, opcode, headerData, BuildBody(body))
+		{
+		}
+
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, Action<FaolanStream> body)
+			: this(sender, receiver, opcode, default, BuildBody(body))
+		{
+		}
+
+		private static byte[] BuildBody(Action<FaolanStream> body)
+		{
+			using var stream = new FaolanStream();
+			body(stream);
+			return stream.ToArray();
+		}
+	}
 }

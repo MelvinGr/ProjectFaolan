@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
@@ -32,13 +31,9 @@ namespace Faolan.GameServer.Session
 			var counter = packet.Body.ReadUInt32();
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
-			using var body = new FaolanStream();
-			body.WriteUInt32(counter);
-			body.WriteUInt32(0x00000012);
-			body.WriteUInt32(tick);
-
 			return client.SendAsync(new Rpc(LatencySender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, client.Session.Character.Id),
-				(ushort)GameCharInterfaceOpcodes.DispatchPong, new byte[] { 0x01 }, body.ToArray()));
+				(ushort)GameCharInterfaceOpcodes.DispatchPong, new byte[] { 0x01 },
+				body => body.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
 		}
 
 		// Ping (0x2005, empty): reply on GameAgent with GameServerStats. Body = [float][0][0]; retail's leading
@@ -46,13 +41,9 @@ namespace Faolan.GameServer.Session
 		// plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
 		public static Task HandlePing(INetworkClient client)
 		{
-			using var body = new FaolanStream();
-			body.WriteUInt32(0x42B32A07);
-			body.WriteUInt32(0);
-			body.WriteUInt32(0);
-
 			return client.SendAsync(new Rpc(PingSender, Endpoints.Endpoint(Endpoints.GameInterfaceType, client.Session.Character.Id),
-				(ushort)GameInterfaceOpcodes.DispatchGameServerStats, default, body.ToArray()));
+				(ushort)GameInterfaceOpcodes.DispatchGameServerStats,
+				body => body.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
 		}
 	}
 }
