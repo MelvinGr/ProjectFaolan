@@ -67,7 +67,7 @@ namespace Faolan.GameServer
 		private async Task BanCommand(INetworkClient client, string arguments, bool ban)
 		{
 			var gmId = client.Session.Character.Id;
-			var name = (arguments ?? "").Trim();
+			var name = arguments.Trim();
 			if (string.IsNullOrEmpty(name))
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, $"Usage: .{(ban ? "ban" : "unban")} &lt;account or character name&gt;");
@@ -85,9 +85,15 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (ban && account.Id == client.Session.Account?.Id)
+			if (ban && account.Id == client.Session.Account.Id)
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, "<span style=\"color: red;\">You can't ban your own account.</span>");
+				return;
+			}
+
+			if (account.Type > client.Session.Account.Type)
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, "<span style=\"color: red;\">You can't ban an account with a higher rank than yours.</span>");
 				return;
 			}
 
@@ -95,7 +101,7 @@ namespace Faolan.GameServer
 					? AccountState.Banned
 					: AccountState.Active))
 			{
-				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">Account '{account.UserName}' not found.</span>");
+				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">Error changing account state.</span>");
 				return;
 			}
 
