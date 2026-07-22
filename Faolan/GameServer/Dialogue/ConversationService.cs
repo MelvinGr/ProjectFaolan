@@ -9,6 +9,7 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
@@ -456,11 +457,8 @@ namespace Faolan.GameServer.Dialogue
 		// captured packet's sender instance rather than hardcoding one, matching the replay path byte-for-byte.
 		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
 		{
-			return new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameAgentType, senderInstance), Endpoints.EndpointBytes(Endpoints.GameInterfaceType, liveInstance),
-					GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArray(record)
-				.SendAsync(client);
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, senderInstance), Endpoints.Endpoint(Endpoints.GameInterfaceType, liveInstance),
+				GameInterfaceOpcodes.DispatchPassBlob, record));
 		}
 
 		// Constructs the dialogue camera (DispatchSetDialogueCamera 0x2015) from the structured columns (#188):

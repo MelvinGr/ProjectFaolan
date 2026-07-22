@@ -5,6 +5,8 @@ using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Inventory
@@ -20,7 +22,7 @@ namespace Faolan.GameServer.Inventory
 	// which routes to HandleAddShortcut only for the in-game case.
 	public sealed class ShortcutBarService
 	{
-		private static readonly byte[] ReplySender = Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x58);
+		private static readonly ProtoEndpoint ReplySender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
@@ -80,10 +82,8 @@ namespace Faolan.GameServer.Inventory
 				return;
 
 			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
-			var ps = new PacketStream();
-			ps.WriteHeader(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchShortcutBarReply);
-			ps.WriteArray(ShortcutBarBuilder.BuildBody(shortcuts));
-			await ps.SendAsync(client);
+			await client.SendAsync(new Rpc(ReplySender, client.EndpointOf(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceOpcodes.DispatchShortcutBarReply, ShortcutBarBuilder.BuildBody(shortcuts)));
 			_logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
 		}
 	}

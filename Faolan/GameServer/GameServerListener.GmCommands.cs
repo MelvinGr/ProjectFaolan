@@ -13,6 +13,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.GameServer.Combat;
@@ -323,10 +324,9 @@ namespace Faolan.GameServer
 
 			if (command == PetCommand.Dismiss)
 			{
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-					.WriteArrayUInt32Length(PetIirCodec.BuildRemove(owner, petHandle))
-					.SendAsync(client);
+				await client.SendAsync(new Rpc(WorldFraming.SenderEndpoint, client.EndpointOf(Endpoints.GameInterfaceType),
+					GameInterfaceOpcodes.DispatchPassBlob,
+					body => body.WriteArrayUInt32Length(PetIirCodec.BuildRemove(owner, petHandle))));
 
 				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
 				Logger.LogInformation(removed != null

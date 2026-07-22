@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 
@@ -47,11 +48,8 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			var id = client.Session.Character.Id;
-			await new PacketStream()
-				.WriteHeader(Endpoints.EndpointBytes(Endpoints.GameCharAgentType, 0x08), Endpoints.EndpointBytes(Endpoints.GameCharInterfaceType, id),
-					GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText)
-				.WriteArray(BuildReceivedStockPhraseBody(threadContext, textBytes))
-				.SendAsync(client);
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
+				GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText, BuildReceivedStockPhraseBody(threadContext, textBytes)));
 
 			_logger.LogInformation("PlayStockphraseAsSubtitle: answered {Key} (tc=0x{Tc:X8}) for client {Id} (#234 cutscene speech)", stockKey, threadContext, id);
 		}

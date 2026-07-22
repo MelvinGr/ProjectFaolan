@@ -9,6 +9,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -172,10 +173,8 @@ namespace Faolan.GameServer.Quest
 		// framing WorldBroadcaster uses for every rendered move/pose/visual-change.
 		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
 		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob)
-				.WriteArrayUInt32Length(body)
-				.SendAsync(recipient);
+			return recipient.SendAsync(new Rpc(WorldFraming.SenderEndpoint, recipient.EndpointOf(Endpoints.GameInterfaceType),
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 		}
 	}
 }
