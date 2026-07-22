@@ -2,6 +2,7 @@ using System;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Xunit;
 
 namespace Faolan.Tests
@@ -49,6 +50,16 @@ namespace Faolan.Tests
 			var reserialized = BuildFrame(parsed.Sender.Type, parsed.Sender.Instance, parsed.Receiver.Type, parsed.Receiver.Instance, parsed.Opcode,
 				parsed.HeaderData, parsed.Body.ToArray());
 			Assert.Equal(frame, reserialized);
+
+			// Same oracle through the NEW structured functions (phase 2): PacketParser.Parse and PacketSerializer.Serialize
+			// must be inverses AND byte-identical to the frame the current builder produced.
+			var rpc = PacketParser.Parse(frame);
+			Assert.Equal(senderType, rpc.Sender.Type);
+			Assert.Equal(receiverType, rpc.Receiver.Type);
+			Assert.Equal(opcode, rpc.Opcode);
+			Assert.Equal(headerData, rpc.HeaderData.ToArray());
+			Assert.Equal(body, rpc.Body.ToArray());
+			Assert.Equal(frame, PacketSerializer.Serialize(rpc));
 		}
 
 		// Builds a whole wire frame exactly as PacketStream.SendAsync does: WriteHeader (+ body) then WriteLengthHash
