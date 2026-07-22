@@ -22,7 +22,7 @@ namespace Faolan.GameServer.Combat
 	// via two narrow seams the listener passes in - `_applySpell` (the listener's ApplySpell self-buff helper) and
 	// `_sendIir` (wrap a record in the world-framed IIR carrier). The per-add element re-send (with the used element
 	// zeroed) + the meter drain-stream + the componentIndex -> stat/effect contribution table are not built yet (see
-	// docs/subsystems/combos-spellweaving-handoff.md). The trance immobilisation IS wired (the CharDCMove handler
+	// docs/subsystems/combos.md + Gitea #141). The trance immobilisation IS wired (the CharDCMove handler
 	// pins the caster's position while IsSpellweaving).
 	public sealed class SpellweaveService
 	{

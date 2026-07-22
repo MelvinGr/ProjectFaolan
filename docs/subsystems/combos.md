@@ -41,7 +41,7 @@ resolves the blend + a backlash roll on deactivate.
 - **`ComboService`** — `GetPerformableCombosAsync` = the superseded, directional combos as
   `PerformableCombo(id, name, ComboInput[] sequence, gameActionId)`.
 
-## Wire decode (IN PROGRESS)
+## Wire decode
 
 **Melee** (dumps: `Hakotep_hox_login_gameplay0`, `Hoxxling_mage-heraldofxotli_combos` [HoX], plus
 `AssassinL23_rogue-assassin_login_combos` [Assassin, incl. a few DELIBERATELY FAILED combos]):
@@ -61,10 +61,9 @@ resolves the blend + a backlash roll on deactivate.
     also use `LL`/`LR`) only surfaced 3 byte values, so it reads more like a **weapon swing-animation index** than a
     raw direction. `[08][animByte][f105]` marks the FIRST swing of a combo; continuations carry a class marker
     (`c702` HoX / `8403` Assassin).
-- **Blocked in-packet**: pinning `cid → combo` and `animByte → ComboInput` reliably needs **client-side RE**
-  (Ghidra) — how the client derives the `cid` and selects the swing anim per (combo, direction, weapon). Overlaps
-  the `#20` "Real Combat" directional decode. `ComboActionParser`/`ComboService` are ready to consume the map once
-  pinned.
+- **Not recoverable from packets alone**: the `cid → combo` and `animByte → ComboInput` mappings are computed
+  client-side (the client derives the `cid` and selects the swing anim per (combo, direction, weapon)), so
+  pinning them needs client-side Ghidra RE. `ComboActionParser`/`ComboService` consume the map once it exists.
 
 **Spellweaving** — DECODED (`Captures/NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving`, a necro
 that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then stopped):
@@ -86,15 +85,25 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
   buff re-applies at an incremented id each picker reappear (stacks ~x2).
 - `0x2085` (~2s heartbeat) and food/potion `RightClickItem` (BCC ActionType 0x0e) are NOT part of the weave.
 
-## Remaining to implement (#2)
+## Implementation (spellweaving, Necromancer)
 
-1. **Melee**: pin the direction-code → `ComboInput` map (Hakotep dump). Open question: likely **activated-combo**
-   (the client picks the combo, then the directions confirm it) rather than free-chaining — resolve from whether a
-   c2s activation packet references the combo id before the swings. Then a per-player FSM that matches the swing
-   inputs against `GetPerformableCombosAsync` and fires the finisher (the s2c `ApplySpell` effect near the cluster).
-2. **Spellweaving** is BUILT for the Necromancer and (except the energy bar) works in-client — see
-   `docs/subsystems/combos-spellweaving-handoff.md` §5 and **Gitea #141** (`needs-testing`) for the full state, code map, and
-   the open items. Top open bug: the **energy bar drops straight to 0** on weave start (the `0x200E` stream/scale
-   needs a frame-by-frame diff vs the capture). Also open: the `componentIndex`→effect table + backlash roll
-   (undecoded), authoritative DoT death, trance immobilisation, and the other 3 caster profiles.
-3. In-client validation for melee (drive the retail client, perform a combo, confirm the outcome).
+The Necromancer weave is built end-to-end and byte-exact (golden tests `SpellweaveCodecTests` +
+`BehaviorAnimationCodecTests`). Code map:
+
+- `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the weave FSM + the trance-meter /
+  energy loop. Session state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`,
+  `Energy`/`EnergyMax`/`IsSprinting`/`EnergyLoopActive`. It reaches the wire through narrow listener seams (ctor
+  args): `ApplySpellweaveBuff` (the 54-byte buff blob, via the shared `ApplySpell` path since #274),
+  `SendWorldIir`, `SendBuffRemoval` (rank-1 end-twins), `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`.
+- `SpellweaveCodec` (`Faolan.Core.Network/Codecs/Combat/SpellweaveCodec.cs`) — reactive-list, stat-gauge,
+  buff-data and fire-stage builders.
+- `BehaviorAnimationCodec` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimationCodec.cs`) — the trance /
+  component / EXIT BCC animations (BCC `0x642CD3D6` is the generic behaviour channel, shared with combat).
+- `SpellweaveCatalog` (`Faolan.Core.Network/Constants/SpellweaveCatalog.cs`) — the per-class `SpellweaveProfile`
+  (Necromancer only) + `EnergyMaxForClass`.
+- `GameServerListener.Buffs.cs` — `SendSprintBar` (`0x200E`) + the persistent energy loop (`RunEnergyMirror`:
+  drain-on-sprint / regen-when-idle / step-aside-while-weaving; the sprint drain itself is client-side, the server
+  mirrors it).
+- `GameServerListener.Inbound.cs` — the `CombatReactiveIIR` add case + the `PerformSpecialAction` (`0x205A`) handler.
+
+Open work — melee combo execution (**Gitea #2**) and spellweaving polish (**Gitea #141**) — is tracked on those issues.
