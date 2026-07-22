@@ -15,6 +15,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
@@ -110,7 +111,7 @@ namespace Faolan.GameServer
 		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldFraming.Sender that
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
-		private static readonly byte[] PlayerDeathSender = Endpoints.EndpointBytes(Endpoints.GameAgentType, 0x59);
+		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
 
 		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
 		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built

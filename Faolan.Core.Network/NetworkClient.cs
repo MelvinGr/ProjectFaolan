@@ -7,6 +7,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
@@ -249,6 +250,14 @@ namespace Faolan.Core.Network
 		public static byte[] Endpoint(this INetworkClient client, uint endpointType, uint? instance = null)
 		{
 			return Endpoints.EndpointBytes(endpointType, instance ?? client.Session.Character.Id);
+		}
+
+		// The same endpoint in structured (ProtoEndpoint) form, for the Rpc send boundary (Gitea #406, phase 5).
+		// Coexists with the byte[] Endpoint above through the migration; that one retires and this becomes Endpoint at
+		// phase 8, once no send site hand-frames a PacketStream anymore.
+		public static ProtoEndpoint EndpointOf(this INetworkClient client, uint endpointType, uint? instance = null)
+		{
+			return Endpoints.Endpoint(endpointType, instance ?? client.Session.Character.Id);
 		}
 	}
 }
