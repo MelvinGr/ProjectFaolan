@@ -123,10 +123,16 @@ namespace Faolan.GameServer.Combat
 
 		// The half-mitigation point for the provisional armor curve: the total armor rating at which incoming physical
 		// damage is halved. PROVISIONAL (#401) - the real mitigation is the server-GDB TotalArmorValue formula
-		// (FUN_0113ba00: armor rating × Strength-scaled constants, then a LEVEL-normalized %), whose float constants
-		// aren't extracted. Single armor pieces reach ~1500 and a worn set sums into the thousands, so this is set so a
-		// geared set mitigates ~half while a starter's few hundred armor mitigates little; it ignores the real
-		// level-normalization. Tune in-client (gaps.md / #401).
+		// (FUN_0113ba00, log tag GameCode/ArmorMitigation). The client SHAPE is now recovered (physical branch, damage
+		// types 1/2/3/8):
+		//   TotalArmorValue         = clamp0( (C3*0.01 + 1.0)*armor(0x1c0) + (Strength(0x324)-10)*0.1*C4 )  (+ invuln 0x1c6 when flagged)
+		//   ApprenticeAdjustedArmor = (2.0 - level(0x36)/stat(0x3c5)) * TotalArmorValue
+		//   MitigationModification  = (ApprenticeAdjustedArmor / (level * C1)) * 100      // a percent
+		// but the coefficients C1/C3/C4 (globals 0x02d24704/24/34) read 0.0 statically - they load from runtime BALANCE
+		// CONFIG (server-GDB, like the #395 weapon scale), so the exact numbers need a live Frida dump or in-client tuning;
+		// only the static consts (0.01/1.0/0.1/2.0/100) are offline-recoverable. This half-point stands in for that
+		// level-normalized, Strength-scaled curve: single armor pieces reach ~1500 and a worn set sums into the thousands,
+		// tuned so a geared set mitigates ~half and a starter's few hundred armor little. Tune in-client (gaps.md / #401).
 		public const uint ArmorHalfMitigation = 2000;
 
 		// The half-mitigation point for the provisional MAGIC-damage curve (Protection rating 0x1C3). Protection values

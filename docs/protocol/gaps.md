@@ -58,6 +58,18 @@ field). `CombatResolver` uses a provisional ÷100 scale and a weapon-avg-plus-le
 captured DamageResult numbers against a known equipped weapon, or tune in-client. Tracked in Gitea #395.
 `[V0: exact combat scale/formula — the real per-hit damage is a server-GDB formula, undecoded]`
 
+### Armor mitigation formula
+The defensive analogue (#401). The client mitigation function `FUN_0113ba00` (log tag `GameCode/ArmorMitigation`)
+is RE'd in SHAPE — physical branch: `TotalArmorValue = clamp0((C3·0.01+1)·armor(0x1c0) + (Strength(0x324)−10)·0.1·C4)`
+(+ invulnerability `0x1c6` when flagged), then a level-normalized percent
+`((2.0 − level(0x36)/stat(0x3c5))·TotalArmorValue) / (level·C1) · 100`. The static consts (0.01/1.0/0.1/2.0/100) read
+straight from the exe, but the coefficients **C1/C3/C4** (globals `0x02d24704`/`24`/`34`) are 0.0 statically — they
+load from runtime BALANCE CONFIG (server-GDB, same class as the weapon scale above), so the exact numbers need a live
+Frida dump of those globals or in-client tuning. `CombatResolver.ApplyPhysicalMitigation` uses a provisional
+`raw·K/(armor+K)` curve (`K=2000`) as a stand-in. The magical branch (damage types 4/5/10) uses `0x14e`+`0x1c3`/`0x1ca`
+scaled by Int/Wis. Tracked in Gitea #401.
+`[V0: exact armor mitigation coefficients — C1/C3/C4 are runtime GDB config, not static in the exe]`
+
 ---
 
 ## How to close a gap
