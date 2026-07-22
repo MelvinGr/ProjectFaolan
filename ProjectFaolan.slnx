@@ -13,6 +13,7 @@
         <File Path="logo.png" />
         <File Path="ProjectFaolan.sln.DotSettings" />
         <File Path="README.md" />
+        <File Path="run.bat" />
         <File Path="run.sh" />
     </Folder>
     <Folder Name="/Faolan.Wireshark/">
