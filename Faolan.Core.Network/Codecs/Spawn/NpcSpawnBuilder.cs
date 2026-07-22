@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Builds a wire FA015807 (SimpleCharFullUpdate) NPC spawn body wholly from typed storage (#243/#244) - the
 	// captured `Data` blob is retired. From a placement (TryBuildLive off an NpcSpawn row) or a creature TYPE
-	// (TryBuildFromType off an NpcTemplate, for summoned pets/mounts): the transform from the row's columns, the CharacterIIR
+	// (BuildFromType off an NpcTemplate, for summoned pets/mounts): the transform from the row's columns, the CharacterIIR
 	// stat core from NpcTemplate.StatCore, worn equipment from the *Equipment rows, morphs from the *Morph rows, and the
 	// pre-IIR/post-IIR scaffolds GENERATED from scratch (BuildBody + NpcSpawnScaffold). This is the unit the
 	// world-entry/interest path calls per NPC.

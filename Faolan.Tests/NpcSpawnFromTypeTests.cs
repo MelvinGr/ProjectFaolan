@@ -9,7 +9,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// #307: a summon-only creature (pet/mount) has no NpcSpawn placement - it builds wholly from its TYPE columns
-	// (StatCore + NpcTemplate.Equipment + NpcTemplate.Morphs + recordCount) via NpcSpawnBuilder.TryBuildFromType. This is the gate
+	// (StatCore + NpcTemplate.Equipment + NpcTemplate.Morphs + recordCount) via NpcSpawnBuilder.BuildFromType. This is the gate
 	// that every lifted type produces a parseable body carrying its equipment/appearance, with no NpcTemplate.Data blob.
 	public class NpcSpawnFromTypeTests
 	{

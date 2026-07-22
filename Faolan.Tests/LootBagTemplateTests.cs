@@ -10,7 +10,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// #193: a loot bag built ENTIRELY FROM SCRATCH - identity columns + the DECODED kd-tree bounds (typed,
-	// LootBagTemplate.BuildBounds) + a clean codec-built ProtoLootBagIIR scaffold - reproduces a captured "Bag of loot"
+	// LootContainerTemplate.BuildBounds) + a clean codec-built ProtoLootBagIIR scaffold - reproduces a captured "Bag of loot"
 	// body's identity + geometry byte-for-byte, with no embedded asset and no baked capture state (the former
 	// LootBagKdTreeTail.bin carried the captured bag's stale OwnerId + a captured item). The live items + cash are
 	// spliced per drop (WithLootContents), so the at-rest template carries an EMPTY scaffold.
