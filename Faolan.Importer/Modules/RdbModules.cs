@@ -121,6 +121,29 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// #291/#300: backfill EMPTY spell names from the localized-string DB (LDB, RDB 1030002), English page picked by
+	// cribbing against the catalog's existing template names. Runs after rdb-spells so those names exist to crib on.
+	public sealed class RdbLdbNamesModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Rdb;
+		public IReadOnlyList<string> DependsOn => [nameof(RdbSpellsModule)];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
+
+		public string Description => "Backfill empty spell names from the English LDB page (RDB 1030002).";
+		public string Name => "rdb-ldb-names";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var r = await RdbLdbNameImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
+			return new ImportResult($"{r.Pages} cat-50210 pages, {r.EnglishNames} English names, filled {r.Filled} empty spell names.");
+		}
+	}
+
 	// Ability names from the RDB 1000020 templates, decrypted with each ability's own harvested Data1..4 TEA key.
 	public sealed class RdbAbilitiesModule : IImportModule
 	{

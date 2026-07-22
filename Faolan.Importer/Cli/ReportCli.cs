@@ -286,6 +286,9 @@ namespace Faolan.Importer.Cli
 					var byLang = new Dictionary<(uint cat, uint id, uint lang), string>();
 					var langHisto = new Dictionary<uint, int>();
 					var perCategory = new Dictionary<uint, int>();
+					// Per-page id->string for the spell-name category (50210), so we can crib-identify the ENGLISH page(s)
+					// against the names our Spells catalog already carries (#291/#300).
+					var spellNamePages = new List<(uint page, Dictionary<uint, string> ids)>();
 					int pages = 0, badMagic = 0;
 					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
 					{
@@ -302,6 +305,7 @@ namespace Faolan.Importer.Cli
 						var indexStart = blobStart + (int)size;
 						if (indexStart + (long)count * 16 > span.Length) continue; // grammar mismatch for this page
 						pages++;
+						var thisPage = category == 50210 ? new Dictionary<uint, string>() : null;
 						for (var i = 0; i < count; i++)
 						{
 							var rec = span.Slice(indexStart + i * 16, 16);
@@ -319,7 +323,9 @@ namespace Faolan.Importer.Cli
 							langHisto[lang] = langHisto.GetValueOrDefault(lang) + 1;
 							byLang[(category, id, lang)] = str;
 							perCategory[category] = perCategory.GetValueOrDefault(category) + 1;
+							if (thisPage != null) thisPage[id] = str;
 						}
+						if (thisPage is { Count: > 0 }) spellNamePages.Add((e.Id, thisPage));
 					}
 					Console.WriteLine($"LDB: {pages} pages parsed, {map.Count} unique ids, {badMagic} bad-magic, {perCategory.Count} categories.");
 					// Per-category: count + an ASCII-ratio on a sample so English (high ASCII) is distinguishable from CJK.
@@ -333,13 +339,42 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine("=== language histogram (2nd u32 per index entry) ===");
 					foreach (var (lang, n) in langHisto.OrderByDescending(kv => kv.Value).Take(12))
 						Console.WriteLine($"  lang {lang,-6} n={n}");
-					Console.WriteLine("=== pins across ALL (category, lang) ===");
-					foreach (var (id, expect) in new (uint, string)[] { (222682, "Set's Ruin"), (222675, "Set's Cold Hatred") })
+					// #291/#300 crib: identify the ENGLISH spell-name page(s) by scoring each cat-50210 page against the
+					// English names our Spells catalog already carries (from the template ExtractName). The page whose
+					// strings match our names is English; the FR/DE/ES/RU/PL/KO copies of the same ids won't.
+					static string Norm(string s) => s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
+					await using (var db = OpenDb(dbPath))
 					{
-						var hits = byLang.Where(kv => kv.Key.id == id).ToList();
-						Console.WriteLine($"  {id} (expect '{expect}'): {hits.Count} hit(s)");
-						foreach (var h in hits)
-							Console.WriteLine($"      cat {h.Key.cat} lang {h.Key.lang}: '{h.Value.Substring(0, Math.Min(50, h.Value.Length))}'");
+						var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "")
+							.ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
+						Console.WriteLine($"=== spell-name crib ({spellNamePages.Count} cat-50210 pages vs {spellNames.Count} named Spells) ===");
+						var scored = spellNamePages
+							.Select(p =>
+							{
+								int overlap = 0, match = 0;
+								foreach (var (id, str) in p.ids)
+									if (spellNames.TryGetValue(id, out var known))
+									{
+										overlap++;
+										if (Norm(str) == known) match++;
+									}
+								return (p.page, p.ids.Count, overlap, match, pct: overlap == 0 ? 0 : match * 100 / overlap);
+							})
+							.Where(x => x.overlap >= 5)
+							.OrderByDescending(x => x.match)
+							.ToList();
+						var english = scored.Where(x => x.pct >= 80).ToList();
+						foreach (var x in scored.Take(14))
+							Console.WriteLine($"  page {x.page,-9} ids={x.Item2,-5} overlap={x.overlap,-5} match={x.match,-5} {x.pct,3}% {(x.pct >= 80 ? "<-- ENGLISH" : "")}");
+						var englishNames = new Dictionary<uint, string>();
+						foreach (var x in english)
+							foreach (var (id, str) in spellNamePages.First(p => p.page == x.page).ids)
+								englishNames[id] = str;
+						var emptyNamed = await db.Spells.Where(s => s.Name == null || s.Name == "").Select(s => s.Id).ToListAsync();
+						var fillable = emptyNamed.Where(englishNames.ContainsKey).ToList();
+						Console.WriteLine($"=== backfill preview: {english.Count} English pages, {englishNames.Count} English names; {emptyNamed.Count} empty-name Spells, {fillable.Count} fillable ===");
+						foreach (var id in fillable.Take(20))
+							Console.WriteLine($"  spell {id}: '{englishNames[id]}'");
 					}
 					return 0;
 				}
