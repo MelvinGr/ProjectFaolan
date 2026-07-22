@@ -1,7 +1,7 @@
 set pagination off
 set confirm off
 set height 0
-set logging file /tmp/claude-1000/-home-melvin-Development-C--Project-Faolan/b0778add-a126-477b-8758-2620da06bf1b/scratchpad/armor_capture.log
+set logging file /tmp/armor_capture.log
 set logging overwrite on
 set logging enabled on
 attach 1854199
