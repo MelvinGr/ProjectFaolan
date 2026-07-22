@@ -12,7 +12,7 @@ from the level-up attribute path).
 
 The message is a **`FormatFeedbackIIR`** (IIR sub-opcode **`0x8D5A8B6B`**) carrying a **`remoteformat` XML**
 string the client renders on-screen. It is carried as an IIR on the **world conversation**: opcode **`0x2000`**
-(PassBlob), sender = `WorldFraming.Sender` (`0xB171CE13`/0x58, GameAgent), receiver = the player's GameInterface
+(PassBlob), sender = `GameServerListener.WorldSenderEndpoint` (`0xB171CE13`/0x58, GameAgent), receiver = the player's GameInterface
 (`Endpoints.GameInterfaceType 0x6C67C147` + `ClientInstance`).
 
 **The top-of-screen FIFO banner** specifically uses the token family
