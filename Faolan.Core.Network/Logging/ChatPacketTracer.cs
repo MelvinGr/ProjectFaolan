@@ -3,6 +3,11 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Packets.ChatServer;
 using Microsoft.Extensions.Logging;
 
+// CS8620 here is a Roslyn false positive: passing (string, ReadOnlyMemory<byte>) tuples to the params tuple-array on the
+// LogPacket/LogUnknownPacket extension members trips a nullability-inference bug even when the argument and parameter
+// tuple types are identical (verified). The values are non-null - suppress it (see PacketLogFormatter).
+#pragma warning disable CS8620
+
 namespace Faolan.Core.Network.Logging
 {
 	// The chat-tier packet tracer. Both directions render from the structured ChatServerMessage, the same way the Conan

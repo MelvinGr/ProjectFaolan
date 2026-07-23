@@ -32,7 +32,7 @@ namespace Faolan.UniverseAgent
 					var accountName = body.ReadString();
 					var unk0 = body.ReadUInt32();
 
-					client.Session.Account = await Database.GetAccount(accountName);
+					client.Session.Account = (await Database.GetAccount(accountName))!;
 					if (client.Session.Account == null)
 					{
 						Logger.LogWarning("UniverseAgent login: unknown account '{Account}' - rejecting (invalid login).", accountName);

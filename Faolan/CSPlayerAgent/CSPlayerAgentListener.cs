@@ -49,13 +49,13 @@ namespace Faolan.CSPlayerAgent
 					var accountId = body.ReadUInt32();
 					var authReply = body.ReadUInt32();
 
-					client.Session.Account = await Database.GetAccount(accountId);
+					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
 						throw new Exception($"Account not found: {accountId:X}");
 
 					client.Session.Account.ClientInstance = characterId;
 
-					client.Session.Character = await Database.GetCharacterForAccount(accountId, characterId);
+					client.Session.Character = (await Database.GetCharacterForAccount(accountId, characterId))!;
 					if (client.Session.Character == null)
 						throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
 

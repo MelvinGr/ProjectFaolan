@@ -4,6 +4,11 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
+// CS8620 here is a Roslyn false positive: passing (string, ReadOnlyMemory<byte>) tuples to the params tuple-array on the
+// LogPacketWithSubOpcode extension member trips a nullability-inference bug even when the argument and parameter tuple
+// types are identical (verified). The values are non-null - suppress it (see PacketLogFormatter).
+#pragma warning disable CS8620
+
 namespace Faolan.Core.Network.Logging
 {
 	// The GameServer channel's tracer: the Conan trace plus the one thing only this tier has - the PassBlob carrier,

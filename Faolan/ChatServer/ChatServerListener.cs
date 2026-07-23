@@ -71,7 +71,7 @@ namespace Faolan.ChatServer
 
 					client.Session.Account.ClientInstance = clientInstance;
 
-					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance);
+					client.Session.Character = (await Database.GetCharacterForAccount(accountId, clientInstance))!;
 					if (client.Session.Character == null)
 						throw new Exception($"Character not found for account: {accountId:X} and clientInstance: {clientInstance:X}");
 
@@ -100,12 +100,13 @@ namespace Faolan.ChatServer
 					// An empty-bodied 0x0005 beat retail sends here; the method it names isn't recovered yet.
 					await client.SendAsync(new ChatServerMessage(0x0005));
 
+					var character = client.Session.Character!;
 					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s
-						.WriteUInt32(client.Session.Character.Id)
+						.WriteUInt32(character.Id)
 						.WriteUInt32(0x00000000)
-						.WriteString(client.Session.Character?.Name?.Length > 0
-							? client.Session.Character.Name
-							: $"Character{client.Session.Character.Id}")));
+						.WriteString(character.Name?.Length > 0
+							? character.Name
+							: $"Character{character.Id}")));
 
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
 					await SendSystemMessage(client, Global.BuildString.Replace("\n", "<br />"));
@@ -142,9 +143,10 @@ namespace Faolan.ChatServer
 					// and replies via SendClaudeChannelMessage); the normal broadcast above still shows them in-game.
 					if (Configuration.McpEnabled && channelId == ClaudeChannel.ChannelId)
 					{
-						var senderId = client.Session.Character.Id;
-						var senderName = client.Session.Character?.Name?.Length > 0
-							? client.Session.Character.Name
+						var character = client.Session.Character!;
+						var senderId = character.Id;
+						var senderName = character.Name?.Length > 0
+							? character.Name
 							: $"Character{senderId}";
 						_claudeChannel.Append(senderId, senderName, message, false);
 					}

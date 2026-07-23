@@ -1123,7 +1123,7 @@ namespace Faolan.GameServer
 
 					client.Session.Account.ClientInstance = clientInstance;
 
-					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance);
+					client.Session.Character = (await Database.GetCharacterForAccount(accountId, clientInstance))!;
 					if (client.Session.Character == null)
 						throw new Exception($"Character not found for account {accountId:X} and client instance {clientInstance:X}");
 
