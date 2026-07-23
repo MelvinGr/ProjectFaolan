@@ -15,16 +15,16 @@ namespace Faolan.Core.Network.Logging
 		{
 		}
 
-		protected override void RenderPacket(string direction, string opcodeName, in Rpc rpc, int frameLength)
+		protected override void RenderPacket(string direction, string opcodeName, in Rpc rpc)
 		{
 			if (!TryReadIirHeader(in rpc, out var payloadLength, out var iir))
 			{
-				base.RenderPacket(direction, opcodeName, in rpc, frameLength);
+				base.RenderPacket(direction, opcodeName, in rpc);
 				return;
 			}
 
-			Logger.LogPacketWithSubOpcode(direction, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(typeof(GameServer0X2000Opcodes), iir), payloadLength, rpc.Body.Length, frameLength,
-				("headerData", rpc.HeaderData), ("body", rpc.Body));
+			Logger.LogPacketWithSubOpcode(direction, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(typeof(GameServer0X2000Opcodes), iir), payloadLength, rpc.Body.Length,
+				rpc.FrameLength, ("headerData", rpc.HeaderData), ("body", rpc.Body));
 		}
 
 		// A PassBlob carrier's body starts [u32 payloadLength][u32 iirType]. Gated on the receiver CLASS as well as the

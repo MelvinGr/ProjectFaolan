@@ -64,7 +64,7 @@ namespace Faolan.Tests
 				var wire = PacketSerializer.Serialize(rpc);
 				var parsed = PacketParser.Parse(wire); // the independent oracle: parse the serialized frame back
 
-				tracer.Transmitted(in rpc, wire.Length);
+				tracer.Transmitted(Sent(rpc, wire));
 				var line = Assert.Single(capture.Messages);
 
 				// The rendered line must carry the frame's real fields (opcode, lengths, the header/body hex), each read
@@ -95,7 +95,7 @@ namespace Faolan.Tests
 				var wire = PacketSerializer.Serialize(rpc);
 				var inbound = PacketParser.Parse(wire); // an RX-shaped Rpc: FrameLength stamped by the parser
 
-				tracer.Transmitted(in rpc, wire.Length);
+				tracer.Transmitted(Sent(rpc, wire));
 				tracer.Received(in inbound);
 
 				Assert.Equal(2, capture.Messages.Count);
@@ -117,7 +117,7 @@ namespace Faolan.Tests
 				(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
 			tracer.Received(PacketParser.Parse(PacketSerializer.Serialize(rpc)));
-			tracer.Transmitted(in rpc, PacketSerializer.Serialize(rpc).Length);
+			tracer.Transmitted(Sent(rpc, PacketSerializer.Serialize(rpc)));
 
 			Assert.All(capture.Messages, line =>
 			{
@@ -137,7 +137,7 @@ namespace Faolan.Tests
 			var rpc = new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateAggroStatus,
 				(byte[]) [0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]);
 
-			tracer.Transmitted(in rpc, PacketSerializer.Serialize(rpc).Length);
+			tracer.Transmitted(Sent(rpc, PacketSerializer.Serialize(rpc)));
 
 			var line = Assert.Single(capture.Messages);
 			Assert.Contains("DispatchUpdateAggroStatus (0x2000)", line);
@@ -155,11 +155,18 @@ namespace Faolan.Tests
 			var rpc = new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
 				(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
-			tracer.Transmitted(in rpc, PacketSerializer.Serialize(rpc).Length);
+			tracer.Transmitted(Sent(rpc, PacketSerializer.Serialize(rpc)));
 
 			var line = Assert.Single(capture.Messages);
 			Assert.Contains("DispatchPassBlob (0x2000)", line);
 			Assert.DoesNotContain("subOpcode=", line);
+		}
+
+		// What the transport hands the tracer for a send: the built Rpc with the serialized frame's size stamped on it
+		// (NetworkClient.SendAsync does exactly this), so a TX line reads its whole shape off the message like an RX one.
+		private static Rpc Sent(Rpc rpc, byte[] wire)
+		{
+			return rpc with { FrameLength = wire.Length };
 		}
 
 		private static GameServerPacketTracer Tracer(ILogger logger)

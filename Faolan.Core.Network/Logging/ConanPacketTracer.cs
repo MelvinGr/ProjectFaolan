@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Logging
 		{
 			try
 			{
-				Trace(PacketLogFormatter.Received, in packet, packet.FrameLength, null, true);
+				Trace(PacketLogFormatter.Received, in packet, null, true);
 			}
 			catch (Exception ex)
 			{
@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Logging
 		{
 			try
 			{
-				Trace(PacketLogFormatter.Received, in packet, packet.FrameLength, null, false);
+				Trace(PacketLogFormatter.Received, in packet, null, false);
 			}
 			catch (Exception ex)
 			{
@@ -49,40 +49,41 @@ namespace Faolan.Core.Network.Logging
 			}
 		}
 
-		// A raw Conan frame handed to the transport as bytes (no structured send site). Decoded back to an Rpc so it
-		// renders through the one path - production sends are all structured, so this costs nothing on the hot path.
+		// A raw Conan frame handed to the transport as bytes (no structured send site). Decoded back to an Rpc - which
+		// stamps its FrameLength - so it renders through the one path; production sends are all structured, so this
+		// costs nothing on the hot path.
 		protected override void RenderTransmitted(byte[] frame)
 		{
-			RenderTransmitted(PacketParser.Parse(frame), frame.Length);
+			RenderTransmitted(PacketParser.Parse(frame));
 		}
 
-		protected override void RenderTransmitted(in Rpc rpc, int frameLength)
+		protected override void RenderTransmitted(in Rpc rpc)
 		{
-			Trace(PacketLogFormatter.Transmitted, in rpc, frameLength, _interfaceOpcodes, true);
+			Trace(PacketLogFormatter.Transmitted, in rpc, _interfaceOpcodes, true);
 		}
 
 		// The line for a packet the listener handled. Virtual so a tier that multiplexes a sub-protocol can render a
 		// richer line for its carrier (GameServerPacketTracer's PassBlob/IIR); everything else about the trace - naming,
 		// direction, the UNHANDLED shape, the byte dump - stays shared.
-		protected virtual void RenderPacket(string direction, string opcodeName, in Rpc rpc, int frameLength)
+		protected virtual void RenderPacket(string direction, string opcodeName, in Rpc rpc)
 		{
-			Logger.LogPacket(direction, ChannelName, opcodeName, rpc.Body.Length, frameLength, ("headerData", rpc.HeaderData), ("body", rpc.Body));
+			Logger.LogPacket(direction, ChannelName, opcodeName, rpc.Body.Length, rpc.FrameLength, ("headerData", rpc.HeaderData), ("body", rpc.Body));
 		}
 
 		// The ONE render for both directions. Direction-dependent inputs are exactly two, and both are properties of the
 		// wire, not of the code path: the direction tag, and the naming fall-back enum (s2c only - see ResolveName).
-		private void Trace(string direction, in Rpc rpc, int frameLength, Type? fallbackOpcodes, bool handled)
+		private void Trace(string direction, in Rpc rpc, Type? fallbackOpcodes, bool handled)
 		{
 			var opcodeName = ProtocolCatalog.ResolveName(rpc.Receiver.Type, rpc.Opcode, fallbackOpcodes);
 
 			// UNHANDLED wins over any richer line shape: the marker is the point of that line.
 			if (!handled)
 			{
-				Logger.LogUnknownPacket(ChannelName, opcodeName, rpc.Body.Length, frameLength, ("headerData", rpc.HeaderData), ("body", rpc.Body));
+				Logger.LogUnknownPacket(ChannelName, opcodeName, rpc.Body.Length, rpc.FrameLength, ("headerData", rpc.HeaderData), ("body", rpc.Body));
 				return;
 			}
 
-			RenderPacket(direction, opcodeName, in rpc, frameLength);
+			RenderPacket(direction, opcodeName, in rpc);
 		}
 	}
 }

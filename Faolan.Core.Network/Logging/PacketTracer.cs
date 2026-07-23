@@ -36,11 +36,11 @@ namespace Faolan.Core.Network.Logging
 			}
 		}
 
-		public void Transmitted(in Rpc rpc, int frameLength)
+		public void Transmitted(in Rpc rpc)
 		{
 			try
 			{
-				RenderTransmitted(in rpc, frameLength);
+				RenderTransmitted(in rpc);
 			}
 			catch (Exception ex)
 			{
@@ -54,7 +54,7 @@ namespace Faolan.Core.Network.Logging
 		protected abstract void RenderTransmitted(byte[] frame);
 
 		// The structured TX render. Not abstract: the chat wire carries no Rpc, so that tracer never sees one.
-		protected virtual void RenderTransmitted(in Rpc rpc, int frameLength)
+		protected virtual void RenderTransmitted(in Rpc rpc)
 		{
 		}
 

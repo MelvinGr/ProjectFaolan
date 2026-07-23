@@ -16,9 +16,10 @@ namespace Faolan.Core.Network.Protocol
 	// header literal must be cast, e.g. (byte[])[0x0D, ...], since [..] can't target ReadOnlyMemory<byte>.)
 	public readonly record struct Rpc(ProtoEndpoint Sender, ProtoEndpoint Receiver, ushort Opcode, ReadOnlyMemory<byte> HeaderData, ReadOnlyMemory<byte> Body)
 	{
-		// The total wire frame length, populated on the RECEIVE path (PacketParser.Parse sets it to the framed byte
-		// count). 0 for a send-side Rpc - its length isn't known until it is serialized. The listeners' inbound (UL) log
-		// lines report it as packetLength; kept on the Rpc so it doesn't have to be threaded alongside every dispatch.
+		// The total wire frame length. Stamped by whoever turns the message into (or out of) bytes: PacketParser.Parse
+		// on the receive path, and the transport on the send path once the serializer has determined the size
+		// (`rpc with { FrameLength = … }`). 0 on a freshly built Rpc, whose length isn't knowable yet. The packet trace
+		// reports it as packetLength in BOTH directions, so it doesn't have to be threaded alongside the message.
 		public int FrameLength { get; init; }
 
 		// Body-building overloads: build the body inline with the fluent FaolanStream writers, e.g.

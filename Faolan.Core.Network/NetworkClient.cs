@@ -93,7 +93,9 @@ namespace Faolan.Core.Network
 		public virtual Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
 			var bytes = PacketSerializer.Serialize(rpc);
-			_tracer.Transmitted(in rpc, bytes.Length);
+			// Stamp the wire size the serializer just determined, so the trace reads the whole line off the message -
+			// exactly as it does for an inbound frame, which PacketParser stamped.
+			_tracer.Transmitted(rpc with { FrameLength = bytes.Length });
 			return SendRawAsync(bytes, cancellationToken);
 		}
 

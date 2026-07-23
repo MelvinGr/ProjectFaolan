@@ -18,8 +18,8 @@ namespace Faolan.Core.Network.Interfaces
 		void Transmitted(byte[] frame);
 
 		// Trace a server->client (TX) frame from the structured Rpc that produced it (Gitea #406 phase 6): rendered from
-		// the message's own Opcode/Receiver/HeaderData/Body with NO re-parse. `frameLength` is the serialized frame's
-		// length (known for free at the send site) - the only thing the trace needs that the Rpc itself doesn't carry.
-		void Transmitted(in Rpc rpc, int frameLength);
+		// the message's own Opcode/Receiver/HeaderData/Body with NO re-parse. The transport stamps FrameLength before
+		// tracing, so the whole line comes off the message - the same as an inbound one, which the parser stamped.
+		void Transmitted(in Rpc rpc);
 	}
 }
