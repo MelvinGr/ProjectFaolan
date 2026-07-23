@@ -62,18 +62,25 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// 0x20A5 DispatchMassivePvpInfoRequestReturn: the Massive-PvP minigame guild leaderboard (the client polls it
-		// with 0x2077, and it rides alongside the 0x203F on a member-list request). Body decoded from the hoxxling
-		// login capture: [u32 lastUpdateUnix][u32 (guildCount+1)*0x3F1][ guild records ], each record
-		// [u32 rank][u32 rank][u32 a][u32 b][u32 c][u32 scoreA][u32 scoreB][u32 tsUnix][u32 guildId][s16 name][u32 0]
-		// (the 0x3F1 count-framing that CoreGuild's list readers assert - see GuildService). We run no Massive-PvP
-		// minigame, so we emit the empty list ([timestamp 0][(0+1)*0x3F1]) rather than replaying the captured retail
-		// leaderboard; the client shows an empty board. Build the real records here if/when a minigame subsystem exists.
+		// with 0x2077, and it rides alongside the 0x203F on a member-list request). Grammar re-derived byte-exact from
+		// every retail 0x20A5 capture (all show the top-8 board; the parse rebuilds each body 1:1):
+		//   [u32 timestamp][u32 (guildCount+1)*0x3F1]  { guildCount × record }  [u32 guildCount+1]
+		//   record = [u32 rank][u32 rank][u32 a][u32 b][u32 c][u32 scoreA][u32 scoreB][u32 tsUnix][u32 guildId]
+		//            [u16 nameLen][name][7 zero bytes]
+		// The TRAILING [u32 guildCount+1] is the fix for #408: we previously emitted only [timestamp][(0+1)*0x3F1]
+		// and DROPPED that trailer, so the client read the timestamp (its i_nTimeRegionOffset field) + the empty list
+		// frame, then ran off the end reading the trailer -> "stream bad after i_nTimeRegionOffset" -> it disconnected
+		// the CSPlayerAgent route on every login. We run no Massive-PvP minigame, so we emit the honest EMPTY board:
+		// [timestamp 0][(0+1)*0x3F1][0+1]. (No empty-list capture oracle exists - every retail board has 8 guilds - so
+		// the empty form is inferred from the round-trip-verified grammar and confirmed in-client: the route no longer
+		// drops.) Build the real records here if/when a minigame subsystem exists.
 		private static Task SendMassivePvpInfo(INetworkClient client, Rpc packet)
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn,
 				(byte[]) [0x01],
 				body => body.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
-					.WriteUInt32(GuildService.GuildListMultiplier))); // empty 0x3F1-framed guild list
+					.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
+					.WriteUInt32(1))); // trailing guildCount+1 (= 1 for the empty board) - the field the client read past
 		}
 
 		// 0x2092 DispatchPvPMatchMakingInfoRequestReturn: PvP matchmaking info (answer to 0x2054
