@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
@@ -90,7 +91,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				}
 			}
 
-			return new Columns(sub, env, field, flag, screens, RpcCallerInstance(data));
+			return new Columns((ConversationSubOpcode)sub, env, field, flag, screens, RpcCallerInstance(data));
 
 			uint U32(int rel)
 			{
@@ -126,7 +127,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 			var agentInstance = RpcCallerInstance(data);
 			var paramsBytes = data.AsSpan(start + 16).ToArray();
-			return new Columns(SetDialogueCamera, null, null, null, null, agentInstance, paramsBytes);
+			return new Columns((ConversationSubOpcode)SetDialogueCamera, null, null, null, null, agentInstance, paramsBytes);
 		}
 
 		// The caller endpoint instance from the rpcHeader: [0x0A len][0x0D class:u32][0x10 instance:varint].
@@ -163,6 +164,6 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToRow). SenderInstance
 		// is the rpcHeader caller endpoint instance (retail varies it per conversation), stored so the send path
 		// re-frames from columns instead of the raw Data blob; CameraParams is the SetDialogueCamera payload.
-		public sealed record Columns(uint SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string>? Screens, uint? SenderInstance = null, byte[]? CameraParams = null);
+		public sealed record Columns(ConversationSubOpcode SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string>? Screens, uint? SenderInstance = null, byte[]? CameraParams = null);
 	}
 }

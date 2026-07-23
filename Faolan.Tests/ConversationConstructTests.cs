@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
@@ -30,7 +31,7 @@ namespace Faolan.Tests
 
 			var cols = ConversationScreenDecoder.Decode(captured);
 			Assert.NotNull(cols);
-			Assert.Equal(ConversationScreenDecoder.SetDialogueCamera, cols.SubOpcode);
+			Assert.Equal(ConversationSubOpcode.SetDialogueCamera, cols.SubOpcode);
 			Assert.Equal(0x58u, cols.SenderInstance);
 
 			// The captured body's two handles: [0xC350][npc][0xC350][player] at 12 + headerLen.

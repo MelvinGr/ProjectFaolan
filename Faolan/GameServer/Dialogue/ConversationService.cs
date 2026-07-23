@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -262,7 +263,7 @@ namespace Faolan.GameServer.Dialogue
 			// instantly closes, can't accept). When the screen has a real AnswerList, drop the spurious close; a pure
 			// terminal screen (CloseChatWindow only) is kept.
 			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).ToList();
-			var hasAnswerList = orderedPackets.Any(p => p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR);
+			var hasAnswerList = orderedPackets.Any(p => p.SubOpcode == ConversationSubOpcode.KnubotAnswerList);
 
 			// Remember the GameAgent instance this conversation's packets are sent from (retail varies it per
 			// conversation). SendConversationClose must reuse it - a close from a different instance (e.g. the old
@@ -290,11 +291,11 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 				}
 
-				if (hasAnswerList && subOp == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR)
+				if (hasAnswerList && subOp == ConversationSubOpcode.KnubotCloseChatWindow)
 					continue; // skip the spurious close so the option list stays interactive
 
 				// Deliver the quest packets immediately BEFORE the screen's AnswerList, mirroring retail's order.
-				if (grantDef != null && !grantSent && subOp == (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR)
+				if (grantDef != null && !grantSent && subOp == ConversationSubOpcode.KnubotAnswerList)
 				{
 					await SendQuestGrantPackets(client, grantDef);
 					grantSent = true;
@@ -303,7 +304,7 @@ namespace Faolan.GameServer.Dialogue
 				// The sender instance (retail varies it per conversation) is a stored column; the record body is built
 				// from the typed screen columns re-addressed to the live player + clicked NPC.
 				var senderInstance = p.SenderInstance ?? DefaultSenderInstance;
-				if (subOp == ConversationScreenDecoder.SetDialogueCamera)
+				if (subOp == ConversationSubOpcode.SetDialogueCamera)
 					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, p.CameraParams!);
 				else
 					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
@@ -327,7 +328,7 @@ namespace Faolan.GameServer.Dialogue
 			// on the client. Recording it as the active position left the session "inside" a finished conversation,
 			// so the greeting the client fires right after re-opened it (#217). End instead - this arms the post-close
 			// guard (EndConversation) so that follow-up greeting is absorbed.
-			var isTerminalClose = !hasAnswerList && orderedPackets.Any(p => p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR);
+			var isTerminalClose = !hasAnswerList && orderedPackets.Any(p => p.SubOpcode == ConversationSubOpcode.KnubotCloseChatWindow);
 			if (isTerminalClose)
 			{
 				client.Session.ConversationNpcHandle = clickedNpcHandle; // ensure the guard arms for THIS npc
@@ -429,14 +430,14 @@ namespace Faolan.GameServer.Dialogue
 			var env = p.Env ?? 0;
 			var screens = ConversationScreenColumns.ToScreens(p.Screens); // ordered RemoteFormatXml.Screen list
 
-			if (p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR)
+			if (p.SubOpcode == ConversationSubOpcode.KnubotOpenChatWindow)
 				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
-			if (p.SubOpcode == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
+			if (p.SubOpcode == ConversationSubOpcode.KnubotAppendText)
 				return KnubotCodec.BuildAppendText(liveInstance, npcHandle, Screen(0), p.Field ?? 1, p.Flag ?? 1, env);
 
 			// AnswerList + CloseChatWindow: the string-list grammar.
 			var strings = screens.Select((_, i) => Screen(i)).ToList();
-			return KnubotCodec.BuildStringList(p.SubOpcode!.Value, liveInstance, npcHandle, strings, env);
+			return KnubotCodec.BuildStringList((uint)p.SubOpcode!.Value, liveInstance, npcHandle, strings, env);
 
 			byte[] Screen(int i)
 			{
