@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -210,6 +211,13 @@ namespace Faolan.Core.Network
 			catch (SocketException ex)
 			{
 				Logger.LogDebug(ex, "Socket receive failed for {PacketType}; closing client.", ProtocolName);
+				Stop();
+			}
+			catch (InvalidDataException ex)
+			{
+				// A frame the wire format says cannot exist (a hostile/garbage length prefix). Unlike a socket error
+				// this says something about the PEER, so it is logged loud rather than at Debug.
+				Logger.LogWarning("Dropping {PacketType} client {IpAddress}: {Reason}", ProtocolName, IpAddress, ex.Message);
 				Stop();
 			}
 			catch (Exception ex)

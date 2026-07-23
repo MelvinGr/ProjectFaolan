@@ -48,8 +48,8 @@ namespace Faolan.Tests
 		public void Framer_DecompressionBomb_IsDroppedNotInflatedToOom()
 		{
 			// ~20 MB of zeros compresses to a few KB. The framer must not inflate it: it skips the 9-byte marker, then
-			// reads the zlib payload's first 4 bytes as a length prefix (>16 MB / high-bit set) and rejects it - so no
-			// packet is produced and nothing is materialised (no OOM).
+			// reads the zlib payload's first 4 bytes as a length prefix (>16 MB / high-bit set) and rejects it - so
+			// nothing is materialised (no OOM) and the desynced connection is dropped.
 			var bomb = new byte[20 * 1024 * 1024];
 			using var ms = new MemoryStream();
 			using (var z = new ZLibStream(ms, CompressionLevel.Optimal, true))
@@ -59,10 +59,18 @@ namespace Faolan.Tests
 			// The marker is a fixed 9-byte control frame [0x80 00 00 05][5 bytes]; the zlib data follows it.
 			byte[] input = [0x80, 0x00, 0x00, 0x05, 0, 0, 0, 0, 0, .. compressed];
 
-			var framer = new ConanMessageFramer();
-			var packets = framer.PushBytes(input).ToList();
+			Assert.Throws<InvalidDataException>(() => new ConanMessageFramer().PushBytes(input));
+		}
 
-			Assert.Empty(packets);
+		// A length prefix no legitimate frame can have means the read cursor is at the wrong offset: everything behind
+		// it would be framed out of garbage. The framer refuses rather than resynchronising on luck, and the receive
+		// loop turns that into a logged disconnect.
+		[Fact]
+		public void Framer_HostileLengthPrefix_FailsTheStreamInsteadOfResyncing()
+		{
+			byte[] hostile = [0x7F, 0xFF, 0xFF, 0xFF, 0xAA, 0xBB]; // ~2 GB length prefix
+
+			Assert.Throws<InvalidDataException>(() => new ConanMessageFramer().PushBytes(hostile));
 		}
 
 		[Fact]

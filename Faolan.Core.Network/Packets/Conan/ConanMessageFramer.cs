@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.IO;
 using Faolan.Core.Network.Interfaces;
 
 namespace Faolan.Core.Network.Packets.Conan
@@ -93,11 +94,12 @@ namespace Faolan.Core.Network.Packets.Conan
 					continue;
 				}
 
+				// A length no legitimate frame can have. The stream is desynced at this point - whatever follows is
+				// being read at the wrong offset - so the connection is finished, not just this recv: dropping the rest
+				// of the buffer and carrying on would keep framing garbage off a cursor that is already lost. The
+				// receive loop turns this into a logged disconnect.
 				if (raw > MaxPacketSize)
-				{
-					_frame = null; // hostile length - drop the rest of this recv
-					break;
-				}
+					throw new InvalidDataException($"Frame length {raw} exceeds the {MaxPacketSize}-byte maximum; the stream is desynced.");
 
 				if (raw == 0)
 					continue;
