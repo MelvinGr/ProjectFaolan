@@ -46,24 +46,31 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void ForFreshGuild_ZeroesRenownButStaysByteAligned()
+		public void ForFreshGuild_MatchesTheFreshCreateBlockInFullUpdateForm()
 		{
 			var fresh = GuildRenownBlock.ForFreshGuild();
+			var create = GuildRenownBlock.ForGuildCreate();
 
+			// #335: a fresh guild's full-update IS its create block re-expressed in full-update FORM - same guild
+			// STATE, so every guild-state field matches ForGuildCreate (byte-exact vs the real fresh-guild create
+			// capture), including the two the old code wrongly carried as "hard caps".
+			Assert.Equal(create.List2, fresh.List2);
+			Assert.Equal(create.Group4, fresh.Group4); // [0, 0] - NOT the Sepulchra placeholder's [0, 30,000,000]
+			Assert.Equal(create.Counters64D, fresh.Counters64D); // 0x01A93458 - NOT Sepulchra's 975,000,000
+			Assert.Equal(create.Counters64C, fresh.Counters64C);
 			Assert.All(fresh.RenownCounters, c => Assert.Equal(0ul, c));
-			Assert.All(fresh.Counters64C, c => Assert.Equal(0ul, c));
-			Assert.Equal(GuildRenownBlock.StatSlotIds, fresh.StatIds); // scaffold preserved
-			Assert.Equal(GuildRenownBlock.Length, fresh.Encode().Length); // still 277 bytes -> roster stays aligned
-
-			// #335: a fresh guild carries NONE of the Sepulchra placeholder's feat/city stats - those are all zero.
 			Assert.All(fresh.Group1, v => Assert.Equal(0u, v));
 			Assert.All(fresh.Group3, v => Assert.Equal(0u, v));
 			Assert.All(fresh.Counters64B, v => Assert.Equal(0ul, v));
-			Assert.Equal(0u, fresh.Group4[0]);
-			// ...but the structural constants stay: the create-time feat defaults + the two hard caps.
-			Assert.Equal(new uint[] { 0x410, 0x816, 0xBEA }, fresh.List2);
-			Assert.Equal(30000000u, fresh.Group4[1]);
-			Assert.Equal(975000000ul, fresh.Counters64D);
+
+			// ...and NONE of the Sepulchra placeholder's accumulated per-guild values leak in.
+			Assert.NotEqual(30000000u, fresh.Group4[1]);
+			Assert.NotEqual(975000000ul, fresh.Counters64D);
+
+			// ...while the two FORM fields switch to the full-update shape (create writes Flag 0 + an empty stat list).
+			Assert.Equal((byte)0x01, fresh.Flag);
+			Assert.Equal(GuildRenownBlock.StatSlotIds, fresh.StatIds);
+			Assert.Equal(GuildRenownBlock.Length, fresh.Encode().Length); // still 277 bytes -> roster stays aligned
 		}
 
 		// The create-time block (0x2044 tail) is the same codec, Flag=0 + empty StatIds -> 225 bytes. This reproduces
@@ -81,7 +88,8 @@ namespace Faolan.Tests
 		}
 
 		// The live path builds the block from Guild.Renown: the total lands in RenownCounters[1] (the proven slot),
-		// everything else stays the zeroed fresh-guild scaffold, and the block stays 277 bytes so the roster aligns.
+		// everything else stays the fresh-guild scaffold (== ForFreshGuild), and the block stays 277 bytes so the
+		// roster aligns.
 		[Fact]
 		public void ForRenown_SplicesTheTotalIntoTheProvenSlotAndStaysAligned()
 		{
@@ -89,7 +97,6 @@ namespace Faolan.Tests
 
 			Assert.Equal(54321ul, block.RenownCounters[1]);
 			Assert.Equal(0ul, block.RenownCounters[0]); // only the total slot is set
-			Assert.All(block.Counters64C, c => Assert.Equal(0ul, c));
 			Assert.Equal(GuildRenownBlock.Length, block.Encode().Length);
 		}
 

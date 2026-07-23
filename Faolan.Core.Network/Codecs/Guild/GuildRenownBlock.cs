@@ -148,24 +148,25 @@ namespace Faolan.Core.Network.Codecs.Guild
 			return b;
 		}
 
-		// A brand-new guild's block (#335). A fresh guild has NO accumulated feats, guild CITY, or renown - only the
-		// structural scaffold (the 13 stat-slot ids + the create-time feat-default List2 = 0x410/0x816/0xBEA, which
-		// both the captured create AND full-update blocks carry) and the two hard CAPS the client expects (Group4[1] =
-		// 30,000,000 and Counters64D = 975,000,000, identified as constants, not per-guild values). EVERYTHING else
-		// stays zero. This is built explicitly rather than as "CapturedPlaceholder with a few fields cleared" because
-		// that left the Sepulchra guild's feat/city stats (Group1/Group3/Group4[0]/Counters64B) in place - which is why
-		// a freshly-created guild rendered a guild city + feats it never built. Cosmetic and
-		// in-client unverified for the still-opaque slots, but a fresh guild with them ZERO is unambiguously correct.
+		// A brand-new guild's 0x203F full-update block (#335). A fresh guild's full-update IS its create-time (0x2044)
+		// block re-expressed in the full-update FORM: the SAME CoreGuild layout and the SAME fresh-guild state,
+		// differing only in the two form fields the full update sets (Flag = 1 not 0, and the 13 stat-slot ids
+		// populated rather than the empty create-time list). So we derive it from ForGuildCreate - which is byte-exact
+		// vs the real fresh-guild create capture (GuildCreateRenownBlockTests) - and override only those form fields.
+		// That is what keeps a just-created guild CONSISTENT between its create block and its next full-update (our own
+		// code used to send Counters64D = 0x01A93458 at create then 975,000,000 on the following member-list poll for
+		// the SAME guild), and it is the evidence that the old [Group4[1] = 30,000,000, Counters64D = 975,000,000]
+		// "hard caps" were wrong: a genuine fresh guild (the create capture) has Group4 = [0, 0] and
+		// Counters64D = 0x01A93458, so 30M/975M were the Sepulchra PLACEHOLDER guild's accumulated per-guild values,
+		// not universal caps - carrying them is what made a freshly-created guild render a guild city it never built.
+		// The still-opaque slots stay whatever the fresh-guild create capture has (never another guild's data).
 		public static GuildRenownBlock ForFreshGuild()
 		{
-			return new GuildRenownBlock
-			{
-				Flag = 0x01,
-				BoolA = 1,
-				List2 = [0x410, 0x816, 0xBEA],
-				Group4 = [0, 30000000],
-				Counters64D = 975000000
-			};
+			var b = ForGuildCreate();
+			b.Flag = 0x01; // full-update form (create writes 0)
+			b.BoolA = 1; // full-update form (create writes 0)
+			b.StatIds = (uint[])StatSlotIds.Clone(); // full-update populates the 13 stat-slot ids (create leaves them empty)
+			return b;
 		}
 
 		// The create-time block that closes DispatchGuildCreated (0x2044) - the SAME CoreGuild_c::Read case-1->3
