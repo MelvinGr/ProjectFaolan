@@ -46,11 +46,16 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// 0x2010 DispatchCharacterSearchResult: the character/"who" search result (answer to 0x200A CharacterSearch).
-		// Body is a 0x3F1-framed list of player records; we return an empty list (no character-search index yet).
+		// Grammar decoded byte-exact from the hoxxling login capture (3 records, rebuilt 1:1):
+		//   [u32 (count+1)*0x3F1] { count × record } [u8 0x00]
+		// The trailing [u8 0x00] closes the list (same end-marker shape as DispatchTeamSearchResult's 000003f100). We
+		// keep no character-search index, so we return the empty list - but MUST still emit that trailer, or the client
+		// reads the empty frame then runs off the end (the #408 dropped-trailer failure mode). Empty body = [(0+1)*0x3F1][0].
 		private static Task SendCharacterSearchResult(INetworkClient client, Rpc packet)
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchCharacterSearchResult,
-				body => body.WriteUInt32(GuildService.GuildListMultiplier))); // empty 0x3F1-framed record list
+				body => body.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+					.WriteByte(0x00))); // list end-marker
 		}
 
 		// 0x2039 DispatchGuildRenownHistoryUpdate: the renown-over-time graph in the guild window (answer to 0x2040
