@@ -99,17 +99,15 @@ namespace Faolan.ChatServer
 					if (Configuration.McpEnabled)
 						await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
 
-					await new FaolanStream().WriteUInt32(0x00050000).SendAsync(client);
+					// An empty-bodied 0x0005 beat retail sends here; the method it names isn't recovered yet.
+					await client.SendAsync(ChatServerMessage.Build(0x0005));
 
-					await new FaolanStream()
-						.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
-						.WriteArrayUInt16Length(s => s
-							.WriteUInt32(client.Session.Character.Id)
-							.WriteUInt32(0x00000000)
-							.WriteString(client.Session.Character?.Name?.Length > 0
-								? client.Session.Character.Name
-								: $"Character{client.Session.Character.Id}"))
-						.SendAsync(client);
+					await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s
+						.WriteUInt32(client.Session.Character.Id)
+						.WriteUInt32(0x00000000)
+						.WriteString(client.Session.Character?.Name?.Length > 0
+							? client.Session.Character.Name
+							: $"Character{client.Session.Character.Id}")));
 
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
 					await SendSystemMessage(client, Global.BuildString.Replace("\n", "<br />"));
@@ -193,10 +191,7 @@ namespace Faolan.ChatServer
 						break;
 					}
 
-					await new FaolanStream()
-						.WriteUInt16(ChatServerInterfaceOpcodes.ChatSenderInfo)
-						.WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName))
-						.SendAsync(target);
+					await target.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)));
 
 					await target.SendAsync(BuildWhisper(senderId, message));
 
@@ -206,7 +201,7 @@ namespace Faolan.ChatServer
 				case ChatServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
-					await new FaolanStream().WriteUInt16(ChatServerInterfaceOpcodes.ChatReadyAck).WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray())).SendAsync(client);
+					await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatReadyAck, s => s.WriteArray(packet.Body.ReadRemainingArray())));
 
 					break;
 				}
