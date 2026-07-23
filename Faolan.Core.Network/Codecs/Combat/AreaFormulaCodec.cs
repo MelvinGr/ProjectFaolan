@@ -36,21 +36,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteArrayUInt32Length(body =>
+			s.WriteArrayUInt32Length(b =>
 			{
-				body.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env);
+				b.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env);
 
-				body.WriteUInt32(((uint)Refs.Length + 1) * ListStride);
+				b.WriteUInt32(((uint)Refs.Length + 1) * ListStride);
 				foreach (var (cls, instance) in Refs)
-					body.WriteUInt32(cls).WriteUInt32(instance);
+					b.WriteUInt32(cls).WriteUInt32(instance);
 
-				body.WriteUInt32(FieldA);
+				b.WriteUInt32(FieldA);
 
-				body.WriteUInt32(((uint)Positions.Length + 1) * ListStride);
+				b.WriteUInt32(((uint)Positions.Length + 1) * ListStride);
 				foreach (var p in Positions)
-					body.WriteVector3(p);
+					b.WriteVector3(p);
 
-				body.WriteUInt32(FieldB);
+				b.WriteUInt32(FieldB);
 			});
 		}
 

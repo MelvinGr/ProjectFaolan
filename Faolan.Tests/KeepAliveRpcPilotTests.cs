@@ -25,8 +25,8 @@ namespace Faolan.Tests
 			await KeepAliveService.HandlePing(client);
 
 			// The expected frame: GameAgent -> GameInterface, GameServerStats, body [0x42B32A07][0][0].
-			var expected = PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, Instance),
-				GameInterfaceOpcodes.DispatchGameServerStats, body => body.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
+			var expected = new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, Instance),
+				GameInterfaceOpcodes.DispatchGameServerStats, b => b.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)).Serialize();
 
 			Assert.Equal(expected, client.Sent);
 		}
@@ -39,15 +39,15 @@ namespace Faolan.Tests
 
 			// Stimulus: an inbound LatencyCheck whose body starts with the counter the reply must echo. Parsed straight
 			// into the Rpc the receive path now dispatches on (Gitea #407).
-			var incoming = PacketParser.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance,
+			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance,
 				(ushort)GameCharInterfaceOpcodes.DispatchPong, [], [0x00, 0x00, 0x00, 0x07]));
 
 			await KeepAliveService.HandleLatencyCheck(client, incoming);
 
 			// The tick (3rd body word) is time-based, so assert structure + the deterministic fields, and that the
 			// parser's independent crc recompute accepts the frame.
-			var pong = PacketParser.Parse(client.Sent!);
-			Assert.True(PacketParser.IsCrcValid(client.Sent!));
+			var pong = Rpc.Parse(client.Sent!);
+			Assert.True(Rpc.IsCrcValid(client.Sent!));
 			Assert.Equal(Endpoints.GameCharAgentType, pong.Sender.Type);
 			Assert.Equal(Endpoints.GameCharInterfaceType, pong.Receiver.Type);
 			Assert.Equal(Instance, pong.Receiver.Instance);
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 
 		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] headerData, byte[] body)
 		{
-			return PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body));
+			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body).Serialize();
 		}
 
 		// Minimal INetworkClient that records the last-sent bytes. The default SendAsync(Rpc) on the interface

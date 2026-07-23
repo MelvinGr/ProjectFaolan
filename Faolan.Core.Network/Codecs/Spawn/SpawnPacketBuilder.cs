@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// GENERATION side - see docs/re/player-spawn-generation.md). The body is the 0x2000 sub-content:
 	//   [u32 len][u32 0xFA015807][u32 0x0000C350][u32 handle][u32 fieldA] 0x2C 0x0A <pos> 0x12 <rot> ...
 	// The transform is always the same size, so BuildSpawnBody stays length-preserving; the outer Conan length
-	// + CRC are (re)computed by the serializer (PacketSerializer).
+	// + CRC are (re)computed when the message is serialized (Rpc.Serialize).
 	public static class SpawnPacketBuilder
 	{
 		// Offsets within the FA015807 body, valid for the Strie-shaped beach layout (the burst's player spawn and

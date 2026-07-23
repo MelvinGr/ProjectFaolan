@@ -139,7 +139,7 @@ namespace Faolan.GameServer.Economy
 			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
 
 			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchItemSoldToShop,
-				body => WriteItemSoldBody(body, container, sellerId, slot)));
+				b => WriteItemSoldBody(b, container, sellerId, slot)));
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 
 			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).", character.Name, row.Item.Name, row.Count,

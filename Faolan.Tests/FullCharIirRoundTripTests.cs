@@ -122,7 +122,7 @@ namespace Faolan.Tests
 			{
 				var path = TestPaths.Asset(bin); // committed fixture - must exist (no silent skip)
 
-				var packet = PacketParser.Parse(File.ReadAllBytes(path));
+				var packet = Rpc.Parse(File.ReadAllBytes(path));
 				yield return (bin, packet.BodyReader().ReadArrayUInt32Length());
 			}
 

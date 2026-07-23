@@ -130,7 +130,7 @@ namespace Faolan.CSPlayerAgent
 				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
 				// taken verbatim from the capture (Dahviie, same-guild reply).
 				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateMember,
-					body => body.WriteUInt32(targetId)
+					b => b.WriteUInt32(targetId)
 						.WriteUInt32(Guild.WireType)
 						.WriteUInt32(targetGuildId)
 						.WriteByte(0x03)
@@ -148,7 +148,7 @@ namespace Faolan.CSPlayerAgent
 			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
 			// is a server-wide constant rather than guild data.
 			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateOther,
-				body => body.WriteUInt32(targetId)
+				b => b.WriteUInt32(targetId)
 					.WriteUInt32(Guild.WireType)
 					.WriteUInt32(targetGuildId)
 					.WriteByte(0x03)
@@ -409,7 +409,7 @@ namespace Faolan.CSPlayerAgent
 		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
 		private static async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
 		{
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged, body => body.WriteString(motd)));
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged, b => b.WriteString(motd)));
 		}
 
 		private void WriteGuildMemberRecord(FaolanStream s, Character member)

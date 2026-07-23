@@ -191,7 +191,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(TradeskillRecipeCodec.BuildReplyIir(handle, records))));
+				b => b.WriteArrayUInt32Length(TradeskillRecipeCodec.BuildReplyIir(handle, records))));
 
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
 		}
@@ -228,7 +228,7 @@ namespace Faolan.GameServer
 		{
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchUpdateCash,
-				body => UpdateCashBody.WriteUpdateCashBody(body, balanceTin, reason)));
+				b => UpdateCashBody.WriteUpdateCashBody(b, balanceTin, reason)));
 
 			Logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
 		}
@@ -356,7 +356,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchAddItem,
-				body => AddItemBody.WriteAddItemBody(body, containerType, charId, itemPos, AddItemBody.SerializeInventoryEntry(entry), feedback)));
+				b => AddItemBody.WriteAddItemBody(b, containerType, charId, itemPos, AddItemBody.SerializeInventoryEntry(entry), feedback)));
 		}
 
 		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value], 		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
@@ -385,7 +385,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchRemoveItem,
-				body => RemoveItemBody.WriteRemoveItemBody(body, containerType, charId, itemPos, amountToRemove)));
+				b => RemoveItemBody.WriteRemoveItemBody(b, containerType, charId, itemPos, amountToRemove)));
 		}
 
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
@@ -401,7 +401,7 @@ namespace Faolan.GameServer
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots,
-				body => ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(body, deathPosition, spots)));
+				b => ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(b, deathPosition, spots)));
 		}
 
 		// Pushes the character's own vitals from its persisted MaxStats (or class/level defaults if a legacy

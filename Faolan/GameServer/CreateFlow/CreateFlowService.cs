@@ -748,7 +748,7 @@ namespace Faolan.GameServer.CreateFlow
 
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArray(0x00, 0x00, 0x1F, 0x8E, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
+				b => b.WriteArray(0x00, 0x00, 0x1F, 0x8E, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x44, 0x28, 0x81, 0x06, 0x32, 0x0E, 0x0A, 0x07, 0x08, 0x65, 0x10)
 					.WriteVarint(id)
@@ -843,7 +843,7 @@ namespace Faolan.GameServer.CreateFlow
 
 			// MagicBuff carries the instance twice (caster + target).
 			await client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(s => s
+				b => b.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
 					.WriteArray(0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
@@ -896,7 +896,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			return client.SendAsync(new Rpc(RetailCreateEditorPostReadyAckSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteUInt32(EntityClass.Character)
+				b => b.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(requestId)
 					.WriteUInt32(requestId == 0x0009FF95
 						? 0x00000000u
@@ -1022,7 +1022,7 @@ namespace Faolan.GameServer.CreateFlow
 		private static Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
 			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(s =>
+				b => b.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR);
 					s.WriteUInt32(EntityClass.Character);
@@ -1048,7 +1048,7 @@ namespace Faolan.GameServer.CreateFlow
 		private static Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
 			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(s =>
+				b => b.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(subOpcode);
 					s.WriteUInt32(EntityClass.Character);
@@ -1099,7 +1099,7 @@ namespace Faolan.GameServer.CreateFlow
 				: 0xBCF5C28Fu;
 
 			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(s =>
+				b => b.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000Opcodes.SetMorphValueIIR);
 					s.WriteUInt32(EntityClass.Character);

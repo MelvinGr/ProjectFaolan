@@ -28,7 +28,7 @@ namespace Faolan.Core.Network
 		// routes through the byte[] send.
 		Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
-			return SendAsync(PacketSerializer.Serialize(rpc), cancellationToken);
+			return SendAsync(rpc.Serialize(), cancellationToken);
 		}
 
 		// The chat tier's send boundary, the same shape one tier down: a handler builds a ChatServerMessage and hands it
@@ -84,7 +84,7 @@ namespace Faolan.Core.Network
 		protected abstract string ProtocolName { get; }
 
 		// Turn one completed wire frame into the listener's dispatch. Packet subclass: factory.Create + IsValid gate;
-		// Rpc subclass: PacketParser.Parse.
+		// Rpc subclass: Rpc.Parse.
 		protected abstract Task DispatchFrame(byte[] frame);
 
 		// The byte[] send path: trace the frame (the tracer decodes it), then put it on the wire. Used by the chat
@@ -100,9 +100,9 @@ namespace Faolan.Core.Network
 		// re-parse), then put it on the wire.
 		public virtual Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
-			var bytes = PacketSerializer.Serialize(rpc);
+			var bytes = rpc.Serialize();
 			// Stamp the wire size the serializer just determined, so the trace reads the whole line off the message -
-			// exactly as it does for an inbound frame, which PacketParser stamped.
+			// exactly as it does for an inbound frame, which Rpc.Parse stamped.
 			_tracer.Transmitted(rpc with { FrameLength = bytes.Length });
 			return SendRawAsync(bytes, cancellationToken);
 		}
@@ -256,7 +256,7 @@ namespace Faolan.Core.Network
 	}
 
 	// The Rpc-dispatching client (Gitea #406/#407): parses each frame straight into the structured Rpc via
-	// PacketParser - no per-frame Packet object - and hands it to the listener. Used by every Conan protocol listener.
+	// Rpc.Parse - no per-frame packet object - and hands it to the listener. Used by every Conan protocol listener.
 	public sealed class RpcNetworkClient<TMessageFramer> : NetworkClient
 		where TMessageFramer : IMessageFramer, new()
 	{
@@ -270,12 +270,12 @@ namespace Faolan.Core.Network
 
 		protected override async Task DispatchFrame(byte[] frame)
 		{
-			// PacketParser.Parse is the SOLE inbound parse (Gitea #406/#407) - straight to the structured Rpc, no
+			// Rpc.Parse is the SOLE inbound parse (Gitea #406/#407) - straight to the structured Rpc, no
 			// ConanPacket. It stamps Rpc.FrameLength with the total wire size. (The old ConanPacket path threw on a bad
 			// CRC; a corrupt frame now surfaces when a handler reads a field off it, which the dispatch try/catch turns
 			// into the same client.Stop().)
 			if (ReceivedRpc != null)
-				await ReceivedRpc(this, PacketParser.Parse(frame));
+				await ReceivedRpc(this, Rpc.Parse(frame));
 		}
 	}
 

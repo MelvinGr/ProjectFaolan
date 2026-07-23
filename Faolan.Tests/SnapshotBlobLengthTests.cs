@@ -135,7 +135,7 @@ namespace Faolan.Tests
 
 		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)
 		{
-			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
+			var packet = Rpc.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
 			var s = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			s.ReadUInt32();
 			s.ReadUInt32();
@@ -147,7 +147,7 @@ namespace Faolan.Tests
 		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).
 		private static (byte[] Prefix, int RootLen, byte[] SubClass, uint Instance, byte[] Root) SplitFull(string bin)
 		{
-			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
+			var packet = Rpc.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
 			var s = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			s.ReadUInt32();
 			s.ReadUInt32();

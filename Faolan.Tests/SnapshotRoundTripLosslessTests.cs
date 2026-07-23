@@ -49,7 +49,7 @@ namespace Faolan.Tests
 
 		private static byte[] SplitRoot(string bin)
 		{
-			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
+			var packet = Rpc.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
 			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();

@@ -109,7 +109,7 @@ namespace Faolan.Tests
 
 			byte[] SubClass(string file)
 			{
-				var packet = PacketParser.Parse(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
+				var packet = Rpc.Parse(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
 				var s = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 				s.ReadUInt32();
 				s.ReadUInt32();
@@ -120,7 +120,7 @@ namespace Faolan.Tests
 
 		private static (byte[] Prefix, byte[] Root, byte[] SubClass) SplitBeach()
 		{
-			var packet = PacketParser.Parse(File.ReadAllBytes(Cap));
+			var packet = Rpc.Parse(File.ReadAllBytes(Cap));
 			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();

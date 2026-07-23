@@ -70,7 +70,7 @@ namespace Faolan.GameServer
 			entity.OwnerHandle = owner;
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
+				b => b.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
 					? PetIirCodec.CombatKind
 					: PetIirCodec.SocialKind))));
 
@@ -226,7 +226,7 @@ namespace Faolan.GameServer
 
 			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []))));
+				b => b.WriteArrayUInt32Length(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []))));
 		}
 
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
@@ -335,7 +335,7 @@ namespace Faolan.GameServer
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType),
 				GameCharInterfaceProjectOpcodes.DispatchUpdateSprintBar,
-				body => body.WriteUInt32(energy).WriteByte(0x01)));
+				b => b.WriteUInt32(energy).WriteByte(0x01)));
 		}
 
 		private void TrackSprintEnergy(INetworkClient client, bool sprinting)

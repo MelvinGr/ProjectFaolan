@@ -1781,7 +1781,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteUInt32(targetType)
+				b => b.WriteUInt32(targetType)
 					.WriteUInt32(targetInstance)
 					.WriteUInt32(category))); // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
 

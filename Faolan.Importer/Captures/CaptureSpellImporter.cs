@@ -416,7 +416,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				return PacketParser.Parse(packetBytes).Opcode == AddShortcutOpcode;
+				return Rpc.Parse(packetBytes).Opcode == AddShortcutOpcode;
 			}
 			catch
 			{
@@ -442,7 +442,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = PacketParser.Parse(packetBytes);
+				var packet = Rpc.Parse(packetBytes);
 				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
 					return;
 
@@ -469,7 +469,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = PacketParser.Parse(packetBytes);
+				var packet = Rpc.Parse(packetBytes);
 				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
 					return;
 
@@ -516,7 +516,7 @@ namespace Faolan.Importer.Captures
 			instance = 0;
 			try
 			{
-				var packet = PacketParser.Parse(packetBytes);
+				var packet = Rpc.Parse(packetBytes);
 				instance = packet.Receiver.Instance;
 				return instance != 0;
 			}
@@ -530,7 +530,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = PacketParser.Parse(packetBytes);
+				var packet = Rpc.Parse(packetBytes);
 				if (packet.Opcode != 0x2000)
 					return;
 

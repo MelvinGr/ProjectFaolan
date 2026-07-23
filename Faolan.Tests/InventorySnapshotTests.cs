@@ -28,7 +28,7 @@ namespace Faolan.Tests
 				return;
 
 			var original = File.ReadAllBytes(BurstInventoryPath);
-			var packet = PacketParser.Parse(original);
+			var packet = Rpc.Parse(original);
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xFF, 0xBD, 0xD9, 0x10];
 
-			var produced = PacketSerializer.Serialize(new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
+			var produced = new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 				s.WriteArray(parts.Prefix);
 				s.WriteArray(parts.Root.ToProtobuf());
 				s.WriteArray(parts.SubClass.ToArray());
-			})));
+			})).Serialize();
 
 			var firstDiff = -1;
 			for (var i = 0; i < Math.Min(original.Length, produced.Length); i++)
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 			if (!File.Exists(BurstInventoryPath))
 				return;
 
-			var packet = PacketParser.Parse(File.ReadAllBytes(BurstInventoryPath));
+			var packet = Rpc.Parse(File.ReadAllBytes(BurstInventoryPath));
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
@@ -123,7 +123,7 @@ namespace Faolan.Tests
 			var crc = Crc32.Calculate(substituted[8..]);
 			BinaryPrimitives.WriteUInt32BigEndian(substituted.AsSpan(4, 4), crc);
 
-			var packet = PacketParser.Parse(substituted);
+			var packet = Rpc.Parse(substituted);
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
@@ -133,7 +133,7 @@ namespace Faolan.Tests
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, .. EncodeVarint(newInstance)];
 
-			var produced = PacketSerializer.Serialize(new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
+			var produced = new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);
@@ -141,7 +141,7 @@ namespace Faolan.Tests
 				s.WriteArray(parts.Prefix);
 				s.WriteArray(parts.Root.ToProtobuf());
 				s.WriteArray(parts.SubClass.ToArray());
-			})));
+			})).Serialize();
 
 			var firstDiff = -1;
 			for (var i = 0; i < Math.Min(substituted.Length, produced.Length); i++)
@@ -166,7 +166,7 @@ namespace Faolan.Tests
 			if (!File.Exists(BigboyPath))
 				return; // capture not present in this checkout
 
-			var packet = PacketParser.Parse(File.ReadAllBytes(BigboyPath));
+			var packet = Rpc.Parse(File.ReadAllBytes(BigboyPath));
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 
 			var subOpcode = body.ReadUInt32();

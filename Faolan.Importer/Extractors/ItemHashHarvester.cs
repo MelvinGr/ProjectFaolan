@@ -164,7 +164,7 @@ namespace Faolan.Importer.Extractors
 		// [u32 feedback]; the entry is a bare ProtoInventoryGameEntry (no Pos wrapper).
 		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType>? types)
 		{
-			var packet = PacketParser.Parse(packetBytes);
+			var packet = Rpc.Parse(packetBytes);
 			if (packet.Opcode != 0x2020)
 				return;
 
@@ -195,7 +195,7 @@ namespace Faolan.Importer.Extractors
 		// items become buildable too. Identity only - the bank holds every kind in one container, so no type stamp.
 		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = PacketParser.Parse(packetBytes);
+			var packet = Rpc.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return;
 
@@ -228,7 +228,7 @@ namespace Faolan.Importer.Extractors
 		// (4×u32 big-endian = the Data quad). Hash is not carried here, so it stays 0 (the item redeems via live add).
 		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = PacketParser.Parse(packetBytes);
+			var packet = Rpc.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return;
 
@@ -259,7 +259,7 @@ namespace Faolan.Importer.Extractors
 		// (quest keys legitimately have none), so the item still lands in the DB even though it won't render in a snapshot.
 		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = PacketParser.Parse(packetBytes);
+			var packet = Rpc.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return;
 
@@ -287,7 +287,7 @@ namespace Faolan.Importer.Extractors
 		// body either throws (caught by the caller) or yields attachments with no real identity, which we skip.
 		private static void ExtractFromMail(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = PacketParser.Parse(packetBytes);
+			var packet = Rpc.Parse(packetBytes);
 			if (packet.Opcode != 0x2002)
 				return;
 
@@ -391,7 +391,7 @@ namespace Faolan.Importer.Extractors
 		{
 			root = null!;
 
-			var packet = PacketParser.Parse(packetBytes);
+			var packet = Rpc.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return false;
 

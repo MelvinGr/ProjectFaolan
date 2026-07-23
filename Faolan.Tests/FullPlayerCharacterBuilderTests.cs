@@ -191,7 +191,7 @@ namespace Faolan.Tests
 			if (!File.Exists(bigboy))
 				return;
 
-			var packet = PacketParser.Parse(File.ReadAllBytes(bigboy));
+			var packet = Rpc.Parse(File.ReadAllBytes(bigboy));
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();

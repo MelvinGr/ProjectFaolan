@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteArrayUInt32Length(body => body.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag));
+			s.WriteArrayUInt32Length(b => b.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteUInt32(Threat).WriteByte(Flag));
 		}
 
 		public static byte[] Build(uint handle, uint threat, byte flag, byte env = 0x00)

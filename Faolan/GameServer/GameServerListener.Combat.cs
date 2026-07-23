@@ -32,28 +32,28 @@ namespace Faolan.GameServer
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(WorldDeath.BuildDeathBcc(dyingHandle))));
+				b => b.WriteArrayUInt32Length(WorldDeath.BuildDeathBcc(dyingHandle))));
 		}
 
 		Task IWorldOutbound.SendDeathEffect(INetworkClient client, uint dyingHandle)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(WorldDeath.BuildDeathEffect(dyingHandle))));
+				b => b.WriteArrayUInt32Length(WorldDeath.BuildDeathEffect(dyingHandle))));
 		}
 
 		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(WorldDeath.BuildDeathPose(dyingHandle, deathPosition))));
+				b => b.WriteArrayUInt32Length(WorldDeath.BuildDeathPose(dyingHandle, deathPosition))));
 		}
 
 		Task IWorldOutbound.SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint))));
+				b => b.WriteArrayUInt32Length(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint))));
 		}
 
 		Task IWorldOutbound.SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
@@ -71,7 +71,7 @@ namespace Faolan.GameServer
 			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(WorldDeath.BuildRevive(handle, respawnPointId))));
+				b => b.WriteArrayUInt32Length(WorldDeath.BuildRevive(handle, respawnPointId))));
 		}
 
 		Task IWorldOutbound.SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ)
@@ -80,7 +80,7 @@ namespace Faolan.GameServer
 			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(TeleportCodec.BuildReviveDestination(handle, mapId, handle, position, facingX, facingZ))));
+				b => b.WriteArrayUInt32Length(TeleportCodec.BuildReviveDestination(handle, mapId, handle, position, facingX, facingZ))));
 		}
 
 		Task IWorldOutbound.SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)
@@ -89,7 +89,7 @@ namespace Faolan.GameServer
 			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(TeleportCodec.BuildReviveTeleport(handle, mapId, handle, playfieldToken))));
+				b => b.WriteArrayUInt32Length(TeleportCodec.BuildReviveTeleport(handle, mapId, handle, playfieldToken))));
 		}
 
 		Task IWorldOutbound.SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)

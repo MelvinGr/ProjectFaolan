@@ -42,7 +42,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.AuthStatus = body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.InitAuth, body => body.WriteUInt32(client.Session.Account.AuthStatus)));
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.InitAuth, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
 
 					break;
 				}
@@ -78,7 +78,7 @@ namespace Faolan.PlayerAgent
 					await SendCharacterList(client, packet.Sender);
 					await SendRealmList(client, packet.Sender);
 
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.SendCharacterRealmData, body => body.WriteUInt32(1)));
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.SendCharacterRealmData, b => b.WriteUInt32(1)));
 
 					break;
 				}
@@ -86,7 +86,7 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentOpcodes.LoadFacebookToken:
 				{
 					// headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.Ox209C, body => body.WriteUInt16(0).WriteByte(0)));
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.Ox209C, b => b.WriteUInt16(0).WriteByte(0)));
 
 					break;
 				}

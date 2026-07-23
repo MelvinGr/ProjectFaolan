@@ -65,7 +65,7 @@ namespace Faolan.Tests
 
 		private static (byte[] Root, byte[] SubClass) SplitBeach()
 		{
-			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset("strie-login-inventory.bin")));
+			var packet = Rpc.Parse(File.ReadAllBytes(TestPaths.Asset("strie-login-inventory.bin")));
 			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();

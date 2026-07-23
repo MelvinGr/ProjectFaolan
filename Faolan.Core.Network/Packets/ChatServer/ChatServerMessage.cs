@@ -39,7 +39,7 @@ namespace Faolan.Core.Network.Packets.ChatServer
 		{
 		}
 
-		// Frame -> message. Lenient like PacketParser.Parse: a body shorter than its declared length is taken as-is
+		// Frame -> message. Lenient like Rpc.Parse: a body shorter than its declared length is taken as-is
 		// rather than throwing, so a malformed frame surfaces where a handler reads a field off it (and the dispatch
 		// try/catch turns that into a disconnect) instead of at two different layers. The framer only ever emits
 		// complete frames, so this clamp is a backstop, not the normal path.

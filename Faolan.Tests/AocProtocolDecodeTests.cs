@@ -34,7 +34,7 @@ namespace Faolan.Tests
 				return;
 
 			// 1) Pull the real captured Slave Manacles equipped entry bytes (an InventoryGame list entry).
-			var packet = PacketParser.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
+			var packet = Rpc.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
@@ -90,7 +90,7 @@ namespace Faolan.Tests
 			if (!File.Exists(InventoryCapture))
 				return;
 
-			var packet = PacketParser.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
+			var packet = Rpc.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();

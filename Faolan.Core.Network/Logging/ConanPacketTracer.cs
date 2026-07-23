@@ -54,7 +54,7 @@ namespace Faolan.Core.Network.Logging
 		// costs nothing on the hot path.
 		protected override void RenderTransmitted(byte[] frame)
 		{
-			RenderTransmitted(PacketParser.Parse(frame));
+			RenderTransmitted(Rpc.Parse(frame));
 		}
 
 		protected override void RenderTransmitted(in Rpc rpc)

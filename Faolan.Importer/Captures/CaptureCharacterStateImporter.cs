@@ -39,7 +39,7 @@ namespace Faolan.Importer.Captures
 				Rpc packet;
 				try
 				{
-					packet = PacketParser.Parse(p.Bytes);
+					packet = Rpc.Parse(p.Bytes);
 				}
 				catch
 				{

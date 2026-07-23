@@ -248,7 +248,7 @@ namespace Faolan.GameServer.World
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchCloseLootBag,
-				body => body.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
+				b => b.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
 			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
 			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
 			await SendWorldIir(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
@@ -976,7 +976,7 @@ namespace Faolan.GameServer.World
 			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchOpenLootBag,
-				body => body.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
+				b => b.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
 
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 			return true;
@@ -1973,7 +1973,7 @@ namespace Faolan.GameServer.World
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
-				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle).WriteByte(state)));
+				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle).WriteByte(state)));
 		}
 
 		// #363 pushes a SetNameIIR (0xADCE0CDA) to `recipient` overriding entity `handle`'s floating nameplate with

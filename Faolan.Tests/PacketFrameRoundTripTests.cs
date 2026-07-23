@@ -10,7 +10,7 @@ namespace Faolan.Tests
 {
 	// GUARDRAIL for the structured-packet-pipeline epic (Gitea #406). Locks the wire frame contract -
 	// [u32 length][u32 crc32][u32 headerLen][sender endpoint][receiver endpoint][u16 opcode][headerData][body] - by
-	// proving the serializer (PacketSerializer.Serialize) and the parser (PacketParser) are mutual
+	// proving the serializer (Rpc.Serialize) and the parser (Rpc.Parse) are mutual
 	// inverses, cross-checked by the parser's INDEPENDENT crc recompute (IsValid). A rewrite that changes a single
 	// frame byte fails here rather than silently on the wire.
 	public class PacketFrameRoundTripTests
@@ -33,9 +33,9 @@ namespace Faolan.Tests
 			var frame = BuildFrame(senderType, senderInstance, receiverType, receiverInstance, opcode, headerData, body);
 
 			// Parse it back with the INBOUND parser and assert every field survives, including the CRC (recomputed
-			// independently by PacketParser.IsCrcValid) - so this is not a build-echoes-itself tautology.
-			var parsed = PacketParser.Parse(frame);
-			Assert.True(PacketParser.IsCrcValid(frame), "crc32 written by the builder must validate under the parser's independent recompute");
+			// independently by Rpc.IsCrcValid) - so this is not a build-echoes-itself tautology.
+			var parsed = Rpc.Parse(frame);
+			Assert.True(Rpc.IsCrcValid(frame), "crc32 written by the builder must validate under the parser's independent recompute");
 			Assert.Equal(frame.Length, parsed.FrameLength);
 			Assert.Equal(senderType, parsed.Sender.Type);
 			Assert.Equal(senderInstance, parsed.Sender.Instance);
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 
 			// Re-serialize from the parsed fields and assert byte-for-byte equality with the original frame - the
 			// Serialize(Parse(bytes)) == bytes oracle.
-			Assert.Equal(frame, PacketSerializer.Serialize(parsed));
+			Assert.Equal(frame, parsed.Serialize());
 		}
 
 		// Endpoints.EndpointFromBytes must reconstruct a ProtoEndpoint that re-serializes to the EXACT input bytes, so
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 		// Builds a whole wire frame through the production serializer.
 		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] headerData, byte[] body)
 		{
-			return PacketSerializer.Serialize(new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body));
+			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body).Serialize();
 		}
 	}
 }

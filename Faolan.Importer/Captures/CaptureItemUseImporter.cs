@@ -101,7 +101,7 @@ namespace Faolan.Importer.Captures
 			body = [];
 			try
 			{
-				var packet = PacketParser.Parse(packetBytes);
+				var packet = Rpc.Parse(packetBytes);
 				if (packet.Opcode != 0x2000)
 					return false;
 

@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Packets.Conan
 
 		// The u32 big-endian LENGTH PREFIX every frame opens with - not the Conan header, which is 12 bytes
 		// ([u32 length][u32 crc32][u32 headerLen]) and is none of this class's business. The prefix counts everything
-		// AFTER itself (PacketSerializer writes it that way), so a whole frame is this + that count.
+		// AFTER itself (Rpc.Serialize writes it that way), so a whole frame is this + that count.
 		private const int LengthPrefixSize = sizeof(uint);
 		private const int MaxPacketSize = 16 * 1024 * 1024;
 

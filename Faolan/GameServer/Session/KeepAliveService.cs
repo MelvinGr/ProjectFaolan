@@ -34,7 +34,7 @@ namespace Faolan.GameServer.Session
 
 			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchPong, new byte[] { 0x01 },
-				body => body.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
+				b => b.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
 		}
 
 		// Ping (0x2005, empty): reply on GameAgent with GameServerStats. Body = [float][0][0]; retail's leading
@@ -44,7 +44,7 @@ namespace Faolan.GameServer.Session
 		{
 			return client.SendAsync(new Rpc(PingSender, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchGameServerStats,
-				body => body.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
+				b => b.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
 		}
 	}
 }

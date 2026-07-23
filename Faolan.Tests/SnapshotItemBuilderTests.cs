@@ -41,7 +41,7 @@ namespace Faolan.Tests
 				return;
 
 			// 1) Extract the captured Slave Manacles entry bytes.
-			var packet = PacketParser.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
+			var packet = Rpc.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
@@ -110,7 +110,7 @@ namespace Faolan.Tests
 				Assert.NotEqual(0u, item!.Hash);
 				var hash = item.Hash;
 
-				var packet = PacketParser.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
+				var packet = Rpc.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
 				var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 				body.ReadUInt32();
 				body.ReadUInt32();

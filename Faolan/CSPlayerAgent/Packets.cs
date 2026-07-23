@@ -53,7 +53,7 @@ namespace Faolan.CSPlayerAgent
 		private static Task SendCharacterSearchResult(INetworkClient client, Rpc packet)
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchCharacterSearchResult,
-				body => body.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				b => b.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
 					.WriteByte(0x00))); // list end-marker
 		}
 
@@ -82,7 +82,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn,
 				(byte[]) [0x01],
-				body => body.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
+				b => b.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
 					.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
 					.WriteUInt32(1))); // trailing guildCount+1 (= 1 for the empty board) - the field the client read past
 		}
@@ -94,7 +94,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn,
 				(byte[]) [0x01],
-				body => body.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				b => b.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
 					.WriteUInt32(0))); // trailer
 		}
 
@@ -104,7 +104,7 @@ namespace Faolan.CSPlayerAgent
 		private static Task SendTeamSearchResult(INetworkClient client, Rpc packet)
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchTeamSearchResult,
-				body => body.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				b => b.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
 					.WriteByte(0x00))); // list trailer
 		}
 	}

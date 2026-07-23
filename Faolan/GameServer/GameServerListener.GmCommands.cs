@@ -325,7 +325,7 @@ namespace Faolan.GameServer
 			{
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 					GameInterfaceOpcodes.DispatchPassBlob,
-					body => body.WriteArrayUInt32Length(PetIirCodec.BuildRemove(owner, petHandle))));
+					b => b.WriteArrayUInt32Length(PetIirCodec.BuildRemove(owner, petHandle))));
 
 				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
 				Logger.LogInformation(removed != null

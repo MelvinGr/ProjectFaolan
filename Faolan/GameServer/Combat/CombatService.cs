@@ -232,7 +232,7 @@ namespace Faolan.GameServer.Combat
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(s => s
+				b => b.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(instance)

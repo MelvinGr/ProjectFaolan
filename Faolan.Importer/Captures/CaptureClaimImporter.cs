@@ -27,7 +27,7 @@ namespace Faolan.Importer.Captures
 				byte[] payload;
 				try
 				{
-					var packet = PacketParser.Parse(bytes);
+					var packet = Rpc.Parse(bytes);
 					if (packet.Opcode != 0x2000)
 						continue;
 

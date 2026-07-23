@@ -270,7 +270,7 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(s => s
+				b => b.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(client.Session.Character.Id)
@@ -281,7 +281,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
-				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteByte(0)));
+				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteByte(0)));
 
 			// Retail sends 0x2024 ReadyForPlayScreen right after the spawn handshake (0x2076) - the "leave the
 			// loading screen and enter the world" signal. We were sending the manifest but never this, so the client
@@ -343,7 +343,7 @@ namespace Faolan.GameServer
 			// record 0: 0x00002000, 17-byte body
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50).WriteUInt32(instance).WriteArray(0x00)));
+				b => b.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50).WriteUInt32(instance).WriteArray(0x00)));
 
 			// record 1: 0x0000200C, 1-byte body
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
@@ -379,7 +379,7 @@ namespace Faolan.GameServer
 			{
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
 					GameInterfaceOpcodes.DispatchPassBlob,
-					body => body.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
+					b => b.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
 						.WriteUInt32(instance)
 						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)));
 
@@ -930,7 +930,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
-				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));
+				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));
 		}
 
 		// The single existing-character WORLD ENTRY used by both login and the teleport GM command: send the 0x201c
@@ -970,7 +970,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client),
 				GameInterfaceOpcodes.DispatchRedirectToServer,
-				body => body.WriteByte(0x00).WriteStringByteLength(address)));
+				b => b.WriteByte(0x00).WriteStringByteLength(address)));
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}
@@ -1061,7 +1061,7 @@ namespace Faolan.GameServer
 		private static Task Send0X201CEntry(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, uint prefix, uint state, uint ticket)
 		{
 			return client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchSetItemStat,
-				body => body.WriteUInt32(prefix)
+				b => b.WriteUInt32(prefix)
 					.WriteUInt32(client.Session.Character.Id)
 					.WriteUInt32(state)
 					.WriteUInt32(0x00000017)

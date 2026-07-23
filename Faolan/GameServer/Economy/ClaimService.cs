@@ -195,7 +195,7 @@ namespace Faolan.GameServer.Economy
 
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))));
+				b => b.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))));
 
 			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
 			// so a re-entry this session doesn't re-glow).
@@ -215,7 +215,7 @@ namespace Faolan.GameServer.Economy
 
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))));
+				b => b.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))));
 		}
 
 		// The sub-0x05 refresh for a multi-charge claim: echo the redeemed row (at its 1-based list index) with its new
@@ -230,7 +230,7 @@ namespace Faolan.GameServer.Economy
 
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
+				b => b.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
 		}
 
 		// Map DB rows to wire entries: assign 1-based indices in Id order and, per row, emit the item's real TEA key

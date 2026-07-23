@@ -212,7 +212,7 @@ namespace Faolan.Core.Network
 		protected abstract Task ReceivedPacket(INetworkClient client, ChatServerMessage packet);
 	}
 
-	// The structured-Rpc listener (every Conan protocol tier): each frame is parsed straight to an Rpc (PacketParser)
+	// The structured-Rpc listener (every Conan protocol tier): each frame is parsed straight to an Rpc (Rpc.Parse)
 	// and dispatched - no per-frame Packet object, no ConanPacket (Gitea #406/#407).
 	public abstract class RpcServer<TMessageFramer> : ServerBase
 		where TMessageFramer : IMessageFramer, new()

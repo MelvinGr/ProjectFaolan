@@ -18,7 +18,7 @@ namespace Faolan.UniverseAgent
 		private Task SendPlayerAgentRealm(INetworkClient client, ProtoEndpoint receiver)
 		{
 			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceOpcodes.DispatchAckAuthenticate,
-				body => body.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
+				b => b.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
 					.WriteUInt64(0x0000271200000000u + client.Session.Account.Id)
 					.WriteString($"{Configuration.ServerIpAddress}:{Configuration.PlayerAgentPort}")
 					.WriteUInt32(client.Session.Account.Id)
@@ -28,20 +28,20 @@ namespace Faolan.UniverseAgent
 		private static Task InitAuth(INetworkClient client)
 		{
 			return client.SendAsync(new Rpc(Sender, AuthChallengeReceiver, UniverseInterfaceOpcodes.DispatchChallenge,
-				body => body.WriteString(client.Session.Account.AuthChallenge!)));
+				b => b.WriteString(client.Session.Account.AuthChallenge!)));
 		}
 
 		private static Task SendInvalidLogin(INetworkClient client, ProtoEndpoint receiver, InvalidLoginReasons reason)
 		{
 			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceOpcodes.DispatchAckAuthenticate,
-				body => body.WriteArray(0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+				b => b.WriteArray(0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 					.WriteByte(reason)));
 		}
 
 		private static Task SetRegionState(INetworkClient client, ProtoEndpoint receiver)
 		{
 			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceOpcodes.DispatchSetRegionState,
-				body => body.WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)));
+				b => b.WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)));
 		}
 	}
 }

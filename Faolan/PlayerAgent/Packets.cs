@@ -106,7 +106,7 @@ namespace Faolan.PlayerAgent
 			var realm = await ResolveActiveRealm(client);
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
 				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02],
-				body => body.WriteUInt32(realm.IpAddressLong)
+				b => b.WriteUInt32(realm.IpAddressLong)
 					.WriteUInt16(realm.ChatServerPort)
 					.WriteUInt32(client.Session.Account.Id)
 					.WriteUInt32(0x0000c350)
@@ -118,7 +118,7 @@ namespace Faolan.PlayerAgent
 			var realm = await ResolveActiveRealm(client);
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
 				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05],
-				body => body.WriteUInt32(realm.IpAddressLong)
+				b => b.WriteUInt32(realm.IpAddressLong)
 					.WriteUInt16(realm.CsPlayerAgentPort)
 					.WriteUInt32(client.Session.Account.Id)
 					.WriteUInt32(0x0000c350)
@@ -130,7 +130,7 @@ namespace Faolan.PlayerAgent
 			var realm = await ResolveActiveRealm(client);
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
 				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D],
-				body => body.WriteString($"{realm.IpAddress}:{realm.Port}")
+				b => b.WriteString($"{realm.IpAddress}:{realm.Port}")
 					.WriteUInt32(client.Session.Account.Id)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(client.Session.Character.Id)
@@ -143,24 +143,24 @@ namespace Faolan.PlayerAgent
 		{
 			var realms = await Database.GetRealms();
 
-			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SendRealmList, body =>
+			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SendRealmList, b =>
 			{
-				body.WriteUInt32(realms.Length);
+				b.WriteUInt32(realms.Length);
 				foreach (var realm in realms)
 				{
-					body.WriteUInt32(realm.Id);
-					body.WriteUInt32(realm.OnlineStatus);
-					body.WriteString(realm.Name);
-					body.WriteUInt32(0x00000001); //u2
-					body.WriteUInt32(0x00000000); //u3
-					body.WriteUInt32(0x00000000); //u4
-					body.WriteUInt32(realm.LoadStatus == RealmLoadStatus.Full);
-					body.WriteUInt32(realm.LoadStatus);
-					body.WriteUInt16(0x0000);
-					body.WriteByte(0x00);
-					body.WriteUInt16(realm.Type);
-					body.WriteUInt32(realm.Country);
-					body.WriteByte(0x00);
+					b.WriteUInt32(realm.Id);
+					b.WriteUInt32(realm.OnlineStatus);
+					b.WriteString(realm.Name);
+					b.WriteUInt32(0x00000001); //u2
+					b.WriteUInt32(0x00000000); //u3
+					b.WriteUInt32(0x00000000); //u4
+					b.WriteUInt32(realm.LoadStatus == RealmLoadStatus.Full);
+					b.WriteUInt32(realm.LoadStatus);
+					b.WriteUInt16(0x0000);
+					b.WriteByte(0x00);
+					b.WriteUInt16(realm.Type);
+					b.WriteUInt32(realm.Country);
+					b.WriteByte(0x00);
 				}
 			}));
 		}
@@ -174,13 +174,13 @@ namespace Faolan.PlayerAgent
 		{
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SmallCharList, (byte[])[0x94, 0xa7, 0x60], body =>
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SmallCharList, (byte[])[0x94, 0xa7, 0x60], b =>
 			{
-				body.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
+				b.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 				foreach (var character in characters)
 				{
-					body.WriteUInt32(character.Id);
-					body.WriteString(character.AuthChallenge!);
+					b.WriteUInt32(character.Id);
+					b.WriteString(character.AuthChallenge!);
 				}
 			}));
 		}
@@ -188,7 +188,7 @@ namespace Faolan.PlayerAgent
 		private static Task SendOx20B9(INetworkClient client, ProtoEndpoint receiver)
 		{
 			return client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.Ox20B9,
-				body => body.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteUInt32(0)));
+				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteUInt32(0)));
 		}
 	}
 }

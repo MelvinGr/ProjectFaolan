@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteArrayUInt32Length(body => body
+			s.WriteArrayUInt32Length(b => b
 				.WriteUInt32(Opcode)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(Handle)

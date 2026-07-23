@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// ChatServerMessage is the chat tier's whole wire model - build, serialize and parse in one type (the counterpart to
-	// Rpc + PacketSerializer + PacketParser one tier down). These pin the frame layout [u16 opcode][u16 bodyLen][body]
-	// and that Serialize/Parse are mutual inverses, which is what stops a send and a receive drifting apart.
+	// ChatServerMessage is the chat tier's whole wire model - build, serialize and parse in one type, as Rpc is one tier
+	// down. These pin the frame layout [u16 opcode][u16 bodyLen][body] and that Serialize/Parse are mutual inverses,
+	// which is what stops a send and a receive drifting apart.
 	public class ChatServerMessageTests
 	{
 		[Fact]

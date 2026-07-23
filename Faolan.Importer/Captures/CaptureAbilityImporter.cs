@@ -424,7 +424,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = PacketParser.Parse(packetBytes);
+				var packet = Rpc.Parse(packetBytes);
 				if (packet.Opcode != AddSpecialAbilityOpcode)
 					return;
 
@@ -450,7 +450,7 @@ namespace Faolan.Importer.Captures
 		{
 			classId = 0;
 			token = null!;
-			var packet = PacketParser.Parse(packetBytes);
+			var packet = Rpc.Parse(packetBytes);
 			var s = packet.BodyReader();
 			if (s.Length < 21)
 				return false;
@@ -512,7 +512,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = PacketParser.Parse(packetBytes);
+				var packet = Rpc.Parse(packetBytes);
 				var body = packet.BodyReader().ReadRemainingArray();
 
 				uint id;

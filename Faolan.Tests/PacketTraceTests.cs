@@ -61,8 +61,8 @@ namespace Faolan.Tests
 				var capture = new CapturingLogger();
 				var tracer = Tracer(capture);
 
-				var wire = PacketSerializer.Serialize(rpc);
-				var parsed = PacketParser.Parse(wire); // the independent oracle: parse the serialized frame back
+				var wire = rpc.Serialize();
+				var parsed = Rpc.Parse(wire); // the independent oracle: parse the serialized frame back
 
 				tracer.Transmitted(Sent(rpc, wire));
 				var line = Assert.Single(capture.Messages);
@@ -92,8 +92,8 @@ namespace Faolan.Tests
 				var capture = new CapturingLogger();
 				var tracer = Tracer(capture);
 
-				var wire = PacketSerializer.Serialize(rpc);
-				var inbound = PacketParser.Parse(wire); // an RX-shaped Rpc: FrameLength stamped by the parser
+				var wire = rpc.Serialize();
+				var inbound = Rpc.Parse(wire); // an RX-shaped Rpc: FrameLength stamped by the parser
 
 				tracer.Transmitted(Sent(rpc, wire));
 				tracer.Received(in inbound);
@@ -116,8 +116,8 @@ namespace Faolan.Tests
 			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), Endpoints.Endpoint(Endpoints.GameAgentType, 0x0012D687), GameAgentOpcodes.PassBlob,
 				(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
-			tracer.Received(PacketParser.Parse(PacketSerializer.Serialize(rpc)));
-			tracer.Transmitted(Sent(rpc, PacketSerializer.Serialize(rpc)));
+			tracer.Received(Rpc.Parse(rpc.Serialize()));
+			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
 			Assert.All(capture.Messages, line =>
 			{
@@ -137,7 +137,7 @@ namespace Faolan.Tests
 			var rpc = new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateAggroStatus,
 				(byte[]) [0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]);
 
-			tracer.Transmitted(Sent(rpc, PacketSerializer.Serialize(rpc)));
+			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
 			var line = Assert.Single(capture.Messages);
 			Assert.Contains("DispatchUpdateAggroStatus (0x2000)", line);
@@ -155,7 +155,7 @@ namespace Faolan.Tests
 			var rpc = new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
 				(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
-			tracer.Transmitted(Sent(rpc, PacketSerializer.Serialize(rpc)));
+			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
 			var line = Assert.Single(capture.Messages);
 			Assert.Contains("DispatchPassBlob (0x2000)", line);

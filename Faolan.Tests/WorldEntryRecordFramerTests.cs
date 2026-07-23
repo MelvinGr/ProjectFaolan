@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		public void BuildSnapshotPrefix_MatchesCapturedBeachPrefix()
 		{
 			var (root, _) = SplitBeachSnapshot();
-			var packet = PacketParser.Parse(File.ReadAllBytes(SnapshotCap));
+			var packet = Rpc.Parse(File.ReadAllBytes(SnapshotCap));
 			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			var captured = File.ReadAllBytes(SnapshotCap);
 			var (root, tails) = SplitBeachSnapshot();
 
-			var built = PacketSerializer.Serialize(GameServerListener.BuildWorldEntrySnapshot(BeachClient(), root, tails));
+			var built = GameServerListener.BuildWorldEntrySnapshot(BeachClient(), root, tails).Serialize();
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch snapshot packet must be byte-identical to the capture");
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
 			var spawnBody = captured[bodyStart..];
 
-			var built = PacketSerializer.Serialize(GameServerListener.BuildWorldEntrySpawn(BeachClient(), spawnBody));
+			var built = GameServerListener.BuildWorldEntrySpawn(BeachClient(), spawnBody).Serialize();
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch player-spawn packet must be byte-identical to the capture");
@@ -76,7 +76,7 @@ namespace Faolan.Tests
 			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
 			var objectBody = captured[bodyStart..];
 
-			var built = PacketSerializer.Serialize(GameServerListener.FrameWorldEntryRecord(BeachClient(), objectBody));
+			var built = GameServerListener.FrameWorldEntryRecord(BeachClient(), objectBody).Serialize();
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch world-object packet must be byte-identical to the capture");
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 
 		private static (byte[] Root, byte[] SubClass) SplitBeachSnapshot()
 		{
-			var packet = PacketParser.Parse(File.ReadAllBytes(SnapshotCap));
+			var packet = Rpc.Parse(File.ReadAllBytes(SnapshotCap));
 			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
