@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
@@ -26,9 +27,8 @@ namespace Faolan.GameServer.Session
 
 		// LatencyCheck (0x2085): reply body = [counter echoed][0x00000012][server tick]. The tick is a
 		// monotonically increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s interval, ms precision).
-		public static Task HandleLatencyCheck(INetworkClient client, Rpc packet)
+		public static Task HandleLatencyCheck(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var counter = body.ReadUInt32();
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 

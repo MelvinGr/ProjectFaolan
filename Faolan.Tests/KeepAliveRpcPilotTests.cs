@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance,
 				(ushort)GameCharInterfaceOpcodes.DispatchPong, [], [0x00, 0x00, 0x00, 0x07]));
 
-			await KeepAliveService.HandleLatencyCheck(client, incoming);
+			await KeepAliveService.HandleLatencyCheck(client, incoming, incoming.BodyReader());
 
 			// The tick (3rd body word) is time-based, so assert structure + the deterministic fields, and that the
 			// parser's independent crc recompute accepts the frame.

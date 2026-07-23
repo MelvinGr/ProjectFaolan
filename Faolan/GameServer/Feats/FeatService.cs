@@ -145,14 +145,14 @@ namespace Faolan.GameServer.Feats
 
 		// c2s FeatUntrainAnswer (0x203E): the confirm-dialog reply. Reset ALL feats only when the player CONFIRMED and
 		// the echoed token matches the outstanding request (guards against a stray/replayed answer).
-		public async Task HandleFeatUntrainAnswer(INetworkClient client, Rpc packet)
+		public async Task HandleFeatUntrainAnswer(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return;
 
-			var body = packet.BodyReader().ReadRemainingArray();
-			if (!FeatUntrainMessageBoxCodec.TryParseAnswer(body, out var answer, out var token))
+			var answerBytes = body.ReadRemainingArray();
+			if (!FeatUntrainMessageBoxCodec.TryParseAnswer(answerBytes, out var answer, out var token))
 				return;
 
 			var pending = client.Session.PendingFeatUntrainToken;

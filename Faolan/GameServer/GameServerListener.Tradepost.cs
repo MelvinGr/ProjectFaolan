@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -85,9 +86,8 @@ namespace Faolan.GameServer
 
 		// TradepostBuyItem (0x200E) [saleId:u64][searchResultId:u64]: charge the buyer and deliver the listed item via
 		// a system mail. Refuses on unknown listing or insufficient funds (no money moves until the mail is created).
-		private async Task HandleTradepostBuy(INetworkClient client, Rpc packet)
+		private async Task HandleTradepostBuy(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -132,9 +132,8 @@ namespace Faolan.GameServer
 
 		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
 		// escrowed attachment is dropped with it (the AH buy-delivery mail is the only attachment source today).
-		private async Task HandleTradepostCancelMail(INetworkClient client, Rpc packet)
+		private async Task HandleTradepostCancelMail(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -154,9 +153,8 @@ namespace Faolan.GameServer
 		// TradepostCancelSellItem (0x200C) [nBankItemSlot:u32]: pull the seller's own listing (capture F397 = slot 6).
 		// The item never left the bank (it just had the "listed" overlay), so cancelling only deletes the listing -
 		// the client clears the overlay itself.
-		private async Task HandleTradepostCancelSell(INetworkClient client, Rpc packet)
+		private async Task HandleTradepostCancelSell(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -178,9 +176,8 @@ namespace Faolan.GameServer
 		}
 
 		// TradepostChangeItemPrice (0x200B) [nBankItemSlot:u32][nNewPrice:u64]: reprice the seller's own listing, 		// addressed by the origin bank slot (capture F363 = slot 6 -> 5,000,000 tin). No tradepost reply (re-poll).
-		private async Task HandleTradepostChangePrice(INetworkClient client, Rpc packet)
+		private async Task HandleTradepostChangePrice(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -204,9 +201,8 @@ namespace Faolan.GameServer
 
 		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
 		// DeleteMail). All address the buyer's own mail by the wire MailId; GetMailItem grants the escrowed item.
-		private async Task HandleTradepostMailOp(INetworkClient client, Rpc packet, TradepostAgentOpcodes method)
+		private async Task HandleTradepostMailOp(INetworkClient client, Rpc packet, FaolanStream body, TradepostAgentOpcodes method)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -271,9 +267,8 @@ namespace Faolan.GameServer
 		// Inbound Tradepost (auction house) + mail dispatch, routed here by receiver class (TradepostAgentType) from
 		// ReceivedPacket. Mutating ops are folded onto the listener (GameServerListener.Tradepost.cs); ItemSearch parses + replies via
 		// TradepostResponses. Grammar in docs/subsystems/tradepost-protocol.md.
-		private async Task HandleTradepostPacket(INetworkClient client, Rpc packet)
+		private async Task HandleTradepostPacket(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var opcode = (TradepostAgentOpcodes)packet.Opcode;
 			switch (opcode)
 			{
@@ -300,38 +295,38 @@ namespace Faolan.GameServer
 				case TradepostAgentOpcodes.BuyItem:
 				{
 					// BUY -> debit the buyer + deliver the item via a system mail.
-					await HandleTradepostBuy(client, packet);
+					await HandleTradepostBuy(client, packet, body);
 					break;
 				}
 
 				case TradepostAgentOpcodes.TradepostSellItem:
 				{
 					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
-					await HandleTradepostSell(client, packet);
+					await HandleTradepostSell(client, packet, body);
 					break;
 				}
 
 				case TradepostAgentOpcodes.TradepostChangeItemPrice:
 				{
-					await HandleTradepostChangePrice(client, packet);
+					await HandleTradepostChangePrice(client, packet, body);
 					break;
 				}
 
 				case TradepostAgentOpcodes.TradepostCancelSellItem:
 				{
-					await HandleTradepostCancelSell(client, packet);
+					await HandleTradepostCancelSell(client, packet, body);
 					break;
 				}
 
 				case TradepostAgentOpcodes.SendMail:
 				{
-					await HandleTradepostSendMail(client, packet);
+					await HandleTradepostSendMail(client, packet, body);
 					break;
 				}
 
 				case TradepostAgentOpcodes.CancelMail:
 				{
-					await HandleTradepostCancelMail(client, packet);
+					await HandleTradepostCancelMail(client, packet, body);
 					break;
 				}
 
@@ -349,7 +344,7 @@ namespace Faolan.GameServer
 				case TradepostAgentOpcodes.MarkMailRead:
 				case TradepostAgentOpcodes.DeleteMail:
 				{
-					await HandleTradepostMailOp(client, packet, opcode);
+					await HandleTradepostMailOp(client, packet, body, opcode);
 					break;
 				}
 
@@ -364,9 +359,8 @@ namespace Faolan.GameServer
 		// TradepostSellItem (0x200A) [nBankItemSlot:u32][nPrice:u64]: list one of the player's BANK items (container
 		// 105) for sale. Decoded from the necrol80 sell_item_on_ah capture (F375 = slot 6 @ 1,000,000 tin). Creates a
 		// TradepostListing from the bank item's identity, escrows the item out of the bank, and refreshes the bank tab.
-		private async Task HandleTradepostSell(INetworkClient client, Rpc packet)
+		private async Task HandleTradepostSell(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -431,9 +425,8 @@ namespace Faolan.GameServer
 		// test", slot 5, no COD - its word is 0x7E2 = one attachment; see #378 on why that is read as a count).
 		// Creates a Mail to the recipient with the sender's bank item escrowed, removes it from the sender's bank, and
 		// replies DispatchSendMailResult. Rejects (success=0) an unknown recipient so the client shows "couldn't send".
-		private async Task HandleTradepostSendMail(INetworkClient client, Rpc packet)
+		private async Task HandleTradepostSendMail(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;

@@ -548,9 +548,8 @@ namespace Faolan.GameServer
 		//      (capture-proven - moving it strands login on the loading screen). FlushPendingPost205FFollowUp no-ops
 		//      unless armed, so a create-editor / post-ready poll just falls through.
 		// Bodies shorter than the 16-byte poll are not spawn-polls (some other same-opcode traffic); just log them.
-		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, Rpc packet)
+		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			if (body.Length < sizeof(uint) * 4)
 			{
 				LogPacketBodyDebug("GameServer 0x2020 short body", body.ToArray());

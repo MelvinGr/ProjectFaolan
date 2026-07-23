@@ -36,11 +36,15 @@ namespace Faolan.CSPlayerAgent
 			var opcode = (CSPlayerAgentOpcodes)packet.Opcode;
 			LogPacketReceived(packet);
 
+			// One reader over the body for the whole dispatch: BodyReader() hands out a fresh cursor per call, so the
+			// handlers must share this instance rather than each re-reading from position 0. Cases that read inline use
+			// it directly; those that hand off to a GuildService handler pass it in (the handler no longer re-reads).
+			var body = packet.BodyReader();
+
 			switch (opcode)
 			{
 				case CSPlayerAgentOpcodes.Authenticate:
 				{
-					var body = packet.BodyReader();
 					var characterId = body.ReadUInt32();
 					var accountId = body.ReadUInt32();
 					var authReply = body.ReadUInt32();
@@ -78,7 +82,6 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.StartVoteRetreat:
 				{
-					var body = packet.BodyReader();
 					var unk0 = body.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
 					var nClientInst = body.ReadUInt32();
 
@@ -116,14 +119,14 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.ClientRequestGuildInfo:
 				{
-					await _guild.HandleClientRequestGuildInfo(client, packet);
+					await _guild.HandleClientRequestGuildInfo(client, packet, body);
 
 					break;
 				}
 
 				case CSPlayerAgentOpcodes.AcceptGuildInvitation:
 				{
-					await _guild.HandleAcceptGuildInvitation(client, packet);
+					await _guild.HandleAcceptGuildInvitation(client, packet, body);
 
 					break;
 				}
@@ -140,21 +143,21 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.CreateGuild:
 				{
-					await _guild.HandleCreateGuild(client, packet);
+					await _guild.HandleCreateGuild(client, packet, body);
 
 					break;
 				}
 
 				case CSPlayerAgentOpcodes.GuildInviteByName:
 				{
-					await _guild.HandleGuildInviteByName(client, packet);
+					await _guild.HandleGuildInviteByName(client, packet, body);
 
 					break;
 				}
 
 				case CSPlayerAgentOpcodes.GuildInvite:
 				{
-					await _guild.HandleGuildInvite(client, packet);
+					await _guild.HandleGuildInvite(client, packet, body);
 
 					break;
 				}
@@ -168,7 +171,7 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.GuildMessageOfTheDay:
 				{
-					await _guild.HandleGuildMessageOfTheDay(client, packet);
+					await _guild.HandleGuildMessageOfTheDay(client, packet, body);
 
 					break;
 				}
@@ -250,7 +253,6 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.EchoGroupFinderUpdateFeaturedActivities:
 				{
-					var body = packet.BodyReader();
 					var unk0 = body.ReadUInt32();
 					// { 0x00, 0x00, 0x03, 0xF1 } // Same data that we send in Authenticate
 
@@ -261,7 +263,6 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.RemovePvpPoints:
 				{
-					var body = packet.BodyReader();
 					var data = body.ReadRemainingArray();
 
 					// Contains guild names or something like that

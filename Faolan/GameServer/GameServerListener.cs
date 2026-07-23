@@ -397,24 +397,31 @@ namespace Faolan.GameServer
 			// class route consumes the packet. See CLAUDE.md (wire-protocol essentials) + docs/subsystems/tradepost-protocol.md.
 			// The two sub-0x2014 opcodes 0x2002/0x2003 are the ONLY ones that also arrive on GameCharAgent (there they
 			// are RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
+
+			// The ONE reader over the body for this packet's whole dispatch chain: BodyReader() hands out a fresh cursor
+			// per call, so every layer (dispatcher -> handler -> service) shares this instance and reads from its
+			// position rather than re-reading from 0. Threaded down as a `FaolanStream body` parameter. Handlers that
+			// read a sub-header first (Handle0X2000) leave the cursor advanced for their own sub-handlers.
+			var body = packet.BodyReader();
+
 			return packet.Receiver.Type switch
 			{
 				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
-				Endpoints.TradepostAgentType => HandleTradepostPacket(client, packet),
+				Endpoints.TradepostAgentType => HandleTradepostPacket(client, packet, body),
 
 				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
 				// screen (without the reply the client retries forever + never opens chat). Existing-character world login
 				// only - the create-editor/create-world flows own this class during their own handshake and must not divert.
 				Endpoints.GameCharAgentProjectType => client.Session is { IsCreateEditorConnection: false, IsCreateWorldSession: false, Character.Name: not null }
-					? HandleGameCharAgentProject(client, packet)
+					? HandleGameCharAgentProject(client, packet, body)
 					: Task.CompletedTask,
 
 				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
 				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
-				Endpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet),
+				Endpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet, body),
 
 				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
-				Endpoints.GameAgentType => HandleGameAgentPacket(client, packet),
+				Endpoints.GameAgentType => HandleGameAgentPacket(client, packet, body),
 
 				_ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
 			};

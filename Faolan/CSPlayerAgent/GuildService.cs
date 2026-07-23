@@ -80,9 +80,8 @@ namespace Faolan.CSPlayerAgent
 		// 0x201C AcceptGuildInvitation(i_cGuildID): body is the guild ID32 from the 0x202A invite. Retail replies
 		// with the 0x203F full update followed by the joiner's own 0x202F member-joined record (which also fans
 		// out to the other online members), and sets the in-world tag with a GameServer 0x2550C99A.
-		public async Task HandleAcceptGuildInvitation(INetworkClient client, Rpc packet)
+		public async Task HandleAcceptGuildInvitation(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -115,9 +114,8 @@ namespace Faolan.CSPlayerAgent
 		// 0x201E ClientRequestGuildInfo([ID32 char]): the client resolves guild banners/tooltips of other
 		// players with this. Reply is 0x2042 when the target is in the requester's own guild, 0x2043 (carrying
 		// the guild name) when it is in another guild, and nothing when the target is guildless.
-		public async Task HandleClientRequestGuildInfo(INetworkClient client, Rpc packet)
+		public async Task HandleClientRequestGuildInfo(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			body.ReadUInt32(); // ID32 type (0x0000C350)
 			var targetId = body.ReadUInt32();
 
@@ -167,9 +165,8 @@ namespace Faolan.CSPlayerAgent
 		// DispatchGuildCreated (0x2044) - a [creator member record][guild header][renown/trailer] packet that opens
 		// the window with NO relog - NOT the 0x203F we send here; that 0x2044 tail + its guild-chat 0x003c subs are
 		// the documented follow-up. Today the guild still shows via the login 0x203F push after a relog.
-		public async Task HandleCreateGuild(INetworkClient client, Rpc packet)
+		public async Task HandleCreateGuild(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character == null)
 				return;
@@ -205,9 +202,8 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// 0x2023 GuildInvite: same as by-name but the target is identified by ID32.
-		public async Task HandleGuildInvite(INetworkClient client, Rpc packet)
+		public async Task HandleGuildInvite(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			body.ReadUInt32(); // ID32 type (0x0000C350)
 			var targetId = body.ReadUInt32();
 			var target = await _database.GetCharacter(targetId);
@@ -216,9 +212,8 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x2022 GuildInviteByName(i_cCharacterName): inviter must be guilded; the target must be online (the
 		// invite dialog is a live push - retail also rejects offline targets).
-		public async Task HandleGuildInviteByName(INetworkClient client, Rpc packet)
+		public async Task HandleGuildInviteByName(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var targetName = body.ReadString();
 			var target = await _database.GetCharacterByName(targetName, client.Session.Character.RealmId);
 			await InviteCharacterToGuild(client, target, targetName);
@@ -244,9 +239,8 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x202E GuildMessageOfTheDay(i_cGuildMessageOfTheDay): persists the MOTD and pushes the targeted MOTD-change
 		// packet (0x2057) to every online member so their guild window's MOTD refreshes + the toast pops.
-		public async Task HandleGuildMessageOfTheDay(INetworkClient client, Rpc packet)
+		public async Task HandleGuildMessageOfTheDay(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var character = client.Session.Character;
 			if (character?.GuildId is not { } guildId)
 				return;

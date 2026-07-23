@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -33,9 +34,8 @@ namespace Faolan.GameServer.Inventory
 
 		// AddShortcut (0x206E, in-game branch): the player dragged an ability/item onto the bar. Persist the slot
 		// (upsert - re-dragging overwrites); the login RESTORE is rebuilt from these rows (SendRestoredBar).
-		public async Task HandleAddShortcut(INetworkClient client, Rpc packet)
+		public async Task HandleAddShortcut(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var type = body.ReadUInt32(); // observed 4 = ability (ids match the 0x2052 grants), 2/3 = other
 			var slotId = body.ReadUInt32(); // client slot id (ranges 0x64.. and 0x4E20.. = bar pages)
 			var sourceId = body.ReadUInt32(); // ability id or item ref
@@ -48,9 +48,8 @@ namespace Faolan.GameServer.Inventory
 		}
 
 		// RemoveShortcut: body = [u32 slot].
-		public async Task HandleRemoveShortcut(INetworkClient client, Rpc packet)
+		public async Task HandleRemoveShortcut(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var slot = body.ReadUInt32();
 			if (client.Session.Character != null)
 				await _database.RemoveCharacterShortcut(client.Session.Character.Id, slot);
@@ -62,9 +61,8 @@ namespace Faolan.GameServer.Inventory
 		// randomActions/changemap captures): the slot is in the bar-PAGE range (0x4E20.., not the 0x64.. item
 		// range), container is always 0x68 (the backpack kind), and flag is 0/1. The bar's restorable contents ride
 		// AddShortcut; this bar-page toggle's exact semantics are still fuzzy, so it stays log-only.
-		public Task HandleUpdateShortcut(INetworkClient client, Rpc packet)
+		public Task HandleUpdateShortcut(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var slot = body.ReadUInt32();
 			var flag = body.ReadUInt32();
 			var container = body.ReadUInt32();

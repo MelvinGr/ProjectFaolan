@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -116,9 +117,8 @@ namespace Faolan.GameServer.CreateFlow
 		//
 		// TheNameIs commits the chosen name straight to the character row (CommitCharacterName); the
 		// create-editor gating keys on Character.Name so the commit is what promotes it out of the editor.
-		internal async Task HandleCommandPacket(INetworkClient client, Rpc packet)
+		internal async Task HandleCommandPacket(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			var ack = body.ReadUInt32();
 			var clientInstance = body.ReadUInt32();
 			var reserved = body.ReadByte();

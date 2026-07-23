@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
@@ -38,9 +39,8 @@ namespace Faolan.GameServer.World
 		}
 
 		// CloseLootBag: the client closed the loot window without taking everything.
-		public async Task HandleCloseLootBag(INetworkClient client, Rpc packet)
+		public async Task HandleCloseLootBag(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 			await _broadcaster.CloseLootBag(client, bagHandle);
@@ -48,9 +48,8 @@ namespace Faolan.GameServer.World
 
 		// 0x2043 TryLootAll: the loot-all click. Grant every item the bag carries into the backpack (persist + live
 		// DispatchAddItem); the bag hands them over once (TakeBagItems clears them), and coins ride TryLootCash.
-		public async Task HandleLootAll(INetworkClient client, Rpc packet)
+		public async Task HandleLootAll(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 
@@ -72,9 +71,8 @@ namespace Faolan.GameServer.World
 		}
 
 		// 0x2045 TryLootCash: loot the bag's coins; fires on every loot alongside TryLootAll.
-		public async Task HandleLootCash(INetworkClient client, Rpc packet)
+		public async Task HandleLootCash(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 
@@ -92,9 +90,8 @@ namespace Faolan.GameServer.World
 		}
 
 		// 0x2046 TryLootItem: a single drag of one item out of the loot window.
-		public async Task HandleLootItem(INetworkClient client, Rpc packet)
+		public async Task HandleLootItem(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 			var itemIndex = body.ReadUInt32(); // which item (display index) the player dragged

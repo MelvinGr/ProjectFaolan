@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -102,9 +103,10 @@ namespace Faolan.GameServer.Economy
 		}
 
 		// Dispatch an inbound CoreClaimIIR. Body (after the 0x2000 sub-header) = [receiverClass][receiverInstance][u16 sub][args].
-		public async Task HandleCoreClaim(INetworkClient client, Rpc packet)
+		// The shared reader arrives positioned PAST the [pbLength][pbOpcode] sub-header (Handle0X2000 consumed it), so the
+		// first field here is the receiver class (0xC350), matching the docs layout - no re-read from position 0.
+		public async Task HandleCoreClaim(INetworkClient client, FaolanStream body)
 		{
-			var body = packet.BodyReader();
 			_ = body.ReadUInt32(); // receiver class (0xC350 Character)
 			_ = body.ReadUInt32(); // receiver instance (the player's handle)
 			var sub = body.ReadUInt16();
