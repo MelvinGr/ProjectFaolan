@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Logging
 			var packet = new ChatServerPacket(bytes);
 			var opcodeName = PacketLogFormatter.OpcodeName(typeof(ChatServerInterfaceOpcodes), (ushort)packet.Opcode);
 
-			Logger.LogPacket(PacketLogFormatter.Downlink, ChannelName, opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length, ("body", packet.Body?.ToArray()));
+			Logger.LogPacket(PacketLogFormatter.Transmitted, ChannelName, opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length, ("body", packet.Body?.ToArray()));
 		}
 	}
 }

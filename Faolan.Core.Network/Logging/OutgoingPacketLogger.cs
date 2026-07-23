@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
 {
-	// Shared scaffold for the server -> client (DL) packet loggers: the send-path hook (IPacketLogger.Log(byte[])) with
+	// Shared scaffold for the server -> client (TX) packet loggers: the send-path hook (IPacketLogger.Log(byte[])) with
 	// the decode wrapped in a try/catch, so a malformed packet can never crash the send path just to trace it.
 	// Subclasses implement the per-protocol decode (LogPacket) and render through PacketLogFormatter. ChannelName is
 	// exposed so the inbound path (Server) can label its UL lines with the same channel without re-plumbing it through

@@ -7,13 +7,16 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Core.Network.Logging
 {
 	// The SINGLE place the packet-trace log line is shaped, shared by the inbound path (Server.LogPacketReceived) and
-	// the outbound loggers (OutgoingPacketLogger) so both directions render identically. Direction is UL (uplink =
-	// client -> server, inbound) or DL (downlink = server -> client, outbound). The raw byte dump is appended via
-	// PacketLogOptions (gated by the LogPacketBytes switch), so disabling packet bytes silences it in both directions.
+	// the outbound loggers (OutgoingPacketLogger) so both directions render identically. Direction is from the SERVER's
+	// perspective: RX (received = client -> server, inbound) or TX (transmitted = server -> client, outbound). The raw
+	// byte dump is appended via PacketLogOptions (gated by the LogPacketBytes switch), so disabling packet bytes
+	// silences it in both directions.
 	public static class PacketLogFormatter
 	{
-		public const string Downlink = "DL"; // server -> client (outbound)
-		public const string Uplink = "UL"; // client -> server (inbound)
+		// Direction tags are from the SERVER's perspective (the node writing the log): TX = the server transmitted it
+		// (server -> client, outbound), RX = the server received it (client -> server, inbound).
+		public const string Transmitted = "TX"; // server -> client (outbound, sent by the server)
+		public const string Received = "RX"; // client -> server (inbound, received by the server)
 
 		// "Name (0xHEX)" when the opcode is a defined member of enumType, else the bare "0xHEX".
 		public static string OpcodeName(Type enumType, ushort opcode)
@@ -54,19 +57,19 @@ namespace Faolan.Core.Network.Logging
 					direction, channel, opcodeName, subOpcodeName, payloadLength, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
 			}
 
-			// An inbound (UL) packet whose opcode the listener didn't handle: same line shape as LogPacket, at Warning
+			// An inbound (RX) packet whose opcode the listener didn't handle: same line shape as LogPacket, at Warning
 			// level with an UNHANDLED marker. `opcodeName` already carries its "(0xHEX)" (via OpcodeName).
 			public void LogUnknownPacket(string channel, string opcodeName, long bodyLength, long packetLength, params (string Label, byte[]? Data)[] byteSegments)
 			{
 				logger.LogWarning("{Direction} [{Channel} {OpcodeName}] UNHANDLED, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
-					Uplink, channel, opcodeName, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
+					Received, channel, opcodeName, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
 			}
 
-			// Inbound (UL) trace: the Server forwards the raw packet + the typed opcode the listener dispatched on, and
+			// Inbound (RX) trace: the Server forwards the raw packet + the typed opcode the listener dispatched on, and
 			// these shape the line - so ALL packet-trace formatting (and the byte-dump gate) lives here, not in Server.
 			public void LogReceived(string channel, Packet packet, Enum opcode)
 			{
-				logger.LogPacket(Uplink, channel, OpcodeName(opcode), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
+				logger.LogPacket(Received, channel, OpcodeName(opcode), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
 			}
 
 			public void LogUnhandled(string channel, Packet packet, Enum opcode)
@@ -79,12 +82,12 @@ namespace Faolan.Core.Network.Logging
 				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
 			}
 
-			// Rpc-model UL variants (Gitea #407): the listener dispatches on the parsed Rpc; both the method NAME and the
+			// Rpc-model RX variants (Gitea #407): the listener dispatches on the parsed Rpc; both the method NAME and the
 			// FrameLength ride on the Rpc itself. The name comes from the (Receiver.Type, Opcode) pair (ProtocolCatalog),
 			// so the listener no longer threads a separate typed opcode enum just for the trace.
 			public void LogReceived(string channel, in Rpc packet)
 			{
-				logger.LogPacket(Uplink, channel, ProtocolCatalog.ResolveName(packet.Receiver.Type, packet.Opcode), packet.Body.Length, packet.FrameLength, ("body", packet.Body.ToArray()));
+				logger.LogPacket(Received, channel, ProtocolCatalog.ResolveName(packet.Receiver.Type, packet.Opcode), packet.Body.Length, packet.FrameLength, ("body", packet.Body.ToArray()));
 			}
 
 			public void LogUnhandled(string channel, in Rpc packet)

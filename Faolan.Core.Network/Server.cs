@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Core.Network
 {
 	// The shared listener machinery - TCP accept loop, client registry, connect/disconnect lifecycle and the inbound
-	// (UL) log helpers - independent of how a frame is parsed. Server<TPacket,…> (ChatServer, a typed Packet) and
+	// (RX) log helpers - independent of how a frame is parsed. Server<TPacket,…> (ChatServer, a typed Packet) and
 	// RpcServer<TFramer> (every Conan protocol listener, the structured Rpc) supply CreateClient + their ReceivedPacket.
 	public abstract class ServerBase : BackgroundService
 	{
@@ -28,7 +28,7 @@ namespace Faolan.Core.Network
 		protected readonly IPacketLogger OutgoingPacketLogger;
 
 		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
-		private string ChannelName => OutgoingPacketLogger?.ChannelName ?? ""; // Reuse the outbound logger's channel name for the inbound (UL) lines, so both directions read "[Channel …]".
+		private string ChannelName => OutgoingPacketLogger?.ChannelName ?? ""; // Reuse the outbound logger's channel name for the inbound (RX) lines, so both directions read "[Channel …]".
 		private readonly TcpListener _tcpListener;
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
@@ -154,13 +154,13 @@ namespace Faolan.Core.Network
 			return NetworkClients.FirstOrDefault(nc => nc.Session.Character?.Id == characterId);
 		}
 
-		// Inbound (UL) trace, forwarded to the logging layer - all line shaping + the byte-dump gate live there.
+		// Inbound (RX) trace, forwarded to the logging layer - all line shaping + the byte-dump gate live there.
 		protected void LogPacketBodyDebug(string label, byte[] bytes)
 		{
 			Logger.LogBodyDump(label, bytes);
 		}
 
-		// Rpc-model UL trace (Gitea #407): the listener dispatches on the parsed Rpc; both the method NAME (from the
+		// Rpc-model RX trace (Gitea #407): the listener dispatches on the parsed Rpc; both the method NAME (from the
 		// Receiver.Type + Opcode pair, via ProtocolCatalog) and the FrameLength (total wire size, reported as
 		// packetLength) come straight off the Rpc - the listener passes nothing but the packet.
 		protected void LogPacketReceived(in Rpc packet)

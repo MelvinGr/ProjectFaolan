@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
 {
-	// The Conan-tier (GameServer / login) DL logger. Every Conan send goes out as a structured Rpc, so this logs
+	// The Conan-tier (GameServer / login) TX (outbound) logger. Every Conan send goes out as a structured Rpc, so this logs
 	// straight from the message model (phase 6) and carries NO byte[] re-parse - it does not override LogPacket(byte[]).
 	public sealed class ConanOutgoingPacketLogger : OutgoingPacketLogger
 	{
@@ -40,13 +40,13 @@ namespace Faolan.Core.Network.Logging
 				var payloadLength = data.ReadUInt32();
 				var subOpcodeValue = data.ReadUInt32();
 
-				Logger.LogPacketWithSubOpcode(PacketLogFormatter.Downlink, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(_subOpcodeEnumType, subOpcodeValue), payloadLength,
+				Logger.LogPacketWithSubOpcode(PacketLogFormatter.Transmitted, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(_subOpcodeEnumType, subOpcodeValue), payloadLength,
 					body.Length, wireLength, ("headerData", headerData), ("body", body));
 
 				return;
 			}
 
-			Logger.LogPacket(PacketLogFormatter.Downlink, ChannelName, opcodeName, body?.Length ?? 0, wireLength, ("headerData", headerData), ("body", body));
+			Logger.LogPacket(PacketLogFormatter.Transmitted, ChannelName, opcodeName, body?.Length ?? 0, wireLength, ("headerData", headerData), ("body", body));
 		}
 	}
 }
