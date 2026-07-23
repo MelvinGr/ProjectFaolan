@@ -32,19 +32,14 @@ namespace Faolan.Core.Network.Packets.Conan
 		private int _markerSkipRemaining;
 		private int _payloadBytesRead;
 
-		public IEnumerable<byte[]> PushBytes(byte[] bytes, int length)
+		public IEnumerable<byte[]> PushBytes(ReadOnlySpan<byte> bytes)
 		{
-			ArgumentNullException.ThrowIfNull(bytes);
-
-			if (length < 0 || length > bytes.Length)
-				throw new ArgumentOutOfRangeException(nameof(length));
-
 			var packets = new List<byte[]>();
 			var offset = 0;
 
-			while (offset < length)
+			while (offset < bytes.Length)
 			{
-				var bytesAvailable = length - offset;
+				var bytesAvailable = bytes.Length - offset;
 
 				// Consume any outstanding compression-marker bytes first (the 9-byte marker can straddle recv
 				// boundaries, so the remaining count is carried across pushes).
@@ -62,7 +57,7 @@ namespace Faolan.Core.Network.Packets.Conan
 					var payloadLength = _frame.Length - HeaderSize;
 					var bytesTransferred = Math.Min(payloadLength - _payloadBytesRead, bytesAvailable);
 
-					Array.Copy(bytes, offset, _frame, HeaderSize + _payloadBytesRead, bytesTransferred);
+					bytes.Slice(offset, bytesTransferred).CopyTo(_frame.AsSpan(HeaderSize + _payloadBytesRead));
 					offset += bytesTransferred;
 					_payloadBytesRead += bytesTransferred;
 
@@ -78,7 +73,7 @@ namespace Faolan.Core.Network.Packets.Conan
 
 				// Accumulate the 4-byte big-endian length header (may straddle recv boundaries).
 				var headerTransferred = Math.Min(HeaderSize - _lengthBytesRead, bytesAvailable);
-				Array.Copy(bytes, offset, _lengthBuffer, _lengthBytesRead, headerTransferred);
+				bytes.Slice(offset, headerTransferred).CopyTo(_lengthBuffer.AsSpan(_lengthBytesRead));
 				offset += headerTransferred;
 				_lengthBytesRead += headerTransferred;
 

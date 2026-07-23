@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			byte[] packet = [0x00, 0x00, 0x00, 0x04, 0xAA, 0xBB, 0xCC, 0xDD]; // [len=4][4-byte body]
 
 			var framer = new ConanMessageFramer();
-			var frames = framer.PushBytes([.. marker, .. packet], marker.Length + packet.Length).ToList();
+			var frames = framer.PushBytes([.. marker, .. packet]).ToList();
 
 			Assert.Single(frames);
 			Assert.Equal(packet, frames[0]);
@@ -35,10 +35,10 @@ namespace Faolan.Tests
 			// following packet.
 			var framer = new ConanMessageFramer();
 
-			Assert.Empty(framer.PushBytes([0x80, 0x00, 0x00, 0x05, 0xA5], 5).ToList()); // tag + 1 of 5 trailing bytes
+			Assert.Empty(framer.PushBytes([0x80, 0x00, 0x00, 0x05, 0xA5]).ToList()); // tag + 1 of 5 trailing bytes
 
 			byte[] rest = [0x05, 0xDF, 0x1B, 0x01, 0x00, 0x00, 0x00, 0x04, 0xAA, 0xBB, 0xCC, 0xDD]; // 4 marker bytes + packet
-			var frames = framer.PushBytes(rest, rest.Length).ToList();
+			var frames = framer.PushBytes(rest).ToList();
 
 			Assert.Single(frames);
 			Assert.Equal([0x00, 0x00, 0x00, 0x04, 0xAA, 0xBB, 0xCC, 0xDD], frames[0]);
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 			byte[] input = [0x80, 0x00, 0x00, 0x05, 0, 0, 0, 0, 0, .. compressed];
 
 			var framer = new ConanMessageFramer();
-			var packets = framer.PushBytes(input, input.Length).ToList();
+			var packets = framer.PushBytes(input).ToList();
 
 			Assert.Empty(packets);
 		}

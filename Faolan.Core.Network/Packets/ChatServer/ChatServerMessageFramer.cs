@@ -1,5 +1,5 @@
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using Faolan.Core.Network.Interfaces;
 
 namespace Faolan.Core.Network.Packets.ChatServer
@@ -8,10 +8,15 @@ namespace Faolan.Core.Network.Packets.ChatServer
 	{
 		private byte[] _buffer = [];
 
-		public IEnumerable<byte[]> PushBytes(byte[] bytes, int length)
+		public IEnumerable<byte[]> PushBytes(ReadOnlySpan<byte> bytes)
 		{
 			var packets = new List<byte[]>();
-			_buffer = _buffer.Concat(bytes.Take(length)).ToArray();
+
+			// Append this recv to whatever partial frame is still buffered.
+			var buffered = new byte[_buffer.Length + bytes.Length];
+			_buffer.CopyTo(buffered, 0);
+			bytes.CopyTo(buffered.AsSpan(_buffer.Length));
+			_buffer = buffered;
 
 			while (_buffer.Length >= sizeof(ushort) * 2)
 			{
@@ -24,8 +29,8 @@ namespace Faolan.Core.Network.Packets.ChatServer
 				if (_buffer.Length < totalLength)
 					break;
 
-				packets.Add(_buffer.Take(totalLength).ToArray());
-				_buffer = _buffer.Skip(totalLength).ToArray();
+				packets.Add(_buffer[..totalLength]);
+				_buffer = _buffer[totalLength..];
 			}
 
 			return packets;

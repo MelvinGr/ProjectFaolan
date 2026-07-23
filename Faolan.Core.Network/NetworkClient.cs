@@ -166,8 +166,12 @@ namespace Faolan.Core.Network
 
 		private async Task DataReceivedAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
 		{
+			// Frame the recv window in place (no copy), THEN dispatch: the span can't outlive the call, and the loop
+			// below awaits.
+			var frames = _messageFramer.PushBytes(data.Span);
+
 			var dispatchedAny = false;
-			foreach (var frame in _messageFramer.PushBytes(data.ToArray(), data.Length))
+			foreach (var frame in frames)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 
