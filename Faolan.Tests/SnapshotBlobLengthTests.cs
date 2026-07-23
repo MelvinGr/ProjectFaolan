@@ -7,7 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
@@ -135,8 +135,8 @@ namespace Faolan.Tests
 
 		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(TestPaths.Asset(bin)));
-			var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
+			var s = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			s.ReadUInt32();
 			s.ReadUInt32();
 			s.ReadUInt32();
@@ -147,8 +147,8 @@ namespace Faolan.Tests
 		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).
 		private static (byte[] Prefix, int RootLen, byte[] SubClass, uint Instance, byte[] Root) SplitFull(string bin)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(TestPaths.Asset(bin)));
-			var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
+			var s = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			s.ReadUInt32();
 			s.ReadUInt32();
 			var instance = s.ReadUInt32();

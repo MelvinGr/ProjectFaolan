@@ -5,7 +5,7 @@ using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -109,8 +109,8 @@ namespace Faolan.Tests
 
 			byte[] SubClass(string file)
 			{
-				var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
-				var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+				var packet = PacketParser.Parse(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
+				var s = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 				s.ReadUInt32();
 				s.ReadUInt32();
 				s.ReadUInt32();
@@ -120,8 +120,8 @@ namespace Faolan.Tests
 
 		private static (byte[] Prefix, byte[] Root, byte[] SubClass) SplitBeach()
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(Cap));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(Cap));
+			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();

@@ -8,7 +8,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
 
@@ -164,11 +164,11 @@ namespace Faolan.Importer.Extractors
 		// [u32 feedback]; the entry is a bare ProtoInventoryGameEntry (no Pos wrapper).
 		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType>? types)
 		{
-			var packet = new ConanPacket(packetBytes);
+			var packet = PacketParser.Parse(packetBytes);
 			if (packet.Opcode != 0x2020)
 				return;
 
-			var body = packet.Body;
+			var body = packet.BodyReader();
 			var containerType = body.ReadUInt32();
 			body.ReadUInt32(); // charId
 			body.ReadUInt32(); // itemPos
@@ -195,11 +195,11 @@ namespace Faolan.Importer.Extractors
 		// items become buildable too. Identity only - the bank holds every kind in one container, so no type stamp.
 		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = new ConanPacket(packetBytes);
+			var packet = PacketParser.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return;
 
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			if (body.ReadUInt32() != BankIirSubOpcode)
 				return;
 
@@ -228,11 +228,11 @@ namespace Faolan.Importer.Extractors
 		// (4×u32 big-endian = the Data quad). Hash is not carried here, so it stays 0 (the item redeems via live add).
 		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = new ConanPacket(packetBytes);
+			var packet = PacketParser.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return;
 
-			var payload = packet.Body.ReadArrayUInt32Length();
+			var payload = packet.BodyReader().ReadArrayUInt32Length();
 			if (!CoreClaimListCodec.TryParse(payload, out _, out var claims))
 				return;
 
@@ -259,11 +259,11 @@ namespace Faolan.Importer.Extractors
 		// (quest keys legitimately have none), so the item still lands in the DB even though it won't render in a snapshot.
 		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = new ConanPacket(packetBytes);
+			var packet = PacketParser.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return;
 
-			var payload = packet.Body.ReadArrayUInt32Length();
+			var payload = packet.BodyReader().ReadArrayUInt32Length();
 			var s = new FaolanStream(payload);
 			if (s.ReadUInt32() != LootBagMessageCodec.Opcode)
 				return;
@@ -287,7 +287,7 @@ namespace Faolan.Importer.Extractors
 		// body either throws (caught by the caller) or yields attachments with no real identity, which we skip.
 		private static void ExtractFromMail(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
-			var packet = new ConanPacket(packetBytes);
+			var packet = PacketParser.Parse(packetBytes);
 			if (packet.Opcode != 0x2002)
 				return;
 
@@ -391,11 +391,11 @@ namespace Faolan.Importer.Extractors
 		{
 			root = null!;
 
-			var packet = new ConanPacket(packetBytes);
+			var packet = PacketParser.Parse(packetBytes);
 			if (packet.Opcode != 0x2000)
 				return false;
 
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			var subOpcode = body.ReadUInt32();
 			if (subOpcode != InventorySubOpcode)
 				return false;

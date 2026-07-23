@@ -6,7 +6,7 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
@@ -36,10 +36,10 @@ namespace Faolan.Importer.Captures
 				if (!p.IsDownload || p.Opcode is not (0x2005 or 0x2076))
 					continue;
 
-				ConanPacket packet;
+				Rpc packet;
 				try
 				{
-					packet = new ConanPacket(p.Bytes);
+					packet = PacketParser.Parse(p.Bytes);
 				}
 				catch
 				{
@@ -53,13 +53,13 @@ namespace Faolan.Importer.Captures
 
 				if (packet.Opcode == 0x2005 && packet.Body.Length == 12)
 				{
-					money[character] = packet.Body.ReadUInt64(); // last one wins (absolute balance)
+					money[character] = packet.BodyReader().ReadUInt64(); // last one wins (absolute balance)
 					continue;
 				}
 
 				// DispatchShortcutBarReply (0x2076): the whole saved bar - the SAME body ShortcutBarBuilder builds, so
 				// parse it with ShortcutBar.Read instead of a hand-rolled 0x3F1 loop. Latest in the capture wins.
-				var body = packet.Body.ReadRemainingArray();
+				var body = packet.BodyReader().ReadRemainingArray();
 				if (body.Length < 4)
 					continue;
 

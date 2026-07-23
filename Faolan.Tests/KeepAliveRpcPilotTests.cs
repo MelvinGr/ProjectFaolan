@@ -4,7 +4,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Session;
 using Xunit;
@@ -47,16 +46,16 @@ namespace Faolan.Tests
 
 			// The tick (3rd body word) is time-based, so assert structure + the deterministic fields, and that the
 			// parser's independent crc recompute accepts the frame.
-			var pong = new ConanPacket(client.Sent!);
-			Assert.True(pong.IsValid);
+			var pong = PacketParser.Parse(client.Sent!);
+			Assert.True(PacketParser.IsCrcValid(client.Sent!));
 			Assert.Equal(Endpoints.GameCharAgentType, pong.Sender.Type);
 			Assert.Equal(Endpoints.GameCharInterfaceType, pong.Receiver.Type);
 			Assert.Equal(Instance, pong.Receiver.Instance);
 			Assert.Equal((ushort)GameCharInterfaceOpcodes.DispatchPong, pong.Opcode);
-			Assert.Equal(new byte[] { 0x01 }, pong.HeaderData);
-			pong.Body.Position = 0;
-			Assert.Equal(counter, pong.Body.ReadUInt32());
-			Assert.Equal(0x00000012u, pong.Body.ReadUInt32());
+			Assert.Equal(new byte[] { 0x01 }, pong.HeaderData.ToArray());
+			var body = pong.BodyReader();
+			Assert.Equal(counter, body.ReadUInt32());
+			Assert.Equal(0x00000012u, body.ReadUInt32());
 		}
 
 		private static CapturingClient ClientAt(uint characterId)

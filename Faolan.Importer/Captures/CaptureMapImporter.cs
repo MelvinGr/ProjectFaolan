@@ -5,7 +5,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -74,11 +74,11 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
+				var packet = PacketParser.Parse(packetBytes);
 				if (packet.Opcode != 0x2000)
 					return;
 
-				var inner = packet.Body.ReadArrayUInt32Length();
+				var inner = packet.BodyReader().ReadArrayUInt32Length();
 				if (!MapChangeCodec.TryParse(inner, out var mc))
 					return;
 

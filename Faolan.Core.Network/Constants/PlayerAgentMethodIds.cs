@@ -4,7 +4,7 @@ using Faolan.Core.Enums;
 namespace Faolan.Core.Network.Constants
 {
 	// The 32-bit method id that PlayerAgent (c2s) / PlayerInterface (s2c) — uniquely among the interfaces — carries
-	// in its header right after the 16-bit opcode (`ConanPacket.HeaderData`, empty for every other interface). The
+	// in its header right after the 16-bit opcode (`Rpc.HeaderData`, empty for every other interface). The
 	// client dispatches on this id; the opcode is a normal 0x2000+index value alongside it. This is the SINGLE source
 	// of the ids: the enums keep only the opcode, the PlayerAgent PlayerRpc helper sets it as the Rpc HeaderData, and
 	// `gen/opcodes.md` reads it for its id column. Keyed by the wire opcode (values don't collide across the two

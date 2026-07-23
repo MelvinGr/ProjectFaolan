@@ -7,7 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
@@ -34,8 +34,8 @@ namespace Faolan.Tests
 				return;
 
 			// 1) Pull the real captured Slave Manacles equipped entry bytes (an InventoryGame list entry).
-			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
@@ -90,8 +90,8 @@ namespace Faolan.Tests
 			if (!File.Exists(InventoryCapture))
 				return;
 
-			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(await File.ReadAllBytesAsync(InventoryCapture, TestContext.Current.CancellationToken));
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();

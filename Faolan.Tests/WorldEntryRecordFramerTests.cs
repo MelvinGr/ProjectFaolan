@@ -4,7 +4,6 @@ using System.IO;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer;
 using Faolan.Tests.Support;
@@ -29,8 +28,8 @@ namespace Faolan.Tests
 		public void BuildSnapshotPrefix_MatchesCapturedBeachPrefix()
 		{
 			var (root, _) = SplitBeachSnapshot();
-			var packet = new ConanPacket(File.ReadAllBytes(SnapshotCap));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(SnapshotCap));
+			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
@@ -90,8 +89,8 @@ namespace Faolan.Tests
 
 		private static (byte[] Root, byte[] SubClass) SplitBeachSnapshot()
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(SnapshotCap));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(SnapshotCap));
+			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();

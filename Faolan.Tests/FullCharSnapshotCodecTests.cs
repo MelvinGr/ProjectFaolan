@@ -5,7 +5,7 @@ using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -65,8 +65,8 @@ namespace Faolan.Tests
 
 		private static (byte[] Root, byte[] SubClass) SplitBeach()
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(TestPaths.Asset("strie-login-inventory.bin")));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset("strie-login-inventory.bin")));
+			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();

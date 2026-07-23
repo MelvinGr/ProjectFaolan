@@ -7,7 +7,6 @@ using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Tests.Support;
 using Xunit;
@@ -29,8 +28,8 @@ namespace Faolan.Tests
 				return;
 
 			var original = File.ReadAllBytes(BurstInventoryPath);
-			var packet = new ConanPacket(original);
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(original);
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
@@ -72,8 +71,8 @@ namespace Faolan.Tests
 			if (!File.Exists(BurstInventoryPath))
 				return;
 
-			var packet = new ConanPacket(File.ReadAllBytes(BurstInventoryPath));
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(BurstInventoryPath));
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
@@ -124,8 +123,8 @@ namespace Faolan.Tests
 			var crc = Crc32.Calculate(substituted[8..]);
 			BinaryPrimitives.WriteUInt32BigEndian(substituted.AsSpan(4, 4), crc);
 
-			var packet = new ConanPacket(substituted);
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(substituted);
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
@@ -167,8 +166,8 @@ namespace Faolan.Tests
 			if (!File.Exists(BigboyPath))
 				return; // capture not present in this checkout
 
-			var packet = new ConanPacket(File.ReadAllBytes(BigboyPath));
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(BigboyPath));
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();

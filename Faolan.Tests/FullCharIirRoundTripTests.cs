@@ -4,7 +4,7 @@ using System.IO;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
@@ -122,8 +122,8 @@ namespace Faolan.Tests
 			{
 				var path = TestPaths.Asset(bin); // committed fixture - must exist (no silent skip)
 
-				var packet = new ConanPacket(File.ReadAllBytes(path));
-				yield return (bin, packet.Body.ReadArrayUInt32Length());
+				var packet = PacketParser.Parse(File.ReadAllBytes(path));
+				yield return (bin, packet.BodyReader().ReadArrayUInt32Length());
 			}
 
 			// NOTE: there is deliberately no capture-corpus loop here. It used to enumerate Captures/*.json while

@@ -5,7 +5,7 @@ using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
@@ -191,8 +191,8 @@ namespace Faolan.Tests
 			if (!File.Exists(bigboy))
 				return;
 
-			var packet = new ConanPacket(File.ReadAllBytes(bigboy));
-			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(bigboy));
+			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();

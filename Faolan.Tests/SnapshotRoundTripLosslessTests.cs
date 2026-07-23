@@ -4,7 +4,7 @@ using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
@@ -49,8 +49,8 @@ namespace Faolan.Tests
 
 		private static byte[] SplitRoot(string bin)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(TestPaths.Asset(bin)));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = PacketParser.Parse(File.ReadAllBytes(TestPaths.Asset(bin)));
+			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();

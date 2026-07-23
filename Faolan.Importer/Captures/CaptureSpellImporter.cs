@@ -8,7 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -416,7 +416,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				return new ConanPacket(packetBytes).Opcode == AddShortcutOpcode;
+				return PacketParser.Parse(packetBytes).Opcode == AddShortcutOpcode;
 			}
 			catch
 			{
@@ -442,11 +442,11 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
+				var packet = PacketParser.Parse(packetBytes);
 				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
 					return;
 
-				var body = packet.Body.ReadRemainingArray();
+				var body = packet.BodyReader().ReadRemainingArray();
 				if (body.Length != 4)
 					return;
 
@@ -469,11 +469,11 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
+				var packet = PacketParser.Parse(packetBytes);
 				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
 					return;
 
-				var body = packet.Body.ReadRemainingArray();
+				var body = packet.BodyReader().ReadRemainingArray();
 				if (body.Length != 4)
 					return;
 
@@ -516,7 +516,7 @@ namespace Faolan.Importer.Captures
 			instance = 0;
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
+				var packet = PacketParser.Parse(packetBytes);
 				instance = packet.Receiver.Instance;
 				return instance != 0;
 			}
@@ -530,11 +530,11 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
+				var packet = PacketParser.Parse(packetBytes);
 				if (packet.Opcode != 0x2000)
 					return;
 
-				var inner = packet.Body.ReadArrayUInt32Length();
+				var inner = packet.BodyReader().ReadArrayUInt32Length();
 				// inner: [subop4][c350 4][casterHandle4][flag byte][spellId4] -> spell id at offset 13.
 				if (inner.Length < 17 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != ApplySpellSubOpcode)
 					return;

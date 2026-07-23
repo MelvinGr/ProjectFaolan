@@ -775,7 +775,7 @@ namespace Faolan.Core.Enums
 	}
 
 	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface that carries a 32-bit method id in the header,
-	// right after the 16-bit opcode (`ConanPacket.HeaderData` - empty for every other interface). The client
+	// right after the 16-bit opcode (`Rpc.HeaderData` - empty for every other interface). The client
 	// dispatches on that 32-bit id; the 16-bit opcode is a normal 0x2000+index value carried alongside. The id per
 	// opcode lives in `PlayerAgentMethodIds` (the single source: WriteHeader appends it, gen/opcodes.md reads it) -
 	// all capture-verified. The 7 login-flow names (Authenticate/GetStartupData/FinishGetStartupData/

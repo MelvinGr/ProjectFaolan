@@ -8,7 +8,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -424,11 +424,11 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
+				var packet = PacketParser.Parse(packetBytes);
 				if (packet.Opcode != AddSpecialAbilityOpcode)
 					return;
 
-				var body = packet.Body.ReadRemainingArray();
+				var body = packet.BodyReader().ReadRemainingArray();
 
 				// The 0x2052 grant is exactly what AbilityGrantBody builds/parses (slot, id, data0, key1..4) - use its
 				// parser (which validates the full 81-byte shape) instead of re-reading the words by hand.
@@ -450,8 +450,8 @@ namespace Faolan.Importer.Captures
 		{
 			classId = 0;
 			token = null!;
-			var packet = new ConanPacket(packetBytes);
-			var s = packet.Body;
+			var packet = PacketParser.Parse(packetBytes);
+			var s = packet.BodyReader();
 			if (s.Length < 21)
 				return false;
 
@@ -512,8 +512,8 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
-				var body = packet.Body.ReadRemainingArray();
+				var packet = PacketParser.Parse(packetBytes);
+				var body = packet.BodyReader().ReadRemainingArray();
 
 				uint id;
 				if (isCombo)

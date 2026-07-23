@@ -7,7 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -82,11 +82,11 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var packet = new ConanPacket(packetBytes);
+				var packet = PacketParser.Parse(packetBytes);
 				if (packet.Opcode != IirCarrierOpcode)
 					return;
 
-				var inner = packet.Body.ReadArrayUInt32Length();
+				var inner = packet.BodyReader().ReadArrayUInt32Length();
 				if (inner.Length < BlobOffset || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != BankIirSubOpcode)
 					return;
 

@@ -15,7 +15,7 @@ namespace Faolan.Tests
 {
 	// Gitea #406 phase 6: the Conan DL logger renders its trace straight from the sent Rpc (ConanOutgoingPacketLogger
 	// carries NO byte[] re-parse anymore). This pins that the rendered line reflects the frame's REAL fields, checked
-	// against an INDEPENDENT parse of the serialized bytes (ConanPacket) - so a wrong field extraction from the Rpc
+	// against an INDEPENDENT parse of the serialized bytes (PacketParser) - so a wrong field extraction from the Rpc
 	// would fail even though the byte-parse path it used to be compared against is gone.
 	public class PacketLogRpcParityTests
 	{
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 				var packetLogger = new ConanOutgoingPacketLogger(capture, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes));
 
 				var wire = PacketSerializer.Serialize(rpc);
-				var parsed = new ConanPacket(wire); // the independent oracle: parse the serialized frame back
+				var parsed = PacketParser.Parse(wire); // the independent oracle: parse the serialized frame back
 
 				capture.Messages.Clear();
 				packetLogger.Log(in rpc, wire.Length);
@@ -70,12 +70,12 @@ namespace Faolan.Tests
 				// The rendered line must carry the frame's real fields (opcode, lengths, the header/body hex), each read
 				// from the independently-parsed packet - never from the Rpc the render used.
 				Assert.Contains(parsed.Opcode.ToHex(), line);
-				Assert.Contains($"bodyLength={parsed.Body?.Length ?? 0}", line);
+				Assert.Contains($"bodyLength={parsed.Body.Length}", line);
 				Assert.Contains($"packetLength={wire.Length}", line);
-				if (parsed.Body?.Length > 0)
+				if (parsed.Body.Length > 0)
 					Assert.Contains(parsed.Body.ToArray().ToHex(), line);
 				if (parsed.HeaderData.Length > 0)
-					Assert.Contains(parsed.HeaderData.ToHex(), line);
+					Assert.Contains(parsed.HeaderData.ToArray().ToHex(), line);
 			}
 			finally
 			{

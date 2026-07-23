@@ -21,7 +21,7 @@ namespace Faolan.Tests
 
 		// A real-format DispatchLearnSpell grant (#73): GameCharAgent 0xa9ecb95d -> GameCharInterface 0x8b87f791
 		// (receiver instance = DemoL80's character id 0x110099bd), body = [u32 spellId 0x4213cd]. Framing matches
-		// TsharkCaptureReader.Rebuild; the CRC is a placeholder (ConanPacket does not enforce it, and the importer
+		// TsharkCaptureReader.Rebuild; the CRC is a placeholder (PacketParser does not enforce the CRC, and the importer
 		// filters on opcode/class-pair/body only).
 		private const string LearnSpellHex = "0000002400000000000000180a070d5db9eca9105a120b0d91f7878b10bdb3828801200a004213cd";
 

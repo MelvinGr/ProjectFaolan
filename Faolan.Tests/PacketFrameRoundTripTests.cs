@@ -10,7 +10,7 @@ namespace Faolan.Tests
 {
 	// GUARDRAIL for the structured-packet-pipeline epic (Gitea #406). Locks the wire frame contract -
 	// [u32 length][u32 crc32][u32 headerLen][sender endpoint][receiver endpoint][u16 opcode][headerData][body] - by
-	// proving the serializer (PacketSerializer.Serialize) and the parser (ConanPacket / PacketParser) are mutual
+	// proving the serializer (PacketSerializer.Serialize) and the parser (PacketParser) are mutual
 	// inverses, cross-checked by the parser's INDEPENDENT crc recompute (IsValid). A rewrite that changes a single
 	// frame byte fails here rather than silently on the wire.
 	public class PacketFrameRoundTripTests
@@ -33,33 +33,21 @@ namespace Faolan.Tests
 			var frame = BuildFrame(senderType, senderInstance, receiverType, receiverInstance, opcode, headerData, body);
 
 			// Parse it back with the INBOUND parser and assert every field survives, including the CRC (recomputed
-			// independently by ConanPacket) - so this is not a build-echoes-itself tautology.
-			var parsed = new ConanPacket(frame);
-			Assert.True(parsed.IsValid, "crc32 written by the builder must validate under the parser's independent recompute");
-			Assert.Equal((uint)frame.Length - sizeof(uint), parsed.Length); // length prefix excludes its own 4 bytes
+			// independently by PacketParser.IsCrcValid) - so this is not a build-echoes-itself tautology.
+			var parsed = PacketParser.Parse(frame);
+			Assert.True(PacketParser.IsCrcValid(frame), "crc32 written by the builder must validate under the parser's independent recompute");
+			Assert.Equal(frame.Length, parsed.FrameLength);
 			Assert.Equal(senderType, parsed.Sender.Type);
 			Assert.Equal(senderInstance, parsed.Sender.Instance);
 			Assert.Equal(receiverType, parsed.Receiver.Type);
 			Assert.Equal(receiverInstance, parsed.Receiver.Instance);
 			Assert.Equal(opcode, parsed.Opcode);
-			Assert.Equal(headerData, parsed.HeaderData);
+			Assert.Equal(headerData, parsed.HeaderData.ToArray());
 			Assert.Equal(body, parsed.Body.ToArray());
 
 			// Re-serialize from the parsed fields and assert byte-for-byte equality with the original frame - the
-			// Serialize(Parse(bytes)) == bytes oracle, expressed with today's types.
-			var reserialized = BuildFrame(parsed.Sender.Type, parsed.Sender.Instance, parsed.Receiver.Type, parsed.Receiver.Instance, parsed.Opcode,
-				parsed.HeaderData, parsed.Body.ToArray());
-			Assert.Equal(frame, reserialized);
-
-			// Same oracle through the NEW structured functions (phase 2): PacketParser.Parse and PacketSerializer.Serialize
-			// must be inverses AND byte-identical to the frame the current builder produced.
-			var rpc = PacketParser.Parse(frame);
-			Assert.Equal(senderType, rpc.Sender.Type);
-			Assert.Equal(receiverType, rpc.Receiver.Type);
-			Assert.Equal(opcode, rpc.Opcode);
-			Assert.Equal(headerData, rpc.HeaderData.ToArray());
-			Assert.Equal(body, rpc.Body.ToArray());
-			Assert.Equal(frame, PacketSerializer.Serialize(rpc));
+			// Serialize(Parse(bytes)) == bytes oracle.
+			Assert.Equal(frame, PacketSerializer.Serialize(parsed));
 		}
 
 		// Endpoints.EndpointFromBytes must reconstruct a ProtoEndpoint that re-serializes to the EXACT input bytes, so
