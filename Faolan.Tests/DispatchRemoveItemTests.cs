@@ -2,7 +2,6 @@ using System;
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
-using Faolan.GameServer;
 using Xunit;
 
 namespace Faolan.Tests
@@ -24,12 +23,12 @@ namespace Faolan.Tests
 		public void RemoveItemBody_EncodesFields()
 		{
 			var s = new FaolanStream();
-			RemoveItemBody.WriteRemoveItemBody(s, GameServerListener.InventoryContainerBackpack, CharId, 5, 2);
+			RemoveItemBody.WriteRemoveItemBody(s, ContainerKind.Bag, CharId, 5, 2);
 			var body = s.ToArray();
 
 			Assert.Equal(16, body.Length);
 			var r = new FaolanStream(body);
-			Assert.Equal((uint)GameServerListener.InventoryContainerBackpack, r.ReadUInt32());
+			Assert.Equal((uint)ContainerKind.Bag, r.ReadUInt32());
 			Assert.Equal(CharId, r.ReadUInt32());
 			Assert.Equal(5u, r.ReadUInt32());
 			Assert.Equal(2u, r.ReadUInt32());

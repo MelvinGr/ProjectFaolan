@@ -14,10 +14,9 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
-using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
-using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Server.GameServer;
+using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
@@ -34,14 +33,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, IGameServerProvider
 	{
-		// Existing-character login no longer emits an opaque post-0x2024 record stream: world entry is CONSTRUCTED
-		// from the DB (#210 burst-less entry, SendWorldEntry). The create-editor still has a verbatim burst (#190).
-		// Inventory container ID32 types seen in the captured DispatchAddItem inventoryID (these equal the ContainerKind
-		// numbers: 0x68 = 104 Bag, 0x71 = 113 Quest). The Casilda-chain captures (casilda_quest_first_stage /
-		// compeltefirstquest) deliver the quest key via a live add to 0x71 - the quest-items tab (#261).
-		internal const ContainerKind InventoryContainerBackpack = ContainerKind.Bag;
-		internal const ContainerKind InventoryContainerQuest = ContainerKind.Quest;
-
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
 		// step, so any genuine step cancels the cast while aiming a ground-target reticle does not.

@@ -15,7 +15,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
@@ -596,7 +595,7 @@ namespace Faolan.GameServer
 					new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(character.Id, FullPlayerCharacterBuilder.BagKind, slot)),
 					new SnapshotItemBuilder.ItemStat(26, row.Count)
 				], row.Item!.Level);
-				await SendAddItem(client, InventoryContainerBackpack, (uint)row.Slot, entry);
+				await SendAddItem(client, ContainerKind.Bag, (uint)row.Slot, entry);
 				pushed++;
 			}
 

@@ -135,8 +135,8 @@ namespace Faolan.GameServer
 
 			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71), 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
 			var containerType = isQuestItem
-				? InventoryContainerQuest
-				: InventoryContainerBackpack;
+				? ContainerKind.Quest
+				: ContainerKind.Bag;
 			var entry = SnapshotItemBuilder.BuildListEntry((ulong)slot.Value, FullPlayerCharacterBuilder.ItemId(characterId, kind, (ulong)slot.Value),
 					FullPlayerCharacterBuilder.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
 				.Item;
@@ -162,7 +162,7 @@ namespace Faolan.GameServer
 				return false;
 
 			await Database.SetCharacterInventorySlot(characterId, FullPlayerCharacterBuilder.BagKind, slot, null);
-			await SendRemoveItem(client, InventoryContainerBackpack, (uint)slot, amountToRemove);
+			await SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
 			return true;
 		}
 
