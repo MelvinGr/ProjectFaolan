@@ -6,7 +6,7 @@ registration index`**, and the registration index is per-interface and contiguou
 
 > **Live on the wire (2026-07-08):** the Wireshark plugin resolves these names per packet
 > (`faolan.pkt.method`, COL_INFO `GameCharAgent TryLootItem`) via tables generated at build time from
-> the curated C# catalogs in `Faolan.Core.Network/Constants/Opcodes.cs` — that file, not this doc's
+> the curated C# catalogs in `Faolan.Core/Enums/Opcodes.cs` — that file, not this doc's
 > tables, is the canonical machine-readable form (`Faolan.Wireshark/scripts/gen_opcode_names.py`).
 > Regenerated `*.tshark.json` dumps carry the name as an additive `Method` key.
 

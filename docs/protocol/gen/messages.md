@@ -55,14 +55,14 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
 | V3 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder` | [V3: ShopOpenBuilderTests.BuildTradeSelectEcho_IsByteIdenticalToFrame1189] |
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootContainerTemplate` | [V3: LootBagMessageTests.BuildContents_RoundTripsByteExact] |
-| V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_EmptyPayload_IsTheBuffRemovalEndTwin] |
 | V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskCodecTests.ApproachTargetBody_MatchesCapture] |
 | V3 | `N3TeleportIIR` | `0x5A32F0D7` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
-| V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
 | V3 | `N3ToClientQuitIIR` | `0x04B82B2D` | `WorldDespawn` | [V3: WorldDespawnTests.BuildBody_MatchesRetailLayout] |
-| V3 | `NewAllowedLooterIIR` | `0x1E2E0139` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `NewAllowedLooterIIR` | `0x1E2E0139` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
+| V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
 | V3 | `NewLevelIIR` | `0x6D314743` | `NewLevelIirCodec` | [V3: NewLevelIirCodecTests.Build_Convenience_CarriesLevelWithZeroDeltas] |
 | V3 | `PetIIR` | `0x1F4CB0F7` | `PetIirCodec` | [V3: PetIirCodecTests.BuildAssign_Combat_MatchesCapture] |
 | V3 | `QuestFullUpdateIIR` | `0x63268258` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
@@ -90,7 +90,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `TradeskillReplyIIR` | `0x9062D559` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
-| V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryDeleteCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
 | V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |

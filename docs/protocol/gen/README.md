@@ -4,7 +4,7 @@ Everything in this directory is produced from the repo's own sources of truth:
 
 | File | Generated from |
 |------|----------------|
-| `opcodes.md` | `Faolan.Core.Network/Constants/Opcodes.cs` |
+| `opcodes.md` | `Faolan.Core/Enums/Opcodes.cs` |
 | `iir-types.md` | `Opcodes.cs` (BKDR-31 hash recomputed from each type name as proof) |
 | `protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` |
 | `coverage.md` | the repo (codecs, golden tests, dissectors) |

@@ -1,7 +1,7 @@
 # Opcode catalog (generated)
 
 > **GENERATED — do not edit.** Source: the compiled enums in
-> `Faolan.Core.Network/Constants/Opcodes.cs`, read by reflection.
+> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
 16 enums, 821 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).

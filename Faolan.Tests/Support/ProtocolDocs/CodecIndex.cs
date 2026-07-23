@@ -57,7 +57,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				idx.NameByValue[Convert.ToUInt32(f.GetRawConstantValue())] = f.Name;
 
 			// Codec -> the IIR types it DECLARES. HandledTypes wins (the whole set); else every `const uint *Opcode`.
-			foreach (var t in typeof(GameServer0X2000Opcodes).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("Faolan.Core.Network.Codecs", StringComparison.Ordinal)))
+			// Anchor the scan on a Faolan.Core.Network type (Rpc), NOT GameServer0X2000Opcodes: the opcode enums moved to
+			// Faolan.Core, so typeof(GameServer0X2000Opcodes).Assembly is now Faolan.Core.dll - the codecs live in
+			// Faolan.Core.Network.dll, and scanning the wrong assembly found zero codecs (every IIR fell back to "inline").
+			foreach (var t in typeof(Faolan.Core.Network.Protocol.Rpc).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("Faolan.Core.Network.Codecs", StringComparison.Ordinal)))
 			{
 				var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
 				var iirs = new HashSet<string>(StringComparer.Ordinal);
@@ -146,7 +149,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			idx.RpcOpcodeTotal = typeof(GameCharAgentOpcodes)
 				.Assembly.GetTypes()
-				.Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Network.Constants" && t.Name != "GameServer0X2000Opcodes")
+				.Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Enums" && t.Name.EndsWith("Opcodes", StringComparison.Ordinal) && t.Name != "GameServer0X2000Opcodes")
 				.Sum(t => t.GetFields(BindingFlags.Public | BindingFlags.Static).Length);
 			idx.Dissectors = Directory.EnumerateFiles(Path.Combine(repo, "tools", "capture"), "decode_*.py").Count();
 

@@ -48,7 +48,7 @@ must never be presented as "the message is decoded." Today that difference is in
 
 | File | Generated from | Content |
 |------|----------------|---------|
-| `gen/opcodes.md` | `Faolan.Core.Network/Constants/Opcodes.cs` | 17 interfaces × 819 entries, direction + class |
+| `gen/opcodes.md` | `Faolan.Core/Enums/Opcodes.cs` | 17 interfaces × 819 entries, direction + class |
 | `gen/iir-types.md` | same | 75 32-bit sub-opcodes, 74 with their **BKDR-31 hash recomputed from the type name as proof** |
 | `gen/protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` | 60 messages, **with `ZigZag`/`Default` field flags surfaced** |
 | `gen/coverage.md` | the repo | the coverage matrix (below) |

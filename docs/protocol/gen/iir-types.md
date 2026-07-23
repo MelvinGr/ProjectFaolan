@@ -1,7 +1,7 @@
 # IIR carrier type sub-opcodes (generated)
 
 > **GENERATED — do not edit.** Source: the compiled `GameServer0X2000Opcodes` enum in
-> `Faolan.Core.Network/Constants/Opcodes.cs`, read by reflection.
+> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
 These are the 32-bit type ids carried inside the GameServer `0x2000` (`DispatchPassBlob`) carrier —

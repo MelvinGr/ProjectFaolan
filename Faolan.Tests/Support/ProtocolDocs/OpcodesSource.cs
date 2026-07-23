@@ -16,7 +16,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		public static Dictionary<(string Enum, string Member), string> AllNotes()
 		{
 			var map = new Dictionary<(string, string), string>();
-			var src = File.ReadAllText(TestPaths.Repo("Faolan.Core.Network", "Constants", "Opcodes.cs"));
+			var src = File.ReadAllText(TestPaths.Repo("Faolan.Core", "Enums", "Opcodes.cs"));
 
 			string? currentEnum = null;
 			foreach (var line in src.Split('\n'))

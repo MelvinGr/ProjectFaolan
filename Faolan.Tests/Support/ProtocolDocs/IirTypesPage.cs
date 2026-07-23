@@ -53,7 +53,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("# IIR carrier type sub-opcodes (generated)");
 			sb.AppendLine();
 			sb.AppendLine("> **GENERATED — do not edit.** Source: the compiled `GameServer0X2000Opcodes` enum in");
-			sb.AppendLine("> `Faolan.Core.Network/Constants/Opcodes.cs`, read by reflection.");
+			sb.AppendLine("> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.");
 			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
 			sb.AppendLine();
 			sb.AppendLine("These are the 32-bit type ids carried inside the GameServer `0x2000` (`DispatchPassBlob`) carrier —");

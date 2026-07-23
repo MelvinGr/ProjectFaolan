@@ -58,7 +58,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var idByClass = ExpectedClassIds.ToDictionary(x => x.Class, x => x.Id);
 			var notes = OpcodesSource.AllNotes();
 
-			var enums = typeof(GameCharAgentOpcodes).Assembly.GetTypes().Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Network.Constants").OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+			var enums = typeof(GameCharAgentOpcodes).Assembly.GetTypes().Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Enums" && t.Name.EndsWith("Opcodes", StringComparison.Ordinal)).OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
 
 			const string iirEnum = "GameServer0X2000Opcodes"; // the 32-bit IIR sub-opcodes live on iir-types.md
 			var tabled = enums.Where(e => e.Name != iirEnum).ToList();
@@ -68,7 +68,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("# Opcode catalog (generated)");
 			sb.AppendLine();
 			sb.AppendLine("> **GENERATED — do not edit.** Source: the compiled enums in");
-			sb.AppendLine("> `Faolan.Core.Network/Constants/Opcodes.cs`, read by reflection.");
+			sb.AppendLine("> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.");
 			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
 			sb.AppendLine();
 			sb.AppendLine($"{tabled.Count} enums, {total} entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).");
