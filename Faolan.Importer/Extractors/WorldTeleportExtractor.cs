@@ -74,7 +74,7 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 38)
 					continue;
 
-				if (p.IsDownload && p.SubOpcode == MapChangeSubOpcode)
+				if (p is { IsDownload: true, SubOpcode: MapChangeSubOpcode })
 				{
 					var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
 					if (map != currentMap)

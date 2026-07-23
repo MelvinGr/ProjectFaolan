@@ -33,7 +33,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				.ThenBy(x => x.Name, StringComparer.Ordinal)
 				.ToList();
 
-			var v3WithCitation = rows.Count(r => r.Level == "V3" && r.Golden != null);
+			var v3WithCitation = rows.Count(r => r is { Level: "V3", Golden: not null });
 			var v3Total = rows.Count(r => r.Level == "V3");
 
 			var sb = new StringBuilder();

@@ -1105,11 +1105,11 @@ namespace Faolan.GameServer
 		private async Task HandleGameAgentPacket(INetworkClient client, Rpc packet)
 		{
 			var body = packet.BodyReader();
-			var gaOp = (GameAgentOpcodes)packet.Opcode;
-			if (gaOp is not GameAgentOpcodes.UpdateGameServerStats)
+			var opcode = (GameAgentOpcodes)packet.Opcode;
+			if (opcode is not GameAgentOpcodes.UpdateGameServerStats)
 				LogPacketReceived(packet);
 
-			switch (gaOp)
+			switch (opcode)
 			{
 				case GameAgentOpcodes.Authenticate2:
 				{
@@ -1286,8 +1286,6 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
-					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
 					LogUnknownPacket(packet);
 					break;
 				}
@@ -1299,11 +1297,11 @@ namespace Faolan.GameServer
 		private async Task HandleGameCharAgentPacket(INetworkClient client, Rpc packet)
 		{
 			var body = packet.BodyReader();
-			var charOp = (GameCharAgentOpcodes)packet.Opcode;
-			if (charOp is not GameCharAgentOpcodes.Ping)
+			var opcode = (GameCharAgentOpcodes)packet.Opcode;
+			if (opcode is not GameCharAgentOpcodes.Ping)
 				LogPacketReceived(packet);
 
-			switch (charOp)
+			switch (opcode)
 			{
 				case GameCharAgentOpcodes.RequestBindLocation: // 0x2002 = RequestBindLocation
 				{
@@ -1669,7 +1667,7 @@ namespace Faolan.GameServer
 					// (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn - Blablabla create
 					// capture f444/449 (dest map 0x0FAA, pos 322.5,150,704.9, descriptor 0x32) - else the player stays
 					// at the drowning cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
-					if (client.Session.IsCreateEditorConnection && client.Session.AwaitingEnterWorld)
+					if (client.Session is { IsCreateEditorConnection: true, AwaitingEnterWorld: true })
 					{
 						client.Session.AwaitingEnterWorld = false;
 						await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
@@ -1687,8 +1685,6 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
-					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
 					LogUnknownPacket(packet);
 					break;
 				}
@@ -1744,9 +1740,7 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					// Other GameCharAgentProject methods are not loading gates and retail's replies aren't decoded yet -
-					// log and no-op rather than misparse them.
-					Logger.LogDebug("GameCharAgentProject opcode 0x{Opcode:X4} (unhandled, no reply).", packet.Opcode);
+					LogUnknownPacket(packet);
 					break;
 				}
 			}

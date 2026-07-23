@@ -548,7 +548,7 @@ namespace Faolan.GameServer.Combat
 		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity? npcEntity)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player != null && _sim.World.ZoneForEntity(player).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
+			if (player != null && _sim.World.ZoneForEntity(player).TryGet(targetHandle, out npcEntity) && npcEntity is { IsPlayer: false, Vitals: not null })
 				return npcEntity.Vitals;
 
 			npcEntity = null!;

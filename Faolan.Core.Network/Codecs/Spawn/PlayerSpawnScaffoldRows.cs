@@ -278,7 +278,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
 		{
 			var preFrame = scaffold?.PreFrame;
-			return preFrame is { } f && f.Length >= VanityShownMaskOffset + 4
+			return preFrame is { Length: >= VanityShownMaskOffset + 4 } f
 				? BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(VanityShownMaskOffset, 4))
 				: 0u;
 		}

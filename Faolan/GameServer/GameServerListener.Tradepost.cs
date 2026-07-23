@@ -274,8 +274,8 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostPacket(INetworkClient client, Rpc packet)
 		{
 			var body = packet.BodyReader();
-			var method = (TradepostAgentOpcodes)packet.Opcode;
-			switch (method)
+			var opcode = (TradepostAgentOpcodes)packet.Opcode;
+			switch (opcode)
 			{
 				case TradepostAgentOpcodes.UpdateItemTimeouts:
 				{
@@ -349,13 +349,13 @@ namespace Faolan.GameServer
 				case TradepostAgentOpcodes.MarkMailRead:
 				case TradepostAgentOpcodes.DeleteMail:
 				{
-					await HandleTradepostMailOp(client, packet, method);
+					await HandleTradepostMailOp(client, packet, opcode);
 					break;
 				}
 
 				default:
 				{
-					Logger.LogInformation("Tradepost: {Char} unknown method 0x{Method:X4} (bodylen={Len}).", client.Session.Character.Name, packet.Opcode, body.Length);
+					LogUnknownPacket(packet);
 					break;
 				}
 			}

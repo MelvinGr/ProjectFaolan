@@ -149,7 +149,7 @@ namespace Faolan.Core.Rdb.Assets
 			var edge2 = v2 - v0;
 			var pvec = Vector3.Cross(dir, edge2);
 			var det = Vector3.Dot(edge1, pvec);
-			if (det > -eps && det < eps)
+			if (det is > -eps and < eps)
 				return false; // parallel
 
 			var inv = 1f / det;

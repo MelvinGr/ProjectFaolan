@@ -111,7 +111,7 @@ namespace Faolan.GameServer.Combat
 
 			var combatBonus = (int)combatRating / CombatRatingDamageDivisor;
 
-			if (weaponMinDamage is { } min && weaponMaxDamage is { } max && max > 0)
+			if (weaponMinDamage is { } min && weaponMaxDamage is { } max and > 0)
 			{
 				var roll = Math.Clamp(rollPercent, 0, 100);
 				var rolled = min + (max - min) * roll / 100; // interpolate min..max

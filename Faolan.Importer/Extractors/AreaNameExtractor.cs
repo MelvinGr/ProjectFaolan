@@ -54,7 +54,7 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 30)
 					continue; // a CharDCMove body is shorter than the 38 a MapChange needs; each check re-validates its own length
 
-				if (p.SubOpcode == MapChangeSubOpcode && p.IsDownload && body.Length >= 38 && MapChangeCodec.TryParse(body.AsSpan(4), out var mc))
+				if (p is { SubOpcode: MapChangeSubOpcode, IsDownload: true } && body.Length >= 38 && MapChangeCodec.TryParse(body.AsSpan(4), out var mc))
 				{
 					var map = mc.MapId;
 					if (map != currentMap)
@@ -66,7 +66,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				if (p.SubOpcode == MoveSubOpcode && !p.IsDownload && TryReadMovePosition(body, out var moved))
+				if (p is { SubOpcode: MoveSubOpcode, IsDownload: false } && TryReadMovePosition(body, out var moved))
 				{
 					pos = moved;
 					continue;

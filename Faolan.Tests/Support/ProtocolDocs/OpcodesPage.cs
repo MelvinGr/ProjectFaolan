@@ -58,7 +58,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var idByClass = ExpectedClassIds.ToDictionary(x => x.Class, x => x.Id);
 			var notes = OpcodesSource.AllNotes();
 
-			var enums = typeof(GameCharAgentOpcodes).Assembly.GetTypes().Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Enums" && t.Name.EndsWith("Opcodes", StringComparison.Ordinal)).OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+			var enums = typeof(GameCharAgentOpcodes).Assembly.GetTypes().Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } && t.Name.EndsWith("Opcodes", StringComparison.Ordinal)).OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
 
 			const string iirEnum = "GameServer0X2000Opcodes"; // the 32-bit IIR sub-opcodes live on iir-types.md
 			var tabled = enums.Where(e => e.Name != iirEnum).ToList();

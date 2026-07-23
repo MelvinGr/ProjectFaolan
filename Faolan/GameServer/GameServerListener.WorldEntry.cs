@@ -587,7 +587,7 @@ namespace Faolan.GameServer
 
 			var rows = await Database.GetCharacterInventory(character.Id);
 			var pushed = 0;
-			foreach (var row in rows.Where(r => r.Container == FullPlayerCharacterBuilder.BagKind && r.ItemId != null && r.Item is { Hash: 0 }))
+			foreach (var row in rows.Where(r => r is { Container: FullPlayerCharacterBuilder.BagKind, ItemId: not null, Item.Hash: 0 }))
 			{
 				var slot = (ulong)row.Slot;
 				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, slot), row.Item!, 0,

@@ -984,7 +984,7 @@ namespace Faolan.GameServer.CreateFlow
 		// existing-character login so the intro/cutscene bursts only fire there.
 		private static bool IsCreateWorldConnection(INetworkClient client)
 		{
-			return client.Session.IsCreateWorldSession && client.Session.Character?.Name != null;
+			return client.Session is { IsCreateWorldSession: true, Character.Name: not null };
 		}
 
 		// The editor map's scene-prop WorldObjects, keyed by captured handle. Null when no DB is available.

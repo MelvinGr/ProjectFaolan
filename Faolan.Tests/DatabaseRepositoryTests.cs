@@ -93,7 +93,7 @@ namespace Faolan.Tests
 
 				var rows = await repo.GetCharacterInventory(character.Id);
 				Assert.DoesNotContain(rows, r => r.Container == bank); // bank now empty
-				Assert.Contains(rows, r => r.Container == bag && r.Slot == 0 && r.ItemId == itemId);
+				Assert.Contains(rows, r => r is { Container: bag, Slot: 0, ItemId: itemId });
 			}
 			finally
 			{

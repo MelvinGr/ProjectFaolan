@@ -1,3 +1,5 @@
+using System;
+
 namespace Faolan.Core.Network.Server.ChatServer
 {
 	/// <summary>
@@ -5,5 +7,6 @@ namespace Faolan.Core.Network.Server.ChatServer
 	///     tooling (e.g. the in-process MCP server). Decoupled from the live INetworkClient
 	///     so callers can't mutate connection state.
 	/// </summary>
+	[Obsolete]
 	public sealed record SessionInfo(string IpAddress, uint? AccountId, string? AccountName, uint? CharacterId, string? CharacterName);
 }

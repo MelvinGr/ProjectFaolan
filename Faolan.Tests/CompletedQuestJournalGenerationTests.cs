@@ -156,7 +156,7 @@ namespace Faolan.Tests
 			}
 
 			o.WriteLine($"goals seen={spell.Count}  always-localized={spell.Count(k => k.Value.Remote == 0)}  " +
-			            $"always-remoteformat={spell.Count(k => k.Value.Localized == 0)}  MIXED={spell.Count(k => k.Value.Localized > 0 && k.Value.Remote > 0)}");
+			            $"always-remoteformat={spell.Count(k => k.Value.Localized == 0)}  MIXED={spell.Count(k => k.Value is { Localized: > 0, Remote: > 0 })}");
 			foreach (var k in spell.Where(x => x.Key is 1448 or 3490))
 				o.WriteLine($"  goal {k.Key}: localized={k.Value.Localized} remoteformat={k.Value.Remote}");
 
@@ -310,7 +310,7 @@ namespace Faolan.Tests
 				// (#389), not a builder defect. Their PARSE round-trip is still guarded by the corpus round-trip gate.
 				bool Generatable(QuestIndexRegion.Block b)
 				{
-					return b.TrailerA == 1 && b.TrailerB == 0 && b.TrailerC == 0 && (b.AreaQuestSequences.Count == 0 || b.AreaQuestSequences.Select((s, i) => s == (uint)(i + 1)).All(x => x));
+					return b is { TrailerA: 1, TrailerB: 0, TrailerC: 0 } && (b.AreaQuestSequences.Count == 0 || b.AreaQuestSequences.Select((s, i) => s == (uint)(i + 1)).All(x => x));
 				}
 
 				// Multi-block (multi-quest) indexes are DB-generation follow-up (#389): the per-quest chain of leadArea

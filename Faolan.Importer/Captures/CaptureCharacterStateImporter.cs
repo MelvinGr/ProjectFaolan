@@ -51,7 +51,7 @@ namespace Faolan.Importer.Captures
 
 				var character = packet.Receiver.Instance;
 
-				if (packet.Opcode == 0x2005 && packet.Body.Length == 12)
+				if (packet is { Opcode: 0x2005, Body.Length: 12 })
 				{
 					money[character] = packet.BodyReader().ReadUInt64(); // last one wins (absolute balance)
 					continue;

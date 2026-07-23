@@ -30,7 +30,7 @@ namespace Faolan.GameServer.Combat
 
 			return zone
 				.EntitiesInRange(primary.Position, radius, primary.Handle)
-				.Where(e => !e.IsPlayer && e.Hostile && e.Vitals != null && !e.IsDead)
+				.Where(e => e is { IsPlayer: false, Hostile: true, Vitals: not null, IsDead: false })
 				.OrderBy(e => Vector3.Distance(e.Position, primary.Position))
 				.Take(max)
 				.ToList();

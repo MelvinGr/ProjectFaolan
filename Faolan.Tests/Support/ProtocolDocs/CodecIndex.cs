@@ -153,7 +153,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			idx.RpcOpcodeTotal = typeof(GameCharAgentOpcodes)
 				.Assembly.GetTypes()
-				.Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Enums" && t.Name.EndsWith("Opcodes", StringComparison.Ordinal) && t.Name != "GameServer0X2000Opcodes")
+				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } && t.Name.EndsWith("Opcodes", StringComparison.Ordinal) && t.Name != "GameServer0X2000Opcodes")
 				.Sum(t => t.GetFields(BindingFlags.Public | BindingFlags.Static).Length);
 			idx.Dissectors = SourceFiles(Path.Combine(repo, "tools", "capture"), "decode_*.py", SearchOption.TopDirectoryOnly).Count;
 

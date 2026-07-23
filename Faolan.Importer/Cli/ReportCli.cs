@@ -270,7 +270,7 @@ namespace Faolan.Importer.Cli
 						var runs = new List<string>();
 						foreach (var b in dec)
 						{
-							if (b >= 32 && b < 127)
+							if (b is >= 32 and < 127)
 								sb.Append((char)b);
 							else
 							{

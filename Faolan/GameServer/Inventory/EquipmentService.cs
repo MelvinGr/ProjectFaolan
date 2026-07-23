@@ -52,7 +52,7 @@ namespace Faolan.GameServer.Inventory
 				{
 					var equipment = await _database.GetCharacterEquipment(character.Id);
 					var rows = await _database.GetCharacterInventory(character.Id);
-					if (equipment?.FirstPosBag != null && rows.All(r => !(r.Container == (ContainerKind)bag && r.Slot == firstBagPos)))
+					if (equipment?.FirstPosBag != null && rows.All(r => !(r is { Container: (ContainerKind)bag, Slot: firstBagPos })))
 					{
 						equipment.FirstPosBag = null;
 						await _database.SaveCharacterEquipment(equipment);

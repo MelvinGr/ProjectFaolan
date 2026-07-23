@@ -1501,7 +1501,7 @@ namespace Faolan.GameServer.World
 			// in progress or after it's been turned in (Completed).
 			return held == null
 				? QuestMarkerAvailable
-				: held.State == QuestState.Active && held.GoalRequired > 0 && held.GoalProgress >= held.GoalRequired
+				: held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired
 					? QuestMarkerTurnIn
 					: QuestMarkerNone;
 		}
@@ -1523,7 +1523,7 @@ namespace Faolan.GameServer.World
 						// Register a streamed-in NPC's handle -> name + template so clicking it routes to the right
 						// conversation/shop by the stable template key (the same map the world-burst spawns use; players
 						// are not conversation targets).
-						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot && ev.Subject.Name != null)
+						if (ev.Subject is { IsPlayer: false, IsLoot: false, Name: not null })
 						{
 							recipient.Session.SpawnedNpcNamesByHandle[ev.Subject.Handle] = ev.Subject.Name;
 							recipient.Session.SpawnedNpcTemplatesByHandle[ev.Subject.Handle] = ev.Subject.NpcTemplateId;
@@ -1533,7 +1533,7 @@ namespace Faolan.GameServer.World
 						// #241: when a quest-giver NPC enters view, set its marker from THIS viewer's quest state
 						// (! available / ? ready-to-turn-in / none active). Recomputed per entry, so it transitions as
 						// the player accepts/completes (e.g. Casilda shows ! then ? after the quest is done).
-						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot)
+						if (ev.Subject is { IsPlayer: false, IsLoot: false })
 							await SendQuestMarkerIfGiver(recipient, ev.Subject);
 						// NOTE: we deliberately do NOT replay the captured patrol route (SendPatrol) on spawn. That route is
 						// a CLIENT-only walk the SERVER can't track - it left entity.Position pinned at spawn while the client
@@ -1543,7 +1543,7 @@ namespace Faolan.GameServer.World
 						// death/loot/aggro land where the client actually has it.
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
-					if (!ev.Subject.IsPlayer && ev.Subject.NpcTemplateId == QuestHandlerService.CasildaTemplateId && recipient.Session.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
+					if (ev.Subject is { IsPlayer: false, NpcTemplateId: QuestHandlerService.CasildaTemplateId } && recipient.Session.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
 							await _questHandler.SendCasildaPose(recipient, ev.Subject.Handle, true);
 						break;
 					}

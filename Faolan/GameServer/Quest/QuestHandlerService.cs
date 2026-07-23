@@ -65,7 +65,7 @@ namespace Faolan.GameServer.Quest
 			if (player == null || await EscorteeTemplateId(client.Session.Character.Id) != CasildaTemplateId)
 				return;
 
-			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.NpcTemplateId == CasildaTemplateId);
+			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => e is { IsPlayer: false, NpcTemplateId: CasildaTemplateId });
 			if (casilda != null)
 				await SendCasildaPose(client, casilda.Handle, false);
 		}

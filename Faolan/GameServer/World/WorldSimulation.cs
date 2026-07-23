@@ -598,7 +598,7 @@ namespace Faolan.GameServer.World
 			{
 				var nearest = zone
 					.EntitiesInRange(deathPosition, PlayerInterestRange, selfHandle)
-					.Where(e => e.Hostile && !e.IsDead && e.Vitals != null)
+					.Where(e => e is { Hostile: true, IsDead: false, Vitals: not null })
 					.OrderBy(e => Vector3.Distance(e.Position, deathPosition))
 					.FirstOrDefault();
 				if (nearest != null)
