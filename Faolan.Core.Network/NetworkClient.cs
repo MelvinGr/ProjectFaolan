@@ -167,20 +167,18 @@ namespace Faolan.Core.Network
 		private async Task DataReceivedAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
 		{
 			// Frame the recv window in place (no copy), THEN dispatch: the span can't outlive the call, and the loop
-			// below awaits.
+			// below awaits. Indexed, so a frame batch costs no enumerator either.
 			var frames = _messageFramer.PushBytes(data.Span);
 
-			var dispatchedAny = false;
-			foreach (var frame in frames)
+			for (var i = 0; i < frames.Count; i++)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 
-				await DispatchFrame(frame);
-				dispatchedAny = true;
+				await DispatchFrame(frames[i]);
 			}
 
 			// The batch this recv carried is fully dispatched - signal the "batch drained" boundary (#197).
-			if (dispatchedAny && ReceivedBatchComplete != null)
+			if (frames.Count > 0 && ReceivedBatchComplete != null)
 				await ReceivedBatchComplete(this);
 		}
 

@@ -32,9 +32,10 @@ namespace Faolan.Core.Network.Packets.Conan
 		private int _markerSkipRemaining;
 		private int _payloadBytesRead;
 
-		public IEnumerable<byte[]> PushBytes(ReadOnlySpan<byte> bytes)
+		public IReadOnlyList<byte[]> PushBytes(ReadOnlySpan<byte> bytes)
 		{
-			var packets = new List<byte[]>();
+			// Allocated only if this recv actually completes a frame - a big packet spans many recvs that complete none.
+			List<byte[]>? packets = null;
 			var offset = 0;
 
 			while (offset < bytes.Length)
@@ -63,7 +64,7 @@ namespace Faolan.Core.Network.Packets.Conan
 
 					if (_payloadBytesRead == payloadLength)
 					{
-						packets.Add(_frame);
+						(packets ??= []).Add(_frame);
 						_frame = null;
 						_payloadBytesRead = 0;
 					}
@@ -108,7 +109,7 @@ namespace Faolan.Core.Network.Packets.Conan
 				_payloadBytesRead = 0;
 			}
 
-			return packets;
+			return packets ?? [];
 		}
 	}
 }
