@@ -215,7 +215,7 @@ namespace Faolan.GameServer
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
 			IGameServerDispatcher gameServerDispatcher) : base(realm.Port, logger, configuration, database,
-			new ConanPacketTracer(logger, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes)))
+			new GameServerPacketTracer(logger))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;

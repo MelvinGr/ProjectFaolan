@@ -18,7 +18,8 @@ namespace Faolan.Tests
 	// parse of the serialized bytes - the TX path renders straight from the Rpc (no re-parse), so a wrong field
 	// extraction has to fail against something other than itself. (2) RX and TX of the same frame render IDENTICALLY
 	// apart from the direction tag: same name, same lengths, same byte dump - which is what "unified" has to mean, and
-	// is only true because both directions go through ConanPacketTracer.Trace.
+	// is only true because both directions go through ConanPacketTracer.Trace. Most cases run through the GameServer
+	// tracer, the one tier that renders the extra IIR sub-opcode on top of that shared line.
 	public class PacketTraceTests
 	{
 		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
@@ -143,9 +144,27 @@ namespace Faolan.Tests
 			Assert.DoesNotContain("subOpcode=", line);
 		}
 
-		private static ConanPacketTracer Tracer(ILogger logger)
+		// The IIR line shape belongs to the GameServer tier alone - it is the only one that multiplexes a sub-protocol
+		// inside a carrier. To a login-tier tracer the same body is opaque, so it renders the plain line.
+		[Fact]
+		public void PlainConanTracer_DoesNotReadABodyAsAnIirCarrier()
 		{
-			return new ConanPacketTracer(logger, "GameServer", typeof(GameCharInterfaceOpcodes), typeof(GameServer0X2000Opcodes));
+			var capture = new CapturingLogger();
+			var tracer = new ConanPacketTracer(capture, "UniverseAgent", typeof(UniverseInterfaceOpcodes));
+
+			var rpc = new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
+				(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
+
+			tracer.Transmitted(in rpc, PacketSerializer.Serialize(rpc).Length);
+
+			var line = Assert.Single(capture.Messages);
+			Assert.Contains("DispatchPassBlob (0x2000)", line);
+			Assert.DoesNotContain("subOpcode=", line);
+		}
+
+		private static GameServerPacketTracer Tracer(ILogger logger)
+		{
+			return new GameServerPacketTracer(logger);
 		}
 
 		// Renders with the headerData/body hex included, so the whole line is under test.
