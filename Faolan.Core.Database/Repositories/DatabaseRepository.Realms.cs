@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface IRealmRepository
 	{
 		Task<Realm?> GetRealm(uint id);
 		Task<Realm[]> GetRealms();

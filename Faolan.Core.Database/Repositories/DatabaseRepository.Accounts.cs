@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface IAccountRepository
 	{
 		Task<bool> CheckLogin(string username, string password);
 		Task CreateAccountClaim(AccountClaim claim);

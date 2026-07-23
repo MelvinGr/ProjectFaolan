@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface ICharacterRepository
 	{
 		Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds);
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);

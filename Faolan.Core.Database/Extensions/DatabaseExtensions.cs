@@ -37,6 +37,18 @@ namespace Faolan.Core.Database.Extensions
 
 			services.AddSingleton<IDatabaseRepository, DatabaseRepository>();
 
+			// Forward each cohesive per-domain port (Gitea #353) to the single DatabaseRepository instance, so a
+			// collaborator can depend on the NARROW interface it actually uses (e.g. IGuildRepository) and still get the
+			// one shared singleton - no second instance, no context-factory duplication.
+			services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICatalogRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IEconomyRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IGuildRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<INpcRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IRealmRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IWorldRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+
 			return services;
 		}
 

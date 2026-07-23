@@ -206,7 +206,7 @@ namespace Faolan
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
 				// stop in reverse order, flips the realm Offline first as shutdown begins (#324).
 				builder.Services.AddScopedHostedService(provider =>
-					new RealmStatusService(provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<ILogger<RealmStatusService>>(), hostRealm!.Id));
+					new RealmStatusService(provider.GetRequiredService<IRealmRepository>(), provider.GetRequiredService<ILogger<RealmStatusService>>(), hostRealm!.Id));
 			}
 
 			// One host. When MCP runs, the builder is a WebApplication - map the endpoint onto its Kestrel and run it;

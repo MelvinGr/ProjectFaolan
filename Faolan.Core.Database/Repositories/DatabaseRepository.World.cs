@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface IWorldRepository
 	{
 		Task<int> DeleteWorldObject(uint mapId, uint capturedHandle);
 		Task<RespawnPoint?> GetDefaultSpawn(uint mapId);

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface INpcRepository
 	{
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);

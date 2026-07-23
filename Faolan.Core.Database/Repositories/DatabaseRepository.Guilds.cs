@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface IGuildRepository
 	{
 		Task<Guild?> CreateGuild(string name, uint leaderCharacterId);
 		Task<Guild?> GetGuild(uint id);

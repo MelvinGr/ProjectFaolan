@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface IEconomyRepository
 	{
 		Task CreateMail(Mail mail);
 		Task CreateTradepostListing(TradepostListing listing);

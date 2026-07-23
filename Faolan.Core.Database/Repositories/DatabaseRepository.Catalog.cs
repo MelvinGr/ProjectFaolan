@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	public partial interface IDatabaseRepository
+	public interface ICatalogRepository
 	{
 		Task<Ability[]> GetAbilities();
 		Task<Ability?> GetAbility(uint id);
