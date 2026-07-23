@@ -21,7 +21,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		// Assembles a whole NPC FA015807 spawn body FROM SCRATCH (#244) - no captured template. The playfield token is
 		// written into the transform directly (no post-hoc SpawnPlayfieldRewriter), and every section has its own
-		// builder: header constants + handle; transform = [2C 0A <vec3 LE> 12 <quat LE> 18 <token varint>]; pre-IIR =
+		// builder: header constants + handle; transform = [<len> 0A <vec3 LE> 12 <quat LE> 18 <token varint>] where <len>
+		// is the transform's own byte length (0x2C for a 4-byte token, less for a shorter one - see below); pre-IIR =
 		// NpcSpawnPreIir.BuildMinimal; the CoreChar header [41][X][msgLen] with X = the lifted IirHeader; the serialised
 		// CharacterIIR message; and the post-IIR: the appearance/morph table when `morphs` are given, else the minimal
 		// form with `minimalRecordCount` (the type-stable 1 or 2 - #243).
@@ -36,23 +37,31 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				? NpcSpawnAppearanceCodec.BuildPostIir(morphs)
 				: NpcSpawnScaffold.BuildMinimalPostIir(minimalRecordCount);
 
+			// The base transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
+			// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order.
+			var transform = new ProtoGameCodeDynelIIR
+			{
+				Position = position,
+				Rotation = rotation,
+				PlayfieldInstance = playfieldToken
+			}.ToProtobuf();
+
 			var body = new FaolanStream()
 				.WriteUInt32(0) // body length placeholder (set below)
 				.WriteUInt32(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR) // the entity-spawn subop ("Spawn")
 				.WriteUInt32(EntityClass.Character) // 0x0000C350 ack
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // fieldA
-								// The 0x2C transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
-								// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order, and every
-								// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
-								// already 4 bytes, so SpawnPlayfieldRewriter's splice-free in-place re-address still holds.
-				.WriteByte(0x2C)
-				.WriteArray(new ProtoGameCodeDynelIIR
-				{
-					Position = position,
-					Rotation = rotation,
-					PlayfieldInstance = playfieldToken
-				}.ToProtobuf())
+				// Transform-length prefix: the client reads EXACTLY this many bytes as the base transform, THEN reads
+				// the SimpleCharFullUpdateIIR version byte - so it MUST equal the actual transform length. It is 0x2C
+				// (44) for the usual 4-byte playfield-token varint (every captured token falls in [2^21, 2^28), which
+				// protobuf-net writes as 4 bytes), which is why it was long hardcoded. But a 0/small token encodes to a
+				// SHORTER varint (a 0 token -> a 41-byte transform); a hardcoded 0x2C then over-reads by 3, so the client
+				// reads the version byte 3 bytes late as 0x00 and asserts "Wrong client version of SimpleCharFullupdateIIR
+				// (clientversion: 5, serverversion: 0)". Compute it from the actual transform so ANY token width stays
+				// self-consistent. (SpawnPlayfieldRewriter can only re-stamp a token that is ALREADY a 4-byte varint.)
+				.WriteVarint((ulong)transform.Length)
+				.WriteArray(transform)
 				.WriteArray(preIir)
 				.WriteByte(0x41)
 				.WriteUInt32(iirHeader)
@@ -111,12 +120,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO world
-		// placement (#244/#307). This is what a summoned PET/MOUNT uses: the creature type carries the lifted stat core
-		// (NpcTemplate.StatCore), worn equipment (NpcTemplate.Equipment), appearance morphs (NpcTemplate.Morphs) and the no-morph recordCount,
-		// and we assemble the whole body FROM SCRATCH at the summoner's position - no captured Data blob. The token is a
-		// placeholder (the caller re-stamps it per recipient via SendWorldSpawn). Returns false if the type has no
-		// lifted stat core.
-		public static byte[] BuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation)
+		// placement (#244/#307). This is what a summoned PET/MOUNT and an AMBIENT-POOL member use: the creature type
+		// carries the lifted stat core (NpcTemplate.StatCore), worn equipment (NpcTemplate.Equipment), appearance morphs
+		// (NpcTemplate.Morphs) and the no-morph recordCount, and we assemble the whole body FROM SCRATCH at the summoner's
+		// position - no captured Data blob. `playfieldToken` MUST be the spawning zone's live token (Zone.PlayfieldToken):
+		// it is baked into the transform, and SendWorldSpawn later re-stamps it per recipient via SpawnPlayfieldRewriter -
+		// but that rewriter can only overwrite a token that is ALREADY a 4-byte varint, so passing 0 (a 1-byte varint) both
+		// left the token un-re-stampable AND made the transform 3 bytes short of the length prefix, desyncing the client's
+		// version read into a crash (see BuildBody). Zone tokens are always 4-byte (WorldState mints them from 0x00A00000),
+		// so passing the zone token keeps the body wire-correct. Throws if the type has no lifted stat core.
+		public static byte[] BuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, uint playfieldToken)
 		{
 			if (npc?.StatCore?.IirHeader is not { } x)
 				throw new InvalidOperationException($"NpcTemplate '{npc?.Name ?? "?"}' (id {npc?.TemplateId}) has no lifted StatCore.IirHeader - the type is not imported/lifted (or StatCore was not Included).");
@@ -133,7 +146,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var message = BuildMessageFromType(npc);
 
 			var minimalRc = npc.StatCore.MinimalPostIirRecordCount ?? NpcSpawnScaffold.MinimalRecordCount;
-			return BuildBody(handle, x, position, rotation, 0, message, morphs, minimalRc);
+			return BuildBody(handle, x, position, rotation, playfieldToken, message, morphs, minimalRc);
 		}
 
 		// The LIVE spawn path (#244/#243): assemble the whole body from typed columns with `playfieldToken` baked into

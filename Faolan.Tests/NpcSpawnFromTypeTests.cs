@@ -40,7 +40,12 @@ namespace Faolan.Tests
 			Assert.NotEmpty(types); // the necro pet family is imported by default in the shipped DB
 			foreach (var npc in types)
 			{
-				var body = NpcSpawnBuilder.BuildFromType(npc, 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity);
+				// A live zone token (4-byte varint, in [2^21, 2^28) like every real one). The version-offset check below
+				// is what catches the #-crash regression: BuildFromType used to bake token 0 (a 1-byte varint), leaving the
+				// transform 3 bytes shorter than its hardcoded 0x2C length prefix - so the client read the version byte 3
+				// bytes late as 0x00 and asserted. TryReadCharacterMessage (a name-signature SCAN) never noticed.
+				var body = NpcSpawnBuilder.BuildFromType(npc, 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity, 0x00A0BEEF);
+				AssertVersionByteFollowsTransformPrefix(body, npc.Name);
 				Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read), $"{npc.Name} body did not parse");
 
 				// The built body carries the type's worn equipment and (for a humanoid) its appearance table.
@@ -54,6 +59,27 @@ namespace Faolan.Tests
 			}
 
 			_out.WriteLine($"summon-only types built from columns: {types.Count} ({string.Join(", ", types.Select(t => t.Name))})");
+		}
+
+		// Reproduces the client's read: after [u32 len][u32 subOp][u32 ack][u32 handle][u32 fieldA] (20 bytes) comes the
+		// transform-length prefix (a varint), then the client consumes EXACTLY that many transform bytes and reads the
+		// SimpleCharFullUpdateIIR version byte, which must be 0x05. A length prefix that disagrees with the real transform
+		// length (the token-0 bug) lands this read on the wrong byte - the exact "serverversion: 0" crash.
+		private static void AssertVersionByteFollowsTransformPrefix(byte[] body, string? name)
+		{
+			var i = 20;
+			var prefix = 0;
+			var shift = 0;
+			while (true)
+			{
+				var x = body[i++];
+				prefix |= (x & 0x7F) << shift;
+				if ((x & 0x80) == 0)
+					break;
+				shift += 7;
+			}
+
+			Assert.Equal(0x05, body[i + prefix]); // the version byte the client reads at transform-end
 		}
 
 		private static string FindRepoRoot()

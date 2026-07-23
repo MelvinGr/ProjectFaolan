@@ -1211,7 +1211,8 @@ namespace Faolan.GameServer.World
 			// BuildFromType throws for a type with no lifted StatCore.IirHeader - the fail-fast signal for un-lifted /
 			// partially-imported data; it never happens for a shipped pet/mount type.
 			var handle = NextRuntimeHandle();
-			var body = NpcSpawnBuilder.BuildFromType(npcType, handle, player.Position, player.Rotation);
+			// Bake the summoner's zone token (4-byte) - see SpawnAmbientMember; a 0 token desyncs the client version read.
+			var body = NpcSpawnBuilder.BuildFromType(npcType, handle, player.Position, player.Rotation, _sim.World.ZoneForEntity(player).PlayfieldToken);
 
 			var level = npcType.StatCore?.Level ?? 0;
 			var maxHealth = level > 0
@@ -1728,7 +1729,10 @@ namespace Faolan.GameServer.World
 		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
 		{
 			var handle = NextRuntimeHandle();
-			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity);
+			// Bake THIS zone's live token (4-byte) so the body is wire-correct and SendWorldSpawn can re-stamp it per
+			// recipient. Passing 0 shipped a 1-byte token that the client read as a version-byte desync (crash on 4010's
+			// ambient pools) and that SpawnPlayfieldRewriter could not fix (it only overwrites a 4-byte token in place).
+			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken);
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
 			entity.InstanceId = zone.InstanceId;
