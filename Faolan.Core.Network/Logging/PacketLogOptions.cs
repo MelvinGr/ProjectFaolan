@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +15,11 @@ namespace Faolan.Core.Network.Logging
 
 		// The " label={ .. } .." suffix appended to a packet's single log line, or "" when bytes are suppressed.
 		// Each (label, data) pair with data is rendered as " <label>({len})={hex}".
-		public static string BytesSuffix(ILogger logger, params (string Label, byte[]? Data)[] segments)
+		//
+		// A segment is a byte WINDOW (ReadOnlyMemory<byte>), not an array: both directions hold their headerData/body as
+		// memory over the frame, so a suppressed trace (the common case) costs no copy at all - the hex is materialized
+		// only past the ShouldLogBytes gate.
+		public static string BytesSuffix(ILogger logger, params (string Label, ReadOnlyMemory<byte> Data)[] segments)
 		{
 			if (!ShouldLogBytes(logger))
 				return "";
@@ -22,7 +27,7 @@ namespace Faolan.Core.Network.Logging
 			var suffix = "";
 			foreach (var (label, data) in segments)
 			{
-				if (data?.Length > 0)
+				if (data.Length > 0)
 					suffix += $" {label}({data.Length})={data.ToHex()}";
 			}
 

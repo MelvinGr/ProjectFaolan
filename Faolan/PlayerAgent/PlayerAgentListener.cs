@@ -17,7 +17,7 @@ namespace Faolan.PlayerAgent
 	public partial class PlayerAgentListener : RpcServer<ConanMessageFramer>
 	{
 		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.PlayerAgentPort, logger, configuration,
-			database, new ConanOutgoingPacketLogger(logger, "PlayerAgent", typeof(PlayerInterfaceOpcodes)))
+			database, new ConanPacketTracer(logger, "PlayerAgent", typeof(PlayerInterfaceOpcodes)))
 		{
 			//
 		}

@@ -22,10 +22,10 @@ namespace Faolan.Core.Network
 		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
 
 		// The structured send boundary (Gitea #406): a handler builds an Rpc and hands it here instead of a hand-framed
-		// PacketStream. The real client (NetworkClient) implements this to serialize ONCE and trace the send directly
+		// packet buffer. The real client (NetworkClient) implements this to serialize ONCE and trace the send directly
 		// from the Rpc model - no re-parse (phase 6). This default only serves lightweight INetworkClient test doubles
-		// that don't derive from NetworkClient; it serializes (byte-identical to the PacketStream builder, locked by
-		// PacketFrameRoundTripTests) and routes through the byte[] send.
+		// that don't derive from NetworkClient; it serializes (byte-identical, locked by PacketFrameRoundTripTests) and
+		// routes through the byte[] send.
 		Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
 			return SendAsync(PacketSerializer.Serialize(rpc), cancellationToken);
@@ -46,7 +46,7 @@ namespace Faolan.Core.Network
 
 		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
 		private readonly IMessageFramer _messageFramer;
-		private readonly IPacketLogger _outgoingPacketLogger;
+		private readonly IPacketTracer _tracer;
 		private readonly SemaphoreSlim _sendLock = new(1, 1);
 
 		private CancellationTokenSource? _cancellationTokenSource;
@@ -64,12 +64,12 @@ namespace Faolan.Core.Network
 
 		public string? IpAddress => field ??= (Socket.RemoteEndPoint as IPEndPoint)?.Address.ToString();
 
-		protected NetworkClient(Socket socket, ILogger logger, IMessageFramer messageFramer, IPacketLogger outgoingPacketLogger)
+		protected NetworkClient(Socket socket, ILogger logger, IMessageFramer messageFramer, IPacketTracer tracer)
 		{
 			Socket = socket;
 			Logger = logger;
 			_messageFramer = messageFramer;
-			_outgoingPacketLogger = outgoingPacketLogger ?? throw new ArgumentNullException(nameof(outgoingPacketLogger));
+			_tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
 		}
 
 		// A short protocol name for the receive-loop error logs (was typeof(TPacket).Name).
@@ -79,12 +79,12 @@ namespace Faolan.Core.Network
 		// Rpc subclass: PacketParser.Parse.
 		protected abstract Task DispatchFrame(byte[] frame);
 
-		// The byte[] send path: trace the frame (the logger re-parses it), then put it on the wire. Used by the chat
+		// The byte[] send path: trace the frame (the tracer decodes it), then put it on the wire. Used by the chat
 		// server (its own framing has no Rpc model) and by the SendAsync(Rpc) default for lightweight test doubles.
 		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
 		{
 			ArgumentNullException.ThrowIfNull(value);
-			_outgoingPacketLogger.Log(value);
+			_tracer.Transmitted(value);
 			return SendRawAsync(value, cancellationToken);
 		}
 
@@ -93,7 +93,7 @@ namespace Faolan.Core.Network
 		public virtual Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
 			var bytes = PacketSerializer.Serialize(rpc);
-			_outgoingPacketLogger.Log(in rpc, bytes.Length);
+			_tracer.Transmitted(in rpc, bytes.Length);
 			return SendRawAsync(bytes, cancellationToken);
 		}
 
@@ -223,7 +223,7 @@ namespace Faolan.Core.Network
 	{
 		public Func<INetworkClient, ChatServerPacket, Task>? ReceivedPacket { get; init; }
 
-		public ChatNetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger, new ChatServerMessageFramer(), outgoingPacketLogger)
+		public ChatNetworkClient(Socket socket, ILogger logger, IPacketTracer tracer) : base(socket, logger, new ChatServerMessageFramer(), tracer)
 		{
 		}
 
@@ -247,7 +247,7 @@ namespace Faolan.Core.Network
 	{
 		public Func<INetworkClient, Rpc, Task>? ReceivedRpc { get; init; }
 
-		public RpcNetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger, new TMessageFramer(), outgoingPacketLogger)
+		public RpcNetworkClient(Socket socket, ILogger logger, IPacketTracer tracer) : base(socket, logger, new TMessageFramer(), tracer)
 		{
 		}
 

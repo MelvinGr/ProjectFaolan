@@ -18,29 +18,27 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
-	// The shared listener machinery - TCP accept loop, client registry, connect/disconnect lifecycle and the inbound
-	// (RX) log helpers - independent of how a frame is parsed. ChatServerBase (the chat protocol, a typed Packet) and
-	// RpcServer<TFramer> (every Conan protocol listener, the structured Rpc) supply CreateClient + their ReceivedPacket.
+	// The shared listener machinery - TCP accept loop, client registry, connect/disconnect lifecycle - independent of
+	// how a frame is parsed. ChatServerBase (the chat protocol, a typed Packet) and RpcServer<TFramer> (every Conan
+	// protocol listener, the structured Rpc) supply CreateClient + their ReceivedPacket, and each holds the concrete
+	// tracer its protocol traces BOTH directions through (the RX half is protocol-typed, so it lives there, not here).
 	public abstract class ServerBase : BackgroundService
 	{
 		protected readonly IConfiguration Configuration;
 		protected readonly IDatabaseRepository Database;
 		protected readonly ILogger Logger;
-		protected readonly IPacketLogger OutgoingPacketLogger;
 
 		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
-		protected string ChannelName => OutgoingPacketLogger?.ChannelName ?? ""; // Reuse the outbound logger's channel name for the inbound (RX) lines, so both directions read "[Channel …]".
 		private readonly TcpListener _tcpListener;
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
 		protected IEnumerable<INetworkClient> NetworkClients => _clients.Keys;
 
-		protected ServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, IPacketLogger? outgoingPacketLogger = null)
+		protected ServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
 		{
 			Logger = logger;
 			Configuration = configuration;
 			Database = database;
-			OutgoingPacketLogger = outgoingPacketLogger ?? NullPacketLogger.Instance;
 			_tcpListener = new TcpListener(IPAddress.Any, port);
 		}
 
@@ -155,23 +153,11 @@ namespace Faolan.Core.Network
 			return NetworkClients.FirstOrDefault(nc => nc.Session.Character?.Id == characterId);
 		}
 
-		// Inbound (RX) trace, forwarded to the logging layer - all line shaping + the byte-dump gate live there.
-		protected void LogPacketBodyDebug(string label, byte[] bytes)
+		// An extra opcode-specific body dump a handler emits on its own line, on the same byte-dump gate as the packet
+		// lines - all line shaping lives in the logging layer.
+		protected void LogPacketBodyDebug(string label, ReadOnlyMemory<byte> bytes)
 		{
 			Logger.LogBodyDump(label, bytes);
-		}
-
-		// Rpc-model RX trace (Gitea #407): the listener dispatches on the parsed Rpc; both the method NAME (from the
-		// Receiver.Type + Opcode pair, via ProtocolCatalog) and the FrameLength (total wire size, reported as
-		// packetLength) come straight off the Rpc - the listener passes nothing but the packet.
-		protected void LogPacketReceived(in Rpc packet)
-		{
-			Logger.LogReceived(ChannelName, packet);
-		}
-
-		protected void LogUnknownPacket(in Rpc packet)
-		{
-			Logger.LogUnhandled(ChannelName, packet);
 		}
 	}
 
@@ -181,14 +167,19 @@ namespace Faolan.Core.Network
 	// generic TPacket/TFactory) - the packet is constructed directly by ChatNetworkClient, so there is no IPacketFactory.
 	public abstract class ChatServerBase : ServerBase
 	{
-		protected ChatServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, IPacketLogger? outgoingPacketLogger = null)
-			: base(port, logger, configuration, database, outgoingPacketLogger)
+		// This channel's packet trace. The listener traces its RECEIVES through it and hands it to every client so the
+		// SENDS are traced through the same object, with the same channel label (Gitea #406 phase 6).
+		private readonly ChatPacketTracer _tracer;
+
+		protected ChatServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ChatPacketTracer tracer)
+			: base(port, logger, configuration, database)
 		{
+			_tracer = tracer;
 		}
 
 		protected override NetworkClient CreateClient(Socket socket)
 		{
-			return new ChatNetworkClient(socket, Logger, OutgoingPacketLogger)
+			return new ChatNetworkClient(socket, Logger, _tracer)
 			{
 				Disconnected = OnClientDisconnected,
 				ReceivedBatchComplete = OnBatchComplete,
@@ -209,12 +200,12 @@ namespace Faolan.Core.Network
 
 		protected void LogPacketReceived(ChatServerPacket packet, Enum opcode)
 		{
-			Logger.LogReceived(ChannelName, packet, opcode);
+			_tracer.Received(packet, opcode);
 		}
 
 		protected void LogUnknownPacket(ChatServerPacket packet, Enum opcode)
 		{
-			Logger.LogUnhandled(ChannelName, packet, opcode);
+			_tracer.Unhandled(packet, opcode);
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, ChatServerPacket packet);
@@ -225,14 +216,18 @@ namespace Faolan.Core.Network
 	public abstract class RpcServer<TMessageFramer> : ServerBase
 		where TMessageFramer : IMessageFramer, new()
 	{
-		protected RpcServer(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, IPacketLogger? outgoingPacketLogger = null)
-			: base(port, logger, configuration, database, outgoingPacketLogger)
+		// This channel's packet trace - both directions through one object (see ChatServerBase._tracer).
+		private readonly ConanPacketTracer _tracer;
+
+		protected RpcServer(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ConanPacketTracer tracer)
+			: base(port, logger, configuration, database)
 		{
+			_tracer = tracer;
 		}
 
 		protected override NetworkClient CreateClient(Socket socket)
 		{
-			return new RpcNetworkClient<TMessageFramer>(socket, Logger, OutgoingPacketLogger)
+			return new RpcNetworkClient<TMessageFramer>(socket, Logger, _tracer)
 			{
 				Disconnected = OnClientDisconnected,
 				ReceivedBatchComplete = OnBatchComplete,
@@ -249,6 +244,19 @@ namespace Faolan.Core.Network
 					}
 				}
 			};
+		}
+
+		// Inbound (RX) trace, through the SAME tracer the transport traces this channel's sends with (Gitea #406/#407):
+		// both the method NAME (from the Receiver.Type + Opcode pair, via ProtocolCatalog) and the FrameLength (total
+		// wire size, reported as packetLength) come straight off the parsed Rpc - the listener passes only the packet.
+		protected void LogPacketReceived(in Rpc packet)
+		{
+			_tracer.Received(in packet);
+		}
+
+		protected void LogUnknownPacket(in Rpc packet)
+		{
+			_tracer.Unhandled(in packet);
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, Rpc packet);

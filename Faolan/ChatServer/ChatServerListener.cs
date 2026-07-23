@@ -29,7 +29,7 @@ namespace Faolan.ChatServer
 		// `port` is the hosting realm's ChatServerPort (from its Realm row - the single source of truth for the
 		// realm-local service ports, #324), passed in at registration rather than read from global config.
 		public ChatServerListener(ushort port, ILogger<ChatServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IChatServerDispatcher dispatcher,
-			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(port, logger, configuration, database, new ChatServerOutgoingPacketLogger(logger))
+			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(port, logger, configuration, database, new ChatPacketTracer(logger))
 		{
 			_dispatcher = dispatcher;
 			_gameServerDispatcher = gameServerDispatcher;

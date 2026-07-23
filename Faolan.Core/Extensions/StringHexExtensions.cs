@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace Faolan.Core.Extensions
 {
@@ -23,6 +24,29 @@ namespace Faolan.Core.Extensions
 				: "{ ") + string.Join(", ", value.Select(e => e.ToHex())) + (asArray
 				? " ]"
 				: " }");
+		}
+
+		// The same rendering for a byte WINDOW (ReadOnlyMemory<byte> doesn't implement IEnumerable<byte>, so it would
+		// otherwise need a .ToArray() copy first). The packet trace holds its headerData/body as memory over the frame,
+		// so this keeps the hex dump copy-free - and it is only ever reached when byte dumping is actually enabled.
+		public static string ToHex(this ReadOnlyMemory<byte> value, bool asArray = false)
+		{
+			var builder = new StringBuilder(asArray
+				? "[ "
+				: "{ ", value.Length * 6 + 4);
+
+			var span = value.Span;
+			for (var i = 0; i < span.Length; i++)
+			{
+				if (i > 0)
+					builder.Append(", ");
+
+				builder.Append(span[i].ToHex());
+			}
+
+			return builder.Append(asArray
+				? " ]"
+				: " }").ToString();
 		}
 
 		public static string ToHex(this Enum value)

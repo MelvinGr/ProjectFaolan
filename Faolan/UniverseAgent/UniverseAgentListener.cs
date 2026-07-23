@@ -15,7 +15,7 @@ namespace Faolan.UniverseAgent
 	public partial class UniverseAgentListener : RpcServer<ConanMessageFramer>
 	{
 		public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.UniverseAgentPort, logger, configuration,
-			database, new ConanOutgoingPacketLogger(logger, "UniverseAgent", typeof(UniverseInterfaceOpcodes)))
+			database, new ConanPacketTracer(logger, "UniverseAgent", typeof(UniverseInterfaceOpcodes)))
 		{
 		}
 

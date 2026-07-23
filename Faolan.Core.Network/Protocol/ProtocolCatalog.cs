@@ -45,12 +45,23 @@ namespace Faolan.Core.Network.Protocol
 				? enumType
 				: null;
 
-		// The (Receiver.Type, opcode) pair -> "MethodName (0xHEX)", or "Unknown (0xHEX)" when the pair doesn't resolve.
-		// This is what lets the inbound (UL) trace name a packet straight off the parsed Rpc, with no separate typed
-		// opcode enum threaded from the listener (the receiver Type already selects the right class catalog).
-		public static string ResolveName(uint receiverType, ushort opcode) =>
-			OpcodeEnumsByReceiverType.TryGetValue(receiverType, out var enumType) && Enum.IsDefined(enumType, opcode)
+		// The (Receiver.Type, opcode) pair -> "MethodName (0xHEX)". THE naming entry point, used by both directions of the
+		// packet trace, so an RX line and a TX line name the same method the same way. The receiver Type already selects
+		// the right class catalog, so nothing has to thread a typed opcode enum in from the listener.
+		//
+		// `fallbackEnum` covers the receiver classes the catalog doesn't map - the login tier's client-side *Interface
+		// classes, which the server addresses on the way OUT. Pass it only for a direction whose class family the enum
+		// actually belongs to: an opcode is a method INDEX, so naming an inbound (c2s) method out of an s2c interface
+		// enum would confidently print the WRONG method. That is why the RX side passes none and renders "Unknown".
+		public static string ResolveName(uint receiverType, ushort opcode, Type? fallbackEnum = null)
+		{
+			var enumType = OpcodeEnumFor(receiverType, opcode) ?? (fallbackEnum is not null && Enum.IsDefined(fallbackEnum, opcode)
+				? fallbackEnum
+				: null);
+
+			return enumType is not null
 				? $"{Enum.GetName(enumType, opcode)} ({opcode.ToHex()})"
 				: $"Unknown ({opcode.ToHex()})";
+		}
 	}
 }
