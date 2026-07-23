@@ -12,7 +12,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
@@ -1108,7 +1107,7 @@ namespace Faolan.GameServer
 			var body = packet.BodyReader();
 			var gaOp = (GameAgentOpcodes)packet.Opcode;
 			if (gaOp is not GameAgentOpcodes.UpdateGameServerStats)
-				LogPacketReceived(packet, gaOp);
+				LogPacketReceived(packet);
 
 			switch (gaOp)
 			{
@@ -1289,7 +1288,7 @@ namespace Faolan.GameServer
 				{
 					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
 					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
-					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
+					LogUnknownPacket(packet);
 					break;
 				}
 			}
@@ -1302,7 +1301,7 @@ namespace Faolan.GameServer
 			var body = packet.BodyReader();
 			var charOp = (GameCharAgentOpcodes)packet.Opcode;
 			if (charOp is not GameCharAgentOpcodes.Ping)
-				LogPacketReceived(packet, charOp);
+				LogPacketReceived(packet);
 
 			switch (charOp)
 			{
@@ -1690,7 +1689,7 @@ namespace Faolan.GameServer
 				{
 					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
 					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
-					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
+					LogUnknownPacket(packet);
 					break;
 				}
 			}

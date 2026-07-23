@@ -25,7 +25,7 @@ namespace Faolan.PlayerAgent
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
 			var opcode = (PlayerAgentOpcodes)packet.Opcode;
-			LogPacketReceived(packet, opcode);
+			LogPacketReceived(packet);
 
 			var body = packet.BodyReader();
 			switch (opcode)
@@ -204,7 +204,7 @@ namespace Faolan.PlayerAgent
 
 				default:
 				{
-					LogUnknownPacket(packet, opcode);
+					LogUnknownPacket(packet);
 					break;
 				}
 			}

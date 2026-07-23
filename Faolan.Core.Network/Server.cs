@@ -160,21 +160,17 @@ namespace Faolan.Core.Network
 			Logger.LogBodyDump(label, bytes);
 		}
 
-		// Rpc-model UL trace (Gitea #407): the listener dispatches on the parsed Rpc; its FrameLength (the total wire
-		// size) rides on the Rpc itself, reported as packetLength.
-		protected void LogPacketReceived(in Rpc packet, Enum opcode)
+		// Rpc-model UL trace (Gitea #407): the listener dispatches on the parsed Rpc; both the method NAME (from the
+		// Receiver.Type + Opcode pair, via ProtocolCatalog) and the FrameLength (total wire size, reported as
+		// packetLength) come straight off the Rpc - the listener passes nothing but the packet.
+		protected void LogPacketReceived(in Rpc packet)
 		{
-			Logger.LogReceived(ChannelName, packet, opcode);
+			Logger.LogReceived(ChannelName, packet);
 		}
 
-		protected void LogUnknownPacket(in Rpc packet, ushort opcode, string opcodeName)
+		protected void LogUnknownPacket(in Rpc packet)
 		{
-			Logger.LogUnhandled(ChannelName, packet, opcode, opcodeName);
-		}
-
-		protected void LogUnknownPacket(in Rpc packet, Enum opcode)
-		{
-			Logger.LogUnhandled(ChannelName, packet, opcode);
+			Logger.LogUnhandled(ChannelName, packet);
 		}
 	}
 

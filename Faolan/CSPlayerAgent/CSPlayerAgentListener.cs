@@ -34,7 +34,7 @@ namespace Faolan.CSPlayerAgent
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
 			var opcode = (CSPlayerAgentOpcodes)packet.Opcode;
-			LogPacketReceived(packet, opcode);
+			LogPacketReceived(packet);
 
 			switch (opcode)
 			{
@@ -281,7 +281,7 @@ namespace Faolan.CSPlayerAgent
 
 				default:
 				{
-					LogUnknownPacket(packet, opcode);
+					LogUnknownPacket(packet);
 					break;
 				}
 			}
