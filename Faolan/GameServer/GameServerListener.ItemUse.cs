@@ -51,8 +51,6 @@ namespace Faolan.GameServer
 		private async Task UseInventoryItem(INetworkClient client, ContainerKind container, int slot)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var item = (await Database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == container && i.Slot == slot)?.Item;
 			if (item == null)

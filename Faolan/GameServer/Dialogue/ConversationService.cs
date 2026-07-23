@@ -199,8 +199,6 @@ namespace Faolan.GameServer.Dialogue
 		private async Task<QuestDefinition?> PrepareQuestGrant(INetworkClient client, ConversationNode node)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return null;
 
 			if (node.GrantQuestId is not { } questId)
 				return null; // this screen grants no quest

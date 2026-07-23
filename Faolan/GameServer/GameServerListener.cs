@@ -459,8 +459,6 @@ namespace Faolan.GameServer
 		private async Task<List<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>> LoadCompletedJournal(Character character)
 		{
 			var groups = new List<(QuestArea, IReadOnlyList<QuestDefinition>)>();
-			if (character == null)
-				return groups;
 
 			var completed = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Completed).ToList();
 			if (completed.Count == 0)
@@ -495,8 +493,6 @@ namespace Faolan.GameServer
 		private async Task<(List<QuestDefinition> Quests, QuestDefinition? Primary)> LoadSnapshotQuests(Character character)
 		{
 			var quests = new List<QuestDefinition>();
-			if (character == null)
-				return (quests, null);
 
 			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
 			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).

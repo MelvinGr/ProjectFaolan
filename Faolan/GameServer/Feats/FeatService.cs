@@ -47,8 +47,6 @@ namespace Faolan.GameServer.Feats
 		public async Task FeatCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
 			var verb = parts.Length > 0
@@ -123,8 +121,6 @@ namespace Faolan.GameServer.Feats
 			}
 
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var added = await TrainWithinBudget(character.Id, character.Level, featIds);
 			if (added < 0)
@@ -148,8 +144,6 @@ namespace Faolan.GameServer.Feats
 		public async Task HandleFeatUntrainAnswer(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var answerBytes = body.ReadRemainingArray();
 			if (!FeatUntrainMessageBoxCodec.TryParseAnswer(answerBytes, out var answer, out var token))
@@ -172,8 +166,6 @@ namespace Faolan.GameServer.Feats
 		public async Task HandleFeatUntrainRequest(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var feats = await _database.GetCharacterFeats(character.Id);
 			if (feats.Length == 0)

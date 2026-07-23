@@ -398,8 +398,6 @@ namespace Faolan.GameServer.CreateFlow
 		private async Task GrantCreateStartingSpells(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var id = client.Session.Account.ClientInstance;
 			var sender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x0C);

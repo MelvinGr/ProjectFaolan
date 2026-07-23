@@ -143,8 +143,6 @@ namespace Faolan.GameServer
 		private async Task RestoreBuffs(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var buffs = await Database.GetCharacterBuffs(character.Id);
 			if (buffs.Length == 0)
@@ -340,9 +338,6 @@ namespace Faolan.GameServer
 
 		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
 		{
-			if (client.Session.Character == null)
-				return;
-
 			client.Session.IsSprinting = sprinting;
 			EnsureEnergyLoop(client);
 		}

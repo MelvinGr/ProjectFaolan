@@ -83,8 +83,6 @@ namespace Faolan.CSPlayerAgent
 		public async Task HandleAcceptGuildInvitation(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			body.ReadUInt32(); // ID32 type (0x0000DEB7)
 			var guildId = body.ReadUInt32();
@@ -168,8 +166,6 @@ namespace Faolan.CSPlayerAgent
 		public async Task HandleCreateGuild(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var name = body.ReadString();
 			var form = body.Length - body.Position >= 1

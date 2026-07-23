@@ -76,8 +76,6 @@ namespace Faolan.GameServer.Inventory
 		public async Task PersistEquip(INetworkClient client, CharacterEquipmentSlot targetSlot, uint itemHandle, int fromBagSlot)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			try
 			{
@@ -227,8 +225,6 @@ namespace Faolan.GameServer.Inventory
 		public async Task PersistUnequip(INetworkClient client, CharacterEquipmentSlot fromSlot, int targetBagSlot)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			try
 			{

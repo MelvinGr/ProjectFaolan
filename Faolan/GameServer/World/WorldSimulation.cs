@@ -137,8 +137,6 @@ namespace Faolan.GameServer.World
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var handle = character.Id;
 			// The player's pre-existing entity (null on a fresh login) decides whether this is a re-entry that should
@@ -416,8 +414,6 @@ namespace Faolan.GameServer.World
 			{
 				var client = pair.Key;
 				var character = client.Session.Character;
-				if (character == null)
-					continue;
 
 				var entity = pair.Value;
 				var points = await GetRespawnPointsCached(entity.MapId);
@@ -519,8 +515,6 @@ namespace Faolan.GameServer.World
 			{
 				var client = pair.Key;
 				var character = client.Session.Character;
-				if (character == null)
-					continue;
 
 				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character);
 				if (vitals.IsDead)
@@ -895,8 +889,6 @@ namespace Faolan.GameServer.World
 			{
 				var client = pair.Key;
 				var entity = pair.Value;
-				if (client.Session.Character == null)
-					continue;
 
 				var areas = await GetMapAreasCached(entity.MapId);
 				if (areas.Length == 0)
@@ -965,8 +957,6 @@ namespace Faolan.GameServer.World
 				var entity = pair.Value;
 				var client = pair.Key;
 				var character = client.Session.Character;
-				if (character == null)
-					continue;
 
 				var vitals = entity.Vitals;
 				if (vitals == null || vitals.IsDead)
@@ -1003,8 +993,6 @@ namespace Faolan.GameServer.World
 			{
 				var client = pair.Key;
 				var character = client.Session.Character;
-				if (character == null)
-					continue;
 
 				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character);
 				if (!vitals.IsDead)

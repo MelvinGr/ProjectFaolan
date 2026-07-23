@@ -89,8 +89,6 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostBuy(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var saleId = body.ReadUInt64(); // searchResultId follows but isn't needed to resolve the sale
 
@@ -135,8 +133,6 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostCancelMail(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var mailId = body.ReadUInt64();
 
@@ -156,8 +152,6 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostCancelSell(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var bankSlot = body.ReadUInt32();
 
@@ -179,8 +173,6 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostChangePrice(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var bankSlot = body.ReadUInt32();
 			var newPrice = body.ReadUInt64();
@@ -204,8 +196,6 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostMailOp(INetworkClient client, Rpc packet, FaolanStream body, TradepostAgentOpcodes method)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var inst = packet.Sender.Instance;
 
@@ -362,8 +352,6 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostSell(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var bankSlot = (int)body.ReadUInt32();
 			var price = body.ReadUInt64();
@@ -428,8 +416,6 @@ namespace Faolan.GameServer
 		private async Task HandleTradepostSendMail(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var recipientName = body.ReadString();
 			var bodyText = body.ReadString();

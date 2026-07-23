@@ -50,8 +50,6 @@ namespace Faolan.GameServer.World
 		public async Task<bool> SavePlayerState(INetworkClient client, WorldEntity entity)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return false;
 
 			try
 			{

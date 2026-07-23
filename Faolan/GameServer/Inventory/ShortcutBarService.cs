@@ -78,9 +78,6 @@ namespace Faolan.GameServer.Inventory
 		// Retail sends 0x2076 from this same endpoint as the 0x2052 grants (login capture pkt 182 vs 237).
 		public async Task SendRestoredBar(INetworkClient client)
 		{
-			if (client.Session.Character == null)
-				return;
-
 			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
 			await client.SendAsync(new Rpc(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType),
 				GameCharInterfaceOpcodes.DispatchShortcutBarReply, ShortcutBarBuilder.BuildBody(shortcuts)));

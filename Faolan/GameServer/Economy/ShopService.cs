@@ -61,8 +61,6 @@ namespace Faolan.GameServer.Economy
 		public async Task HandleBuyItemFromShop(INetworkClient client, uint shopInstance, uint pos)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			if (!_openShop.TryGetValue(client, out var shop) || shop.Instance != shopInstance)
 			{
@@ -113,8 +111,6 @@ namespace Faolan.GameServer.Economy
 			var slot = body.ReadUInt32();
 
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var row = (await _database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == (ContainerKind)container && i.Slot == (int)slot);
 			if (row?.Item == null)

@@ -61,9 +61,6 @@ namespace Faolan.GameServer
 		// item navs included so they can be built into the snapshot. Beach characters only.
 		private async Task<CharacterEquipment?> EnsureBeachStarterEquipment(Character character)
 		{
-			if (character == null)
-				return null;
-
 			try
 			{
 				var equipment = await Database.GetCharacterEquipment(character.Id);
@@ -131,8 +128,6 @@ namespace Faolan.GameServer
 		private async Task EnsureCharacterLoadout(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			const uint shortcutTypeAbility = 4;
 			const uint shortcutTypeSpell = 2;
@@ -211,9 +206,6 @@ namespace Faolan.GameServer
 		// then keeps the captured scaffold frame.
 		private async Task<Character?> EnsureSpawnScaffoldRows(Character character)
 		{
-			if (character == null)
-				return null;
-
 			try
 			{
 				var scaffoldCharacter = await Database.GetCharacterScaffold(character.Id) ?? character;
@@ -467,8 +459,6 @@ namespace Faolan.GameServer
 		private async Task GrantCharacterAbilities(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var abilities = await GetLoadoutAbilities(character);
 			// Login is a SILENT re-grant: the abilities were already learned (in the create flow / on first learn), so
@@ -489,8 +479,6 @@ namespace Faolan.GameServer
 		private async Task GrantCharacterCombos(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var instance = character.Id;
 
@@ -523,8 +511,6 @@ namespace Faolan.GameServer
 		private async Task GrantCharacterSpells(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var spells = await Database.GetCharacterSpells(character.Id);
 			foreach (var spell in spells)
@@ -581,8 +567,6 @@ namespace Faolan.GameServer
 		private async Task RedeliverNonSnapshotBagItems(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return;
 
 			var rows = await Database.GetCharacterInventory(character.Id);
 			var pushed = 0;

@@ -72,8 +72,6 @@ namespace Faolan.GameServer.Quest
 		public async Task<uint?> TryAdvanceCollectPickup(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null)
-				return null;
 
 			foreach (var quest in await _database.GetCharacterQuests(character.Id))
 			{

@@ -382,8 +382,6 @@ namespace Faolan.GameServer.Combat
 		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
 		{
 			var character = killer.Session.Character;
-			if (character == null)
-				return;
 
 			var xp = CombatResolver.ResolveKillXp(npcLevel);
 			character.Experience += xp;
