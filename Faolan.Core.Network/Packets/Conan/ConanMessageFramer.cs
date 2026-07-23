@@ -9,7 +9,11 @@ namespace Faolan.Core.Network.Packets.Conan
 	public sealed class ConanMessageFramer : IMessageFramer
 	{
 		private const int CompressionMarkerLength = 9;
-		private const int HeaderSize = sizeof(int);
+
+		// The u32 big-endian LENGTH PREFIX every frame opens with - not the Conan header, which is 12 bytes
+		// ([u32 length][u32 crc32][u32 headerLen]) and is none of this class's business. The prefix counts everything
+		// AFTER itself (PacketSerializer writes it that way), so a whole frame is this + that count.
+		private const int LengthPrefixSize = sizeof(uint);
 		private const int MaxPacketSize = 16 * 1024 * 1024;
 
 		// The compression-stream marker: a 9-byte control frame that is just an ordinary [u32 length][u32 crc32][body]
@@ -24,10 +28,10 @@ namespace Faolan.Core.Network.Packets.Conan
 		// non-deterministic loss of the post-ready 0x205f grant-arm packet (abilities/spellbar intermittently empty).
 		private const uint CompressionMarkerTag = 0x80000005u;
 
-		private readonly byte[] _lengthBuffer = new byte[HeaderSize];
+		private readonly byte[] _lengthBuffer = new byte[LengthPrefixSize];
 
-		// The frame currently being filled: [HeaderSize big-endian length][payload], allocated once when the length is
-		// known so a completed packet is emitted with no extra copy. Null while the 4-byte length header is being read.
+		// The frame currently being filled: [u32 length prefix][payload], allocated once when the length is known so a
+		// completed packet is emitted with no extra copy. Null while the length prefix itself is being read.
 		private byte[]? _frame;
 		private int _lengthBytesRead;
 		private int _markerSkipRemaining;
@@ -56,10 +60,10 @@ namespace Faolan.Core.Network.Packets.Conan
 				if (_frame != null)
 				{
 					// Read the payload straight into the frame, after its 4-byte length header.
-					var payloadLength = _frame.Length - HeaderSize;
+					var payloadLength = _frame.Length - LengthPrefixSize;
 					var bytesTransferred = Math.Min(payloadLength - _payloadBytesRead, bytesAvailable);
 
-					bytes.Slice(offset, bytesTransferred).CopyTo(_frame.AsSpan(HeaderSize + _payloadBytesRead));
+					bytes.Slice(offset, bytesTransferred).CopyTo(_frame.AsSpan(LengthPrefixSize + _payloadBytesRead));
 					offset += bytesTransferred;
 					_payloadBytesRead += bytesTransferred;
 
@@ -73,13 +77,13 @@ namespace Faolan.Core.Network.Packets.Conan
 					continue;
 				}
 
-				// Accumulate the 4-byte big-endian length header (may straddle recv boundaries).
-				var headerTransferred = Math.Min(HeaderSize - _lengthBytesRead, bytesAvailable);
-				bytes.Slice(offset, headerTransferred).CopyTo(_lengthBuffer.AsSpan(_lengthBytesRead));
-				offset += headerTransferred;
-				_lengthBytesRead += headerTransferred;
+				// Accumulate the 4-byte big-endian length prefix (may straddle recv boundaries).
+				var prefixTransferred = Math.Min(LengthPrefixSize - _lengthBytesRead, bytesAvailable);
+				bytes.Slice(offset, prefixTransferred).CopyTo(_lengthBuffer.AsSpan(_lengthBytesRead));
+				offset += prefixTransferred;
+				_lengthBytesRead += prefixTransferred;
 
-				if (_lengthBytesRead < HeaderSize)
+				if (_lengthBytesRead < LengthPrefixSize)
 					continue;
 
 				_lengthBytesRead = 0;
@@ -90,7 +94,7 @@ namespace Faolan.Core.Network.Packets.Conan
 				// packets coalesced behind it in the same recv still get framed.
 				if (raw == CompressionMarkerTag)
 				{
-					_markerSkipRemaining = CompressionMarkerLength - HeaderSize;
+					_markerSkipRemaining = CompressionMarkerLength - LengthPrefixSize;
 					continue;
 				}
 
@@ -106,7 +110,7 @@ namespace Faolan.Core.Network.Packets.Conan
 
 				// Allocate the whole frame ([length][payload]) once and stamp the header, so the completed packet is
 				// emitted directly - no per-packet Concat/copy.
-				_frame = new byte[HeaderSize + (int)raw];
+				_frame = new byte[LengthPrefixSize + (int)raw];
 				BinaryPrimitives.WriteUInt32BigEndian(_frame, raw);
 				_payloadBytesRead = 0;
 			}
