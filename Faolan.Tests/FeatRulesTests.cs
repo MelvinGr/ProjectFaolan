@@ -1,4 +1,4 @@
-using Faolan.Core;
+using Faolan.GameServer;
 using Xunit;
 
 namespace Faolan.Tests
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 		}
 
 		[Theory, InlineData(1u, 0), InlineData(9u, 0), InlineData(10u, 1), InlineData(24u, 15), InlineData(80u, 71)]
-			// AoC: 1 feat point per level from 10 -> 71 at 80
+		// AoC: 1 feat point per level from 10 -> 71 at 80
 		public void PointBudget_IsOnePerLevelFromTen(uint level, int expected)
 		{
 			Assert.Equal(expected, FeatRules.PointBudget(level));
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 		[Theory, InlineData(112700u, 1), InlineData(110004u, 4), InlineData(111402u, 2)]
 		// rank 0 (id % 100 == 0) still costs 1 (the unlock)
 		// rank 4
-			// rank 2
+		// rank 2
 		public void PointCost_IsMaxOneAndRank(uint featId, int expected)
 		{
 			Assert.Equal(expected, FeatRules.PointCost(featId));

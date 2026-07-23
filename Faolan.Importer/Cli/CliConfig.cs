@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Helpers;
 using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli

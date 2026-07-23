@@ -1,12 +1,13 @@
 using System;
 using System.IO;
 
-namespace Faolan.Core
+namespace Faolan.Core.Helpers
 {
 	// Locates the repository root AT RUNTIME so no absolute build-machine path (e.g. /home/<user>/...) is ever baked
 	// into source or config. Walks up from the current working directory (the dev tools - server, importer, web -
 	// all run with CWD = repo root) and then from the executing assembly's directory, looking for the solution file
 	// that marks the root. Falls back to the CWD if the marker isn't found (e.g. a published single-file deploy).
+	[Obsolete]
 	public static class RepoPaths
 	{
 		private const string RootMarker = "ProjectFaolan.slnx";

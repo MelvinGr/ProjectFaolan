@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Faolan.Core
+namespace Faolan.GameServer
 {
 	// Server-side feat POINT rules - a coarse prerequisite guard grounded in the captured retail chars (Hakotep L24,
 	// NecroL80/DemoL80 L80): a character's total spent feat points must not exceed its level budget. This is the subset
