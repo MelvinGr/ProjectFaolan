@@ -114,7 +114,7 @@ namespace Faolan
 
 			// Packet trace bytes: each packet logs on a single line; set Log:PacketBytes false (faolan.json "Log": {
 			// "PacketBytes": false }, or --Log:PacketBytes false) to drop the raw headerData/body hex dump.
-			PacketLogOptions.IncludeBytes = builder.Configuration.LogPacketBytes;
+			PacketLogOptions.ShouldLogBytes = builder.Configuration.LogPacketBytes;
 
 			builder.Logging.SetMinimumLevel(Global.IsDebug
 				? LogLevel.Debug

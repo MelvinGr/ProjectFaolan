@@ -19,6 +19,7 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.CoreClaimIIR;
 
+		// TODO: Convert these to enum
 		// Sub-opcodes carried in the u16 after the endpoint (method indices within the InventoryClaims IIR).
 		public const ushort SubList = 0x0001; // s2c: the claim list (this codec)
 		public const ushort SubNewClaims = 0x0009; // s2c: "you have new claims" glow (CoreClaimCodec.Build)

@@ -47,16 +47,16 @@ namespace Faolan.Core.Network.Logging
 		{
 			public void LogPacket(string direction, string channel, string opcodeName, long bodyLength, long packetLength, params (string Label, ReadOnlyMemory<byte> Data)[] byteSegments)
 			{
-				logger.LogInformation("{Direction} [{Channel} {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
-					direction, channel, opcodeName, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
+				logger.LogDebug("{Direction} [{Channel} {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
+					direction, channel, opcodeName, bodyLength, packetLength, PacketLogOptions.BytesSuffix(byteSegments));
 			}
 
 			// The PassBlob (IIR) variant that also carries a 32-bit sub-opcode + its declared payload length.
 			public void LogPacketWithSubOpcode(string direction, string channel, string opcodeName, string subOpcodeName, uint payloadLength, long bodyLength, long packetLength,
 				params (string Label, ReadOnlyMemory<byte> Data)[] byteSegments)
 			{
-				logger.LogInformation("{Direction} [{Channel} {OpcodeName}] subOpcode={SubOpcodeName}, payloadLength={PayloadLength}, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
-					direction, channel, opcodeName, subOpcodeName, payloadLength, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
+				logger.LogDebug("{Direction} [{Channel} {OpcodeName}] subOpcode={SubOpcodeName}, payloadLength={PayloadLength}, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
+					direction, channel, opcodeName, subOpcodeName, payloadLength, bodyLength, packetLength, PacketLogOptions.BytesSuffix(byteSegments));
 			}
 
 			// An inbound (RX) packet whose opcode the listener didn't handle: same line shape as LogPacket, at Warning
@@ -64,14 +64,14 @@ namespace Faolan.Core.Network.Logging
 			public void LogUnknownPacket(string channel, string opcodeName, long bodyLength, long packetLength, params (string Label, ReadOnlyMemory<byte> Data)[] byteSegments)
 			{
 				logger.LogWarning("{Direction} [{Channel} {OpcodeName}] UNHANDLED, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}",
-					Received, channel, opcodeName, bodyLength, packetLength, PacketLogOptions.BytesSuffix(logger, byteSegments));
+					Received, channel, opcodeName, bodyLength, packetLength, PacketLogOptions.BytesSuffix(byteSegments));
 			}
 
 			// An extra opcode-specific body dump some inbound handlers emit on their own line, gated on the byte-dump
 			// switch (PacketLogOptions.ShouldLogBytes) so disabling packet bytes silences these too.
 			public void LogBodyDump(string label, ReadOnlyMemory<byte> bytes)
 			{
-				if (bytes.Length > 0 && PacketLogOptions.ShouldLogBytes(logger))
+				if (bytes.Length > 0 && PacketLogOptions.ShouldLogBytes)
 					logger.LogDebug("{Label} ({Length} bytes): {Bytes}", label, bytes.Length, bytes.ToHex());
 			}
 		}

@@ -177,15 +177,15 @@ namespace Faolan.Tests
 		// Renders with the headerData/body hex included, so the whole line is under test.
 		private static void WithByteDump(Action body)
 		{
-			var previousIncludeBytes = PacketLogOptions.IncludeBytes;
-			PacketLogOptions.IncludeBytes = true;
+			var previousIncludeBytes = PacketLogOptions.ShouldLogBytes;
+			PacketLogOptions.ShouldLogBytes = true;
 			try
 			{
 				body();
 			}
 			finally
 			{
-				PacketLogOptions.IncludeBytes = previousIncludeBytes;
+				PacketLogOptions.ShouldLogBytes = previousIncludeBytes;
 			}
 		}
 
