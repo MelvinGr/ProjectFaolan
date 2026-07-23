@@ -96,7 +96,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			// listeners. They name the opcode member directly, so a plain reference scan finds them (V2 vs V1).
 			idx.BuiltSomewhere.UnionWith(idx.IirToCodecs.Keys);
 			foreach (var dir in new[] { Path.Combine(repo, "Faolan"), Path.Combine(repo, "Faolan.Core.Network") })
-				foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
+				foreach (var file in SourceFiles(dir, "*.cs"))
 				{
 					if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
 						file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") || file.EndsWith("Opcodes.cs", StringComparison.Ordinal))
@@ -117,12 +117,16 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 
 			// codec -> has a byte-exact test, and the NAME of that test method (for messages.md citations).
-			var testFiles = Directory.EnumerateFiles(Path.Combine(repo, "Faolan.Tests"), "*.cs", SearchOption.AllDirectories).Select(f => (Text: File.ReadAllText(f), Path: f)).ToList();
+			var testFiles = SourceFiles(Path.Combine(repo, "Faolan.Tests"), "*.cs").Select(f => (Text: File.ReadAllText(f), Path: f)).ToList();
 			foreach (var codec in idx.CodecToIir.Keys)
 			{
 				var re = new Regex(@"\b" + Regex.Escape(codec) + @"\b");
 				string? method = null;
-				foreach (var (text, _) in testFiles)
+
+				// Most SPECIFIC proof first - the test class named after the codec beats an unrelated suite that merely
+				// touches it - then the sorted order as a stable tie-break (OrderBy is stable), so the citation is
+				// picked by name, never by which file the filesystem happened to hand back first.
+				foreach (var (text, _) in testFiles.OrderBy(f => Affinity(Path.GetFileNameWithoutExtension(f.Path), codec)))
 				{
 					// File-level IsByteExact is only a cheap pre-filter; the authoritative signal is a SINGLE method
 					// that both references the codec and is byte-exact (FindGoldenMethod). Requiring the method-level
@@ -151,7 +155,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				.Assembly.GetTypes()
 				.Where(t => t.IsEnum && t.Namespace == "Faolan.Core.Enums" && t.Name.EndsWith("Opcodes", StringComparison.Ordinal) && t.Name != "GameServer0X2000Opcodes")
 				.Sum(t => t.GetFields(BindingFlags.Public | BindingFlags.Static).Length);
-			idx.Dissectors = Directory.EnumerateFiles(Path.Combine(repo, "tools", "capture"), "decode_*.py").Count();
+			idx.Dissectors = SourceFiles(Path.Combine(repo, "tools", "capture"), "decode_*.py", SearchOption.TopDirectoryOnly).Count;
 
 			return idx;
 		}
@@ -164,6 +168,39 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				"V2" => 1,
 				_ => 2
 			};
+		}
+
+		// How closely a test file's name matches the codec it might cite: 0 = named after it exactly
+		// (FooCodec -> FooCodecTests), 1 = named after its subject (FooCodec -> FooTests), 2 = mentions the subject,
+		// 3 = unrelated.
+		private static int Affinity(string testFile, string codec)
+		{
+			var subject = codec;
+			foreach (var suffix in new[] { "Codec", "Builder", "Decoder", "Body" })
+			{
+				if (subject.EndsWith(suffix, StringComparison.Ordinal))
+					subject = subject[..^suffix.Length];
+			}
+
+			if (testFile == codec + "Tests")
+				return 0;
+
+			if (testFile == subject + "Tests")
+				return 1;
+
+			return testFile.Contains(subject, StringComparison.Ordinal)
+				? 2
+				: 3;
+		}
+
+		// Every source file under `dir`, in a DETERMINISTIC order. Directory.EnumerateFiles returns filesystem order,
+		// which changes when a file is rewritten (an editor or `sed -i` replaces the inode) - and several of the picks
+		// below are "first match wins", so an unordered scan silently rewrites generated pages: a codec with two equally
+		// valid golden tests would flip citation between machines and between commits. Sorted, the page is a function of
+		// the sources alone.
+		private static List<string> SourceFiles(string dir, string pattern, SearchOption option = SearchOption.AllDirectories)
+		{
+			return Directory.EnumerateFiles(dir, pattern, option).OrderBy(f => f, StringComparer.Ordinal).ToList();
 		}
 
 		// Finds a `TestClass.Method` whose body references `codec` AND asserts on bytes - a real [V3: ...] citation.
