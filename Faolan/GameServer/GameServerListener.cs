@@ -22,6 +22,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.Feats;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.Session;
@@ -194,6 +195,7 @@ namespace Faolan.GameServer
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
 		private readonly ShopService _shop;
 		private readonly ClaimService _claims;
+		private readonly FeatService _feats;
 
 		// The player action bar / hotbar persistence + login restore (#71). See Inventory/ShortcutBarService.cs.
 		private readonly ShortcutBarService _shortcutBar;
@@ -253,6 +255,7 @@ namespace Faolan.GameServer
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
+			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => DoTeleport(id, map, pos));
 
 			InitGmCommands();
 		}

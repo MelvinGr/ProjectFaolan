@@ -1013,7 +1013,7 @@ namespace Faolan.GameServer
 				{
 					// Feat TRAIN: state 0x04 [feat ids] -> add to CharacterFeat -> s2c FeatIIR state 0x05 ack. See
 					// GameServerListener.Feats.cs / docs/subsystems/feats.md.
-					await HandleFeatTrain(client, rawPayload);
+					await _feats.HandleFeatTrain(client, rawPayload);
 
 					break;
 				}
@@ -1434,14 +1434,14 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.UntrainFeat: // "untrain all feats" -> send the confirm messagebox
 				{
-					await HandleFeatUntrainRequest(client);
+					await _feats.HandleFeatUntrainRequest(client);
 
 					break;
 				}
 
 				case GameCharAgentOpcodes.FeatUntrainAnswer: // confirm-dialog answer -> reset if confirmed
 				{
-					await HandleFeatUntrainAnswer(client, packet);
+					await _feats.HandleFeatUntrainAnswer(client, packet);
 
 					break;
 				}
