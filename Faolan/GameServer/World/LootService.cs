@@ -23,13 +23,13 @@ namespace Faolan.GameServer.World
 	// persist-only left the items un-takeable), so the server item-grant push is what actually delivers them.
 	public sealed class LootService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _database;
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
 
-		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger)
+		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression, ILogger logger)
 		{
 			_broadcaster = broadcaster;
 			_outbound = outbound;

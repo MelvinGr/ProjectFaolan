@@ -17,13 +17,13 @@ namespace Faolan.GameServer.Dialogue
 	// harvested from captures by the importer's stock-phrases module) - keyed by the {stock_N} token.
 	internal sealed class StockConversationService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly ILogger _logger;
 
 		// {stock_N} -> captured remoteformat, loaded once from the DB (small, stable server content).
 		private Dictionary<string, byte[]>? _phrases;
 
-		public StockConversationService(ILogger logger, IDatabaseRepository database)
+		public StockConversationService(ILogger logger, ICatalogRepository database)
 		{
 			_logger = logger;
 			_database = database;

@@ -19,12 +19,12 @@ namespace Faolan.GameServer.World
 	{
 		private static readonly TimeSpan AutoSaveInterval = TimeSpan.FromMinutes(5);
 
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _database;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _simulation;
 		private Task _autoSaveTask = Task.CompletedTask;
 
-		public PlayerPersistenceService(IDatabaseRepository database, ILogger logger, WorldSimulation simulation)
+		public PlayerPersistenceService(ICharacterRepository database, ILogger logger, WorldSimulation simulation)
 		{
 			_database = database;
 			_logger = logger;

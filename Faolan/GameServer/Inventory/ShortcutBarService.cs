@@ -22,10 +22,10 @@ namespace Faolan.GameServer.Inventory
 	public sealed class ShortcutBarService
 	{
 		private static readonly ProtoEndpoint ReplySender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _database;
 		private readonly ILogger _logger;
 
-		public ShortcutBarService(IDatabaseRepository database, ILogger logger)
+		public ShortcutBarService(ICharacterRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

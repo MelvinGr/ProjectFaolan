@@ -38,8 +38,6 @@ resolves the blend + a backlash roll on deactivate.
 - **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboActionParser.cs`) — normalises all 33 `Actions` tokens into the
   `ComboInput` enum (4 quadrants + Up/Head/Thrust); returns false for the non-directional markers (spellweaving /
   reactive). Validated against all 130 distinct `Actions` (109 directional, 21 non-directional, 0 unknown).
-- **`ComboService`** — `GetPerformableCombosAsync` = the superseded, directional combos as
-  `PerformableCombo(id, name, ComboInput[] sequence, gameActionId)`.
 
 ## Wire decode
 
@@ -63,7 +61,7 @@ resolves the blend + a backlash roll on deactivate.
     (`c702` HoX / `8403` Assassin).
 - **Not recoverable from packets alone**: the `cid → combo` and `animByte → ComboInput` mappings are computed
   client-side (the client derives the `cid` and selects the swing anim per (combo, direction, weapon)), so
-  pinning them needs client-side Ghidra RE. `ComboActionParser`/`ComboService` consume the map once it exists.
+  pinning them needs client-side Ghidra RE. `ComboActionParser` consumes the map once it exists.
 
 **Spellweaving** — DECODED (`Captures/NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving`, a necro
 that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then stopped):
