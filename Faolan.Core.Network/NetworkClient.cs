@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
@@ -32,14 +31,22 @@ namespace Faolan.Core.Network
 			return SendAsync(PacketSerializer.Serialize(rpc), cancellationToken);
 		}
 
+		// The chat tier's send boundary, the same shape one tier down: a handler builds a ChatServerMessage and hands it
+		// here. Its frame is 4 bytes plus the body, so it serializes straight through rather than earning a transport
+		// path of its own (the trace decodes those 4 bytes back, which costs nothing).
+		Task SendAsync(ChatServerMessage message, CancellationToken cancellationToken = default)
+		{
+			return SendAsync(message.Serialize(), cancellationToken);
+		}
+
 		void Start();
 		void Stop();
 	}
 
 	// The concrete socket client: owns the socket, the send lock, the message framer and the receive loop - everything
 	// EXCEPT how a completed frame is turned into something the listener dispatches on. That one step is DispatchFrame,
-	// which the two subclasses supply: a ChatServerPacket (ChatServer, constructed directly) or the structured Rpc (the
-	// Conan protocol listeners, via PacketParser - the #406/#407 receive model, no per-frame Packet object).
+	// which the two subclasses supply: a ChatServerMessage (ChatServer) or the structured Rpc (the Conan protocol
+	// listeners) - both parsed straight from the frame, with no per-frame packet object on either side.
 	public abstract class NetworkClient : INetworkClient
 	{
 		protected readonly ILogger Logger;
@@ -228,27 +235,23 @@ namespace Faolan.Core.Network
 		}
 	}
 
-	// The chat-protocol client: frames the chat wire format and constructs its ChatServerPacket DIRECTLY (no factory
-	// indirection - it is the only typed-Packet tier), handing the listener the typed packet. The chat frame
-	// ([u16 opcode][u16 bodyLen][body]) has no Rpc sender/receiver/CRC model, so it keeps its own Packet + framer.
+	// The chat-protocol client: frames the chat wire format and parses each frame into the structured ChatServerMessage
+	// for the listener. That frame ([u16 opcode][u16 bodyLen][body]) has no Rpc sender/receiver/CRC model, so it keeps
+	// its own message type + framer.
 	public sealed class ChatNetworkClient : NetworkClient
 	{
-		public Func<INetworkClient, ChatServerPacket, Task>? ReceivedPacket { get; init; }
+		public Func<INetworkClient, ChatServerMessage, Task>? ReceivedPacket { get; init; }
 
 		public ChatNetworkClient(Socket socket, ILogger logger, IPacketTracer tracer) : base(socket, logger, new ChatServerMessageFramer(), tracer)
 		{
 		}
 
-		protected override string ProtocolName => nameof(ChatServerPacket);
+		protected override string ProtocolName => nameof(ChatServerMessage);
 
 		protected override async Task DispatchFrame(byte[] frame)
 		{
-			var packet = new ChatServerPacket(frame);
-			if (!packet.IsValid)
-				throw new InvalidOperationException($"{nameof(ChatServerPacket)} was invalid");
-
 			if (ReceivedPacket != null)
-				await ReceivedPacket(this, packet);
+				await ReceivedPacket(this, ChatServerMessage.Parse(frame));
 		}
 	}
 

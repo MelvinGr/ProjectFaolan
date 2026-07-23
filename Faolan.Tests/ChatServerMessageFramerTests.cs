@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ManyFramesInOneRecv_AreAllFramed()
 		{
-			var frames = Enumerable.Range(0, 50).Select(i => ChatServerMessage.Build(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteString($"message {i}"))).ToList();
+			var frames = Enumerable.Range(0, 50).Select(i => Frame($"message {i}")).ToList();
 
 			var framed = new ChatServerMessageFramer().PushBytes(Concat(frames));
 
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 		[InlineData(9)]
 		public void FrameSplitAcrossRecvs_IsEmittedOnceComplete(int splitAt)
 		{
-			var frame = ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan"));
+			var frame = new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan")).Serialize();
 
 			var framer = new ChatServerMessageFramer();
 			Assert.Empty(framer.PushBytes(frame.AsSpan(0, splitAt)));
@@ -48,9 +48,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void PartialTail_IsCarriedIntoTheNextRecv()
 		{
-			var first = ChatServerMessage.Build(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteString("first"));
-			var split = ChatServerMessage.Build(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteString("split across the boundary"));
-			var last = ChatServerMessage.Build(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteString("last"));
+			var first = Frame("first");
+			var split = Frame("split across the boundary");
+			var last = Frame("last");
 
 			var framer = new ChatServerMessageFramer();
 			var head = framer.PushBytes(Concat([first, split[..6]]));
@@ -65,8 +65,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void EmptyBodiedFrame_DoesNotStallTheStream()
 		{
-			var beat = ChatServerMessage.Build(0x0005);
-			var next = ChatServerMessage.Build(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteString("after the beat"));
+			var beat = new ChatServerMessage(0x0005).Serialize();
+			var next = Frame("after the beat");
 
 			Assert.Equal([beat, next], new ChatServerMessageFramer().PushBytes(Concat([beat, next])));
 		}
@@ -74,6 +74,11 @@ namespace Faolan.Tests
 		private static byte[] Concat(IReadOnlyCollection<byte[]> frames)
 		{
 			return frames.SelectMany(f => f).ToArray();
+		}
+
+		private static byte[] Frame(string text)
+		{
+			return new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteString(text)).Serialize();
 		}
 	}
 }

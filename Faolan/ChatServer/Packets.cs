@@ -24,7 +24,7 @@ namespace Faolan.ChatServer
 				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(recipientId))
 					continue;
 
-				await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.CharacterChat, s => s
+				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.CharacterChat, s => s
 					.WriteUInt32(characterId)
 					.WriteString(message)
 					.WriteUInt16(0x0001) // type?
@@ -40,10 +40,10 @@ namespace Faolan.ChatServer
 			var delivered = 0;
 			foreach (var client in NetworkClients)
 			{
-				await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo,
+				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo,
 					s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName)));
 
-				await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChannelChat,
+				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChannelChat,
 					s => s.WriteByte(ClaudeChannel.ChannelType).WriteUInt32(ClaudeChannel.ChannelId).WriteUInt32(ClaudeChannel.SenderId).WriteString(message).WriteUInt16(0x0000)));
 
 				delivered++;
@@ -63,7 +63,7 @@ namespace Faolan.ChatServer
 			if (target == null)
 				return false;
 
-			await target.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo,
+			await target.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo,
 				s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName)));
 
 			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
@@ -103,9 +103,9 @@ namespace Faolan.ChatServer
 
 			foreach (var client in NetworkClients)
 			{
-				await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)));
+				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)));
 
-				await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChannelChat,
+				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChannelChat,
 					s => s.WriteByte(channelType).WriteUInt32(channelId).WriteUInt32(senderId).WriteString(message).WriteUInt16(0x0000)));
 			}
 		}
@@ -113,9 +113,9 @@ namespace Faolan.ChatServer
 		// An incoming tell (0x001E): [u32 peerCharacterId][string][00 01 00] - the peer slot carries the SENDER's
 		// id on delivery (and the target's id in the client's request, same shape both ways). Byte-exact against
 		// the whisper capture (WhisperTests). The receiving client resolves the name from the preceding 0x0014.
-		internal static byte[] BuildWhisper(uint peerCharacterId, string message)
+		internal static ChatServerMessage BuildWhisper(uint peerCharacterId, string message)
 		{
-			return ChatServerMessage.Build(ChatServerInterfaceOpcodes.Whisper, s => s.WriteUInt32(peerCharacterId).WriteString(message).WriteByte(0x00).WriteByte(0x01).WriteByte(0x00));
+			return new ChatServerMessage(ChatServerInterfaceOpcodes.Whisper, s => s.WriteUInt32(peerCharacterId).WriteString(message).WriteByte(0x00).WriteByte(0x01).WriteByte(0x00));
 		}
 
 		// A chat-channel subscription (0x003C): [type][id][name][flag][0x0000]. Sent on ChatServer connect for each
@@ -123,13 +123,13 @@ namespace Faolan.ChatServer
 		// verified from the raw login pcap.
 		private static Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
 		{
-			return client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChannelSubscription,
+			return client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChannelSubscription,
 				s => s.WriteByte(type).WriteUInt32(id).WriteString(name).WriteUInt32(flag).WriteUInt16(0x0000)));
 		}
 
 		private static Task SendSystemMessage(INetworkClient client, string message)
 		{
-			return client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString(message).WriteUInt16(0x0000)));
+			return client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString(message).WriteUInt16(0x0000)));
 		}
 	}
 }

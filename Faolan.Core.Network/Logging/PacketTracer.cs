@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Logging
 	//
 	// Only the SEND hooks live here, because only sending is protocol-agnostic at the transport (NetworkClient traces
 	// every frame it writes through IPacketTracer). The receive hooks are protocol-typed - an Rpc for the Conan tiers,
-	// a ChatServerPacket for the chat tier - so each concrete tracer exposes its own, and its listener calls it.
+	// a ChatServerMessage for the chat tier - so each concrete tracer exposes its own, and its listener calls it.
 	public abstract class PacketTracer : IPacketTracer
 	{
 		protected readonly ILogger Logger;

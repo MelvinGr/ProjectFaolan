@@ -10,7 +10,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
@@ -55,17 +54,18 @@ namespace Faolan.ChatServer
 			return base.StopAsync(cancellationToken);
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, ChatServerPacket packet)
+		protected override async Task ReceivedPacket(INetworkClient client, ChatServerMessage packet)
 		{
-			LogPacketReceived(packet, packet.Opcode);
+			LogPacketReceived(in packet);
 
-			switch (packet.Opcode)
+			var body = packet.BodyReader();
+			switch ((ChatServerOpcodes)packet.Opcode)
 			{
 				case ChatServerOpcodes.Hello:
 				{
-					var unk0 = packet.Body.ReadUInt32();
-					var clientInstance = packet.Body.ReadUInt32();
-					var accountId = packet.Body.ReadUInt32();
+					var unk0 = body.ReadUInt32();
+					var clientInstance = body.ReadUInt32();
+					var accountId = body.ReadUInt32();
 
 					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
@@ -100,9 +100,9 @@ namespace Faolan.ChatServer
 						await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
 
 					// An empty-bodied 0x0005 beat retail sends here; the method it names isn't recovered yet.
-					await client.SendAsync(ChatServerMessage.Build(0x0005));
+					await client.SendAsync(new ChatServerMessage(0x0005));
 
-					await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s
+					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s
 						.WriteUInt32(client.Session.Character.Id)
 						.WriteUInt32(0x00000000)
 						.WriteString(client.Session.Character?.Name?.Length > 0
@@ -123,9 +123,9 @@ namespace Faolan.ChatServer
 					// subscriptions decide whether/where it shows - that is what makes the multiple channels work
 					// (global channels reach everyone; ~Playfield's id is a map, so only same-map clients are
 					// subscribed to it and the rest ignore it).
-					var channelType = packet.Body.ReadByte();
-					var channelId = packet.Body.ReadUInt32();
-					var message = packet.Body.ReadString();
+					var channelType = body.ReadByte();
+					var channelId = body.ReadUInt32();
+					var message = body.ReadString();
 
 					Logger.LogInformation("ChatServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}", client.Session.Character?.Name ?? "?", channelType, channelId, message);
 
@@ -160,8 +160,8 @@ namespace Faolan.ChatServer
 					// capture 2026-06-12, Hoxxling <-> Settuc). Deliver to the target as the sender's identity
 					// (0x0014, like channel chat) + the same 0x001E shape with the SENDER's id in the peer slot.
 					// The sender's client renders its own outgoing tell locally - retail echoes nothing back.
-					var targetCharacterId = packet.Body.ReadUInt32();
-					var message = packet.Body.ReadString();
+					var targetCharacterId = body.ReadUInt32();
+					var message = body.ReadString();
 					var senderId = client.Session.Character.Id;
 					var senderName = client.Session.Character?.Name?.Length > 0
 						? client.Session.Character.Name
@@ -191,7 +191,7 @@ namespace Faolan.ChatServer
 						break;
 					}
 
-					await target.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)));
+					await target.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)));
 
 					await target.SendAsync(BuildWhisper(senderId, message));
 
@@ -201,14 +201,14 @@ namespace Faolan.ChatServer
 				case ChatServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
-					await client.SendAsync(ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatReadyAck, s => s.WriteArray(packet.Body.ReadRemainingArray())));
+					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatReadyAck, s => s.WriteArray(body.ReadRemainingArray())));
 
 					break;
 				}
 
 				default:
 				{
-					LogUnknownPacket(packet, packet.Opcode);
+					LogUnknownPacket(in packet);
 					break;
 				}
 			}

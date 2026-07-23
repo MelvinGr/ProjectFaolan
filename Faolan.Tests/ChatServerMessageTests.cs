@@ -5,38 +5,61 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The chat wire frame is [u16 opcode][u16 bodyLen][body]. ChatServerMessage.Build is the one place a send frames it
-	// (the chat tier's PacketSerializer), so it is pinned against the parser that reads the same frame back.
+	// ChatServerMessage is the chat tier's whole wire model - build, serialize and parse in one type (the counterpart to
+	// Rpc + PacketSerializer + PacketParser one tier down). These pin the frame layout [u16 opcode][u16 bodyLen][body]
+	// and that Serialize/Parse are mutual inverses, which is what stops a send and a receive drifting apart.
 	public class ChatServerMessageTests
 	{
 		[Fact]
-		public void Build_FramesOpcodeAndBodyLength()
+		public void Serialize_FramesOpcodeAndBodyLength()
 		{
-			var frame = ChatServerMessage.Build(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan"));
+			var frame = new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan")).Serialize();
 
 			Assert.Equal("0014", Convert.ToHexString(frame.AsSpan(0, 2)).ToLowerInvariant());
 			Assert.Equal(frame.Length - 4, (frame[2] << 8) | frame[3]); // bodyLen counts the bytes AFTER the 4-byte header
 		}
 
-		// Round-trips through the inbound parser: opcode and body survive, so the builder and ChatServerPacket agree on
-		// the frame layout.
 		[Fact]
-		public void Build_RoundTripsThroughTheParser()
+		public void SerializeAndParse_AreMutualInverses()
 		{
-			var frame = ChatServerMessage.Build(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString("hello").WriteUInt16(0x0000));
+			var message = new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString("hello").WriteUInt16(0x0000));
+			var frame = message.Serialize();
 
-			var parsed = new ChatServerPacket(frame);
-			Assert.True(parsed.IsValid);
-			Assert.Equal((ushort)ChatServerInterfaceOpcodes.SystemMessage, (ushort)parsed.Opcode);
-			Assert.Equal(frame.Length - 4u, parsed.Length);
+			var parsed = ChatServerMessage.Parse(frame);
+
+			Assert.Equal(message.Opcode, parsed.Opcode);
+			Assert.Equal(message.Body.ToArray(), parsed.Body.ToArray());
+			Assert.Equal(frame.Length, parsed.FrameLength);
+			Assert.Equal(frame, parsed.Serialize());
 		}
 
-		// An empty body frames as a bare 4-byte header - the shape of the unnamed 0x0005 beat on chat connect. (The
-		// inbound parser rejects a 0-length body, which is an inbound guard: nothing the server sends is parsed back.)
+		// The reader is a fresh cursor over the body per call, so a handler reads its fields sequentially off one.
 		[Fact]
-		public void Build_WithNoBody_IsTheBareHeader()
+		public void BodyReader_ReadsTheBodyFields()
 		{
-			Assert.Equal([0x00, 0x05, 0x00, 0x00], ChatServerMessage.Build(0x0005));
+			var parsed = ChatServerMessage.Parse(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan")).Serialize());
+
+			var body = parsed.BodyReader();
+			Assert.Equal(0x01313438u, body.ReadUInt32());
+			Assert.Equal("Conan", body.ReadString());
+		}
+
+		// An empty body frames as a bare 4-byte header - the shape of the unnamed 0x0005 beat on chat connect.
+		[Fact]
+		public void EmptyBody_IsTheBareHeader()
+		{
+			Assert.Equal([0x00, 0x05, 0x00, 0x00], new ChatServerMessage(0x0005).Serialize());
+			Assert.Equal(0, ChatServerMessage.Parse([0x00, 0x05, 0x00, 0x00]).Body.Length);
+		}
+
+		// Parse is lenient like the Conan parser: a body shorter than its declared length is taken as-is, so a malformed
+		// frame surfaces where a handler reads a field off it rather than throwing in the transport.
+		[Fact]
+		public void Parse_ShortBody_TakesWhatIsThere()
+		{
+			var parsed = ChatServerMessage.Parse([0x00, 0x23, 0x00, 0x40, 0xAA, 0xBB]); // declares 0x40 bytes, carries 2
+
+			Assert.Equal([0xAA, 0xBB], parsed.Body.ToArray());
 		}
 	}
 }

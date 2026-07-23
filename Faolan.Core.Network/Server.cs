@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
@@ -161,7 +160,7 @@ namespace Faolan.Core.Network
 		}
 	}
 
-	// The chat-protocol listener (ChatServer): each frame is parsed to a ChatServerPacket and dispatched. The chat wire
+	// The chat-protocol listener (ChatServer): each frame is parsed to a ChatServerMessage and dispatched. The chat wire
 	// frame ([u16 opcode][u16 bodyLen][body]) has no Rpc sender/receiver/CRC model, so it keeps its own typed Packet +
 	// framer rather than the structured Rpc path. This is the sole typed-Packet tier, so it is a plain concrete base (no
 	// generic TPacket/TFactory) - the packet is constructed directly by ChatNetworkClient, so there is no IPacketFactory.
@@ -198,17 +197,19 @@ namespace Faolan.Core.Network
 			};
 		}
 
-		protected void LogPacketReceived(ChatServerPacket packet, Enum opcode)
+		// Inbound (RX) trace, through the SAME tracer the transport traces this channel's sends with: the method name and
+		// the frame length both come off the parsed message, so the listener passes nothing but the packet.
+		protected void LogPacketReceived(in ChatServerMessage packet)
 		{
-			_tracer.Received(packet, opcode);
+			_tracer.Received(in packet);
 		}
 
-		protected void LogUnknownPacket(ChatServerPacket packet, Enum opcode)
+		protected void LogUnknownPacket(in ChatServerMessage packet)
 		{
-			_tracer.Unhandled(packet, opcode);
+			_tracer.Unhandled(in packet);
 		}
 
-		protected abstract Task ReceivedPacket(INetworkClient client, ChatServerPacket packet);
+		protected abstract Task ReceivedPacket(INetworkClient client, ChatServerMessage packet);
 	}
 
 	// The structured-Rpc listener (every Conan protocol tier): each frame is parsed straight to an Rpc (PacketParser)
