@@ -35,11 +35,9 @@ namespace Faolan.ChatServer
 			_claudeChannel = claudeChannel;
 		}
 
-		public IReadOnlyList<SessionInfo> GetSessions()
+		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
 		{
-			return NetworkClients
-				.Select(nc => new SessionInfo(nc.IpAddress!, nc.Session.Account?.Id, nc.Session.Account?.UserName, nc.Session.Character?.Id, nc.Session.Character?.Name))
-				.ToArray();
+			return NetworkClients.Select(nc => nc.Session).Where(s => s != null).ToArray();
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)

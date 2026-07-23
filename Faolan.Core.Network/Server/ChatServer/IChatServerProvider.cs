@@ -10,8 +10,12 @@ namespace Faolan.Core.Network.Server.ChatServer
 		// live positions); null = every connected client (server-wide).
 		Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint>? recipientCharacterIds = null);
 
-		/// <summary>Snapshot of currently connected sessions. Cheap, read-only, safe to call at any time.</summary>
-		IReadOnlyList<SessionInfo> GetSessions();
+		/// <summary>
+		///     The COMPLETE live <see cref="INetworkClientSession" /> of every connected client - full session state.
+		///     Cheap, read-only, safe to call at any time (e.g. the MCP list_sessions tool); do not mutate the returned
+		///     objects.
+		/// </summary>
+		IReadOnlyList<INetworkClientSession> GetWorldSessions();
 
 		/// <summary>
 		///     Posts a message on the Claude channel (<see cref="ClaudeChannel" />) as the synthetic "Claude" sender,

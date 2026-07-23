@@ -12,8 +12,8 @@ using ModelContextProtocol.Protocol;
 
 namespace Faolan.Web.Services
 {
-	// One live connected player, as reported by the game server's MCP `list_sessions` tool. Mirrors
-	// Faolan.Core's SessionInfo record (we deserialize the tool's JSON rather than referencing the server types).
+	// One live connected player, as reported by the game server's MCP `list_sessions` tool. Mirrors the flat identity
+	// projection that tool serializes (we deserialize the tool's JSON rather than referencing the server types).
 	public sealed record LiveSession(uint? CharacterId, string? CharacterName, ushort? CharacterLevel, uint? AccountId, string? AccountName);
 
 	// One live entity in a zone (player/npc/loot), as reported by the MCP list_zone_entities tool. Mirrors
@@ -73,7 +73,7 @@ namespace Faolan.Web.Services
 			if (text == null)
 				return null; // unreachable / offline
 
-			// The tool returns a human string when empty, else a JSON array of SessionInfo.
+			// The tool returns a human string when empty, else a JSON array of the session identity projection.
 			if (!text.TrimStart().StartsWith('['))
 				return [];
 

@@ -276,18 +276,6 @@ namespace Faolan.GameServer
 				entity.Vitals?.MaxHealth, buffs);
 		}
 
-		public IReadOnlyList<SessionInfo> GetSessions()
-		{
-			return NetworkClients
-				.Select(nc =>
-				{
-					var account = nc.Session.Account;
-					var character = nc.Session.Character;
-					return new SessionInfo(nc.IpAddress!, account?.Id, account?.UserName, character?.Id, character?.Name);
-				})
-				.ToArray();
-		}
-
 		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
 		{
 			return NetworkClients.Select(nc => nc.Session).Where(s => s != null).ToArray();

@@ -27,14 +27,24 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "list_sessions"),
-		 Description("List the clients currently connected to the live Faolan agent server, with account/character identity and source ip. Read-only snapshot of the running server.")]
+		 Description("List the clients currently connected to the live Faolan agent server, with account/character identity. Read-only snapshot of the running server.")]
 		public string ListSessions()
 		{
-			var sessions = _dispatcher.GetSessions();
+			var sessions = _dispatcher.GetWorldSessions();
 			if (sessions.Count == 0)
 				return "No clients are currently connected.";
 
-			return JsonSerializer.Serialize(sessions, JsonOptions);
+			// Flat identity projection (the shape Faolan.Web's LiveSession deserializes) rather than dumping the whole
+			// session - list_world_sessions is the full-state dump.
+			var summary = sessions.Select(s => new
+			{
+				CharacterId = s.Character?.Id,
+				CharacterName = s.Character?.Name,
+				CharacterLevel = s.Character?.Level,
+				AccountId = s.Account?.Id,
+				AccountName = s.Account?.UserName
+			});
+			return JsonSerializer.Serialize(summary, JsonOptions);
 		}
 
 		[McpServerTool(Name = "send_system_message"),
@@ -45,7 +55,7 @@ namespace Faolan.Mcp.Tools
 			if (string.IsNullOrWhiteSpace(message))
 				return "Message is empty; nothing sent.";
 
-			if (_dispatcher.GetSessions().All(s => s.CharacterId != characterId))
+			if (_dispatcher.GetWorldSessions().All(s => s.Character?.Id != characterId))
 				return $"Character {characterId} is not currently connected to the ChatServer; nothing sent.";
 
 			await _dispatcher.SendSystemMessage(characterId, message);

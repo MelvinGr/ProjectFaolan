@@ -25,14 +25,10 @@ namespace Faolan.Core.Network.Server.GameServer
 		/// </summary>
 		CharacterLiveState? GetCharacterLiveState(uint characterId);
 
-		/// <summary>Snapshot of clients connected to this listener. Cheap, read-only.</summary>
-		IReadOnlyList<SessionInfo> GetSessions();
-
 		/// <summary>
 		///     The COMPLETE live <see cref="INetworkClientSession" /> of every client connected to this listener -
-		///     the full session state (selected target, energy, conversation, entry mode, account/character, …), unlike
-		///     the projected <see cref="GetSessions" /> summary. Read-only inspection (e.g. the MCP list_world_sessions
-		///     tool); do not mutate the returned objects.
+		///     the full session state (selected target, energy, conversation, entry mode, account/character, …).
+		///     Read-only inspection (e.g. the MCP list_world_sessions tool); do not mutate the returned objects.
 		/// </summary>
 		IReadOnlyList<INetworkClientSession> GetWorldSessions();
 

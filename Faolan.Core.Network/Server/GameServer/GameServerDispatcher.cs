@@ -47,11 +47,6 @@ namespace Faolan.Core.Network.Server.GameServer
 			return _providers.Keys.Select(p => p.GetCharacterLiveState(characterId)).FirstOrDefault(s => s != null);
 		}
 
-		public IReadOnlyList<SessionInfo> GetSessions()
-		{
-			return _providers.Keys.SelectMany(p => p.GetSessions()).ToArray();
-		}
-
 		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
 		{
 			return _providers.Keys.SelectMany(p => p.GetWorldSessions()).ToArray();

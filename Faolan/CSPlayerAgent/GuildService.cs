@@ -326,7 +326,7 @@ namespace Faolan.CSPlayerAgent
 		// online flag; the member list has no other liveness source).
 		private bool IsCharacterOnline(uint characterId)
 		{
-			return _gameServerDispatcher.GetSessions().Any(s => s.CharacterId == characterId);
+			return _gameServerDispatcher.GetWorldSessions().Any(s => s.Character?.Id == characterId);
 		}
 
 		private static async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
