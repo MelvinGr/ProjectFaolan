@@ -14,7 +14,8 @@ namespace Faolan.GameServer.Economy
 	public interface IEconomyOutbound
 	{
 		// Grant an item template into the first free backpack slot, returning the slot (or null when full).
-		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1);
+		// allowHashless permits a live add of an item that carries a key but no hash (claim items - #claims).
+		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool allowHashless = false);
 
 		// Push a live single-item add into a container (backpack 0x68, bank 0x69, ...). See GameServerListener.Outbound.cs SendAddItem.
 		Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0);

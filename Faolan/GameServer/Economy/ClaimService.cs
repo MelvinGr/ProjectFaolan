@@ -6,27 +6,42 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.ChatServer;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Economy
 {
 	// Item claims / "Redeem" window (CoreClaimIIR 0x06EC1255). The client requests its claims (sub 0x0007), the
 	// server answers with the list (sub 0x0001, CoreClaimListCodec); redeeming (sub 0x0003 + 1-based index) grants
 	// the item to the backpack and drops the claim. The "new claims available" glow (sub 0x0009, CoreClaimListCodec.BuildNewClaimsGlow) is
 	// pushed at world entry only when the account has unseen claims. Claims are account-scoped (AccountClaim), seeded
-	// by the .claim GM command for now. See docs/subsystems/item-claims.md.
-	public partial class GameServerListener
+	// by the .claim GM command for now. See docs/subsystems/item-claims.md. Extracted from GameServerListener as a
+	// composed collaborator (#200): item-grant rides the IEconomyOutbound port, system messages the chat dispatcher.
+	public sealed class ClaimService
 	{
+		private readonly IDatabaseRepository _database;
+		private readonly IEconomyOutbound _outbound;
+		private readonly IChatServerDispatcher _chat;
+		private readonly ILogger _logger;
+
+		public ClaimService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, IChatServerDispatcher chat)
+		{
+			_database = database;
+			_logger = logger;
+			_outbound = outbound;
+			_chat = chat;
+		}
+
 		// .claim add <itemId> [count]  - seed a redeemable item claim onto the calling account's Claims window (the
 		// test bootstrap until shop/reward grants populate it). .claim list - show the pending claims. Redeem in-game
 		// via the client's Claims/Redeem window.
-		private async Task ClaimCommand(INetworkClient client, string arguments)
+		public async Task ClaimCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
 			var accountId = client.Session.Account.Id;
@@ -34,18 +49,18 @@ namespace Faolan.GameServer
 
 			if (parts.Length >= 1 && parts[0].Equals("list", StringComparison.OrdinalIgnoreCase))
 			{
-				var rows = await Database.GetAccountClaims(accountId);
+				var rows = await _database.GetAccountClaims(accountId);
 				if (rows.Length == 0)
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, "No pending claims.");
+					await _chat.SendSystemMessage(characterId, "No pending claims.");
 					return;
 				}
 
 				for (var i = 0; i < rows.Length; i++)
 				{
-					var item = await Database.GetItem(rows[i].ItemTemplateId);
+					var item = await _database.GetItem(rows[i].ItemTemplateId);
 					var qty = rows[i].Quantity?.ToString() ?? "∞"; // null = infinite charges
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"#{i + 1}: {qty}x '{item?.Name ?? "?"}' (template {rows[i].ItemTemplateId})");
+					await _chat.SendSystemMessage(characterId, $"#{i + 1}: {qty}x '{item?.Name ?? "?"}' (template {rows[i].ItemTemplateId})");
 				}
 
 				return;
@@ -54,22 +69,22 @@ namespace Faolan.GameServer
 			if (parts.Length is < 2 or > 3 || !parts[0].Equals("add", StringComparison.OrdinalIgnoreCase) ||
 			    !uint.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var itemId))
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]  |  .claim list");
+				await _chat.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]  |  .claim list");
 				return;
 			}
 
 			uint count = 1;
 			if (parts.Length == 3 && !uint.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out count))
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]");
+				await _chat.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]");
 				return;
 			}
 
-			var template = await Database.GetItem(itemId);
+			var template = await _database.GetItem(itemId);
 			// Level is cosmetic (the client shows the item's own level from its RDB); seed it from our Items row if we
 			// have it. count <= 1 = an ordinary INFINITE item claim (null charges, shown as ∞); count > 1 = a finite
 			// multi-charge claim.
-			await Database.CreateAccountClaim(new AccountClaim
+			await _database.CreateAccountClaim(new AccountClaim
 			{
 				AccountId = accountId,
 				ItemTemplateId = itemId,
@@ -81,12 +96,12 @@ namespace Faolan.GameServer
 					? null
 					: count
 			});
-			await _agentServerDispatcher.SendSystemMessage(characterId,
+			await _chat.SendSystemMessage(characterId,
 				$"Added claim: {(count == 0 ? 1 : count)}x '{template?.Name ?? "?"}' (template {itemId}). Open the Claims/Redeem window to collect it.");
 		}
 
 		// Dispatch an inbound CoreClaimIIR. Body (after the 0x2000 sub-header) = [receiverClass][receiverInstance][u16 sub][args].
-		private async Task HandleCoreClaim(INetworkClient client, Rpc packet)
+		public async Task HandleCoreClaim(INetworkClient client, Rpc packet)
 		{
 			var body = packet.BodyReader();
 			_ = body.ReadUInt32(); // receiver class (0xC350 Character)
@@ -105,7 +120,7 @@ namespace Faolan.GameServer
 					break;
 
 				default:
-					Logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
+					_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
 					break;
 			}
 		}
@@ -120,23 +135,23 @@ namespace Faolan.GameServer
 			var slots = client.Session.ClaimSlots;
 			if (slots == null || index < 1 || index > slots.Count)
 			{
-				Logger.LogWarning("Redeem for out-of-range claim index {Index} (snapshot has {Count}).", index, slots?.Count ?? 0);
+				_logger.LogWarning("Redeem for out-of-range claim index {Index} (snapshot has {Count}).", index, slots?.Count ?? 0);
 				return;
 			}
 
-			var claim = await Database.GetAccountClaim(slots[(int)(index - 1)]);
+			var claim = await _database.GetAccountClaim(slots[(int)(index - 1)]);
 			if (claim == null || claim.AccountId != client.Session.Account.Id)
 				return; // already redeemed (or not this account's) - no-op
 
 			// Each redeem delivers exactly ONE of the item (proven by the capture: the delivered DispatchAddItem carries
 			// no stat-26 stack count). The Type is the BINDING (6 account / 4 character), not item-vs-currency. Claim
 			// items carry a key but no hash, so allow the hashless live add.
-			var slot = await GrantItemToBackpack(client, claim.ItemTemplateId, allowHashless: true);
+			var slot = await _outbound.GrantItemToBackpack(client, claim.ItemTemplateId, allowHashless: true);
 			if (slot == null)
 			{
 				// Bag full (or the item template is missing) - keep the claim so the player can retry.
 				if (characterId != 0)
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Your bag is full - free a slot and redeem the claim again.");
+					await _chat.SendSystemMessage(characterId, "Your bag is full - free a slot and redeem the claim again.");
 				return;
 			}
 
@@ -144,7 +159,7 @@ namespace Faolan.GameServer
 			// keeps an ∞ row after the DispatchAddItem, so nothing else to send.
 			if (claim.Quantity is not { } remaining)
 			{
-				Logger.LogInformation("Account {AccountId} redeemed infinite claim {ClaimId} (template {Template}).", client.Session.Account.Id, claim.Id, claim.ItemTemplateId);
+				_logger.LogInformation("Account {AccountId} redeemed infinite claim {ClaimId} (template {Template}).", client.Session.Account.Id, claim.Id, claim.ItemTemplateId);
 				return;
 			}
 
@@ -153,15 +168,15 @@ namespace Faolan.GameServer
 			// is spent (its DispatchAddItem then tells the client to remove it).
 			if (remaining > 1)
 			{
-				await Database.SetAccountClaimQuantity(claim.Id, remaining - 1);
+				await _database.SetAccountClaimQuantity(claim.Id, remaining - 1);
 				await SendRedeemAck(client, claim, index, remaining - 1);
-				Logger.LogInformation("Account {AccountId} redeemed 1 charge of claim {ClaimId} (template {Template}); {Remaining} left.", client.Session.Account.Id, claim.Id, claim.ItemTemplateId,
+				_logger.LogInformation("Account {AccountId} redeemed 1 charge of claim {ClaimId} (template {Template}); {Remaining} left.", client.Session.Account.Id, claim.Id, claim.ItemTemplateId,
 					remaining - 1);
 				return;
 			}
 
-			await Database.DeleteAccountClaim(claim.Id);
-			Logger.LogInformation("Account {AccountId} redeemed claim {ClaimId} (template {Template}).", client.Session.Account.Id, claim.Id, claim.ItemTemplateId);
+			await _database.DeleteAccountClaim(claim.Id);
+			_logger.LogInformation("Account {AccountId} redeemed claim {ClaimId} (template {Template}).", client.Session.Account.Id, claim.Id, claim.ItemTemplateId);
 		}
 
 		// Build + send the account's claim list (sub 0x0001) and clear the "new" glow flag - opening the window counts
@@ -170,34 +185,34 @@ namespace Faolan.GameServer
 		{
 			var accountId = client.Session.Account.Id;
 			var handle = client.Session.Character.Id;
-			var rows = await Database.GetAccountClaims(accountId);
+			var rows = await _database.GetAccountClaims(accountId);
 			var entries = BuildClaimEntries(accountId, rows);
 
 			// Remember the exact order we sent, so a subsequent redeem resolves its 1-based index against THIS list even
 			// as "Claim All" deletes rows one by one (which would otherwise shift every later index).
 			client.Session.ClaimSlots = rows.Select(r => r.Id).ToList();
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))));
 
 			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
 			// so a re-entry this session doesn't re-glow).
-			await Database.SetAccountClaimsAvailable(accountId, false);
+			await _database.SetAccountClaimsAvailable(accountId, false);
 			client.Session.Account.ClaimsAvailable = false;
 
-			Logger.LogInformation("Sent {Count} claim(s) to account {AccountId}.", entries.Count, accountId);
+			_logger.LogInformation("Sent {Count} claim(s) to account {AccountId}.", entries.Count, accountId);
 		}
 
 		// Push the "new claims available" glow (sub 0x0009) at world entry, but only when the account has UNSEEN claims
 		// (Account.ClaimsAvailable) - retail sends this on a fresh login with new claims and omits it once viewed. The
 		// session account is loaded at login, so the flag is current here.
-		private static async Task SendNewClaimsGlowIfAny(INetworkClient client)
+		public async Task SendNewClaimsGlowIfAny(INetworkClient client)
 		{
 			if (!client.Session.Account.ClaimsAvailable)
 				return;
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))));
 		}
@@ -212,7 +227,7 @@ namespace Faolan.GameServer
 				: claim.Code;
 			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
 				GameInterfaceOpcodes.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
 		}

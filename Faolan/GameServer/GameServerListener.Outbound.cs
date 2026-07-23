@@ -32,9 +32,9 @@ namespace Faolan.GameServer
 		// sizing the snapshot uses (FullPlayerCharacterBuilder), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count)
+		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, bool allowHashless)
 		{
-			return GrantItemToBackpack(client, itemTemplateId, count);
+			return GrantItemToBackpack(client, itemTemplateId, count, allowHashless: allowHashless);
 		}
 
 		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)

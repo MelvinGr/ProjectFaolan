@@ -193,6 +193,7 @@ namespace Faolan.GameServer
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
 		private readonly ShopService _shop;
+		private readonly ClaimService _claims;
 
 		// The player action bar / hotbar persistence + login restore (#71). See Inventory/ShortcutBarService.cs.
 		private readonly ShortcutBarService _shortcutBar;
@@ -251,6 +252,7 @@ namespace Faolan.GameServer
 			_equipment = new EquipmentService(database, logger);
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
+			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 
 			InitGmCommands();
 		}

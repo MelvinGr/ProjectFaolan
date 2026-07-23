@@ -339,7 +339,7 @@ namespace Faolan.GameServer
 			// "New claims available" glow (CoreClaimIIR sub 0x0009) - pushed ONLY when the account has unseen claims,
 			// matching retail (present on a fresh login with new claims, absent once viewed). Previously this fired
 			// unconditionally, so the claims button lit up for every account; see GameServerListener.Claims.cs.
-			await SendNewClaimsGlowIfAny(client);
+			await _claims.SendNewClaimsGlowIfAny(client);
 
 			// record 0: 0x00002000, 17-byte body
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),

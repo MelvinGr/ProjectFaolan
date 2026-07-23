@@ -353,7 +353,7 @@ namespace Faolan.GameServer
 				["kill"] = KillCommand,
 				["additem"] = AddItemCommand,
 				["removeitem"] = RemoveItemCommand,
-				["claim"] = ClaimCommand,
+				["claim"] = _claims.ClaimCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
