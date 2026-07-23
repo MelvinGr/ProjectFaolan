@@ -6,23 +6,23 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.UniverseAgent
 {
-	public partial class UniverseAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
+	public partial class UniverseAgentListener : RpcServer<ConanMessageFramer>
 	{
 		public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.UniverseAgentPort, logger, configuration,
 			database, new ConanOutgoingPacketLogger(logger, "UniverseAgent", typeof(UniverseInterfaceOpcodes)))
 		{
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket frame)
+		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			var packet = frame.ToRpc();
 			var opcode = (UniverseAgentOpcodes)packet.Opcode;
-			LogPacketReceived(frame, opcode);
+			LogPacketReceived(packet, opcode);
 
 			var body = packet.BodyReader();
 			switch (opcode)
@@ -107,7 +107,7 @@ namespace Faolan.UniverseAgent
 
 				default:
 				{
-					LogUnknownPacket(frame, opcode);
+					LogUnknownPacket(packet, opcode);
 					break;
 				}
 			}

@@ -34,12 +34,24 @@ namespace Faolan.Core.Network
 		void Stop();
 	}
 
+	// The concrete socket client: owns the socket, the send lock, the message framer and the receive loop - everything
+	// EXCEPT how a completed frame is turned into something the listener dispatches on. That one step is DispatchFrame,
+	// which the two subclasses supply: a Packet (ChatServer, via a factory) or the structured Rpc (the Conan protocol
+	// listeners, via PacketParser - the #406/#407 receive model, no per-frame Packet object).
 	public abstract class NetworkClient : INetworkClient
 	{
 		protected readonly ILogger Logger;
 		protected readonly Socket Socket;
 
-		public Func<INetworkClient, Packet, Task>? ReceivedPacket { get; init; }
+		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
+		private readonly IMessageFramer _messageFramer;
+		private readonly IPacketLogger _outgoingPacketLogger;
+		private readonly SemaphoreSlim _sendLock = new(1, 1);
+
+		private CancellationTokenSource? _cancellationTokenSource;
+		private int _stopped;
+		private Task? _receiveTask;
+
 		public Func<INetworkClient, Task>? Disconnected { get; init; }
 
 		// Fired once after every TCP recv whose bytes produced at least one complete packet, when that recv's
@@ -51,80 +63,40 @@ namespace Faolan.Core.Network
 
 		public string? IpAddress => field ??= (Socket.RemoteEndPoint as IPEndPoint)?.Address.ToString();
 
-		protected NetworkClient(Socket socket, ILogger logger)
+		protected NetworkClient(Socket socket, ILogger logger, IMessageFramer messageFramer, IPacketLogger outgoingPacketLogger)
 		{
 			Socket = socket;
 			Logger = logger;
+			_messageFramer = messageFramer;
+			_outgoingPacketLogger = outgoingPacketLogger ?? throw new ArgumentNullException(nameof(outgoingPacketLogger));
 		}
+
+		// A short protocol name for the receive-loop error logs (was typeof(TPacket).Name).
+		protected abstract string ProtocolName { get; }
+
+		// Turn one completed wire frame into the listener's dispatch. Packet subclass: factory.Create + IsValid gate;
+		// Rpc subclass: PacketParser.Parse.
+		protected abstract Task DispatchFrame(byte[] frame);
 
 		// The byte[] send path: trace the frame (the logger re-parses it), then put it on the wire. Used by the chat
 		// server (its own framing has no Rpc model) and by the SendAsync(Rpc) default for lightweight test doubles.
 		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
 		{
 			ArgumentNullException.ThrowIfNull(value);
-			LogOutgoing(value);
+			_outgoingPacketLogger.Log(value);
 			return SendRawAsync(value, cancellationToken);
 		}
 
 		// The structured send path (Gitea #406 phase 6): serialize ONCE, trace directly from the Rpc model (no
-		// re-parse), then put it on the wire. This class member implements the interface's SendAsync(Rpc) for the real
-		// client hierarchy; the interface's default (serialize + SendAsync(byte[])) still serves lightweight
-		// INetworkClient test doubles that don't derive from NetworkClient.
+		// re-parse), then put it on the wire.
 		public virtual Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
 			var bytes = PacketSerializer.Serialize(rpc);
-			LogOutgoing(in rpc, bytes.Length);
+			_outgoingPacketLogger.Log(in rpc, bytes.Length);
 			return SendRawAsync(bytes, cancellationToken);
 		}
 
-		// The raw socket write (no logging), supplied by the concrete client.
-		protected abstract Task SendRawAsync(byte[] value, CancellationToken cancellationToken);
-
-		// Send-path trace hooks the concrete client routes to its IPacketLogger. No-op by default.
-		protected virtual void LogOutgoing(byte[] value)
-		{
-		}
-
-		protected virtual void LogOutgoing(in Rpc rpc, int frameByteLength)
-		{
-		}
-
-		public abstract void Start();
-		public abstract void Stop();
-	}
-
-	public sealed class NetworkClient<TPacket, TMessageFramer, TPacketFactory> : NetworkClient
-		where TPacket : Packet where TMessageFramer : IMessageFramer, new() where TPacketFactory : IPacketFactory<TPacket>, new()
-	{
-		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
-		private readonly IMessageFramer _messageFramer;
-		private readonly IPacketFactory<TPacket> _packetFactory;
-		private readonly IPacketLogger _outgoingPacketLogger;
-		private readonly SemaphoreSlim _sendLock = new(1, 1);
-
-		private CancellationTokenSource? _cancellationTokenSource;
-		private int _stopped;
-		private Task? _receiveTask;
-
-		public NetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger)
-		{
-			_messageFramer = new TMessageFramer();
-			_packetFactory = new TPacketFactory();
-			_outgoingPacketLogger = outgoingPacketLogger ?? throw new ArgumentNullException(nameof(outgoingPacketLogger));
-		}
-
-		// The IPacketLogger trace hooks the base send paths call before the raw socket write.
-		protected override void LogOutgoing(byte[] value)
-		{
-			_outgoingPacketLogger.Log(value);
-		}
-
-		protected override void LogOutgoing(in Rpc rpc, int frameByteLength)
-		{
-			_outgoingPacketLogger.Log(in rpc, frameByteLength);
-		}
-
-		protected override async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
+		private async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
 		{
 			await _sendLock.WaitAsync(cancellationToken);
 			try
@@ -150,7 +122,7 @@ namespace Faolan.Core.Network
 			}
 		}
 
-		public override void Start()
+		public void Start()
 		{
 			if (_receiveTask != null)
 				return;
@@ -159,7 +131,7 @@ namespace Faolan.Core.Network
 			_receiveTask = ReceiveLoopAsync(_cancellationTokenSource.Token);
 		}
 
-		public override void Stop()
+		public void Stop()
 		{
 			if (Interlocked.Exchange(ref _stopped, 1) == 1)
 				return;
@@ -196,14 +168,7 @@ namespace Faolan.Core.Network
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 
-				var packet = _packetFactory.Create(frame);
-
-				if (packet?.IsValid != true)
-					throw new InvalidOperationException($"{typeof(TPacket).Name} was invalid");
-
-				if (ReceivedPacket != null)
-					await ReceivedPacket(this, packet);
-
+				await DispatchFrame(frame);
 				dispatchedAny = true;
 			}
 
@@ -239,14 +204,64 @@ namespace Faolan.Core.Network
 			}
 			catch (SocketException ex)
 			{
-				Logger.LogDebug(ex, "Socket receive failed for {PacketType}; closing client.", typeof(TPacket).Name);
+				Logger.LogDebug(ex, "Socket receive failed for {PacketType}; closing client.", ProtocolName);
 				Stop();
 			}
 			catch (Exception ex)
 			{
-				Logger.LogDebug(ex, "Receive processing failed for {PacketType}; closing client.", typeof(TPacket).Name);
+				Logger.LogDebug(ex, "Receive processing failed for {PacketType}; closing client.", ProtocolName);
 				Stop();
 			}
+		}
+	}
+
+	// The Packet-dispatching client: parses each frame with the protocol's IPacketFactory and hands the listener the
+	// typed Packet. Used by the ChatServer (its framing has no Rpc model).
+	public sealed class NetworkClient<TPacket, TMessageFramer, TPacketFactory> : NetworkClient
+		where TPacket : Packet where TMessageFramer : IMessageFramer, new() where TPacketFactory : IPacketFactory<TPacket>, new()
+	{
+		private readonly IPacketFactory<TPacket> _packetFactory = new TPacketFactory();
+
+		public Func<INetworkClient, Packet, Task>? ReceivedPacket { get; init; }
+
+		public NetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger, new TMessageFramer(), outgoingPacketLogger)
+		{
+		}
+
+		protected override string ProtocolName => typeof(TPacket).Name;
+
+		protected override async Task DispatchFrame(byte[] frame)
+		{
+			var packet = _packetFactory.Create(frame);
+			if (packet?.IsValid != true)
+				throw new InvalidOperationException($"{typeof(TPacket).Name} was invalid");
+
+			if (ReceivedPacket != null)
+				await ReceivedPacket(this, packet);
+		}
+	}
+
+	// The Rpc-dispatching client (Gitea #406/#407): parses each frame straight into the structured Rpc via
+	// PacketParser - no per-frame Packet object - and hands it to the listener. Used by every Conan protocol listener.
+	public sealed class RpcNetworkClient<TMessageFramer> : NetworkClient
+		where TMessageFramer : IMessageFramer, new()
+	{
+		public Func<INetworkClient, Rpc, Task>? ReceivedRpc { get; init; }
+
+		public RpcNetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger, new TMessageFramer(), outgoingPacketLogger)
+		{
+		}
+
+		protected override string ProtocolName => "Rpc";
+
+		protected override async Task DispatchFrame(byte[] frame)
+		{
+			// PacketParser.Parse is the SOLE inbound parse (Gitea #406/#407) - straight to the structured Rpc, no
+			// ConanPacket. It stamps Rpc.FrameLength with the total wire size. (The old ConanPacket path threw on a bad
+			// CRC; a corrupt frame now surfaces when a handler reads a field off it, which the dispatch try/catch turns
+			// into the same client.Stop().)
+			if (ReceivedRpc != null)
+				await ReceivedRpc(this, PacketParser.Parse(frame));
 		}
 	}
 

@@ -79,16 +79,21 @@ namespace Faolan.Core.Network.Logging
 				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
 			}
 
-			// Rpc-model UL variants (Gitea #407): the listener dispatches on the parsed Rpc, so it passes the Rpc + the
-			// serialized frame length (the total wire size the Rpc doesn't itself carry).
-			public void LogReceived(string channel, in Rpc packet, Enum opcode, int frameLength)
+			// Rpc-model UL variants (Gitea #407): the listener dispatches on the parsed Rpc; its FrameLength (the total
+			// wire size) rides on the Rpc, reported as packetLength.
+			public void LogReceived(string channel, in Rpc packet, Enum opcode)
 			{
-				logger.LogPacket(Uplink, channel, OpcodeName(opcode), packet.Body.Length, frameLength, ("body", packet.Body.ToArray()));
+				logger.LogPacket(Uplink, channel, OpcodeName(opcode), packet.Body.Length, packet.FrameLength, ("body", packet.Body.ToArray()));
 			}
 
-			public void LogUnhandled(string channel, in Rpc packet, ushort opcode, string opcodeName, int frameLength)
+			public void LogUnhandled(string channel, in Rpc packet, ushort opcode, string opcodeName)
 			{
-				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body.Length, frameLength, ("body", packet.Body.ToArray()));
+				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body.Length, packet.FrameLength, ("body", packet.Body.ToArray()));
+			}
+
+			public void LogUnhandled(string channel, in Rpc packet, Enum opcode)
+			{
+				logger.LogUnknownPacket(channel, OpcodeName(opcode), packet.Body.Length, packet.FrameLength, ("body", packet.Body.ToArray()));
 			}
 
 			// An extra opcode-specific body dump some inbound handlers emit on their own line, gated on the byte-dump

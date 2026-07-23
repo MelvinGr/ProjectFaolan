@@ -4,15 +4,15 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	public partial class CsPlayerAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
+	public partial class CsPlayerAgentListener : RpcServer<ConanMessageFramer>
 	{
 		// Composed collaborator: owns the guild RPC handlers, wire builders, and pending-invite / reply-endpoint
 		// state. The cross-connection lookup (ClientForCharacter, on the Server base) is injected as a delegate seam.
@@ -31,11 +31,10 @@ namespace Faolan.CSPlayerAgent
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket frame)
+		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			var packet = frame.ToRpc();
 			var opcode = (CSPlayerAgentOpcodes)packet.Opcode;
-			LogPacketReceived(frame, opcode);
+			LogPacketReceived(packet, opcode);
 
 			switch (opcode)
 			{
@@ -282,7 +281,7 @@ namespace Faolan.CSPlayerAgent
 
 				default:
 				{
-					LogUnknownPacket(frame, opcode);
+					LogUnknownPacket(packet, opcode);
 					break;
 				}
 			}

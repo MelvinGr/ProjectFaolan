@@ -36,13 +36,6 @@ namespace Faolan.Core.Network.Packets.Conan
 			Body = new FaolanStream(stream.ReadRemainingArray());
 		}
 
-		// Transitional (Gitea #407): lift the parsed frame into the structured Rpc the handlers now dispatch on. Removed
-		// with ConanPacket once the transport produces the Rpc directly.
-		public Rpc ToRpc()
-		{
-			return new Rpc(Sender, Receiver, Opcode, HeaderData, Body.ToArray());
-		}
-
 		public override string ToString()
 		{
 			return $"Opcode: {Opcode.ToHex()} Length: {Length}{(Body != null ? Environment.NewLine + Body.ToArray().ToHex() : "")}";

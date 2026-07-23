@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Protocol
 		public static Rpc Parse(byte[] frame)
 		{
 			var packet = new ConanPacket(frame);
-			return new Rpc(packet.Sender, packet.Receiver, packet.Opcode, packet.HeaderData, packet.Body.ToArray());
+			return new Rpc(packet.Sender, packet.Receiver, packet.Opcode, packet.HeaderData, packet.Body.ToArray()) { FrameLength = frame.Length };
 		}
 	}
 }

@@ -1103,12 +1103,12 @@ namespace Faolan.GameServer
 		}
 
 		// GameAgent (connection-class) dispatch: auth / chat / ping / server-stats. Routed here by receiver class.
-		private async Task HandleGameAgentPacket(INetworkClient client, Rpc packet, int frameLength)
+		private async Task HandleGameAgentPacket(INetworkClient client, Rpc packet)
 		{
 			var body = packet.BodyReader();
 			var gaOp = (GameAgentOpcodes)packet.Opcode;
 			if (gaOp is not GameAgentOpcodes.UpdateGameServerStats)
-				LogPacketReceived(packet, gaOp, frameLength);
+				LogPacketReceived(packet, gaOp);
 
 			switch (gaOp)
 			{
@@ -1289,7 +1289,7 @@ namespace Faolan.GameServer
 				{
 					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
 					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
-					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode), frameLength);
+					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
 					break;
 				}
 			}
@@ -1297,12 +1297,12 @@ namespace Faolan.GameServer
 
 		// GameCharAgent dispatch: the 0x2002/0x2003 collision forms (bind/tutorial) + every per-character method
 		// (loot / shop / respawn / shortcut / latency / ...). Routed here by receiver class from ReceivedPacket.
-		private async Task HandleGameCharAgentPacket(INetworkClient client, Rpc packet, int frameLength)
+		private async Task HandleGameCharAgentPacket(INetworkClient client, Rpc packet)
 		{
 			var body = packet.BodyReader();
 			var charOp = (GameCharAgentOpcodes)packet.Opcode;
 			if (charOp is not GameCharAgentOpcodes.Ping)
-				LogPacketReceived(packet, charOp, frameLength);
+				LogPacketReceived(packet, charOp);
 
 			switch (charOp)
 			{
@@ -1690,7 +1690,7 @@ namespace Faolan.GameServer
 				{
 					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
 					// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
-					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode), frameLength);
+					LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
 					break;
 				}
 			}

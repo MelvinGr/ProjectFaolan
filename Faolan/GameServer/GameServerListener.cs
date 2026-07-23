@@ -14,6 +14,7 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
@@ -31,7 +32,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -387,12 +388,10 @@ namespace Faolan.GameServer
 			return Task.CompletedTask;
 		}
 
-		protected override Task ReceivedPacket(INetworkClient client, ConanPacket frame)
+		protected override Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
 			// Lift the parsed frame into the structured Rpc the handlers dispatch on (Gitea #407); the total wire length
 			// (which the Rpc doesn't carry) is threaded to the dispatchers that log it as packetLength.
-			var packet = frame.ToRpc();
-			var frameLength = frame.Bytes.Length;
 
 			// This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes, 			// so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
 			// class route consumes the packet. See CLAUDE.md (wire-protocol essentials) + docs/subsystems/tradepost-protocol.md.
@@ -412,10 +411,10 @@ namespace Faolan.GameServer
 
 				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
 				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
-				Endpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet, frameLength),
+				Endpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet),
 
 				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
-				Endpoints.GameAgentType => HandleGameAgentPacket(client, packet, frameLength),
+				Endpoints.GameAgentType => HandleGameAgentPacket(client, packet),
 
 				_ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
 			};

@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.PlayerAgent
 {
-	public partial class PlayerAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
+	public partial class PlayerAgentListener : RpcServer<ConanMessageFramer>
 	{
 		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.PlayerAgentPort, logger, configuration,
 			database, new ConanOutgoingPacketLogger(logger, "PlayerAgent", typeof(PlayerInterfaceOpcodes)))
@@ -22,11 +22,10 @@ namespace Faolan.PlayerAgent
 			//
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket frame)
+		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			var packet = frame.ToRpc();
 			var opcode = (PlayerAgentOpcodes)packet.Opcode;
-			LogPacketReceived(frame, opcode);
+			LogPacketReceived(packet, opcode);
 
 			var body = packet.BodyReader();
 			switch (opcode)
@@ -205,7 +204,7 @@ namespace Faolan.PlayerAgent
 
 				default:
 				{
-					LogUnknownPacket(frame, opcode);
+					LogUnknownPacket(packet, opcode);
 					break;
 				}
 			}
