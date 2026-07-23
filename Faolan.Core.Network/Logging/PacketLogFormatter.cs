@@ -77,11 +77,6 @@ namespace Faolan.Core.Network.Logging
 				logger.LogUnknownPacket(channel, OpcodeName(opcode), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
 			}
 
-			public void LogUnhandled(string channel, Packet packet, ushort opcode, string opcodeName)
-			{
-				logger.LogUnknownPacket(channel, $"{opcodeName} ({opcode.ToHex()})", packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0, ("body", packet.Body?.ToArray()));
-			}
-
 			// Rpc-model RX variants (Gitea #407): the listener dispatches on the parsed Rpc; both the method NAME and the
 			// FrameLength ride on the Rpc itself. The name comes from the (Receiver.Type, Opcode) pair (ProtocolCatalog),
 			// so the listener no longer threads a separate typed opcode enum just for the trace.

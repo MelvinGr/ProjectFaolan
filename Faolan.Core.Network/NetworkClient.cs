@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
@@ -36,8 +37,8 @@ namespace Faolan.Core.Network
 
 	// The concrete socket client: owns the socket, the send lock, the message framer and the receive loop - everything
 	// EXCEPT how a completed frame is turned into something the listener dispatches on. That one step is DispatchFrame,
-	// which the two subclasses supply: a Packet (ChatServer, via a factory) or the structured Rpc (the Conan protocol
-	// listeners, via PacketParser - the #406/#407 receive model, no per-frame Packet object).
+	// which the two subclasses supply: a ChatServerPacket (ChatServer, constructed directly) or the structured Rpc (the
+	// Conan protocol listeners, via PacketParser - the #406/#407 receive model, no per-frame Packet object).
 	public abstract class NetworkClient : INetworkClient
 	{
 		protected readonly ILogger Logger;
@@ -215,26 +216,24 @@ namespace Faolan.Core.Network
 		}
 	}
 
-	// The Packet-dispatching client: parses each frame with the protocol's IPacketFactory and hands the listener the
-	// typed Packet. Used by the ChatServer (its framing has no Rpc model).
-	public sealed class NetworkClient<TPacket, TMessageFramer, TPacketFactory> : NetworkClient
-		where TPacket : Packet where TMessageFramer : IMessageFramer, new() where TPacketFactory : IPacketFactory<TPacket>, new()
+	// The chat-protocol client: frames the chat wire format and constructs its ChatServerPacket DIRECTLY (no factory
+	// indirection - it is the only typed-Packet tier), handing the listener the typed packet. The chat frame
+	// ([u16 opcode][u16 bodyLen][body]) has no Rpc sender/receiver/CRC model, so it keeps its own Packet + framer.
+	public sealed class ChatNetworkClient : NetworkClient
 	{
-		private readonly IPacketFactory<TPacket> _packetFactory = new TPacketFactory();
+		public Func<INetworkClient, ChatServerPacket, Task>? ReceivedPacket { get; init; }
 
-		public Func<INetworkClient, Packet, Task>? ReceivedPacket { get; init; }
-
-		public NetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger, new TMessageFramer(), outgoingPacketLogger)
+		public ChatNetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger, new ChatServerMessageFramer(), outgoingPacketLogger)
 		{
 		}
 
-		protected override string ProtocolName => typeof(TPacket).Name;
+		protected override string ProtocolName => nameof(ChatServerPacket);
 
 		protected override async Task DispatchFrame(byte[] frame)
 		{
-			var packet = _packetFactory.Create(frame);
-			if (packet?.IsValid != true)
-				throw new InvalidOperationException($"{typeof(TPacket).Name} was invalid");
+			var packet = new ChatServerPacket(frame);
+			if (!packet.IsValid)
+				throw new InvalidOperationException($"{nameof(ChatServerPacket)} was invalid");
 
 			if (ReceivedPacket != null)
 				await ReceivedPacket(this, packet);

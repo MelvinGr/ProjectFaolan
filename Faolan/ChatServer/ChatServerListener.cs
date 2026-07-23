@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.ChatServer
 {
-	public partial class ChatServerListener : Server<ChatServerPacket, ChatServerPacketFactory, ChatServerMessageFramer>, IChatServerProvider
+	public partial class ChatServerListener : ChatServerBase, IChatServerProvider
 	{
 		private readonly ClaudeChannel _claudeChannel;
 		private readonly IChatServerDispatcher _dispatcher;
