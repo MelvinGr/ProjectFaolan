@@ -7,7 +7,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
@@ -50,7 +49,7 @@ namespace Faolan.Tests
 			Assert.Equal(expectedBlobLen, be32); // matches the byte-level capture
 			Assert.Equal((uint)rootLen, be32); // blobLen == rootLen (the prefix carries no payload of its own)
 			Assert.Equal((byte)0x00, prefix[0]); // flag
-			// The blob ends exactly at the root's end; the version 0x18 sits at tails offset 0 (= blob end).
+												 // The blob ends exactly at the root's end; the version 0x18 sits at tails offset 0 (= blob end).
 			Assert.True(tails.Length >= 4);
 			Assert.Equal(0x18u, BinaryPrimitives.ReadUInt32BigEndian(tails.AsSpan(0, 4)));
 		}

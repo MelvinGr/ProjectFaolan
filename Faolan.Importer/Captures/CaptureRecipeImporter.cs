@@ -6,7 +6,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -139,35 +138,35 @@ namespace Faolan.Importer.Captures
 			var harvested = 0;
 			var seen = new HashSet<uint>();
 			foreach (var r in records)
-			foreach (var e in r.Ingredients.Concat(r.Results))
-			{
-				if (e.ItemId == 0 || !seen.Add(e.ItemId))
-					continue;
-
-				var existing = await db.Items.FirstOrDefaultAsync(i => i.Id == e.ItemId);
-				if (existing != null)
+				foreach (var e in r.Ingredients.Concat(r.Results))
 				{
-					if (existing.Hash == 0 && e.Hash != 0)
-						existing.Hash = e.Hash;
-					continue;
-				}
+					if (e.ItemId == 0 || !seen.Add(e.ItemId))
+						continue;
 
-				db.Items.Add(new Item
-				{
-					Id = e.ItemId,
-					Name = "",
-					Type = ItemType.Normal,
-					Hash = e.Hash,
-					Key = new ProtoDecryptionKey
+					var existing = await db.Items.FirstOrDefaultAsync(i => i.Id == e.ItemId);
+					if (existing != null)
 					{
-						Key1 = e.Key1,
-						Key2 = e.Key2,
-						Key3 = e.Key3,
-						Key4 = e.Key4
+						if (existing.Hash == 0 && e.Hash != 0)
+							existing.Hash = e.Hash;
+						continue;
 					}
-				});
-				harvested++;
-			}
+
+					db.Items.Add(new Item
+					{
+						Id = e.ItemId,
+						Name = "",
+						Type = ItemType.Normal,
+						Hash = e.Hash,
+						Key = new ProtoDecryptionKey
+						{
+							Key1 = e.Key1,
+							Key2 = e.Key2,
+							Key3 = e.Key3,
+							Key4 = e.Key4
+						}
+					});
+					harvested++;
+				}
 
 			await db.SaveChangesAsync();
 			return harvested;

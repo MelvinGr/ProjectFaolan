@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Guild

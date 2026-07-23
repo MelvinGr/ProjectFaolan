@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
@@ -80,9 +80,9 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				notes.TryGetValue(member, out var note);
 				var recCell = kind switch
 				{
-					"hash"    => $"`{recovered}` ✓",
+					"hash" => $"`{recovered}` ✓",
 					"command" => "— *(command opcode, not a hash)*",
-					_         => "— *(source string not reproduced)*"
+					_ => "— *(source string not reproduced)*"
 				};
 				sb.AppendLine($"| `0x{value:X8}` | {recCell} | `{member}` | {Escape(note)} |");
 			}
@@ -119,15 +119,15 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			}
 
 			foreach (var b in bases)
-			foreach (var suffix in new[] { "", "_c", "_t" })
-			{
-				var cand = b + suffix;
-				if (OpcodesPage.Bkdr31(cand) == value)
+				foreach (var suffix in new[] { "", "_c", "_t" })
 				{
-					recovered = cand;
-					return true;
+					var cand = b + suffix;
+					if (OpcodesPage.Bkdr31(cand) == value)
+					{
+						recovered = cand;
+						return true;
+					}
 				}
-			}
 
 			recovered = "";
 			return false;

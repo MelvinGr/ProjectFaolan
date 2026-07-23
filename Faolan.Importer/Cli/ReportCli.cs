@@ -14,7 +14,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Captures;

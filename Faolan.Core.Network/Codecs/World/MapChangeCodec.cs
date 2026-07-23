@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.World
 {

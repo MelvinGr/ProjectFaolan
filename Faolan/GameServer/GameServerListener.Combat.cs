@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;

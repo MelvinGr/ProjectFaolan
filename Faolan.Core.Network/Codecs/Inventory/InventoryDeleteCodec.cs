@@ -1,4 +1,4 @@
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Inventory

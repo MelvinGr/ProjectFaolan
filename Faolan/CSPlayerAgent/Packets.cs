@@ -1,9 +1,8 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Guild;
-using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 
 namespace Faolan.CSPlayerAgent

@@ -12,7 +12,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Packets.Conan;
+using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
@@ -1828,9 +1828,9 @@ namespace Faolan.GameServer
 
 			var slot = body.ReadUInt32();
 			body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-									  // Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
-									  // shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
-									  // (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
+							   // Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
+							   // shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
+							   // (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
 			var toggleState = Convert.ToBoolean(body.ReadByte());
 
 			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);

@@ -11,7 +11,6 @@ using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;

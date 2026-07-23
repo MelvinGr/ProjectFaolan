@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Feats

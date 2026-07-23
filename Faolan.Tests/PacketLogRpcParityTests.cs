@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;

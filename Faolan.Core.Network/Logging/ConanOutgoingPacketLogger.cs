@@ -1,5 +1,5 @@
 using System;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;

@@ -5,8 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Quest;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -175,11 +175,11 @@ namespace Faolan.Importer.Captures
 						if (!completedByChar.TryGetValue(charId, out var set))
 							completedByChar[charId] = set = [];
 						foreach (var area in completed.Areas)
-						foreach (var q in area.Quests)
-						{
-							if (q.QuestId != 0)
-								set.Add(q.QuestId);
-						}
+							foreach (var q in area.Quests)
+							{
+								if (q.QuestId != 0)
+									set.Add(q.QuestId);
+							}
 					}
 
 					return;

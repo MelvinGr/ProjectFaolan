@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Constants
 {

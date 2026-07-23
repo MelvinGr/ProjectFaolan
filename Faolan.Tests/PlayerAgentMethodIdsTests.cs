@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 using Xunit;
 

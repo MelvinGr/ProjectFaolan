@@ -1,4 +1,4 @@
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 using Faolan.GameServer.Dialogue;
 using Faolan.Tests.Support;
 using Xunit;

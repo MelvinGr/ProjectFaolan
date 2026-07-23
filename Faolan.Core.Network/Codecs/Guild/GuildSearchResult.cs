@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {

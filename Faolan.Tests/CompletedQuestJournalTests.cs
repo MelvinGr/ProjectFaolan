@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Faolan.Core;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
-using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -73,23 +73,23 @@ namespace Faolan.Tests
 			var zeroSamples = new List<string>();
 			var mapVals = new Dictionary<uint, int>();
 			foreach (var (src, sub, _) in SubClasses())
-			foreach (var rec in sub.Quests.Records)
-			{
-				if (rec.Objectives is not { Goals.Count: > 0 } obj)
-					continue;
-
-				foreach (var g in obj.Goals)
+				foreach (var rec in sub.Quests.Records)
 				{
-					goals++;
-					mapVals[g.MapId] = mapVals.GetValueOrDefault(g.MapId) + 1;
-					if (g.MapId != 0)
+					if (rec.Objectives is not { Goals.Count: > 0 } obj)
 						continue;
 
-					zeroMap++;
-					if (g.MarkerX != 0 || g.MarkerY != 0)
-						zeroSamples.Add($"COUNTER-EXAMPLE quest {rec.QuestId} goal {g.GoalId}: mapId=0 but marker=({g.MarkerX},{g.MarkerY})");
+					foreach (var g in obj.Goals)
+					{
+						goals++;
+						mapVals[g.MapId] = mapVals.GetValueOrDefault(g.MapId) + 1;
+						if (g.MapId != 0)
+							continue;
+
+						zeroMap++;
+						if (g.MarkerX != 0 || g.MarkerY != 0)
+							zeroSamples.Add($"COUNTER-EXAMPLE quest {rec.QuestId} goal {g.GoalId}: mapId=0 but marker=({g.MarkerX},{g.MarkerY})");
+					}
 				}
-			}
 
 			o.WriteLine($"@609 goals={goals} withMapId0={zeroMap} distinctMapIds={mapVals.Count}");
 			o.WriteLine($"  mapId==0 goals that still carry a marker: {zeroSamples.Count}");

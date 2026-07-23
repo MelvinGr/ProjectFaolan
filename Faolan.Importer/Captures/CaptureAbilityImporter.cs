@@ -8,7 +8,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -174,23 +173,23 @@ namespace Faolan.Importer.Captures
 			var inserted = 0;
 
 			foreach (var cls in Enum.GetValues<Class>())
-			foreach (var abilityId in kit)
-			{
-				if (!abilityIds.Contains(abilityId))
-					continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
-
-				if (existing.ContainsKey((cls, abilityId)))
-					continue; // already known; DeriveClassAbilitiesAsync owns the level for those
-
-				db.ClassAbilities.Add(new ClassAbility
+				foreach (var abilityId in kit)
 				{
-					Class = cls,
-					AbilityId = abilityId,
-					Level = 1 // the universal kit is level 1 by definition
-				});
-				existing[(cls, abilityId)] = null!;
-				inserted++;
-			}
+					if (!abilityIds.Contains(abilityId))
+						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
+
+					if (existing.ContainsKey((cls, abilityId)))
+						continue; // already known; DeriveClassAbilitiesAsync owns the level for those
+
+					db.ClassAbilities.Add(new ClassAbility
+					{
+						Class = cls,
+						AbilityId = abilityId,
+						Level = 1 // the universal kit is level 1 by definition
+					});
+					existing[(cls, abilityId)] = null!;
+					inserted++;
+				}
 
 			await db.SaveChangesAsync();
 			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} abilities (from {Dumps} create dumps) -> {Inserted} new class-ability rows across {Classes} classes.", kit.Count,

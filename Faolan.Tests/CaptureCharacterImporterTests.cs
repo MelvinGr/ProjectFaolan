@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Constants;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;

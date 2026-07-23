@@ -2,8 +2,8 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {

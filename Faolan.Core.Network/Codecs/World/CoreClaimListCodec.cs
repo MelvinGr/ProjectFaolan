@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World

@@ -1,4 +1,6 @@
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Server.GameServer;
 using Xunit;
 
 namespace Faolan.Tests

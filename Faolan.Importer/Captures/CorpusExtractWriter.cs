@@ -7,7 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Importer.Captures
 {
@@ -100,9 +100,9 @@ namespace Faolan.Importer.Captures
 					{
 						frame = fEl.ValueKind switch
 						{
-							JsonValueKind.Number                                                    => fEl.GetInt32(),
+							JsonValueKind.Number => fEl.GetInt32(),
 							JsonValueKind.String when int.TryParse(fEl.GetString(), out var parsed) => parsed,
-							_                                                                       => 0
+							_ => 0
 						};
 					}
 

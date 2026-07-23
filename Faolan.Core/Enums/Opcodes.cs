@@ -1,7 +1,5 @@
-using System;
-
 // ReSharper disable InconsistentNaming
-namespace Faolan.Core.Network.Constants
+namespace Faolan.Core.Enums
 {
 	public enum ChatServerOpcodes : ushort
 	{
@@ -1108,31 +1106,5 @@ namespace Faolan.Core.Network.Constants
 		DispatchOnFacebookFriendSignedUp = 0x20B2,
 		DispatchRequestGetEffect = 0x20B3,
 		DispatchSignalWorldStatChanged = 0x20B4
-	}
-
-	// Resolves an inbound GameServer RPC (receiver class id, 16-bit method opcode) to its recovered method name
-	// for diagnostic logging. The GameServer connection multiplexes several RPC class-pairs, so the SAME 0x20xx
-	// opcode means different methods per class - the receiver endpoint's class id is the disambiguator (memory
-	// protocol_gameserver_rpc_multiplexing). Used by the listeners' default branch so an unhandled packet logs
-	// its method name instead of bare hex. Returns "Unknown" when the (class, opcode) pair has no recovered name.
-	public static class GameServerMethodNames
-	{
-		public static string Resolve(uint receiverClass, ushort opcode)
-		{
-			return receiverClass switch
-			{
-				Endpoints.GameAgentType            => Name<GameAgentOpcodes>(opcode), // GameAgent
-				Endpoints.GameCharAgentType        => Name<GameCharAgentOpcodes>(opcode), // GameCharAgent
-				Endpoints.GameCharAgentProjectType => Name<GameCharAgentProjectOpcodes>(opcode), // GameCharAgentProject
-				_                                  => "Unknown"
-			};
-		}
-
-		private static string Name<TEnum>(ushort opcode) where TEnum : struct, Enum
-		{
-			return Enum.IsDefined(typeof(TEnum), opcode)
-				? ((TEnum)(object)opcode).ToString()
-				: "Unknown";
-		}
 	}
 }

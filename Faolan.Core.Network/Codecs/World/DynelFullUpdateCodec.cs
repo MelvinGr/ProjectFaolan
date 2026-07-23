@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.World
 {

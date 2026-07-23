@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
 

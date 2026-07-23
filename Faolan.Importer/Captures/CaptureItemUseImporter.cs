@@ -5,8 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Packets.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -66,8 +66,8 @@ namespace Faolan.Importer.Captures
 		{
 			var merged = new Dictionary<uint, uint>();
 			foreach (var cap in captures)
-			foreach (var (template, spell) in Extract(cap))
-				merged[template] = spell;
+				foreach (var (template, spell) in Extract(cap))
+					merged[template] = spell;
 
 			if (merged.Count == 0)
 				return (0, 0);

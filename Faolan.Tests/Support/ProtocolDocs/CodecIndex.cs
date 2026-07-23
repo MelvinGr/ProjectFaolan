@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
@@ -93,25 +93,25 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			// listeners. They name the opcode member directly, so a plain reference scan finds them (V2 vs V1).
 			idx.BuiltSomewhere.UnionWith(idx.IirToCodecs.Keys);
 			foreach (var dir in new[] { Path.Combine(repo, "Faolan"), Path.Combine(repo, "Faolan.Core.Network") })
-			foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
-			{
-				if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
-				    file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") || file.EndsWith("Opcodes.cs", StringComparison.Ordinal))
-					continue;
-
-				var text = File.ReadAllText(file);
-				foreach (var iir in allIirNames)
+				foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
 				{
-					if (idx.BuiltSomewhere.Contains(iir))
+					if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
+						file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") || file.EndsWith("Opcodes.cs", StringComparison.Ordinal))
 						continue;
 
-					if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal))
+					var text = File.ReadAllText(file);
+					foreach (var iir in allIirNames)
 					{
-						idx.BuiltSomewhere.Add(iir);
-						idx.BuiltIn[iir] = Path.GetFileNameWithoutExtension(file);
+						if (idx.BuiltSomewhere.Contains(iir))
+							continue;
+
+						if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal))
+						{
+							idx.BuiltSomewhere.Add(iir);
+							idx.BuiltIn[iir] = Path.GetFileNameWithoutExtension(file);
+						}
 					}
 				}
-			}
 
 			// codec -> has a byte-exact test, and the NAME of that test method (for messages.md citations).
 			var testFiles = Directory.EnumerateFiles(Path.Combine(repo, "Faolan.Tests"), "*.cs", SearchOption.AllDirectories).Select(f => (Text: File.ReadAllText(f), Path: f)).ToList();
@@ -159,7 +159,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			{
 				"V3" => 0,
 				"V2" => 1,
-				_    => 2
+				_ => 2
 			};
 		}
 

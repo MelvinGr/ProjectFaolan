@@ -6,7 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Tests.Support
 {
@@ -70,8 +70,8 @@ namespace Faolan.Tests.Support
 				if (actual < expected)
 				{
 					throw new InvalidDataException($"Corpus extract covers only {actual} packets of IIR 0x{iir:X8}, expected at least {expected}. " +
-					                               "It was probably regenerated against a partial capture corpus - the whole-corpus gates would " +
-					                               "still pass while testing less. Regenerate with the full corpus, or update ExpectedCounts if " + "the corpus itself legitimately changed.");
+												   "It was probably regenerated against a partial capture corpus - the whole-corpus gates would " +
+												   "still pass while testing less. Regenerate with the full corpus, or update ExpectedCounts if " + "the corpus itself legitimately changed.");
 				}
 			}
 		}
