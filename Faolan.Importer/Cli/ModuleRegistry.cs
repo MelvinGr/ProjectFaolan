@@ -45,7 +45,8 @@ namespace Faolan.Importer.Cli
 		// (deps before dependents). Registration order in All breaks ties so runs are deterministic.
 		public static IReadOnlyList<IImportModule> Plan(IEnumerable<IImportModule> requested)
 		{
-			// 1. Transitive closure over DependsOn.
+			// 1. Transitive closure over DependsOn (what a module needs) AND RequiredAfter (what must happen because
+			//    it ran - a module that leaves the database in a state nobody should stop at names its completer).
 			var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			var pending = new Stack<IImportModule>(requested);
 			while (pending.Count > 0)
@@ -56,6 +57,8 @@ namespace Faolan.Importer.Cli
 
 				foreach (var dep in m.DependsOn)
 					pending.Push(Find(dep) ?? throw new InvalidOperationException($"Module '{m.Name}' depends on unknown module '{dep}'."));
+				foreach (var after in m.RequiredAfter)
+					pending.Push(Find(after) ?? throw new InvalidOperationException($"Module '{m.Name}' requires unknown module '{after}' to run after it."));
 			}
 
 			// 2. Topological sort (DFS), iterating All so the output order is stable.

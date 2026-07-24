@@ -36,6 +36,17 @@ namespace Faolan.Importer.Cli
 		// Module names that must run before this one (the runner resolves + topo-sorts these).
 		IReadOnlyList<string> DependsOn { get; }
 
+		// Module names that must run AFTER this one, because this module alone leaves the database in a state nobody
+		// should stop at. The prerequisite edge cannot express that: `--only X` pulls in what X needs, not what needs
+		// to happen because X ran.
+		//
+		// The case that motivated it: `quests` refreshes the harvested goal fields from the captures, which CLOBBERS
+		// the hand-authored trigger values that `quest-wiring` owns (goal 1448's TrailingLocalized, Casilda's escort
+		// TrailingRefId). Running `--only quests` therefore left the quest data wrong and broke 9 byte-exact gates -
+		// diagnosed at length as a data divergence (Gitea #420) when it was really an incomplete module selection.
+		// Defaults to empty; only a module with that hazard declares one.
+		IReadOnlyList<string> RequiredAfter => [];
+
 		// The write modes this module can honour. The runner warns + falls back to the module's first
 		// supported mode if an unsupported one is requested.
 		IReadOnlySet<WriteMode> SupportedModes { get; }

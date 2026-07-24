@@ -848,6 +848,10 @@ namespace Faolan.Importer.Modules
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(MapsModule)];
 
+		// The capture refresh CLOBBERS the hand-authored trigger fields quest-wiring owns, so stopping here leaves the
+		// quest data wrong (see IImportModule.RequiredAfter - this is the hazard that motivated it).
+		public IReadOnlyList<string> RequiredAfter => [nameof(QuestWiringModule)];
+
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
 			WriteMode.Insert,
