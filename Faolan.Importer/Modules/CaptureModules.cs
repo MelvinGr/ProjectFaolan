@@ -260,21 +260,28 @@ namespace Faolan.Importer.Modules
 		// first so the references resolve (FK is enforced on every provider; no import-time deferral).
 		public IReadOnlyList<string> DependsOn => [nameof(NpcsModule), nameof(QuestsModule)];
 
+		// UPSERT merges a dump into what is stored (#419) - drop one new capture in and its screens are added, while
+		// screens already held in a more complete form are left alone. OVERWRITE rebuilds from the whole corpus.
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
-			WriteMode.Overwrite
+			WriteMode.Overwrite,
+			WriteMode.Upsert
 		};
 
 		public ImportSource Source => ImportSource.Captures;
 
-		public string Description => "NPC dialogue trees (per-capture condition-tagged, clean rebuild).";
+		public string Description => "NPC dialogue trees (per-capture condition-tagged; upsert merges a dump, overwrite rebuilds).";
 		public string Name => "conversations";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var conversations = ConversationExtractor.Merge(ctx.Captures.SelectMany(c => ConversationConditions.Apply(c.Name, ConversationExtractor.Extract(c.Packets))));
-			await ImportOps.ImportConversations(ctx.Db, conversations);
-			return new ImportResult($"{conversations.Count} conversation nodes (rebuilt).");
+			var overwrite = ctx.ModeFor(Name) == WriteMode.Overwrite;
+			var result = await ImportOps.ImportConversations(ctx.Db, conversations, overwrite);
+
+			return new ImportResult(overwrite
+				? $"{conversations.Count} conversation nodes (rebuilt)."
+				: $"{conversations.Count} screens in the dump: {result.Inserted} new, {result.Replaced} replaced by a richer capture, {result.Kept} already as complete.");
 		}
 	}
 

@@ -256,14 +256,30 @@ namespace Faolan.Importer.Captures
 			return (added, filled);
 		}
 
-		public static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
+		// OVERWRITE rebuilds the tree from the whole corpus; UPSERT merges a dump into what is already stored (#419),
+		// which is what makes dropping a single new capture in useful. Both run the same comparison - overwrite just
+		// starts from an empty table, so "nothing stored" falls out rather than being a second code path.
+		//
+		// The merge rule is the extractor's, applied against the database: the MOST COMPLETE capture of a screen wins
+		// (most response packets), so a truncated dump can never displace a screen already captured in full. Two
+		// fields are merged rather than overwritten - GrantQuestId and NpcTemplateId are sparsely observed (only the
+		// capture that walked the accept branch sees the grant), so a dump that did not see one must not clear it.
+		public static async Task<ConversationImportResult> ImportConversations(DatabaseContext db, List<ConversationEntry> conversations, bool overwrite)
 		{
-			// Clean rebuild, and the drop MUST land before the inserts are staged. The node ids are derived from the
-			// node's identity now, so a re-import of the same corpus reuses the very same keys - queueing the deletes
-			// and the inserts into one SaveChanges races them on the same primary key ("UNIQUE constraint failed:
-			// ConversationScreens..."). ExecuteDelete runs the DELETE immediately (inside the importer's transaction)
-			// and cascades to packets/screens/parameters in the database.
-			await db.ConversationNodes.ExecuteDeleteAsync();
+			if (overwrite)
+			{
+				// The drop MUST land before the inserts are staged. The node ids are derived from the node's identity,
+				// so a re-import of the same corpus reuses the very same keys - queueing the deletes and the inserts
+				// into one SaveChanges races them on the same primary key ("UNIQUE constraint failed:
+				// ConversationScreens..."). ExecuteDelete runs the DELETE immediately (inside the importer's
+				// transaction) and cascades to packets/screens/parameters in the database.
+				await db.ConversationNodes.ExecuteDeleteAsync();
+
+				// ...but it goes straight to the database and does NOT tell the change tracker, so anything this
+				// context already holds would collide on the identity map when the same (derived) ids are re-added.
+				foreach (var entry in db.ChangeTracker.Entries<ConversationNode>().ToList())
+					entry.State = EntityState.Detached;
+			}
 
 			// A conversation NPC's template must exist to be the FK target (#244); the world is pruned, so a template
 			// resolved from a capture may not be imported - null it out (name-only fallback) rather than fail the FK.
@@ -274,6 +290,7 @@ namespace Faolan.Importer.Captures
 			// same screen twice (the extractor's Merge should already have deduped it) or a genuine hash collision -
 			// both are import bugs, so name the pair and fail rather than let one screen silently overwrite the other.
 			var byId = new Dictionary<uint, string>();
+			var desired = new List<ConversationNode>();
 
 			foreach (var e in conversations)
 			{
@@ -288,7 +305,7 @@ namespace Faolan.Importer.Captures
 				if (!byId.TryAdd(id, identity))
 					throw new InvalidOperationException($"Conversation node id 0x{id:X8} is not unique: '{identity}' collides with '{byId[id]}'.");
 
-				db.ConversationNodes.Add(new ConversationNode
+				desired.Add(new ConversationNode
 				{
 					Id = id,
 					TypeId = e.TypeId,
@@ -306,8 +323,74 @@ namespace Faolan.Importer.Captures
 				});
 			}
 
+			// What is already there, by id - only the fields the merge decides on.
+			var wanted = desired.Select(d => d.Id).ToList();
+			var stored = await db
+				.ConversationNodes.Where(n => wanted.Contains(n.Id))
+				.Select(n => new
+				{
+					n.Id,
+					PacketCount = n.Packets.Count,
+					n.GrantQuestId,
+					n.NpcTemplateId
+				})
+				.ToDictionaryAsync(x => x.Id);
+
+			var insert = new List<ConversationNode>();
+			var replace = new List<uint>();
+			var kept = 0;
+
+			foreach (var node in desired)
+			{
+				if (!stored.TryGetValue(node.Id, out var existing))
+				{
+					insert.Add(node);
+					continue;
+				}
+
+				if (node.Packets.Count > existing.PacketCount)
+				{
+					// A richer capture of a screen we already hold: carry the sparse fields across so replacing the
+					// screen cannot lose a grant (or a template gate) that only the older capture observed.
+					node.GrantQuestId ??= existing.GrantQuestId;
+					node.NpcTemplateId ??= existing.NpcTemplateId;
+					replace.Add(node.Id);
+					insert.Add(node);
+					continue;
+				}
+
+				// The stored screen is at least as complete, so it stays - but it can still LEARN the sparse fields
+				// from this capture.
+				kept++;
+				if (node.GrantQuestId is { } grant || node.NpcTemplateId is { } template)
+				{
+					var row = await db.ConversationNodes.FirstAsync(n => n.Id == node.Id);
+					row.GrantQuestId ??= node.GrantQuestId;
+					row.NpcTemplateId ??= node.NpcTemplateId;
+				}
+			}
+
+			// Same-key delete-then-insert has to be two round-trips, for the reason spelled out above.
+			if (replace.Count > 0)
+			{
+				await db.ConversationNodes.Where(n => replace.Contains(n.Id)).ExecuteDeleteAsync();
+
+				// ExecuteDelete goes straight to the database and does NOT tell the change tracker, so a node this
+				// context still holds from an earlier import would collide on the identity map when the replacement
+				// is added under the same (derived) id. Detach them.
+				foreach (var entry in db.ChangeTracker.Entries<ConversationNode>().Where(x => replace.Contains(x.Entity.Id)).ToList())
+					entry.State = EntityState.Detached;
+			}
+
+			db.ConversationNodes.AddRange(insert);
 			await db.SaveChangesAsync();
+
+			return new ConversationImportResult(insert.Count - replace.Count, replace.Count, kept);
 		}
+
+		// What an incremental conversation import did: rows newly added, rows replaced by a richer capture, and rows
+		// left alone because what is stored is already at least as complete.
+		public sealed record ConversationImportResult(int Inserted, int Replaced, int Kept);
 
 		// Rebuild the per-map loot pool (#273) from the captured bag contents. Clean rebuild (the pool is fully derived
 		// from the captures, so a re-run should not accumulate stale rows), keyed for dedup by (MapId, ItemTemplateId).
